@@ -29,6 +29,8 @@ func routes(_ app: Application) throws {
     pick(app)
     pick(spin(app))
     app.grouped(AuthMiddleware()).get("guarded") { req in "guarded" }
+    app.grouped(User.authenticator(), User.guardMiddleware()).get("me") { req in "me" }
+    app.grouped(User.authenticator(), app.sessions.middleware).get("mixed") { req in "unread" }
     app.grouped(PathComponent("typed")).get("unread") { req in "unread" }
     app.grouped(String(describing: app)).get("unread") { req in "unread" }
     shadowedByLet(app)
@@ -71,6 +73,8 @@ struct OrderController: RouteCollection {
         orders.get(use: list)
         orders.get(":id", use: self.show)
         orders.post { req in "placed" }
+        mountReports(orders)
+        self.mountSelf(orders)
         unlisted(routes)
         let alias = routes
         alias.get("alias") { req in "alias" }
@@ -81,6 +85,15 @@ struct OrderController: RouteCollection {
     // own method is exact.
     func tally() -> Int {
         0
+    }
+
+    // A helper method of the collection: its call is exact, so the builder it is given is followed.
+    func mountReports(_ r: RoutesBuilder) {
+        r.get("reports") { req in "reports" }
+    }
+
+    func mountSelf(_ r: RoutesBuilder) {
+        r.get("self") { req in "self" }
     }
 
     func list(req: Request) -> [String] {

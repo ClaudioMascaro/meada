@@ -3,7 +3,7 @@
 //! so a kind accepts a name when exactly one of its spellings is in the kind's own table
 //! (`one`). The JVM and C# kinds share them.
 
-use crate::lang::{Facts, Kind};
+use crate::lang::{Call, Facts, Kind};
 use crate::resolve::{Code, Follow, Form, Of, Outside};
 
 /// Whether `target`, what an annotation of `facts` decorates, is a method of the file: a
@@ -30,7 +30,59 @@ pub fn known<'a>(
     name: &'a str,
     is_known: impl Fn(&str) -> bool,
 ) -> Option<String> {
-    let outside = code.outside(file, scope, name, false)?;
+    written_or(
+        code.outside(file, scope, name, false),
+        code,
+        file,
+        scope,
+        name,
+        is_known,
+    )
+}
+
+/// `known` for the callee of an annotation (`Call::decorates`): a base from outside the
+/// repository hides no import from it (#354).
+pub fn annotation<'a>(
+    code: &Code<'a>,
+    file: &'a str,
+    call: &'a Call,
+    is_known: impl Fn(&str) -> bool,
+) -> Option<String> {
+    let outside = code.outside_decorator(file, &call.scope, &call.callee);
+    written_or(outside, code, file, &call.scope, &call.callee, is_known)
+}
+
+/// The spelling the imports give `outside`, else (no import binds the head) the name as written
+/// in full. The implicit `java.lang.*` makes a candidate of a dotted name, so an `outside`
+/// with only that is still unbound.
+fn written_or<'a>(
+    outside: Option<Outside>,
+    code: &Code<'a>,
+    file: &'a str,
+    scope: &'a str,
+    name: &'a str,
+    is_known: impl Fn(&str) -> bool,
+) -> Option<String> {
+    let unbound = outside.as_ref().is_none_or(|o| o.imported.is_none());
+    let imported = outside.and_then(|o| accepted(o, &is_known));
+    imported.or_else(|| written_in_full(code, file, scope, name, is_known).filter(|_| unbound))
+}
+
+/// A dotted `name` whose head nothing binds (no import, no declaration, no definition of the
+/// repository) and that no definition names in full is its own spelling (`@retrofit2.http.GET`).
+fn written_in_full<'a>(
+    code: &Code<'a>,
+    file: &'a str,
+    scope: &'a str,
+    name: &'a str,
+    is_known: impl Fn(&str) -> bool,
+) -> Option<String> {
+    let (head, _) = name.split_once('.')?;
+    (code.definition(file, scope, head).is_none() && in_full(code, file, scope, name, is_known))
+        .then(|| name.to_string())
+}
+
+fn accepted(outside: Outside, is_known: impl Fn(&str) -> bool) -> Option<String> {
     let spellings = match outside.candidates.is_empty() {
         true => vec![outside.spelled],
         false => outside.candidates,

@@ -139,6 +139,38 @@ func optionalBinding() async throws {
     }
 }
 
+func guardLet() async throws {
+    guard let base = ProcessInfo.processInfo.environment["GUARD_URL"] else { return }
+    let (_, _) = try await URLSession.shared.data(from: URL(string: "\(base)/a")!)
+}
+
+func guardWithCondition() async throws {
+    guard let base = ProcessInfo.processInfo.environment["COND_URL"], !base.isEmpty else { return }
+    let (_, _) = try await URLSession.shared.data(from: URL(string: base + "/a")!)
+}
+
+func guardFallback() async throws {
+    if let base = ProcessInfo.processInfo.environment["GUARD_FALLBACK_URL"] ?? "http://localhost" {
+        let (_, _) = try await URLSession.shared.data(from: URL(string: base + "/a")!)
+    }
+}
+
+func guardVar() async throws {
+    guard var base = ProcessInfo.processInfo.environment["VAR_URL"] else { return }
+    let (_, _) = try await URLSession.shared.data(from: URL(string: base + "/a")!)
+}
+
+func guardVapor() async throws {
+    guard let base = Environment.get("VAPOR_GUARD_URL") else { return }
+    let (_, _) = try await URLSession.shared.data(from: URL(string: base + "/a")!)
+}
+
+func shadowed() async throws {
+    if let base = ProcessInfo.processInfo.environment["SHADOW_URL"] { print(base) }
+    let base = defaultURL
+    let (_, _) = try await URLSession.shared.data(from: URL(string: base + "/a")!)
+}
+
 func wrapped() async throws {
     let base = ProcessInfo.processInfo.environment["WRAPPED_URL"]!
     _ = try await fetchWhole(base + "/a")

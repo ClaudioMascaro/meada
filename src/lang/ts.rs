@@ -1,6 +1,6 @@
 //! The TypeScript and JavaScript language pack.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Range;
 
 use tree_sitter::{Language, Node, Parser};
@@ -54,7 +54,7 @@ impl LanguagePack for TsJs {
         let tree = parser
             .parse(src, None)
             .ok_or("tree-sitter returned no tree")?;
-        let parents = Parents::new(tree.root_node());
+        let parents = Parents::new(tree.root_node(), src);
         let mut facts = Facts::default();
         let mut uses = uses::Uses::new(src, &parents);
         // Explicit stack instead of recursion: generated code can nest deeper than the call
@@ -92,6 +92,7 @@ impl LanguagePack for TsJs {
                         .and_then(|t| types::returned(t, src, &parents)),
                     type_params: types::type_parameters(node, src),
                     result: None,
+                    suspends: false,
                     name: inner.clone(),
                     kind,
                     range,
@@ -116,6 +117,7 @@ impl LanguagePack for TsJs {
                         facts.calls.push(Call {
                             arity: None,
                             labels: None,
+                            awaited: false,
                             constructs: false,
                             scope: scope.clone(),
                             callee: callee(function, src),
@@ -155,6 +157,19 @@ impl LanguagePack for TsJs {
                 _ => {}
             }
             let named = binds(node, src, &parents);
+            if node.kind() == "assignment_expression"
+                && named.is_some()
+                && let Some(Assigned {
+                    name,
+                    exported: true,
+                    ..
+                }) = assignment(node, src, &parents)
+            {
+                facts.exports.push(Export::Local {
+                    exported: name.clone(),
+                    local: name,
+                });
+            }
             let pattern = match node.kind() {
                 kind if BODIES.contains(&kind) => node
                     .child_by_field_name("parameters")
@@ -221,7 +236,7 @@ impl LanguagePack for TsJs {
     }
 
     fn config_files(&self) -> &'static [&'static str] {
-        &["tsconfig.json", "jsconfig.json"]
+        &["**/tsconfig.json", "**/jsconfig.json"]
     }
 
     fn receiver(&self) -> Option<&'static str> {
@@ -232,6 +247,10 @@ impl LanguagePack for TsJs {
         Some("super")
     }
 
+    fn assigned_members(&self) -> bool {
+        true
+    }
+
     fn globals(&self) -> &'static [&'static str] {
         &["fetch"]
     }
@@ -239,14 +258,34 @@ impl LanguagePack for TsJs {
     fn modules(&self, configs: &[(&str, &[u8])], _: &BTreeMap<&str, &Facts>) -> Result<Modules> {
         // Read as `package::read_tsconfig` reads one: a config past the size limit, not UTF-8,
         // not JSON or not an object declares no paths, and indexing carries on.
-        let aliases =
-            (configs.first()).map_or_else(Aliases::default, |(_, src)| Aliases::parse(src));
+        // The nearest config above an importer serves it; in one directory `tsconfig.json`
+        // comes first in `configs`, so it wins. A config under `node_modules` declares nothing.
+        let mut by_dir: HashMap<String, Aliases> = HashMap::new();
+        for (path, src) in configs {
+            let dir = path.rsplit_once('/').map_or("", |(dir, _)| dir);
+            if !path.split('/').any(|s| s == "node_modules") {
+                by_dir
+                    .entry(dir.to_string())
+                    .or_insert_with(|| Aliases::parse(dir, src));
+            }
+        }
         Ok(Box::new(move |importer, specifier| {
+            let dir = importer.rsplit_once('/').map_or("", |(dir, _)| dir);
             let bases: Vec<String> = if specifier.starts_with('.') {
-                let dir = importer.rsplit_once('/').map_or("", |(dir, _)| dir);
                 join(dir, specifier).into_iter().collect()
             } else {
-                aliases.expand(specifier)
+                let mut up = Some(dir);
+                let mut found = None;
+                while let Some(d) = up {
+                    if let Some(aliases) = by_dir.get(d) {
+                        found = Some(aliases);
+                        break;
+                    }
+                    up = d
+                        .rsplit_once('/')
+                        .map_or((!d.is_empty()).then_some(""), |(p, _)| Some(p));
+                }
+                found.map_or_else(Vec::new, |aliases| aliases.expand(specifier))
             };
             bases
                 .iter()
@@ -256,18 +295,23 @@ impl LanguagePack for TsJs {
     }
 }
 
-/// `compilerOptions.baseUrl` and `paths` of the root `tsconfig.json` (or `jsconfig.json`).
-// ponytail: `extends` and nested project configs are not followed.
+/// `compilerOptions.baseUrl` and `paths` of a `tsconfig.json` (or `jsconfig.json`) in `dir`.
+// ponytail: `extends` and project `references` are not followed.
 #[derive(Default)]
 struct Aliases {
+    dir: String,
     base_url: Option<String>,
     paths: Vec<(String, Vec<String>)>,
 }
 
 impl Aliases {
-    fn parse(src: &[u8]) -> Self {
+    fn parse(dir: &str, src: &[u8]) -> Self {
+        let empty = Self {
+            dir: dir.to_string(),
+            ..Self::default()
+        };
         let Some(config) = package::tsconfig_root(src) else {
-            return Self::default();
+            return empty;
         };
         let options = &config["compilerOptions"];
         let paths = options["paths"]
@@ -281,14 +325,15 @@ impl Aliases {
             })
             .collect();
         Self {
-            base_url: options["baseUrl"].as_str().and_then(|b| join("", b)),
+            base_url: options["baseUrl"].as_str().and_then(|b| join(dir, b)),
             paths,
+            ..empty
         }
     }
 
     /// The paths a bare specifier names: the targets of the `paths` pattern with the
     /// longest prefix that matches, then the specifier under `baseUrl`. Without `baseUrl`,
-    /// targets are relative to the config file, at the repository root.
+    /// targets are relative to the config file's directory.
     fn expand(&self, specifier: &str) -> Vec<String> {
         let mut best: Option<(usize, &str, &[String])> = None;
         for (pattern, targets) in &self.paths {
@@ -305,7 +350,7 @@ impl Aliases {
                 best = Some((rank, star, targets));
             }
         }
-        let root = self.base_url.as_deref().unwrap_or("");
+        let root = self.base_url.as_deref().unwrap_or(&self.dir);
         let mut out: Vec<String> = best
             .into_iter()
             .flat_map(|(_, star, targets)| {
@@ -417,14 +462,29 @@ fn definition(
     let (kind, (name, range)) = match node.kind() {
         "function_declaration" | "generator_function_declaration" => (Kind::Function, own()?),
         "class_declaration" | "abstract_class_declaration" => (Kind::Class, own()?),
-        // Methods of object literals are not definitions: only those of a class body, and
-        // those of an options object, which are written in place like an argument.
+        // Methods of object literals are definitions only in a class body, in an options
+        // object (written in place like an argument) and in a top-level `const` (below).
         "method_definition" if up.of(node)?.kind() == "class_body" => (Kind::Method, own()?),
         "method_definition" if in_options(node, up) => {
             (Kind::Inline, (inline(node), node.byte_range()))
         }
+        // A method of an object literal bound by a top-level `const` is `o.m`.
+        "method_definition" => {
+            let name = node.child_by_field_name("name")?;
+            let owner =
+                literal_owner(node, src, up).filter(|_| name.kind() == "property_identifier")?;
+            (
+                Kind::Function,
+                (format!("{owner}.{}", text(name, src)), node.byte_range()),
+            )
+        }
         kind if FUNCTIONS.contains(&kind) => match binding {
-            Some(binding) => (Kind::Function, binding),
+            Some(binding) => {
+                let method = (up.of(node))
+                    .and_then(|p| assignment(p, src, up))
+                    .is_some_and(|a| a.method);
+                (if method { Kind::Method } else { Kind::Function }, binding)
+            }
             None if written_in_place(node, up) => (Kind::Inline, (inline(node), node.byte_range())),
             None => return None,
         },
@@ -435,24 +495,41 @@ fn definition(
 }
 
 /// The parent of every node, read once: `Node::parent` walks down from the root, so asking it
-/// for each function in deeply nested code costs time quadratic in the file.
-struct Parents<'t>(HashMap<usize, Node<'t>>);
+/// for each function in deeply nested code costs time quadratic in the file. It also holds the
+/// names the file assigns after declaring them (`f = other`, `[f] = list`, `for (f in o)`).
+struct Parents<'t> {
+    up: HashMap<usize, Node<'t>>,
+    assigned: HashSet<String>,
+}
 
 impl<'t> Parents<'t> {
-    fn new(root: Node<'t>) -> Self {
-        let mut parents = HashMap::new();
+    fn new(root: Node<'t>, src: &[u8]) -> Self {
+        let mut up = HashMap::new();
+        let mut assigned = HashSet::new();
         let mut stack = vec![root];
         while let Some(node) = stack.pop() {
+            let target = match node.kind() {
+                "assignment_expression" | "augmented_assignment_expression" => {
+                    node.child_by_field_name("left")
+                }
+                "for_in_statement" => node
+                    .child_by_field_name("kind")
+                    .is_none()
+                    .then(|| node.child_by_field_name("left"))
+                    .flatten(),
+                _ => None,
+            };
+            assigned.extend(target.map(|t| bound(t, src)).unwrap_or_default());
             for child in children(node) {
-                parents.insert(child.id(), node);
+                up.insert(child.id(), node);
                 stack.push(child);
             }
         }
-        Self(parents)
+        Self { up, assigned }
     }
 
     fn of(&self, node: Node) -> Option<Node<'t>> {
-        self.0.get(&node.id()).copied()
+        self.up.get(&node.id()).copied()
     }
 }
 
@@ -551,6 +628,7 @@ fn params(node: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Param> {
             label: None,
             default: None,
             fields: Vec::new(),
+            closure: Default::default(),
         }];
     }
     named(list)
@@ -578,6 +656,7 @@ fn params(node: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Param> {
                 fields: pattern
                     .filter(|n| n.kind() == "object_pattern")
                     .map_or_else(Vec::new, |n| fields(n, src, scope, up)),
+                closure: Default::default(),
             }
         })
         .collect()
@@ -624,27 +703,122 @@ fn fields(pattern: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Field> {
 }
 
 /// The child of `node` that a binding names, with that name and the binding's span:
-/// the value of a `const` declarator, or of an `export default`.
+/// the value of a `const` declarator, of a `let` or `var` one that holds a function or class
+/// and is assigned nowhere else, of an `export default`, of a top-level assignment to a member
+/// (`assignment`) or of a function-valued property of an object literal bound by a top-level
+/// `const`.
 fn binds<'t>(node: Node<'t>, src: &[u8], up: &Parents) -> Option<(Node<'t>, String, Range<usize>)> {
-    let value = node.child_by_field_name("value")?;
     match node.kind() {
         "variable_declarator" => {
-            let declaration = up.of(node)?;
-            let is_const = declaration
-                .child_by_field_name("kind")
-                .is_some_and(|k| text(k, src) == "const");
+            let value = node.child_by_field_name("value")?;
             let name = node.child_by_field_name("name")?;
-            (is_const && name.kind() == "identifier")
-                .then(|| (value, text(name, src).to_string(), node.byte_range()))
+            let declaration = up.of(node)?;
+            let kind = declaration
+                .child_by_field_name("kind")
+                .map(|k| text(k, src));
+            let name = (name.kind() == "identifier").then(|| text(name, src))?;
+            let held = FUNCTIONS.contains(&value.kind()) || value.kind() == "class";
+            (kind == Some("const") || (held && !up.assigned.contains(name)))
+                .then(|| (value, name.to_string(), node.byte_range()))
         }
         "export_statement" => {
+            let value = node.child_by_field_name("value")?;
             let is_default = node
                 .children(&mut node.walk())
                 .any(|c| c.kind() == "default");
             is_default.then(|| (value, "default".to_string(), node.byte_range()))
         }
+        "assignment_expression" => {
+            let a = assignment(node, src, up)?;
+            Some((
+                node.child_by_field_name("right")?,
+                a.name,
+                node.byte_range(),
+            ))
+        }
+        "pair" => {
+            let key = node.child_by_field_name("key")?;
+            let value = node.child_by_field_name("value")?;
+            let owner = literal_owner(node, src, up).filter(|_| {
+                key.kind() == "property_identifier" && FUNCTIONS.contains(&value.kind())
+            })?;
+            Some((
+                value,
+                format!("{owner}.{}", text(key, src)),
+                node.byte_range(),
+            ))
+        }
         _ => None,
     }
+}
+
+/// A top-level assignment of a function or class to a member, as `binds` and `exports` read it.
+struct Assigned {
+    /// The name it defines: `obj.y`, `X.y` for `X.prototype.y`, `y` for `exports.y` and
+    /// `module.exports.y`, `default` for `module.exports`.
+    name: String,
+    /// `X.prototype.y`: a method of `X`.
+    method: bool,
+    /// A CommonJS export.
+    exported: bool,
+}
+
+/// What the statement `node` (an assignment) defines, when it is `<member> = <function or
+/// class>` at the top level of the file. Other chains than `a.b.c` of plain names define
+/// nothing, and neither does anything under `exports` or `module` but the CommonJS forms.
+fn assignment(node: Node, src: &[u8], up: &Parents) -> Option<Assigned> {
+    let (left, right) = (
+        node.child_by_field_name("left")?,
+        node.child_by_field_name("right")?,
+    );
+    let statement = up.of(node).filter(|s| s.kind() == "expression_statement")?;
+    up.of(statement).filter(|p| p.kind() == "program")?;
+    if left.kind() != "member_expression"
+        || !(FUNCTIONS.contains(&right.kind()) || right.kind() == "class")
+    {
+        return None;
+    }
+    let path = callee(left, src);
+    let names: Vec<&str> = path.split('.').collect();
+    let plain = names.iter().all(|n| !n.is_empty() && !n.starts_with('('))
+        && !matches!(names[0], "this" | "super");
+    if !plain {
+        return None;
+    }
+    let (name, method, exported) = match names.as_slice() {
+        ["module", "exports"] => ("default".to_string(), false, true),
+        ["exports", y] | ["module", "exports", y] => (y.to_string(), false, true),
+        ["exports" | "module", ..] => return None,
+        [.., "prototype"] => return None,
+        ["prototype", _] => return None,
+        [x @ .., "prototype", y] => (format!("{}.{y}", x.join(".")), true, false),
+        _ => (path.clone(), false, false),
+    };
+    Some(Assigned {
+        name,
+        method,
+        exported,
+    })
+}
+
+/// The name of the top-level `const` whose object literal holds `property` (a pair or a
+/// method): `o` for the `litM` of `const o = { litM() {} }`.
+fn literal_owner(property: Node, src: &[u8], up: &Parents) -> Option<String> {
+    let object = up.of(property).filter(|o| o.kind() == "object")?;
+    let declarator = (up.of(object)).filter(|d| d.kind() == "variable_declarator")?;
+    let name = declarator.child_by_field_name("name")?;
+    let declaration = up.of(declarator)?;
+    let top = match up.of(declaration)? {
+        p if p.kind() == "export_statement" => up.of(p)?,
+        p => p,
+    };
+    (name.kind() == "identifier"
+        && declaration.kind() == "lexical_declaration"
+        && declaration
+            .child_by_field_name("kind")
+            .is_some_and(|k| text(k, src) == "const")
+        && top.kind() == "program")
+        .then(|| text(name, src).to_string())
 }
 
 /// The bindings of `import d, { a, b as c } from 's'` and `import * as ns from 's'`.
@@ -1114,6 +1288,38 @@ mod tests {
     }
 
     #[test]
+    fn the_nearest_config_serves_an_importer_and_node_modules_declares_nothing() {
+        let config = |t: &str| format!(r#"{{"compilerOptions": {{"paths": {{"@/*": ["{t}"]}}}}}}"#);
+        let (root, app, js, hidden) = (
+            config("lib/*"),
+            config("./src/*"),
+            config("./js/*"),
+            config("./x/*"),
+        );
+        let modules = TsJs
+            .modules(
+                &[
+                    ("tsconfig.json", root.as_bytes()),
+                    ("app/tsconfig.json", app.as_bytes()),
+                    ("app/node_modules/p/tsconfig.json", hidden.as_bytes()),
+                    ("app/jsconfig.json", js.as_bytes()),
+                    ("web/jsconfig.json", js.as_bytes()),
+                    ("bad/tsconfig.json", b"{ not json"),
+                ],
+                &BTreeMap::new(),
+            )
+            .unwrap();
+        let has = |from: &str, file: &str| modules(from, "@/b").contains(&file.to_string());
+        assert!(has("x.ts", "lib/b.ts"));
+        assert!(has("app/src/a.ts", "app/src/b.ts"));
+        assert!(!has("app/src/a.ts", "app/js/b.ts"));
+        assert!(has("web/a.ts", "web/js/b.ts"));
+        // A hostile nested config declares nothing, and hides the root's aliases from its subtree.
+        assert!(modules("bad/a.ts", "@/b").is_empty());
+        assert!(!has("app/node_modules/p/a.ts", "app/node_modules/p/x/b.ts"));
+    }
+
+    #[test]
     fn a_cast_is_the_value_it_casts() {
         let src = "const BASE = process.env.API;\n\
                    const u = BASE as string;\n\
@@ -1191,6 +1397,96 @@ mod tests {
         assert_eq!(facts.calls.len(), n);
         let deepest = (facts.defs.iter()).map(|d| d.name.matches('.').count() + 1);
         assert_eq!(deepest.max(), Some(DEFINITION_DEPTH.min(n)));
+    }
+
+    /// The definitions of `facts` as `(name, kind)`, sorted by name.
+    fn defined(facts: &Facts) -> Vec<(&str, &'static str)> {
+        let kind = |k: Kind| match k {
+            Kind::Function => "function",
+            Kind::Method => "method",
+            Kind::Class => "class",
+            _ => "other",
+        };
+        let mut out: Vec<_> = (facts.defs.iter())
+            .map(|d| (d.name.as_str(), kind(d.kind)))
+            .collect();
+        out.sort_by_key(|(name, _)| *name);
+        out
+    }
+
+    #[test]
+    fn a_function_assigned_to_a_member_at_the_top_level_is_a_definition() {
+        let facts = parse(
+            "exports.a = function () {};\nmodule.exports.b = () => {};\n\
+             V.prototype.m = function m() {};\napp.use = function use() {};\n\
+             x.y.z = () => {};\nthis.t = () => {};\nmodule.exports.a.b = () => {};\n\
+             f().g = () => {};\nfunction f() { o.p = () => {}; }\n\
+             module.exports = function () {};\n",
+        );
+
+        assert_eq!(
+            defined(&facts),
+            [
+                ("V.m", "method"),
+                ("a", "function"),
+                ("app.use", "function"),
+                ("b", "function"),
+                ("default", "function"),
+                ("f", "function"),
+                ("x.y.z", "function"),
+            ]
+        );
+        let exported: Vec<_> = (facts.exports.iter())
+            .filter_map(|e| match e {
+                Export::Local { exported, local } if exported == local => Some(exported.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(exported, ["a", "b", "default"]);
+    }
+
+    #[test]
+    fn a_let_or_var_function_is_a_definition_unless_assigned_again() {
+        let facts = parse(
+            "let a = () => {}; var b = function () {}; let c = () => {}; c = a;\n\
+             var d = () => {}; [d] = [a]; let e = 1; var g = class {}; var h = () => {};\n\
+             for (h in a) {}\nlet i = () => {}; i += 1;\n",
+        );
+
+        assert_eq!(
+            defined(&facts),
+            [("a", "function"), ("b", "function"), ("g", "class")]
+        );
+        for name in ["c", "d", "e", "h", "i"] {
+            assert!(facts.locals.contains(&name.to_string()), "{name}");
+        }
+    }
+
+    #[test]
+    fn the_functions_of_a_top_level_const_object_are_definitions() {
+        let facts = parse(
+            "const o = { m() {}, p: () => {}, q: 1, 'k-x': () => {}, n: { deep() {} } };\n\
+             let l = { z() {} };\nexport const e = { y: function () {} };\n\
+             function f() { const inner = { w() {} }; }\nrun({ eachMessage() {} });\n",
+        );
+
+        let names: Vec<_> = defined(&facts).into_iter().map(|(n, _)| n).collect();
+        assert_eq!(names.len(), 5, "{names:?}");
+        assert!(names[0].starts_with('@'));
+        assert_eq!(&names[1..], ["e.y", "f", "o.m", "o.p"]);
+    }
+
+    #[test]
+    fn let_definitions_nest_to_a_limit() {
+        let n = DEFINITION_DEPTH * 2;
+        let facts = parse(&format!(
+            "{}1{}",
+            "let f = () => {".repeat(n),
+            "};".repeat(n)
+        ));
+
+        let deepest = (facts.defs.iter()).map(|d| d.name.matches('.').count() + 1);
+        assert_eq!(deepest.max(), Some(DEFINITION_DEPTH));
     }
 
     #[test]

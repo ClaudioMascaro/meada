@@ -20,7 +20,7 @@
 use std::collections::BTreeMap;
 
 use crate::lang::{Annotated, Marked, Part, Value};
-use crate::names::known;
+use crate::names::annotation as known_annotation;
 use crate::package::Manifest;
 use crate::resolve::Code;
 
@@ -358,9 +358,7 @@ pub fn inject<'a>(
         return None;
     }
     let annotation = &annotated.annotation;
-    known(code, path, &annotation.scope, &annotation.callee, |s| {
-        s == VALUE
-    })?;
+    known_annotation(code, path, annotation, |s| s == VALUE)?;
     let written = annotation.args.first().or(annotation.keyword("value"))?;
     Some(resolved(
         &code.value(path, &annotation.scope, written),

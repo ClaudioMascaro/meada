@@ -19,9 +19,13 @@
 //!
 //! A closure handler is an inline handler named for its route, and a function given as `use:`
 //! is that function (`handler_site`). A method of the repository named like one of the
-//! framework's (`get`, `grouped`) hides it where a call reaches it. A `grouped` argument that
-//! constructs a value (`grouped(AuthMiddleware())`) is a middleware and adds no segment, unless
-//! it constructs a path (`PATHS`); one else that is no string literal serves nothing.
+//! framework's (`get`, `grouped`) hides it where a call reaches it. Vapor's `grouped` takes
+//! path components or middlewares, never both: when every argument is a call on a capitalized
+//! head (`AuthMiddleware()`, `User.authenticator()`) with no path producer (`PATHS`) in its
+//! callee, it is the middleware overload and adds no segment. Any other `grouped` must fold
+//! every argument to a string, or serves nothing: a member read (`app.sessions.middleware`) is
+//! not told from a stored path. By shape, a static call that returns a path component
+//! (`Paths.api()`) is read as middleware, so its routes are served under the parent prefix.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -60,6 +64,9 @@ pub(super) struct Dialect {
     pub method_first: bool,
     /// Whether `register(collection:)` mounts a `RouteCollection`.
     pub collections: bool,
+    /// Whether a group call may be the middleware overload (`grouped(Auth())`), which adds no
+    /// segment.
+    pub middleware: bool,
 }
 
 pub(super) const VAPOR: Dialect = Dialect {
@@ -67,6 +74,7 @@ pub(super) const VAPOR: Dialect = Dialect {
     group: "grouped",
     method_first: true,
     collections: true,
+    middleware: true,
 };
 
 /// An origin of a builder: the call that made it and the calls the walk climbed through to
@@ -83,8 +91,16 @@ fn method(callee: &str) -> &str {
     callee.rsplit('.').next().unwrap_or(callee)
 }
 
-/// The types whose construction is a path component, not a middleware.
+/// The types whose calls are path components, not middlewares.
 const PATHS: [&str; 3] = ["String", "Substring", "PathComponent"];
+
+/// Whether `arg` is a call on a capitalized head (`Auth()`, `User.authenticator()`) with no
+/// path producer in its callee, by shape: no type is resolved.
+fn middleware(arg: &Value) -> bool {
+    matches!(arg, Value::Call(inv)
+        if inv.callee.starts_with(char::is_uppercase)
+            && !inv.callee.split('.').any(|s| PATHS.contains(&s)))
+}
 
 /// How many nodes the mounts of one repository may hold.
 // ponytail: real apps make tens of groups; past this (a crafted web of factories) nothing is
@@ -173,17 +189,18 @@ impl<'c, 'a> Vapor<'c, 'a> {
         one(&spelled, |s| self.dialect.roots.contains(&s)).is_some()
     }
 
-    /// The path components `call` is given, joined with `/`: its string arguments, a value that
-    /// constructs one a middleware (`middleware`) adding none. `None` when one cannot be read.
+    /// The path components `call` is given, joined with `/`: its string arguments. A group call
+    /// whose every argument is a middleware (`middleware`) adds none. `None` when one cannot be
+    /// read.
     fn components(&self, path: &'a str, call: &'a Call, args: &[&'a Value]) -> Option<String> {
+        if self.dialect.middleware
+            && call.callee.ends_with(self.dialect.group)
+            && args.iter().all(|&a| middleware(a))
+        {
+            return Some(String::new());
+        }
         let mut out = Vec::new();
         for &arg in args {
-            let middleware = matches!(arg, Value::Call(inv)
-                if method(&inv.callee).starts_with(char::is_uppercase)
-                    && !PATHS.contains(&method(&inv.callee)));
-            if middleware && call.callee.ends_with(self.dialect.group) {
-                continue;
-            }
             out.push(path_literal(self.code.value(path, &call.scope, arg))?);
         }
         Some(out.join("/"))

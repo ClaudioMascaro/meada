@@ -7,8 +7,9 @@ use std::rc::Rc;
 use tree_sitter::{Node, Parser};
 
 use super::{
-    Annotated, Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation, Kind,
-    LanguagePack, Layout, Marked, Modules, Param, Part, Receiver, children, named, text, wildcard,
+    Annotated, Binds, Bound, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation,
+    Kind, LanguagePack, Layout, Marked, Modules, Param, Part, Receiver, children, field_write,
+    named, text, wildcard,
 };
 use crate::{Result, qualify};
 
@@ -201,7 +202,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
         depth: 0,
         generics: Rc::new(Vec::new()),
     }];
-    let mut fields = BTreeSet::new();
+    // The fields by declaring scope: a local is hidden by those of its class or an enclosing one.
+    let mut fields: BTreeSet<(String, String)> = BTreeSet::new();
     let mut locals = Vec::new();
     // The types declared so far: a local whose scope is one sits in an initializer.
     let mut classes = BTreeSet::new();
@@ -214,8 +216,15 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // fields, by class and field.
     let mut finals: Vec<(String, String, Option<Value>)> = Vec::new();
     let mut assigned: BTreeMap<(String, String), Vec<(Value, String)>> = BTreeMap::new();
-    // The names assigned anywhere in the file (`f = v`, `x.f = v`), marked as constants `.f`.
-    let mut written = BTreeSet::new();
+    // The writes of a name that can be a field (`f = v`, `this.f = v`, `x.f = v`, `f++`): where
+    // each is, its name, and whether it may be a field of the class around it (`this.f`, or a
+    // bare `f` no local or parameter declares).
+    let mut written: Vec<(String, String, bool)> = Vec::new();
+    // The locals declared with an initializer, and every name the file assigns: a local the
+    // file assigns holds no one value, so its bound is dropped (`Facts::bound`).
+    let mut initialized: Vec<Bound> = Vec::new();
+    let mut reassigned: BTreeSet<String> = BTreeSet::new();
+    let mut seen = Declared::new();
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
         node,
@@ -320,12 +329,17 @@ fn parse(src: &[u8]) -> Result<Facts> {
             );
             let params = parameters
                 .into_iter()
-                .map(|(name, _, _)| Param {
+                .map(|(name, ty, _)| Param {
                     name,
-                    binds: Binds::Any,
+                    binds: if ty.ends_with("...") {
+                        Binds::Rest
+                    } else {
+                        Binds::Any
+                    },
                     label: None,
                     default: None,
                     fields: Vec::new(),
+                    closure: Default::default(),
                 })
                 .collect();
             let modifiers = modifiers(node);
@@ -350,6 +364,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 decorators: Vec::new(),
                 return_values: Vec::new(),
                 returns: None,
+                suspends: false,
                 type_params: Vec::new(),
                 result: match node
                     .child_by_field_name("type")
@@ -547,10 +562,18 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 for declaration in named(node).filter(|n| n.kind() == "variable_declarator") {
                     if let Some(name) = declaration.child_by_field_name("name") {
                         let dimensions = declaration.child_by_field_name("dimensions").is_some();
-                        bind(
-                            name,
-                            typed(declaration.child_by_field_name("value"), dimensions),
-                        );
+                        let initial = declaration.child_by_field_name("value");
+                        bind(name, typed(initial, dimensions));
+                        // An initializer block's local sits in its class's scope, which a method
+                        // of the class reads through: it is no bound.
+                        if let Some(initial) = initial.filter(|_| !initializer) {
+                            initialized.push(Bound {
+                                scope: scope.as_ref().clone(),
+                                within: scope.as_ref().clone(),
+                                name: text(name, src).to_string(),
+                                value: value(initial, src, 0),
+                            });
+                        }
                     }
                 }
             }
@@ -623,14 +646,31 @@ fn parse(src: &[u8]) -> Result<Facts> {
             "type_identifier" => {
                 outside.insert(text(node, src).to_string());
             }
-            "assignment_expression" => {
-                let left = node.child_by_field_name("left");
-                let name = match left {
-                    Some(n) if n.kind() == "identifier" => Some(n),
-                    Some(n) if n.kind() == "field_access" => n.child_by_field_name("field"),
+            "assignment_expression" | "update_expression" => {
+                let left = match node.kind() {
+                    "assignment_expression" => node.child_by_field_name("left"),
+                    _ => named(node).next(),
+                };
+                if let Some(n) = left.filter(|n| n.kind() == "identifier") {
+                    reassigned.insert(text(n, src).to_string());
+                }
+                let write = match left {
+                    Some(n) if n.kind() == "identifier" => {
+                        (!declared_before(n, src, &mut seen)).then_some((n, true))
+                    }
+                    Some(n) if n.kind() == "field_access" => {
+                        let this = n
+                            .child_by_field_name("object")
+                            .is_some_and(|o| o.kind() == "this");
+                        n.child_by_field_name("field").map(|f| (f, this))
+                    }
                     _ => None,
                 };
-                written.extend(name.map(|n| text(n, src).to_string()));
+                if let Some((name, own)) = write {
+                    // The `this` of an anonymous class is not the class around it.
+                    let own = own && definitions;
+                    written.push((scope.as_ref().clone(), text(name, src).to_string(), own));
+                }
             }
             _ => {}
         }
@@ -648,7 +688,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         }
                         _ => Class::Unknown,
                     };
-                    fields.insert(text(name, src).to_string());
+                    fields.insert((scope.as_ref().clone(), text(name, src).to_string()));
                     if definitions {
                         let is_static = modifiers(node).contains(&"static");
                         for annotation in annotations(node, src, &scope) {
@@ -715,14 +755,21 @@ fn parse(src: &[u8]) -> Result<Facts> {
             });
         }
     }
-    // What `Code::field_written` reads: a field so assigned holds no one value.
-    for name in written {
-        facts.consts.push(Const {
-            name: format!(".{name}"),
-            value: Value::Unknown,
-            ty: None,
-            scope: None,
-        });
+    // What `Code::field_written_in` reads: a field so assigned holds no one value. A write of
+    // the field of the class around it, the innermost one, names that class; any other, a field
+    // it inherits, one of an outer class its own class may inherit or one of another object,
+    // names none.
+    let written: BTreeSet<(String, Option<String>)> = (written.into_iter())
+        .map(|(scope, name, own)| {
+            let around = (classes.iter())
+                .filter(|at| encloses(at, &scope))
+                .max_by_key(|at| at.len());
+            let owner = around.filter(|at| own && fields.contains(&((*at).clone(), name.clone())));
+            (name, owner.cloned())
+        })
+        .collect();
+    for (name, class) in written {
+        facts.consts.push(field_write(&name, class.as_deref()));
     }
     // A local is typed only where it is the one binding of its name in its scope; one named
     // like a field may be read as the field before its declaration, so its class is unknown.
@@ -734,11 +781,27 @@ fn parse(src: &[u8]) -> Result<Facts> {
     for (outer, inner) in chains {
         facts.calls[outer].on = call_at(&inner);
     }
+    // A local is bound to its initializer when it is the one binding of its name in its
+    // definition, no field of an enclosing class shares the name and the file never assigns it.
+    let mut declared: BTreeMap<(&str, &str), usize> = BTreeMap::new();
+    for local in &locals {
+        *declared.entry((&local.scope, &local.name)).or_default() += 1;
+    }
+    let field_hides = |name: &str, scope: &str| {
+        (fields.iter()).any(|(at, field)| field == name && encloses(at, scope))
+    };
+    facts.bound = (initialized.into_iter())
+        .filter(|b| {
+            declared.get(&(b.scope.as_str(), b.name.as_str())) == Some(&1)
+                && !reassigned.contains(&b.name)
+                && !field_hides(&b.name, &b.scope)
+        })
+        .collect();
     for mut local in locals {
         if let Class::Result(n) = local.class {
             local.class = call_at(&results[n]).map_or(Class::Unknown, Class::Result);
         }
-        if fields.contains(&local.name) {
+        if field_hides(&local.name, &local.scope) {
             local.class = Class::Unknown;
         }
         facts.receivers.push(local);
@@ -876,6 +939,89 @@ fn assignments(
     }
 }
 
+/// The names the children of a node declare, each with the offset of the first child that does.
+type Declared = BTreeMap<usize, BTreeMap<String, usize>>;
+
+/// Whether the identifier `name` is a local or a parameter declared before it, in a block
+/// around it, a loop, a `catch`, a `try` resource, a lambda or the method. `seen` holds what
+/// each block declares, read once, so a block of thousands of statements costs its width.
+// ponytail: a pattern variable (`o instanceof Foo base`) and a local of an earlier `case` group
+// are not read, so an assignment to either counts as a write of a field of that name.
+fn declared_before(name: Node, src: &[u8], seen: &mut Declared) -> bool {
+    let wanted = text(name, src);
+    let mut child = name;
+    while let Some(parent) = child.parent() {
+        if parent.kind() == "class_body" {
+            return false;
+        }
+        let names = seen
+            .entry(parent.id())
+            .or_insert_with(|| declared_in(parent, src));
+        if names.get(wanted).is_some_and(|&at| at < child.start_byte()) {
+            return true;
+        }
+        child = parent;
+    }
+    false
+}
+
+/// The names the children of `parent` declare, and a compact constructor's parameters.
+fn declared_in(parent: Node, src: &[u8]) -> BTreeMap<String, usize> {
+    let mut names = BTreeMap::new();
+    if parent.kind() == "compact_constructor_declaration" {
+        for p in formal_parameters(parent) {
+            declares(parent, p, src, &mut |n| {
+                names.insert(n.to_string(), 0);
+            });
+        }
+    }
+    for s in named(parent) {
+        declares(parent, s, src, &mut |n| {
+            names.entry(n.to_string()).or_insert(s.start_byte());
+        });
+    }
+    names
+}
+
+/// Tells `out` each name `sibling`, a child of `parent`, declares.
+fn declares(parent: Node, sibling: Node, src: &[u8], out: &mut dyn FnMut(&str)) {
+    match sibling.kind() {
+        "local_variable_declaration" | "spread_parameter" => {
+            for d in named(sibling).filter(|n| n.kind() == "variable_declarator") {
+                if let Some(n) = d.child_by_field_name("name") {
+                    out(text(n, src));
+                }
+            }
+        }
+        "formal_parameter" | "catch_formal_parameter" | "resource" => {
+            if let Some(n) = sibling.child_by_field_name("name") {
+                out(text(n, src));
+            }
+        }
+        "formal_parameters" | "inferred_parameters" | "resource_specification" => {
+            for n in named(sibling) {
+                declares(sibling, n, src, out);
+            }
+        }
+        // A lambda's parameter, or a loop's variable.
+        "identifier" => {
+            let declared =
+                (parent.child_by_field_name("name")).or(parent.child_by_field_name("parameters"));
+            let declared = match parent.kind() {
+                "lambda_expression" | "enhanced_for_statement" => {
+                    declared.is_some_and(|d| d.id() == sibling.id())
+                }
+                "inferred_parameters" => true,
+                _ => false,
+            };
+            if declared {
+                out(text(sibling, src));
+            }
+        }
+        _ => {}
+    }
+}
+
 fn modifiers(node: Node<'_>) -> Vec<&str> {
     named(node)
         .find(|n| n.kind() == "modifiers")
@@ -978,6 +1124,7 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
         arity: None,
         labels: None,
         constructs: false,
+        awaited: false,
         range,
         args: Vec::new(),
         kwargs: Vec::new(),
@@ -1252,6 +1399,14 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
     }
 }
 
+/// Whether the class scope `class` is `scope` or encloses it.
+fn encloses(class: &str, scope: &str) -> bool {
+    scope == class
+        || scope
+            .strip_prefix(class)
+            .is_some_and(|rest| rest.starts_with('.'))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1270,5 +1425,117 @@ mod tests {
             })
             .collect();
         assert_eq!(fields, [("s", true), ("t", false)]);
+    }
+
+    /// The markers `Code::field_written_in` reads (`Const`s named `.f` or `.f@class`) of a source.
+    fn writes(src: &str) -> Vec<String> {
+        let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
+        let mut marks: Vec<_> = (facts.consts.iter())
+            .filter(|c| c.name.starts_with('.'))
+            .map(|c| c.name.clone())
+            .collect();
+        marks.sort();
+        marks
+    }
+
+    /// A block of thousands of assignments costs its width: what a block declares is read once.
+    #[test]
+    fn a_block_of_many_assignments_is_read_in_linear_time() {
+        let body = "a = 1;\n".repeat(50_000);
+        let src = format!("class C {{ int a; void f() {{ {body} }} }}");
+        let start = std::time::Instant::now();
+        let mut marks = writes(&src);
+        marks.dedup();
+        assert_eq!(marks, [".a@C"]);
+        assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
+    }
+
+    #[test]
+    fn an_assignment_to_a_local_or_a_parameter_is_no_write() {
+        let src = "class C { String base; String url;
+            void a(String url) { String base = \"a\"; base = \"b\"; url = \"c\"; }
+            void b() { for (String base : list) { base = \"d\"; } }
+            void c() { { String base; } base = \"e\"; }
+            void d() { Runnable r = () -> { String url = \"f\"; url += \"g\"; }; }
+        }";
+        assert_eq!(writes(src), [".base@C"]);
+    }
+
+    #[test]
+    fn a_catch_parameter_a_varargs_one_and_a_compact_constructors_are_no_write() {
+        let src = "class C { String base; String url;
+            void a() { try { } catch (Exception base) { base = null; } }
+            void b(String... url) { url = null; }
+            void c() { try (Res base = open()) { base = null; } }
+        }";
+        assert_eq!(writes(src), Vec::<String>::new());
+        let src = "record R(String base) { R { base = base.trim(); } }";
+        assert_eq!(writes(src), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_write_names_its_class_when_it_is_known() {
+        let src = "class C { String base; String url; int n;
+            void a() { this.base = \"a\"; n++; }
+            void b(C other) { other.url = \"b\"; }
+            class D { String base; void c() { base = \"c\"; } }
+            void d() { new Object() { void e() { this.url = \"d\"; } }; }
+        }";
+        assert_eq!(writes(src), [".base@C", ".base@C.D", ".n@C", ".url"]);
+    }
+
+    #[test]
+    fn a_write_of_a_name_only_an_outer_class_declares_names_no_class() {
+        // `D` may inherit a `base` of its own.
+        let src = "class C { String base; class D extends B { void s() { base = \"y\"; } } }";
+        assert_eq!(writes(src), [".base"]);
+        let src = "class C { void m() { java.util.function.BiConsumer<String, String> f = (url, x) -> { url = null; }; } }";
+        assert_eq!(writes(src), Vec::<String>::new());
+    }
+
+    /// A local with no initializer, a loop variable, a `try` resource, a `catch` parameter and a
+    /// lambda parameter are no bounds, and one sharing the name of a bound leaves it unread.
+    #[test]
+    fn a_local_is_bound_only_when_declared_once_with_an_initializer() {
+        let held = |body: &str| {
+            let src = format!("package a;\nclass C {{ void f() {{\n{body}\n}} }}\n");
+            let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
+            facts.bound.into_iter().map(|b| b.name).collect::<Vec<_>>()
+        };
+        assert_eq!(held("String a = x(); int b = 1, c;"), ["a", "b"]);
+        // An initializer block's local is keyed by its class, which methods read through.
+        let src = "class C { { String a = x(); } }";
+        assert!(
+            Java.parse("a/C.java", src.as_bytes())
+                .unwrap()
+                .bound
+                .is_empty()
+        );
+        assert_eq!(held("String a; a = x();"), Vec::<String>::new());
+        assert_eq!(
+            held("for (String a : xs) { use(a); }"),
+            Vec::<String>::new()
+        );
+        assert_eq!(held("try (R a = open()) { use(a); }"), Vec::<String>::new());
+        assert_eq!(
+            held("try { x(); } catch (E a) { use(a); }"),
+            Vec::<String>::new()
+        );
+        assert_eq!(held("xs.forEach(a -> use(a));"), Vec::<String>::new());
+        assert_eq!(
+            held("if (o instanceof T a) { use(a); }"),
+            Vec::<String>::new()
+        );
+        assert_eq!(held("String a = x(); a += y();"), Vec::<String>::new());
+        assert_eq!(held("int a = 0; a++;"), Vec::<String>::new());
+        assert_eq!(held("int a = 0; --a;"), Vec::<String>::new());
+        assert_eq!(
+            held("String a = x(); run(() -> { a = y(); });"),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            held("String a = x(); for (String a : xs) {}"),
+            Vec::<String>::new()
+        );
     }
 }

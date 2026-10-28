@@ -944,6 +944,7 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
         arity: None,
         labels: None,
         constructs: false,
+        awaited: false,
         scope: scope.to_string(),
         callee,
         range,
@@ -971,6 +972,7 @@ fn def(name: String, kind: Kind, range: Range<usize>, params: Vec<Param>) -> Def
         returns: None,
         type_params: Vec::new(),
         result: None,
+        suspends: false,
     }
 }
 
@@ -986,6 +988,7 @@ fn params(list: Option<Node>, src: &[u8]) -> Vec<Param> {
         label: None,
         default: None,
         fields: Vec::new(),
+        closure: Default::default(),
     };
     let mut out = Vec::new();
     for declaration in list.into_iter().flat_map(named) {

@@ -12,11 +12,12 @@ use super::super::{named, text};
 pub(crate) const MANIFESTS: &str = "**/Package.swift";
 pub(crate) const MANIFEST: &str = MANIFESTS.split_at(3).1;
 
-/// A target of a package: its module name and the directory of its files, relative to the
-/// repository (`Sources/Store`, `pkg/Sources/Store`).
+/// A target of a package: its module name, the directory of its package and the directory of
+/// its files, both relative to the repository (`pkg`, `pkg/Sources/Store`).
 #[derive(Debug, PartialEq)]
 pub struct Target {
     pub name: String,
+    pub package: String,
     pub dir: String,
 }
 
@@ -81,6 +82,7 @@ pub fn targets(path: &str, src: &[u8]) -> Vec<Target> {
         let dir: Vec<&str> = segments.filter(|s| !s.is_empty() && *s != ".").collect();
         found.push(Target {
             name,
+            package: package.to_string(),
             dir: dir.join("/"),
         });
     }

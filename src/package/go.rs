@@ -181,7 +181,7 @@ impl Ecosystem for Go {
         });
         let mut ids: Vec<String> = (by_dir.get(dir.as_str()).into_iter().flatten())
             .filter(|f| at.owned_source(manifest, f))
-            .filter_map(|f| at.reach(repository, f, chain, known))
+            .filter_map(|f| at.reach(self, repository, f, chain, known))
             .collect();
         ids.sort();
         ids.dedup();

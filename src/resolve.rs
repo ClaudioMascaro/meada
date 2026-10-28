@@ -12,8 +12,9 @@ use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Annotated, Binds, Bound, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation,
-    Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker, Ty, Value,
+    Annotated, Binds, Bound, Call, Class, Closure, Const, Def, Export, Facts, Import, Imported,
+    Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker, Ty,
+    Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -217,6 +218,11 @@ enum Reading {
     /// a receiver of a block whose type is not the repository's may hold one of any name, so
     /// the name is unknown there.
     Member,
+    /// The callee of a decorator call (an annotation or attribute): `Value`, but no field of a
+    /// base binds it, so a base from outside the repository hides no import from it. A member
+    /// type of that base named like the annotation, which JLS 6.4.1 would put first, is read
+    /// wrong (#354).
+    Decorator,
 }
 
 impl Reading {
@@ -234,7 +240,12 @@ impl Reading {
     fn value(self) -> bool {
         matches!(
             self,
-            Reading::Value | Reading::Path | Reading::Method | Reading::Read | Reading::Member
+            Reading::Value
+                | Reading::Decorator
+                | Reading::Path
+                | Reading::Method
+                | Reading::Read
+                | Reading::Member
         )
     }
 }
@@ -312,6 +323,9 @@ pub struct Resolver<'a> {
     arities: HashMap<Target<'a>, Arity<'a>>,
     statics: HashSet<Target<'a>>,
     members_in_scope: bool,
+    /// The pack's `LanguagePack::assigned_members`.
+    assigned_members: bool,
+    guesses_constructs: bool,
     unordered_globs: bool,
     qualified_types: bool,
     /// The pack's `LanguagePack::namespaced`.
@@ -320,9 +334,15 @@ pub struct Resolver<'a> {
     /// The types each file of a compilation keeps to it (`Facts::private` of a file with a
     /// `Facts::unit`), for `hidden`.
     internal: HashMap<&'a str, HashSet<&'a str>>,
+    /// The names of each file with some (`Facts::confined`).
+    confined: HashMap<&'a str, HashSet<&'a str>>,
     /// The names some file of the repository writes through a selector (`cfg.Base = ..`): a
-    /// constant marked `.Name` (Go). A variable of such a name holds no one value.
+    /// constant marked `.Name` (Go, and a Java or Kotlin write whose class is unknown). A
+    /// variable of such a name holds no one value.
     written: HashSet<&'a str>,
+    /// The fields some file writes in the code of their class (`.name@class`, Java and Kotlin),
+    /// by class and name.
+    written_in: HashSet<(&'a str, &'a str)>,
     /// The other names bindings make (`Facts::locals`): each hides an outer name.
     locals: HashMap<&'a str, HashSet<&'a str>>,
     /// Each file's `Facts::receivers`, by scope and name.
@@ -435,7 +455,7 @@ fn nested_in(inner: Target, outer: Target) -> bool {
 }
 
 /// The argument counts a function takes: one per parameter, fewer for the ones a call may leave
-/// out (`Binds::Optional`), and any number more for a `Binds::Rest` one (Kotlin's `vararg`).
+/// out (`Binds::Optional`), and any number more for a `Binds::Rest` one (Kotlin's `vararg`, Java's spread parameter).
 /// Where its parameters carry argument labels (`Param::label`, Swift), a call fits only with
 /// its labels in order (`Args::labels`).
 #[derive(Clone, Copy)]
@@ -446,16 +466,20 @@ struct Arity<'a> {
     /// extension `this`): such a call counts one argument fewer than `Ext.F(x)` does.
     receiver: bool,
     params: &'a [Param],
+    /// A call fits only when written under `await` (`Def::suspends`).
+    suspends: bool,
 }
 
 impl<'a> Arity<'a> {
-    fn of(params: &'a [Param]) -> Self {
+    fn of(def: &'a Def) -> Self {
+        let params = &def.params[..];
         let required = |p: &&Param| !matches!(p.binds, Binds::Optional | Binds::Rest);
         Arity {
             least: params.iter().filter(required).count(),
             most: (!params.iter().any(|p| p.binds == Binds::Rest)).then_some(params.len()),
             receiver: params.first().is_some_and(|p| p.binds == Binds::Instance),
             params,
+            suspends: def.suspends,
         }
     }
 
@@ -469,6 +493,7 @@ impl<'a> Arity<'a> {
     fn fits_call(self, args: Args, on_receiver: &dyn Fn() -> bool) -> bool {
         let arity = args.count + usize::from(self.receiver && on_receiver());
         self.fits(arity)
+            && (args.awaited || !self.suspends)
             && args
                 .labels
                 .is_none_or(|labels| labelled(self.params, labels))
@@ -481,6 +506,7 @@ impl<'a> Arity<'a> {
 struct Args<'c> {
     count: usize,
     labels: Option<&'c [String]>,
+    awaited: bool,
 }
 
 impl<'c> Args<'c> {
@@ -489,6 +515,7 @@ impl<'c> Args<'c> {
         Some(Args {
             count: call.arity?,
             labels: call.labels.as_deref(),
+            awaited: call.awaited,
         })
     }
 }
@@ -510,8 +537,9 @@ pub(crate) fn labelled(params: &[Param], labels: &[String]) -> bool {
 /// the arguments of a call with `labels` in order, as Swift matches them: each argument goes to
 /// a parameter of its label, a parameter with a default value or a variadic one may take none,
 /// a variadic one takes the unlabelled arguments after its first, and a trailing closure (an
-/// empty label) takes the first parameter that cannot be left out, else any. `None` when the
-/// call does not fit, or weighs more than `LABELLED_CELLS`.
+/// empty label) takes the first parameter that accepts one (`Param::closure`) and cannot be
+/// left out, else any that accepts one. `None` when the call does not fit, or weighs more than
+/// `LABELLED_CELLS`.
 fn labelled_args(params: &[Param], labels: &[String]) -> Option<Vec<Option<usize>>> {
     let skips = |p: &Param| matches!(p.binds, Binds::Optional | Binds::Rest);
     // The ends of the arguments `p` may take from the `j`th on: one of its label, then for a
@@ -521,6 +549,9 @@ fn labelled_args(params: &[Param], labels: &[String]) -> Option<Vec<Option<usize
             return j..j;
         };
         if first != p.label.as_deref().unwrap_or("_") && !first.is_empty() {
+            return j..j;
+        }
+        if first.is_empty() && p.closure == Closure::Refuses {
             return j..j;
         }
         let mut k = j + 1;
@@ -635,7 +666,7 @@ impl<'a> Resolver<'a> {
                                 .filter_map(|name| {
                                     let (&name, def) = defs[path].get_key_value(name.as_str())?;
                                     let target = Target { path, name };
-                                    arities.insert(target, Arity::of(&def.params));
+                                    arities.insert(target, Arity::of(def));
                                     Some(target)
                                 })
                                 .collect();
@@ -728,9 +759,17 @@ impl<'a> Resolver<'a> {
             paths.dedup();
             (2..=TYPE_PARTS).contains(&paths.len())
         });
-        let written = (files.values())
+        let marks: Vec<&str> = (files.values())
             .flat_map(|f| f.consts.iter())
             .filter_map(|c| c.name.strip_prefix('.'))
+            .collect();
+        let written = (marks.iter())
+            .filter(|m| !m.contains('@'))
+            .copied()
+            .collect();
+        let written_in = (marks.iter())
+            .filter_map(|m| m.split_once('@'))
+            .map(|(name, class)| (class, name))
             .collect();
         // Those of the definition `defs` keeps for each name.
         let params = (defs.iter())
@@ -760,6 +799,10 @@ impl<'a> Resolver<'a> {
         let internal = (files.iter())
             .filter(|(_, facts)| !facts.unit.is_empty() && !facts.private.is_empty())
             .map(|(path, facts)| (*path, facts.private.iter().map(String::as_str).collect()))
+            .collect();
+        let confined = (files.iter())
+            .filter(|(_, facts)| !facts.confined.is_empty())
+            .map(|(path, facts)| (*path, facts.confined.iter().map(String::as_str).collect()))
             .collect();
         let locals = files
             .iter()
@@ -859,12 +902,16 @@ impl<'a> Resolver<'a> {
             arities,
             statics,
             members_in_scope: language.members_in_scope(),
+            assigned_members: language.assigned_members(),
+            guesses_constructs: language.guesses_constructs(),
             unordered_globs: language.unordered_globs(),
             qualified_types: language.qualified_types(),
             namespaced: language.namespaced(),
             written,
+            written_in,
             consts,
             internal,
+            confined,
             locals,
             receivers,
             params,
@@ -1104,12 +1151,39 @@ impl<'a> Resolver<'a> {
         self.resolved(path, call, true, &mut Work::default())
     }
 
-    /// `call`, with what resolving it carries along (a chain of calls on call results is
-    /// bounded by `RECEIVER_DEPTH`).
+    /// `call`, resolved. Where the pack only guesses at constructor syntax
+    /// (`LanguagePack::guesses_constructs`), a guess that is no `exact` type is a plain call of
+    /// the function the name binds, if it does: Swift's `Check(1)`, also a method of the type
+    /// around it. A plain `exact` call beats a name match of the guess.
     fn resolved(
         &self,
         path: &'a str,
         call: &'a Call,
+        matching: bool,
+        work: &mut Work<'a>,
+    ) -> Resolution<'a> {
+        let found = self.resolved_as(path, call, call.constructs, matching, work);
+        if !(self.guesses_constructs && call.constructs) || matches!(found, Resolution::Exact(_)) {
+            return found;
+        }
+        let plain = self.resolved_as(path, call, false, matching, work);
+        let function = |t: &Target| self.defs[t.path][t.name].kind != Kind::Class;
+        let better = matches!(found, Resolution::Unresolved);
+        match &plain {
+            Resolution::Exact(t) if function(t) => plain,
+            Resolution::Inferred(t) | Resolution::Narrowed(t) if better && function(t) => plain,
+            Resolution::Ambiguous(all) if better && all.iter().all(function) => plain,
+            _ => found,
+        }
+    }
+
+    /// `call`, with what resolving it carries along (a chain of calls on call results is
+    /// bounded by `RECEIVER_DEPTH`).
+    fn resolved_as(
+        &self,
+        path: &'a str,
+        call: &'a Call,
+        constructs: bool,
         matching: bool,
         work: &mut Work<'a>,
     ) -> Resolution<'a> {
@@ -1121,7 +1195,7 @@ impl<'a> Resolver<'a> {
         // The result of the call this one is made on, read once: the name match below reads it
         // too, and reading it twice per call would double the work at every call of a chain.
         let mut on = None;
-        let binding = match (call.on, call.constructs, call.by_path) {
+        let binding = match (call.on, constructs, call.by_path) {
             (Some(inner), false, _) => {
                 let members = callee.split_once('.').map_or("", |(_, m)| m);
                 let result = self.result_of(path, inner, work);
@@ -1133,10 +1207,16 @@ impl<'a> Resolver<'a> {
                 self.resolve_as(path, scope, callee, seen, work, Reading::Method)
             }
             (_, false, true) => self.resolve_as(path, scope, callee, seen, work, Reading::Path),
-            (_, false, false) => self.resolve_as(path, scope, callee, seen, work, Reading::Value),
+            (_, false, false) => {
+                let reading = match call.decorates {
+                    Some(_) => Reading::Decorator,
+                    None => Reading::Value,
+                };
+                self.resolve_as(path, scope, callee, seen, work, reading)
+            }
         };
         let binding = match binding {
-            Binding::Several(all) if call.constructs => {
+            Binding::Several(all) if constructs => {
                 let classes: Vec<_> = all.into_iter().filter(|t| self.is_class(*t)).collect();
                 match classes[..] {
                     [] => return Resolution::Unresolved,
@@ -1148,12 +1228,12 @@ impl<'a> Resolver<'a> {
             }
             found => found,
         };
-        if call.constructs && matches!(binding, Binding::Def(t) if !self.is_class(t)) {
+        if constructs && matches!(binding, Binding::Def(t) if !self.is_class(t)) {
             return Resolution::Unresolved;
         }
         let binding = match binding {
             Binding::Def(t) if call.arity.is_some() && self.is_class(t) => {
-                let (families, absent) = if call.constructs {
+                let (families, absent) = if constructs {
                     (&self.constructors, Binding::Def(t))
                 } else {
                     (&self.overloads, Binding::Unknown)
@@ -1169,9 +1249,11 @@ impl<'a> Resolver<'a> {
                     .collect();
                 all.sort();
                 all.dedup();
+                // An initializer the type's compilation keeps to itself is no candidate from
+                // another one, as a member is not (`accessible`).
                 match all.is_empty() {
                     true => absent,
-                    false => Binding::Several(all),
+                    false => self.accessible(path, Binding::Several(all)),
                 }
             }
             found => found,
@@ -1180,7 +1262,7 @@ impl<'a> Resolver<'a> {
         let binding = self.narrow(binding, Args::of(call), &|| self.on_receiver(path, call));
         // No member fits: an extension function in scope may.
         if matches!(binding, Binding::Unknown | Binding::External(..))
-            && let Some(found) = self.extended(path, call, on.clone(), work)
+            && let Some(found) = self.extended(path, call, constructs, on.clone(), work)
         {
             return found;
         }
@@ -1225,7 +1307,8 @@ impl<'a> Resolver<'a> {
     /// from outside the repository the receiver `head` (bound to `receiver`) is of: the type
     /// the source writes or constructs for it, or the capitalized name it starts with, when
     /// nothing in the repository binds that name. `Some(None)` for a member read on such a name
-    /// (`URLSession.shared`), whose type is not known; `None` for any other receiver.
+    /// (`URLSession.shared`, or a local bound to it: `Class::Member`), whose type is not known;
+    /// `None` for any other receiver.
     fn outside_type(
         &self,
         path: &'a str,
@@ -1242,6 +1325,14 @@ impl<'a> Resolver<'a> {
         if let Some((p, s, n)) = self.holder(receiver) {
             return match self.receivers[p].get(&(s, n)) {
                 Some(Class::Type(ty) | Class::Named(ty)) if outside(ty, work) => Some(Some(ty)),
+                // A member read on a name from outside (`let s = URLSession.shared`): opaque.
+                Some(Class::Member(read)) => {
+                    // As a direct chain, only a capitalized head is a type: `h.cache` is a member
+                    // of a local or a parameter.
+                    let first = read.split('.').next().unwrap_or(read);
+                    (first.starts_with(|c: char| c.is_ascii_uppercase()) && outside(first, work))
+                        .then_some(None)
+                }
                 _ => None,
             };
         }
@@ -1553,10 +1644,11 @@ impl<'a> Resolver<'a> {
         &self,
         path: &'a str,
         call: &'a Call,
+        constructs: bool,
         on: Option<Binding<'a>>,
         work: &mut Work<'a>,
     ) -> Option<Resolution<'a>> {
-        if !self.extending.contains(path) || call.constructs {
+        if !self.extending.contains(path) || constructs {
             return None;
         }
         let scope = call.scope.as_str();
@@ -1578,10 +1670,12 @@ impl<'a> Resolver<'a> {
             None => self.class(path, scope),
             Some(head) if Some(head) == self.receiver => self.class(path, scope),
             Some(head) if Some(head) == self.base_receiver => return None,
-            Some(head) => match (on, call.on) {
-                (Some(known), _) => known,
-                (None, Some(inner)) => self.result_of(path, inner, work),
-                (None, None) => {
+            // A member read between the call and the call made (`make().x.tag()`) is the
+            // receiver, not the call's result.
+            Some(head) => match (head.contains('.'), on, call.on) {
+                (false, Some(known), _) => known,
+                (false, None, Some(inner)) => self.result_of(path, inner, work),
+                (true, ..) | (false, None, None) => {
                     let seen = &mut self.seen(path, scope);
                     let found = self.resolve_as(path, scope, head, seen, work, Reading::Value);
                     // A type's name calls its companion or its statics.
@@ -1796,6 +1890,11 @@ impl<'a> Resolver<'a> {
             let found = self.base_member(path, scope, first, work);
             return self.walk(found, rest, seen, work, reading);
         }
+        if self.assigned_members
+            && let Some(found) = self.assigned(path, scope, callee)
+        {
+            return self.in_unit(path, self.accessible(path, found));
+        }
         let lexical = |seen: &mut Seen<'a>| {
             let (head, members) = callee.split_once('.').unwrap_or((callee, ""));
             // The head of a member chain is read, not called.
@@ -1839,6 +1938,32 @@ impl<'a> Resolver<'a> {
         }
         let found = self.walk(binding, members, seen, work, reading);
         self.in_unit(path, self.accessible(path, found))
+    }
+
+    /// The definition the whole of `callee` names from `scope` (`LanguagePack::assigned_members`),
+    /// innermost scope first. A local, constant, parameter or definition of the head in a scope
+    /// between hides the definitions outside it.
+    fn assigned(&self, path: &'a str, scope: &str, callee: &str) -> Option<Binding<'a>> {
+        let head = callee.split_once('.')?.0;
+        let mut s = scope;
+        loop {
+            let candidate = crate::qualify(s, callee);
+            if let Some((name, def)) = self.defs[path].get_key_value(candidate.as_str())
+                && def.kind != Kind::Method
+            {
+                return Some(Binding::Def(Target { path, name }));
+            }
+            let held = crate::qualify(s, head);
+            if s.is_empty()
+                || self.locals[path].contains(held.as_str())
+                || self.consts[path].contains(held.as_str())
+                || self.defs[path].contains_key(held.as_str())
+                || self.params[path].contains_key(&(s, head))
+            {
+                return None;
+            }
+            s = crate::parent(s);
+        }
     }
 
     /// `binding`'s dotted `members`, each looked up in what the one before gives (`member` for
@@ -2020,7 +2145,7 @@ impl<'a> Resolver<'a> {
             Class::Returned(callee) => self.returned(path, scope, callee, false, work),
             Class::Called(callee) => self.returned(path, scope, callee, true, work),
             Class::Result(index) => self.result_of(path, *index, work),
-            Class::Imported | Class::Unknown => Binding::Unknown,
+            Class::Imported | Class::Member(_) | Class::Unknown => Binding::Unknown,
         };
         work.busy.pop();
         match found {
@@ -2669,6 +2794,11 @@ impl<'a> Resolver<'a> {
             found.extend(self.by_name.get(&(false, last)).into_iter().flatten());
             found.sort();
         }
+        // The member of a contextual type (`.make()`) is no function: a free one of its name
+        // is not what it reaches. Every initializer answers `.init`, so a match tells nothing.
+        if callee.starts_with(crate::lang::IMPLICIT_HEAD) {
+            found.retain(|t| last != "init" && self.defs[t.path][t.name].kind == Kind::Method);
+        }
         if let Some(reaches) = &self.reaches {
             found.retain(|t| reaches(path, t.path));
         }
@@ -2873,7 +3003,10 @@ impl<'a> Resolver<'a> {
             if let Some((name, def)) = defs.get_key_value(candidate.as_str())
                 && def.kind != Kind::Method
                 && !(def.kind == Kind::Module
-                    && matches!(reading, Reading::Value | Reading::Read | Reading::Member))
+                    && matches!(
+                        reading,
+                        Reading::Value | Reading::Decorator | Reading::Read | Reading::Member
+                    ))
             {
                 return Binding::Def(Target { path, name });
             }
@@ -2884,6 +3017,7 @@ impl<'a> Resolver<'a> {
             // A field a class body sees may be its base's (`protected Repo repo`), before an
             // outer class's.
             if self.members_in_scope
+                && reading != Reading::Decorator
                 && defs.get(s).is_some_and(|d| d.kind == Kind::Class)
                 && let Some(found) = self.inherited_field(path, s, name)
             {
@@ -3036,10 +3170,20 @@ impl<'a> Resolver<'a> {
         }
     }
 
+    /// Whether `path` sees the `internal` names of the file `module` (`Facts::internals`).
+    fn sees_internals(&self, path: &str, module: &str) -> bool {
+        let (Some(from), Some(at)) = (self.files.get(path), self.files.get(module)) else {
+            return false;
+        };
+        from.internals.contains(&at.unit)
+    }
+
     /// Whether `t` is, or is declared in, a type its file keeps to its compilation
     /// (`Facts::private` of a file with a `Facts::unit`: C#'s `internal` types) and `path` is
     /// in another one. A file in no project (its own unit) neither hides nor is hidden.
     // ponytail: `InternalsVisibleTo` is not read, so a friend project gets no link.
+    // A file sees the `private` names of the units it lists in `Facts::internals`, but for the
+    // `confined` ones.
     fn hidden(&self, path: &str, t: Target) -> bool {
         let (Some(from), Some(at)) = (self.files.get(path), self.files.get(t.path)) else {
             return false;
@@ -3050,10 +3194,14 @@ impl<'a> Resolver<'a> {
         let Some(internal) = self.internal.get(t.path) else {
             return false;
         };
+        let sees = from.internals.contains(&at.unit);
         let mut name = t.name;
         while !name.is_empty() {
             if internal.contains(name) {
-                return true;
+                let confined = self.confined.get(t.path).is_some_and(|c| c.contains(name));
+                if !sees || confined {
+                    return true;
+                }
             }
             name = crate::parent(name);
         }
@@ -3238,7 +3386,7 @@ impl<'a> Resolver<'a> {
                     // names are bound before this is asked.
                     _ if *inside => Ok(None),
                     other => match self
-                        .through_glob(other, false, name, work, seen)
+                        .through_glob(path, other, false, name, work, seen)
                         .of_namespace(self, self.glob_namespace(path, target))
                     {
                         Binding::Unknown => Ok(None),
@@ -3279,6 +3427,7 @@ impl<'a> Resolver<'a> {
     /// What a glob import whose target is `bound` gives `name` (`globs`).
     fn through_glob(
         &self,
+        path: &str,
         bound: Binding<'a>,
         inside: bool,
         name: &'a str,
@@ -3286,7 +3435,10 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
     ) -> Binding<'a> {
         match bound {
-            Binding::Module(m) if inside => self.export(m, name, seen),
+            // A module `path` imports `testable` gives its `internal` names as its own do.
+            Binding::Module(m) if inside || self.sees_internals(path, m) => {
+                self.export(m, name, seen)
+            }
             Binding::Module(m) => self.star(m, name, seen).unwrap_or(Binding::Unknown),
             // A module written in place states no visibility of its items: only a glob
             // from inside it, which sees them all, is read.
@@ -3370,7 +3522,7 @@ impl<'a> Resolver<'a> {
             let found = self.past(seen, |seen| {
                 let work = &mut Work::default();
                 let bound = self.resolve_as(path, scope, target, seen, work, Reading::Alias);
-                self.through_glob(bound, *inside, name, work, seen)
+                self.through_glob(path, bound, *inside, name, work, seen)
             });
             let found = found.of_namespace(self, self.glob_namespace(path, target));
             // A definition `path` may not reach is not there: the lookup goes on past it.
@@ -4531,7 +4683,7 @@ impl<'a> Code<'a> {
                 vec![Origin {
                     call: None,
                     form,
-                    outside: Some(outside),
+                    outside,
                     routes: vec![Route {
                         through: Vec::new(),
                         steps,
@@ -4887,10 +5039,33 @@ impl<'a> Code<'a> {
         name: &'a str,
         by_path: bool,
     ) -> Option<Outside<'a>> {
+        self.outside_read(path, scope, name, by_path, false)
+    }
+
+    /// `outside` for the callee of a decorator call (an annotation or attribute): no field of
+    /// a base binds it (`Reading::Decorator`).
+    pub fn outside_decorator(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Option<Outside<'a>> {
+        self.outside_read(path, scope, name, false, true)
+    }
+
+    fn outside_read(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        by_path: bool,
+        decorator: bool,
+    ) -> Option<Outside<'a>> {
         let r = self.resolver;
-        let (reading, head_reading) = match by_path {
-            true => (Reading::Path, Reading::Path),
-            false => (Reading::Value, Reading::Any),
+        let (reading, head_reading) = match (by_path, decorator) {
+            (true, _) => (Reading::Path, Reading::Path),
+            (false, true) => (Reading::Decorator, Reading::Decorator),
+            (false, false) => (Reading::Value, Reading::Any),
         };
         let resolve = |name| {
             let (seen, work) = (&mut r.seen(path, scope), &mut Work::default());
@@ -4997,6 +5172,17 @@ impl<'a> Code<'a> {
         })
     }
 
+    /// Whether the type the source writes, `written` in `scope` of `path`, is one the repository
+    /// defines.
+    fn is_repository_type(&self, path: &'a str, scope: &'a str, written: &'a str) -> bool {
+        let r = self.resolver;
+        let (seen, work) = (&mut r.seen(path, scope), &mut Work::default());
+        matches!(
+            r.resolve_as(path, scope, written, seen, work, Reading::Path),
+            Binding::Def(_)
+        )
+    }
+
     /// The declarations walk of `name`: the type the source writes for it, or the call it is
     /// declared from (a function of a package, a function of the repository whose result type
     /// is outside, or a method of a value declared so in turn, a step), at most `RECEIVER_DEPTH`
@@ -5007,7 +5193,7 @@ impl<'a> Code<'a> {
         scope: &'a str,
         name: &'a str,
         depth: usize,
-    ) -> Option<(Form, Outside<'a>, Vec<&'a str>)> {
+    ) -> Option<(Form, Option<Outside<'a>>, Vec<&'a str>)> {
         if depth >= RECEIVER_DEPTH {
             return None;
         }
@@ -5016,7 +5202,11 @@ impl<'a> Code<'a> {
         let (at, within, held) = r.holder(&binding)?;
         match r.receivers[at].get(&(within, held))? {
             Class::Type(written) => {
-                let outside = self.outside_written(at, within, written)?;
+                let outside = self.outside_written(at, within, written);
+                // A type of the repository is an answer with no spelling.
+                if outside.is_none() && !self.is_repository_type(at, within, written) {
+                    return None;
+                }
                 Some((Form::Type, outside, Vec::new()))
             }
             Class::Called(callee) => {
@@ -5025,7 +5215,7 @@ impl<'a> Code<'a> {
                     && function.direct
                 {
                     // A function of a package.
-                    return Some((Form::Call, function, Vec::new()));
+                    return Some((Form::Call, Some(function), Vec::new()));
                 }
                 if let Binding::Def(t) = r.binding(at, within, callee) {
                     // A function of the repository: the type its result writes.
@@ -5033,13 +5223,14 @@ impl<'a> Code<'a> {
                         return None;
                     };
                     let outside = self.outside_written(t.path, t.name, written)?;
-                    return Some((Form::Call, outside, Vec::new()));
+                    return Some((Form::Call, Some(outside), Vec::new()));
                 }
                 // A method of a value that was made outside.
                 let (receiver, member) = callee.rsplit_once('.')?;
                 let (form, outside, mut steps) = self.declared(at, within, receiver, depth + 1)?;
                 steps.push(member);
-                Some((form, outside, steps))
+                // A method of a value of a repository type names nothing outside.
+                Some((form, Some(outside?), steps))
             }
             _ => None,
         }
@@ -5120,6 +5311,12 @@ impl<'a> Code<'a> {
     /// (`w.Topic = ..`, `*p.Topic = ..`, `&w.Topic`): a value read off a literal may differ.
     pub fn field_written(&self, field: &str) -> bool {
         self.resolver.written.contains(field)
+    }
+
+    /// Whether some file of the repository writes the field `field` of `class` (Java and
+    /// Kotlin): a write in the code of `class`, or one whose class the pack could not tell.
+    pub fn field_written_in(&self, class: &str, field: &str) -> bool {
+        self.field_written(field) || self.resolver.written_in.contains(&(class, field))
     }
 
     /// The argument the call at `index` of `path` passes for parameter `n` of `function`: by
@@ -6292,7 +6489,7 @@ impl<'a> Code<'a> {
             }
             // A field no file assigns holds what an annotation on it injects.
             Binding::Local(at, class, field) => match fold.inject {
-                Some(inject) if !self.field_written(field) => {
+                Some(inject) if !self.field_written_in(class, field) => {
                     let marks = |on: &Marked| matches!(on, Marked::Field { class: c, name, .. } if c == class && name == field);
                     self.injected(at, marks, inject).unwrap_or(Value::Unknown)
                 }
@@ -6399,6 +6596,26 @@ mod tests {
             .collect();
         found.sort();
         found
+    }
+
+    #[test]
+    fn a_kotlin_chain_of_calls_past_the_receiver_depth_resolves_each_call_once() {
+        use crate::lang::kotlin::Kotlin;
+        // As Java's: every call reads the result of the one it is made on once.
+        let calls = ".m()".repeat(RECEIVER_DEPTH + 16);
+        let src = format!("package a\nimport b.outside\nfun f() {{ outside(){calls} }}\n");
+        let facts = Kotlin.parse("a/C.kt", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("a/C.kt", &facts)]);
+        let layout = Kotlin.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Kotlin);
+        let chained = facts.calls.iter().filter(|c| c.on.is_some()).count();
+        assert!(chained > RECEIVER_DEPTH, "{chained} calls on calls");
+        for call in &facts.calls {
+            assert!(!matches!(
+                resolver.call("a/C.kt", call),
+                Resolution::Exact(_)
+            ));
+        }
     }
 
     #[test]
@@ -6810,6 +7027,7 @@ mod tests {
             returns: None,
             type_params: Vec::new(),
             result: None,
+            suspends: false,
         }
     }
 
@@ -7055,6 +7273,24 @@ mod tests {
             labelled_args(&params, &strings(&["a"])),
             Some(vec![None, Some(0)])
         );
+        // A trailing closure skips a parameter whose type refuses one (`Param::closure`), and
+        // fits nothing when every parameter left refuses it.
+        let refusing = |label: &str, binds| Param {
+            closure: Closure::Refuses,
+            ..labelled_param(label, binds)
+        };
+        let params = [
+            labelled_param("_", any),
+            refusing("animation", optional),
+            labelled_param("assert", optional),
+        ];
+        assert_eq!(
+            labelled_args(&params, &strings(&["_", ""])),
+            Some(vec![Some(0), None, Some(1)])
+        );
+        let params = [labelled_param("_", any), refusing("animation", optional)];
+        assert_eq!(labelled_args(&params, &strings(&["_", ""])), None);
+        assert!(labelled_args(&params, &strings(&["_"])).is_some());
         // A call too wide to weigh fits nothing.
         let wide = |n: usize| -> (Vec<Param>, Vec<String>) {
             (
@@ -7076,6 +7312,7 @@ mod tests {
             label: None,
             default: None,
             fields: Vec::new(),
+            closure: Default::default(),
         }
     }
 
@@ -7125,6 +7362,7 @@ mod tests {
         };
         facts.calls = (names.iter().enumerate())
             .map(|(i, name)| Call {
+                awaited: false,
                 arity: None,
                 labels: None,
                 constructs: false,
@@ -9679,6 +9917,45 @@ mod tests {
              func run(o: Own, n: inout Int) { o.hash(into: &n) }",
         );
         assert_eq!(own["run(o:n:) o.hash"], "exact Own.hash(into:)");
+    }
+
+    /// A Swift local bound to a member read on a name nothing in the repository binds is opaque
+    /// (`let session = URLSession.shared`), as the direct chain is; on a name the repository
+    /// declares (`Remote.shared`) the call stays the name match it was (issue #385).
+    #[test]
+    fn a_swift_member_read_on_an_outside_name_is_opaque() {
+        let calls = pack_calls(
+            &crate::lang::swift::Swift,
+            "A.swift",
+            "struct Cache { func data(from key: String) -> Int { 0 } }
+             enum Remote { static let shared = Cache() }
+             func outside() {
+                 let session = URLSession.shared
+                 _ = session.data(from: \"k\")
+                 _ = URLSession.shared.data(from: \"k\")
+             }
+             func inside() {
+                 let cache = Remote.shared
+                 _ = cache.data(from: \"k\")
+             }
+             struct Holder { let cache = Cache() }
+             func viaParam(h: Holder) {
+                 let c = h.cache
+                 _ = c.data(from: \"k\")
+             }
+             func again(other: URLSession) {
+                 var client = URLSession.shared
+                 client = other
+                 _ = client.data(from: \"k\")
+             }",
+        );
+        assert_eq!(calls["outside() session.data"], "none");
+        assert_eq!(calls["outside() URLSession.shared.data"], "none");
+        assert_eq!(calls["inside() cache.data"], "inferred Cache.data(from:)");
+        assert_eq!(
+            calls["again(other:) client.data"],
+            "inferred Cache.data(from:)"
+        );
     }
 
     /// A bare call a nested class does not answer climbs to the class around it: past that

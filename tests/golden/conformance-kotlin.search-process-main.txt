@@ -1,1 +1,3 @@
+example.com/acme/conformance example.Launcher.main() process::example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Launcher.main() (export)
+example.com/acme/conformance example.String.main() process::example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.String.main() (export)
 example.com/acme/conformance example.main(Array<String>) process::example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.main(Array<String>) (program)

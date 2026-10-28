@@ -1,0 +1,248 @@
+{
+  "repository": "example.com/acme/conformance",
+  "files": [
+    {
+      "path": "Sources/Implicit.swift",
+      "hash": "d2f26673a91eab31788e2b5b9aa351298758843c5ac615a0e8dcfb1b9dc814fa"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::Config",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 103,
+        "end": 260
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::Config.build()",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 212,
+        "end": 258
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::Config.init(x:)",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 134,
+        "end": 161
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::Config.make()",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 164,
+        "end": 209
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::Duration",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 0,
+        "end": 35
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::Other",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 262,
+        "end": 320
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::Other.make()",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 279,
+        "end": 318
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::configure()",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 361,
+        "end": 455
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::fresh()",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 457,
+        "end": 504
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::seconds(_:)",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 66,
+        "end": 101
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::sleepy()",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 322,
+        "end": 359
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::swapped()",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 506,
+        "end": 563
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::wait(_:)",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 37,
+        "end": 64
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::Config.build()::Config#0",
+      "caller": "example.com/acme/conformance::Sources/Implicit.swift::Config.build()",
+      "target": "example.com/acme/conformance::Sources/Implicit.swift::Config.init(x:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 244,
+        "end": 256
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::Config.make()::Config#0",
+      "caller": "example.com/acme/conformance::Sources/Implicit.swift::Config.make()",
+      "target": "example.com/acme/conformance::Sources/Implicit.swift::Config.init(x:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 195,
+        "end": 207
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::Other.make()::Other#0",
+      "caller": "example.com/acme/conformance::Sources/Implicit.swift::Other.make()",
+      "target": "example.com/acme/conformance::Sources/Implicit.swift::Other",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 309,
+        "end": 316
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::configure()::(implicit).build#0",
+      "caller": "example.com/acme/conformance::Sources/Implicit.swift::configure()",
+      "target": "example.com/acme/conformance::Sources/Implicit.swift::Config.build()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 434,
+        "end": 442
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::configure()::(implicit).make#0",
+      "caller": "example.com/acme/conformance::Sources/Implicit.swift::configure()",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/Implicit.swift::Config.make()",
+        "example.com/acme/conformance::Sources/Implicit.swift::Other.make()"
+      ],
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 408,
+        "end": 415
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::fresh()::(implicit).init#0",
+      "caller": "example.com/acme/conformance::Sources/Implicit.swift::fresh()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 491,
+        "end": 502
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::sleepy()::(implicit).seconds#0",
+      "caller": "example.com/acme/conformance::Sources/Implicit.swift::sleepy()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 345,
+        "end": 356
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::sleepy()::wait#0",
+      "caller": "example.com/acme/conformance::Sources/Implicit.swift::sleepy()",
+      "target": "example.com/acme/conformance::Sources/Implicit.swift::wait(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 340,
+        "end": 357
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Implicit.swift::swapped()::swap#0",
+      "caller": "example.com/acme/conformance::Sources/Implicit.swift::swapped()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Implicit.swift",
+        "start": 549,
+        "end": 561
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [],
+  "communities": [
+    {
+      "name": "Sources",
+      "members": [
+        "example.com/acme/conformance::Sources/Implicit.swift::Config.build()",
+        "example.com/acme/conformance::Sources/Implicit.swift::Config.init(x:)",
+        "example.com/acme/conformance::Sources/Implicit.swift::Config.make()",
+        "example.com/acme/conformance::Sources/Implicit.swift::configure()"
+      ]
+    },
+    {
+      "name": "Sources#2",
+      "members": [
+        "example.com/acme/conformance::Sources/Implicit.swift::Other",
+        "example.com/acme/conformance::Sources/Implicit.swift::Other.make()"
+      ]
+    },
+    {
+      "name": "Sources#3",
+      "members": [
+        "example.com/acme/conformance::Sources/Implicit.swift::sleepy()",
+        "example.com/acme/conformance::Sources/Implicit.swift::wait(_:)"
+      ]
+    }
+  ],
+  "links": []
+}

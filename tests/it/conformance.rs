@@ -115,9 +115,23 @@ fn java() {
             "maven/api/src/main/java/example/Mains.java::example.Mains.Decorated.main(String[])",
             "maven/api/src/main/java/example/Mains.java::example.Mains.Qualified",
             "maven/api/src/main/java/example/Mains.java::example.Mains.Qualified.main(java.lang.String[])",
+            "maven/api/src/main/java/example/clients/Assigned.java::example.clients.Assigned",
+            "maven/api/src/main/java/example/clients/Assigned.java::example.clients.Assigned.Assigned(RestTemplate)",
+            "maven/api/src/main/java/example/clients/Assigned.java::example.clients.Assigned.rebase(String)",
+            "maven/api/src/main/java/example/clients/Assigned.java::example.clients.Assigned.send()",
+            "maven/api/src/main/java/example/other/Locals.java::example.other.Locals",
+            "maven/api/src/main/java/example/other/Locals.java::example.other.Locals.shadow()",
+            "maven/api/src/main/java/example/other/Locals.java::example.other.Locals.param(String)",
             "maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected",
             "maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.Injected(RestTemplate)",
             "maven/api/src/main/java/example/clients/Injected.java::example.clients.Injected.send()",
+            "maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases",
+            "maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.Bases(RestTemplate)",
+            "maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.local()",
+            "maven/api/src/main/java/example/clients/Bases.java::example.clients.Bases.client()",
+            "maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned",
+            "maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.Reassigned(RestTemplate)",
+            "maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.send(String)",
             "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest",
             "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.Rest(RestTemplate)",
             "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.list()",
@@ -130,6 +144,10 @@ fn java() {
             "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.drop()",
             "maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.lookup()",
             "maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive",
+            "maven/api/src/main/java/example/clients/Typed.java::example.clients.Typed",
+            "maven/api/src/main/java/example/clients/Typed.java::example.clients.Typed.typed()",
+            "maven/api/src/main/java/example/clients/Typed.java::example.clients.Shadowing",
+            "maven/api/src/main/java/example/clients/Typed.java::example.clients.Shadowing.hidden()",
             "maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.get()",
             "maven/api/src/main/java/example/clients/Reactive.java::example.clients.Reactive.flag()",
             "maven/api/src/main/java/example/clients/Jdk.java::example.clients.Jdk",
@@ -184,6 +202,11 @@ fn java() {
             "maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger",
             "maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger.entry(String)",
             "maven/api/src/main/java/example/declarative/Ledger.java::example.declarative.Ledger.record()",
+            "maven/api/src/main/java/example/declarative/Qualified.java::example.declarative.Qualified",
+            "maven/api/src/main/java/example/declarative/Qualified.java::example.declarative.Qualified.a()",
+            "maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController",
+            "maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController.s()",
+            "maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController.x()",
             "maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes",
             "maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes.ledger()",
             "maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient",
@@ -234,6 +257,9 @@ fn java() {
             "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()",
             "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onInvoice(String)",
             "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)",
+            "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.repoType(JOrder)",
+            "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRepo(JOrder)",
+            "maven/api/src/main/java/example/channels/Billing.java::example.channels.JOrder",
             "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery",
             "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.Delivery(JmsTemplate,SqsClient,Connection)",
             "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.notifyCustomer(String)",
@@ -492,6 +518,7 @@ fn java_channel_clients_link_their_producers_to_their_handlers() {
         "exact channel::kafka::orders.created Sales.created(String)::kafka.send#0 -> Sales.onSale(String)",
         "exact channel::kafka::orders.paid Sales.paid(String)::kafka.send#0 -> Sales.onSale(String)",
         "inferred channel::amqp::invoices Billing.invoice(String)::rabbit.convertAndSend#0 -> Billing.onInvoice(String)",
+        "exact channel::amqp::j.repo Billing.repoType(JOrder)::rabbit.convertAndSend#0 -> Billing.onRepo(JOrder)",
         "inferred channel::amqp::audit Billing.invoice(String)::rabbit.convertAndSend#0 -> Billing.onRefund(String)",
         "exact channel::amqp::refunds Billing.refund(String)::rabbit.convertAndSend#0 -> Billing.onRefund(String)",
         "exact channel::jms::notifications Delivery.notifyCustomer(String)::jms.convertAndSend#0 -> Delivery.onNotification(String)",
@@ -505,7 +532,7 @@ fn java_channel_clients_link_their_producers_to_their_handlers() {
             "{wanted} in {links:#?}"
         );
     }
-    assert_eq!(links.len(), 10, "{links:#?}");
+    assert_eq!(links.len(), 11, "{links:#?}");
     let unresolved = |side: &str| -> Vec<String> {
         (json[side].as_array().unwrap().iter())
             .filter(|s| s["contract"] == "channel::kafka")
@@ -560,6 +587,7 @@ fn kotlin_channel_clients_link_their_producers_to_their_handlers() {
         "exact channel::kafka::orders.paid Sales.fromConfig(String)::this.kafka.send#0 -> Sales.onSale(String)",
         "exact channel::kafka::orders.shipped Sales.shipped(String)::emit#0 -> Sales.onShipped(String)",
         "inferred channel::amqp::invoices Billing.invoice(String)::rabbit.convertAndSend#0 -> Billing.onInvoice(String)",
+        "exact channel::amqp::kt.repo Billing.repoType(Order)::rabbit.convertAndSend#0 -> Billing.onRepo(Order)",
         "inferred channel::amqp::audit Billing.invoice(String)::rabbit.convertAndSend#0 -> Billing.onRefund(String)",
         "exact channel::amqp::refunds Billing.refund(String)::rabbit.convertAndSend#0 -> Billing.onRefund(String)",
         "exact channel::jms::notifications Delivery.notifyCustomer(String)::jms.convertAndSend#0 -> Delivery.onNotification(String)",
@@ -573,7 +601,7 @@ fn kotlin_channel_clients_link_their_producers_to_their_handlers() {
             "{wanted} in {links:#?}"
         );
     }
-    assert_eq!(links.len(), 12, "{links:#?}");
+    assert_eq!(links.len(), 13, "{links:#?}");
     let unresolved = |side: &str| -> Vec<String> {
         (json[side].as_array().unwrap().iter())
             .filter(|s| s["contract"] == "channel::kafka")
@@ -679,6 +707,66 @@ fn java_static_calls_resolve_overloads_by_argument_count() {
             .len(),
         2
     );
+}
+
+#[test]
+fn a_java_spread_parameter_takes_any_number_of_arguments() {
+    let repo = fixture_repo("java_varargs", "conformance-java", Some(ORIGIN));
+    for (path, source) in [
+        (
+            "p/Asserts.java",
+            "package p; public final class Asserts { \
+             public static void eq(int a, int b) {} public static void eq(long a, long b) {} \
+             public static void eq(Object a, Object b) {} public static void eq(int a, int b, String m) {} \
+             public static void any(String... parts) {} public static void one(int a) {} \
+             public static void f(int a, String... r) {} }",
+        ),
+        (
+            "q/Use.java",
+            "package q; import static p.Asserts.*; public class Use { public static void run() { \
+             any(); any(\"a\"); any(\"a\", \"b\"); eq(1, 2, \"m\"); one(1); eq(1, 2); \
+             f(1); f(1, \"x\", \"y\"); f(); } }",
+        ),
+    ] {
+        let path = repo.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, source).unwrap();
+    }
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let calls: Vec<_> = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["caller"].as_str().unwrap().ends_with("q.Use.run()"))
+        .collect();
+    let at = |id: &str| {
+        calls
+            .iter()
+            .find(|c| c["id"].as_str().unwrap().ends_with(id))
+            .unwrap()
+    };
+    for (id, level, target) in [
+        ("::any#0", "exact", "any(String...)"),
+        ("::any#1", "exact", "any(String...)"),
+        ("::any#2", "exact", "any(String...)"),
+        ("::eq#0", "exact", "eq(int,int,String)"),
+        ("::one#0", "exact", "one(int)"),
+        ("::f#0", "exact", "f(int,String...)"),
+        ("::f#1", "exact", "f(int,String...)"),
+    ] {
+        let found = at(id);
+        assert_eq!(found["level"], level, "{id}: {found}");
+        assert!(
+            found["target"].as_str().unwrap().ends_with(target),
+            "{id}: {found}"
+        );
+    }
+    let two = at("::eq#1");
+    assert_eq!(two["level"], "ambiguous", "{two}");
+    assert_eq!(two["candidates"].as_array().unwrap().len(), 3);
+    assert!(at("::f#2")["target"].is_null());
+    assert_ne!(at("::f#2")["level"], "exact");
 }
 
 #[test]
@@ -1502,6 +1590,7 @@ fn kotlin() {
             "src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
             "src/main/kotlin/example/Members.kt::example.util()",
             "src/main/kotlin/example/Members.kt::example.Init",
+            "src/main/kotlin/example/Members.kt::example.Init.Init()",
             "src/main/kotlin/example/Members.kt::example.Level",
             "src/main/kotlin/example/Members.kt::example.Level.label()",
             "src/main/kotlin/example/Members.kt::example.Twin",
@@ -1530,6 +1619,9 @@ fn kotlin() {
             "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()",
             "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)",
             "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.repoType(Order)",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRepo(Order)",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Order",
             "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery",
             "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.notifyCustomer(String)",
             "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.onNotification(String)",
@@ -1827,6 +1919,11 @@ fn kotlin() {
             "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake.delete(String)",
             "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake.probe(Fake,Map<String,String>)",
             "src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive",
+            "src/main/kotlin/example/jvm/Typed.kt::example.jvm.make()",
+            "src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed",
+            "src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()",
+            "src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing",
+            "src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()",
             "src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.get()",
             "src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.flag()",
             "src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typed()",
@@ -1876,11 +1973,18 @@ fn kotlin() {
             "src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk",
             "src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.list()",
             "src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.create()",
+            "src/main/kotlin/example/jvm/Assigned.kt::example.jvm.Assigned",
+            "src/main/kotlin/example/jvm/Assigned.kt::example.jvm.Assigned.rebase(String)",
+            "src/main/kotlin/example/jvm/Assigned.kt::example.jvm.Assigned.send()",
+            "src/main/kotlin/example/other/Locals.kt::example.other.shadow()",
+            "src/main/kotlin/example/other/Locals.kt::example.other.param(String)",
             "src/main/kotlin/example/jvm/Injected.kt::example.jvm.Injected",
             "src/main/kotlin/example/jvm/Injected.kt::example.jvm.Injected.send()",
             "src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger",
             "src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.entry(String)",
             "src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.record()",
+            "src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified",
+            "src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified.a()",
             "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Remotes",
             "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Remotes.ledger()",
             "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Shared",
@@ -1912,6 +2016,38 @@ fn kotlin() {
             "src/main/kotlin/example/stars/Base.kt::example.stars.Face.face()",
             "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub",
             "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Parcel(String,String)",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.Maker()",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.Maker(Parcel)",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.assemble()",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Plain",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two(String)",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two()",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(Int)",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(String)",
+            "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Lid",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Lid.latch()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Box",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Epoch",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Epoch.toEpochMilli()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Box.stamp()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Crate",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Crate.peek()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.crate()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.maker()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.Lid.stamp()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.make()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.find()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.g()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.pick()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.now()",
+            "src/main/kotlin/example/chains/Chains.kt::example.chains.use()",
             "src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base",
             "src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base.mark(Int)",
             "src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both",
@@ -2396,11 +2532,8 @@ fn kotlin() {
             ),
             (
                 "src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)::(call_expression).tag#0",
-                AMBIGUOUS,
-                &[
-                    "src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.tag()",
-                    "src/main/kotlin/example/ext/Extensions.kt::example.ext.Store.tag()",
-                ],
+                EXACT,
+                &["src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.tag()"],
             ),
             (
                 "src/main/kotlin/example/Receivers.kt::example.scopes(Cache,Disk,Store)::size#0",
@@ -2668,6 +2801,115 @@ fn kotlin() {
                 "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::Base#0",
                 EXACT,
                 &["src/main/kotlin/example/stars/Base.kt::example.stars.Base"],
+            ),
+            // Each constructor, the primary one and the secondary ones, is a callable of the
+            // class's name: a call narrows among them by argument count.
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.assemble()::Parcel#0",
+                EXACT,
+                &["src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel"],
+            ),
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Plain#0",
+                EXACT,
+                &["src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Plain"],
+            ),
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Two#0",
+                EXACT,
+                &["src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two(String)"],
+            ),
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Two#1",
+                EXACT,
+                &["src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two()"],
+            ),
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Parcel#0",
+                EXACT,
+                &["src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel"],
+            ),
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Parcel#1",
+                EXACT,
+                &[
+                    "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Parcel(String,String)",
+                ],
+            ),
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Parcel.Maker#0",
+                EXACT,
+                &["src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.Maker()"],
+            ),
+            (
+                "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()::Same#0",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(Int)",
+                    "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(String)",
+                ],
+            ),
+            // A call made on another call's result is typed by the written return type of the
+            // first, or by the class a constructor builds.
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).latch#0",
+                EXACT,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Lid.latch()"],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#0",
+                EXACT,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#1",
+                EXACT,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#2",
+                EXACT,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#3",
+                INFERRED,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#4",
+                INFERRED,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).toEpochMilli#0",
+                None,
+                &[],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#5",
+                EXACT,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
+            ),
+            // A type with arguments names its class; a function type names none.
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).peek#0",
+                EXACT,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Crate.peek()"],
+            ),
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).unlatch#6",
+                INFERRED,
+                &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
+            ),
+            // A property read between the calls is the receiver, not the first call's result.
+            (
+                "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).lid.stamp#0",
+                AMBIGUOUS,
+                &[
+                    "src/main/kotlin/example/chains/Chains.kt::example.chains.Box.stamp()",
+                    "src/main/kotlin/example/chains/Chains.kt::example.chains.Lid.stamp()",
+                ],
             ),
             // An explicit import wins over a star import; two star imports that give one name
             // leave it ambiguous, and the members of a base so named unknown.
@@ -5413,6 +5655,21 @@ fn typescript_and_javascript() {
         "conformance-ts-js",
         &[
             "src/app.ts::main",
+            "src/assigned.js::V",
+            "src/assigned.js::V.proto",
+            "src/assigned.js::app.use",
+            "src/assigned.js::caller",
+            "src/assigned.js::decl",
+            "src/assigned.js::expA",
+            "src/assigned.js::expB",
+            "src/assigned.js::hidden",
+            "src/assigned.js::innerCatch",
+            "src/assigned.js::innerDef",
+            "src/assigned.js::innerDef.app",
+            "src/assigned.js::letArrow",
+            "src/assigned.js::o.litM",
+            "src/assigned.js::o.litP",
+            "src/assigned.js::varFn",
             "src/legacy.cjs::legacy",
             "src/math.ts::add",
             "src/math.ts::double",
@@ -5456,6 +5713,7 @@ fn typescript_and_javascript() {
             "src/messages/redis.ts::readMany",
             "src/messages/redis.ts::readNamed",
             "src/messages/redis.ts::readNodeRedis",
+            "src/messages/nats.ts::bus.publish",
             "src/messages/nats.ts::notPublished",
             "src/messages/nats.ts::onAudit",
             "src/messages/nats.ts::publishAll",
@@ -5483,6 +5741,7 @@ fn typescript_and_javascript() {
             "src/messages/produce.ts::produceAll",
             "src/messages/produce.ts::relay",
             "src/messages/produce.ts::retry",
+            "src/messages/produce.ts::transport.send",
             "src/messages/queues.ts::enqueue",
             "src/messages/queues.ts::enqueueReports",
             "src/messages/queues.ts::queue",
@@ -5508,6 +5767,7 @@ fn typescript_and_javascript() {
             "src/shapes/shape.ts::Shape.area",
             "src/shapes/shape.ts::Shape.describe",
             "src/shapes/shape.ts::Shape.unit",
+            "src/single.js::default",
             "src/util/format.mjs::format",
             "src/util/log.js::default",
             "src/view.tsx::render",
@@ -5612,6 +5872,35 @@ fn typescript_and_javascript() {
             ),
             // No definition has the name.
             ("src/util/log.js::default::console.log#0", None, &[]),
+            // Functions defined by assignment: a member, `let`, `var`, an object literal's
+            // method and property. `f` is assigned again, so it is no definition.
+            (
+                "src/assigned.js::caller::app.use#0",
+                EXACT,
+                &["src/assigned.js::app.use"],
+            ),
+            (
+                "src/assigned.js::caller::o.litM#0",
+                EXACT,
+                &["src/assigned.js::o.litM"],
+            ),
+            (
+                "src/assigned.js::caller::varFn#0",
+                EXACT,
+                &["src/assigned.js::varFn"],
+            ),
+            (
+                "src/assigned.js::caller::letArrow#0",
+                EXACT,
+                &["src/assigned.js::letArrow"],
+            ),
+            ("src/assigned.js::caller::f#0", None, &[]),
+            // A parameter spelled like the head hides the definition.
+            ("src/assigned.js::hidden::app.use#0", None, &[]),
+            ("src/assigned.js::hidden::o.litM#0", None, &[]),
+            // So do a nested definition, a `catch` binding.
+            ("src/assigned.js::innerDef::app.use#0", None, &[]),
+            ("src/assigned.js::innerCatch::o.litM#0", None, &[]),
             // Hidden names: a `catch`, `for ... of`, `let` or `var` binding, an arrow parameter
             // without parentheses, a nested or array parameter pattern, and one spelled like a
             // constant or a parameter of the same function hide the top-level `helper`.
@@ -12440,6 +12729,7 @@ fn swift() {
         checkout("Routes.swift", "explicit(_:)"),
         checkout("Routes.swift", "routes(_:).GET /api/v1/ex/explicit"),
         checkout("Routes.swift", "routes(_:).GET /guarded"),
+        checkout("Routes.swift", "routes(_:).GET /me"),
         checkout("Routes.swift", "spin(_:)"),
         checkout("Routes.swift", "pick(_:)"),
         checkout("Routes.swift", "pick(_:).GET /pick/one"),
@@ -12465,6 +12755,16 @@ fn swift() {
         checkout("Routes.swift", "OrderController.list(req:)"),
         checkout("Routes.swift", "OrderController.show(req:)"),
         checkout("Routes.swift", "OrderController.tally()"),
+        checkout("Routes.swift", "OrderController.mountReports(_:)"),
+        checkout(
+            "Routes.swift",
+            "OrderController.mountReports(_:).GET /api/v1/beta/orders/reports",
+        ),
+        checkout("Routes.swift", "OrderController.mountSelf(_:)"),
+        checkout(
+            "Routes.swift",
+            "OrderController.mountSelf(_:).GET /api/v1/beta/orders/self",
+        ),
         checkout("Gateway.swift", "gateway()"),
         checkout("Gateway.swift", "gateway().GET /health"),
         checkout("Gateway.swift", "gateway().POST /v1/items"),
@@ -12695,6 +12995,22 @@ fn swift() {
             checkout("Routes.swift", "OrderController.boot(routes:)::tally#0"),
             EXACT,
             one(checkout("Routes.swift", "OrderController.tally()")),
+        ),
+        (
+            checkout(
+                "Routes.swift",
+                "OrderController.boot(routes:)::mountReports#0",
+            ),
+            EXACT,
+            one(checkout("Routes.swift", "OrderController.mountReports(_:)")),
+        ),
+        (
+            checkout(
+                "Routes.swift",
+                "OrderController.boot(routes:)::self.mountSelf#0",
+            ),
+            EXACT,
+            one(checkout("Routes.swift", "OrderController.mountSelf(_:)")),
         ),
         // Across the import: a public initializer and function, the module's name as a
         // qualifier, and an internal function the import does not reach.
@@ -13256,6 +13572,79 @@ fn swift_without_a_package_manifest() {
     );
 }
 
+/// A Swift call whose callee is capitalized is read as constructor syntax only when the name
+/// binds a type; one that binds a function is a plain call, and `await` decides an `async`
+/// target.
+#[test]
+fn swift_a_capitalized_callee_binds_a_function() {
+    conform(
+        "conformance-swift-capitalized",
+        &[
+            "Sources/Plain.swift::Check(_:)",
+            "Sources/Plain.swift::check(_:)",
+            "Sources/Plain.swift::run()",
+            "Sources/Plain.swift::Holder",
+            "Sources/Plain.swift::Holder.Pick()",
+            "Sources/Plain.swift::Holder.pick()",
+            "Sources/Plain.swift::Holder.use()",
+            "Sources/Uses.swift::Load()",
+            "Sources/Uses.swift::spawn()",
+            "Sources/Wrapper.swift::XCTAssertNoThrow(_:file:)",
+            "Sources/Uses.swift::Store",
+            "Sources/Uses.swift::Store.init(initialState:)",
+            "Sources/Uses.swift::g()",
+            "Sources/Uses.swift::awaited()",
+            "Sources/Uses.swift::synchronous()",
+            "Sources/Uses.swift::types()",
+        ],
+        &[],
+        &[
+            (
+                "Sources/Plain.swift::run()::Check#0",
+                EXACT,
+                &["Sources/Plain.swift::Check(_:)"],
+            ),
+            (
+                "Sources/Plain.swift::run()::check#0",
+                EXACT,
+                &["Sources/Plain.swift::check(_:)"],
+            ),
+            (
+                "Sources/Plain.swift::Holder.use()::Pick#0",
+                EXACT,
+                &["Sources/Plain.swift::Holder.Pick()"],
+            ),
+            (
+                "Sources/Uses.swift::spawn()::Load#0",
+                EXACT,
+                &["Sources/Uses.swift::Load()"],
+            ),
+            (
+                "Sources/Uses.swift::spawn()::Load#1",
+                EXACT,
+                &["Sources/Uses.swift::Load()"],
+            ),
+            ("Sources/Uses.swift::spawn()::Load#2", None, &[]),
+            (
+                "Sources/Uses.swift::awaited()::XCTAssertNoThrow#0",
+                EXACT,
+                &["Sources/Wrapper.swift::XCTAssertNoThrow(_:file:)"],
+            ),
+            (
+                "Sources/Uses.swift::synchronous()::XCTAssertNoThrow#0",
+                None,
+                &[],
+            ),
+            (
+                "Sources/Uses.swift::types()::Store#0",
+                EXACT,
+                &["Sources/Uses.swift::Store.init(initialState:)"],
+            ),
+            ("Sources/Uses.swift::types()::Text#0", None, &[]),
+        ],
+    );
+}
+
 #[test]
 fn swift_search_finds_the_program_entry_points() {
     let repo = fixture_repo("swift_programs", "conformance-swift", Some(ORIGIN));
@@ -13475,4 +13864,451 @@ fn swift_search_finds_an_extension_member_and_context_lists_callers_and_callees(
         "conformance-swift.context-moor.txt",
         &engine.context("Boat.moor()", None).unwrap(),
     );
+}
+
+/// An annotation name on a method is read through the file's imports, past a base from outside
+/// the repository: a member type of that base could shadow it (JLS 6.4.1), an accepted miss
+/// (#354). Single-type and on-demand imports agree.
+#[test]
+fn java_method_annotations_resolve_past_an_outside_base() {
+    let repo = fixture_repo(
+        "java_outside_base_annotations",
+        "conformance-java",
+        Some(ORIGIN),
+    );
+    let dir = repo.join("maven/api/src/main/java/example/based");
+    std::fs::create_dir_all(&dir).unwrap();
+    let files = [
+        (
+            "Single.java",
+            "package example.based;
+import com.corp.shared.BaseController;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+@RestController @RequestMapping(\"/single\")
+class Single extends BaseController { @GetMapping(\"/{id}\") String get() { return \"\"; } }",
+        ),
+        (
+            "Wild.java",
+            "package example.based;
+import com.corp.shared.BaseController;
+import org.springframework.web.bind.annotation.*;
+@RestController @RequestMapping(\"/wild\")
+class Wild extends BaseController { @GetMapping(\"/{id}\") String get() { return \"\"; } }",
+        ),
+        (
+            "Resource.java",
+            "package example.based;
+import com.corp.shared.BaseResource;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+@Path(\"/resource\")
+class Resource extends BaseResource { @GET String get() { return \"\"; } }",
+        ),
+        (
+            "Remote.java",
+            "package example.based;
+import com.corp.shared.BaseClient;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+@FeignClient(name = \"remote\", url = \"https://remote.example.com\")
+interface Remote extends BaseClient { @GetMapping(\"/things\") String things(); }",
+        ),
+        (
+            "Listener.java",
+            "package example.based;
+import com.corp.shared.BaseListener;
+import org.springframework.kafka.annotation.KafkaListener;
+class Listener extends BaseListener { @KafkaListener(topics = \"based-topic\") void on(String m) {} }",
+        ),
+    ];
+    for (name, source) in files {
+        std::fs::write(dir.join(name), source).unwrap();
+    }
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let on = |kind: &str| -> Vec<(String, String)> {
+        let mut found: Vec<(String, String)> = json[kind]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|p| {
+                let site = p["site"].as_str().unwrap();
+                let site = site.strip_prefix(&format!("{REPO}::")).unwrap();
+                let site = site.strip_prefix("maven/api/src/main/java/example/based/")?;
+                Some((p["contract"].as_str()?.into(), site.into()))
+            })
+            .collect();
+        found.sort();
+        found
+    };
+    assert_eq!(
+        on("providers"),
+        pairs(&[
+            (
+                "http::GET::/resource",
+                "Resource.java::example.based.Resource.get()"
+            ),
+            (
+                "http::GET::/single/{}",
+                "Single.java::example.based.Single.get()"
+            ),
+            ("http::GET::/wild/{}", "Wild.java::example.based.Wild.get()"),
+        ])
+    );
+    assert_eq!(
+        on("consumers"),
+        pairs(&[
+            (
+                "channel::kafka::based-topic",
+                "Listener.java::example.based.Listener.on(String)"
+            ),
+            (
+                "http::GET::/things",
+                "Remote.java::example.based.Remote.things()"
+            ),
+        ])
+    );
+}
+
+/// The same in Kotlin: a method annotation of a class with an outside base is read through the
+/// imports, a class without a base alike, and a name no import binds stays unread.
+#[test]
+fn kotlin_method_annotations_resolve_past_an_outside_base() {
+    let repo = fixture_repo(
+        "kotlin_outside_base_annotations",
+        "conformance-kotlin",
+        Some(ORIGIN),
+    );
+    let dir = repo.join("src/main/kotlin/example/based");
+    std::fs::create_dir_all(&dir).unwrap();
+    let head = "package example.based
+import com.corp.shared.BaseController
+import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.RequestMapping
+";
+    let files = [
+        (
+            "Single.kt",
+            "import org.springframework.web.bind.annotation.GetMapping
+@RestController @RequestMapping(\"/single\")
+class Single : BaseController() { @GetMapping(\"/{id}\") fun get(): String = \"\" }",
+        ),
+        (
+            "Plain.kt",
+            "import org.springframework.web.bind.annotation.GetMapping
+@RestController @RequestMapping(\"/plain\")
+class Plain { @GetMapping(\"/{id}\") fun get(): String = \"\" }",
+        ),
+        (
+            "Unbound.kt",
+            "@RestController @RequestMapping(\"/unbound\")
+class Unbound : BaseController() { @GetMapping(\"/{id}\") fun get(): String = \"\" }",
+        ),
+    ];
+    for (name, source) in files {
+        std::fs::write(dir.join(name), format!("{head}{source}")).unwrap();
+    }
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let mut actual: Vec<(String, String)> = (json["providers"].as_array().unwrap().iter())
+        .filter_map(|p| {
+            let site = p["site"].as_str().unwrap();
+            let site = site.strip_prefix(&format!("{REPO}::")).unwrap();
+            let site = site.strip_prefix("src/main/kotlin/example/based/")?;
+            Some((p["contract"].as_str()?.into(), site.into()))
+        })
+        .collect();
+    actual.sort();
+    assert_eq!(
+        actual,
+        pairs(&[
+            (
+                "http::GET::/plain/{}",
+                "Plain.kt::example.based.Plain.get()"
+            ),
+            (
+                "http::GET::/single/{}",
+                "Single.kt::example.based.Single.get()"
+            ),
+        ])
+    );
+}
+
+/// A Swift call through an implicit member (`.make()`) keeps its member name under a head no
+/// declaration binds: it resolves by name and labels, never `exact` and never to a free
+/// function of that name; an implicit initializer stays unresolved (issue #407).
+#[test]
+fn swift_an_implicit_member_call_resolves_by_name() {
+    conform(
+        "conformance-swift-implicit",
+        &[
+            "Sources/Implicit.swift::Duration",
+            "Sources/Implicit.swift::wait(_:)",
+            "Sources/Implicit.swift::seconds(_:)",
+            "Sources/Implicit.swift::sleepy()",
+            "Sources/Implicit.swift::Config",
+            "Sources/Implicit.swift::Config.init(x:)",
+            "Sources/Implicit.swift::Config.make()",
+            "Sources/Implicit.swift::Config.build()",
+            "Sources/Implicit.swift::Other",
+            "Sources/Implicit.swift::Other.make()",
+            "Sources/Implicit.swift::configure()",
+            "Sources/Implicit.swift::fresh()",
+            "Sources/Implicit.swift::swapped()",
+        ],
+        &[],
+        &[
+            (
+                "Sources/Implicit.swift::sleepy()::wait#0",
+                EXACT,
+                &["Sources/Implicit.swift::wait(_:)"],
+            ),
+            (
+                "Sources/Implicit.swift::sleepy()::(implicit).seconds#0",
+                None,
+                &[],
+            ),
+            (
+                "Sources/Implicit.swift::configure()::(implicit).make#0",
+                AMBIGUOUS,
+                &[
+                    "Sources/Implicit.swift::Config.make()",
+                    "Sources/Implicit.swift::Other.make()",
+                ],
+            ),
+            (
+                "Sources/Implicit.swift::configure()::(implicit).build#0",
+                INFERRED,
+                &["Sources/Implicit.swift::Config.build()"],
+            ),
+            (
+                "Sources/Implicit.swift::fresh()::(implicit).init#0",
+                None,
+                &[],
+            ),
+            ("Sources/Implicit.swift::swapped()::swap#0", None, &[]),
+        ],
+    );
+}
+
+/// Swift modules are targets of one package (issue #410): two packages that each declare a
+/// target `App` give two modules, each package's call binds its own function, a
+/// `@testable import App` reaches the `internal` function of the package's own `App` but not
+/// its `fileprivate` one, and a plain `import App` reaches neither.
+#[test]
+fn swift_same_named_targets_of_two_packages_are_two_modules() {
+    let at = |pkg: &str, file: &str, name: &str| format!("{pkg}/{file}::{name}");
+    let app = |pkg: &str, name: &str| at(pkg, "Sources/App/App.swift", name);
+    let test = |pkg: &str, name: &str| at(pkg, "Tests/AppTests/AppTests.swift", name);
+    let mut symbols = Vec::new();
+    for pkg in ["one", "two", "plain"] {
+        symbols.extend(["buildApplication()", "secret()", "start()"].map(|n| app(pkg, n)));
+        symbols.push(test(pkg, "check()"));
+    }
+    let symbols: Vec<&str> = symbols.iter().map(String::as_str).collect();
+    let mut calls: Vec<(String, Option<&str>, Vec<String>)> = Vec::new();
+    for pkg in ["one", "two"] {
+        let build = vec![app(pkg, "buildApplication()")];
+        calls.push((
+            app(pkg, "start()::buildApplication#0"),
+            EXACT,
+            build.clone(),
+        ));
+        calls.push((
+            app(pkg, "start()::secret#0"),
+            EXACT,
+            vec![app(pkg, "secret()")],
+        ));
+        calls.push((test(pkg, "check()::buildApplication#0"), EXACT, build));
+        calls.push((test(pkg, "check()::secret#0"), None, vec![]));
+    }
+    calls.push((
+        app("plain", "start()::buildApplication#0"),
+        EXACT,
+        vec![app("plain", "buildApplication()")],
+    ));
+    calls.push((test("plain", "check()::buildApplication#0"), None, vec![]));
+    let targets: Vec<Vec<&str>> = (calls.iter())
+        .map(|(_, _, t)| t.iter().map(String::as_str).collect())
+        .collect();
+    let calls: Vec<ExpectedCall> = (calls.iter().zip(&targets))
+        .map(|((call, level, _), targets)| (call.as_str(), *level, targets.as_slice()))
+        .collect();
+    conform("conformance-swift-packages", &symbols, &[], &calls);
+}
+
+/// Swift calls through a `typealias`, a hidden initializer and a trailing closure (issue #411):
+/// a receiver written as an alias is typed as its target (through an alias of an alias, an
+/// optional and a property), a cycle of aliases types nothing and an alias of an outside type
+/// leaves its receiver outside; an initializer another module keeps to itself is no candidate;
+/// a trailing closure fills only a parameter whose written type is a function type, a generic
+/// parameter or a repository alias of a function type.
+#[test]
+fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
+    let lib = |name: &str| format!("Sources/Lib/Lib.swift::{name}");
+    let app = |name: &str| format!("Sources/App/main.swift::{name}");
+    let aliases = |name: &str| format!("Sources/App/Aliases.swift::{name}");
+    let symbols = [
+        lib("Reduce"),
+        lib("Reduce.init(internal:)"),
+        lib("Reduce.init(_:(S,A)->Int)"),
+        lib("Reduce.init(_:someReducer)"),
+        lib("Reducer"),
+        lib("Store"),
+        lib("Store.send(_:)"),
+        lib("inside()"),
+        aliases("Feature"),
+        aliases("Feature.tap()"),
+        app("main"),
+        app("use(_:_:_:_:)"),
+        app("cycle(_:_:)"),
+        app("Sender"),
+        app("Sender.send(_:animation:)"),
+        app("Sender.send(_:assert:)"),
+        app("Sender.on(_:h:)"),
+        app("Sender.on(_:n:)"),
+        app("run(_:)"),
+        app("trailing(_:)"),
+        app("hidden(_:)"),
+        app("Wheel"),
+        app("Wheel.spin()"),
+        app("local()"),
+        app("generic(_:)"),
+        app("Other"),
+        app("Other.ping()"),
+        app("Box"),
+        app("Box.g(_:)"),
+        app("untyped()"),
+    ];
+    let symbols: Vec<&str> = symbols.iter().map(String::as_str).collect();
+    let (send, init, internal) = (
+        lib("Store.send(_:)"),
+        lib("Reduce.init(_:(S,A)->Int)"),
+        lib("Reduce.init(internal:)"),
+    );
+    let use_ = |callee: &str| app(&format!("use(_:_:_:_:)::{callee}"));
+    let trailing = |callee: &str| app(&format!("trailing(_:)::{callee}"));
+    let calls: Vec<(String, Option<&str>, Vec<String>)> = vec![
+        (use_("typed.send#0"), EXACT, vec![send.clone()]),
+        (use_("aliased.send#0"), EXACT, vec![send.clone()]),
+        (use_("maybe.send#0"), EXACT, vec![send.clone()]),
+        (use_("again.send#0"), EXACT, vec![send.clone()]),
+        (use_("Reduce#0"), EXACT, vec![init.clone()]),
+        (
+            lib("Reduce.init(_:(S,A)->Int)::self.init#0"),
+            EXACT,
+            vec![internal.clone()],
+        ),
+        (lib("inside()::Reduce#0"), EXACT, vec![internal]),
+        (aliases("Feature.tap()::store.send#0"), EXACT, vec![send]),
+        // A cycle of aliases and an alias of an outside type type their receivers: neither
+        // reaches the repository's `spin` by name, as a receiver of no known type does.
+        (app("cycle(_:_:)::a.spin#0"), None, vec![]),
+        (app("cycle(_:_:)::anim.spin#0"), None, vec![]),
+        (
+            app("untyped()::w.spin#0"),
+            INFERRED,
+            vec![app("Wheel.spin()")],
+        ),
+        (app("local()::x.send#0"), EXACT, vec![lib("Store.send(_:)")]),
+        // A type parameter named like an alias hides it, and an alias in a type hides a type
+        // of its name around it.
+        (
+            app("generic(_:)::x.send#0"),
+            AMBIGUOUS,
+            vec![
+                app("Sender.send(_:animation:)"),
+                app("Sender.send(_:assert:)"),
+                lib("Store.send(_:)"),
+            ],
+        ),
+        (app("Box.g(_:)::s.ping#0"), EXACT, vec![app("Other.ping()")]),
+        (
+            trailing("x.send#0"),
+            EXACT,
+            vec![app("Sender.send(_:assert:)")],
+        ),
+        (
+            trailing("x.send#1"),
+            AMBIGUOUS,
+            vec![
+                app("Sender.send(_:animation:)"),
+                app("Sender.send(_:assert:)"),
+            ],
+        ),
+        (trailing("x.on#0"), EXACT, vec![app("Sender.on(_:h:)")]),
+        (trailing("run#0"), EXACT, vec![app("run(_:)")]),
+        // An alias its module keeps to itself types nothing in another module.
+        (app("hidden(_:)::x.send#0"), None, vec![]),
+    ];
+    let targets: Vec<Vec<&str>> = (calls.iter())
+        .map(|(_, _, t)| t.iter().map(String::as_str).collect())
+        .collect();
+    let calls: Vec<ExpectedCall> = (calls.iter().zip(&targets))
+        .map(|((call, level, _), targets)| (call.as_str(), *level, targets.as_slice()))
+        .collect();
+    conform(
+        "conformance-swift-alias",
+        &symbols,
+        &["Sources/App/main.swift::main"],
+        &calls,
+    );
+}
+
+/// The level and target of the call to `callee` in `main` of `dir/main.py`, in `python-nested-pyproject`.
+fn nested_pyproject_call(
+    json: &Value,
+    dir: &str,
+    callee: &str,
+) -> (Option<String>, Option<String>) {
+    let id = format!("{REPO}::{dir}/main.py::main::{callee}#0");
+    let call = (json["calls"].as_array().unwrap().iter())
+        .find(|c| c["id"] == id)
+        .unwrap_or_else(|| panic!("no call {id}"));
+    let text = |k: &str| call[k].as_str().map(String::from);
+    (text("level"), text("target"))
+}
+
+#[test]
+fn python_imports_resolve_through_the_nearest_nested_pyproject() {
+    let repo = fixture_repo(
+        "python_nested_pyproject",
+        "python-nested-pyproject",
+        Some(ORIGIN),
+    );
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    // The template's shape, siblings that both hold `app`, and a Poetry `from` of its own.
+    for (dir, callee, target) in [
+        ("backend", "create", "backend/app/crud.py::create"),
+        ("a", "f", "a/app/util.py::f"),
+        ("b", "f", "b/app/util.py::f"),
+        ("c", "g", "c/lib/pkg/mod.py::g"),
+        ("d", "g", "d/lib/pkg/mod.py::g"),
+    ] {
+        let (level, to) = nested_pyproject_call(&json, dir, callee);
+        assert_eq!(level.as_deref(), Some("exact"), "{dir}");
+        assert_eq!(to, Some(format!("{REPO}::{target}")), "{dir}");
+    }
+}
+
+#[test]
+fn python_nested_pyproject_that_cannot_be_read_declares_no_roots() {
+    // Not TOML, not UTF-8, or past the size limit: no declared roots, and the rest indexes.
+    let large = format!("[tool.poetry]\n# {}\n", "x".repeat(1 << 20));
+    for (case, bytes) in [
+        ("python_nested_invalid", b"[tool\n".to_vec()),
+        ("python_nested_binary", vec![0xff, 0xfe, 0x00]),
+        ("python_nested_large", large.into_bytes()),
+    ] {
+        let repo = fixture_repo(case, "python-nested-pyproject", Some(ORIGIN));
+        std::fs::write(repo.join("c/pyproject.toml"), bytes).unwrap();
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        let json: Value = serde_json::from_str(&export).unwrap();
+        assert_eq!(nested_pyproject_call(&json, "c", "g").0, None, "{case}");
+        let a = nested_pyproject_call(&json, "a", "f").0;
+        assert_eq!(a.as_deref(), Some("exact"), "{case}");
+    }
 }

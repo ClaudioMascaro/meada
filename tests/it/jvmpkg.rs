@@ -157,6 +157,77 @@ fn computed_coordinates_keep_literal_parts_and_stay_ambiguous_with_one_provider(
     }
 }
 
+/// The `(contract, level, reason)` of each declared link of the repository at `path`, sorted.
+fn declared_links(path: &std::path::Path) -> Vec<(String, String, String)> {
+    let json: Value = serde_json::from_str(&Engine::open(path).unwrap().export().unwrap()).unwrap();
+    let mut links: Vec<_> = (declared(&json).iter())
+        .map(|l| {
+            let at = |k: &str| l[k].as_str().unwrap().to_string();
+            (at("contract"), at("level"), at("reason"))
+        })
+        .collect();
+    links.sort();
+    links
+}
+
+#[test]
+fn a_property_the_build_files_declare_as_a_literal_links_like_a_written_coordinate() {
+    let [_, _, client, gradle_client] = workspace("jvm_packages_declared");
+    // A pom reads a property of its own, then of a parent pom of the repository; one without a
+    // declaration stays computed, listing every provider whose literal parts fit.
+    fs::write(
+        client.join("pom.xml"),
+        "<project><groupId>example</groupId><artifactId>web</artifactId>\
+         <properties><shared.group>example</shared.group></properties></project>",
+    )
+    .unwrap();
+    fs::create_dir(client.join("app")).unwrap();
+    fs::write(
+        client.join("app/pom.xml"),
+        "<project><parent><groupId>example</groupId><artifactId>web</artifactId></parent>\
+         <artifactId>app</artifactId><properties><artifact>models</artifact></properties>\
+         <dependencies>\
+         <dependency><groupId>${shared.group}</groupId><artifactId>${artifact}</artifactId>\
+         <version>1.2.0</version></dependency>\
+         <dependency><groupId>${undeclared}</groupId><artifactId>tools</artifactId></dependency>\
+         </dependencies></project>",
+    )
+    .unwrap();
+    let links = declared_links(&client);
+    let (names, levels): (Vec<_>, Vec<_>) = links.iter().map(|(c, l, _)| (c, l)).unzip();
+    assert_eq!(
+        names,
+        ["package::maven::*:tools", "package::maven::example:models"]
+    );
+    assert_eq!(levels, ["ambiguous", "exact"]);
+    assert_eq!(
+        links[1].2,
+        "package::maven::example:models 1.2.0 (local 1.2.0), range unchecked"
+    );
+    assert!(links[0].2.contains("computed coordinate"), "{links:?}");
+    // A Gradle name assigned once is a literal; assigned twice it is none.
+    let gradle = |assignments: &str| {
+        let build = format!(
+            "{assignments}\ndependencies {{\n    implementation \"example:t${{suffix}}\"\n}}\n"
+        );
+        fs::write(gradle_client.join("build.gradle"), build).unwrap();
+        let links = declared_links(&gradle_client);
+        links
+            .into_iter()
+            .map(|(c, l, _)| (c, l))
+            .collect::<Vec<_>>()
+    };
+    let link = |c: &str, l: &str| (c.to_string(), l.to_string());
+    assert_eq!(
+        gradle("def suffix = 'ools'"),
+        [link("package::maven::example:tools", "exact")]
+    );
+    assert_eq!(
+        gradle("def suffix = 'ools'\nsuffix = 'ome'"),
+        [link("package::maven::example:t*", "ambiguous")]
+    );
+}
+
 #[test]
 fn comments_strings_and_unrelated_blocks_never_supply_gradle_coordinates() {
     let [_, gradle, _, gradle_client] = workspace("jvm_packages_scanner");
@@ -452,7 +523,7 @@ fn map_notation_and_configured_declarations_read_their_coordinate() {
         ),
         // No literal fragment at all is no coordinate, as `libs.models` is none.
         ("implementation \"$coordinates\"", None),
-        ("implementation(\"${group}:${artifact}:1\")", None),
+        ("implementation(\"${vendor}:${artifact}:1\")", None),
     ] {
         fs::write(
             client.join("build.gradle"),
@@ -617,6 +688,36 @@ fn on_demand_candidates_and_shadowing_names_never_give_a_wrong_exact() {
             "ambiguous",
             &*format!("{MODELS}shared/Stamp.java::example.shared.Stamp.later()")
         )]
+    );
+}
+
+#[test]
+fn a_call_with_several_arguments_reaches_a_provider_varargs_method() {
+    let [maven, _, client, _] = workspace("jvm_imports_varargs");
+    let write = |root: &PathBuf, path: &str, source: &str| {
+        let path = root.join(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, source).unwrap();
+    };
+    write(
+        &maven,
+        "models/src/main/java/example/models/Pack.java",
+        "package example.models; public class Pack { public static int all(String... parts) { return 0; } }",
+    );
+    write(
+        &client,
+        "src/main/java/example/web/Packs.java",
+        "package example.web; import example.models.Pack; public class Packs { public int two() { return Pack.all(\"a\", \"b\"); } }",
+    );
+    let json: Value =
+        serde_json::from_str(&Engine::open(&client).unwrap().export().unwrap()).unwrap();
+    let found = imports(&json, &format!("{CLIENT}Packs.java::"));
+    assert_eq!(found.len(), 1, "{found:?}");
+    let (_, _, name, level, _, target) = found[0];
+    assert_eq!((name, level), ("all(2)", "exact"));
+    assert!(
+        target.ends_with("Pack.java::example.models.Pack.all(String...)"),
+        "{target}"
     );
 }
 

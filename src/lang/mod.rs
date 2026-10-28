@@ -105,6 +105,19 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether a definition named by a dotted path (`app.use` of `app.use = function () {}`, `o.m`
+    /// of a method of `const o = {}`) is what that path written in a call reaches, though its
+    /// head is a local or a constant (JavaScript's).
+    fn assigned_members(&self) -> bool {
+        false
+    }
+
+    /// Whether `Call::constructs` is a guess from the case of the callee (Swift has no `new`): a
+    /// call that constructs nothing the repository holds is read again as a plain call.
+    fn guesses_constructs(&self) -> bool {
+        false
+    }
+
     /// Whether wildcard imports combine their candidates rather than the latest one winning.
     /// An inside glob has priority over public globs (the class's own package in Java).
     fn unordered_globs(&self) -> bool {
@@ -419,6 +432,12 @@ pub struct Facts {
     /// The interfaces of the file (Java's `interface`), by qualified name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub interfaces: Vec<String>,
+    /// The type aliases of the file whose target is a function type (Swift's `typealias
+    /// Handler = (Int) -> Void`), by qualified name: a parameter written as one takes a
+    /// trailing closure (`Closure::Named`). An alias of a named type is an import
+    /// (`Imported::Path`) instead.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub function_aliases: Vec<String>,
     /// Whether the file is left out of the build for the target: a Rust file that opens with an
     /// inner `#![cfg(..)]` that is false (as if no `mod` reached it), a Go file whose build
     /// constraints exclude it.
@@ -438,9 +457,10 @@ pub struct Facts {
     /// Not kept in the index (see `Call::args`).
     #[serde(skip)]
     pub annotated: Vec<Annotated>,
-    /// The value each Kotlin, C# or Swift local, or the parameter of a tracked lambda, was given,
-    /// where no constant records it: the call a `val` (a Swift `let`) holds, the receiver `use`
-    /// passes on; in C#, the creation or call a field or a local is initialized with, and a member written through a
+    /// The value each Kotlin, Java, C# or Swift local, or the parameter of a tracked lambda, was
+    /// given, where no constant records it: the call a `val` (a Swift `let`) holds, the receiver
+    /// `use` passes on; in Java, the initializer of a local the file never assigns; in C#, the
+    /// creation or call a field or a local is initialized with, and a member written through a
     /// name (`c.BaseAddress = v`, named `c.BaseAddress`). Not kept in
     /// the index (see `Call::args`).
     #[serde(skip)]
@@ -470,6 +490,19 @@ pub struct Facts {
     /// Not kept in the index: it is joined again.
     #[serde(skip)]
     pub unit_references: Vec<String>,
+    /// The modules the file imports `@testable` (Swift), by the name written: they show it their
+    /// `internal` declarations.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub testable: Vec<String>,
+    /// The `private` names only their file sees (Swift's `fileprivate` and `private`), which
+    /// even a module imported `testable` keeps to itself.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub confined: Vec<String>,
+    /// The compilations (`unit`) whose `private` declarations the file sees, which
+    /// `LanguagePack::join` sets (Swift's `testable` imports, as the modules they name here).
+    /// Not kept in the index: it is joined again.
+    #[serde(skip)]
+    pub internals: Vec<String>,
     /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,
@@ -553,6 +586,10 @@ pub enum Class {
     /// make(1)`): as `Call::on` reads it, so the overload the call's argument count picks
     /// decides.
     Result(usize),
+    /// A member read on a callee-like name, as written (Swift's `let s = URLSession.shared`):
+    /// not a constructor, a returned value or a call result, so it gives no instance. Its head,
+    /// the first segment, may name a type outside the repository, which makes the value opaque.
+    Member(String),
     /// Bound by an import in the scope: what the file's imports bind the name to.
     Imported,
     /// Bound otherwise, so an outer binding of the name is hidden.
@@ -725,6 +762,9 @@ pub struct Def {
     /// it gives (`Class::Returned`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result: Option<Class>,
+    /// A call fits the function only when written under `await` (Swift's `async`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub suspends: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -744,6 +784,30 @@ pub struct Param {
     /// The names an object pattern binds, in order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fields: Vec<Field>,
+    /// Whether a trailing closure (Swift's `f(a) { }`, an empty `Call::labels` entry) may fill
+    /// it, as its written type says.
+    #[serde(default, skip_serializing_if = "Closure::takes")]
+    pub closure: Closure,
+}
+
+/// Whether a trailing closure may fill a parameter (`Param::closure`).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub enum Closure {
+    /// It may: a function type, a type parameter, or a pack that does not tell.
+    #[default]
+    Takes,
+    /// It may not: any other written type, a named one outside the repository included.
+    Refuses,
+    /// Written as this name, which `LanguagePack::join` reads among the repository's aliases of
+    /// a function type (Swift's `typealias Handler = (Int) -> Void`): `Takes` when one is so
+    /// named, else `Refuses`. The resolver reads one left as `Takes`.
+    Named(String),
+}
+
+impl Closure {
+    fn takes(&self) -> bool {
+        *self == Closure::Takes
+    }
 }
 
 /// Which argument of a call binds a parameter. A positional argument binds the parameters that
@@ -802,6 +866,21 @@ fn unknown() -> Value {
     Value::Unknown
 }
 
+/// The marker constant for a write of the field `name` (`Code::field_written_in`): `.name` for a
+/// write whose class is unknown, `.name@class` for one in the code of `class`. The value is
+/// none: a field so written holds no one value.
+pub fn field_write(name: &str, class: Option<&str>) -> Const {
+    Const {
+        name: match class {
+            Some(class) => format!(".{name}@{class}"),
+            None => format!(".{name}"),
+        },
+        value: Value::Unknown,
+        ty: None,
+        scope: None,
+    }
+}
+
 /// A call site. `scope` is the qualified name of the enclosing definition, empty at the top
 /// level; `callee` is the normalized call expression: `a.b.c` for identifier and member
 /// chains, `(<node kind>)` for any other expression.
@@ -823,6 +902,9 @@ pub struct Call {
     /// namespace. Kept with its argument count in cached facts.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub constructs: bool,
+    /// Whether the call is written under `await` (Swift), as a `Def::suspends` target needs.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub awaited: bool,
     pub range: Range<usize>,
     /// The arguments, as far as the call's own syntax tells: what contract kinds read URLs
     /// and options from. Not kept in the index: they hold string literals, so the index
@@ -1135,6 +1217,10 @@ fn bare_calls(facts: &mut Facts) {
     }
 }
 
+/// The head of a call on an implicit member (Swift's `.make()`): no declaration binds it, so the
+/// call resolves by name and labels, as one on a receiver of unknown type, among methods alone.
+pub const IMPLICIT_HEAD: &str = "(implicit)";
+
 /// Imports every name `source` exports (a Java or Kotlin package, a Swift module) on demand: a
 /// namespace import of it under an alias and a glob of that alias, `inside` when the names are
 /// the file's own package's.
@@ -1212,7 +1298,7 @@ mod tests {
         ("ts.rs:EXTENSIONS", "syntax"),
         ("ts.rs:FUNCTIONS", "syntax"),
         ("ts.rs:STRING_METHODS", "runtime"),
-        // Type reads the pack makes at parse time, pending #383.
+        // Decided exception (#383): the pack unwraps a declared return type at parse time.
         ("ts/types.rs:INFERS", "exception"),
         ("ts/types.rs:RESPONSES", "exception"),
         ("ts/uses.rs:ELEMENT_METHODS", "runtime"),

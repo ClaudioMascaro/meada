@@ -1,0 +1,314 @@
+{
+  "repository": "example.com/acme/conformance",
+  "files": [
+    {
+      "path": "one/Sources/App/App.swift",
+      "hash": "e8f8c94c0b430c5fe9b094ce6a3e4a403838ba742543b54eef0d271d65ee3ae6"
+    },
+    {
+      "path": "one/Tests/AppTests/AppTests.swift",
+      "hash": "bfd481488c4f1a54269eb49ab7c413f63b0a0d813de29272104dc5433edd2665"
+    },
+    {
+      "path": "plain/Sources/App/App.swift",
+      "hash": "e8f8c94c0b430c5fe9b094ce6a3e4a403838ba742543b54eef0d271d65ee3ae6"
+    },
+    {
+      "path": "plain/Tests/AppTests/AppTests.swift",
+      "hash": "4b3f39a541bebdc64cb654c47d0bdf022ee8122f7bbaf218dea026973de1a1da"
+    },
+    {
+      "path": "two/Sources/App/App.swift",
+      "hash": "e8f8c94c0b430c5fe9b094ce6a3e4a403838ba742543b54eef0d271d65ee3ae6"
+    },
+    {
+      "path": "two/Tests/AppTests/AppTests.swift",
+      "hash": "bfd481488c4f1a54269eb49ab7c413f63b0a0d813de29272104dc5433edd2665"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/conformance::one/Sources/App/App.swift::buildApplication()",
+      "span": {
+        "path": "one/Sources/App/App.swift",
+        "start": 0,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::one/Sources/App/App.swift::secret()",
+      "span": {
+        "path": "one/Sources/App/App.swift",
+        "start": 58,
+        "end": 107
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::one/Sources/App/App.swift::start()",
+      "span": {
+        "path": "one/Sources/App/App.swift",
+        "start": 109,
+        "end": 219
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::one/Tests/AppTests/AppTests.swift::check()",
+      "span": {
+        "path": "one/Tests/AppTests/AppTests.swift",
+        "start": 22,
+        "end": 132
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::plain/Sources/App/App.swift::buildApplication()",
+      "span": {
+        "path": "plain/Sources/App/App.swift",
+        "start": 0,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::plain/Sources/App/App.swift::secret()",
+      "span": {
+        "path": "plain/Sources/App/App.swift",
+        "start": 58,
+        "end": 107
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::plain/Sources/App/App.swift::start()",
+      "span": {
+        "path": "plain/Sources/App/App.swift",
+        "start": 109,
+        "end": 219
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::plain/Tests/AppTests/AppTests.swift::check()",
+      "span": {
+        "path": "plain/Tests/AppTests/AppTests.swift",
+        "start": 12,
+        "end": 65
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::two/Sources/App/App.swift::buildApplication()",
+      "span": {
+        "path": "two/Sources/App/App.swift",
+        "start": 0,
+        "end": 56
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::two/Sources/App/App.swift::secret()",
+      "span": {
+        "path": "two/Sources/App/App.swift",
+        "start": 58,
+        "end": 107
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::two/Sources/App/App.swift::start()",
+      "span": {
+        "path": "two/Sources/App/App.swift",
+        "start": 109,
+        "end": 219
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::two/Tests/AppTests/AppTests.swift::check()",
+      "span": {
+        "path": "two/Tests/AppTests/AppTests.swift",
+        "start": 22,
+        "end": 132
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/conformance::one/Sources/App/App.swift::start()::buildApplication#0",
+      "caller": "example.com/acme/conformance::one/Sources/App/App.swift::start()",
+      "target": "example.com/acme/conformance::one/Sources/App/App.swift::buildApplication()",
+      "level": "exact",
+      "span": {
+        "path": "one/Sources/App/App.swift",
+        "start": 147,
+        "end": 165
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::one/Sources/App/App.swift::start()::secret#0",
+      "caller": "example.com/acme/conformance::one/Sources/App/App.swift::start()",
+      "target": "example.com/acme/conformance::one/Sources/App/App.swift::secret()",
+      "level": "exact",
+      "span": {
+        "path": "one/Sources/App/App.swift",
+        "start": 183,
+        "end": 191
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::one/Tests/AppTests/AppTests.swift::check()::buildApplication#0",
+      "caller": "example.com/acme/conformance::one/Tests/AppTests/AppTests.swift::check()",
+      "target": "example.com/acme/conformance::one/Sources/App/App.swift::buildApplication()",
+      "level": "exact",
+      "span": {
+        "path": "one/Tests/AppTests/AppTests.swift",
+        "start": 60,
+        "end": 78
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::one/Tests/AppTests/AppTests.swift::check()::secret#0",
+      "caller": "example.com/acme/conformance::one/Tests/AppTests/AppTests.swift::check()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "one/Tests/AppTests/AppTests.swift",
+        "start": 96,
+        "end": 104
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::plain/Sources/App/App.swift::start()::buildApplication#0",
+      "caller": "example.com/acme/conformance::plain/Sources/App/App.swift::start()",
+      "target": "example.com/acme/conformance::plain/Sources/App/App.swift::buildApplication()",
+      "level": "exact",
+      "span": {
+        "path": "plain/Sources/App/App.swift",
+        "start": 147,
+        "end": 165
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::plain/Sources/App/App.swift::start()::secret#0",
+      "caller": "example.com/acme/conformance::plain/Sources/App/App.swift::start()",
+      "target": "example.com/acme/conformance::plain/Sources/App/App.swift::secret()",
+      "level": "exact",
+      "span": {
+        "path": "plain/Sources/App/App.swift",
+        "start": 183,
+        "end": 191
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::plain/Tests/AppTests/AppTests.swift::check()::buildApplication#0",
+      "caller": "example.com/acme/conformance::plain/Tests/AppTests/AppTests.swift::check()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "plain/Tests/AppTests/AppTests.swift",
+        "start": 45,
+        "end": 63
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::two/Sources/App/App.swift::start()::buildApplication#0",
+      "caller": "example.com/acme/conformance::two/Sources/App/App.swift::start()",
+      "target": "example.com/acme/conformance::two/Sources/App/App.swift::buildApplication()",
+      "level": "exact",
+      "span": {
+        "path": "two/Sources/App/App.swift",
+        "start": 147,
+        "end": 165
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::two/Sources/App/App.swift::start()::secret#0",
+      "caller": "example.com/acme/conformance::two/Sources/App/App.swift::start()",
+      "target": "example.com/acme/conformance::two/Sources/App/App.swift::secret()",
+      "level": "exact",
+      "span": {
+        "path": "two/Sources/App/App.swift",
+        "start": 183,
+        "end": 191
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::two/Tests/AppTests/AppTests.swift::check()::buildApplication#0",
+      "caller": "example.com/acme/conformance::two/Tests/AppTests/AppTests.swift::check()",
+      "target": "example.com/acme/conformance::two/Sources/App/App.swift::buildApplication()",
+      "level": "exact",
+      "span": {
+        "path": "two/Tests/AppTests/AppTests.swift",
+        "start": 60,
+        "end": 78
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::two/Tests/AppTests/AppTests.swift::check()::secret#0",
+      "caller": "example.com/acme/conformance::two/Tests/AppTests/AppTests.swift::check()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "two/Tests/AppTests/AppTests.swift",
+        "start": 96,
+        "end": 104
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::swiftpm::one",
+      "site": "example.com/acme/conformance::one/Package.swift"
+    },
+    {
+      "contract": "package::swiftpm::plain",
+      "site": "example.com/acme/conformance::plain/Package.swift"
+    },
+    {
+      "contract": "package::swiftpm::two",
+      "site": "example.com/acme/conformance::two/Package.swift"
+    }
+  ],
+  "consumers": [],
+  "packages": [
+    {
+      "name": "one",
+      "repository": "example.com/acme/conformance",
+      "directory": "one",
+      "ecosystem": "swiftpm"
+    },
+    {
+      "name": "plain",
+      "repository": "example.com/acme/conformance",
+      "directory": "plain",
+      "ecosystem": "swiftpm"
+    },
+    {
+      "name": "two",
+      "repository": "example.com/acme/conformance",
+      "directory": "two",
+      "ecosystem": "swiftpm"
+    }
+  ],
+  "communities": [
+    {
+      "name": "one/Sources/App",
+      "members": [
+        "example.com/acme/conformance::one/Sources/App/App.swift::buildApplication()",
+        "example.com/acme/conformance::one/Sources/App/App.swift::secret()",
+        "example.com/acme/conformance::one/Sources/App/App.swift::start()",
+        "example.com/acme/conformance::one/Tests/AppTests/AppTests.swift::check()"
+      ]
+    },
+    {
+      "name": "plain/Sources/App",
+      "members": [
+        "example.com/acme/conformance::plain/Sources/App/App.swift::buildApplication()",
+        "example.com/acme/conformance::plain/Sources/App/App.swift::secret()",
+        "example.com/acme/conformance::plain/Sources/App/App.swift::start()"
+      ]
+    },
+    {
+      "name": "two/Sources/App",
+      "members": [
+        "example.com/acme/conformance::two/Sources/App/App.swift::buildApplication()",
+        "example.com/acme/conformance::two/Sources/App/App.swift::secret()",
+        "example.com/acme/conformance::two/Sources/App/App.swift::start()",
+        "example.com/acme/conformance::two/Tests/AppTests/AppTests.swift::check()"
+      ]
+    }
+  ],
+  "links": []
+}

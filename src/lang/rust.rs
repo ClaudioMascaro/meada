@@ -544,6 +544,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                                 arity: None,
                                 labels: None,
                                 constructs: false,
+                                awaited: false,
                                 scope: scope.clone(),
                                 callee: callee.unwrap_or_default(),
                                 range: item.byte_range(),
@@ -768,6 +769,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     arity: None,
                     labels: None,
                     constructs: false,
+                    awaited: false,
                     scope: scope.clone(),
                     callee,
                     range: node.byte_range(),
@@ -1115,6 +1117,7 @@ fn def(name: &str, kind: Kind, node: Node) -> Def {
         returns: None,
         type_params: Vec::new(),
         result: None,
+        suspends: false,
     }
 }
 
@@ -1364,6 +1367,7 @@ fn parameters(function: Node, src: &[u8]) -> Vec<Parameter> {
             label: None,
             default: None,
             fields: Vec::new(),
+            closure: Default::default(),
         };
         match node.kind() {
             "self_parameter" => out.push(Parameter {
@@ -2574,7 +2578,7 @@ mod tests {
             .map(|r| {
                 let class = match r.class {
                     Class::Enclosing => "Self".to_string(),
-                    Class::Named(n) | Class::Type(n) => n,
+                    Class::Named(n) | Class::Type(n) | Class::Member(n) => n,
                     Class::Returned(n) | Class::Called(n) => format!("{n}()"),
                     Class::Result(n) => format!("#{n}()"),
                     Class::Imported => "imported".into(),

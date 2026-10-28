@@ -18,9 +18,9 @@ use std::rc::Rc;
 use tree_sitter::{Node, Parser};
 
 use super::{
-    Binds, Bound, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Join, Kind,
-    LanguagePack, Layout, Modules, Param, Receiver, Star, Value, bare_calls, children, named, text,
-    wildcard,
+    Binds, Bound, Call, Class, Closure, Const, Def, Export, Facts, Impl, Import, Imported, Join,
+    Kind, LanguagePack, Layout, Modules, Param, Receiver, Star, Value, bare_calls, children, named,
+    text, wildcard,
 };
 use crate::{Result, qualify};
 use values::Ctx;
@@ -36,6 +36,10 @@ const PATH_DEPTH: usize = 256;
 /// it keeps no facts: a partial overload family could turn an ambiguous call into an exact one.
 // ponytail: a long nested name must not multiply across a broad file without a budget.
 const QUALIFICATION_BYTES: usize = 4 * 1024 * 1024;
+/// How many aliases deep an alias of an alias of a function type is followed
+/// (`function_aliases`): a parameter written as one past it takes no trailing closure.
+// ponytail: real aliases chain once or twice; this keeps a crafted chain cheap.
+const ALIAS_DEPTH: usize = 16;
 
 /// The module of the files no target of a `Package.swift` holds, which no import can name.
 const NO_TARGET: &str = "(no target)";
@@ -70,7 +74,7 @@ impl LanguagePack for Swift {
     /// and the module's own names, which come before what an import brings: the inside glob,
     /// read first as the last import.
     fn join(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Join {
-        let targets = targets(configs);
+        let targets = Targets::new(configs);
         // The type parameters and associated types of each type, in whichever file declares it:
         // an extension's body sees those of the type it extends.
         let mut generics: HashMap<String, HashSet<String>> = HashMap::new();
@@ -80,24 +84,40 @@ impl LanguagePack for Swift {
                     .extend(def.type_params.iter().cloned());
             }
         }
+        let function_aliases = function_aliases(files);
         Box::new(move |path, facts| {
-            let module = module_of(&targets, path);
+            let module = targets.module_of(path);
             wildcard(module, true, facts);
             facts.unit = module.to_string();
+            facts.internals = (facts.testable.iter())
+                .flat_map(|name| targets.named_from(path, name))
+                .map(str::to_string)
+                .collect();
+            // Whether `ty` written in `scope` names a type parameter of a type around it.
+            let held = |scope: &str, ty: &str| {
+                enclosing(scope).any(|t| generics.get(t).is_some_and(|g| g.contains(head(ty))))
+            };
             for call in facts.calls.iter_mut().filter(|c| c.constructs) {
-                let ty = head(&call.callee);
-                let held =
-                    enclosing(&call.scope).any(|t| generics.get(t).is_some_and(|g| g.contains(ty)));
-                call.constructs = !held;
+                call.constructs = !held(&call.scope, &call.callee);
+            }
+            for def in &mut facts.defs {
+                for param in &mut def.params {
+                    let Closure::Named(ty) = &param.closure else {
+                        continue;
+                    };
+                    let takes = held(&def.name, ty) || function_aliases.contains(last(ty));
+                    param.closure = match takes {
+                        true => Closure::Takes,
+                        false => Closure::Refuses,
+                    };
+                }
             }
             for receiver in &mut facts.receivers {
-                let (Class::Type(ty) | Class::Named(ty)) = &receiver.class else {
+                let (Class::Type(ty) | Class::Named(ty) | Class::Member(ty)) = &receiver.class
+                else {
                     continue;
                 };
-                let ty = head(ty);
-                if enclosing(&receiver.scope)
-                    .any(|t| generics.get(t).is_some_and(|g| g.contains(ty)))
-                {
+                if held(&receiver.scope, ty) {
                     receiver.class = Class::Unknown;
                 }
             }
@@ -115,10 +135,10 @@ impl LanguagePack for Swift {
     /// The files of a module share its scope, and an import of the module's name names them
     /// all through its first file. A module that is no target of the repository is outside it.
     fn layout(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Result<Layout> {
-        let targets = targets(configs);
+        let targets = Targets::new(configs);
         let mut modules: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for path in files.keys() {
-            let module = module_of(&targets, path).to_string();
+            let module = targets.module_of(path).to_string();
             modules.entry(module).or_default().push(path.to_string());
         }
         let first: HashMap<String, String> = (modules.iter())
@@ -126,7 +146,13 @@ impl LanguagePack for Swift {
             .collect();
         Ok(Layout {
             members: None,
-            modules: Box::new(move |_, name| first.get(name).cloned().into_iter().collect()),
+            // A module's own glob names it by its unit; an import, by the target's name.
+            modules: Box::new(move |from, name| match first.get(name) {
+                Some(file) => [file.clone()].into(),
+                None => (targets.named_from(from, name).into_iter())
+                    .filter_map(|unit| first.get(unit).cloned())
+                    .collect(),
+            }),
             published: None,
             programs: Vec::new(),
             reaches: None,
@@ -143,6 +169,10 @@ impl LanguagePack for Swift {
     }
 
     fn members_in_scope(&self) -> bool {
+        true
+    }
+
+    fn guesses_constructs(&self) -> bool {
         true
     }
 
@@ -190,24 +220,81 @@ impl LanguagePack for Swift {
     }
 }
 
-/// The module of each target directory the manifests declare (empty at the root); of two
-/// targets of one directory, the last by name.
-fn targets(configs: &[(&str, &[u8])]) -> HashMap<String, String> {
-    (configs.iter())
-        .filter(|(path, _)| !Swift.is_code(path))
-        .flat_map(|(path, src)| manifest::targets(path, src))
-        .map(|t| (t.dir, t.name))
-        .collect()
+/// The modules the manifests declare: a module is a target of one package, named by the
+/// package's directory and the target's name (its `unit`).
+struct Targets {
+    /// The module of each target directory (empty at the root); of two targets of one
+    /// directory, the last by name.
+    dirs: HashMap<String, String>,
+    /// The module of each target name, by the directory of its package.
+    named: HashMap<String, BTreeMap<String, String>>,
+    /// The directory of every package that declares a target.
+    packages: HashSet<String>,
 }
 
-/// The module of the file `path`: the target whose directory holds it, the deepest one when
-/// several do, else `NO_TARGET`. Its directories are looked up, so the cost is the path's depth.
-// ponytail: two packages of the repository that name a target alike make one module of both.
-fn module_of<'t>(targets: &'t HashMap<String, String>, path: &str) -> &'t str {
-    let dirs = (path.rmatch_indices('/').map(|(at, _)| &path[..at])).chain([""]);
-    dirs.into_iter()
-        .find_map(|dir| targets.get(dir))
-        .map_or(NO_TARGET, String::as_str)
+impl Targets {
+    fn new(configs: &[(&str, &[u8])]) -> Self {
+        let found = (configs.iter())
+            .filter(|(path, _)| !Swift.is_code(path))
+            .flat_map(|(path, src)| manifest::targets(path, src));
+        let mut targets = Targets {
+            dirs: HashMap::new(),
+            named: HashMap::new(),
+            packages: HashSet::new(),
+        };
+        for t in found {
+            let unit = format!("{}:{}", t.package, t.name);
+            targets.dirs.insert(t.dir, unit.clone());
+            targets.packages.insert(t.package.clone());
+            (targets.named.entry(t.name).or_default()).insert(t.package, unit);
+        }
+        targets
+    }
+
+    /// The module of the file `path`: the target whose directory holds it, the deepest one
+    /// when several do, else `NO_TARGET`. Its directories are looked up, so the cost is the
+    /// path's depth.
+    fn module_of(&self, path: &str) -> &str {
+        let dirs = (path.rmatch_indices('/').map(|(at, _)| &path[..at])).chain([""]);
+        dirs.into_iter()
+            .find_map(|dir| self.dirs.get(dir))
+            .map_or(NO_TARGET, String::as_str)
+    }
+
+    /// The modules `import name` in the file `from` binds: the target of that name in the
+    /// package the file sits in (the deepest package around it), else in the package nearest
+    /// it in the directory tree, by the steps from the file's directory to the package's
+    /// through their common ancestor (every one when several are as near).
+    // ponytail: scans the packages that declare the name, so the cost is their number times
+    // the path's depth; index them by directory if a repository holds thousands alike.
+    fn named_from(&self, from: &str, name: &str) -> Vec<&str> {
+        let Some(packages) = self.named.get(name) else {
+            return Vec::new();
+        };
+        let dirs = (from.rmatch_indices('/').map(|(at, _)| &from[..at])).chain([""]);
+        let own = dirs.into_iter().find(|dir| self.packages.contains(*dir));
+        if let Some(unit) = own.and_then(|own| packages.get(own)) {
+            return vec![unit];
+        }
+        let here: Vec<&str> = from
+            .rsplit_once('/')
+            .map_or("", |(dir, _)| dir)
+            .split('/')
+            .collect();
+        let steps = |package: &str| {
+            let there: Vec<&str> = package.split('/').collect();
+            let shared = (here.iter().zip(&there))
+                .take_while(|(a, b)| a == b && !a.is_empty())
+                .count();
+            let depth = |parts: &[&str]| parts.iter().filter(|p| !p.is_empty()).count();
+            depth(&here) + depth(&there) - 2 * shared
+        };
+        let nearest = packages.keys().map(|p| steps(p)).min();
+        (packages.iter())
+            .filter(|(package, _)| Some(steps(package)) == nearest)
+            .map(|(_, unit)| unit.as_str())
+            .collect()
+    }
 }
 
 /// Swift's access levels, least first (`open` is `public`).
@@ -260,6 +347,8 @@ struct Visit<'t> {
     /// Whether the node is, or is directly in, the body of a function the walk defines: the
     /// statements of that body, not the ones nested in a block, a closure or an accessor.
     body: bool,
+    /// Whether the node is written under an `await` of its own function or closure.
+    awaited: bool,
 }
 
 /// A function, method or initializer's parameters: each with its argument label, and the
@@ -336,6 +425,8 @@ fn walk(
     // The names assigned (`x = v`, `x += v`, `&x`), by the scope written in, which hold no one
     // value there, and the members assigned through a name (`request.httpMethod = v`).
     let mut assigned: Vec<(Rc<String>, String)> = Vec::new();
+    // The properties assigned as `self.name = v`: they hold no one value to a receiver alone.
+    let mut self_assigned: Vec<(Rc<String>, String)> = Vec::new();
     let mut members: Vec<Member> = Vec::new();
     // The names a `var` declares, and those a method is called on, by the scope written in
     // (`url.appendPathComponent(..)` mutates a value in place).
@@ -364,6 +455,7 @@ fn walk(
         plain: Rc::new(String::new()),
         generics: Rc::default(),
         body: false,
+        awaited: false,
     }];
     while let Some(Visit {
         node,
@@ -375,6 +467,7 @@ fn walk(
         plain,
         generics,
         body,
+        awaited,
     }) = stack.pop()
     {
         let charge = if stores(node.kind()) { scope.len() } else { 0 };
@@ -523,6 +616,7 @@ fn walk(
                 }
                 facts.defs.push(Def {
                     params: signature.params,
+                    suspends: children(node).any(|c| c.kind() == "async"),
                     ..definition(&inner, kind, node.byte_range(), Vec::new())
                 });
                 if place == Place::Top {
@@ -534,6 +628,32 @@ fn walk(
                 }
                 if place != Place::Code && own < Access::Public {
                     facts.private.push(inner.as_ref().clone());
+                    if own < Access::Internal {
+                        facts.confined.push(inner.as_ref().clone());
+                    }
+                }
+            }
+            // An alias of a named type binds its name to that type, as an import does: a type
+            // written as the alias resolves through it (`StoreOf<X>` names `Store`). One of a
+            // function type is a parameter type that takes a trailing closure.
+            "typealias_declaration" if defining => {
+                let mut cursor = node.walk();
+                let names: Vec<Node> = node.children_by_field_name("name", &mut cursor).collect();
+                if let [alias, target] = names[..] {
+                    let name = unbacktick(text(alias, src));
+                    let local = qualify(&scope, &name);
+                    let own = access(node, src).unwrap_or(default).min(ceiling);
+                    let generics = with_generics(&generics, node, src);
+                    if let Class::Type(target) = class_of(target, src, &generics) {
+                        facts.imports.push(Import {
+                            local: local.clone(),
+                            source: String::new(),
+                            name: Imported::Path(target),
+                        });
+                        publish(&mut facts, place, own, &local, &name);
+                    } else if closure(target, src, &Generics::default()) == Closure::Takes {
+                        facts.function_aliases.push(local);
+                    }
                 }
             }
             // A deinitializer, a subscript and an accessor are code of the type around them.
@@ -650,6 +770,20 @@ fn walk(
                 for name in bound(node, src) {
                     facts.locals.push(qualify(&scope, &name));
                 }
+                // An `if let` or `guard let` of one environment read binds it as a `let` does.
+                if defining
+                    && place != Place::Top
+                    && matches!(node.kind(), "if_statement" | "guard_statement")
+                {
+                    for (name, value) in optional_reads(node, src, ctx(&scope, defining, &types)) {
+                        facts.bound.push(Bound {
+                            scope: scope.as_ref().clone(),
+                            within: scope.as_ref().clone(),
+                            name,
+                            value,
+                        });
+                    }
+                }
             }
             "lambda_literal" => {
                 inner_place = Place::Code;
@@ -687,6 +821,9 @@ fn walk(
                     match name.split_once('.') {
                         None => assigned.push((scope.clone(), name)),
                         Some((head, rest)) if !name.contains('(') => {
+                            if head == "self" && plain && !rest.contains('.') {
+                                self_assigned.push((scope.clone(), rest.to_string()));
+                            }
                             // Only a plain `=` as a statement of the body runs once, in place.
                             let direct = plain && !rest.contains('.') && runs_once(node);
                             let value = match (direct, result) {
@@ -725,6 +862,7 @@ fn walk(
                     );
                     // A type parameter is no type of the repository: `T()` constructs none.
                     at.constructs &= !generics.holds(head(&at.callee));
+                    at.awaited = awaited;
                     if let Some((receiver, _)) = at.callee.split_once('.') {
                         called.push((scope.clone(), receiver.to_string()));
                     }
@@ -736,6 +874,16 @@ fn walk(
             }
             _ => {}
         }
+        // `await` and `async let` cover what is written under them, up to a function or closure.
+        let inner_awaited = match node.kind() {
+            "await_expression" => true,
+            "property_declaration" => awaited || children(node).any(|c| c.kind() == "async"),
+            "function_declaration"
+            | "protocol_function_declaration"
+            | "init_declaration"
+            | "lambda_literal" => false,
+            _ => awaited,
+        };
         for &child in pushed.iter().rev() {
             let child_body = match node.kind() {
                 "function_declaration" | "protocol_function_declaration" | "init_declaration" => {
@@ -761,6 +909,7 @@ fn walk(
                 plain: inner_plain.clone(),
                 generics: inner_generics.clone(),
                 body: child_body,
+                awaited: inner_awaited,
             });
         }
     }
@@ -796,7 +945,8 @@ fn walk(
             .map(|(s, n)| (function(s).to_string(), n.clone()))
             .collect()
     };
-    let (assigned, called) = (by_function(&assigned), by_function(&called));
+    let (self_assigned, called) = (by_function(&self_assigned), by_function(&called));
+    let assigned = by_function(&assigned);
     facts.bound.retain(|b| {
         let at = (function(&b.scope).to_string(), b.name.clone());
         !assigned.contains(&at)
@@ -829,6 +979,17 @@ fn walk(
     facts
         .bound
         .retain(|b| !shared.contains(&qualify(&b.scope, &b.name)));
+    // A `var` read from outside and assigned again holds no one value: its calls keep the name
+    // match (the assignment may be in a function of the type, for a property).
+    let reassigned: HashSet<(&str, &str)> = (assigned.iter().chain(&self_assigned))
+        .flat_map(|(f, n)| enclosing(f).map(move |s| (s, n.as_str())))
+        .collect();
+    for receiver in &mut facts.receivers {
+        let at = (receiver.scope.as_str(), receiver.name.as_str());
+        if matches!(receiver.class, Class::Member(_)) && reassigned.contains(&at) {
+            receiver.class = Class::Unknown;
+        }
+    }
     facts.locals.sort();
     facts.locals.dedup();
     facts.receivers = one_class_each(std::mem::take(&mut facts.receivers), &facts.locals);
@@ -983,6 +1144,7 @@ fn stack_children<'t>(
             plain: plain.clone(),
             generics: generics.clone(),
             body: false,
+            awaited: false,
         });
     }
 }
@@ -1018,6 +1180,9 @@ fn publish(facts: &mut Facts, place: Place, access: Access, qualified: &str, nam
     if access < Access::Public {
         facts.private.push(qualified.to_string());
     }
+    if access < Access::Internal {
+        facts.confined.push(qualified.to_string());
+    }
     if place != Place::Top || access < Access::Internal {
         return;
     }
@@ -1028,9 +1193,8 @@ fn publish(facts: &mut Facts, place: Place, access: Access, qualified: &str, nam
 }
 
 /// `import Module` (or `import struct Module.Type`): the module's public names on demand,
-/// and its name as a qualifier (`Module.f()`).
-// ponytail: `@testable import` sees no `internal` declarations here, and an import of one
-// declaration takes the whole module.
+/// and its name as a qualifier (`Module.f()`); `@testable` lists it in `Facts::testable`.
+// ponytail: an import of one declaration takes the whole module.
 fn import(node: Node, src: &[u8], facts: &mut Facts) {
     let Some(path) = named(node).find(|n| n.kind() == "identifier") else {
         return;
@@ -1043,6 +1207,9 @@ fn import(node: Node, src: &[u8], facts: &mut Facts) {
         source: module.clone(),
         name: Imported::Namespace,
     });
+    if named(node).any(|n| n.kind() == "modifiers" && text(n, src).contains("@testable")) {
+        facts.testable.push(module.clone());
+    }
     wildcard(&module, false, facts);
 }
 
@@ -1076,6 +1243,8 @@ fn signature(node: Node, src: &[u8], generics: &Generics) -> Option<Signature> {
                     label: Some(label),
                     default: None,
                     fields: Vec::new(),
+                    closure: (names.get(1))
+                        .map_or(Closure::Refuses, |t| closure(*t, src, generics)),
                 });
                 let ty = names.get(1).map_or("", |t| text(*t, src));
                 types.push(ty.split_whitespace().collect());
@@ -1162,6 +1331,49 @@ fn class_of(node: Node, src: &[u8], generics: &Generics) -> Class {
     }
 }
 
+/// Whether a trailing closure may fill a parameter of the written type `node`: a function type
+/// (through `?`, parentheses and attributes), a type parameter of `generics` or `Any` does, a
+/// name is left to `join` (`Closure::Named`), and any other type does not.
+fn closure(mut node: Node, src: &[u8], generics: &Generics) -> Closure {
+    // A loop, not a recursion: a type nested deep costs no stack.
+    loop {
+        node = match node.kind() {
+            "function_type" => return Closure::Takes,
+            "optional_type" => match node.child_by_field_name("wrapped") {
+                Some(wrapped) => wrapped,
+                None => return Closure::Refuses,
+            },
+            // `(T)`: one element without a name.
+            "tuple_type" => {
+                let only = match named(node).collect::<Vec<_>>()[..] {
+                    [item] => {
+                        let mut cursor = item.walk();
+                        let names = item.children_by_field_name("name", &mut cursor);
+                        match names.collect::<Vec<_>>()[..] {
+                            [ty] => Some(ty),
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                };
+                match only {
+                    Some(ty) => ty,
+                    None => return Closure::Refuses,
+                }
+            }
+            "user_type" => {
+                return match type_name(node, src) {
+                    name if name.is_empty() => Closure::Refuses,
+                    // `Any` holds a closure as it holds any value.
+                    name if name == "Any" || generics.holds(head(&name)) => Closure::Takes,
+                    name => Closure::Named(name),
+                };
+            }
+            _ => return Closure::Refuses,
+        };
+    }
+}
+
 /// The type parameters a declaration brings (`<T: P>`) and, for a protocol, its associated
 /// types.
 fn own_generics(node: Node, src: &[u8]) -> Vec<String> {
@@ -1198,10 +1410,23 @@ fn declared(node: Node, src: &[u8], generics: &Generics) -> Class {
             .map_or(Class::Unknown, |t| class_of(t, src, generics));
     }
     let mut value = node.child_by_field_name("value");
+    // The grammar leaves the `?` of `URLSession.shared?` beside the value.
+    let optional_chain = value
+        .and_then(|v| v.next_sibling())
+        .is_some_and(|n| n.kind() == "?");
     while let Some(inner) =
         value.filter(|v| matches!(v.kind(), "try_expression" | "await_expression"))
     {
         value = inner.child_by_field_name("expr");
+    }
+    if let Some(read) = value
+        .filter(|_| !optional_chain)
+        .and_then(|v| member_read(v, src))
+    {
+        return match generics.holds(head(&read)) {
+            true => Class::Unknown,
+            false => Class::Member(read),
+        };
     }
     let Some(value) =
         value.filter(|v| matches!(v.kind(), "call_expression" | "constructor_expression"))
@@ -1215,6 +1440,66 @@ fn declared(node: Node, src: &[u8], generics: &Generics) -> Class {
         }
         _ => Class::Unknown,
     }
+}
+
+/// A member read on a plain name, as written (`URLSession.shared`, `Foundation.URLSession.shared`);
+/// `None` for anything else: a bare name, a subscript, a force unwrap or an optional chain at
+/// any point of the read, a call.
+fn member_read(node: Node, src: &[u8]) -> Option<String> {
+    let mut segments = Vec::new();
+    let mut at = node;
+    while at.kind() == "navigation_expression" {
+        if segments.len() + 1 >= PATH_DEPTH || children(at).any(|c| c.kind() == "?") {
+            return None;
+        }
+        let suffix = at.child_by_field_name("suffix")?;
+        if children(suffix).any(|c| c.kind() == "?") {
+            return None;
+        }
+        let name = suffix.child_by_field_name("suffix")?;
+        if name.kind() != "simple_identifier" {
+            return None;
+        }
+        segments.push(unbacktick(text(name, src)));
+        at = at.child_by_field_name("target")?;
+    }
+    if segments.is_empty() || at.kind() != "simple_identifier" {
+        return None;
+    }
+    segments.push(unbacktick(text(at, src)));
+    segments.reverse();
+    Some(segments.join("."))
+}
+
+/// The names (their last segment) of the repository's aliases of a function type
+/// (`Facts::function_aliases`), and of the aliases of those, `ALIAS_DEPTH` deep. A name matches an alias
+/// of any scope, so a parameter written as it takes a closure rather than lose a candidate.
+fn function_aliases(files: &BTreeMap<&str, &Facts>) -> HashSet<String> {
+    let mut takes: HashSet<String> = (files.values().flat_map(|f| &f.function_aliases))
+        .map(|c| last(c).to_string())
+        .collect();
+    let aliases: Vec<(&str, &str)> = (files.values().flat_map(|f| &f.imports))
+        .filter_map(|i| match &i.name {
+            Imported::Path(target) => Some((last(&i.local), last(target))),
+            _ => None,
+        })
+        .collect();
+    for _ in 0..ALIAS_DEPTH {
+        let more: Vec<&str> = (aliases.iter())
+            .filter(|(alias, target)| !takes.contains(*alias) && takes.contains(*target))
+            .map(|(alias, _)| *alias)
+            .collect();
+        if more.is_empty() {
+            break;
+        }
+        takes.extend(more.into_iter().map(str::to_string));
+    }
+    takes
+}
+
+/// The last segment of a dotted name.
+fn last(name: &str) -> &str {
+    name.rsplit('.').next().unwrap_or_default()
 }
 
 /// The receivers with one class per scope and name: a name bound twice to other classes, or
@@ -1264,6 +1549,34 @@ fn head(name: &str) -> &str {
 
 fn unbacktick(name: &str) -> String {
     name.trim_matches('`').to_string()
+}
+
+/// The `let name = <environment read>` bindings of the condition list of an `if` or `guard`.
+/// The grammar flattens the list: a `let`'s pattern, its name, then `=` and the initializer; a
+/// `var`, a shorthand `let name` or any other initializer binds no read.
+fn optional_reads(node: Node, src: &[u8], ctx: Ctx) -> Vec<(String, Value)> {
+    let mut out = Vec::new();
+    let mut cursor = node.walk();
+    for name in node.children_by_field_name("bound_identifier", &mut cursor) {
+        let (Some(pattern), Some(eq), Some(init)) = (
+            name.prev_sibling(),
+            name.next_sibling(),
+            name.next_named_sibling(),
+        ) else {
+            continue;
+        };
+        if pattern.kind() == "value_binding_pattern"
+            && text(pattern, src) == "let"
+            && pattern.prev_sibling().is_none_or(|p| p.kind() != "case")
+            && eq.kind() == "="
+        {
+            let value = values::value(init, src, ctx);
+            if values::read(&value).is_some() {
+                out.push((unbacktick(text(name, src)), value));
+            }
+        }
+    }
+    out
 }
 
 /// The names a declaration or a statement binds in its own node: a property's or a
@@ -1368,6 +1681,7 @@ fn call(function: Node, suffixes: &[Node], node: Node, src: &[u8], scope: &str) 
         arity: Some(labels.len()),
         labels: Some(labels),
         constructs,
+        awaited: false,
         range: node.byte_range(),
         args: Vec::new(),
         kwargs: Vec::new(),
@@ -1381,8 +1695,8 @@ fn call(function: Node, suffixes: &[Node], node: Node, src: &[u8], scope: &str) 
     })
 }
 
-/// A called expression as a dotted name (`a.b.c`, `self.f`, `super.init`); a part that is no
-/// name is `(<node kind>)`, and so is a chain longer than `PATH_DEPTH`. `x!` and `x?` are `x`.
+/// A called expression as a dotted name (`a.b.c`, `self.f`, `super.init`, `(implicit).f` for
+/// `.f`); a part that is no name is `(<node kind>)`, and so is a chain longer than `PATH_DEPTH`. `x!` and `x?` are `x`.
 fn callee(node: Node, src: &[u8]) -> String {
     let mut segments: Vec<String> = Vec::new();
     let mut at = node;
@@ -1421,6 +1735,17 @@ fn callee(node: Node, src: &[u8]) -> String {
                     break;
                 }
             },
+            // `.name`, a member of the contextual type: a head no declaration binds.
+            "prefix_expression" if text(at, src).starts_with('.') => {
+                match at.child_by_field_name("target") {
+                    Some(t) if t.kind() == "simple_identifier" => {
+                        segments.push(unbacktick(text(t, src)));
+                        segments.push(crate::lang::IMPLICIT_HEAD.into());
+                    }
+                    _ => segments.push("(prefix_expression)".into()),
+                }
+                break;
+            }
             kind => {
                 segments.push(format!("({kind})"));
                 break;
@@ -1452,6 +1777,7 @@ fn definition(name: &str, kind: Kind, range: Range<usize>, bases: Vec<String>) -
         returns: None,
         type_params: Vec::new(),
         result: None,
+        suspends: false,
     }
 }
 
@@ -1494,6 +1820,70 @@ mod tests {
             ("Vapor.RouteCollection", &["boot(routes:)"]),
         ];
         assert_eq!(Swift.known_outside(), expected);
+    }
+
+    /// What the file's receivers hold, as `name = class`, sorted.
+    fn classes(src: &str) -> Vec<String> {
+        let mut found: Vec<String> = (facts(src).receivers.into_iter())
+            .map(|r| {
+                let class = match r.class {
+                    Class::Member(n) => format!("member {n}"),
+                    Class::Named(n) => format!("named {n}"),
+                    Class::Type(n) => format!("type {n}"),
+                    _ => "?".to_string(),
+                };
+                format!("{} = {class}", r.name)
+            })
+            .collect();
+        found.sort();
+        found
+    }
+
+    #[test]
+    fn a_member_read_on_a_name_is_the_class_as_written() {
+        let found = classes(
+            "func f() async throws {\n\
+             let a = URLSession.shared\n\
+             let b = try await Foundation.URLSession.shared\n\
+             let c = await try Net.Http.client\n\
+             let d = Session()\n\
+             }\n\
+             struct S { let e = URLSession.shared }\n",
+        );
+        assert_eq!(
+            found,
+            [
+                "a = member URLSession.shared",
+                "b = member Foundation.URLSession.shared",
+                "c = member Net.Http.client",
+                "d = named Session",
+                "e = member URLSession.shared",
+            ]
+        );
+    }
+
+    #[test]
+    fn no_member_read_of_a_plain_name_is_unknown() {
+        let found = classes(
+            "func f(items: [Int]) {\n\
+             let a = Remote\n\
+             let b = items[0]\n\
+             let c = URLSession.shared!\n\
+             let d = URLSession.shared?\n\
+             let e = URLSession?.shared\n\
+             let g = URLSession.shared!.configuration\n\
+             let h = URLSession.shared?.configuration\n\
+             let i = URLSession.make().shared\n\
+             var j = URLSession.shared\n\
+             j = other\n\
+             }\n\
+             struct S { var k = URLSession.shared\n\
+             func swap() { k = other } }\n\
+             struct P { var m = URLSession.shared\n\
+             func swap() { self.m = other } }\n",
+        );
+        // A reassigned `var` keeps its name, with no class: it only hides an outer one.
+        assert_eq!(found, ["j = ?", "k = ?", "m = ?"]);
     }
 
     #[test]
@@ -1595,6 +1985,24 @@ mod tests {
         let chain = vec!["a"; PATH_DEPTH].join(".");
         let calls = facts(&format!("func f() {{ {chain}() }}\n")).calls;
         assert_eq!(calls[0].callee, chain);
+    }
+
+    #[test]
+    fn a_member_read_past_the_path_limit_is_unknown() {
+        let read = |depth: usize| {
+            classes(&format!(
+                "func f() {{ let x = {} }}\n",
+                vec!["A"; depth].join(".")
+            ))
+        };
+        assert_eq!(read(PATH_DEPTH).len(), 1);
+        assert!(read(PATH_DEPTH + 1).is_empty());
+    }
+
+    #[test]
+    fn a_type_parameter_is_no_head_of_an_outside_read() {
+        let found = classes("struct S<T> { func f() { let x = T.shared; let y = U.shared } }\n");
+        assert_eq!(found, ["y = member U.shared"]);
     }
 
     #[test]
@@ -1775,6 +2183,21 @@ mod tests {
     }
 
     #[test]
+    fn only_an_optional_let_of_one_read_is_bound() {
+        let env = "ProcessInfo.processInfo.environment[\"X\"]";
+        let bounds = |cond: &str| facts(&format!("func f() {{ {cond} {{ }} }}\n")).bound.len();
+        assert_eq!(bounds(&format!("if let a = {env}")), 1);
+        for hidden in [
+            format!("if var a = {env}"),
+            format!("while let a = {env}"),
+            format!("if case let a = {env}"),
+            "if let a".to_string(),
+        ] {
+            assert_eq!(bounds(&hidden), 0, "{hidden}");
+        }
+    }
+
+    #[test]
     fn a_global_var_is_not_bound() {
         let facts = facts(
             "var host = \"https://h\"\nlet fixed = \"https://f\"\nfunc f() { var local = \"x\" }\n",
@@ -1891,5 +2314,129 @@ mod tests {
         let facts = facts("enum Api {\n  static let host = \"h\"\n  var other = \"o\"\n}\n");
         let names: Vec<&str> = facts.consts.iter().map(|c| c.name.as_str()).collect();
         assert_eq!(names, ["Api.host"]);
+    }
+
+    /// What each written parameter type says about a trailing closure (issue #411): a function
+    /// type through `?`, parentheses and attributes, a type parameter of the function or its
+    /// type, and `Any`, take one; a name is left to `join`; any other type refuses it.
+    #[test]
+    fn a_parameter_type_tells_whether_it_takes_a_trailing_closure() {
+        let facts = facts(
+            "struct Box<T> {\n  func f<F>(a: @escaping (Int) -> Void, b: ((Int) -> Void)? = nil, \
+             c: @MainActor @Sendable () -> Void, d: F, e: T, g: Handler?, h: Lib.Handler, \
+             i: some Reducer, j: [Int], k: (Int, Int), l: Any?) {}\n}\n",
+        );
+        let def = (facts.defs.iter())
+            .find(|d| d.name.starts_with("Box.f("))
+            .unwrap();
+        let named = |n: &str| Closure::Named(n.to_string());
+        let closures: Vec<Closure> = def.params.iter().map(|p| p.closure.clone()).collect();
+        let expected = [
+            Closure::Takes,
+            Closure::Takes,
+            Closure::Takes,
+            Closure::Takes,
+            Closure::Takes,
+            named("Handler"),
+            named("Lib.Handler"),
+            Closure::Refuses,
+            Closure::Refuses,
+            Closure::Refuses,
+            Closure::Takes,
+        ];
+        assert_eq!(closures, expected);
+    }
+
+    /// A `typealias` of a named type binds its name as an import of that type, exported by its
+    /// access; one of a function type is listed in `Facts::function_aliases` (issue #411).
+    #[test]
+    fn a_typealias_binds_its_name_to_its_target() {
+        let facts = facts(
+            "public typealias StoreOf<S> = Store<S, Int>\ntypealias Maybe = Lib.Store?\n\
+             typealias Id<T> = T\npublic typealias Handler = ((Int) -> Void)?\n\
+             struct Box { typealias Inner = Store }\n",
+        );
+        let imports: Vec<(&str, &str)> = (facts.imports.iter())
+            .filter_map(|i| match &i.name {
+                Imported::Path(target) => Some((i.local.as_str(), target.as_str())),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            imports,
+            [
+                ("StoreOf", "Store"),
+                ("Maybe", "Lib.Store"),
+                ("Box.Inner", "Store")
+            ]
+        );
+        let exported: Vec<&str> = (facts.exports.iter())
+            .filter_map(|e| match e {
+                Export::Local { exported, .. } => Some(exported.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(exported, ["StoreOf", "Maybe", "Box"]);
+        assert!(facts.private.contains(&"Maybe".to_string()));
+        assert_eq!(facts.function_aliases, ["Handler"]);
+    }
+
+    /// `import App` binds the target of the importer's own package, else the nearest package's
+    /// by steps through the tree, every one when several are as near.
+    #[test]
+    fn an_import_names_the_nearest_package_target() {
+        let manifest = |name: &str| {
+            format!("let p = Package(name: \"p\", targets: [.target(name: \"{name}\")])")
+        };
+        let sources = [
+            ("Package.swift", manifest("Root")),
+            ("a/Package.swift", manifest("App")),
+            ("b/c/Package.swift", manifest("App")),
+            ("d/Package.swift", manifest("App")),
+            ("e/Package.swift", manifest("App")),
+            ("e/Fixtures/Package.swift", manifest("App")),
+            ("e/Sources/App/x.swift", String::new()),
+        ];
+        let configs: Vec<(&str, &[u8])> = (sources.iter())
+            .filter(|(path, _)| path.ends_with("Package.swift"))
+            .map(|(path, src)| (*path, src.as_bytes()))
+            .collect();
+        let targets = Targets::new(&configs);
+        let from = |path: &str, name: &str| targets.named_from(path, name);
+        // The file's own package, though a nested one sits nearer.
+        assert_eq!(from("e/Sources/App/x.swift", "App"), ["e:App"]);
+        // The root package has no `App`: `a`, `d` and `e` are three steps away, `b/c` four.
+        assert_eq!(
+            from("Sources/Root/x.swift", "App"),
+            ["a:App", "d:App", "e:App"]
+        );
+        // Outside every package but the root: `b/c` is two steps away, `a` three.
+        assert_eq!(from("b/x/y.swift", "App"), ["b/c:App"]);
+        // The target of an outer package, when the file's own has none of that name.
+        assert_eq!(from("a/x.swift", "Root"), [":Root"]);
+        assert!(from("a/x.swift", "Missing").is_empty());
+    }
+
+    #[test]
+    fn a_testable_import_is_listed() {
+        let facts =
+            facts("@testable import App\nimport Lib\n@preconcurrency @testable import Other\n");
+        assert_eq!(facts.testable, ["App", "Other"]);
+    }
+
+    /// `join` follows an alias of an alias of a function type `ALIAS_DEPTH` deep: a parameter
+    /// written as one past it takes no trailing closure, and a cycle ends.
+    #[test]
+    fn an_alias_chain_of_a_function_type_is_followed_to_its_limit() {
+        let mut src = String::from("typealias A0 = () -> Void\ntypealias X = Y\ntypealias Y = X\n");
+        for n in 1..=ALIAS_DEPTH + 1 {
+            src.push_str(&format!("typealias A{n} = A{}\n", n - 1));
+        }
+        let facts = facts(&src);
+        let files = BTreeMap::from([("a.swift", &facts)]);
+        let takes = function_aliases(&files);
+        assert!(takes.contains(&format!("A{ALIAS_DEPTH}")));
+        assert!(!takes.contains(&format!("A{}", ALIAS_DEPTH + 1)));
+        assert!(!takes.contains("X") && !takes.contains("Y"));
     }
 }

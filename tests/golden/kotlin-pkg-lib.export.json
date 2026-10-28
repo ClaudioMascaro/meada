@@ -38,7 +38,7 @@
       "hash": "f6a15d704123f28e16692675758193cb51ef713e7fb23dad7d70b6155b4a43d0"
     },
     {
-      "path": "src/main/kotlin/dev/kt/shared/Shared.kt",
+      "path": "util/src/main/kotlin/dev/kt/shared/Shared.kt",
       "hash": "15540c266f1762282574bd2d5d2f8296be56ba0f5ca8d9fc6e4803c2b111e08d"
     }
   ],
@@ -260,25 +260,25 @@
       }
     },
     {
-      "id": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp",
+      "id": "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp",
       "span": {
-        "path": "src/main/kotlin/dev/kt/shared/Shared.kt",
+        "path": "util/src/main/kotlin/dev/kt/shared/Shared.kt",
         "start": 23,
         "end": 73
       }
     },
     {
-      "id": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()",
+      "id": "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()",
       "span": {
-        "path": "src/main/kotlin/dev/kt/shared/Shared.kt",
+        "path": "util/src/main/kotlin/dev/kt/shared/Shared.kt",
         "start": 42,
         "end": 71
       }
     },
     {
-      "id": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()",
+      "id": "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()",
       "span": {
-        "path": "src/main/kotlin/dev/kt/shared/Shared.kt",
+        "path": "util/src/main/kotlin/dev/kt/shared/Shared.kt",
         "start": 75,
         "end": 110
       }
@@ -429,12 +429,12 @@
       }
     },
     {
-      "id": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()::Stamp.now#0",
-      "caller": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()",
-      "target": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()",
+      "id": "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()::Stamp.now#0",
+      "caller": "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()",
+      "target": "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()",
       "level": "exact",
       "span": {
-        "path": "src/main/kotlin/dev/kt/shared/Shared.kt",
+        "path": "util/src/main/kotlin/dev/kt/shared/Shared.kt",
         "start": 99,
         "end": 110
       }
@@ -520,10 +520,10 @@
       ]
     },
     {
-      "name": "src/main/kotlin/dev/kt/shared",
+      "name": "util/src/main/kotlin/dev/kt/shared",
       "members": [
-        "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()",
-        "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()"
+        "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()",
+        "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()"
       ]
     }
   ],
@@ -550,25 +550,18 @@
       "reason": "package::maven::dev.kt.http:client 3.1 (local 3.1), range unchecked"
     },
     {
-      "consumer": "example.com/kotlin/app::build.gradle.kts::implementation::dev.kt:*",
-      "provider": "example.com/kotlin/lib::build.gradle.kts",
-      "contract": "package::maven::dev.kt:*",
-      "level": "ambiguous",
-      "reason": "2 providers fit; computed coordinate; package::maven::dev.kt:* 3.1 (local 3.1), range unchecked"
-    },
-    {
-      "consumer": "example.com/kotlin/app::build.gradle.kts::implementation::dev.kt:*",
-      "provider": "example.com/kotlin/lib::util/build.gradle.kts",
-      "contract": "package::maven::dev.kt:*",
-      "level": "ambiguous",
-      "reason": "2 providers fit; computed coordinate; package::maven::dev.kt:* 3.1 (local 3.1), range unchecked"
-    },
-    {
       "consumer": "example.com/kotlin/app::build.gradle.kts::implementation::dev.kt:toolbox",
       "provider": "example.com/kotlin/lib::build.gradle.kts",
       "contract": "package::maven::dev.kt:toolbox",
       "level": "exact",
       "reason": "package::maven::dev.kt:toolbox 3.1 (local 3.1), range unchecked"
+    },
+    {
+      "consumer": "example.com/kotlin/app::build.gradle.kts::implementation::dev.kt:util",
+      "provider": "example.com/kotlin/lib::util/build.gradle.kts",
+      "contract": "package::maven::dev.kt:util",
+      "level": "exact",
+      "reason": "package::maven::dev.kt:util 3.1 (local 3.1), range unchecked"
     },
     {
       "consumer": "example.com/kotlin/app::build.gradle.kts::runtimeOnly::dev.kt:util",
@@ -768,31 +761,17 @@
     },
     {
       "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.stamp()::Stamp.now#0",
-      "provider": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()",
-      "contract": "package::maven::dev.kt:*",
+      "provider": "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()",
+      "contract": "package::maven::dev.kt:util",
       "level": "ambiguous",
-      "reason": "2 providers fit; computed coordinate; package::maven::dev.kt:* 3.1 (local 3.1), range unchecked; import package"
-    },
-    {
-      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.stamp()::Stamp.now#0",
-      "provider": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()",
-      "contract": "package::maven::dev.kt:toolbox",
-      "level": "ambiguous",
-      "reason": "package::maven::dev.kt:toolbox 3.1 (local 3.1), range unchecked; import package"
+      "reason": "package::maven::dev.kt:util 3.1 (local 3.1), range unchecked; import package"
     },
     {
       "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.stamp()::stamped#0",
-      "provider": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()",
-      "contract": "package::maven::dev.kt:*",
+      "provider": "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()",
+      "contract": "package::maven::dev.kt:util",
       "level": "ambiguous",
-      "reason": "2 providers fit; computed coordinate; package::maven::dev.kt:* 3.1 (local 3.1), range unchecked; import package"
-    },
-    {
-      "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/Shop.kt::dev.shop.stamp()::stamped#0",
-      "provider": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()",
-      "contract": "package::maven::dev.kt:toolbox",
-      "level": "ambiguous",
-      "reason": "package::maven::dev.kt:toolbox 3.1 (local 3.1), range unchecked; import package"
+      "reason": "package::maven::dev.kt:util 3.1 (local 3.1), range unchecked; import package"
     },
     {
       "consumer": "example.com/kotlin/app::src/main/kotlin/dev/shop/probes/Hidden.kt::dev.shop.probes.real()::greet#0",
@@ -1112,7 +1091,7 @@
       ]
     },
     {
-      "entry_point": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()",
+      "entry_point": "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()",
       "kind": "export",
       "label": "dev.kt.shared.stamped()",
       "steps": [
@@ -1121,14 +1100,14 @@
           "repository": "example.com/kotlin/lib",
           "level": null,
           "via": "entry",
-          "node": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()"
+          "node": "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.stamped()"
         },
         {
           "depth": 1,
           "repository": "example.com/kotlin/lib",
           "level": "exact",
           "via": "call",
-          "node": "example.com/kotlin/lib::src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()"
+          "node": "example.com/kotlin/lib::util/src/main/kotlin/dev/kt/shared/Shared.kt::dev.kt.shared.Stamp.now()"
         }
       ]
     }

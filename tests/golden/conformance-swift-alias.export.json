@@ -1,0 +1,589 @@
+{
+  "repository": "example.com/acme/conformance",
+  "files": [
+    {
+      "path": "Sources/App/Aliases.swift",
+      "hash": "705baade888cf58f6d00fe6ecb6aa950a9dfc5c506e37d7c1c5293f1198a9ed0"
+    },
+    {
+      "path": "Sources/App/main.swift",
+      "hash": "ff7a42ba9678c733d5ba7be5f2ec4a4d4f99ae56f6180cf291ce08f32fa191ef"
+    },
+    {
+      "path": "Sources/Lib/Lib.swift",
+      "hash": "af30553316c7f4970bf2e8c0574bacf448aa6aa6924a74d3b44fa6dbd7049aa4"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/conformance::Sources/App/Aliases.swift::Feature",
+      "span": {
+        "path": "Sources/App/Aliases.swift",
+        "start": 118,
+        "end": 201
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/Aliases.swift::Feature.tap()",
+      "span": {
+        "path": "Sources/App/Aliases.swift",
+        "start": 167,
+        "end": 199
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Box",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 905,
+        "end": 987
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Box.g(_:)",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 950,
+        "end": 985
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Other",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 857,
+        "end": 903
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Other.ping()",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 877,
+        "end": 901
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Sender",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 308,
+        "end": 523
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Sender.on(_:h:)",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 442,
+        "end": 481
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Sender.on(_:n:)",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 486,
+        "end": 521
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Sender.send(_:animation:)",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 333,
+        "end": 378
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Sender.send(_:assert:)",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 383,
+        "end": 437
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Wheel",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 695,
+        "end": 731
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Wheel.spin()",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 715,
+        "end": 729
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::cycle(_:_:)",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 241,
+        "end": 306
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::generic(_:)",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 802,
+        "end": 855
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::hidden(_:)",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 651,
+        "end": 693
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::local()",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 733,
+        "end": 800
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::main",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 0,
+        "end": 1040
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::run(_:)",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 525,
+        "end": 547
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::trailing(_:)",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 549,
+        "end": 649
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::untyped()",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 989,
+        "end": 1039
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::use(_:_:_:_:)",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 12,
+        "end": 239
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce",
+      "span": {
+        "path": "Sources/Lib/Lib.swift",
+        "start": 0,
+        "end": 211
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce.init(_:(S,A)->Int)",
+      "span": {
+        "path": "Sources/Lib/Lib.swift",
+        "start": 87,
+        "end": 165
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce.init(_:someReducer)",
+      "span": {
+        "path": "Sources/Lib/Lib.swift",
+        "start": 170,
+        "end": 209
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce.init(internal:)",
+      "span": {
+        "path": "Sources/Lib/Lib.swift",
+        "start": 33,
+        "end": 82
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reducer",
+      "span": {
+        "path": "Sources/Lib/Lib.swift",
+        "start": 213,
+        "end": 239
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::Store",
+      "span": {
+        "path": "Sources/Lib/Lib.swift",
+        "start": 241,
+        "end": 318
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::Store.send(_:)",
+      "span": {
+        "path": "Sources/Lib/Lib.swift",
+        "start": 274,
+        "end": 316
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::inside()",
+      "span": {
+        "path": "Sources/Lib/Lib.swift",
+        "start": 406,
+        "end": 473
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/conformance::Sources/App/Aliases.swift::Feature.tap()::store.send#0",
+      "caller": "example.com/acme/conformance::Sources/App/Aliases.swift::Feature.tap()",
+      "target": "example.com/acme/conformance::Sources/Lib/Lib.swift::Store.send(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/App/Aliases.swift",
+        "start": 184,
+        "end": 197
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::Box.g(_:)::s.ping#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::Box.g(_:)",
+      "target": "example.com/acme/conformance::Sources/App/main.swift::Other.ping()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 975,
+        "end": 983
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::cycle(_:_:)::a.spin#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::cycle(_:_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 280,
+        "end": 288
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::cycle(_:_:)::anim.spin#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::cycle(_:_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 293,
+        "end": 304
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::generic(_:)::x.send#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::generic(_:)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/App/main.swift::Sender.send(_:animation:)",
+        "example.com/acme/conformance::Sources/App/main.swift::Sender.send(_:assert:)",
+        "example.com/acme/conformance::Sources/Lib/Lib.swift::Store.send(_:)"
+      ],
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 844,
+        "end": 853
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::hidden(_:)::x.send#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::hidden(_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 682,
+        "end": 691
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::local()::make#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::local()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 774,
+        "end": 780
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::local()::x.send#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::local()",
+      "target": "example.com/acme/conformance::Sources/Lib/Lib.swift::Store.send(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 789,
+        "end": 798
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::trailing(_:)::run#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::trailing(_:)",
+      "target": "example.com/acme/conformance::Sources/App/main.swift::run(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 640,
+        "end": 647
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::trailing(_:)::x.on#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::trailing(_:)",
+      "target": "example.com/acme/conformance::Sources/App/main.swift::Sender.on(_:h:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 619,
+        "end": 635
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::trailing(_:)::x.send#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::trailing(_:)",
+      "target": "example.com/acme/conformance::Sources/App/main.swift::Sender.send(_:assert:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 582,
+        "end": 600
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::trailing(_:)::x.send#1",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::trailing(_:)",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/App/main.swift::Sender.send(_:animation:)",
+        "example.com/acme/conformance::Sources/App/main.swift::Sender.send(_:assert:)"
+      ],
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 605,
+        "end": 614
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::untyped()::make#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::untyped()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 1018,
+        "end": 1024
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::untyped()::w.spin#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::untyped()",
+      "target": "example.com/acme/conformance::Sources/App/main.swift::Wheel.spin()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 1029,
+        "end": 1037
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::use(_:_:_:_:)::Reduce#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::use(_:_:_:_:)",
+      "target": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce.init(_:(S,A)->Int)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 207,
+        "end": 237
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::use(_:_:_:_:)::again.send#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::use(_:_:_:_:)",
+      "target": "example.com/acme/conformance::Sources/Lib/Lib.swift::Store.send(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 185,
+        "end": 198
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::use(_:_:_:_:)::aliased.send#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::use(_:_:_:_:)",
+      "target": "example.com/acme/conformance::Sources/Lib/Lib.swift::Store.send(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 141,
+        "end": 156
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::use(_:_:_:_:)::maybe.send#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::use(_:_:_:_:)",
+      "target": "example.com/acme/conformance::Sources/Lib/Lib.swift::Store.send(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 165,
+        "end": 179
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::use(_:_:_:_:)::typed.send#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::use(_:_:_:_:)",
+      "target": "example.com/acme/conformance::Sources/Lib/Lib.swift::Store.send(_:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 122,
+        "end": 135
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce.init(_:(S,A)->Int)::self.init#0",
+      "caller": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce.init(_:(S,A)->Int)",
+      "target": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce.init(internal:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Lib/Lib.swift",
+        "start": 136,
+        "end": 163
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::inside()::Reduce#0",
+      "caller": "example.com/acme/conformance::Sources/Lib/Lib.swift::inside()",
+      "target": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce.init(internal:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Lib/Lib.swift",
+        "start": 430,
+        "end": 471
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::swiftpm::Alias",
+      "site": "example.com/acme/conformance::Package.swift"
+    }
+  ],
+  "consumers": [],
+  "packages": [
+    {
+      "name": "Alias",
+      "repository": "example.com/acme/conformance",
+      "directory": ".",
+      "ecosystem": "swiftpm"
+    }
+  ],
+  "communities": [
+    {
+      "name": "Sources/App",
+      "members": [
+        "example.com/acme/conformance::Sources/App/Aliases.swift::Feature.tap()",
+        "example.com/acme/conformance::Sources/App/main.swift::local()",
+        "example.com/acme/conformance::Sources/App/main.swift::use(_:_:_:_:)",
+        "example.com/acme/conformance::Sources/Lib/Lib.swift::Store.send(_:)"
+      ]
+    },
+    {
+      "name": "Sources/App#2",
+      "members": [
+        "example.com/acme/conformance::Sources/App/main.swift::Box.g(_:)",
+        "example.com/acme/conformance::Sources/App/main.swift::Other.ping()"
+      ]
+    },
+    {
+      "name": "Sources/App#3",
+      "members": [
+        "example.com/acme/conformance::Sources/App/main.swift::Sender.on(_:h:)",
+        "example.com/acme/conformance::Sources/App/main.swift::Sender.send(_:assert:)",
+        "example.com/acme/conformance::Sources/App/main.swift::run(_:)",
+        "example.com/acme/conformance::Sources/App/main.swift::trailing(_:)"
+      ]
+    },
+    {
+      "name": "Sources/App#4",
+      "members": [
+        "example.com/acme/conformance::Sources/App/main.swift::Wheel.spin()",
+        "example.com/acme/conformance::Sources/App/main.swift::untyped()"
+      ]
+    },
+    {
+      "name": "Sources/Lib",
+      "members": [
+        "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce.init(_:(S,A)->Int)",
+        "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce.init(internal:)",
+        "example.com/acme/conformance::Sources/Lib/Lib.swift::inside()"
+      ]
+    }
+  ],
+  "links": [],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/conformance::Sources/App/main.swift::main",
+      "kind": "program",
+      "label": "main",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/App/main.swift::main"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce.init(_:someReducer)",
+      "kind": "export",
+      "label": "Reduce.init(_:someReducer)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce.init(_:someReducer)"
+        }
+      ]
+    }
+  ]
+}

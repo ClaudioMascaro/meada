@@ -320,7 +320,7 @@ impl Ecosystem for Cargo {
             return None;
         }
         let (file, how, level) = at.entry(manifest, &self.ways(manifest, subpath))?;
-        let id = at.reach(repository, &file, chain, known)?;
+        let id = at.reach(self, repository, &file, chain, known)?;
         Some(Resolved {
             how,
             level,

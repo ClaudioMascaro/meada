@@ -112,6 +112,7 @@ impl LanguagePack for Python {
                             returns: None,
                             type_params: Vec::new(),
                             result: None,
+                            suspends: false,
                         });
                         facts.programs.push(MAIN.to_string());
                     }
@@ -159,6 +160,7 @@ impl LanguagePack for Python {
                                 returns: None,
                                 type_params: Vec::new(),
                                 result: None,
+                                suspends: false,
                             });
                         }
                         if !is_class {
@@ -198,6 +200,7 @@ impl LanguagePack for Python {
                         let (args, kwargs) = arguments(node, src);
                         facts.calls.push(Call {
                             arity: None,
+                            awaited: false,
                             labels: None,
                             constructs: false,
                             scope: scope.clone(),
@@ -363,7 +366,7 @@ impl LanguagePack for Python {
     }
 
     fn config_files(&self) -> &'static [&'static str] {
-        &["pyproject.toml"]
+        &["**/pyproject.toml"]
     }
 
     fn stars_bind(&self) -> bool {
@@ -372,15 +375,36 @@ impl LanguagePack for Python {
 
     fn modules(&self, configs: &[(&str, &[u8])], _: &BTreeMap<&str, &Facts>) -> Result<Modules> {
         // Read as a PyPI manifest is: one past the size limit, not UTF-8 or not TOML declares
-        // nothing, and indexing carries on.
-        let declared =
-            (configs.first()).map_or_else(Vec::new, |(name, src)| read_manifest(name, src).roots);
-        let roots = pyproject::source_roots("", &declared);
+        // nothing, and indexing carries on. An importer tries the roots of each manifest in its
+        // directory and above, nearest first; the repository root always has some (`src` when
+        // it has no manifest).
+        let mut by_dir: HashMap<String, Vec<String>> = (configs.iter())
+            .map(|(path, src)| {
+                let dir = path.rsplit_once('/').map_or("", |(dir, _)| dir);
+                let declared = read_manifest(path, src).roots;
+                (dir.to_string(), pyproject::source_roots(dir, &declared))
+            })
+            .collect();
+        by_dir
+            .entry(String::new())
+            .or_insert_with(|| pyproject::source_roots("", &[]));
         Ok(Box::new(move |importer, specifier| {
             let dots = specifier.bytes().take_while(|&b| b == b'.').count();
             let name = specifier[dots..].replace('.', "/");
             let bases = if dots == 0 {
-                roots.clone()
+                let mut dir = Some(importer.rsplit_once('/').map_or("", |(dir, _)| dir));
+                let mut roots: Vec<String> = Vec::new();
+                while let Some(d) = dir {
+                    for root in by_dir.get(d).into_iter().flatten() {
+                        if !roots.contains(root) {
+                            roots.push(root.clone());
+                        }
+                    }
+                    dir = d
+                        .rsplit_once('/')
+                        .map_or((!d.is_empty()).then_some(""), |(p, _)| Some(p));
+                }
+                roots
             } else {
                 // One dot names the importer's own package, its directory; each more goes one
                 // level up.
@@ -716,6 +740,7 @@ fn params(node: Node, method: bool, src: &[u8]) -> Vec<Param> {
             label: None,
             default: default.map(|d| value(d, src)),
             fields: Vec::new(),
+            closure: Default::default(),
         });
     }
     out

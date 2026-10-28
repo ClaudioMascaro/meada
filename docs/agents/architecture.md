@@ -806,7 +806,9 @@ one for the area a change touches.
 - Symbol: `<repository>::<path>::<qualified name>` (`Class.method`, `outer.inner`).
 - Call site: `<caller>::<normalized callee>#<ordinal>`; a top-level call's caller is
   `<repository>::<path>`. The normalized callee keeps identifier and member chains only; any
-  other expression becomes `(<node kind>)`. A Rust path is dotted like a chain (`crate::a::f`
+  other expression becomes `(<node kind>)`, except Swift's implicit member `.f(..)`, which is
+  `(implicit).f` (`lang::IMPLICIT_HEAD`: the resolver matches it among methods by name and labels,
+  and leaves `init` unresolved). A Rust path is dotted like a chain (`crate::a::f`
   is `crate.a.f`, `Type::new` is `Type.new`); its `self::` and a `super::` that stays in the
   file are read from the file's top under the keyword `mod` (`self::f` in `inner` is
   `mod.inner.f`, `super::f` out of `inner` is `mod.f`).
@@ -1012,8 +1014,10 @@ one for the area a change touches.
   again through `Code::misses`), and, for a parameter no annotation on it injects into, what it
   gives the parameter itself (`Injected::Param(function, n)`: a dependency injection container
   passes a constructor's parameter by its type, with no annotation, as C#'s typed client takes
-  its `HttpClient`). The shared side asks it for a field no file assigns (`Code::field_written`, the `.f` marker
-  constants the Java pack writes for every `f = v` and `x.f = v`) and for a parameter no frame
+  its `HttpClient`). The shared side asks it for a field no file assigns (`Code::field_written_in`, the `.f` and
+  `.f@class` marker constants the Java pack writes for a field write: `f = v` of a name no local or parameter declared
+  before it, `f++`, `this.f = v` and `x.f = v`; an assignment to a local or a parameter is not one, and a write carries
+  its class when the pack knows it, which a classless write, as `x.f = v`, does not) and for a parameter no frame
   binds of a function no call of the repository may reach (`Code::may_be_called`: an exact
   caller, or any callee ending in its name, so a name match, a call on an opaque receiver, a
   `new` inside an anonymous class and `this(..)` or `super(..)`, which the Java pack emits as
@@ -1030,8 +1034,10 @@ one for the area a change touches.
   other part unknown. The list of Spring's config files is the reader's too
   (`spring::CONFIG_FILES`), which the Java pack returns as its `config_files`. `names.rs`
   holds the name questions the JVM and C# kinds share: `one` (exactly one spelling in the kind's
-  table), `known` (a name an import binds), `spellings`, `typed` and `declared` (the outside type
-  the source writes for a name), `in_full` and `is_type` (a type written in full is the
+  table), `known` (a name an import binds), `annotation` (`known` for an annotation's callee, which no
+  field of an outside base hides, #354), `spellings`, `typed` and `declared` (the outside type
+  the source writes for a name; a type of the repository is an answer with no spelling, `Code::declared`
+  gives it an origin with no outside name), `in_full` and `is_type` (a type written in full is the
   library's unless a definition of the repository binds that very name, as a compiler prefers
   the source's type; else the one spelling the usings give it, one rule for every C# kind) and
   `is_method` (an annotation on a method of the file);
@@ -1156,7 +1162,8 @@ one for the area a change touches.
   (`(routingKey, message, correlation)`) unless a `MessagePostProcessor` before it makes it
   `(message, postProcessor, correlation)`; an argument whose type the source does not tell (a
   lambda, a call, a name with no written type, anything the pack cannot read) leaves the
-  producer unresolved, and a literal or a name of another written type is the message. The two-argument AMQP form publishes to the
+  producer unresolved, and a literal, a name of another written type or one written as a type of the repository (a
+  DTO) is the message, so a publish of a repository type resolves. The two-argument AMQP form publishes to the
   template's exchange: `spring.rabbitmq.template.exchange` of the module's configuration, else
   the default exchange, a producer of the queue the key names. An `@Exchange` is `direct`
   unless its `type` (a string, or a member of `ExchangeTypes` bound by an import) says
@@ -1236,7 +1243,10 @@ one for the area a change touches.
     spelling of the one provider whose id differs by case only, before `consume` reads them,
     each by one folded-location map (linear in the manifests).
   - `fits`: literal package-name equality; Maven matches the literal fragments of a computed
-    coordinate (`pattern_fits`). `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
+    coordinate (`pattern_fits`), a coordinate being computed only for a `${..}` or `$name` hole the
+    build files leave without a literal (a pom property, `project.groupId` or `project.artifactId`,
+    a parent pom's property through `inherit`; a Gradle name assigned once to a plain string).
+    `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
   - `flag`: the range is unchecked (`range unchecked`); npm checks semver.
   - `reaches`: every provider; npm's `workspace:` keeps the dependent's own repository, Cargo
     and Go share `sourced`, in the seam (a `path` by the folded location, a `git` by the
@@ -1244,6 +1254,8 @@ one for the area a change touches.
     and only for a project of another repository, so a reference inside one repository adds no
     package link (the pack resolves it), while a `PackageReference` reaches every provider of
     the id.
+  - `submodule`: none; PyPI's package `__init__.py` names its submodules (`name/__init__.py`, then
+    `name.py`), as `import pkg` then `pkg.name.f()` reaches them.
   - `owns`: every manifest of the ecosystem bounds the files under it; PyPI only a
     `pyproject.toml`, Cargo only a manifest with a `[package]`.
   - `ways` and `resolve`: Node's rule (`exports`, else `types`, `module` and `main`, else the
@@ -1531,11 +1543,16 @@ one for the area a change touches.
   `files.setting` and `Facts::setting`) and takes it in `parse_with`; a file whose setting
   changed is parsed again, whatever its content. Besides `parse` and `modules`, it says what the
   shared resolution cannot guess: `members_in_scope` (bare names may name class members),
+  `assigned_members` (a definition named by a dotted path, `app.use` of `app.use = function`, is what
+  that path written in a call reaches, though its head is a local or constant: JavaScript's),
+  `guesses_constructs` (`Call::constructs` is a guess from the callee's case: a guess that is no
+  `exact` type is read again as a plain call, and a function it binds wins),
   `unordered_globs` (combine wildcard candidates, with an inside glob taking priority),
   `qualified_types` (an unbound path head may name a repository type through its layout),
   `Facts::overloads` and `Facts::constructors` (separate method and constructor families with
   written signatures), `Call::arity` and `Call::constructs`
-  (the argument count and constructor call form, kept in cached facts), `Facts::statics` (members a class wildcard
+  (the argument count and constructor call form, kept in cached facts), `Def::suspends` and
+  `Call::awaited` (Swift: a call not under `await` does not fit an `async` function), `Facts::statics` (members a class wildcard
   import takes), `Imported::Qualified` (a fully qualified definition import),
   with Java parameter types spelled from syntax tokens, excluding annotations and comments,
   and `#method` after a class-named method's signature to distinguish it from a constructor,
@@ -1545,7 +1562,7 @@ one for the area a change touches.
   star import takes), `stars_bind` (whether a star import rebinds names in statement order, as
   Python's does, or only re-exports, as an ES `export *` does) and `Param::binds` (which
   argument binds each parameter; `Binds::Optional`, a Kotlin parameter with a default value, and
-  `Binds::Rest` widen the argument counts an overload takes, `Arity` in `Resolver::narrow`). A pack
+  `Binds::Rest` (a Kotlin `vararg`, a Java spread parameter) widen the argument counts an overload takes, `Arity` in `Resolver::narrow`). A pack
   whose files resolve with another pack's says so through `LanguagePack::resolves_with` (Kotlin
   with Java): `refresh` keys its resolution groups by `lang::resolver_of`, so one `Resolver` and
   one `Code` built from that pack's `layout` and flags take both packs' files, and calls between
@@ -1756,7 +1773,9 @@ one for the area a change touches.
   (`lang/swift/manifest.rs`: every `.target`, `.executableTarget`, `.testTarget`, `.macro` and
   `.plugin` call with a literal `name:` outside a `dependencies:` argument, under its literal
   `path:` inside the package or the default directory) as a config file (`**/Package.swift`,
-  no code: `is_code`). Each target is a module of the files under its directory, the deepest
+  no code: `is_code`). Each target is a module of its package (`Targets`: the package's directory
+  and the target's name, which is the file's `Facts::unit`, so two packages that name a target
+  alike give two modules) of the files under its directory, the deepest
   one when several hold a file (looked up by the file's directories, so the cost is the path's
   depth), and the files no target holds (all of them without a manifest) are one module no
   import names. The layout shares a module's scope among its files (`Layout::shared`), whose
@@ -1765,7 +1784,13 @@ one for the area a change touches.
   `Facts::unit` to its module, so `internal` declarations (`Facts::private`) stay in it
   (`Resolver::hidden`), and appends the module's own inside glob after the imports, so its
   names come before an import's. `import M` is a namespace import of `M` and an outside glob
-  of it, which takes `M`'s public names (`Facts::star`). A function's name carries its
+  of it, which takes `M`'s public names (`Facts::star`); `M` is the target of that name in the
+  importer's own package (the deepest around it), else in the nearest package by steps through
+  the directory tree, every one when several are as near (`Targets::named_from`). An import written
+  `@testable` is also listed in `Facts::testable`; `join` sets `Facts::internals` to the modules
+  it names, whose `internal` declarations the file sees (`Resolver::hidden`, and the glob reads
+  the module's exports, `Resolver::sees_internals`), but for the `fileprivate` and `private`
+  ones (`Facts::confined`). A function's name carries its
   argument labels (`place(order:quantity:)`, `init(baseURL:)`, `_` for none); declarations of
   one scope in a file (a type's body and its extensions alike) with the same labels and other
   types carry each label's written type too (`audit(_:Order)`): `parse` walks the file twice,
@@ -1773,7 +1798,15 @@ one for the area a change touches.
   unlabelled argument, empty for a trailing closure) is kept with the facts, and `Arity`
   narrows an overload family by them (`labelled`: in order, past parameters with a default
   value, a variadic one taking the unlabelled arguments after its first, a trailing closure any
-  label), so a tie is `ambiguous` with each overload. An extension is no definition but a
+  label of a parameter that takes one), so a tie is `ambiguous` with each overload. Each
+  `Param::closure` is read from the written type: a function type (through `?`, parentheses and
+  attributes such as `@escaping`), a type parameter or `Any` takes a trailing closure, a name is
+  `Closure::Named` until `join` looks it up among the repository's aliases of a function type
+  (`Facts::function_aliases`, and aliases of those to `ALIAS_DEPTH`, by last segment in any scope), and
+  any other type refuses it. A `typealias` of a named type is an `Imported::Path` import of its
+  target under the alias's qualified name, exported by its access as a declaration is: a type
+  written as the alias resolves through `Resolver::alias` (a cycle or `LINK_DEPTH` ends with
+  nothing). An extension is no definition but a
   `Facts::impls` block of the extended type, one more per protocol it writes (`Impl::of`).
   `Resolver::overloaded` reads one level per class of the family, the class with its blocks in
   any file (two declarations of one signature there are two overloads, but for a protocol a
@@ -1788,8 +1821,13 @@ one for the area a change touches.
   opaque, `: String, CaseIterable` does not). A protocol extension's member of the requirement's signature in the
   requirement's file is that one definition. A capitalized callee (`Order(id:)`,
   `Order.Line()`) constructs (`Call::constructs`): the type's initializers in its body and its
-  blocks (`Facts::constructors`, also the family `Type.init` for `self.init(..)`), or the type
-  itself when it declares none (a memberwise initializer). Bare calls are Kotlin's
+  blocks (`Facts::constructors`, also the family `Type.init` for `self.init(..)`), without
+  those its module keeps to itself when the call is in another (`Resolver::accessible`), or the
+  type itself when it declares none (a memberwise initializer). The case is a guess
+  (`LanguagePack::guesses_constructs`): a capitalized callee that binds a function instead of a
+  type is a plain call of it (`Check(1)`), and `await` decides an `async` target (`Call::awaited`
+  from the `await_expression` or `async let` around the call, up to its function or closure;
+  `Def::suspends` from the `async` of the declaration). Bare calls are Kotlin's
   (`bare_calls`).
   The values the contract kinds read (spec #29, #119; `lang/swift/values.rs`) are written for
   each call: its receiver (`a.b` of `a.b.f()`), its arguments (a label makes a keyword
@@ -1806,11 +1844,13 @@ one for the area a change touches.
   text-only literal (any other fallback is a `Hole`: which value is the base is unknown); it
   is also the one value an interpolation may hold besides a name. The pack decides by the
   spelling alone, as Go's and Rust's do; a repository type named `ProcessInfo` is not looked for. Vapor's
-  `Environment.get` and an optional binding are no reads. `http` takes the leading `Env` as the
+  `Environment.get` is no read; an `if let` or `guard let` of one read is (see
+  `Facts::bound`). `http` takes the leading `Env` as the
   `base_url_env` variable, as for every language. A closure written in code (not in a
   type's property initializer) is a `Kind::Inline` definition named `<scope>.@<offset>`, and the
   calls and names inside it belong to that scope. `Facts::bound` holds a `let` or `var` of one name given
-  a call, a name or a string (#121), and drops the name when another binding of the
+  a call, a name or a string (#121), and an `if let` or `guard let` of one name given one
+  environment read (#388), and drops the name when another binding of the
   function (a loop variable, an `if let`, a `guard let`, a `catch`, a `case let`, a `var` or
   another `let` in a block) also declares it, when its function (or a closure in it) assigns it
   (`x = ..`, `&x`) or calls a method on a `var` of the name that holds a string, a name or a URL
@@ -1826,8 +1866,8 @@ one for the area a change touches.
   `labelled` decides the fit with (`labelled_args`, one table of which parameters take which
   arguments): an unlabelled argument takes a parameter written `_`, a labelled one a parameter
   of its label, a parameter that may be left out gives its label to a later one when the call
-  fits no other way, and the first trailing closure takes the first parameter that cannot be
-  left out; a trailing closure after the first (`f { } other: { }`) is not bound.
+  fits no other way, and the first trailing closure takes the first parameter that takes one
+  (`Param::closure`) and cannot be left out; a trailing closure after the first (`f { } other: { }`) is not bound.
   Method calls on a receiver (spec #29, #118) use the seams Java's and C#'s do, with no new
   one. The pack writes `Facts::receivers` from the written type of a stored property, a
   parameter (scope: the function's labelled name) and a `let` or `var` of code or the top level
@@ -1852,9 +1892,13 @@ one for the area a change touches.
   whose written or constructed type nothing in the repository binds (`session: URLSession`, a
   standard-library type too), or a capitalized name nothing binds (`AF.request`), matches the
   members of that type's extensions in the repository alone (`Resolver::outside_type`), and a
-  call past a member read on such a name (`URLSession.shared.data(..)`) resolves to nothing.
-  Ceiling: a receiver whose value comes from outside but whose type the source does not write
-  (`let session = URLSession.shared`, a `var` assigned again) keeps the name match.
+  call past a member read on such a name (`URLSession.shared.data(..)`) resolves to nothing. A
+  local or property whose value is such a member read holds the read as written
+  (`Class::Member`, through `try` and `await`; not a force unwrap, an optional chain or a
+  subscript), and `outside_type` reads its head: outside the repository, the receiver is opaque
+  (`let session = URLSession.shared`); a head the repository declares leaves the call to the
+  name match. Ceiling: a `var` assigned again (`var client = URLSession.shared; client = other`)
+  holds no one value and keeps the name match.
   C# method calls (spec #28, #108) use the seams Java's do and add none but one flag. The pack
   writes `Facts::receivers` from the declared type of a field, a property, a parameter
   (primary constructors' too), a local with an explicit type, a `foreach`, `out` or pattern
@@ -1904,7 +1948,10 @@ one for the area a change touches.
   still climb exact calls alone. A local the pack bound to one value (`Facts::bound`: every
   local declared in a definition, dropped when the file assigns its name anywhere with `=`,
   a compound operator, `++`, `--`, `out` or `ref`) is followed into that value, for every pack
-  that fills `Facts::bound` (Kotlin's `val` too). The pack fills `Def::return_values` from
+  that fills `Facts::bound` (Kotlin's `val` and a Java local declared with an initializer, too:
+  the Java pack drops it when the file assigns its name anywhere, when another binding of the
+  name shares its definition or when a field of an enclosing class has the name). The pack
+  fills `Def::return_values` from
   `return x;` and a method's or local function's `=> x`, and makes every lambda written in a
   definition (not in a type's initializer) a `Kind::Inline` scope `@<offset>` with its
   parameters, which a call's argument names (`Value::Function`) and which folds into the
@@ -1945,8 +1992,12 @@ one for the area a change touches.
   cannot tell.
 - The index holds no source text and no values, apart from the argument count, the argument
   labels and constructor form of an overloaded call (`Call::arity`, `Call::labels`,
-  `Call::constructs`) and the argument label of a parameter (`Param::label`), the place of the call a
-  chained call is made on (`Call::on`), whether an `inferred` call was narrowed from several
+  `Call::constructs`), the argument label of a parameter and whether its written type takes a
+  trailing closure, or the name it is written as (`Param::label`, `Param::closure`), the names
+  of a Swift file's aliases of a function type (`Facts::function_aliases`), the place of the call a
+  chained call is made on (`Call::on`), whether a Swift call is written under `await` and
+  whether a function needs one (`Call::awaited`, `Def::suspends`), the modules a Swift file imports
+  `@testable` and the names only their file sees (`Facts::testable`, `Facts::confined`), whether an `inferred` call was narrowed from several
   definitions of its name (`calls.narrowed`), callable-to-signature and
   static-member names (`Facts::overloads`, `Facts::constructors` and
   `Facts::statics`), the namespaces and types a C# file's `global using` directives name
@@ -1981,7 +2032,9 @@ one for the area a change touches.
   when it leaves the repository, or the normalized `git` URL; `workspace = true` as a flag; the
   `[workspace.dependencies]` entries; the `[workspace.package]` version), and of JVM build files
   (spec #26: literal Maven coordinates and versions, dependency coordinate fragments with `*`
-  for computed parts, declared ranges and a `computed` source flag, source roots with the test ones marked, and Gradle's
+  for computed parts, declared ranges and a `computed` source flag, source roots with the test ones marked, a pom's
+  `<properties>` and `<parent>` coordinate, with the group and artifact of a computed entry as
+  written (`Entry::template`, for `Maven::inherit` to fill from the parent poms), and Gradle's
   literal group, root project name and included project names/directories in `Summary::build`),
   of each SDK-style `.csproj` (spec #28: the package id, else assembly name, else file name, the
   literal version, each `PackageReference` with its range as written, each `ProjectReference`
@@ -2148,8 +2201,8 @@ one for the area a change touches.
 - `jvm/names.rs`: `LOCAL_DEPTH` (8) bounds how many locals a JVM client reader (Ktor,
   `RestTemplate`, `WebClient`, Retrofit) follows a client through (`val b = a`, `val a =
   HttpClient(..)`) where the value flow does not reach it; past it the client is not followed
-  and its calls are no consumers. The value flow follows a Kotlin `val` itself (`Facts::bound`),
-  as deep as `EVAL_DEPTH`.
+  and its calls are no consumers. The value flow follows a Kotlin `val` or a Java local the file
+  never reassigns itself (`Facts::bound`), as deep as `EVAL_DEPTH`.
 
 - `lang/kotlin.rs`: `DEFINITION_DEPTH` (128), `VALUE_DEPTH` (64), `PATH_DEPTH` (256) and
   `QUALIFICATION_BYTES` (4 MiB) bound the Kotlin pack as they bound the Java pack's, with the same
@@ -2166,10 +2219,14 @@ one for the area a change touches.
   told by name (a function of the repository called `apply` is not told apart), and a receiver
   is known when it is a name with a written type, a constructor call `T(..)` or an `apply` or
   `also` chain of them; any other (a call's result, a property chain) leaves the lambda as any
-  other. A function's result type is not read (`Def::result` is empty), so `make().m()` and a
-  local initialized with `make()` are name matches. A typealias is no class of the repository:
+  other. A function's written return type is its `Def::result` (`Box?` and `Box<T>` name `Box`; none
+  for an expression body, a type parameter or a function type), and a class and each secondary
+  constructor give their class, so a call made on a call (`make().m()`, `Box().m()`, also
+  through `?.`, `!!` and a property) has `Call::on` and resolves within that class's family. A
+  local initialized with `make()` is a name match. A typealias is no class of the repository:
   a receiver typed by one is outside it, and resolves to nothing. A name bound twice in one
-  scope with different types, or named like a property, holds an unknown type. A call `X.f(..)`
+  scope with different types, or named like a property of its class or of an enclosing class (or
+  of the file), holds an unknown type. A call `X.f(..)`
   is read as a constructor only when `f` is capitalized, as Kotlin names classes. An import alias
   of an extension (`import a.slug as s`) brings nothing in scope for it. A bare call a top-level function of its name answers is
   exact to that function, though Kotlin prefers an extension of the implicit receiver. A star import of a class (`import a.C.*`) reads every export of
@@ -2177,9 +2234,11 @@ one for the area a change touches.
   receiver typed `p.C`, though the extension's file may import another `C` over its package's. In the block of a receiver whose type is outside the repository (a Ktor
   `Application` or `Route` extension function), a constant's value and a call's receiver are
   the names outside the block, though that type may declare a member of the name; the object a
-  client walk or a declared type asks is unknown there. A fully qualified function call (`example.helper()`) is a name match. A class
-  with a secondary constructor is not in its name's overload family, so calling it resolves to
-  nothing. A single import of a top-level declaration named like a package of the repository
+  client walk or a declared type asks is unknown there. A fully qualified function call (`example.helper()`) is a name match. A class's
+  constructors, the primary one (the class's own definition) and each secondary one (a method
+  `C.C(types)`, `internal` and `private` ones hidden as a function's), are the callables of its
+  name, so a call narrows among them by argument count; a class with secondary constructors and
+  no primary one is only those. A single import of a top-level declaration named like a package of the repository
   (`import app.config` beside package `app.config`) binds nothing, since the package keeps the
   name. A property of function type that a base class declares, invoked by bare name, is read as
   a method call. A companion's outside base leaves the companion's members unknown, so
@@ -2219,14 +2278,19 @@ qualification budget does (ADR 0017).
   around a definition and the segments of a callee (past them a body keeps its enclosing
   symbol and a callee is `(navigation_expression)`); `QUALIFICATION_BYTES` (4 MiB) bounds the
   enclosing-name bytes a file's definitions, calls and bindings store, past which the file
-  keeps no facts. The pack's unit tests exceed each. Beyond the limits, what the pack leaves out
-  (spec #29, #117): a target's `sources:` and `exclude:`, two packages of the repository that
-  name a target alike (one module), `@testable import` (no `internal` access), a closure,
+  keeps no facts; `ALIAS_DEPTH` (16) bounds the aliases of aliases of a function type `join`
+  follows (`function_aliases`), past which a parameter written as one takes no trailing closure.
+  The pack's unit tests exceed each. Beyond the limits, what the pack leaves out
+  (spec #29, #117): a target's `sources:` and `exclude:`, a closure,
   deinitializer, subscript or accessor (their calls and locals are the enclosing symbol's, so
   an accessor's local hides its name in the whole type), an operator
   function, enum cases, `Self` as a type's name, a local typed by a call result or a closure
   parameter's type (#118), a typed local of a nested block, closure or accessor (a name match
-  where Java and C# keep it function-wide), and the
+  where Java and C# keep it function-wide), a `typealias` as a symbol, one written in a type
+  seen from another file (its extensions included), the repository's extension of an outside
+  type reached through an alias of it (the receiver stays outside under the alias's name, so
+  it reaches no block), an outside alias of a function type (`Ext.Handler`, which takes no
+  trailing closure, as the brief of #411 decides for every outside name), and the
   protocols a conformed protocol inherits when the conformance is written on an extension. As in Java, an outside base
   the pack does not list among its known outside members (`NSObject`, `View`) keeps a type's own
   overloads from `exact`, and a listed one (`Codable`, a raw value type) the names it declares.
@@ -2519,7 +2583,8 @@ qualification budget does (ADR 0017).
   so the `uri` and `build` steps of `clients.rs` match a chain step spelled
   `(call_expression).name`, `constructs` takes a `RestTemplate(..)` call for the written type, and
   `made` falls back, after typed and origin lookups, to `Code::local` (Kotlin's
-  `Facts::bound`, shared with the Ktor reader and indexed by scope and name in `ByName`, so a
+  `Facts::bound` (Kotlin's `val`, a Java local the file never reassigns), shared with the Ktor
+  reader and indexed by scope and name in `ByName`, so a
   lookup costs its scope depth) up to `jvm::names::LOCAL_DEPTH`. The value evaluation reads the
   same local (`Code::eval`, a `Binding::Hidden` or `Binding::Local` with a bound): a URL or a
   topic written through a local `val` of a function folds where the `val` is written, an
@@ -2543,10 +2608,18 @@ qualification budget does (ADR 0017).
   `jakarta.ws.rs.*` is two candidates and serves nothing. A `@Path`-only method and
   `@ApplicationPath` are not routes, and neither is a method of an interface (`Facts::interfaces`):
   a `@Path` interface is a MicroProfile or Quarkus client. A controller or resource class whose
-  family has an outside base (`extends com.corp.Base`, top-level or nested) gives no provider
-  (#354), since its annotations are read in the class scope, where an inherited member type
-  could shadow the import. A fully qualified annotation without an import (`@javax.ws.rs.GET`)
-  and annotations an implementation inherits from an interface are not read.
+  family has an outside base (`extends com.corp.Base`, top-level or nested) still gives its
+  providers (#354): the callee of a decorator call (`Call::decorates`) is read as
+  `Reading::Decorator` (`Code::outside_decorator`, `names::annotation`), which skips the inherited
+  field pass, so an opaque ancestor hides no import from an annotation, and single-type and
+  on-demand imports agree. The one miss, accepted and not detected, is a member type of the
+  outside base named like the annotation (JLS 6.4.1 would put it before the import); the same
+  reading serves the declarative clients and the channel listeners, in Java and Kotlin. A fully
+  qualified annotation without an import (`@javax.ws.rs.GET`) is read too, as `names::known` and
+  `annotation` take a dotted name whose head nothing binds as its own spelling (`written_in_full`,
+  `in_full`), the repository winning: an import, or a definition of the repository named by the head
+  or by the full name, keeps its reading. Only the annotations an implementation inherits from an
+  interface are not read.
 - `http/csharp.rs` (spec #28, #109): an ASP.NET Core controller route is read from `Call::decorates`
   on a method of a class that is a controller: `[ApiController]`, or a base that `Code::outside`
   says is `Microsoft.AspNetCore.Mvc.ControllerBase` or `Controller`. The pack ships syntax only,
@@ -2619,12 +2692,18 @@ qualification budget does (ADR 0017).
   binds (`Code::origins_unbound`), through the arguments of exact calls. Ceilings as the
   minimal APIs': a builder Meada does not read serves nothing (a parameter no call reaches, a
   `var`, a property), the closure form `group("api") { }` is not read, and a repository past
-  `VAPOR_NODES` (4096) nodes serves nothing. Also: a helper `boot` calls (`mount(routes)`) is
-  followed only when the call is exact, and a call made inside a type of an outside protocol
-  (`RouteCollection` always is) is a name match, so its routes are not served;
-  `grouped(User.authenticator(), User.guardMiddleware())` (a lowercase callee, an unread mount)
-  leaves the routes under it unserved; an inline handler served under two prefixes has one
-  symbol, named by one of them (as in C#); a factory that calls itself serves nothing through
+  `VAPOR_NODES` (4096) nodes serves nothing. Also: a helper `boot` calls
+  (`mountReports(routes)`, bare or through `self`) is followed when the call is exact: a member
+  `RouteCollection` does not declare is the collection's own (Known outside members), so a
+  helper method of the collection is, and the routes it registers serve under the builder it
+  was given (a free function helper is exact too, for the same reason);
+  a `grouped` whose every argument is a call on a capitalized head with no path producer
+  (`String`, `Substring`, `PathComponent`) in its callee (`AuthMiddleware()`,
+  `User.authenticator()`) is the middleware overload (`Dialect::middleware`, Vapor only) and
+  adds no segment, by shape: a member read argument (`app.sessions.middleware`) leaves the
+  group unread, and a static call that returns a path component (`Paths.api()`) is read as
+  middleware, so its routes are served under the parent prefix (accepted false positive); an inline handler
+  served under two prefixes has one symbol, named by one of them (as in C#); a factory that calls itself serves nothing through
   it, and a builder it reaches by one origin among others serves its routes under the others.
 - `http/swift/hummingbird.rs` (spec #29, #120): Hummingbird routes, a `Dialect` that
   `vapor.rs::providers` runs with Vapor's value flow, mounts and handler rules. The root is a
@@ -2800,7 +2879,7 @@ qualification budget does (ADR 0017).
   pack recorded (`Facts::bound`: a `val x = Callee(..)` with no written type, and the parameter
   of a `let`, `also` or `use` lambda, whose value is the receiver; `Code::local` takes the
   nearest binding of the name and none when another binding of it shares its scope, so a
-  parameter, a loop variable, a `var`, a local named like a property of the file or one declared
+  parameter, a loop variable, a `var`, a local named like a property of its class, of an enclosing class or of the file, or one declared
   twice hides it) followed through `origins` again, or one whose written type is it
   (`names::typed`); a map, another library's client and a name a local hides are none. The
   call is read whole (`Expand::Chain`, which also gives the reader the call's keyword arguments),
@@ -2834,9 +2913,11 @@ qualification budget does (ADR 0017).
   a `val` or `var` declares, whose `Const` is dropped when annotated, as a `lateinit var` has
   none, so the annotation is what it holds) and a function's parameter, by use-site target: none,
   `field`, `set` and `setparam` for a property, none and `param` for a parameter; `get`,
-  `property` and the others inject nothing. Every assignment to a name (`base = ..`,
-  `this.base += ..`, `o.base = ..`) is a `.name` constant, as Java's, which `Code::field_written`
-  reads: a field some code assigns holds no injected value. `value()` reads
+  `property` and the others inject nothing. Every assignment to a name that can be a
+  property (`base = ..` of a name no local or parameter declared before it, `this.base += ..`, `base++`, `o.base = ..`)
+  is a `.name` constant, or `.name@class` when the pack knows the class, as Java's, which
+  `Code::field_written_in` reads; an assignment to a local or a parameter is not one, and a classless write
+  matches the name in every class: a field some code of its class assigns holds no injected value. `value()` reads
   `System.getenv("X")`, `java.lang.System.getenv("X")` and `System.getenv()["X"]` as `Part::Env`,
   through `!!`, parentheses, `?:` fallbacks and the string methods of `STRING_METHODS`
   (`trimEnd`, `removeSuffix`, ...), unless the file binds `System` to another type
@@ -3005,8 +3086,10 @@ qualification budget does (ADR 0017).
   written result. Not through `?`, which unwraps that result (`Result<T>`, `Option<T>`): the call
   stays a name match. `.await` takes the written result as the awaited value, as an `async fn`
   writes it; on a plain `fn` that returns `impl Future<Output = T>` the call resolves to nothing.
-- `lang/ts.rs`: tsconfig `extends` and nested configs are not followed. The root
-  `tsconfig.json` (else `jsconfig.json`) is read as `package::read_tsconfig` reads one
+- `lang/ts.rs`: tsconfig `extends` and `references` are not followed. Every `tsconfig.json` and
+  `jsconfig.json` but those under `node_modules` is read; an importer uses the nearest one in its
+  directory or above (`tsconfig.json` over `jsconfig.json`), `paths` and `baseUrl` relative to it.
+  Each is read as `package::read_tsconfig` reads one
   (`package::tsconfig_root`, `MAX_BYTES`), so one past the size limit, not UTF-8, not JSON or
   not an object declares no `paths` or `baseUrl` and the refresh carries on, with no status
   line. `require` and
@@ -3215,8 +3298,8 @@ qualification budget does (ADR 0017).
   neither, as in ES modules.
 - `lang/ts.rs` (`Facts::locals`): a local binding hides the name in its whole enclosing
   definition, whatever block holds it, the definition's own definitions, constants and
-  parameters of that name included, and a function that is no definition (an object literal
-  method, `module.exports = (db) => ...`, an IIFE, an arrow kept in an object) lends its
+  parameters of that name included, and a function that is no definition (a method or arrow of an
+  object literal that no top-level `const` binds, an IIFE) lends its
   parameters and locals to the definition around it; at the top level that is the whole file.
   A call to the hidden name elsewhere in that scope loses its exact link or its value, never
   gains a wrong one (no marker).
@@ -3245,9 +3328,10 @@ qualification budget does (ADR 0017).
   one's), since qualified names and `Resolver::lexical` cost time cubic in the nesting.
   `TARGET_DEPTH` (64 nodes): a name deeper in an unpacking target or a `case` pattern is not
   bound, so it hides nothing. An annotation reads `Optional[...]` and `... | None` to
-  `TYPE_DEPTH` levels; deeper is no class. For imports inside the repository only the root `pyproject.toml` is read
-  (`lang/python/pyproject.rs`, which the PyPI reader shares), and only the setuptools and
-  Poetry root declarations; it is read as a PyPI manifest is (`package::read_manifest`, `MAX_BYTES`), so one past the size limit, not UTF-8 or not TOML declares no roots and the refresh carries on, with no status line. `src` is a source root when nothing is declared, whether or not it holds
+  `TYPE_DEPTH` levels; deeper is no class. For imports inside the repository every `pyproject.toml` is read
+  (`lang/python/pyproject.rs`, which the PyPI reader shares), the setuptools and Poetry root
+  declarations only; an importer tries the roots of the nearest one in its directory or above, then
+  of each further ancestor, nearest first, and a sibling project's never; each is read as a PyPI manifest is (`package::read_manifest`, `MAX_BYTES`), so one past the size limit, not UTF-8 or not TOML declares no roots and the refresh carries on, with no status line. `src` is a source root when nothing is declared, whether or not it holds
   packages (a pack sees no file list). An import binds its names for the whole file, wherever
   it sits. A comprehension's targets are bound in the enclosing scope, so they hide a name
   there for the whole scope (the safe side: a name match instead of `exact`); at the top level
@@ -3391,7 +3475,7 @@ qualification budget does (ADR 0017).
   are not read. A `defaultRequest` base given by a parameter of a client factory is a hole. A
   local client is followed only when its `val` is written with the constructor call (or a
   `let`, `also` or `use` receiver): `val b = a` and a `var` are not, and a local named like a
-  property of its file is typed unknown by the pack, so it is not either. A nested lambda's
+  property of its class, of an enclosing class or of its file is typed unknown by the pack, so it is not either. A nested lambda's
   `method = X` makes the outer request's method unknown even when the inner lambda always runs
   (`headers { }`).
 - Kotlin base URLs (spec #27, #100): `STRING_METHODS` also lets `replace`, `lowercase` and the
@@ -3509,7 +3593,10 @@ qualification budget does (ADR 0017).
   declares one and checks a tag's attributes pairwise; `XML_NODES` (65,536) bounds the parsed
   tree, in addition to `lang::MAX_BYTES`. `roxmltree` rejects DTDs and never loads external
   entities. An over-limit, unterminated or malformed manifest reads as an empty summary (a
-  project file as no project); indexing continues. `jvm/gradle.rs`: `GRADLE_DEPTH` (64) bounds nested blocks; a deeper build
+  project file as no project); indexing continues. `jvm/maven.rs`: `PROPERTY_DEPTH` (16) bounds
+  how many properties a `${..}` follows, a cycle included; a property longer than a package name
+  is not kept; `FILL_BUDGET` (100 000) bounds the properties one pom reads, past which a hole
+  stays as written. `jvm/gradle.rs`: `GRADLE_DEPTH` (64) bounds nested blocks; a deeper build
   or settings file reads as an empty summary. The Gradle scanner does not read Groovy slashy
   strings, and reads a triple-quoted string as quoted pairs. It keeps at most `MAX_ROOTS` (64)
   source directories. The Groovy and the Kotlin DSL files (`*.gradle`, `*.gradle.kts`) go

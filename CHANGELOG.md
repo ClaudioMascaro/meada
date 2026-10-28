@@ -8,6 +8,117 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Imports of a project under a nested `pyproject.toml` resolve: the nearest manifest above an
+  importer gives its package roots (`src`, Poetry `from`, setuptools `where`), so `from app.crud
+  import f` in a template's `backend/` reaches `backend/app/crud.py`, and two sibling projects
+  that each hold an `app` package keep their own. An unreadable nested manifest declares nothing.
+
+- TypeScript and JavaScript: the `paths` and `baseUrl` of a nested `tsconfig.json` (or
+  `jsconfig.json`) resolve the imports of the files below it; the nearest config above an importer
+  wins, and `extends` is still not followed. A config under `node_modules` declares nothing.
+
+- A Spring AMQP publish whose message is a class of the repository (`convertAndSend("q", order)`)
+  reads the queue, or the exchange and the routing key, as it does for a string message: the
+  overload no longer needs the message's type from outside the repository. Java and Kotlin.
+
+- A `@Value` field keeps its base URL when the only writers of its name in the repository are a
+  local or parameter of that name, or another class's field of it: an assignment is a write of a
+  field only where the name can be one, and it names its class when the innermost class declares
+  the field.
+
+- A typed local (`WebClient client = ..`) stays typed when another class in its file has a field
+  of the same name: only a field of its own class or of an enclosing class hides it. A Kotlin
+  top-level property still hides the locals of its file.
+
+- A Java or Kotlin annotation written in full without an import (`@retrofit2.http.GET`,
+  `@org.springframework.web.bind.annotation.GetMapping`) is read as the library's, unless the
+  repository defines that name or an import binds its head.
+
+- Swift: a Vapor group of static middleware calls (`grouped(AuthMiddleware())`) adds no path
+  segment, so the routes registered on it are served at the parent's path. A route group argument
+  Meada cannot tell from a middleware (`grouped(Paths.api())`) is read as one, an accepted false
+  positive, documented in the repo map.
+
+- Swift: an `if let` or `guard let` of an environment read
+  (`guard let base = ProcessInfo.processInfo.environment["X"]`) is a base URL like a `let`
+  holding it, so `base_url_env` maps it.
+
+- TypeScript and JavaScript: a function defined by assignment is a symbol, and the calls of its
+  file reach it: `obj.y = function`, `X.prototype.y = function` (the method `X.y`), `exports.y =`,
+  `module.exports.y =` and `module.exports = function` (the export), a `let` or `var` function
+  the file assigns nowhere else, and the methods and function properties of a top-level `const`
+  object literal (`o.m`).
+
+- A Swift local or property bound to a member read on a name from outside the repository
+  (`let session = URLSession.shared`) is opaque, as the direct chain `URLSession.shared.data(..)`
+  is: a call on it no longer matches a repository method of the same name and labels
+  (`Cache.data(from:)`). A `var` assigned again keeps the name match. The stored facts of a Swift
+  file gain `Class::Member`, so an existing index is rebuilt.
+
+- A Swift module is a target of one package: two packages of a repository that each declare a
+  target `App` are two modules, so a call binds its own package's declaration instead of staying
+  `ambiguous` among the others; `import App` binds the importer's own package's target, else the
+  nearest one's. `@testable import App` shows the `internal` declarations of that module
+  (`fileprivate` and `private` stay hidden), so a test's call to them resolves. The stored facts of
+  a Swift file gain `testable` and `confined`, so an existing index is rebuilt.
+
+- A Swift receiver whose written type is a `typealias` (`store: StoreOf<Feature>`, optional or
+  not, on a parameter, a property or a local) is typed as the alias's target, through an alias of
+  an alias; a cycle of aliases types nothing and an alias of an outside type leaves the receiver
+  outside; a constructor call written through the alias (`StoreOf<X>(..)`) reaches the target's
+  initializers. An initializer another module keeps to itself (`internal`) is no longer a candidate
+  of a constructor call there. A trailing closure fills only a parameter whose written type is a
+  function type (also optional or `@escaping`), a generic parameter or a repository `typealias`
+  of a function type, so `store.send(.action) { }` no longer weighs the `animation:` overload.
+  The stored facts of a Swift file gain each parameter's `closure` and the file's `function_aliases`, so
+  an existing index is rebuilt.
+
+- A Swift call on an implicit member (`.make()`, `wait(.seconds(1))`) keeps its member name under
+  the head `(implicit)`, instead of the placeholder `(prefix_expression)`, and resolves by name
+  and labels among methods (`inferred` or `ambiguous`), never to a free function or a type of
+  that name; `.init(..)` stays unresolved. The call ids of such calls change.
+
+- A Swift call to a function with a capitalized name (`Check(1)`) resolves as a plain call, by
+  scope, labels and arity, instead of staying unresolved as constructor syntax; a name that binds
+  a type still constructs it and a name the repository does not declare stays unresolved. A
+  call not written under `await` no longer reaches a function declared `async`. The stored facts
+  of a Swift file gain `awaited` and `suspends`, so an existing index is rebuilt.
+
+- A Maven or Gradle dependency whose group or artifact names a property or variable the build
+  files declare as a literal reads as that literal, and links like a written coordinate: a pom
+  `<properties>` entry, `project.groupId` or `project.artifactId`, or a property of a parent pom
+  in the repository; a Gradle `val`, `def` or `ext` name assigned once to a plain string, the
+  project's `group` included. A name the build files do not declare, declare more than once or
+  compute stays `ambiguous`, as before. Versions are untouched. The stored summary of a `pom.xml`
+  gains `properties`, `parent` and a computed entry's `template`, so an existing index is rebuilt.
+
+- A Java local declared with an initializer and never assigned again in its file is followed into
+  its value, as a Kotlin `val` is: `String base = System.getenv("WEB_URL");` then
+  `rest.getForObject(base + "/api", ..)` carries `env:WEB_URL`, so `base_url_env` maps it to its
+  peer, and a local `WebClient` made by `WebClient.create("https://x")` has that host. A local the
+  file assigns, one sharing its name with another binding or a field of its class, one in an
+  initializer block and one in an anonymous class's method stay unread.
+- A Java call with two or more arguments to a varargs method (`any(String... parts)`) reaches it:
+  a spread parameter takes any number of arguments, as Kotlin's `vararg` does, and the method is
+  among the functions of the `flexible` table.
+- A method annotation of a Java or Kotlin class whose family has a base from outside the
+  repository is read through the file's imports, so a Spring controller, a JAX-RS resource, a
+  declarative client (Feign, Retrofit) and a channel listener (`@KafkaListener`, `@RabbitListener`,
+  `@JmsListener`) that extends an internal library's base gives its providers and consumers.
+  Single-type and on-demand imports agree. A member type of the outside base named like the
+  annotation, which Java would read before the import, is the one case read wrong. Before, the
+  opaque base hid the single-type import and the class gave nothing.
+- A Kotlin call made on another call's result (`make().open()`, `Box().open()`,
+  `find()?.open()`) resolves within the class of the first call's written return type, or the
+  class its constructor builds, `exact` when one member fits. A type with arguments or a `?`
+  names its class; an expression body, a type parameter, a function type and a type from outside
+  the repository give no class. Before, the Kotlin pack recorded no result and every such call
+  was a name match (okhttp's `Request.Builder().build()`).
+- A Kotlin class with a secondary constructor is constructible: each constructor, the primary
+  one and each secondary one, is a callable of the class's name with its own parameter list, and
+  a call narrows among them by argument count (`exact` when one fits, `ambiguous` when two take
+  that count). Before, the class left the callables of its name and every construction stayed
+  unresolved (okhttp's `Request.Builder()`).
 - A Rust method called on another call's result (`Router::new().route(..)`, also through
   `.await` and parentheses) resolves within the family of the inner target's written result,
   `exact` when one member fits. Before, it was a name match among every method of its name
@@ -108,6 +219,11 @@ All notable changes to Meada are recorded here. The format follows
 - Fence recovery shares the fleet reader's Valkey clock and complete heartbeat validation,
   and refuses counters that would prevent the next native INCR acquisition. Exact u64
   transport remains supported, with bilingual operational refusals at the signed ceiling.
+
+- Rust message brokers: the client a producer or consumer traces back to is read from its
+  constructor by path, as the Rust HTTP readers do, and only when the head of the name is the
+  import itself: a function spelled like the crate (`fn lapin() {}` beside `lapin::Connection::
+  connect(..)`) no longer hides the client, and a value spelled like the crate gives none.
 
 ### Added
 

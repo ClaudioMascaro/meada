@@ -1491,7 +1491,7 @@ sample.java
       "name": "example.Store.PREFIX"
     },
     {
-      "name": ".client"
+      "name": ".client@example.Store"
     }
   ],
   "receivers": [
@@ -1569,7 +1569,10 @@ sample.kt
       ],
       "bases": [
         "Store.Companion"
-      ]
+      ],
+      "result": {
+        "Type": "Store"
+      }
     },
     {
       "name": "example.Store.save(Int,vararg String)",
@@ -1605,7 +1608,10 @@ sample.kt
         "start": 180,
         "end": 207
       },
-      "params": []
+      "params": [],
+      "result": {
+        "Type": "Store"
+      }
     },
     {
       "name": "example.helper()",
@@ -1614,7 +1620,10 @@ sample.kt
         "start": 217,
         "end": 260
       },
-      "params": []
+      "params": [],
+      "result": {
+        "Type": "Store"
+      }
     },
     {
       "name": "example.Clock",
@@ -1623,7 +1632,10 @@ sample.kt
         "start": 262,
         "end": 280
       },
-      "params": []
+      "params": [],
+      "result": {
+        "Type": "Clock"
+      }
     },
     {
       "name": "example.Timer",
@@ -1632,12 +1644,47 @@ sample.kt
         "start": 282,
         "end": 300
       },
-      "params": []
+      "params": [],
+      "result": {
+        "Type": "Timer"
+      }
+    },
+    {
+      "name": "example.OnlySecondary",
+      "kind": "Class",
+      "range": {
+        "start": 302,
+        "end": 352
+      },
+      "params": [],
+      "result": {
+        "Type": "OnlySecondary"
+      }
+    },
+    {
+      "name": "example.OnlySecondary.OnlySecondary(Int)",
+      "kind": "Method",
+      "range": {
+        "start": 328,
+        "end": 350
+      },
+      "params": [
+        {
+          "name": "a",
+          "binds": "Any"
+        }
+      ],
+      "result": {
+        "Type": "OnlySecondary"
+      }
     }
   ],
   "overloads": {
     "example.Clock": [
       "example.Clock"
+    ],
+    "example.OnlySecondary": [
+      "example.OnlySecondary.OnlySecondary(Int)"
     ],
     "example.Store": [
       "example.Store"
@@ -1898,6 +1945,18 @@ sample.kt
         "exported": "example.Timer",
         "local": "example.Timer"
       }
+    },
+    {
+      "Local": {
+        "exported": "OnlySecondary",
+        "local": "example.OnlySecondary"
+      }
+    },
+    {
+      "Local": {
+        "exported": "example.OnlySecondary",
+        "local": "example.OnlySecondary"
+      }
     }
   ],
   "star": {
@@ -1909,7 +1968,9 @@ sample.kt
       "Clock",
       "example.Clock",
       "Timer",
-      "example.Timer"
+      "example.Timer",
+      "OnlySecondary",
+      "example.OnlySecondary"
     ]
   },
   "calls": [
@@ -1961,10 +2022,18 @@ sample.kt
       "class": {
         "Type": "Int"
       }
+    },
+    {
+      "scope": "example.OnlySecondary",
+      "name": "a",
+      "class": {
+        "Type": "Int"
+      }
     }
   ],
   "externs": [
     "Int",
+    "Store",
     "String"
   ],
   "private": [
@@ -2202,8 +2271,8 @@ sample.swift
       "name": "Order",
       "kind": "Class",
       "range": {
-        "start": 14,
-        "end": 68
+        "start": 35,
+        "end": 89
       },
       "params": []
     },
@@ -2211,14 +2280,17 @@ sample.swift
       "name": "Order.init(id:)",
       "kind": "Method",
       "range": {
-        "start": 40,
-        "end": 66
+        "start": 61,
+        "end": 87
       },
       "params": [
         {
           "name": "id",
           "binds": "Any",
-          "label": "id"
+          "label": "id",
+          "closure": {
+            "Named": "String"
+          }
         }
       ]
     },
@@ -2226,33 +2298,88 @@ sample.swift
       "name": "Order.place(order:quantity:_:)",
       "kind": "Method",
       "range": {
-        "start": 101,
-        "end": 205
+        "start": 122,
+        "end": 226
       },
       "params": [
         {
           "name": "o",
           "binds": "Any",
-          "label": "order"
+          "label": "order",
+          "closure": {
+            "Named": "Order"
+          }
         },
         {
           "name": "quantity",
           "binds": "Optional",
-          "label": "quantity"
+          "label": "quantity",
+          "closure": {
+            "Named": "Int"
+          }
         },
         {
           "name": "rest",
           "binds": "Rest",
-          "label": "_"
+          "label": "_",
+          "closure": {
+            "Named": "Int"
+          }
         }
       ]
     },
     {
-      "name": "Order.place(order:quantity:_:).@196",
+      "name": "Order.place(order:quantity:_:).@217",
       "kind": "Inline",
       "range": {
-        "start": 196,
-        "end": 199
+        "start": 217,
+        "end": 220
+      },
+      "params": []
+    },
+    {
+      "name": "on(_:)",
+      "kind": "Function",
+      "range": {
+        "start": 313,
+        "end": 350
+      },
+      "params": [
+        {
+          "name": "handler",
+          "binds": "Optional",
+          "label": "_",
+          "closure": {
+            "Named": "Handler"
+          }
+        }
+      ]
+    },
+    {
+      "name": "settle()",
+      "kind": "Function",
+      "range": {
+        "start": 352,
+        "end": 393
+      },
+      "params": [],
+      "suspends": true
+    },
+    {
+      "name": "local()",
+      "kind": "Function",
+      "range": {
+        "start": 395,
+        "end": 422
+      },
+      "params": []
+    },
+    {
+      "name": "shared()",
+      "kind": "Function",
+      "range": {
+        "start": 424,
+        "end": 516
       },
       "params": []
     }
@@ -2263,6 +2390,18 @@ sample.swift
     ],
     "Order.place": [
       "Order.place(order:quantity:_:)"
+    ],
+    "local": [
+      "local()"
+    ],
+    "on": [
+      "on(_:)"
+    ],
+    "settle": [
+      "settle()"
+    ],
+    "shared": [
+      "shared()"
     ]
   },
   "constructors": {
@@ -2291,6 +2430,34 @@ sample.swift
           "public": false
         }
       }
+    },
+    {
+      "local": "Kit",
+      "source": "Kit",
+      "name": "Namespace"
+    },
+    {
+      "local": "@glob4",
+      "source": "Kit",
+      "name": "Namespace"
+    },
+    {
+      "local": "*",
+      "source": "",
+      "name": {
+        "Glob": {
+          "path": "@glob4",
+          "inside": false,
+          "public": false
+        }
+      }
+    },
+    {
+      "local": "Orders",
+      "source": "",
+      "name": {
+        "Path": "Order"
+      }
     }
   ],
   "exports": [
@@ -2304,6 +2471,30 @@ sample.swift
       "Local": {
         "exported": "limit",
         "local": "limit"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Orders",
+        "local": "Orders"
+      }
+    },
+    {
+      "Local": {
+        "exported": "on",
+        "local": "on"
+      }
+    },
+    {
+      "Local": {
+        "exported": "settle",
+        "local": "settle"
+      }
+    },
+    {
+      "Local": {
+        "exported": "shared",
+        "local": "shared"
       }
     }
   ],
@@ -2321,8 +2512,8 @@ sample.swift
         "_"
       ],
       "range": {
-        "start": 173,
-        "end": 181
+        "start": 194,
+        "end": 202
       },
       "by_path": true
     },
@@ -2334,10 +2525,32 @@ sample.swift
         ""
       ],
       "range": {
-        "start": 190,
-        "end": 199
+        "start": 211,
+        "end": 220
       },
       "by_path": true
+    },
+    {
+      "scope": "settle()",
+      "callee": "flush",
+      "arity": 0,
+      "labels": [],
+      "awaited": true,
+      "range": {
+        "start": 384,
+        "end": 391
+      },
+      "by_path": true
+    },
+    {
+      "scope": "shared()",
+      "callee": "session.finishTasksAndInvalidate",
+      "arity": 0,
+      "labels": [],
+      "range": {
+        "start": 480,
+        "end": 514
+      }
     }
   ],
   "consts": [
@@ -2366,6 +2579,20 @@ sample.swift
       "class": {
         "Type": "Int"
       }
+    },
+    {
+      "scope": "on(_:)",
+      "name": "handler",
+      "class": {
+        "Type": "Handler"
+      }
+    },
+    {
+      "scope": "shared()",
+      "name": "session",
+      "class": {
+        "Member": "URLSession.shared"
+      }
     }
   ],
   "impls": [
@@ -2383,10 +2610,27 @@ sample.swift
   ],
   "private": [
     "Order.place(order:quantity:_:)",
-    "limit"
+    "limit",
+    "Orders",
+    "on(_:)",
+    "settle()",
+    "local()",
+    "shared()",
+    "on",
+    "settle",
+    "shared"
   ],
   "hidden": [
     "Order.place(order:quantity:_:)"
+  ],
+  "function_aliases": [
+    "Handler"
+  ],
+  "testable": [
+    "Kit"
+  ],
+  "confined": [
+    "local()"
   ]
 }
 
@@ -2651,7 +2895,11 @@ sample.pom.xml
       "field": "dependencies",
       "name": "example:shared*",
       "range": "${release}",
-      "via": "computed"
+      "via": "computed",
+      "template": [
+        "example",
+        "shared${suffix}"
+      ]
     }
   ],
   "roots": [
@@ -2663,7 +2911,8 @@ sample.pom.xml
   "test_roots": [
     "src/test/java",
     "src/test/kotlin"
-  ]
+  ],
+  "parent": "example:parent"
 }
 
 sample.build.gradle.kts
