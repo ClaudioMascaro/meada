@@ -8,6 +8,41 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Imports of a project under a nested `pyproject.toml` resolve: the nearest manifest above an
+  importer gives its package roots (`src`, Poetry `from`, setuptools `where`), so `from app.crud
+  import f` in a template's `backend/` reaches `backend/app/crud.py`, and two sibling projects
+  that each hold an `app` package keep their own. An unreadable nested manifest declares nothing.
+
+- TypeScript and JavaScript: the `paths` and `baseUrl` of a nested `tsconfig.json` (or
+  `jsconfig.json`) resolve the imports of the files below it; the nearest config above an importer
+  wins, and `extends` is still not followed. A config under `node_modules` declares nothing.
+
+- A Spring AMQP publish whose message is a class of the repository (`convertAndSend("q", order)`)
+  reads the queue, or the exchange and the routing key, as it does for a string message: the
+  overload no longer needs the message's type from outside the repository. Java and Kotlin.
+
+- A `@Value` field keeps its base URL when the only writers of its name in the repository are a
+  local or parameter of that name, or another class's field of it: an assignment is a write of a
+  field only where the name can be one, and it names its class when the innermost class declares
+  the field.
+
+- A typed local (`WebClient client = ..`) stays typed when another class in its file has a field
+  of the same name: only a field of its own class or of an enclosing class hides it. A Kotlin
+  top-level property still hides the locals of its file.
+
+- A Java or Kotlin annotation written in full without an import (`@retrofit2.http.GET`,
+  `@org.springframework.web.bind.annotation.GetMapping`) is read as the library's, unless the
+  repository defines that name or an import binds its head.
+
+- Swift: a Vapor group of static middleware calls (`grouped(AuthMiddleware())`) adds no path
+  segment, so the routes registered on it are served at the parent's path. A route group argument
+  Meada cannot tell from a middleware (`grouped(Paths.api())`) is read as one, an accepted false
+  positive, documented in the repo map.
+
+- Swift: an `if let` or `guard let` of an environment read
+  (`guard let base = ProcessInfo.processInfo.environment["X"]`) is a base URL like a `let`
+  holding it, so `base_url_env` maps it.
+
 - TypeScript and JavaScript: a function defined by assignment is a symbol, and the calls of its
   file reach it: `obj.y = function`, `X.prototype.y = function` (the method `X.y`), `exports.y =`,
   `module.exports.y =` and `module.exports = function` (the export), a `let` or `var` function

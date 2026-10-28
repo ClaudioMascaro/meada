@@ -1995,7 +1995,9 @@ one for the area a change touches.
   `Call::constructs`), the argument label of a parameter and whether its written type takes a
   trailing closure, or the name it is written as (`Param::label`, `Param::closure`), the names
   of a Swift file's aliases of a function type (`Facts::function_aliases`), the place of the call a
-  chained call is made on (`Call::on`), whether an `inferred` call was narrowed from several
+  chained call is made on (`Call::on`), whether a Swift call is written under `await` and
+  whether a function needs one (`Call::awaited`, `Def::suspends`), the modules a Swift file imports
+  `@testable` and the names only their file sees (`Facts::testable`, `Facts::confined`), whether an `inferred` call was narrowed from several
   definitions of its name (`calls.narrowed`), callable-to-signature and
   static-member names (`Facts::overloads`, `Facts::constructors` and
   `Facts::statics`), the namespaces and types a C# file's `global using` directives name
@@ -3296,8 +3298,8 @@ qualification budget does (ADR 0017).
   neither, as in ES modules.
 - `lang/ts.rs` (`Facts::locals`): a local binding hides the name in its whole enclosing
   definition, whatever block holds it, the definition's own definitions, constants and
-  parameters of that name included, and a function that is no definition (an object literal
-  method, `module.exports = (db) => ...`, an IIFE, an arrow kept in an object) lends its
+  parameters of that name included, and a function that is no definition (a method or arrow of an
+  object literal that no top-level `const` binds, an IIFE) lends its
   parameters and locals to the definition around it; at the top level that is the whole file.
   A call to the hidden name elsewhere in that scope loses its exact link or its value, never
   gains a wrong one (no marker).
@@ -3593,7 +3595,8 @@ qualification budget does (ADR 0017).
   entities. An over-limit, unterminated or malformed manifest reads as an empty summary (a
   project file as no project); indexing continues. `jvm/maven.rs`: `PROPERTY_DEPTH` (16) bounds
   how many properties a `${..}` follows, a cycle included; a property longer than a package name
-  is not kept. `jvm/gradle.rs`: `GRADLE_DEPTH` (64) bounds nested blocks; a deeper build
+  is not kept; `FILL_BUDGET` (100 000) bounds the properties one pom reads, past which a hole
+  stays as written. `jvm/gradle.rs`: `GRADLE_DEPTH` (64) bounds nested blocks; a deeper build
   or settings file reads as an empty summary. The Gradle scanner does not read Groovy slashy
   strings, and reads a triple-quoted string as quoted pairs. It keeps at most `MAX_ROOTS` (64)
   source directories. The Groovy and the Kotlin DSL files (`*.gradle`, `*.gradle.kts`) go

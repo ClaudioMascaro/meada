@@ -348,6 +348,7 @@ fn parent_properties(manifests: &mut [Manifest]) {
         let (group, artifact) = (m.summary.name.as_deref())
             .and_then(|n| n.split_once(':'))
             .unzip();
+        let mut budget = jvm::maven::FILL_BUDGET;
         let lookup = |name: &str| match name {
             "project.groupId" => group,
             "project.artifactId" => artifact,
@@ -360,7 +361,10 @@ fn parent_properties(manifests: &mut [Manifest]) {
                 let Some((g, a)) = &e.template else {
                     return Some(e.clone());
                 };
-                let (g, a) = (jvm::maven::fill(g, &lookup), jvm::maven::fill(a, &lookup));
+                let (g, a) = (
+                    jvm::maven::fill(g, &lookup, &mut budget),
+                    jvm::maven::fill(a, &lookup, &mut budget),
+                );
                 let (name, computed) = jvm::maven::named(&g, &a)?;
                 Some(Entry {
                     name,

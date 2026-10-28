@@ -40,10 +40,11 @@ overloads of the whole family; an ancestor from outside the repository is opaque
 _Avoid_: hierarchy, inheritance chain
 
 **Opaque outside**:
-A value whose type comes from outside the repository, so its members resolve to nothing: a
-base class, a receiver typed by a name nothing binds (`session: URLSession`), a local bound to a
-member read on such a name (`let session = URLSession.shared`). Its calls get no repository
-target, not even by name (CODING_STANDARDS.md, the probe of the same name).
+A value whose type comes from outside the repository: a receiver typed by a name nothing binds
+(`session: URLSession`), or a local bound to a member read on such a name
+(`let session = URLSession.shared`). Its calls get no repository target by name; only an
+`extension` the repository writes for that type is reached (CODING_STANDARDS.md, the probe of
+the same name).
 _Avoid_: external type, unknown type
 
 **Known outside members**:
