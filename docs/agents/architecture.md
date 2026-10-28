@@ -2189,7 +2189,9 @@ qualification budget does (ADR 0017).
   one defining unit among those its project references, directly or through the references
   that pass on (`Facts::unit_references`, from the walk of `dotnet::references`;
   `Resolver::in_references`), and stays `ambiguous` with several or none, since a project
-  not referenced may still be visible through references not read.
+  not referenced may still be visible through references not read. The overloads of one
+  family's member are kept whole, since they merge across units (a base in another project, a
+  Swift extension in a test module): methods narrow only when two of their types share a name.
 
 - `resolve.rs` (`labelled_args`): `LABELLED_CELLS` (65,536) bounds the pairs of a parameter and
   an argument the label matcher weighs for one call; a wider call fits no function that labels

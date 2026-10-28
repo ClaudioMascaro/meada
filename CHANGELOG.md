@@ -14,6 +14,10 @@ All notable changes to Meada are recorded here. The format follows
   names those types declare (`compareTo`, `Dispose`, `hash(into:)`) stay name matches. Any other
   outside base keeps the strict rule (ADR 0019). A helper a `RouteCollection` calls from `boot`
   now serves its routes under the collection's prefix.
+- The overloads of a member stay candidates across projects and modules: a C# call that fits a
+  base's overload in another project no longer links `exact` to the derived class's own, and a
+  Swift call through a type extended in a test module still reaches the type's overloads in
+  its library.
 
 - A C# file of a few hundred KB (an Entity Framework model snapshot) is no longer dropped
   silently: the qualification budget is charged for enclosing names past 256 bytes, not for every

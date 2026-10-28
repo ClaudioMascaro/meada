@@ -1,9 +1,9 @@
 // Known outside members: `Hashable` declares `hash(into:)` and `hashValue`, `Codable`
 // `encode(to:)` and `init(from:)`, so the type's own overloads are exact, `hash` stays a name
 // match and a name nobody declares resolves to nothing.
-struct Tag: Hashable, Codable {
+public struct Tag: Hashable, Codable {
     func open() {}
-    func open(seat: Int) {}
+    public func open(seat: Int) {}
     func hash(into hasher: inout Hasher) {}
 
     func use(_ t: Tag) {

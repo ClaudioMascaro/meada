@@ -30,6 +30,10 @@
       "hash": "ddc43419ae51aba6eaa09999f70bab40d0c4446b1986a76a34c958ded460a0cb"
     },
     {
+      "path": "Sources/Checkout/Tagging.swift",
+      "hash": "2a07474ccc9110f88328fa2a10fd5769a66a61049b13a0bb7930f93cadca14cc"
+    },
+    {
       "path": "Sources/Checkout/Ui.swift",
       "hash": "875c400f61c055b503f2ec19202e0006760ba2a43c1339c2470688d267c8c76f"
     },
@@ -71,7 +75,7 @@
     },
     {
       "path": "Sources/Store/Tag.swift",
-      "hash": "3827cd3de8104c35de73417870b1de99003c08625ed621034e4c84676d5414dd"
+      "hash": "a7b2c17a8f466692d21cc1e2f8556f65e0c91ec080c169d2c212f23df31e4830"
     },
     {
       "path": "Sources/Tool/Cli.swift",
@@ -848,6 +852,22 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/Checkout/Tagging.swift::Tag.open(label:)",
+      "span": {
+        "path": "Sources/Checkout/Tagging.swift",
+        "start": 183,
+        "end": 210
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Checkout/Tagging.swift::tagging(_:)",
+      "span": {
+        "path": "Sources/Checkout/Tagging.swift",
+        "start": 214,
+        "end": 264
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/Checkout/Ui.swift::reroute()",
       "span": {
         "path": "Sources/Checkout/Ui.swift",
@@ -1371,32 +1391,32 @@
       "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Status",
       "span": {
         "path": "Sources/Store/Tag.swift",
-        "start": 609,
-        "end": 799
+        "start": 623,
+        "end": 813
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Status.label()",
       "span": {
         "path": "Sources/Store/Tag.swift",
-        "start": 672,
-        "end": 701
+        "start": 686,
+        "end": 715
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Status.label(upper:)",
       "span": {
         "path": "Sources/Store/Tag.swift",
-        "start": 706,
-        "end": 746
+        "start": 720,
+        "end": 760
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Status.shout()",
       "span": {
         "path": "Sources/Store/Tag.swift",
-        "start": 752,
-        "end": 797
+        "start": 766,
+        "end": 811
       }
     },
     {
@@ -1404,39 +1424,39 @@
       "span": {
         "path": "Sources/Store/Tag.swift",
         "start": 239,
-        "end": 514
+        "end": 528
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.hash(into:)",
       "span": {
         "path": "Sources/Store/Tag.swift",
-        "start": 322,
-        "end": 361
+        "start": 336,
+        "end": 375
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.open()",
       "span": {
         "path": "Sources/Store/Tag.swift",
-        "start": 275,
-        "end": 289
+        "start": 282,
+        "end": 296
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.open(seat:)",
       "span": {
         "path": "Sources/Store/Tag.swift",
-        "start": 294,
-        "end": 317
+        "start": 301,
+        "end": 331
       }
     },
     {
       "id": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.use(_:)",
       "span": {
         "path": "Sources/Store/Tag.swift",
-        "start": 367,
-        "end": 512
+        "start": 381,
+        "end": 526
       }
     },
     {
@@ -4065,6 +4085,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/Checkout/Tagging.swift::tagging(_:)::tag.open#0",
+      "caller": "example.com/acme/conformance::Sources/Checkout/Tagging.swift::tagging(_:)",
+      "target": "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.open(seat:)",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Checkout/Tagging.swift",
+        "start": 245,
+        "end": 262
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/Checkout/Ui.swift::uikit(session:)::URL#0",
       "caller": "example.com/acme/conformance::Sources/Checkout/Ui.swift::uikit(session:)",
       "target": null,
@@ -4641,8 +4672,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Store/Tag.swift",
-        "start": 777,
-        "end": 795
+        "start": 791,
+        "end": 809
       }
     },
     {
@@ -4652,8 +4683,8 @@
       "level": null,
       "span": {
         "path": "Sources/Store/Tag.swift",
-        "start": 448,
-        "end": 456
+        "start": 462,
+        "end": 470
       }
     },
     {
@@ -4663,8 +4694,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Store/Tag.swift",
-        "start": 420,
-        "end": 426
+        "start": 434,
+        "end": 440
       }
     },
     {
@@ -4674,8 +4705,8 @@
       "level": "inferred",
       "span": {
         "path": "Sources/Store/Tag.swift",
-        "start": 465,
-        "end": 486
+        "start": 479,
+        "end": 500
       }
     },
     {
@@ -4685,8 +4716,8 @@
       "level": null,
       "span": {
         "path": "Sources/Store/Tag.swift",
-        "start": 495,
-        "end": 506
+        "start": 509,
+        "end": 520
       }
     },
     {
@@ -4696,8 +4727,8 @@
       "level": "exact",
       "span": {
         "path": "Sources/Store/Tag.swift",
-        "start": 396,
-        "end": 411
+        "start": 410,
+        "end": 425
       }
     },
     {
@@ -5170,25 +5201,24 @@
     {
       "name": "Sources/Store#10",
       "members": [
+        "example.com/acme/conformance::Sources/Store/Probe+Tracer.swift::Probe.trace()",
+        "example.com/acme/conformance::Sources/Store/Probe.swift::Pinger.ping()",
+        "example.com/acme/conformance::Sources/Store/Probe.swift::Probe.run()"
+      ]
+    },
+    {
+      "name": "Sources/Store#11",
+      "members": [
         "example.com/acme/conformance::Sources/Store/Probe.swift::Bag.run()",
         "example.com/acme/conformance::Sources/Store/Probe.swift::Sack.run()",
         "example.com/acme/conformance::Sources/Store/Probe.swift::describe()"
       ]
     },
     {
-      "name": "Sources/Store#11",
+      "name": "Sources/Store#12",
       "members": [
         "example.com/acme/conformance::Sources/Store/Tag.swift::Status.label(upper:)",
         "example.com/acme/conformance::Sources/Store/Tag.swift::Status.shout()"
-      ]
-    },
-    {
-      "name": "Sources/Store#12",
-      "members": [
-        "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.hash(into:)",
-        "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.open()",
-        "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.open(seat:)",
-        "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.use(_:)"
       ]
     },
     {
@@ -5208,6 +5238,16 @@
     {
       "name": "Sources/Store#3",
       "members": [
+        "example.com/acme/conformance::Sources/Checkout/Tagging.swift::tagging(_:)",
+        "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.hash(into:)",
+        "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.open()",
+        "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.open(seat:)",
+        "example.com/acme/conformance::Sources/Store/Tag.swift::Tag.use(_:)"
+      ]
+    },
+    {
+      "name": "Sources/Store#4",
+      "members": [
         "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat",
         "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot",
         "example.com/acme/conformance::Sources/Store/Dispatch.swift::Depot.again(lorry:)",
@@ -5215,7 +5255,7 @@
       ]
     },
     {
-      "name": "Sources/Store#4",
+      "name": "Sources/Store#5",
       "members": [
         "example.com/acme/conformance::Sources/Store/Dispatch.swift::Boat.moor()",
         "example.com/acme/conformance::Sources/Store/Dispatch.swift::Carrier.ship(parcel:)",
@@ -5227,14 +5267,14 @@
       ]
     },
     {
-      "name": "Sources/Store#5",
+      "name": "Sources/Store#6",
       "members": [
         "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.Line.doubled()",
         "example.com/acme/conformance::Sources/Store/Order.swift::Order.Line.total()"
       ]
     },
     {
-      "name": "Sources/Store#6",
+      "name": "Sources/Store#7",
       "members": [
         "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.discount(quantity:)",
         "example.com/acme/conformance::Sources/Store/Order+Pricing.swift::Order.price(quantity:)",
@@ -5248,25 +5288,17 @@
       ]
     },
     {
-      "name": "Sources/Store#7",
+      "name": "Sources/Store#8",
       "members": [
         "example.com/acme/conformance::Sources/Store/Order.swift::log(level:)",
         "example.com/acme/conformance::Sources/Tool/Cli.swift::Cli.main()"
       ]
     },
     {
-      "name": "Sources/Store#8",
+      "name": "Sources/Store#9",
       "members": [
         "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter.report()",
         "example.com/acme/conformance::Sources/Store/OrderService.swift::Reporter.summary()"
-      ]
-    },
-    {
-      "name": "Sources/Store#9",
-      "members": [
-        "example.com/acme/conformance::Sources/Store/Probe+Tracer.swift::Probe.trace()",
-        "example.com/acme/conformance::Sources/Store/Probe.swift::Pinger.ping()",
-        "example.com/acme/conformance::Sources/Store/Probe.swift::Probe.run()"
       ]
     }
   ],

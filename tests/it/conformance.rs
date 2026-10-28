@@ -12093,6 +12093,8 @@ fn swift() {
         dispatch("Depot.lookup()"),
         checkout("Checkout.swift", "Checkout"),
         checkout("Checkout.swift", "Checkout.run()"),
+        checkout("Tagging.swift", "Tag.open(label:)"),
+        checkout("Tagging.swift", "tagging(_:)"),
         checkout("Summary.swift", "summarize()"),
         checkout("Summary.swift", "log(level:)"),
         checkout("Routes.swift", "routes(_:)"),
@@ -12359,6 +12361,12 @@ fn swift() {
             one(store("Tag.swift", "Tag.hash(into:)")),
         ),
         (store("Tag.swift", "Tag.use(_:)::t.missing#0"), None, vec![]),
+        // The overloads of a member merge across modules.
+        (
+            checkout("Tagging.swift", "tagging(_:)::tag.open#0"),
+            EXACT,
+            one(store("Tag.swift", "Tag.open(seat:)")),
+        ),
         (
             store("Tag.swift", "Status.shout()::label#0"),
             EXACT,

@@ -2982,11 +2982,28 @@ impl<'a> Resolver<'a> {
     /// `found`, when files define its name apart (`Several`), narrowed to the definitions of the
     /// compilation of `path` (`Facts::unit`, C#'s project) if it holds any: the compiler prefers
     /// a type its own project declares to one of the same name a reference or another project
-    /// brings. A file of no compilation, or one that defines none of them, keeps them all.
+    /// brings. A file of no compilation, or one that defines none of them, keeps them all, and
+    /// so do the overloads of one family's member, which merge across compilations (a Swift
+    /// extension in a test module beside the type's own in its library, a base of another
+    /// project): methods narrow only when two of their types share a name (`Kit/Order.Of` and
+    /// `Kit2/Order.Of`).
     fn in_unit(&self, path: &'a str, found: Binding<'a>) -> Binding<'a> {
         let Binding::Several(all) = found else {
             return found;
         };
+        let owner = |t: &Target<'a>| {
+            let scope = crate::parent(t.name);
+            (self.blocks.get(&(t.path, scope)).copied()).unwrap_or(Target {
+                path: t.path,
+                name: scope,
+            })
+        };
+        let owners: HashSet<Target<'a>> = all.iter().map(owner).collect();
+        let methods = (all.iter()).all(|t| self.defs[t.path][t.name].kind == Kind::Method);
+        let apart = (owners.iter()).any(|a| owners.iter().any(|b| a.name == b.name && a != b));
+        if methods && !apart {
+            return Binding::Several(all);
+        }
         let unit = self.files.get(path).map_or("", |f| f.unit.as_str());
         let own = |t: &&Target| self.files.get(t.path).is_some_and(|f| f.unit == unit);
         let kept: Vec<Target<'a>> = all.iter().filter(own).copied().collect();
@@ -9770,6 +9787,22 @@ mod csharp_tests {
         ] {
             assert_eq!(calls(body).0.0, "ambiguous", "{body}");
         }
+    }
+
+    /// The overloads of one family merge across projects: a base's overload in another project
+    /// is no type the caller's project hides, so the call is `ambiguous` by count, never the
+    /// derived class's `exact`.
+    #[test]
+    fn a_family_s_overloads_in_another_project_stay_candidates() {
+        let base = "namespace P;\npublic class Base { public void F(int n) { } }\n";
+        let app = "namespace Q;\nusing P;\nclass Derived : Base { public void F(string s) { } \
+                   void Run(Derived d) { d.F(1); } }\n";
+        let found = resolved(&[("Kit/Base.cs", base), ("App/Derived.cs", app)]);
+        let call = (found.iter())
+            .find(|(_, callee, ..)| callee == "d.F")
+            .unwrap();
+        let both = vec!["App/Derived.cs".to_string(), "Kit/Base.cs".to_string()];
+        assert_eq!((call.2, call.3.clone()), ("ambiguous", both));
     }
 
     /// A type two projects of the repository declare under one qualified name binds, from a
