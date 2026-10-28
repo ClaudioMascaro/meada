@@ -59,3 +59,24 @@ Los contratos de paquetes NuGet se descubren en los `.csproj` con SDK. No necesi
 
 Los contratos de paquete Swift se descubren en `Package.swift`. No necesitan una clave nueva en `meada.toml`: un `.package(url:)` enlaza con el repositorio del workspace de la misma identidad de remoto y un `.package(path:)` con el repositorio en esa ruta, que debe ser un `[[peer]]` del workspace cuando es otro repositorio. Use URLs, rutas y nombres literales para enlaces `exact`.
 
+
+## Qué se indexa
+
+El recorrido cubre todos los archivos del repositorio, versionados o no, salvo lo que estos excluyen:
+
+- **Siempre omitidos**, los liste o no un archivo de ignore: directorios llamados `node_modules` o `Pods`, un directorio `Checkouts` dentro de `Carthage`, archivos llamados `*.min.js` o `*.min.css` y la salida de build de .NET (`obj` o `bin` junto a un `.csproj`). Son cachés de dependencias y artefactos de build, nunca código propio.
+- **`.gitignore` y `.ignore`**, respetados con o sin git, en la raíz y en subdirectorios, y solo dentro del repositorio.
+- **`.meadaignore`**, con la sintaxis de `.gitignore`, leído de la misma forma. No devuelve un archivo que los valores por defecto omiten.
+
+`vendor`, `dist`, `build` y el código generado (las migraciones de Entity Framework, por ejemplo) no se omiten por defecto: cualquiera puede ser código propio o contener un contrato, y Meada no puede distinguirlo. Lista en `.meadaignore` lo que no quieras indexar:
+
+```gitignore
+vendor/
+dist/
+build/
+Migrations/
+*ModelSnapshot.cs
+*.Designer.cs
+```
+
+Un archivo que un nuevo valor por defecto o una nueva entrada excluye sale del índice en el siguiente refresh, como un archivo borrado.
