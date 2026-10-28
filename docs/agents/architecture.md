@@ -1032,7 +1032,8 @@ one for the area a change touches.
   holds the name questions the JVM and C# kinds share: `one` (exactly one spelling in the kind's
   table), `known` (a name an import binds), `annotation` (`known` for an annotation's callee, which no
   field of an outside base hides, #354), `spellings`, `typed` and `declared` (the outside type
-  the source writes for a name), `in_full` and `is_type` (a type written in full is the
+  the source writes for a name; a type of the repository is an answer with no spelling, `Code::declared`
+  gives it an origin with no outside name), `in_full` and `is_type` (a type written in full is the
   library's unless a definition of the repository binds that very name, as a compiler prefers
   the source's type; else the one spelling the usings give it, one rule for every C# kind) and
   `is_method` (an annotation on a method of the file);
@@ -1157,7 +1158,8 @@ one for the area a change touches.
   (`(routingKey, message, correlation)`) unless a `MessagePostProcessor` before it makes it
   `(message, postProcessor, correlation)`; an argument whose type the source does not tell (a
   lambda, a call, a name with no written type, anything the pack cannot read) leaves the
-  producer unresolved, and a literal or a name of another written type is the message. The two-argument AMQP form publishes to the
+  producer unresolved, and a literal, a name of another written type or one written as a type of the repository (a
+  DTO) is the message, so a publish of a repository type resolves. The two-argument AMQP form publishes to the
   template's exchange: `spring.rabbitmq.template.exchange` of the module's configuration, else
   the default exchange, a producer of the queue the key names. An `@Exchange` is `direct`
   unless its `type` (a string, or a member of `ExchangeTypes` bound by an import) says

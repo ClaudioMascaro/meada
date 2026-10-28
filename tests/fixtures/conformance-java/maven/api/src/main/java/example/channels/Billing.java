@@ -27,6 +27,11 @@ public class Billing {
         rabbit.convertAndSend("refunds", id);
     }
 
+    public void repoType(JOrder o) {
+        rabbit.convertAndSend("j.repo", o);
+        rabbit.convertAndSend("jx.repo", "jkey.repo", o);
+    }
+
     public Binding audit() {
         return BindingBuilder.bind(new Queue("audit")).to(new TopicExchange("billing")).with("invoice.#");
     }
@@ -39,4 +44,9 @@ public class Billing {
 
     @RabbitListener(queues = {"refunds", "audit"})
     public void onRefund(String message) {}
+
+    @RabbitListener(queues = "j.repo")
+    public void onRepo(JOrder message) {}
 }
+
+class JOrder {}

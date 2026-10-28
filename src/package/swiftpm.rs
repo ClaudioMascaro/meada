@@ -379,6 +379,8 @@ impl Ecosystem for Swiftpm {
             let origins = |follow| code.origins(path, &call.scope, Of::Name(receiver), follow);
             // What the source writes for the receiver, else the construction it holds.
             let mut found_origins = origins(Follow::Declarations);
+            // A type of the repository names nothing outside: the construction may.
+            found_origins.retain(|o| o.outside.is_some());
             if found_origins.is_empty() {
                 found_origins = origins(Follow::Values {
                     passes: passes_nothing,

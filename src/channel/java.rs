@@ -975,6 +975,21 @@ mod tests {
         );
     }
 
+    /// A parameter of a class of the repository is the message.
+    #[test]
+    fn a_message_of_a_repository_type_tells_the_overload() {
+        let body = "class JOrder {}\n\
+            RabbitTemplate rabbit;\n\
+            void f(JOrder o) {\n\
+            rabbit.convertAndSend(\"j.repo\", o);\n\
+            rabbit.convertAndSend(\"jx.repo\", \"jkey.repo\", o);\n\
+}";
+        assert_eq!(
+            read(RABBIT, body),
+            ["amqp j.repo producer", "amqp jkey.repo publish jx.repo",]
+        );
+    }
+
     /// An `@Exchange` is `direct` unless its `type` says otherwise, and a `DirectExchange`
     /// routes by the key as written: a wildcard key binds only on a topic exchange (or one whose
     /// type is not read), and a headers exchange routes by no key.

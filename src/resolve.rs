@@ -4553,7 +4553,7 @@ impl<'a> Code<'a> {
                 vec![Origin {
                     call: None,
                     form,
-                    outside: Some(outside),
+                    outside,
                     routes: vec![Route {
                         through: Vec::new(),
                         steps,
@@ -5042,6 +5042,17 @@ impl<'a> Code<'a> {
         })
     }
 
+    /// Whether the type the source writes, `written` in `scope` of `path`, is one the repository
+    /// defines.
+    fn is_repository_type(&self, path: &'a str, scope: &'a str, written: &'a str) -> bool {
+        let r = self.resolver;
+        let (seen, work) = (&mut r.seen(path, scope), &mut Work::default());
+        matches!(
+            r.resolve_as(path, scope, written, seen, work, Reading::Path),
+            Binding::Def(_)
+        )
+    }
+
     /// The declarations walk of `name`: the type the source writes for it, or the call it is
     /// declared from (a function of a package, a function of the repository whose result type
     /// is outside, or a method of a value declared so in turn, a step), at most `RECEIVER_DEPTH`
@@ -5052,7 +5063,7 @@ impl<'a> Code<'a> {
         scope: &'a str,
         name: &'a str,
         depth: usize,
-    ) -> Option<(Form, Outside<'a>, Vec<&'a str>)> {
+    ) -> Option<(Form, Option<Outside<'a>>, Vec<&'a str>)> {
         if depth >= RECEIVER_DEPTH {
             return None;
         }
@@ -5061,7 +5072,11 @@ impl<'a> Code<'a> {
         let (at, within, held) = r.holder(&binding)?;
         match r.receivers[at].get(&(within, held))? {
             Class::Type(written) => {
-                let outside = self.outside_written(at, within, written)?;
+                let outside = self.outside_written(at, within, written);
+                // A type of the repository is an answer with no spelling.
+                if outside.is_none() && !self.is_repository_type(at, within, written) {
+                    return None;
+                }
                 Some((Form::Type, outside, Vec::new()))
             }
             Class::Called(callee) => {
@@ -5070,7 +5085,7 @@ impl<'a> Code<'a> {
                     && function.direct
                 {
                     // A function of a package.
-                    return Some((Form::Call, function, Vec::new()));
+                    return Some((Form::Call, Some(function), Vec::new()));
                 }
                 if let Binding::Def(t) = r.binding(at, within, callee) {
                     // A function of the repository: the type its result writes.
@@ -5078,13 +5093,14 @@ impl<'a> Code<'a> {
                         return None;
                     };
                     let outside = self.outside_written(t.path, t.name, written)?;
-                    return Some((Form::Call, outside, Vec::new()));
+                    return Some((Form::Call, Some(outside), Vec::new()));
                 }
                 // A method of a value that was made outside.
                 let (receiver, member) = callee.rsplit_once('.')?;
                 let (form, outside, mut steps) = self.declared(at, within, receiver, depth + 1)?;
                 steps.push(member);
-                Some((form, outside, steps))
+                // A method of a value of a repository type names nothing outside.
+                Some((form, Some(outside?), steps))
             }
             _ => None,
         }
