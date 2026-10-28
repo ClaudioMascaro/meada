@@ -737,18 +737,17 @@ fn parse(src: &[u8]) -> Result<Facts> {
             });
         }
     }
-    // What `Code::field_written` reads: a field so assigned holds no one value. A write of the
-    // field of a class in the file names that class (the innermost one around it that declares
-    // the field); any other, a field it inherits or one of another object, names none.
+    // What `Code::field_written_in` reads: a field so assigned holds no one value. A write of
+    // the field of the class around it, the innermost one, names that class; any other, a field
+    // it inherits, one of an outer class its own class may inherit or one of another object,
+    // names none.
     let written: BTreeSet<(String, Option<String>)> = (written.into_iter())
         .map(|(scope, name, own)| {
-            let owner = (fields.iter())
-                .filter(|(at, field)| {
-                    *field == name && classes.contains(at) && encloses(at, &scope)
-                })
-                .map(|(at, _)| at)
+            let around = (classes.iter())
+                .filter(|at| encloses(at, &scope))
                 .max_by_key(|at| at.len());
-            (name, owner.filter(|_| own).cloned())
+            let owner = around.filter(|at| own && fields.contains(&((*at).clone(), name.clone())));
+            (name, owner.cloned())
         })
         .collect();
     for (name, class) in written {
@@ -942,15 +941,18 @@ fn declares(parent: Node, sibling: Node, wanted: &str, src: &[u8]) -> bool {
         "formal_parameters" | "inferred_parameters" | "resource_specification" => {
             named(sibling).any(|n| declares(sibling, n, wanted, src))
         }
-        // A lambda's one parameter, or a loop's variable.
+        // A lambda's parameter, or a loop's variable.
         "identifier" => {
             let declared =
                 (parent.child_by_field_name("name")).or(parent.child_by_field_name("parameters"));
-            matches!(
-                parent.kind(),
-                "lambda_expression" | "enhanced_for_statement"
-            ) && declared.is_some_and(|d| d.id() == sibling.id())
-                && is(Some(sibling))
+            let declared = match parent.kind() {
+                "lambda_expression" | "enhanced_for_statement" => {
+                    declared.is_some_and(|d| d.id() == sibling.id())
+                }
+                "inferred_parameters" => true,
+                _ => false,
+            };
+            declared && is(Some(sibling))
         }
         _ => false,
     }
@@ -1360,7 +1362,7 @@ mod tests {
         assert_eq!(fields, [("s", true), ("t", false)]);
     }
 
-    /// The markers `Code::field_written` reads (`Const`s named `.f` or `.f@class`) of a source.
+    /// The markers `Code::field_written_in` reads (`Const`s named `.f` or `.f@class`) of a source.
     fn writes(src: &str) -> Vec<String> {
         let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
         let mut marks: Vec<_> = (facts.consts.iter())
@@ -1383,6 +1385,18 @@ mod tests {
     }
 
     #[test]
+    fn a_catch_parameter_a_varargs_one_and_a_compact_constructors_are_no_write() {
+        let src = "class C { String base; String url;
+            void a() { try { } catch (Exception base) { base = null; } }
+            void b(String... url) { url = null; }
+            void c() { try (Res base = open()) { base = null; } }
+        }";
+        assert_eq!(writes(src), Vec::<String>::new());
+        let src = "record R(String base) { R { base = base.trim(); } }";
+        assert_eq!(writes(src), Vec::<String>::new());
+    }
+
+    #[test]
     fn a_write_names_its_class_when_it_is_known() {
         let src = "class C { String base; String url; int n;
             void a() { this.base = \"a\"; n++; }
@@ -1391,5 +1405,14 @@ mod tests {
             void d() { new Object() { void e() { this.url = \"d\"; } }; }
         }";
         assert_eq!(writes(src), [".base@C", ".base@C.D", ".n@C", ".url"]);
+    }
+
+    #[test]
+    fn a_write_of_a_name_only_an_outer_class_declares_names_no_class() {
+        // `D` may inherit a `base` of its own.
+        let src = "class C { String base; class D extends B { void s() { base = \"y\"; } } }";
+        assert_eq!(writes(src), [".base"]);
+        let src = "class C { void m() { java.util.function.BiConsumer<String, String> f = (url, x) -> { url = null; }; } }";
+        assert_eq!(writes(src), Vec::<String>::new());
     }
 }

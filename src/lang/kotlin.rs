@@ -268,9 +268,10 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     // The assignments to a name that can be a property (`f = v`, `this.f = v`, `o.f = v`, `f++`)
     // with where each is and whether it may be a property of the class around it (`this.f`, or
     // a bare `f` no local or parameter declares), and the properties by the class `Marked`
-    // names, which `Code::field_written` is asked about.
+    // names, which `Code::field_written_in` is asked about.
     let mut writes: Vec<(String, String, bool)> = Vec::new();
     let mut members: BTreeSet<(String, String)> = BTreeSet::new();
+    let mut classes: BTreeSet<String> = BTreeSet::new();
     let mut locals: Vec<Receiver> = Vec::new();
     // The `val`s of unknown class a `Bound` was recorded for, by qualified name.
     let mut vals: Vec<String> = Vec::new();
@@ -330,6 +331,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     None => continue,
                 };
                 inner = Rc::new(qualify(&scope, &name));
+                classes.insert(inner.as_ref().clone());
                 inner_access = access.max(own_access(node, src));
                 inner_place = Place::Class;
                 inner_generics = with_parameters(&generics, node, src);
@@ -845,15 +847,16 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
             local.class = Class::Unknown;
         }
     }
-    // A write of a property of a class in the file names the innermost class around it that
-    // declares it; any other, a property it inherits or one of another object, names none.
+    // A write of a property of the class around it, the innermost one, names that class; any
+    // other, a property it inherits, one of an outer class its own class may inherit, an
+    // extension receiver's or one of another object, names none.
     let writes: BTreeSet<(String, Option<String>)> = (writes.into_iter())
         .map(|(scope, name, own)| {
-            let owner = (members.iter())
-                .filter(|(at, member)| *member == name && encloses(at, &scope))
-                .map(|(at, _)| at)
+            let around = (classes.iter())
+                .filter(|at| encloses(at, &scope))
                 .max_by_key(|at| at.len());
-            (name, owner.filter(|_| own).cloned())
+            let owner = around.filter(|at| own && members.contains(&((*at).clone(), name.clone())));
+            (name, owner.cloned())
         })
         .collect();
     for (name, class) in writes {
@@ -2744,7 +2747,7 @@ mod tests {
     /// A field some code assigns holds no one value, so Spring's injection is not its value
     /// (`Code::field_written_in`, which reads the `.name` constants).
     #[test]
-    fn every_assignment_to_a_name_is_recorded_as_a_write() {
+    fn every_assignment_to_a_name_that_can_be_a_property_is_recorded_as_a_write() {
         let source = br#"package a
 class C {
     @Value("\${k}") lateinit var base: String
@@ -2946,7 +2949,7 @@ class A {
         );
     }
 
-    /// The markers `Code::field_written` reads (`Const`s named `.f` or `.f@class`) of a source.
+    /// The markers `Code::field_written_in` reads (`Const`s named `.f` or `.f@class`) of a source.
     fn writes(src: &str) -> Vec<String> {
         let facts = parse(src.as_bytes(), false).unwrap();
         let mut marks: Vec<_> = (facts.consts.iter())
@@ -2981,5 +2984,14 @@ class A {
                 class D { var base = \"\"; fun h() { base = \"c\" } }
             }";
         assert_eq!(writes(src), [".base@a.C", ".base@a.C.D", ".n@a.C", ".url"]);
+    }
+
+    #[test]
+    fn a_write_of_a_name_only_an_outer_class_or_the_package_declares_names_no_class() {
+        let src = "package a
+            var base = \"\"
+            fun C.reset() { this.base = \"x\" }
+            class C { var url = \"\"; class D : B() { fun s() { url = \"y\" } } }";
+        assert_eq!(writes(src), [".base", ".url"]);
     }
 }

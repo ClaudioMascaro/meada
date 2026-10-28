@@ -802,7 +802,7 @@ fn unknown() -> Value {
     Value::Unknown
 }
 
-/// The marker constant for a write of the field `name` (`Code::field_written`): `.name` for a
+/// The marker constant for a write of the field `name` (`Code::field_written_in`): `.name` for a
 /// write whose class is unknown, `.name@class` for one in the code of `class`. The value is
 /// none: a field so written holds no one value.
 pub fn field_write(name: &str, class: Option<&str>) -> Const {
