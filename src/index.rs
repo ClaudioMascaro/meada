@@ -706,15 +706,20 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
 
     // The facts of every file: parsed now, or kept from the index.
     let changed_paths: HashSet<String> = changed.iter().map(|p| p.path.clone()).collect();
-    let rows = tx
+    // Only the files not parsed in this run are read back: a changed file's facts are in memory.
+    let kept: Option<Vec<(String, Facts)>> = tx
         .prepare("SELECT path, facts FROM files")?
-        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
-        .collect::<rusqlite::Result<Vec<(String, String)>>>()?;
-    let kept: Option<Vec<(String, Facts)>> = rows
-        .into_iter()
-        .filter(|(path, _)| !changed_paths.contains(path.as_str()))
-        .map(|(path, facts)| Some((path, serde_json::from_str(&facts).ok()?)))
-        .collect();
+        .query_map([], |r| {
+            let path: String = r.get(0)?;
+            if changed_paths.contains(&path) {
+                return Ok(None);
+            }
+            let facts: String = r.get(1)?;
+            Ok(Some((path, serde_json::from_str(&facts).ok())))
+        })?
+        .filter_map(|row| row.transpose())
+        .map(|row| row.map(|(path, facts)| facts.map(|f| (path, f))))
+        .collect::<rusqlite::Result<Option<Vec<_>>>>()?;
     let Some(mut kept) = kept else {
         // Facts this version cannot read, stored before a change whose golden was not
         // re-blessed: rebuild, as for another version. Without the identity, the next pass starts
@@ -740,7 +745,11 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .map(|(&pack, files)| (pack, lang::pack(pack).join(&found_configs(pack), files)))
         .collect();
     drop(raw);
+    // Past the joins, which read some values (`Def::type_params`), a changed file keeps what the
+    // index keeps, as a kept file does: the files a contract kind reads values of are parsed
+    // again by the miss loop below.
     for p in &mut changed {
+        p.facts = serde_json::from_str(&serde_json::to_string(&p.facts)?)?;
         joins[&packs[p.path.as_str()]](&p.path, &mut p.facts);
     }
     for (path, facts) in &mut kept {
@@ -835,7 +844,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .collect::<rusqlite::Result<BTreeSet<String>>>()?;
     let mut reparsed: BTreeMap<String, Facts> = BTreeMap::new();
     for path in &valued {
-        if packs.contains_key(path.as_str()) && !changed_paths.contains(path) {
+        if packs.contains_key(path.as_str()) {
             reparsed.insert(path.clone(), reparse(path)?);
         }
     }
@@ -844,10 +853,9 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     let mut done: BTreeMap<usize, Vec<Found>> = BTreeMap::new();
     let mut read: BTreeSet<String> = BTreeSet::new();
     let found = loop {
-        let full: BTreeMap<&str, &Facts> = changed
+        let full: BTreeMap<&str, &Facts> = reparsed
             .iter()
-            .map(|p| (p.path.as_str(), &p.facts))
-            .chain(reparsed.iter().map(|(path, facts)| (path.as_str(), facts)))
+            .map(|(path, facts)| (path.as_str(), facts))
             .collect();
         let mut misses = Vec::new();
         for (&pack, resolver) in &resolvers {
@@ -884,6 +892,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             tx.execute("INSERT INTO valued VALUES (?1)", params![path])?;
         }
     }
+    // The values are not needed past the extraction.
+    drop(reparsed);
     let names = Names::new(&found);
 
     // ponytail: every file's calls are resolved again on any change, in memory; only the

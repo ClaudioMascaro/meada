@@ -1063,6 +1063,38 @@ fn contracts_follow_values_edited_in_other_files() {
     }
 }
 
+/// A cold index keeps no file's values past its parse (the index does not hold them), yet a
+/// kind that reads one still finds it: the constants a URL is built from, and the arguments of
+/// a client wrapper's call.
+#[test]
+fn a_cold_index_still_reads_the_values_a_contract_kind_asks_for() {
+    let [paths, admin, _] = values("cold_values");
+    let consumers = |repo: &Path| -> Vec<String> {
+        let json: serde_json::Value =
+            serde_json::from_str(&Engine::open(repo).unwrap().export().unwrap()).unwrap();
+        let consumers = json["consumers"].as_array().unwrap();
+        let contract = |c: &serde_json::Value| c["contract"].as_str().unwrap().to_string();
+        consumers.iter().map(contract).collect()
+    };
+    assert_eq!(
+        consumers(&paths),
+        [
+            "http::GET::/api/users",
+            "http::GET::/api/users/{}",
+            "http::GET::/api/users"
+        ]
+    );
+    assert_eq!(
+        consumers(&admin),
+        [
+            "http::DELETE::/api/users/{}",
+            "http::GET::/api/users",
+            "http::GET::/api/users",
+            "http::GET::/api/users"
+        ]
+    );
+}
+
 /// Renames the topic the gateway produces through its wrapper, in the imported constant, and
 /// the topics the conformance fixture builds from a constant (spec #20).
 fn edit_topics(gateway: &Path, conformance: &Path) {
