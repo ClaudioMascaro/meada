@@ -3329,6 +3329,7 @@ fn csharp() {
     let service = |name: &str| orders("OrderService.cs", &format!("OrderService{name}"));
     let store = |name: &str| core("Store/Repository.cs", &format!("Acme.Core.Store.{name}"));
     let shadows = |name: &str| api("Shadows.cs", &format!("Acme.Api.{name}"));
+    let enclosing = |file: &str, name: &str| api(&format!("Enclosing/{file}"), name);
     let symbols = [
         format("Format"),
         format("Format.Upper(string)"),
@@ -3477,6 +3478,27 @@ fn csharp() {
         api("Namespaces.cs", "Acme.Api.Outside.Run()"),
         api("Inside.cs", "Acme.Api.Inside"),
         api("Inside.cs", "Acme.Api.Inside.Run()"),
+        enclosing("Util.cs", "Acme.Query.Util"),
+        enclosing("Util.cs", "Acme.Query.Util.Go()"),
+        enclosing("Util.cs", "Acme.Query.Util.Hello()"),
+        enclosing("Outer.cs", "Acme.Util"),
+        enclosing("Outer.cs", "Acme.Util.Go()"),
+        enclosing("Outer.cs", "Acme.Util.Hello()"),
+        enclosing("Other.cs", "Other.Util"),
+        enclosing("Other.cs", "Other.Util.Go()"),
+        enclosing("Internal/Gen.cs", "Acme.Query.Internal.Gen"),
+        enclosing("Internal/Gen.cs", "Acme.Query.Internal.Gen.M()"),
+        enclosing("Internal/Gen.cs", "Acme.Query.Internal.Sub"),
+        enclosing("Internal/Gen.cs", "Acme.Query.Internal.Sub.N()"),
+        enclosing("Used.cs", "Acme.Query.Imports.Used"),
+        enclosing("Used.cs", "Acme.Query.Imports.Used.M()"),
+        enclosing("Block/Util.cs", "Acme.Block.Util"),
+        enclosing("Block/Util.cs", "Acme.Block.Util.Go()"),
+        enclosing("Block/Util.cs", "Acme.Block.Util.Hello()"),
+        enclosing("Block/Internal/Gen.cs", "Acme.Block.Internal.Gen"),
+        enclosing("Block/Internal/Gen.cs", "Acme.Block.Internal.Gen.M()"),
+        enclosing("Block/Internal/Gen.cs", "Acme.Block.Internal.Sub"),
+        enclosing("Block/Internal/Gen.cs", "Acme.Block.Internal.Sub.N()"),
         orders("Routes.cs", "Routes"),
         api("Channels.cs", "Acme.Api.Channels.Topics"),
         api("Channels.cs", "Acme.Api.Channels.KafkaSales"),
@@ -3997,6 +4019,65 @@ fn csharp() {
                 "Text/Nested.cs",
                 "Acme.Core.Outer.Inner.Second.Make()",
             )],
+        ),
+        // A type of a namespace around the file's binds without a using, the innermost
+        // namespace's first and before a using's (#420): as a static call's receiver, a
+        // constructor and a base, in a file-scoped namespace and in nested blocks alike.
+        (
+            format!(
+                "{}::Util.Go#0",
+                enclosing("Internal/Gen.cs", "Acme.Query.Internal.Gen.M()")
+            ),
+            EXACT,
+            vec![enclosing("Util.cs", "Acme.Query.Util.Go()")],
+        ),
+        (
+            format!(
+                "{}::Util#0",
+                enclosing("Internal/Gen.cs", "Acme.Query.Internal.Gen.M()")
+            ),
+            EXACT,
+            vec![enclosing("Util.cs", "Acme.Query.Util")],
+        ),
+        (
+            format!(
+                "{}::Hello#0",
+                enclosing("Internal/Gen.cs", "Acme.Query.Internal.Sub.N()")
+            ),
+            EXACT,
+            vec![enclosing("Util.cs", "Acme.Query.Util.Hello()")],
+        ),
+        (
+            format!(
+                "{}::Util.Go#0",
+                enclosing("Used.cs", "Acme.Query.Imports.Used.M()")
+            ),
+            EXACT,
+            vec![enclosing("Util.cs", "Acme.Query.Util.Go()")],
+        ),
+        (
+            format!(
+                "{}::Util.Go#0",
+                enclosing("Block/Internal/Gen.cs", "Acme.Block.Internal.Gen.M()")
+            ),
+            EXACT,
+            vec![enclosing("Block/Util.cs", "Acme.Block.Util.Go()")],
+        ),
+        (
+            format!(
+                "{}::Util#0",
+                enclosing("Block/Internal/Gen.cs", "Acme.Block.Internal.Gen.M()")
+            ),
+            EXACT,
+            vec![enclosing("Block/Util.cs", "Acme.Block.Util")],
+        ),
+        (
+            format!(
+                "{}::Hello#0",
+                enclosing("Block/Internal/Gen.cs", "Acme.Block.Internal.Sub.N()")
+            ),
+            EXACT,
+            vec![enclosing("Block/Util.cs", "Acme.Block.Util.Hello()")],
         ),
         // Acme.Core's global usings stop at its project: a bare call no family declares and a
         // type name nothing binds resolve to nothing.

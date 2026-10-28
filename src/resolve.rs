@@ -3266,8 +3266,11 @@ impl<'a> Resolver<'a> {
 
     /// What the glob imports written in `scope` give `name`, the latest first; `public` limits
     /// them to the re-exporting ones (`pub use`). A glob is asked for a name once: it may reach
-    /// itself. A glob cut at `LINK_DEPTH` may give the name: it is unknown, and no other glob
-    /// binds it in its place.
+    /// itself. The walk claims its globs before it asks the first, so a lookup it leads back
+    /// into (an inside glob of the file's own namespace, whose exports read the file's globs)
+    /// leaves the rest to it rather than taking them for a binding the walk then drops. A glob
+    /// cut at `LINK_DEPTH` may give the name: it is unknown, and no other glob binds it in its
+    /// place.
     fn globs(
         &self,
         path: &'a str,
@@ -3277,18 +3280,17 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
     ) -> Option<Binding<'a>> {
         let imports = &self.files[path].imports;
-        let mut candidates = Vec::new();
+        let mut claimed = Vec::new();
         for &at in self.by_local[path]
             .of(&crate::qualify(scope, "*"))
             .iter()
             .rev()
         {
-            let import = &imports[at];
             let Imported::Glob {
                 path: target,
                 inside,
                 public: re_exports,
-            } = &import.name
+            } = &imports[at].name
             else {
                 continue;
             };
@@ -3299,9 +3301,12 @@ impl<'a> Resolver<'a> {
                 self.cut_link(seen);
                 return Some(Binding::Unknown);
             }
-            if !seen.globs.insert((path, at, name)) {
-                continue;
+            if seen.globs.insert((path, at, name)) {
+                claimed.push((target, inside));
             }
+        }
+        let mut candidates = Vec::new();
+        for (target, inside) in claimed {
             seen.depth += 1;
             let found = self.past(seen, |seen| {
                 let work = &mut Work::default();
@@ -10368,5 +10373,95 @@ mod csharp_tests {
         });
         assert_eq!(exact.count(), n);
         assert!(took.as_secs() < 20, "{took:?}");
+    }
+
+    /// What `Gen.M` (`Util.Go(); new Util();`, in `namespace Acme.Query.Internal`, or `block`
+    /// nested) binds `Util` to among `files`, and the family of `Sub : Util`: the paths of
+    /// `Util.Go`'s and `Util`'s targets, then the ancestor `Sub` names.
+    fn enclosing(files: &[(&str, &str)], usings: &str, block: bool) -> (Vec<String>, String) {
+        let body = "public class Gen { void M() { Util.Go(); new Util(); } }\n\
+                    public class Sub : Util { }\n";
+        let gen_ = match block {
+            true => format!(
+                "{usings}namespace Acme {{ namespace Query {{ namespace Internal {{\n{body}}} }} }}\n"
+            ),
+            false => format!("{usings}namespace Acme.Query.Internal;\n{body}"),
+        };
+        let mut all = files.to_vec();
+        all.push(("App/Gen.cs", &gen_));
+        let found = resolved(&all);
+        let calls = (calls_in(&found, "App/Gen.cs").into_iter())
+            .map(|(callee, level, targets)| format!("{callee} {level} {}", targets.join(" ")))
+            .collect();
+        let configs = [("App/App.csproj", PROJECT)];
+        let family = families_in(&all, &configs)["Acme.Query.Internal.Sub"].clone();
+        (calls, family.unwrap_or_default().join(" "))
+    }
+
+    /// `Util`, with a static `Go`, declared in `namespace ns` (file-scoped).
+    fn util(ns: &str) -> String {
+        format!("namespace {ns};\npublic class Util {{ public static void Go() {{ }} }}\n")
+    }
+
+    /// A type of a namespace enclosing the file's binds without a using, as C# looks a name up
+    /// in each enclosing namespace: a static call's receiver, a constructor and a base alike,
+    /// whether the namespace is file-scoped or written as nested blocks.
+    #[test]
+    fn a_type_of_an_enclosing_namespace_binds_without_a_using() {
+        let query = util("Acme.Query");
+        for block in [false, true] {
+            let found = enclosing(&[("App/Util.cs", &query)], "", block);
+            let with_using = enclosing(&[("App/Util.cs", &query)], "using Acme.Query;\n", block);
+            assert_eq!(
+                found,
+                (
+                    vec![
+                        "Util.Go exact App/Util.cs".to_string(),
+                        "Util exact App/Util.cs".to_string(),
+                    ],
+                    "Acme.Query.Internal.Sub Acme.Query.Util".to_string(),
+                ),
+                "block: {block}"
+            );
+            assert_eq!(found, with_using, "block: {block}");
+        }
+    }
+
+    /// The enclosing namespaces are read the innermost first, and before the file's usings: of
+    /// three `Util`s, the nearest namespace's binds, and a using's never does.
+    #[test]
+    fn the_innermost_enclosing_namespace_binds_before_outer_ones_and_usings() {
+        let (inner, query, acme, other) = (
+            util("Acme.Query.Internal"),
+            util("Acme.Query"),
+            util("Acme"),
+            util("Other"),
+        );
+        let cases: [(&[(&str, &str)], &str); 3] = [
+            (&[("App/A.cs", &acme), ("App/Q.cs", &query)], "App/Q.cs"),
+            (
+                &[
+                    ("App/A.cs", &acme),
+                    ("App/I.cs", &inner),
+                    ("App/Q.cs", &query),
+                ],
+                "App/I.cs",
+            ),
+            (&[("App/A.cs", &acme), ("App/O.cs", &other)], "App/A.cs"),
+        ];
+        for block in [false, true] {
+            for (files, wanted) in cases {
+                let (calls, _) = enclosing(files, "using Other;\n", block);
+                let names: Vec<&str> = files.iter().map(|f| f.0).collect();
+                assert_eq!(
+                    calls,
+                    [
+                        format!("Util.Go exact {wanted}"),
+                        format!("Util exact {wanted}")
+                    ],
+                    "{names:?}, block: {block}"
+                );
+            }
+        }
     }
 }
