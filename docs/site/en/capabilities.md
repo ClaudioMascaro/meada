@@ -15,7 +15,7 @@ Server mode includes the [console](console.md), [snapshots](snapshots.md), [rete
 | Java | `.java`, resolved by their `package` declarations |
 | Kotlin | `.kt` and `.kts` (but `build.gradle.kts` and `settings.gradle.kts`), resolved by their `package` declarations |
 | C# | `.cs`, grouped into projects by SDK-style `.csproj` files and resolved by their `namespace` declarations |
-| Swift | `.swift` (except `Package.swift`), grouped into modules by the targets of `Package.swift` |
+| Swift | `.swift` (except `Package.swift` and `Package@swift-<version>.swift`), grouped into modules by the targets of `Package.swift` |
 
 ### Rust
 

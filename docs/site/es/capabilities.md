@@ -15,7 +15,7 @@ El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [rete
 | Java | `.java`, resueltos por sus declaraciones de `package` |
 | Kotlin | `.kt` y `.kts` (salvo `build.gradle.kts` y `settings.gradle.kts`), resueltos por sus declaraciones de `package` |
 | C# | `.cs`, agrupados en proyectos por los `.csproj` de estilo SDK y resueltos por sus `namespace` |
-| Swift | `.swift` (salvo `Package.swift`), agrupados en módulos por los targets de `Package.swift` |
+| Swift | `.swift` (salvo `Package.swift` y `Package@swift-<versión>.swift`), agrupados en módulos por los targets de `Package.swift` |
 
 ### Rust
 
