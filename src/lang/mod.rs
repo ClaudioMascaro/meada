@@ -105,6 +105,12 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether `Call::constructs` is a guess from the case of the callee (Swift has no `new`): a
+    /// call that constructs nothing the repository holds is read again as a plain call.
+    fn guesses_constructs(&self) -> bool {
+        false
+    }
+
     /// Whether wildcard imports combine their candidates rather than the latest one winning.
     /// An inside glob has priority over public globs (the class's own package in Java).
     fn unordered_globs(&self) -> bool {
@@ -726,6 +732,9 @@ pub struct Def {
     /// it gives (`Class::Returned`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result: Option<Class>,
+    /// A call fits the function only when written under `await` (Swift's `async`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub suspends: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -839,6 +848,9 @@ pub struct Call {
     /// namespace. Kept with its argument count in cached facts.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub constructs: bool,
+    /// Whether the call is written under `await` (Swift), as a `Def::suspends` target needs.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub awaited: bool,
     pub range: Range<usize>,
     /// The arguments, as far as the call's own syntax tells: what contract kinds read URLs
     /// and options from. Not kept in the index: they hold string literals, so the index

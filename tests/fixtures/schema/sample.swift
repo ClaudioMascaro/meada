@@ -12,3 +12,7 @@ extension Order: Codable {
 }
 
 let limit = 10
+
+func settle() async {
+    await flush()
+}

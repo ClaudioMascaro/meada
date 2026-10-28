@@ -322,6 +322,7 @@ pub struct Resolver<'a> {
     arities: HashMap<Target<'a>, Arity<'a>>,
     statics: HashSet<Target<'a>>,
     members_in_scope: bool,
+    guesses_constructs: bool,
     unordered_globs: bool,
     qualified_types: bool,
     /// The pack's `LanguagePack::namespaced`.
@@ -460,16 +461,20 @@ struct Arity<'a> {
     /// extension `this`): such a call counts one argument fewer than `Ext.F(x)` does.
     receiver: bool,
     params: &'a [Param],
+    /// A call fits only when written under `await` (`Def::suspends`).
+    suspends: bool,
 }
 
 impl<'a> Arity<'a> {
-    fn of(params: &'a [Param]) -> Self {
+    fn of(def: &'a Def) -> Self {
+        let params = &def.params[..];
         let required = |p: &&Param| !matches!(p.binds, Binds::Optional | Binds::Rest);
         Arity {
             least: params.iter().filter(required).count(),
             most: (!params.iter().any(|p| p.binds == Binds::Rest)).then_some(params.len()),
             receiver: params.first().is_some_and(|p| p.binds == Binds::Instance),
             params,
+            suspends: def.suspends,
         }
     }
 
@@ -483,6 +488,7 @@ impl<'a> Arity<'a> {
     fn fits_call(self, args: Args, on_receiver: &dyn Fn() -> bool) -> bool {
         let arity = args.count + usize::from(self.receiver && on_receiver());
         self.fits(arity)
+            && (args.awaited || !self.suspends)
             && args
                 .labels
                 .is_none_or(|labels| labelled(self.params, labels))
@@ -495,6 +501,7 @@ impl<'a> Arity<'a> {
 struct Args<'c> {
     count: usize,
     labels: Option<&'c [String]>,
+    awaited: bool,
 }
 
 impl<'c> Args<'c> {
@@ -503,6 +510,7 @@ impl<'c> Args<'c> {
         Some(Args {
             count: call.arity?,
             labels: call.labels.as_deref(),
+            awaited: call.awaited,
         })
     }
 }
@@ -649,7 +657,7 @@ impl<'a> Resolver<'a> {
                                 .filter_map(|name| {
                                     let (&name, def) = defs[path].get_key_value(name.as_str())?;
                                     let target = Target { path, name };
-                                    arities.insert(target, Arity::of(&def.params));
+                                    arities.insert(target, Arity::of(def));
                                     Some(target)
                                 })
                                 .collect();
@@ -881,6 +889,7 @@ impl<'a> Resolver<'a> {
             arities,
             statics,
             members_in_scope: language.members_in_scope(),
+            guesses_constructs: language.guesses_constructs(),
             unordered_globs: language.unordered_globs(),
             qualified_types: language.qualified_types(),
             namespaced: language.namespaced(),
@@ -1127,12 +1136,39 @@ impl<'a> Resolver<'a> {
         self.resolved(path, call, true, &mut Work::default())
     }
 
-    /// `call`, with what resolving it carries along (a chain of calls on call results is
-    /// bounded by `RECEIVER_DEPTH`).
+    /// `call`, resolved. Where the pack only guesses at constructor syntax
+    /// (`LanguagePack::guesses_constructs`), a guess that is no `exact` type is a plain call of
+    /// the function the name binds, if it does: Swift's `Check(1)`, also a method of the type
+    /// around it. A plain `exact` call beats a name match of the guess.
     fn resolved(
         &self,
         path: &'a str,
         call: &'a Call,
+        matching: bool,
+        work: &mut Work<'a>,
+    ) -> Resolution<'a> {
+        let found = self.resolved_as(path, call, call.constructs, matching, work);
+        if !(self.guesses_constructs && call.constructs) || matches!(found, Resolution::Exact(_)) {
+            return found;
+        }
+        let plain = self.resolved_as(path, call, false, matching, work);
+        let function = |t: &Target| self.defs[t.path][t.name].kind != Kind::Class;
+        let better = matches!(found, Resolution::Unresolved);
+        match &plain {
+            Resolution::Exact(t) if function(t) => plain,
+            Resolution::Inferred(t) | Resolution::Narrowed(t) if better && function(t) => plain,
+            Resolution::Ambiguous(all) if better && all.iter().all(function) => plain,
+            _ => found,
+        }
+    }
+
+    /// `call`, with what resolving it carries along (a chain of calls on call results is
+    /// bounded by `RECEIVER_DEPTH`).
+    fn resolved_as(
+        &self,
+        path: &'a str,
+        call: &'a Call,
+        constructs: bool,
         matching: bool,
         work: &mut Work<'a>,
     ) -> Resolution<'a> {
@@ -1144,7 +1180,7 @@ impl<'a> Resolver<'a> {
         // The result of the call this one is made on, read once: the name match below reads it
         // too, and reading it twice per call would double the work at every call of a chain.
         let mut on = None;
-        let binding = match (call.on, call.constructs, call.by_path) {
+        let binding = match (call.on, constructs, call.by_path) {
             (Some(inner), false, _) => {
                 let members = callee.split_once('.').map_or("", |(_, m)| m);
                 let result = self.result_of(path, inner, work);
@@ -1165,7 +1201,7 @@ impl<'a> Resolver<'a> {
             }
         };
         let binding = match binding {
-            Binding::Several(all) if call.constructs => {
+            Binding::Several(all) if constructs => {
                 let classes: Vec<_> = all.into_iter().filter(|t| self.is_class(*t)).collect();
                 match classes[..] {
                     [] => return Resolution::Unresolved,
@@ -1177,12 +1213,12 @@ impl<'a> Resolver<'a> {
             }
             found => found,
         };
-        if call.constructs && matches!(binding, Binding::Def(t) if !self.is_class(t)) {
+        if constructs && matches!(binding, Binding::Def(t) if !self.is_class(t)) {
             return Resolution::Unresolved;
         }
         let binding = match binding {
             Binding::Def(t) if call.arity.is_some() && self.is_class(t) => {
-                let (families, absent) = if call.constructs {
+                let (families, absent) = if constructs {
                     (&self.constructors, Binding::Def(t))
                 } else {
                     (&self.overloads, Binding::Unknown)
@@ -1209,7 +1245,7 @@ impl<'a> Resolver<'a> {
         let binding = self.narrow(binding, Args::of(call), &|| self.on_receiver(path, call));
         // No member fits: an extension function in scope may.
         if matches!(binding, Binding::Unknown | Binding::External(..))
-            && let Some(found) = self.extended(path, call, on.clone(), work)
+            && let Some(found) = self.extended(path, call, constructs, on.clone(), work)
         {
             return found;
         }
@@ -1582,10 +1618,11 @@ impl<'a> Resolver<'a> {
         &self,
         path: &'a str,
         call: &'a Call,
+        constructs: bool,
         on: Option<Binding<'a>>,
         work: &mut Work<'a>,
     ) -> Option<Resolution<'a>> {
-        if !self.extending.contains(path) || call.constructs {
+        if !self.extending.contains(path) || constructs {
             return None;
         }
         let scope = call.scope.as_str();
@@ -6910,6 +6947,7 @@ mod tests {
             returns: None,
             type_params: Vec::new(),
             result: None,
+            suspends: false,
         }
     }
 
@@ -7225,6 +7263,7 @@ mod tests {
         };
         facts.calls = (names.iter().enumerate())
             .map(|(i, name)| Call {
+                awaited: false,
                 arity: None,
                 labels: None,
                 constructs: false,

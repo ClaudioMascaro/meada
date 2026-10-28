@@ -13498,6 +13498,79 @@ fn swift_without_a_package_manifest() {
     );
 }
 
+/// A Swift call whose callee is capitalized is read as constructor syntax only when the name
+/// binds a type; one that binds a function is a plain call, and `await` decides an `async`
+/// target.
+#[test]
+fn swift_a_capitalized_callee_binds_a_function() {
+    conform(
+        "conformance-swift-capitalized",
+        &[
+            "Sources/Plain.swift::Check(_:)",
+            "Sources/Plain.swift::check(_:)",
+            "Sources/Plain.swift::run()",
+            "Sources/Plain.swift::Holder",
+            "Sources/Plain.swift::Holder.Pick()",
+            "Sources/Plain.swift::Holder.pick()",
+            "Sources/Plain.swift::Holder.use()",
+            "Sources/Uses.swift::Load()",
+            "Sources/Uses.swift::spawn()",
+            "Sources/Wrapper.swift::XCTAssertNoThrow(_:file:)",
+            "Sources/Uses.swift::Store",
+            "Sources/Uses.swift::Store.init(initialState:)",
+            "Sources/Uses.swift::g()",
+            "Sources/Uses.swift::awaited()",
+            "Sources/Uses.swift::synchronous()",
+            "Sources/Uses.swift::types()",
+        ],
+        &[],
+        &[
+            (
+                "Sources/Plain.swift::run()::Check#0",
+                EXACT,
+                &["Sources/Plain.swift::Check(_:)"],
+            ),
+            (
+                "Sources/Plain.swift::run()::check#0",
+                EXACT,
+                &["Sources/Plain.swift::check(_:)"],
+            ),
+            (
+                "Sources/Plain.swift::Holder.use()::Pick#0",
+                EXACT,
+                &["Sources/Plain.swift::Holder.Pick()"],
+            ),
+            (
+                "Sources/Uses.swift::spawn()::Load#0",
+                EXACT,
+                &["Sources/Uses.swift::Load()"],
+            ),
+            (
+                "Sources/Uses.swift::spawn()::Load#1",
+                EXACT,
+                &["Sources/Uses.swift::Load()"],
+            ),
+            ("Sources/Uses.swift::spawn()::Load#2", None, &[]),
+            (
+                "Sources/Uses.swift::awaited()::XCTAssertNoThrow#0",
+                EXACT,
+                &["Sources/Wrapper.swift::XCTAssertNoThrow(_:file:)"],
+            ),
+            (
+                "Sources/Uses.swift::synchronous()::XCTAssertNoThrow#0",
+                None,
+                &[],
+            ),
+            (
+                "Sources/Uses.swift::types()::Store#0",
+                EXACT,
+                &["Sources/Uses.swift::Store.init(initialState:)"],
+            ),
+            ("Sources/Uses.swift::types()::Text#0", None, &[]),
+        ],
+    );
+}
+
 #[test]
 fn swift_search_finds_the_program_entry_points() {
     let repo = fixture_repo("swift_programs", "conformance-swift", Some(ORIGIN));

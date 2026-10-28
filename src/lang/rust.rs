@@ -544,6 +544,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                                 arity: None,
                                 labels: None,
                                 constructs: false,
+                                awaited: false,
                                 scope: scope.clone(),
                                 callee: callee.unwrap_or_default(),
                                 range: item.byte_range(),
@@ -768,6 +769,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     arity: None,
                     labels: None,
                     constructs: false,
+                    awaited: false,
                     scope: scope.clone(),
                     callee,
                     range: node.byte_range(),
@@ -1115,6 +1117,7 @@ fn def(name: &str, kind: Kind, node: Node) -> Def {
         returns: None,
         type_params: Vec::new(),
         result: None,
+        suspends: false,
     }
 }
 

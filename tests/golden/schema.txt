@@ -2324,6 +2324,16 @@ sample.swift
         "end": 199
       },
       "params": []
+    },
+    {
+      "name": "settle()",
+      "kind": "Function",
+      "range": {
+        "start": 225,
+        "end": 266
+      },
+      "params": [],
+      "suspends": true
     }
   ],
   "overloads": {
@@ -2332,6 +2342,9 @@ sample.swift
     ],
     "Order.place": [
       "Order.place(order:quantity:_:)"
+    ],
+    "settle": [
+      "settle()"
     ]
   },
   "constructors": {
@@ -2374,6 +2387,12 @@ sample.swift
         "exported": "limit",
         "local": "limit"
       }
+    },
+    {
+      "Local": {
+        "exported": "settle",
+        "local": "settle"
+      }
     }
   ],
   "star": {
@@ -2405,6 +2424,18 @@ sample.swift
       "range": {
         "start": 190,
         "end": 199
+      },
+      "by_path": true
+    },
+    {
+      "scope": "settle()",
+      "callee": "flush",
+      "arity": 0,
+      "labels": [],
+      "awaited": true,
+      "range": {
+        "start": 257,
+        "end": 264
       },
       "by_path": true
     }
@@ -2452,7 +2483,9 @@ sample.swift
   ],
   "private": [
     "Order.place(order:quantity:_:)",
-    "limit"
+    "limit",
+    "settle()",
+    "settle"
   ],
   "hidden": [
     "Order.place(order:quantity:_:)"

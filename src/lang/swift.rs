@@ -146,6 +146,10 @@ impl LanguagePack for Swift {
         true
     }
 
+    fn guesses_constructs(&self) -> bool {
+        true
+    }
+
     fn unordered_globs(&self) -> bool {
         true
     }
@@ -260,6 +264,8 @@ struct Visit<'t> {
     /// Whether the node is, or is directly in, the body of a function the walk defines: the
     /// statements of that body, not the ones nested in a block, a closure or an accessor.
     body: bool,
+    /// Whether the node is written under an `await` of its own function or closure.
+    awaited: bool,
 }
 
 /// A function, method or initializer's parameters: each with its argument label, and the
@@ -364,6 +370,7 @@ fn walk(
         plain: Rc::new(String::new()),
         generics: Rc::default(),
         body: false,
+        awaited: false,
     }];
     while let Some(Visit {
         node,
@@ -375,6 +382,7 @@ fn walk(
         plain,
         generics,
         body,
+        awaited,
     }) = stack.pop()
     {
         let charge = if stores(node.kind()) { scope.len() } else { 0 };
@@ -523,6 +531,7 @@ fn walk(
                 }
                 facts.defs.push(Def {
                     params: signature.params,
+                    suspends: children(node).any(|c| c.kind() == "async"),
                     ..definition(&inner, kind, node.byte_range(), Vec::new())
                 });
                 if place == Place::Top {
@@ -725,6 +734,7 @@ fn walk(
                     );
                     // A type parameter is no type of the repository: `T()` constructs none.
                     at.constructs &= !generics.holds(head(&at.callee));
+                    at.awaited = awaited;
                     if let Some((receiver, _)) = at.callee.split_once('.') {
                         called.push((scope.clone(), receiver.to_string()));
                     }
@@ -736,6 +746,16 @@ fn walk(
             }
             _ => {}
         }
+        // `await` and `async let` cover what is written under them, up to a function or closure.
+        let inner_awaited = match node.kind() {
+            "await_expression" => true,
+            "property_declaration" => awaited || children(node).any(|c| c.kind() == "async"),
+            "function_declaration"
+            | "protocol_function_declaration"
+            | "init_declaration"
+            | "lambda_literal" => false,
+            _ => awaited,
+        };
         for &child in pushed.iter().rev() {
             let child_body = match node.kind() {
                 "function_declaration" | "protocol_function_declaration" | "init_declaration" => {
@@ -761,6 +781,7 @@ fn walk(
                 plain: inner_plain.clone(),
                 generics: inner_generics.clone(),
                 body: child_body,
+                awaited: inner_awaited,
             });
         }
     }
@@ -983,6 +1004,7 @@ fn stack_children<'t>(
             plain: plain.clone(),
             generics: generics.clone(),
             body: false,
+            awaited: false,
         });
     }
 }
@@ -1368,6 +1390,7 @@ fn call(function: Node, suffixes: &[Node], node: Node, src: &[u8], scope: &str) 
         arity: Some(labels.len()),
         labels: Some(labels),
         constructs,
+        awaited: false,
         range: node.byte_range(),
         args: Vec::new(),
         kwargs: Vec::new(),
@@ -1452,6 +1475,7 @@ fn definition(name: &str, kind: Kind, range: Range<usize>, bases: Vec<String>) -
         returns: None,
         type_params: Vec::new(),
         result: None,
+        suspends: false,
     }
 }
 
