@@ -3584,6 +3584,11 @@ impl<'a> Resolver<'a> {
         let mut given = (index.stars.iter())
             .filter_map(|&at| self.gives(path, &exports[at], name, seen, value));
         let Some(first) = given.next() else {
+            // A namespace (Java's package, C#'s) exports its types alone: a file's on-demand
+            // imports are its own.
+            if self.unordered_globs && self.namespaced {
+                return None;
+            }
             return self.globs(path, "", name, false, seen);
         };
         match given.all(|other| same(&first, &other)) {
@@ -10368,5 +10373,117 @@ mod csharp_tests {
         });
         assert_eq!(exact.count(), n);
         assert!(took.as_secs() < 20, "{took:?}");
+    }
+
+    /// What `Gen.M` (`Util.Go(); new Util();`, in `namespace Acme.Query.Internal`, or `block`
+    /// nested) binds `Util` to among `files`, and the family of `Sub : Util`: the paths of
+    /// `Util.Go`'s and `Util`'s targets, then the ancestor `Sub` names.
+    fn enclosing(files: &[(&str, &str)], usings: &str, block: bool) -> (Vec<String>, String) {
+        let body = "public class Gen { void M() { Util.Go(); new Util(); } }\n\
+                    public class Sub : Util { }\n";
+        let source = match block {
+            true => format!(
+                "{usings}namespace Acme {{ namespace Query {{ namespace Internal {{\n{body}}} }} }}\n"
+            ),
+            false => format!("{usings}namespace Acme.Query.Internal;\n{body}"),
+        };
+        let mut all = files.to_vec();
+        all.push(("App/Gen.cs", &source));
+        let found = resolved(&all);
+        let calls = (calls_in(&found, "App/Gen.cs").into_iter())
+            .map(|(callee, level, targets)| format!("{callee} {level} {}", targets.join(" ")))
+            .collect();
+        let configs = [("App/App.csproj", PROJECT)];
+        let family = families_in(&all, &configs)["Acme.Query.Internal.Sub"].clone();
+        (calls, family.unwrap_or_default().join(" "))
+    }
+
+    /// `Util`, with a static `Go`, declared in `namespace ns` (file-scoped).
+    fn util(ns: &str) -> String {
+        format!("namespace {ns};\npublic class Util {{ public static void Go() {{ }} }}\n")
+    }
+
+    /// A type of a namespace enclosing the file's binds without a using, as C# looks a name up
+    /// in each enclosing namespace: a static call's receiver, a constructor and a base alike,
+    /// whether the namespace is file-scoped or written as nested blocks.
+    #[test]
+    fn a_type_of_an_enclosing_namespace_binds_without_a_using() {
+        let query = util("Acme.Query");
+        for block in [false, true] {
+            let found = enclosing(&[("App/Util.cs", &query)], "", block);
+            let with_using = enclosing(&[("App/Util.cs", &query)], "using Acme.Query;\n", block);
+            assert_eq!(
+                found,
+                (
+                    vec![
+                        "Util.Go exact App/Util.cs".to_string(),
+                        "Util exact App/Util.cs".to_string(),
+                    ],
+                    "Acme.Query.Internal.Sub Acme.Query.Util".to_string(),
+                ),
+                "block: {block}"
+            );
+            assert_eq!(found, with_using, "block: {block}");
+        }
+    }
+
+    /// The enclosing namespaces are read the innermost first, and before the file's usings: of
+    /// three `Util`s, the nearest namespace's binds, and a using's never does.
+    #[test]
+    fn the_innermost_enclosing_namespace_binds_before_outer_ones_and_usings() {
+        let (inner, query, acme, other) = (
+            util("Acme.Query.Internal"),
+            util("Acme.Query"),
+            util("Acme"),
+            util("Other"),
+        );
+        let cases: [(&[(&str, &str)], &str); 3] = [
+            (&[("App/A.cs", &acme), ("App/Q.cs", &query)], "App/Q.cs"),
+            (
+                &[
+                    ("App/A.cs", &acme),
+                    ("App/I.cs", &inner),
+                    ("App/Q.cs", &query),
+                ],
+                "App/I.cs",
+            ),
+            (&[("App/A.cs", &acme), ("App/O.cs", &other)], "App/A.cs"),
+        ];
+        for block in [false, true] {
+            for (files, wanted) in cases {
+                let (calls, _) = enclosing(files, "using Other;\n", block);
+                let names: Vec<&str> = files.iter().map(|f| f.0).collect();
+                assert_eq!(
+                    calls,
+                    [
+                        format!("Util.Go exact {wanted}"),
+                        format!("Util exact {wanted}")
+                    ],
+                    "{names:?}, block: {block}"
+                );
+            }
+        }
+    }
+
+    /// A namespace declared beside the one around the code, in the same file, does not enclose
+    /// it: its types are not seen, and the namespaces around the code still bind theirs.
+    #[test]
+    fn a_sibling_namespace_of_the_file_does_not_enclose_the_code() {
+        let (acme, other) = (util("Acme"), util("Other"));
+        let source = "namespace Acme.Query { public class Gen { void M() { Util.Go(); } } }\n\
+                    namespace Other.Query { public class Gen { void M() { Util.Go(); } } }\n";
+        let found = resolved(&[
+            ("App/A.cs", &acme),
+            ("App/O.cs", &other),
+            ("App/Gen.cs", source),
+        ]);
+        let (a, o) = (vec!["App/A.cs".to_string()], vec!["App/O.cs".to_string()]);
+        assert_eq!(
+            calls_in(&found, "App/Gen.cs"),
+            [
+                ("Util.Go".to_string(), "exact", a),
+                ("Util.Go".to_string(), "exact", o),
+            ]
+        );
     }
 }

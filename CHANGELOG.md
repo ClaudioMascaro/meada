@@ -8,6 +8,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A C# type of a namespace around the file's (`Acme.Query` from `Acme.Query.Internal`) binds
+  without a `using`, as a static call's receiver, a constructor and a base: the innermost
+  namespace first, and before a type a `using` brings. Before, the name stayed unresolved, or
+  bound to a farther namespace's type of the same name. A namespace declared beside the code's
+  in the same file does not enclose it.
 - A Java, Kotlin, C# or Swift class whose outside bases are all platform types with known
   members (`Serializable`, `Comparable`, `IDisposable`, `Hashable`, `Codable`, an enum's raw
   value type, Vapor's `RouteCollection`) resolves calls to its own members at `exact`; only the
