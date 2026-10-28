@@ -1567,6 +1567,7 @@ fn optional_reads(node: Node, src: &[u8], ctx: Ctx) -> Vec<(String, Value)> {
         };
         if pattern.kind() == "value_binding_pattern"
             && text(pattern, src) == "let"
+            && pattern.prev_sibling().is_none_or(|p| p.kind() != "case")
             && eq.kind() == "="
         {
             let value = values::value(init, src, ctx);
@@ -2179,6 +2180,21 @@ mod tests {
             .map(|b| (b.scope.as_str(), b.name.as_str()))
             .collect();
         assert_eq!(held, [("g()", "x"), ("g()", "u"), ("g()", "y")]);
+    }
+
+    #[test]
+    fn only_an_optional_let_of_one_read_is_bound() {
+        let env = "ProcessInfo.processInfo.environment[\"X\"]";
+        let bounds = |cond: &str| facts(&format!("func f() {{ {cond} {{ }} }}\n")).bound.len();
+        assert_eq!(bounds(&format!("if let a = {env}")), 1);
+        for hidden in [
+            format!("if var a = {env}"),
+            format!("while let a = {env}"),
+            format!("if case let a = {env}"),
+            "if let a".to_string(),
+        ] {
+            assert_eq!(bounds(&hidden), 0, "{hidden}");
+        }
     }
 
     #[test]
