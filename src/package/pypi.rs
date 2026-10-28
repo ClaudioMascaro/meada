@@ -271,6 +271,20 @@ impl Ecosystem for Pypi {
         manifest.path.rsplit('/').next() == Some("pyproject.toml")
     }
 
+    /// The submodules of a package's `__init__.py` (the root one or `<dir>/__init__.py`), as
+    /// `import pkg` then `pkg.name.f()` reaches them: `name/__init__.py`, then `name.py`, under
+    /// the package's directory. Any other file has none.
+    fn submodule(&self, file: &str, name: &str) -> Vec<String> {
+        let dir = match file {
+            "__init__.py" => "",
+            file => match file.strip_suffix("/__init__.py") {
+                Some(dir) => dir,
+                None => return Vec::new(),
+            },
+        };
+        python::files(dir, name)
+    }
+
     /// The import names a module, not a distribution: each distribution a manifest of a
     /// directory holding the file depends on (`entries`, the nearest first) is a candidate when
     /// a provider of it exposes the import's top-level module under its source roots. The import
@@ -307,7 +321,7 @@ impl Ecosystem for Pypi {
                 };
                 let known = |id: &str| known(at, id);
                 let target = (module(at, manifest, specifier))
-                    .and_then(|file| at.reach(&exports[m].repository, &file, chain, &known));
+                    .and_then(|file| at.reach(self, &exports[m].repository, &file, chain, &known));
                 if let Some(target) = target {
                     let targets = vec![target];
                     let r = Resolved {
@@ -757,6 +771,46 @@ serve = "acme.cli:main"
             Pypi.programs(&all, &files),
             [("src/inner/mod.py".to_string(), "go".to_string())]
         );
+    }
+
+    #[test]
+    fn a_package_init_names_its_submodules_and_no_other_file_does() {
+        let files = |file: &str| Pypi.submodule(file, "name");
+        assert_eq!(
+            files("pkg/__init__.py"),
+            ["pkg/name/__init__.py", "pkg/name.py"]
+        );
+        assert_eq!(files("__init__.py"), ["name/__init__.py", "name.py"]);
+        assert!(files("pkg/core.py").is_empty());
+        assert!(files("pkg/x__init__.py").is_empty());
+    }
+
+    #[test]
+    fn a_submodule_is_reached_through_the_init_that_exports_no_such_name() {
+        let row = |path: &str, name: &str| Exported {
+            path: path.into(),
+            name: Some(name.into()),
+            file: Some(path.into()),
+            target: Some(name.into()),
+        };
+        let export = Export {
+            repository: "lib".into(),
+            files: (["pkg/__init__.py", "pkg/api.py"].iter())
+                .map(|p| File {
+                    path: p.to_string(),
+                    hash: String::new(),
+                })
+                .collect(),
+            exported: vec![row("pkg/api.py", "fetch")],
+            ..Export::default()
+        };
+        let at = Provided::new(&export);
+        let reach = |chain: &str| at.reach(&Pypi, "lib", "pkg/__init__.py", chain, &|_| true);
+        assert_eq!(
+            reach("api.fetch").as_deref(),
+            Some("lib::pkg/api.py::fetch")
+        );
+        assert_eq!(reach("other.fetch"), None);
     }
 
     #[test]

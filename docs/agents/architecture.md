@@ -1254,6 +1254,8 @@ one for the area a change touches.
     and only for a project of another repository, so a reference inside one repository adds no
     package link (the pack resolves it), while a `PackageReference` reaches every provider of
     the id.
+  - `submodule`: none; PyPI's package `__init__.py` names its submodules (`name/__init__.py`, then
+    `name.py`), as `import pkg` then `pkg.name.f()` reaches them.
   - `owns`: every manifest of the ecosystem bounds the files under it; PyPI only a
     `pyproject.toml`, Cargo only a manifest with a `[package]`.
   - `ways` and `resolve`: Node's rule (`exports`, else `types`, `module` and `main`, else the
