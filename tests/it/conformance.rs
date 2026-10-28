@@ -14256,3 +14256,59 @@ fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
         &calls,
     );
 }
+
+/// The level and target of the call to `callee` in `main` of `dir/main.py`, in `python-nested-pyproject`.
+fn nested_pyproject_call(
+    json: &Value,
+    dir: &str,
+    callee: &str,
+) -> (Option<String>, Option<String>) {
+    let id = format!("{REPO}::{dir}/main.py::main::{callee}#0");
+    let call = (json["calls"].as_array().unwrap().iter())
+        .find(|c| c["id"] == id)
+        .unwrap_or_else(|| panic!("no call {id}"));
+    let text = |k: &str| call[k].as_str().map(String::from);
+    (text("level"), text("target"))
+}
+
+#[test]
+fn python_imports_resolve_through_the_nearest_nested_pyproject() {
+    let repo = fixture_repo(
+        "python_nested_pyproject",
+        "python-nested-pyproject",
+        Some(ORIGIN),
+    );
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&export).unwrap();
+    // The template's shape, siblings that both hold `app`, and a Poetry `from` of its own.
+    for (dir, callee, target) in [
+        ("backend", "create", "backend/app/crud.py::create"),
+        ("a", "f", "a/app/util.py::f"),
+        ("b", "f", "b/app/util.py::f"),
+        ("c", "g", "c/lib/pkg/mod.py::g"),
+        ("d", "g", "d/lib/pkg/mod.py::g"),
+    ] {
+        let (level, to) = nested_pyproject_call(&json, dir, callee);
+        assert_eq!(level.as_deref(), Some("exact"), "{dir}");
+        assert_eq!(to, Some(format!("{REPO}::{target}")), "{dir}");
+    }
+}
+
+#[test]
+fn python_nested_pyproject_that_cannot_be_read_declares_no_roots() {
+    // Not TOML, not UTF-8, or past the size limit: no declared roots, and the rest indexes.
+    let large = format!("[tool.poetry]\n# {}\n", "x".repeat(1 << 20));
+    for (case, bytes) in [
+        ("python_nested_invalid", b"[tool\n".to_vec()),
+        ("python_nested_binary", vec![0xff, 0xfe, 0x00]),
+        ("python_nested_large", large.into_bytes()),
+    ] {
+        let repo = fixture_repo(case, "python-nested-pyproject", Some(ORIGIN));
+        std::fs::write(repo.join("c/pyproject.toml"), bytes).unwrap();
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        let json: Value = serde_json::from_str(&export).unwrap();
+        assert_eq!(nested_pyproject_call(&json, "c", "g").0, None, "{case}");
+        let a = nested_pyproject_call(&json, "a", "f").0;
+        assert_eq!(a.as_deref(), Some("exact"), "{case}");
+    }
+}

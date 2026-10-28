@@ -9,7 +9,7 @@ El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [rete
 | Lenguaje | Archivos leídos |
 | --- | --- |
 | TypeScript y JavaScript | `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs` |
-| Python | `.py` |
+| Python | `.py`; cada `pyproject.toml` da raíces de código (su directorio, las raíces declaradas o `src`) a los archivos bajo él |
 | Rust | `.rs` alcanzados por el árbol de módulos de cada crate |
 | Go | `.go` incluidos por las reglas de build del paquete |
 | Java | `.java`, resueltos por sus declaraciones de `package` |

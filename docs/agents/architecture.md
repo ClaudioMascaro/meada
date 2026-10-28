@@ -3324,9 +3324,10 @@ qualification budget does (ADR 0017).
   one's), since qualified names and `Resolver::lexical` cost time cubic in the nesting.
   `TARGET_DEPTH` (64 nodes): a name deeper in an unpacking target or a `case` pattern is not
   bound, so it hides nothing. An annotation reads `Optional[...]` and `... | None` to
-  `TYPE_DEPTH` levels; deeper is no class. For imports inside the repository only the root `pyproject.toml` is read
-  (`lang/python/pyproject.rs`, which the PyPI reader shares), and only the setuptools and
-  Poetry root declarations; it is read as a PyPI manifest is (`package::read_manifest`, `MAX_BYTES`), so one past the size limit, not UTF-8 or not TOML declares no roots and the refresh carries on, with no status line. `src` is a source root when nothing is declared, whether or not it holds
+  `TYPE_DEPTH` levels; deeper is no class. For imports inside the repository every `pyproject.toml` is read
+  (`lang/python/pyproject.rs`, which the PyPI reader shares), the setuptools and Poetry root
+  declarations only; an importer tries the roots of the nearest one in its directory or above, then
+  of each further ancestor, nearest first, and a sibling project's never; each is read as a PyPI manifest is (`package::read_manifest`, `MAX_BYTES`), so one past the size limit, not UTF-8 or not TOML declares no roots and the refresh carries on, with no status line. `src` is a source root when nothing is declared, whether or not it holds
   packages (a pack sees no file list). An import binds its names for the whole file, wherever
   it sits. A comprehension's targets are bound in the enclosing scope, so they hide a name
   there for the whole scope (the safe side: a name match instead of `exact`); at the top level
