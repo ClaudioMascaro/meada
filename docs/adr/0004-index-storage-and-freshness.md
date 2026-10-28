@@ -22,8 +22,10 @@ fresh, and how things in it are named.
 - (Amended 2026-10-21; in server mode, ADR 0011, the index lives at
   `<index_dir>/<identity>/index.db`, keyed by remote identity, with no `.gitignore`, and nothing
   is written into the checkout.)
-- A cross-repo query opens the peers' indexes with `ATTACH DATABASE`. Several indexes are read
-  together and never merged (invariant 5).
+- A cross-repo query opens the peers' indexes. Several indexes are read together and never
+  merged (invariant 5). (Amended 2026-10-28; each index is read through its own connection
+  instead of `ATTACH DATABASE`, since SQLite attaches at most ten databases to one connection
+  and a workspace has no such bound.)
 - The index holds no source text. A span is stored as a location; the content hash is per file
   (`files.hash`), which freshness compares and which `context` checks before showing a span. Each
   symbol also stores the BLAKE3 of its span's exact bytes (`symbols.hash`, no normalisation),
