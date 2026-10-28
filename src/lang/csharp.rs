@@ -26,9 +26,16 @@ const VALUE_DEPTH: usize = 64;
 /// How many segments of a callee are kept before it becomes an unknown expression.
 // ponytail: real member paths are short; this keeps crafted chains cheap.
 const PATH_DEPTH: usize = 256;
-/// Enclosing-name bytes across syntax visits, before each visit's bounded metadata fanout.
+/// Enclosing-name bytes past `QUALIFICATION_FREE` across syntax visits, before each visit's
+/// bounded metadata fanout.
 // ponytail: a long namespace prefix must not multiply across a broad file without a budget.
 const QUALIFICATION_BYTES: usize = 4 * 1024 * 1024;
+/// How long an enclosing name is before a visit is charged for it: a real qualified name is
+/// shorter, so a generated file of any size reads whole, while a longer prefix pays its excess
+/// at every node that repeats it.
+// ponytail: a flat 256 bytes; a file under it keeps up to 256 bytes of scope per stored call,
+// about 130 MB of facts at `MAX_BYTES`. Lower it if that shows up.
+const QUALIFICATION_FREE: usize = 256;
 /// How many distinct usings a project adds to each of its files (`join`), its project file's
 /// and its `global using` directives together. A project past it keeps no facts in any file:
 /// a partial set could bind a name one of the missing usings makes ambiguous.
@@ -425,10 +432,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
         conditional,
     }) = stack.pop()
     {
-        let Some(remaining) = qualification_bytes.checked_sub(scope.len()) else {
+        let excess = scope.len().saturating_sub(QUALIFICATION_FREE);
+        let Some(remaining) = qualification_bytes.checked_sub(excess) else {
             // A partial overload family could turn an ambiguous call into a false exact one.
             return Ok(Facts {
-                unbuilt: true,
+                budget: Some(QUALIFICATION_BYTES),
                 ..Facts::default()
             });
         };
@@ -2246,6 +2254,64 @@ mod tests {
         let took = start.elapsed();
         assert_eq!(facts.calls.len(), 4096);
         assert!(took.as_secs() < 10, "{took:?}");
+    }
+
+    /// An Entity Framework model snapshot of about `size` bytes: one `BuildModel` whose entity
+    /// lambdas hold a call per property, as the scaffolder writes them.
+    fn snapshot(size: usize) -> String {
+        let mut source = String::from(
+            "namespace Acme.Migrations\n{\npartial class AppModelSnapshot\n{\n\
+             protected override void BuildModel(ModelBuilder modelBuilder)\n{\n",
+        );
+        let mut n = 0;
+        while source.len() < size {
+            source += &format!("modelBuilder.Entity(\"Acme.Entity{n}\", b =>\n{{\n");
+            for p in 0..8 {
+                source += &format!(
+                    "b.Property<int>(\"P{p}\").ValueGeneratedOnAdd().HasColumnType(\"integer\");\n"
+                );
+            }
+            source += "b.HasKey(\"P0\");\n});\n";
+            n += 1;
+        }
+        source + "}\n}\n}\n"
+    }
+
+    /// A generated file reads whole at any size the indexer takes: the budget is charged for a
+    /// long enclosing name, not for every node of a file whose names are short. The 1 MiB case
+    /// takes about 3 s in a local debug build, a twentieth of its bound.
+    #[test]
+    fn a_generated_model_snapshot_is_read_whole() {
+        for size in [154 << 10, 256 << 10, 1 << 20] {
+            let source = snapshot(size);
+            let start = std::time::Instant::now();
+            let facts = CSharp.parse("Snapshot.cs", source.as_bytes()).unwrap();
+            let took = start.elapsed();
+            assert_eq!(facts.budget, None, "{size}");
+            assert!(
+                !facts.defs.is_empty() && facts.calls.len() > size / 100,
+                "{size}"
+            );
+            assert!(took.as_secs() < 60, "{size}: {took:?}");
+        }
+    }
+
+    /// A long namespace repeated by every node of a broad file exhausts the budget in bounded
+    /// time: the file keeps no definitions and carries the budget `meada status` names.
+    #[test]
+    fn a_long_namespace_across_a_broad_file_is_dropped_in_bounded_time() {
+        let mut source = format!("namespace N{};\npublic class C {{\n", "a".repeat(4096));
+        for n in 0..2000 {
+            source += &format!("public void M{n}() {{ F(); }}\n");
+        }
+        source += "}\n";
+        let start = std::time::Instant::now();
+        let facts = CSharp.parse("C.cs", source.as_bytes()).unwrap();
+        let took = start.elapsed();
+        assert!(facts.defs.is_empty() && facts.calls.is_empty());
+        assert_eq!(facts.budget, Some(QUALIFICATION_BYTES));
+        assert!(!facts.unbuilt);
+        assert!(took.as_secs() < 60, "{took:?}");
     }
 
     /// The arguments of the calls of `callee` in `source`, as the strings they fold to.

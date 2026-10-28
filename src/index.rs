@@ -1629,6 +1629,9 @@ pub(crate) struct Export {
     /// Where the repository stands in the workspace; set by the engine, never stored or shown.
     pub(crate) root: PathBuf,
     pub(crate) files: Vec<File>,
+    /// The files a pack dropped for exhausting a budget (`Facts::budget`), each with the
+    /// budget's size in bytes, in path order: no symbols, no calls. Shown by `meada status` only.
+    pub(crate) dropped: Vec<(String, usize)>,
     pub(crate) symbols: Vec<Symbol>,
     pub(crate) calls: Vec<CallSite>,
     pub(crate) providers: Vec<Provider>,
@@ -1835,6 +1838,21 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
+    // A dropped file has no symbols, so only those files' (small) facts are searched.
+    let dropped = db
+        .prepare(&format!(
+            "SELECT path, facts FROM {schema}.files WHERE NOT EXISTS \
+             (SELECT 1 FROM {schema}.symbols s WHERE s.path = files.path) \
+             AND instr(facts, '\"budget\":') > 0 ORDER BY path"
+        ))?
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+        .collect::<rusqlite::Result<Vec<_>>>()?
+        .into_iter()
+        .filter_map(|(path, facts)| {
+            let facts: Facts = serde_json::from_str(&facts).ok()?;
+            Some((path, facts.budget?))
+        })
+        .collect();
     let symbols = db
         .prepare(&format!(
             "SELECT id, path, start, end FROM {schema}.symbols ORDER BY id, path, start, end"
@@ -2097,6 +2115,7 @@ pub fn export(db: &Connection, schema: &str, identity: &str) -> Result<Export> {
         repository: identity.to_string(),
         root: PathBuf::new(),
         files,
+        dropped,
         symbols,
         calls,
         providers,

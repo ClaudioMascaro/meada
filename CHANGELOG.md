@@ -8,6 +8,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A C# file of a few hundred KB (an Entity Framework model snapshot) is no longer dropped
+  silently: the qualification budget is charged for enclosing names past 256 bytes, not for every
+  node, so a generated file reads whole. A file the budget still drops (a long namespace repeated
+  across a broad file) is named by a `meada status` line. An index built before keeps such a
+  file empty until the file changes or `.meada/` is removed.
 - A static import of a class whose own base is looked up through it (a C# `using static N.A;`
   beside `class A : Inner`, as in efcore; Java's `import static p.A.*;` the same way) no longer
   overflows the stack of the indexer: the base is opaque unless another import names it, and
