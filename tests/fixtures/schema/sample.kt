@@ -16,6 +16,6 @@ expect class Clock
 
 actual class Timer
 
-class Pair2 {
+class OnlySecondary {
     constructor(a: Int) {}
 }

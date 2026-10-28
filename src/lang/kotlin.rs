@@ -2259,6 +2259,21 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
 mod tests {
     use super::*;
 
+    /// A secondary constructor is a method `C.C(types)` in the overload family of its class's
+    /// name, hidden when `internal` or `private`; an enum's included.
+    #[test]
+    fn a_secondary_constructor_joins_its_classs_overloads() {
+        let facts = parse(
+            b"package a\nclass C {\n constructor(x: Int) {}\n private constructor() {}\n}\n\
+              enum class E(val n: Int) {\n A(1);\n internal constructor() : this(0)\n}\n",
+            false,
+        )
+        .unwrap();
+        assert_eq!(facts.overloads["a.C"], ["a.C.C()", "a.C.C(Int)"]);
+        assert_eq!(facts.overloads["a.E"], ["a.E", "a.E.E()"]);
+        assert_eq!(facts.hidden, ["a.C.C()", "a.E.E()"]);
+    }
+
     #[test]
     fn a_declaration_read_as_an_infix_call_leaves_the_file_out() {
         // What the grammar makes of a declaration it misparses: a hard keyword as an operand

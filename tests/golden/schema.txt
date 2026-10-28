@@ -1635,20 +1635,20 @@ sample.kt
       "params": []
     },
     {
-      "name": "example.Pair2",
+      "name": "example.OnlySecondary",
       "kind": "Class",
       "range": {
         "start": 302,
-        "end": 344
+        "end": 352
       },
       "params": []
     },
     {
-      "name": "example.Pair2.Pair2(Int)",
+      "name": "example.OnlySecondary.OnlySecondary(Int)",
       "kind": "Method",
       "range": {
-        "start": 320,
-        "end": 342
+        "start": 328,
+        "end": 350
       },
       "params": [
         {
@@ -1662,8 +1662,8 @@ sample.kt
     "example.Clock": [
       "example.Clock"
     ],
-    "example.Pair2": [
-      "example.Pair2.Pair2(Int)"
+    "example.OnlySecondary": [
+      "example.OnlySecondary.OnlySecondary(Int)"
     ],
     "example.Store": [
       "example.Store"
@@ -1927,14 +1927,14 @@ sample.kt
     },
     {
       "Local": {
-        "exported": "Pair2",
-        "local": "example.Pair2"
+        "exported": "OnlySecondary",
+        "local": "example.OnlySecondary"
       }
     },
     {
       "Local": {
-        "exported": "example.Pair2",
-        "local": "example.Pair2"
+        "exported": "example.OnlySecondary",
+        "local": "example.OnlySecondary"
       }
     }
   ],
@@ -1948,8 +1948,8 @@ sample.kt
       "example.Clock",
       "Timer",
       "example.Timer",
-      "Pair2",
-      "example.Pair2"
+      "OnlySecondary",
+      "example.OnlySecondary"
     ]
   },
   "calls": [
@@ -2003,7 +2003,7 @@ sample.kt
       }
     },
     {
-      "scope": "example.Pair2",
+      "scope": "example.OnlySecondary",
       "name": "a",
       "class": {
         "Type": "Int"
