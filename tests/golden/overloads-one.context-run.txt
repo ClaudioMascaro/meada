@@ -1,0 +1,9 @@
+local/overloads-one src/main/java/ex/Box.java:8-10 ex.Box.run(Object)
+community: none
+processes: none
+void run(Object o) {
+        m(o);
+    }
+callers: none
+callees:
+local/overloads-one src/main/java/ex/Box.java:5 ex.Box.m (one of 3 overloads) [ambiguous: 3 functions or classes named m]

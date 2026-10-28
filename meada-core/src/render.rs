@@ -101,6 +101,46 @@ pub fn label(id: &str) -> &str {
     id.rsplit_once("::").map_or(id, |(_, name)| name)
 }
 
+/// `<repository>::<path>::<Class>.<method>` of a symbol id that names a method, without its
+/// parameters. A name with no dot (a free function of no package) has no key; top-level
+/// overloads of one file, whose names carry the package, are a set like a class's.
+fn overload_key(id: &str) -> Option<&str> {
+    let name = id.splitn(3, "::").nth(2)?;
+    let key = id.get(..id.len() - name.len())?;
+    let method = name.split('(').next()?;
+    method
+        .contains('.')
+        .then(|| &id[..key.len() + method.len()])
+}
+
+/// Groups `items` by id into overload sets, in the order of each group's first member: the
+/// items that share a file, a class and a method name form one group, every other item its own.
+pub fn overload_sets<T>(items: Vec<T>, id: impl Fn(&T) -> &str) -> Vec<Vec<T>> {
+    let mut sets: Vec<Vec<T>> = Vec::new();
+    let mut keys: Vec<Option<String>> = Vec::new();
+    for item in items {
+        let key = overload_key(id(&item)).map(str::to_string);
+        match key
+            .is_some()
+            .then(|| keys.iter().position(|k| *k == key))
+            .flatten()
+        {
+            Some(n) => sets[n].push(item),
+            None => {
+                keys.push(key);
+                sets.push(vec![item]);
+            }
+        }
+    }
+    sets
+}
+
+/// `Class.method` of the overload set holding `id`.
+pub fn overload_name(id: &str) -> &str {
+    let name = id.splitn(3, "::").nth(2).unwrap_or(id);
+    name.split('(').next().unwrap_or(name)
+}
+
 /// The callee of the call site `<caller>::<callee>#<ordinal>`.
 pub fn callee(site: &str) -> &str {
     let callee = label(site);
@@ -137,4 +177,32 @@ pub fn section(name: &str, items: Vec<String>) -> Vec<String> {
     let mut lines = vec![format!("{name}:")];
     lines.extend(items);
     lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn overloads_of_one_file_class_and_name_are_one_set() {
+        let ids = vec![
+            "r::A.java::ex.A.m(int)",
+            "r::A.java::ex.B.m(int)",
+            "r::A.java::ex.A.m(String)",
+            "r::B.java::ex.A.m(long)",
+            "r::A.java::f",
+        ];
+        let sets = overload_sets(ids, |id| id);
+        let sets: Vec<Vec<&str>> = sets;
+        assert_eq!(
+            sets,
+            vec![
+                vec!["r::A.java::ex.A.m(int)", "r::A.java::ex.A.m(String)"],
+                vec!["r::A.java::ex.B.m(int)"],
+                vec!["r::B.java::ex.A.m(long)"],
+                vec!["r::A.java::f"],
+            ]
+        );
+        assert_eq!(overload_name("r::A.java::ex.A.m(int)"), "ex.A.m");
+    }
 }

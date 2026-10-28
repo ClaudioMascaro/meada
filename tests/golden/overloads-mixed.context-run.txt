@@ -1,0 +1,11 @@
+local/overloads-mixed src/main/java/ex/Mixed.kt:9-11 ex.run((Any)->Unit)
+community: none
+processes: 1 (1 export; 1 repository): ex.run((Any)->Unit) (local/overloads-mixed)
+fun run(f: (Any) -> Unit) {
+    f { x -> x.m(1) }
+}
+callers: none
+callees:
+local/overloads-mixed src/main/java/ex/Mixed.kt:10 (unresolved) f
+local/overloads-mixed src/main/java/ex/Mixed.kt:4 ex.Holder.m(Int) [ambiguous: 2 methods named m]
+local/overloads-mixed src/main/java/ex/Mixed.kt:7 ex.m(Int) [ambiguous: 2 methods named m]

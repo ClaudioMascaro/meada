@@ -32,7 +32,10 @@ São três ferramentas, sempre em inglês, e nenhuma escreve:
   escreve e quem lê, com o símbolo e a linha, ou `(repository-level)` para o repositório
   inteiro; num canal (`channel::kafka::orders.created`), lista produtores e consumidores,
   inclusive os que chegam a ele por um curinga ou por um binding, com o nível e o motivo, e um
-  lado cujo nome Meada não consegue avaliar aparece como `(unresolved)` e nunca é ligado;
+  lado cujo nome Meada não consegue avaliar aparece como `(unresolved)` e nunca é ligado; os candidatos de uma chamada ambígua que
+  são sobrecargas de um método (um arquivo, uma classe, um nome) aparecem como um conjunto,
+  `(one of N overloads)`, e o `trace` os escreve como `Class.name (N overloads)`; a chamada
+  continua `ambiguous` e o export lista cada candidato como antes;
 - `trace` segue uma cadeia de chamadas por vários repositórios, rio abaixo (`down`) ou rio
   acima (`up`); com `changes: uncommitted`, parte do diff da árvore de trabalho e serve para
   analisar o impacto do que acabou de ser editado.
