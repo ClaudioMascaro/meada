@@ -339,6 +339,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     let mut public_names = Vec::new();
     // The values to read once the file is, and how many bindings each local name has.
     let mut held: Vec<Held> = Vec::new();
+    // The calls made on another call (`Router::new().route(..)`) and the range of the inner one.
+    let mut chains: Vec<(usize, Range<usize>)> = Vec::new();
     let mut bindings: HashMap<String, usize> = HashMap::new();
     // The names a `let mut` of a plain name declares.
     let mut mut_lets: HashSet<String> = HashSet::new();
@@ -755,6 +757,13 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 };
                 let put = Put::Call(facts.calls.len());
                 held.push(Held { at, node, put });
+                let root = chain_root(function, src);
+                if root.is_none()
+                    && callee.starts_with('(')
+                    && let Some(inner) = inner_call(function)
+                {
+                    chains.push((facts.calls.len(), inner.byte_range()));
+                }
                 facts.calls.push(Call {
                     arity: None,
                     labels: None,
@@ -766,7 +775,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     kwargs: Vec::new(),
                     decorates: None,
                     by_path,
-                    root: chain_root(function, src),
+                    root,
                     on: None,
                     receiver: None,
                     arg_types: Vec::new(),
@@ -983,6 +992,12 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             }
             Slot::Result(at) => facts.defs[*at].result = callee.map(Class::Type),
         }
+    }
+    let called: HashMap<(usize, usize), usize> = (facts.calls.iter().enumerate())
+        .map(|(n, c)| ((c.range.start, c.range.end), n))
+        .collect();
+    for (outer, inner) in chains {
+        facts.calls[outer].on = called.get(&(inner.start, inner.end)).copied();
     }
     // The values, now that the file's `use` declarations are known.
     let mut reader = Reader::new(src, &scan, &mut heads, &candidates);
@@ -1752,6 +1767,25 @@ fn member(node: Node, src: &[u8]) -> String {
     }
     parts.reverse();
     parts.join(".")
+}
+
+/// The call a method call is made on (`Router::new()` in `Router::new().route(..)`), through
+/// `.await`, `?` and parentheses.
+fn inner_call(function: Node) -> Option<Node> {
+    if function.kind() != "field_expression" {
+        return None;
+    }
+    let mut at = field(function, "value")?;
+    for _ in 0..PATH_DEPTH {
+        match at.kind() {
+            "call_expression" => return Some(at),
+            "try_expression" | "await_expression" | "parenthesized_expression" => {
+                at = at.named_child(0)?
+            }
+            _ => return None,
+        }
+    }
+    None
 }
 
 /// The name a method call on a call chain starts at (`Call::root`): `client` for

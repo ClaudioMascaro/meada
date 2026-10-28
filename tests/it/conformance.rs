@@ -6822,6 +6822,21 @@ fn rust() {
             "api/src/bin/tool.rs::helper",
             "api/src/bin/tool.rs::helper.go",
             "api/src/bin/tool.rs::main",
+            "api/src/main.rs::chains",
+            "api/src/chains.rs::Router",
+            "api/src/chains.rs::Router.new",
+            "api/src/chains.rs::Router.route",
+            "api/src/chains.rs::Plain",
+            "api/src/chains.rs::Plain.new",
+            "api/src/chains.rs::Plain.route",
+            "api/src/chains.rs::Other",
+            "api/src/chains.rs::Other.route",
+            "api/src/chains.rs::make",
+            "api/src/chains.rs::chained",
+            "api/src/chains.rs::chained_plain",
+            "api/src/chains.rs::bound",
+            "api/src/chains.rs::bound_plain",
+            "api/src/chains.rs::awaited",
             "api/src/main.rs::below",
             "api/src/main.rs::below.go",
             "api/src/main.rs::elsewhere",
@@ -7473,7 +7488,7 @@ fn rust() {
             ),
             (
                 "crates/billing/src/billing.rs::total::(call_expression).amount#0",
-                INFERRED,
+                EXACT,
                 &["crates/billing/src/invoice.rs::Invoice.amount"],
             ),
             // A name match keeps to the crates the caller reaches: its own and the libraries it
@@ -7897,6 +7912,42 @@ fn rust() {
                 "crates/worker/src/derived.rs::Client.ApiExt.api::self.clone#0",
                 None,
                 &[],
+            ),
+            // A call on another call's result is typed by the written result of the inner one.
+            (
+                "api/src/chains.rs::chained::(call_expression).route#0",
+                EXACT,
+                &["api/src/chains.rs::Router.route"],
+            ),
+            (
+                "api/src/chains.rs::chained::(call_expression).route#1",
+                EXACT,
+                &["api/src/chains.rs::Router.route"],
+            ),
+            (
+                "api/src/chains.rs::chained_plain::(call_expression).route#0",
+                EXACT,
+                &["api/src/chains.rs::Plain.route"],
+            ),
+            (
+                "api/src/chains.rs::chained_plain::(call_expression).route#1",
+                EXACT,
+                &["api/src/chains.rs::Plain.route"],
+            ),
+            (
+                "api/src/chains.rs::bound::r.route#0",
+                EXACT,
+                &["api/src/chains.rs::Router.route"],
+            ),
+            (
+                "api/src/chains.rs::bound_plain::r.route#0",
+                EXACT,
+                &["api/src/chains.rs::Plain.route"],
+            ),
+            (
+                "api/src/chains.rs::awaited::(await_expression).route#0",
+                EXACT,
+                &["api/src/chains.rs::Router.route"],
             ),
             // A chain that starts at a call of an outside crate is that crate's, whatever
             // function of the file shares the crate's name.

@@ -12,6 +12,7 @@ mod native;
 mod real;
 #[cfg(feature = "metrics")]
 mod metrics;
+mod chains;
 mod methods;
 mod prelude;
 mod ring;
