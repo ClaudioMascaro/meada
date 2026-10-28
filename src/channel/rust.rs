@@ -211,13 +211,11 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
 }
 
 /// The spelling of what the callee of `call`, written in `path`, names outside the repository,
-/// as the file's imports spell it: `Code::outside` read as a value, not a path, whatever its head
-/// is.
+/// as the file's imports spell it, read by path as the Rust HTTP readers do, and only when its head
+/// is the import itself.
 fn outside_spelling<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> Option<String> {
-    Some(
-        code.outside(path, &call.scope, &call.callee, false)?
-            .spelled,
-    )
+    let outside = code.outside(path, &call.scope, &call.callee, call.by_path)?;
+    outside.direct.then_some(outside.spelled)
 }
 
 /// The client that `receiver`, written in `scope` of `path`, traces back to: the library of the
@@ -399,5 +397,28 @@ mod tests {
                 "nats spawned consumer x.rs::consume",
             ]
         );
+    }
+
+    #[test]
+    fn a_path_written_constructor_is_read_by_path_past_a_value_binding_of_its_head() {
+        let src = "use lapin;\nfn lapin() {}\n\
+            async fn go() {\n    let c = lapin::Connection::connect(\"u\").await.unwrap();\n    c.basic_publish(\"x\", \"k\").await.unwrap();\n}\n";
+        assert_eq!(lines(src), ["amqp k publish x"]);
+    }
+
+    #[test]
+    fn a_constructor_whose_head_is_not_the_import_itself_gives_no_client() {
+        // `async_nats` is a parameter here: `async_nats.connect` is spelled like the crate's
+        // function, but its head is a value, not the import.
+        let src = "use async_nats;\nfn go(async_nats: X) { async_nats.connect(\"u\"); }\n";
+        let facts = Rust.parse("x.rs", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("x.rs", &facts)]);
+        let modules = Rust.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &Rust);
+        let code = Code::new(&resolver, &files, &Rust);
+        let call = &facts.calls[0];
+        let outside = code.outside("x.rs", &call.scope, &call.callee, call.by_path);
+        assert!(outside.is_some_and(|o| !o.direct && o.spelled == "async_nats.connect"));
+        assert_eq!(outside_spelling(&code, "x.rs", call), None);
     }
 }

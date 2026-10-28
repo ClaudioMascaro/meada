@@ -185,6 +185,11 @@ All notable changes to Meada are recorded here. The format follows
   and refuses counters that would prevent the next native INCR acquisition. Exact u64
   transport remains supported, with bilingual operational refusals at the signed ceiling.
 
+- Rust message brokers: the client a producer or consumer traces back to is read from its
+  constructor by path, as the Rust HTTP readers do, and only when the head of the name is the
+  import itself: a function spelled like the crate (`fn lapin() {}` beside `lapin::Connection::
+  connect(..)`) no longer hides the client, and a value spelled like the crate gives none.
+
 ### Added
 
 - Swift language pack (spec #29, #117): `.swift` files without a Swift toolchain or Xcode. Each
