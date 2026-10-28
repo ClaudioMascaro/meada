@@ -1749,7 +1749,9 @@ one for the area a change touches.
   is its first namespace's and it may declare types in another; the C# layout names such a file
   for each other namespace it declares types in, when no file has that namespace as package.
   A pack whose type names carry no namespace turns that check off (`LanguagePack::namespaced`,
-  false for Swift: a module is no part of its types' names).
+  false for Swift, a module being no part of its types' names, and for Rust, whose type names
+  are paths in their file, so a `use super::*` takes the parent's types as it takes its
+  functions).
   The Swift pack (spec #29, #117; `lang/swift.rs`) reads `Package.swift` with the same grammar
   (`lang/swift/manifest.rs`: every `.target`, `.executableTarget`, `.testTarget`, `.macro` and
   `.plugin` call with a literal `name:` outside a `dependencies:` argument, under its literal

@@ -2,6 +2,7 @@ mod extras;
 #[cfg(not(target_has_atomic = "64"))]
 mod fallback;
 mod gated;
+mod globbed;
 mod imp;
 mod launch;
 #[cfg(test)]
