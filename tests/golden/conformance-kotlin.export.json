@@ -75,7 +75,7 @@
     },
     {
       "path": "src/main/kotlin/example/channels/Billing.kt",
-      "hash": "93cbb09ca1ff24b73ae37c10e405c7f5b20860037e99729b49c0c5fab3b14d5a"
+      "hash": "d547f251abbed99dc0abf0cd96da6326358d17ab8b12f384a75c68f9f2207a1a"
     },
     {
       "path": "src/main/kotlin/example/channels/Delivery.kt",
@@ -1684,15 +1684,15 @@
       "span": {
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 645,
-        "end": 1440
+        "end": 1654
       }
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()",
       "span": {
         "path": "src/main/kotlin/example/channels/Billing.kt",
-        "start": 883,
-        "end": 1003
+        "start": 1020,
+        "end": 1140
       }
     },
     {
@@ -1707,16 +1707,24 @@
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)",
       "span": {
         "path": "src/main/kotlin/example/channels/Billing.kt",
-        "start": 1009,
-        "end": 1349
+        "start": 1146,
+        "end": 1486
       }
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)",
       "span": {
         "path": "src/main/kotlin/example/channels/Billing.kt",
-        "start": 1355,
-        "end": 1438
+        "start": 1492,
+        "end": 1575
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRepo(Order)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 1581,
+        "end": 1652
       }
     },
     {
@@ -1725,6 +1733,22 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 802,
         "end": 877
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.repoType(Order)",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 883,
+        "end": 1014
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Order",
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 1656,
+        "end": 1688
       }
     },
     {
@@ -6599,8 +6623,8 @@
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/channels/Billing.kt",
-        "start": 921,
-        "end": 985
+        "start": 1058,
+        "end": 1122
       }
     },
     {
@@ -6610,8 +6634,8 @@
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/channels/Billing.kt",
-        "start": 921,
-        "end": 1003
+        "start": 1058,
+        "end": 1140
       }
     },
     {
@@ -6621,8 +6645,8 @@
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/channels/Billing.kt",
-        "start": 921,
-        "end": 956
+        "start": 1058,
+        "end": 1093
       }
     },
     {
@@ -6632,8 +6656,8 @@
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/channels/Billing.kt",
-        "start": 941,
-        "end": 955
+        "start": 1078,
+        "end": 1092
       }
     },
     {
@@ -6643,8 +6667,8 @@
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/channels/Billing.kt",
-        "start": 960,
-        "end": 984
+        "start": 1097,
+        "end": 1121
       }
     },
     {
@@ -6665,8 +6689,8 @@
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/channels/Billing.kt",
-        "start": 1186,
-        "end": 1241
+        "start": 1323,
+        "end": 1378
       }
     },
     {
@@ -6676,8 +6700,8 @@
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/channels/Billing.kt",
-        "start": 1059,
-        "end": 1293
+        "start": 1196,
+        "end": 1430
       }
     },
     {
@@ -6687,8 +6711,8 @@
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/channels/Billing.kt",
-        "start": 1097,
-        "end": 1157
+        "start": 1234,
+        "end": 1294
       }
     },
     {
@@ -6703,14 +6727,36 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.repoType(Order)::rabbit.convertAndSend#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.repoType(Order)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 916,
+        "end": 951
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.repoType(Order)::rabbit.convertAndSend#1",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.repoType(Order)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 960,
+        "end": 1008
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing::RabbitListener#0",
       "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing",
       "target": null,
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/channels/Billing.kt",
-        "start": 1009,
-        "end": 1311
+        "start": 1146,
+        "end": 1448
       }
     },
     {
@@ -6720,8 +6766,19 @@
       "level": null,
       "span": {
         "path": "src/main/kotlin/example/channels/Billing.kt",
-        "start": 1355,
-        "end": 1401
+        "start": 1492,
+        "end": 1538
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing::RabbitListener#2",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/channels/Billing.kt",
+        "start": 1581,
+        "end": 1618
       }
     },
     {
@@ -11949,6 +12006,10 @@
   ],
   "providers": [
     {
+      "contract": "channel::amqp::kt.repo",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.repoType(Order)::rabbit.convertAndSend#0"
+    },
+    {
       "contract": "channel::amqp::refunds",
       "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.refund(String)::rabbit.convertAndSend#0"
     },
@@ -12187,6 +12248,11 @@
     {
       "contract": "channel::amqp::refunds",
       "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)",
+      "via": null
+    },
+    {
+      "contract": "channel::amqp::kt.repo",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRepo(Order)",
       "via": null
     },
     {
@@ -12719,6 +12785,11 @@
       "exchange": "billing",
       "key": "invoice.created",
       "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.invoice(String)::rabbit.convertAndSend#0"
+    },
+    {
+      "exchange": "kx.repo",
+      "key": "kkey.repo",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.repoType(Order)::rabbit.convertAndSend#1"
     }
   ],
   "packages": [
@@ -13214,6 +13285,13 @@
       "contract": "channel::amqp::refunds",
       "level": "exact",
       "reason": "channel::amqp::refunds"
+    },
+    {
+      "consumer": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRepo(Order)",
+      "provider": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.repoType(Order)::rabbit.convertAndSend#0",
+      "contract": "channel::amqp::kt.repo",
+      "level": "exact",
+      "reason": "channel::amqp::kt.repo"
     },
     {
       "consumer": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.onNotification(String)",
@@ -15316,6 +15394,20 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRepo(Order)::channel::amqp::kt.repo",
+      "kind": "channel",
+      "label": "channel::amqp::kt.repo",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRepo(Order)"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.refund(String)",
       "kind": "export",
       "label": "example.channels.Billing.refund(String)",
@@ -15334,6 +15426,28 @@
           "via": "link",
           "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)",
           "reason": "channel::amqp::refunds"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.repoType(Order)",
+      "kind": "export",
+      "label": "example.channels.Billing.repoType(Order)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.repoType(Order)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRepo(Order)",
+          "reason": "channel::amqp::kt.repo"
         }
       ]
     },

@@ -239,6 +239,9 @@ fn java() {
             "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()",
             "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onInvoice(String)",
             "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)",
+            "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.repoType(JOrder)",
+            "maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRepo(JOrder)",
+            "maven/api/src/main/java/example/channels/Billing.java::example.channels.JOrder",
             "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery",
             "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.Delivery(JmsTemplate,SqsClient,Connection)",
             "maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.notifyCustomer(String)",
@@ -497,6 +500,7 @@ fn java_channel_clients_link_their_producers_to_their_handlers() {
         "exact channel::kafka::orders.created Sales.created(String)::kafka.send#0 -> Sales.onSale(String)",
         "exact channel::kafka::orders.paid Sales.paid(String)::kafka.send#0 -> Sales.onSale(String)",
         "inferred channel::amqp::invoices Billing.invoice(String)::rabbit.convertAndSend#0 -> Billing.onInvoice(String)",
+        "exact channel::amqp::j.repo Billing.repoType(JOrder)::rabbit.convertAndSend#0 -> Billing.onRepo(JOrder)",
         "inferred channel::amqp::audit Billing.invoice(String)::rabbit.convertAndSend#0 -> Billing.onRefund(String)",
         "exact channel::amqp::refunds Billing.refund(String)::rabbit.convertAndSend#0 -> Billing.onRefund(String)",
         "exact channel::jms::notifications Delivery.notifyCustomer(String)::jms.convertAndSend#0 -> Delivery.onNotification(String)",
@@ -510,7 +514,7 @@ fn java_channel_clients_link_their_producers_to_their_handlers() {
             "{wanted} in {links:#?}"
         );
     }
-    assert_eq!(links.len(), 10, "{links:#?}");
+    assert_eq!(links.len(), 11, "{links:#?}");
     let unresolved = |side: &str| -> Vec<String> {
         (json[side].as_array().unwrap().iter())
             .filter(|s| s["contract"] == "channel::kafka")
@@ -565,6 +569,7 @@ fn kotlin_channel_clients_link_their_producers_to_their_handlers() {
         "exact channel::kafka::orders.paid Sales.fromConfig(String)::this.kafka.send#0 -> Sales.onSale(String)",
         "exact channel::kafka::orders.shipped Sales.shipped(String)::emit#0 -> Sales.onShipped(String)",
         "inferred channel::amqp::invoices Billing.invoice(String)::rabbit.convertAndSend#0 -> Billing.onInvoice(String)",
+        "exact channel::amqp::kt.repo Billing.repoType(Order)::rabbit.convertAndSend#0 -> Billing.onRepo(Order)",
         "inferred channel::amqp::audit Billing.invoice(String)::rabbit.convertAndSend#0 -> Billing.onRefund(String)",
         "exact channel::amqp::refunds Billing.refund(String)::rabbit.convertAndSend#0 -> Billing.onRefund(String)",
         "exact channel::jms::notifications Delivery.notifyCustomer(String)::jms.convertAndSend#0 -> Delivery.onNotification(String)",
@@ -578,7 +583,7 @@ fn kotlin_channel_clients_link_their_producers_to_their_handlers() {
             "{wanted} in {links:#?}"
         );
     }
-    assert_eq!(links.len(), 12, "{links:#?}");
+    assert_eq!(links.len(), 13, "{links:#?}");
     let unresolved = |side: &str| -> Vec<String> {
         (json[side].as_array().unwrap().iter())
             .filter(|s| s["contract"] == "channel::kafka")
@@ -1596,6 +1601,9 @@ fn kotlin() {
             "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()",
             "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)",
             "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.repoType(Order)",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRepo(Order)",
+            "src/main/kotlin/example/channels/Billing.kt::example.channels.Order",
             "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery",
             "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.notifyCustomer(String)",
             "src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.onNotification(String)",

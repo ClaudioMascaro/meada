@@ -21,6 +21,11 @@ class Billing(private val rabbit: RabbitTemplate) {
         rabbit.convertAndSend("refunds", id)
     }
 
+    fun repoType(o: Order) {
+        rabbit.convertAndSend("kt.repo", o)
+        rabbit.convertAndSend("kx.repo", "kkey.repo", o)
+    }
+
     fun auditBinding(): Binding =
         BindingBuilder.bind(Queue("audit")).to(TopicExchange("billing")).with("invoice.#")
 
@@ -37,4 +42,9 @@ class Billing(private val rabbit: RabbitTemplate) {
 
     @RabbitListener(queues = ["refunds", "audit"])
     fun onRefund(message: String) {}
+
+    @RabbitListener(queues = ["kt.repo"])
+    fun onRepo(message: Order) {}
 }
+
+data class Order(val id: String)

@@ -47,7 +47,7 @@
     },
     {
       "path": "maven/api/src/main/java/example/channels/Billing.java",
-      "hash": "489fb361b1e682ac123fafd16cc8bd714bb66ce4257ef29f50f23731a247bd08"
+      "hash": "9c66bd253463a5a255d48f8973edb68e53e5fd9a188c3d1cf93e948700bee75f"
     },
     {
       "path": "maven/api/src/main/java/example/channels/Delivery.java",
@@ -864,7 +864,7 @@
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
         "start": 655,
-        "end": 1526
+        "end": 1754
       }
     },
     {
@@ -879,8 +879,8 @@
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.audit()",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1003,
-        "end": 1140
+        "start": 1149,
+        "end": 1286
       }
     },
     {
@@ -895,16 +895,24 @@
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onInvoice(String)",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1146,
-        "end": 1428
+        "start": 1292,
+        "end": 1574
       }
     },
     {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1434,
-        "end": 1524
+        "start": 1580,
+        "end": 1670
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRepo(JOrder)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 1676,
+        "end": 1752
       }
     },
     {
@@ -913,6 +921,22 @@
         "path": "maven/api/src/main/java/example/channels/Billing.java",
         "start": 914,
         "end": 997
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.repoType(JOrder)",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 1003,
+        "end": 1143
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.JOrder",
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 1756,
+        "end": 1771
       }
     },
     {
@@ -2687,8 +2711,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1043,
-        "end": 1115
+        "start": 1189,
+        "end": 1261
       }
     },
     {
@@ -2698,8 +2722,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1043,
-        "end": 1133
+        "start": 1189,
+        "end": 1279
       }
     },
     {
@@ -2709,8 +2733,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1043,
-        "end": 1082
+        "start": 1189,
+        "end": 1228
       }
     },
     {
@@ -2720,8 +2744,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1063,
-        "end": 1081
+        "start": 1209,
+        "end": 1227
       }
     },
     {
@@ -2731,8 +2755,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1086,
-        "end": 1114
+        "start": 1232,
+        "end": 1260
       }
     },
     {
@@ -2758,14 +2782,36 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.repoType(JOrder)::rabbit.convertAndSend#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.repoType(JOrder)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 1044,
+        "end": 1078
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.repoType(JOrder)::rabbit.convertAndSend#1",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.repoType(JOrder)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 1088,
+        "end": 1136
+      }
+    },
+    {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing::RabbitListener#0",
       "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing",
       "target": null,
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1146,
-        "end": 1383
+        "start": 1292,
+        "end": 1529
       }
     },
     {
@@ -2775,8 +2821,19 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Billing.java",
-        "start": 1434,
-        "end": 1480
+        "start": 1580,
+        "end": 1626
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing::RabbitListener#2",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Billing.java",
+        "start": 1676,
+        "end": 1710
       }
     },
     {
@@ -4652,6 +4709,10 @@
   ],
   "providers": [
     {
+      "contract": "channel::amqp::j.repo",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.repoType(JOrder)::rabbit.convertAndSend#0"
+    },
+    {
       "contract": "channel::amqp::refunds",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.refund(String)::rabbit.convertAndSend#0"
     },
@@ -4854,6 +4915,11 @@
       "via": null
     },
     {
+      "contract": "channel::amqp::j.repo",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRepo(JOrder)",
+      "via": null
+    },
+    {
       "contract": "channel::jms::notifications",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.onNotification(String)",
       "via": null
@@ -5038,6 +5104,11 @@
       "exchange": "billing",
       "key": "invoice.created",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.invoice(String)::rabbit.convertAndSend#0"
+    },
+    {
+      "exchange": "jx.repo",
+      "key": "jkey.repo",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.repoType(JOrder)::rabbit.convertAndSend#1"
     }
   ],
   "packages": [
@@ -5220,6 +5291,13 @@
       "contract": "channel::amqp::refunds",
       "level": "exact",
       "reason": "channel::amqp::refunds"
+    },
+    {
+      "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRepo(JOrder)",
+      "provider": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.repoType(JOrder)::rabbit.convertAndSend#0",
+      "contract": "channel::amqp::j.repo",
+      "level": "exact",
+      "reason": "channel::amqp::j.repo"
     },
     {
       "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.onNotification(String)",
@@ -6102,6 +6180,20 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRepo(JOrder)::channel::amqp::j.repo",
+      "kind": "channel",
+      "label": "channel::amqp::j.repo",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRepo(JOrder)"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.refund(String)",
       "kind": "export",
       "label": "example.channels.Billing.refund(String)",
@@ -6120,6 +6212,28 @@
           "via": "link",
           "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRefund(String)",
           "reason": "channel::amqp::refunds"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.repoType(JOrder)",
+      "kind": "export",
+      "label": "example.channels.Billing.repoType(JOrder)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.repoType(JOrder)"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRepo(JOrder)",
+          "reason": "channel::amqp::j.repo"
         }
       ]
     },
