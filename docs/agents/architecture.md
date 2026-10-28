@@ -1539,11 +1539,14 @@ one for the area a change touches.
   `files.setting` and `Facts::setting`) and takes it in `parse_with`; a file whose setting
   changed is parsed again, whatever its content. Besides `parse` and `modules`, it says what the
   shared resolution cannot guess: `members_in_scope` (bare names may name class members),
+  `guesses_constructs` (`Call::constructs` is a guess from the callee's case: a guess that is no
+  `exact` type is read again as a plain call, and a function it binds wins),
   `unordered_globs` (combine wildcard candidates, with an inside glob taking priority),
   `qualified_types` (an unbound path head may name a repository type through its layout),
   `Facts::overloads` and `Facts::constructors` (separate method and constructor families with
   written signatures), `Call::arity` and `Call::constructs`
-  (the argument count and constructor call form, kept in cached facts), `Facts::statics` (members a class wildcard
+  (the argument count and constructor call form, kept in cached facts), `Def::suspends` and
+  `Call::awaited` (Swift: a call not under `await` does not fit an `async` function), `Facts::statics` (members a class wildcard
   import takes), `Imported::Qualified` (a fully qualified definition import),
   with Java parameter types spelled from syntax tokens, excluding annotations and comments,
   and `#method` after a class-named method's signature to distinguish it from a constructor,
@@ -1797,7 +1800,11 @@ one for the area a change touches.
   requirement's file is that one definition. A capitalized callee (`Order(id:)`,
   `Order.Line()`) constructs (`Call::constructs`): the type's initializers in its body and its
   blocks (`Facts::constructors`, also the family `Type.init` for `self.init(..)`), or the type
-  itself when it declares none (a memberwise initializer). Bare calls are Kotlin's
+  itself when it declares none (a memberwise initializer). The case is a guess
+  (`LanguagePack::guesses_constructs`): a capitalized callee that binds a function instead of a
+  type is a plain call of it (`Check(1)`), and `await` decides an `async` target (`Call::awaited`
+  from the `await_expression` or `async let` around the call, up to its function or closure;
+  `Def::suspends` from the `async` of the declaration). Bare calls are Kotlin's
   (`bare_calls`).
   The values the contract kinds read (spec #29, #119; `lang/swift/values.rs`) are written for
   each call: its receiver (`a.b` of `a.b.f()`), its arguments (a label makes a keyword

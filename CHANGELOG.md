@@ -8,6 +8,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Swift call to a function with a capitalized name (`Check(1)`) resolves as a plain call, by
+  scope, labels and arity, instead of staying unresolved as constructor syntax; a name that binds
+  a type still constructs it and a name the repository does not declare stays unresolved. A
+  call not written under `await` no longer reaches a function declared `async`. The stored facts
+  of a Swift file gain `awaited` and `suspends`, so an existing index is rebuilt.
+
 - A Maven or Gradle dependency whose group or artifact names a property or variable the build
   files declare as a literal reads as that literal, and links like a written coordinate: a pom
   `<properties>` entry, `project.groupId` or `project.artifactId`, or a property of a parent pom

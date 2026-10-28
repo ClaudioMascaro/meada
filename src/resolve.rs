@@ -1137,8 +1137,9 @@ impl<'a> Resolver<'a> {
     }
 
     /// `call`, resolved. Where the pack only guesses at constructor syntax
-    /// (`LanguagePack::guesses_constructs`), a guess that reaches no type is a plain call of a
-    /// function the name binds, if it does: Swift's `Check(1)`.
+    /// (`LanguagePack::guesses_constructs`), a guess that is no `exact` type is a plain call of
+    /// the function the name binds, if it does: Swift's `Check(1)`, also a method of the type
+    /// around it. A plain `exact` call beats a name match of the guess.
     fn resolved(
         &self,
         path: &'a str,
@@ -1147,19 +1148,16 @@ impl<'a> Resolver<'a> {
         work: &mut Work<'a>,
     ) -> Resolution<'a> {
         let found = self.resolved_as(path, call, call.constructs, matching, work);
-        if !(self.guesses_constructs && call.constructs && matches!(found, Resolution::Unresolved))
-        {
+        if !(self.guesses_constructs && call.constructs) || matches!(found, Resolution::Exact(_)) {
             return found;
         }
         let plain = self.resolved_as(path, call, false, matching, work);
         let function = |t: &Target| self.defs[t.path][t.name].kind != Kind::Class;
+        let better = matches!(found, Resolution::Unresolved);
         match &plain {
-            Resolution::Exact(t) | Resolution::Inferred(t) | Resolution::Narrowed(t)
-                if function(t) =>
-            {
-                plain
-            }
-            Resolution::Ambiguous(all) if all.iter().all(function) => plain,
+            Resolution::Exact(t) if function(t) => plain,
+            Resolution::Inferred(t) | Resolution::Narrowed(t) if better && function(t) => plain,
+            Resolution::Ambiguous(all) if better && all.iter().all(function) => plain,
             _ => found,
         }
     }

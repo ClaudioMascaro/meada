@@ -3,11 +3,11 @@
   "files": [
     {
       "path": "Sources/Plain.swift",
-      "hash": "9300d641cc6579803e3ff237f3d0731f6444f232254aa5286351785cee27b31f"
+      "hash": "df5e11c1410098cf3331a447241b9e68ef462ae4b513af603befe56d1d708461"
     },
     {
       "path": "Sources/Uses.swift",
-      "hash": "669a25b37d3111e1542ef36bbe36bf2e7c7e9fa273537cab4ec7173d1bd729a4"
+      "hash": "5fcef190cd5511519a5a402eff85b0eba4326a61d1459b420dd7e6dacbb9f87c"
     },
     {
       "path": "Sources/Wrapper.swift",
@@ -24,6 +24,38 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/Plain.swift::Holder",
+      "span": {
+        "path": "Sources/Plain.swift",
+        "start": 83,
+        "end": 166
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Plain.swift::Holder.Pick()",
+      "span": {
+        "path": "Sources/Plain.swift",
+        "start": 101,
+        "end": 115
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Plain.swift::Holder.pick()",
+      "span": {
+        "path": "Sources/Plain.swift",
+        "start": 118,
+        "end": 132
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Plain.swift::Holder.use()",
+      "span": {
+        "path": "Sources/Plain.swift",
+        "start": 135,
+        "end": 164
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/Plain.swift::check(_:)",
       "span": {
         "path": "Sources/Plain.swift",
@@ -37,6 +69,14 @@
         "path": "Sources/Plain.swift",
         "start": 48,
         "end": 81
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::Load()",
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 281,
+        "end": 311
       }
     },
     {
@@ -72,6 +112,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::spawn()",
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 313,
+        "end": 400
+      }
+    },
+    {
       "id": "example.com/acme/conformance::Sources/Uses.swift::synchronous()",
       "span": {
         "path": "Sources/Uses.swift",
@@ -97,6 +145,28 @@
     }
   ],
   "calls": [
+    {
+      "id": "example.com/acme/conformance::Sources/Plain.swift::Holder.use()::Pick#0",
+      "caller": "example.com/acme/conformance::Sources/Plain.swift::Holder.use()",
+      "target": "example.com/acme/conformance::Sources/Plain.swift::Holder.Pick()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Plain.swift",
+        "start": 148,
+        "end": 154
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Plain.swift::Holder.use()::pick#0",
+      "caller": "example.com/acme/conformance::Sources/Plain.swift::Holder.use()",
+      "target": "example.com/acme/conformance::Sources/Plain.swift::Holder.pick()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Plain.swift",
+        "start": 156,
+        "end": 162
+      }
+    },
     {
       "id": "example.com/acme/conformance::Sources/Plain.swift::run()::Check#0",
       "caller": "example.com/acme/conformance::Sources/Plain.swift::run()",
@@ -139,6 +209,61 @@
         "path": "Sources/Uses.swift",
         "start": 148,
         "end": 151
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::spawn()::Load#0",
+      "caller": "example.com/acme/conformance::Sources/Uses.swift::spawn()",
+      "target": "example.com/acme/conformance::Sources/Uses.swift::Load()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 350,
+        "end": 356
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::spawn()::Load#1",
+      "caller": "example.com/acme/conformance::Sources/Uses.swift::spawn()",
+      "target": "example.com/acme/conformance::Sources/Uses.swift::Load()",
+      "level": "exact",
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 372,
+        "end": 378
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::spawn()::Load#2",
+      "caller": "example.com/acme/conformance::Sources/Uses.swift::spawn()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 390,
+        "end": 396
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::spawn()::Task#0",
+      "caller": "example.com/acme/conformance::Sources/Uses.swift::spawn()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 359,
+        "end": 380
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/Uses.swift::spawn()::Task#1",
+      "caller": "example.com/acme/conformance::Sources/Uses.swift::spawn()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/Uses.swift",
+        "start": 383,
+        "end": 398
       }
     },
     {
@@ -200,12 +325,27 @@
     {
       "name": "Sources#2",
       "members": [
+        "example.com/acme/conformance::Sources/Plain.swift::Holder.Pick()",
+        "example.com/acme/conformance::Sources/Plain.swift::Holder.pick()",
+        "example.com/acme/conformance::Sources/Plain.swift::Holder.use()"
+      ]
+    },
+    {
+      "name": "Sources#3",
+      "members": [
+        "example.com/acme/conformance::Sources/Uses.swift::Load()",
+        "example.com/acme/conformance::Sources/Uses.swift::spawn()"
+      ]
+    },
+    {
+      "name": "Sources#4",
+      "members": [
         "example.com/acme/conformance::Sources/Uses.swift::Store.init(initialState:)",
         "example.com/acme/conformance::Sources/Uses.swift::types()"
       ]
     },
     {
-      "name": "Sources#3",
+      "name": "Sources#5",
       "members": [
         "example.com/acme/conformance::Sources/Uses.swift::awaited()",
         "example.com/acme/conformance::Sources/Uses.swift::g()",
