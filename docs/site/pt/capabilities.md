@@ -25,7 +25,7 @@ Chamadas como `crate::a::f()`, `Tipo::new()` e `Self::f()` seguem o caminho escr
 
 Para `x.m()`, o Meada usa o tipo do receptor quando ele aparece em um `let`, parâmetro, campo, `self` ou retorno de função. Um `dyn Trait` ou genérico limitado por trait chega ao método do trait. Sem tipo escrito, a resolução usa o nome. Métodos ausentes dos `impl` do tipo, como os gerados por `derive` ou vindos de traits externos, não geram ligação. Atributos de rota também não ligam a funções.
 
-A análise usa a configuração padrão de cada crate para x86_64 Linux. Itens com `#[cfg(..)]` falso e features fora do `default` ficam de fora; módulos `#[cfg(test)]` entram. Chamadas dentro de macros não são indexadas. Os contratos Rust cobrem pacotes, HTTP e canais.
+A análise usa a configuração padrão de cada crate para x86_64 Linux. Itens com `#[cfg(..)]` falso e features fora do `default` ficam de fora; módulos compilados em um build de teste entram, não só os `#[cfg(test)]`. Chamadas dentro de macros não são indexadas. Os contratos Rust cobrem pacotes, HTTP e canais.
 
 ### Go
 

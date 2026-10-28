@@ -23,7 +23,11 @@
     },
     {
       "path": "api/src/gated.rs",
-      "hash": "79b74729bc4b32e847afc0aaecea6cb06cf718fc666c6d4399ff25469682a174"
+      "hash": "b91a5d0af0581ba024c2438065ba00b0bc20abfe09495331073f557b2b5f5359"
+    },
+    {
+      "path": "api/src/gated/th.rs",
+      "hash": "82abd53fb570f76f6c35090f004dc6ccfdde14181cb534d3df17635056e8f787"
     },
     {
       "path": "api/src/launch.rs",
@@ -404,6 +408,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::api/src/gated.rs::caller",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 1325,
+        "end": 1367
+      }
+    },
+    {
       "id": "example.com/acme/conformance::api/src/gated.rs::connect",
       "span": {
         "path": "api/src/gated.rs",
@@ -444,6 +456,14 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::api/src/gated.rs::th",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 1316,
+        "end": 1323
+      }
+    },
+    {
       "id": "example.com/acme/conformance::api/src/gated.rs::through_net",
       "span": {
         "path": "api/src/gated.rs",
@@ -457,6 +477,22 @@
         "path": "api/src/gated.rs",
         "start": 356,
         "end": 388
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/gated/th.rs::Client",
+      "span": {
+        "path": "api/src/gated/th.rs",
+        "start": 0,
+        "end": 18
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/gated/th.rs::Client.new",
+      "span": {
+        "path": "api/src/gated/th.rs",
+        "start": 38,
+        "end": 83
       }
     },
     {
@@ -3985,6 +4021,17 @@
         "path": "api/src/bin/tool.rs",
         "start": 51,
         "end": 63
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::api/src/gated.rs::caller::th.Client.new#0",
+      "caller": "example.com/acme/conformance::api/src/gated.rs::caller",
+      "target": "example.com/acme/conformance::api/src/gated/th.rs::Client.new",
+      "level": "exact",
+      "span": {
+        "path": "api/src/gated.rs",
+        "start": 1347,
+        "end": 1364
       }
     },
     {
@@ -14808,13 +14855,21 @@
     {
       "name": "api/src#10",
       "members": [
+        "example.com/acme/conformance::api/src/methods.rs::Counter.reset",
+        "example.com/acme/conformance::api/src/methods.rs::cleared",
+        "example.com/acme/conformance::api/src/methods.rs::named"
+      ]
+    },
+    {
+      "name": "api/src#11",
+      "members": [
         "example.com/acme/conformance::api/src/methods.rs::outside",
         "example.com/acme/conformance::api/src/methods.rs::pick",
         "example.com/acme/conformance::api/src/methods.rs::shadowed"
       ]
     },
     {
-      "name": "api/src#11",
+      "name": "api/src#12",
       "members": [
         "example.com/acme/conformance::api/src/methods.rs::wrap",
         "example.com/acme/conformance::api/src/methods.rs::wrapped"
@@ -14864,12 +14919,19 @@
     {
       "name": "api/src#4",
       "members": [
+        "example.com/acme/conformance::api/src/gated.rs::caller",
+        "example.com/acme/conformance::api/src/gated/th.rs::Client.new"
+      ]
+    },
+    {
+      "name": "api/src#5",
+      "members": [
         "example.com/acme/conformance::api/src/gated.rs::connect",
         "example.com/acme/conformance::api/src/real.rs::client"
       ]
     },
     {
-      "name": "api/src#5",
+      "name": "api/src#6",
       "members": [
         "example.com/acme/conformance::api/src/main.rs::below.go",
         "example.com/acme/conformance::api/src/main.rs::checks.compute",
@@ -14889,7 +14951,7 @@
       ]
     },
     {
-      "name": "api/src#6",
+      "name": "api/src#7",
       "members": [
         "example.com/acme/conformance::api/src/methods.rs::Build.make",
         "example.com/acme/conformance::api/src/methods.rs::Build.seed",
@@ -14898,7 +14960,7 @@
       ]
     },
     {
-      "name": "api/src#7",
+      "name": "api/src#8",
       "members": [
         "example.com/acme/conformance::api/src/methods.rs::Counter.Build.seed",
         "example.com/acme/conformance::api/src/methods.rs::Counter.bump",
@@ -14918,7 +14980,7 @@
       ]
     },
     {
-      "name": "api/src#8",
+      "name": "api/src#9",
       "members": [
         "example.com/acme/conformance::api/src/methods.rs::Counter.Probe.probe",
         "example.com/acme/conformance::api/src/methods.rs::Counter.read",
@@ -14932,14 +14994,6 @@
         "example.com/acme/conformance::api/src/methods.rs::opaque_impl",
         "example.com/acme/conformance::api/src/methods.rs::probed",
         "example.com/acme/conformance::api/src/methods.rs::shared"
-      ]
-    },
-    {
-      "name": "api/src#9",
-      "members": [
-        "example.com/acme/conformance::api/src/methods.rs::Counter.reset",
-        "example.com/acme/conformance::api/src/methods.rs::cleared",
-        "example.com/acme/conformance::api/src/methods.rs::named"
       ]
     },
     {

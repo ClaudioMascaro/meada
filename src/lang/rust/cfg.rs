@@ -1,8 +1,8 @@
 //! Conditional compilation (spec #30): whether a `#[cfg(..)]` predicate holds for the one
 //! target Meada indexes, `x86_64` Linux, with the default features of the crate. Nothing
 //! depends on the machine that runs Meada, and a predicate this module does not know is false.
-//! `test` is false, as in a build of the crate itself. The one predicate `cfg(test)` holds
-//! (`holds`), for the caller to keep test modules and nothing else under it (`only_test`).
+//! `test` is a parameter of `holds`: the caller asks with it false, as in a build of the crate
+//! itself, and with it true, to keep the modules a test build compiles and nothing else.
 
 use std::collections::BTreeSet;
 
@@ -20,22 +20,15 @@ pub const PREDICATE_DEPTH: usize = 64;
 pub const FEATURES: usize = 4096;
 
 /// Whether the text after `cfg`, `(unix, not(feature = "x"))` with its parentheses, holds with
-/// `features` enabled. A malformed or too deep predicate is false.
-pub fn holds(predicate: &str, features: &BTreeSet<String>) -> bool {
-    if only_test(predicate) {
-        return true;
-    }
+/// `features` enabled and `test` set as given. A malformed or too deep predicate is false.
+pub fn holds(predicate: &str, features: &BTreeSet<String>, test: bool) -> bool {
     let mut at = Reader {
         tokens: tokens(predicate),
         next: 0,
         features,
+        test,
     };
     at.open() && at.predicate(0) == Some(true) && at.close() && at.next == at.tokens.len()
-}
-
-/// Whether the predicate is exactly `(test)`.
-pub fn only_test(predicate: &str) -> bool {
-    predicate.split_whitespace().collect::<String>() == "(test)"
 }
 
 /// The default features of a manifest: `default`, the names it lists, and the ones those enable
@@ -137,6 +130,7 @@ struct Reader<'s, 'f> {
     tokens: Vec<Token<'s>>,
     next: usize,
     features: &'f BTreeSet<String>,
+    test: bool,
 }
 
 impl Reader<'_, '_> {
@@ -169,7 +163,10 @@ impl Reader<'_, '_> {
             return Some(self.pair(name, value));
         }
         if !self.open() {
-            return Some(matches!(name, "unix" | "debug_assertions" | "true"));
+            return Some(
+                matches!(name, "unix" | "debug_assertions" | "true")
+                    || (name == "test" && self.test),
+            );
         }
         if depth >= PREDICATE_DEPTH {
             return None;
@@ -213,15 +210,24 @@ mod tests {
     use super::*;
 
     fn on(predicate: &str) -> bool {
-        holds(predicate, &["net".to_string()].into())
+        holds(predicate, &["net".to_string()].into(), false)
+    }
+
+    #[test]
+    fn test_is_a_parameter() {
+        let features = ["net".to_string()].into();
+        let with = |p: &str, test| holds(p, &features, test);
+        assert!(!with("(test)", false) && with("(test)", true));
+        assert!(with("(any(test, feature = \"p\"))", true));
+        assert!(!with("(any(test, feature = \"p\"))", false));
+        assert!(!with("(all(test, feature = \"p\"))", true));
+        assert!(with("(not(test))", false) && !with("(not(test))", true));
     }
 
     #[test]
     fn the_fixed_target_decides_the_atoms() {
         for yes in [
             "(unix)",
-            "(test)",
-            "(  test )",
             "(not(test))",
             "(true)",
             "(not(false))",
@@ -249,6 +255,7 @@ mod tests {
             "(panic = \"abort\")",
             "(made_up)",
             "(false)",
+            "(test)",
             "(all(test, unix))",
             "(target_has_atomic = \"128\")",
             "(target_feature = \"avx512f\")",
