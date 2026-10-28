@@ -102,7 +102,8 @@ pub fn label(id: &str) -> &str {
 }
 
 /// `<repository>::<path>::<Class>.<method>` of a symbol id that names a method, without its
-/// parameters; a free function has no class, so no key.
+/// parameters. A name with no dot (a free function of no package) has no key; top-level
+/// overloads of one file, whose names carry the package, are a set like a class's.
 fn overload_key(id: &str) -> Option<&str> {
     let name = id.splitn(3, "::").nth(2)?;
     let key = id.get(..id.len() - name.len())?;
@@ -176,4 +177,32 @@ pub fn section(name: &str, items: Vec<String>) -> Vec<String> {
     let mut lines = vec![format!("{name}:")];
     lines.extend(items);
     lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn overloads_of_one_file_class_and_name_are_one_set() {
+        let ids = vec![
+            "r::A.java::ex.A.m(int)",
+            "r::A.java::ex.B.m(int)",
+            "r::A.java::ex.A.m(String)",
+            "r::B.java::ex.A.m(long)",
+            "r::A.java::f",
+        ];
+        let sets = overload_sets(ids, |id| id);
+        let sets: Vec<Vec<&str>> = sets;
+        assert_eq!(
+            sets,
+            vec![
+                vec!["r::A.java::ex.A.m(int)", "r::A.java::ex.A.m(String)"],
+                vec!["r::A.java::ex.B.m(int)"],
+                vec!["r::B.java::ex.A.m(long)"],
+                vec!["r::A.java::f"],
+            ]
+        );
+        assert_eq!(overload_name("r::A.java::ex.A.m(int)"), "ex.A.m");
+    }
 }
