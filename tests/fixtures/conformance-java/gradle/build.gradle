@@ -1,6 +1,7 @@
 group = 'example'
 
-// A computed coordinate: every artifact of the workspace whose literal parts fit, ambiguous.
+// A name the script assigns once to a plain string reads as that string: a written coordinate,
+// linked exact to its one provider.
 def suffix = 'pi'
 dependencies {
     implementation "example:a${suffix}"
