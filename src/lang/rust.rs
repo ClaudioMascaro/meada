@@ -2253,6 +2253,9 @@ mod tests {
         assert!(file.unbuilt && file.defs.is_empty());
         let file = facts("// note\n#![cfg(unix)]\nfn a() {}\n");
         assert!(!file.unbuilt && file.defs.len() == 1);
+        // A file is a module: one a test build compiles stays.
+        let file = facts("#![cfg(any(test, feature = \"p\"))]\nfn a() {}\n");
+        assert!(!file.unbuilt);
         let src = "mod m {\n#![cfg(windows)]\nfn a() {}\n}\nmod n {\n#![cfg(unix)]\nfn b() {}\n}\n";
         let names: Vec<String> = facts(src).defs.into_iter().map(|d| d.name).collect();
         assert_eq!(names, ["n", "n.b"]);
