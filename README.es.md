@@ -22,7 +22,8 @@ Elija Cargo, un binario, el instalador, npm o un contenedor en la guía completa
 `meada export` imprime el índice de un repositorio como JSON ordenado, bueno para `diff` y para
 alimentar una base de conocimiento. Por repositorio trae los símbolos (identidad estable y
 span), las llamadas con sus niveles, proveedores y consumidores, links, imports, comunidades,
-procesos y puntos de entrada. No trae texto fuente: quien necesita el fragmento lee el span en el archivo.
+procesos y puntos de entrada. No trae texto fuente: quien necesita el fragmento lee el span
+en el archivo.
 
 Un registro por símbolo, con su comunidad, quién lo llama y a quién llama, contratos y procesos:
 
@@ -50,9 +51,10 @@ sigue las mismas listas.
   los nombres exportados y los consumidores de paquete (`packages`, `dependencies`, `imports`).
 
 ```sh
-jq -s '[.[] | (.calls[]? | select(.target) | {target, kind: "calls"}),
-              (.links[]? | {target: .provider, kind: "links"}),
-              (.imports[]? | {target, kind: "imports"})]
+jq -s '[.[] | (.calls[]? | select(.target) | {site: .id, target, kind: "calls"}),
+              (.links[]? | {site: .consumer, target: .provider, kind: "links"}),
+              (.imports[]? | {site, target, kind: "imports"})]
+  | unique_by([.kind, .site, .target])
   | group_by(.target)
   | map(. as $g | {target: $g[0].target}
       + ([$g[].kind] | group_by(.) | map({(.[0]): length}) | add))' *.export.json

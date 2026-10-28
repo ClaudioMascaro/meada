@@ -50,9 +50,10 @@ segue as mesmas listas.
   nomes exportados e os consumidores de pacote (`packages`, `dependencies`, `imports`).
 
 ```sh
-jq -s '[.[] | (.calls[]? | select(.target) | {target, kind: "calls"}),
-              (.links[]? | {target: .provider, kind: "links"}),
-              (.imports[]? | {target, kind: "imports"})]
+jq -s '[.[] | (.calls[]? | select(.target) | {site: .id, target, kind: "calls"}),
+              (.links[]? | {site: .consumer, target: .provider, kind: "links"}),
+              (.imports[]? | {site, target, kind: "imports"})]
+  | unique_by([.kind, .site, .target])
   | group_by(.target)
   | map(. as $g | {target: $g[0].target}
       + ([$g[].kind] | group_by(.) | map({(.[0]): length}) | add))' *.export.json
