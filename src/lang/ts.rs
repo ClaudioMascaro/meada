@@ -306,12 +306,12 @@ struct Aliases {
 
 impl Aliases {
     fn parse(dir: &str, src: &[u8]) -> Self {
-        let none = Self {
+        let empty = Self {
             dir: dir.to_string(),
             ..Self::default()
         };
         let Some(config) = package::tsconfig_root(src) else {
-            return none;
+            return empty;
         };
         let options = &config["compilerOptions"];
         let paths = options["paths"]
@@ -327,7 +327,7 @@ impl Aliases {
         Self {
             base_url: options["baseUrl"].as_str().and_then(|b| join(dir, b)),
             paths,
-            ..none
+            ..empty
         }
     }
 
@@ -1304,6 +1304,7 @@ mod tests {
                     ("app/node_modules/p/tsconfig.json", hidden.as_bytes()),
                     ("app/jsconfig.json", js.as_bytes()),
                     ("web/jsconfig.json", js.as_bytes()),
+                    ("bad/tsconfig.json", b"{ not json"),
                 ],
                 &BTreeMap::new(),
             )
@@ -1313,6 +1314,8 @@ mod tests {
         assert!(has("app/src/a.ts", "app/src/b.ts"));
         assert!(!has("app/src/a.ts", "app/js/b.ts"));
         assert!(has("web/a.ts", "web/js/b.ts"));
+        // A hostile nested config declares nothing, and hides the root's aliases from its subtree.
+        assert!(modules("bad/a.ts", "@/b").is_empty());
         assert!(!has("app/node_modules/p/a.ts", "app/node_modules/p/x/b.ts"));
     }
 
