@@ -19,6 +19,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- `context` and `trace` show the overloads of one method (an ambiguous call whose candidates share a
+  file, a class and a name) as one set: `Class.m (one of N overloads)` in `context`, a leaf
+  `Class.m (N overloads)` in `trace`. The level, target and candidates in the export do not change.
 - A workspace of any number of repositories opens and answers: each index is read through its
   own connection, so the limit of eleven repositories (SQLite attaches ten databases to one
   connection) and its error are gone. Answers and exports of a workspace of eleven or fewer

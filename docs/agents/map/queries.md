@@ -110,6 +110,9 @@ modules updates it.
   or more is listed when any member's name or path matches: a header `<n> copies`, then one
   symbol line per member by identity; groups by span length descending, then smallest member
   identity. A duplicated class lists its methods as groups of their own.
+- Overload sets (#397): `render::overload_sets` groups ambiguous candidates sharing file, class
+  and method name. `context` writes a set as one callee line; `trace` writes it as one leaf
+  (`Walk::call_down`, `Walk::show`) and does not descend into its overloads.
 - Communities and processes in `search` and `context` (spec #31): `search` kind `community`
   (`search_communities`, an early branch) lists `<repository> <name> (members: <n>)`, matched by
   name; kind `process` (`search_processes`) lists `<repository> <label> process::<identity>

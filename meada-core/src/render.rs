@@ -103,13 +103,19 @@ pub fn label(id: &str) -> &str {
 
 /// `<repository>::<path>::<Class>.<method>` of a symbol id that names a method, without its
 /// parameters. A name with no dot (a free function of no package) has no key; top-level
-/// overloads of one file, whose names carry the package, are a set like a class's.
+/// overloads of one file, whose names carry the package, are a set like a class's. A name
+/// that continues after its parameters (a route handler inside `module()`) names a nested
+/// symbol, not an overload, and has no key.
 fn overload_key(id: &str) -> Option<&str> {
     let name = id.splitn(3, "::").nth(2)?;
     let key = id.get(..id.len() - name.len())?;
-    let method = name.split('(').next()?;
-    method
-        .contains('.')
+    let (method, params) = name.split_once('(')?;
+    let mut depth = 1;
+    let closes = params.char_indices().find(|&(_, c)| {
+        depth += i32::from(c == '(') - i32::from(c == ')');
+        depth == 0
+    });
+    (method.contains('.') && closes.is_some_and(|(i, _)| i + 1 == params.len()))
         .then(|| &id[..key.len() + method.len()])
 }
 
@@ -204,5 +210,17 @@ mod tests {
             ]
         );
         assert_eq!(overload_name("r::A.java::ex.A.m(int)"), "ex.A.m");
+    }
+
+    #[test]
+    fn a_symbol_nested_in_a_method_is_not_an_overload() {
+        let ids = vec![
+            "r::A.kt::ex.A.m().GET /",
+            "r::A.kt::ex.A.m().GET /b",
+            "r::A.kt::ex.A.m((Int) -> Unit)",
+            "r::A.kt::ex.A.m(String)",
+        ];
+        let sets: Vec<Vec<&str>> = overload_sets(ids, |id| id);
+        assert_eq!(sets.iter().map(Vec::len).collect::<Vec<_>>(), [1, 1, 2]);
     }
 }

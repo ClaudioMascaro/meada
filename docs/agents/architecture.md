@@ -2421,7 +2421,8 @@ qualification budget does (ADR 0017).
   regular file of at most `SOURCE_MAX` (16 MiB); anything else renders as unavailable, the path
   without its line, as a missing file does. An answer keeps each file it reads, so several
   large files add up.
-- `engine.rs`: `search` scans every symbol.
+- `engine.rs`: `search` scans every symbol. Kind `duplicate` folds no nested groups (a duplicated
+  class and each of its methods are groups of their own) and has no minimum span size (#254).
 - `index.rs`: every contract is extracted again and every call resolved again on any change
   (rows rewritten only when they differ), and every file whose values the last extraction read
   (`valued`) is parsed again for it: on this repository, a one-line edit of a Rust file parses

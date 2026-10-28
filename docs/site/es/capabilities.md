@@ -17,7 +17,7 @@ El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [rete
 | C# | `.cs`, agrupados en proyectos por los `.csproj` de estilo SDK y resueltos por sus `namespace` |
 | Swift | `.swift` (salvo `Package.swift` y `Package@swift-<versión>.swift`), agrupados en módulos por los targets de `Package.swift` |
 
-Una anotación (Java, Kotlin), un atributo (C#, Rust) o un decorador (Python) escrito sobre una definición es una llamada del ámbito que la envuelve, en el nivel en que resuelve. El sitio de llamada del export nombra la definición que decora (`decorates`) y `context` la lista aparte, en `annotations:`, no entre los callees.
+Una anotación (Java, Kotlin), un atributo (C#, o un atributo de ruta de Rust) o un decorador (Python) escrito sobre una definición es una llamada del ámbito que la envuelve, en el nivel en que resuelve. El sitio de llamada del export nombra la definición que decora (`decorates`) y `context` la lista aparte, en `annotations:`, no entre los callees.
 
 ### TypeScript y JavaScript
 
