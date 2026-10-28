@@ -1569,7 +1569,10 @@ sample.kt
       ],
       "bases": [
         "Store.Companion"
-      ]
+      ],
+      "result": {
+        "Type": "Store"
+      }
     },
     {
       "name": "example.Store.save(Int,vararg String)",
@@ -1605,7 +1608,10 @@ sample.kt
         "start": 180,
         "end": 207
       },
-      "params": []
+      "params": [],
+      "result": {
+        "Type": "Store"
+      }
     },
     {
       "name": "example.helper()",
@@ -1614,7 +1620,10 @@ sample.kt
         "start": 217,
         "end": 260
       },
-      "params": []
+      "params": [],
+      "result": {
+        "Type": "Store"
+      }
     },
     {
       "name": "example.Clock",
@@ -1623,7 +1632,10 @@ sample.kt
         "start": 262,
         "end": 280
       },
-      "params": []
+      "params": [],
+      "result": {
+        "Type": "Clock"
+      }
     },
     {
       "name": "example.Timer",
@@ -1632,7 +1644,10 @@ sample.kt
         "start": 282,
         "end": 300
       },
-      "params": []
+      "params": [],
+      "result": {
+        "Type": "Timer"
+      }
     },
     {
       "name": "example.OnlySecondary",
@@ -1641,7 +1656,10 @@ sample.kt
         "start": 302,
         "end": 352
       },
-      "params": []
+      "params": [],
+      "result": {
+        "Type": "OnlySecondary"
+      }
     },
     {
       "name": "example.OnlySecondary.OnlySecondary(Int)",
@@ -1655,7 +1673,10 @@ sample.kt
           "name": "a",
           "binds": "Any"
         }
-      ]
+      ],
+      "result": {
+        "Type": "OnlySecondary"
+      }
     }
   ],
   "overloads": {
@@ -2012,6 +2033,7 @@ sample.kt
   ],
   "externs": [
     "Int",
+    "Store",
     "String"
   ],
   "private": [

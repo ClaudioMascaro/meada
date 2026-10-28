@@ -2166,8 +2166,11 @@ one for the area a change touches.
   told by name (a function of the repository called `apply` is not told apart), and a receiver
   is known when it is a name with a written type, a constructor call `T(..)` or an `apply` or
   `also` chain of them; any other (a call's result, a property chain) leaves the lambda as any
-  other. A function's result type is not read (`Def::result` is empty), so `make().m()` and a
-  local initialized with `make()` are name matches. A typealias is no class of the repository:
+  other. A function's written return type is its `Def::result` (`Box?` and `Box<T>` name `Box`; none
+  for an expression body, a type parameter or a function type), and a class and each secondary
+  constructor give their class, so a call made on a call (`make().m()`, `Box().m()`, also
+  through `?.`, `!!` and a property) has `Call::on` and resolves within that class's family. A
+  local initialized with `make()` is a name match. A typealias is no class of the repository:
   a receiver typed by one is outside it, and resolves to nothing. A name bound twice in one
   scope with different types, or named like a property, holds an unknown type. A call `X.f(..)`
   is read as a constructor only when `f` is capitalized, as Kotlin names classes. An import alias
