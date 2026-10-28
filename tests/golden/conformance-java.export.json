@@ -98,6 +98,10 @@
       "hash": "86fa7519dda8e53b81442fdadc1f96cc2657a7f123352880b52e844b48513c67"
     },
     {
+      "path": "maven/api/src/main/java/example/declarative/Qualified.java",
+      "hash": "9058c30dd1a0adf3f9e78b3429522a7816e971c59c67100aa1468dab4381a78c"
+    },
+    {
       "path": "maven/api/src/main/java/example/declarative/Remotes.java",
       "hash": "b7f50f0b81a815d288e3f51361421130f58dc3b831118016b0b3d5fb5e69dcf0"
     },
@@ -140,6 +144,10 @@
     {
       "path": "maven/api/src/main/java/example/web/Plain.java",
       "hash": "d97efd35977b7b082ee9f1a6114c2dbcd72e4b3262ec7412848c6b11b1afa726"
+    },
+    {
+      "path": "maven/api/src/main/java/example/web/QualifiedController.java",
+      "hash": "d54284c4c68a46fc7071d79462b444c9163a8ac5bb1c747af1e90f87f21e92cf"
     },
     {
       "path": "maven/api/src/main/java/example/web/Wildcard.java",
@@ -1364,6 +1372,22 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Qualified.java::example.declarative.Qualified",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Qualified.java",
+        "start": 87,
+        "end": 163
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Qualified.java::example.declarative.Qualified.a()",
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Qualified.java",
+        "start": 120,
+        "end": 161
+      }
+    },
+    {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes",
       "span": {
         "path": "maven/api/src/main/java/example/declarative/Remotes.java",
@@ -1673,6 +1697,30 @@
         "path": "maven/api/src/main/java/example/web/Plain.java",
         "start": 554,
         "end": 631
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/QualifiedController.java",
+        "start": 114,
+        "end": 480
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController.s()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/QualifiedController.java",
+        "start": 209,
+        "end": 303
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController.x()",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/QualifiedController.java",
+        "start": 397,
+        "end": 478
       }
     },
     {
@@ -3667,6 +3715,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Qualified.java::example.declarative.Qualified::retrofit2.http.GET#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Qualified.java::example.declarative.Qualified",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/declarative/Qualified.java",
+        "start": 120,
+        "end": 145
+      }
+    },
+    {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes.ledger()::(expression).baseUrl#0",
       "caller": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Remotes.java::example.declarative.Remotes.ledger()",
       "target": null,
@@ -4082,6 +4141,39 @@
         "path": "maven/api/src/main/java/example/web/Plain.java",
         "start": 376,
         "end": 391
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController::example.declarative.shadow.GetMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController",
+      "target": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/GetMapping.java::example.declarative.shadow.GetMapping",
+      "level": "exact",
+      "span": {
+        "path": "maven/api/src/main/java/example/web/QualifiedController.java",
+        "start": 397,
+        "end": 441
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController::org.springframework.web.bind.annotation.GetMapping#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/QualifiedController.java",
+        "start": 209,
+        "end": 266
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/web/QualifiedController.java::example.web::org.springframework.web.bind.annotation.RestController#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/web/QualifiedController.java::example.web",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/web/QualifiedController.java",
+        "start": 114,
+        "end": 169
       }
     },
     {
@@ -4660,6 +4752,10 @@
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Unreadable.known()"
     },
     {
+      "contract": "http::GET::/s",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController.s()"
+    },
+    {
       "contract": "http::GET::/v1/pages/{}",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/web/PageController.java::example.web.PageController.page()"
     },
@@ -4916,6 +5012,11 @@
       "contract": "http::POST::/api/orders",
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/OrdersClient.java::example.declarative.OrdersClient.place(String)",
       "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::GET::/ja",
+      "site": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Qualified.java::example.declarative.Qualified.a()",
+      "via": null
     }
   ],
   "bindings": [
@@ -5071,7 +5172,8 @@
       "name": "maven/api/src/main/java/example/declarative/shadow",
       "members": [
         "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/GetMapping.java::example.declarative.shadow.GetMapping",
-        "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Hidden.java::example.declarative.shadow.Hidden"
+        "example.com/acme/conformance::maven/api/src/main/java/example/declarative/shadow/Hidden.java::example.declarative.shadow.Hidden",
+        "example.com/acme/conformance::maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController"
       ]
     },
     {
@@ -6858,6 +6960,29 @@
       ]
     },
     {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Qualified.java::example.declarative.Qualified.a()",
+      "kind": "export",
+      "label": "example.declarative.Qualified.a()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Qualified.java::example.declarative.Qualified.a()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Qualified.java::example.declarative.Qualified.a()",
+          "mark": "no-provider",
+          "contract": "http::GET::/ja"
+        }
+      ]
+    },
+    {
       "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Statements.java::example.declarative.Statements.Statements(OrdersClient,BillingClient)",
       "kind": "export",
       "label": "example.declarative.Statements.Statements(OrdersClient,BillingClient)",
@@ -7210,6 +7335,34 @@
           "level": null,
           "via": "entry",
           "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/Plain.java::example.web.Unreadable.known()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController.s()::http::GET::/s",
+      "kind": "route",
+      "label": "GET /s",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController.s()"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController.x()",
+      "kind": "export",
+      "label": "example.web.QualifiedController.x()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::maven/api/src/main/java/example/web/QualifiedController.java::example.web.QualifiedController.x()"
         }
       ]
     },

@@ -150,6 +150,10 @@
       "hash": "2663683e51821ab4515143bd1c03621a1595f7b7b31c8a854b9e635b5705422a"
     },
     {
+      "path": "src/main/kotlin/example/declarative/Qualified.kt",
+      "hash": "44cf4e5978a9f739c947c13ad872c588e815086cb01aaa84a175b5db473405d9"
+    },
+    {
       "path": "src/main/kotlin/example/declarative/Reified.kt",
       "hash": "9f1d91f93a03419314a0e4efd11cd0e4527a9fcf6d207940adf1e845e3ae0abf"
     },
@@ -2649,6 +2653,22 @@
         "path": "src/main/kotlin/example/declarative/Orphan.kt",
         "start": 147,
         "end": 190
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified",
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Qualified.kt",
+        "start": 86,
+        "end": 158
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified.a()",
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Qualified.kt",
+        "start": 112,
+        "end": 156
       }
     },
     {
@@ -8773,6 +8793,17 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified::retrofit2.http.GET#0",
+      "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/main/kotlin/example/declarative/Qualified.kt",
+        "start": 112,
+        "end": 136
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.archive()::retrofit.create#0",
       "caller": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.archive()",
       "target": null,
@@ -12506,6 +12537,11 @@
     {
       "contract": "http::GET::/orphan",
       "site": "example.com/acme/conformance::src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan.get()",
+      "via": null
+    },
+    {
+      "contract": "http::GET::/a",
+      "site": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified.a()",
       "via": null
     },
     {
@@ -17086,6 +17122,29 @@
             "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.create()",
             "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()"
           ]
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified.a()",
+      "kind": "export",
+      "label": "example.declarative.Qualified.a()",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified.a()"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified.a()",
+          "mark": "no-provider",
+          "contract": "http::GET::/a"
         }
       ]
     },
