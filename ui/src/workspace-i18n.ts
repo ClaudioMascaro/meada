@@ -14,6 +14,15 @@ export const workspaceCopy = {
     actions: 'Ações', apply: 'Aplicar versão', rollback: 'Reverter workspace',
     rollbackTitle: 'Reverter o workspace no próximo refresh', confirmApply: 'Confirmar aplicação', confirmRollback: 'Confirmar reversão',
     rollbackNotice: 'As entradas desta versão anterior serão usadas no próximo refresh.',
+    state: 'Estado', owner: 'Time responsável', noOwner: 'Sem time', owners: 'Times das entradas', entryState: 'Entradas que você pode alterar',
+    mayChange: 'Pode alterar', readOnly: 'Somente leitura', reasonLabel: 'Motivo',
+    reason_outside_grant: 'fora do seu acesso', reason_ownerless: 'a entrada não tem time responsável', reason_owner_change: 'o time responsável não pode ser alterado', reason_not_your_team: 'pertence a outro time',
+    change_add: 'adição', change_edit: 'edição', change_remove: 'remoção',
+    refusedMark: 'Recusada', refusedSummary: 'Há alterações recusadas: o salvamento fica desabilitado até desfazê-las.',
+    teamHint: 'Só as entradas dos seus times e as que você pode ler aparecem aqui; as demais ficam como estão.',
+    apiRefused: 'O servidor recusou estas entradas', hiddenRefused: 'Entradas fora do seu acesso também recusadas',
+    roleLost: 'Seu papel mudou: você não pode mais editar o workspace. O editor ficou somente leitura.',
+    authorizedBy: 'Autorizado pelos times', noTeams: 'nenhum time (nada dos seus times muda)',
     added: 'Adicionadas', removed: 'Removidas', changed: 'Alteradas', entry: 'Entrada', key: 'Chaves alteradas',
   },
   en: {
@@ -31,7 +40,18 @@ export const workspaceCopy = {
     actions: 'Actions', apply: 'Apply version', rollback: 'Roll back workspace',
     rollbackTitle: 'Roll back workspace for the next refresh', confirmApply: 'Confirm apply', confirmRollback: 'Confirm rollback',
     rollbackNotice: 'The entries from this older version will be used by the next refresh.',
+    state: 'State', owner: 'Owner', noOwner: 'No owner', owners: 'Entry owners', entryState: 'Entries you can change',
+    mayChange: 'May change', readOnly: 'Read only', reasonLabel: 'Reason',
+    reason_outside_grant: 'outside your access', reason_ownerless: 'the entry has no owner', reason_owner_change: 'the owner cannot be changed', reason_not_your_team: 'owned by another team',
+    change_add: 'addition', change_edit: 'edit', change_remove: 'removal',
+    refusedMark: 'Refused', refusedSummary: 'Some changes are refused: saving stays disabled until they are undone.',
+    teamHint: 'Only the entries your teams own and the ones you can read appear here; the others stay as they are.',
+    apiRefused: 'The server refused these entries', hiddenRefused: 'Entries outside your access also refused',
+    roleLost: 'Your role changed: you can no longer edit the workspace. The editor is read-only.',
+    authorizedBy: 'Authorized by the teams', noTeams: 'no team (nothing in your teams changes)',
     added: 'Added', removed: 'Removed', changed: 'Changed', entry: 'Entry', key: 'Changed keys',
   },
 };
 export type WorkspaceCopy = typeof workspaceCopy.en;
+/** The copy of a refusal's reason or change; an unknown one shows as the server sent it. */
+export const word = (t: WorkspaceCopy, kind: 'reason' | 'change', value: string) => (t as Record<string, string>)[`${kind}_${value}`] ?? value;

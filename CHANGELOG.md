@@ -8,6 +8,45 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- An entry of a workspace version may name the team that answers for its repository with
+  `owner = "<OIDC group>"` (ADR 0015): one string of 1 to 256 characters, no control character, no
+  whitespace at either end, compared exactly. It is imported, stored, shown (right after `path`)
+  and pulled like the entry's other keys, and changes the version id; an entry without it keeps
+  its id, and generation and bundle ids never read it. `meada index` ignores it. In a bootstrap
+  manifest's own `[[repository]]` entries it is an error naming `source = "store"`.
+- `meada-core` decides what a subject may change in a workspace version (ADR 0015):
+  `authorize_entries` lists each entry a team operator may not add, edit or remove with its
+  reason (`outside_grant`, `ownerless`, `owner_change`, `not_your_team`), and `compose_entries`
+  builds the version a team operator's save stores, keeping every entry outside its grant in
+  place. The browser gets both through WebAssembly. The apply path checks a team operator under
+  the refresh lock against the version then current; `meada workspace apply` acts as the global
+  operator, so its output and exit codes do not change.
+- The console has a team operator (ADR 0015): with `[oidc]` carrying `groups_claim`, `[ui]
+  operations = true` and `[workspace] source = "store"`, a subject one of whose groups owns an
+  entry of the current workspace version that its grant reads. It sees what a viewer with its
+  grant sees and may save and apply changes to its teams' entries; `pointer` and `fence/recover`
+  stay the global operator's. Any other change is a 403 `entries_refused` naming each entry
+  with its change and reason (an apply counts the entries outside the grant in `hidden`) and
+  writing nothing. `GET /api/v1/session` gains `groups` and `grant` with `[oidc]` and `teams`
+  for a team operator, and its `role` may be `team_operator`. A team operator's write logs
+  `ui: <subject> as <owners> <action> <arguments>: <outcome>`.
+- The console's workspace editor serves a team operator (ADR 0015): it holds only the entries its
+  grant reads, each with its owner and whether it may change it and why not, marks every change
+  the API would refuse in the diff as it types (computed by `authorize_entries` and
+  `compose_entries` in WebAssembly, in pt-BR and English) and disables the save while one stands.
+  Its save and apply confirmations name the teams that authorize them instead of a CLI command,
+  a 403 `entries_refused` shows the server's entries and the hidden count, a lost role turns the
+  editor read-only, and apply is offered only when the entries it reads authorize it. Every role
+  sees each entry's owner on the versions page, where an owner change lists as the changed key
+  `repository.owner` like any other. `meada-core` exports `entriesJson` to WebAssembly.
+- The console documentation gains a Teams section in three languages (shared trust, the `owner`
+  key, roles, delegation, the `[oidc.groups]` mapping, static manifests, the CLI twins, owner-only
+  applies, position and the whole-publication abort), and the Compose and Helm console profiles
+  map an example team group. Team ownership as a whole (the `owner` key, the `team_operator` role,
+  the session's `groups`, `grant` and `teams`, the `entries_refused` refusal) is additive under
+  Spec R1's stability rule: a minor change.
+- ADR 0020 and the glossary record the direction of spec S5: a named query context over shared
+  indexing and publication.
 - `meada status` ends a repository's lines with a pointer to the new `inference` issue form when the
   repository holds a shape drift or an `inferred` link, so a wrong conclusion can be reported.
   The MCP tools never print it.
@@ -19,6 +58,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- A refresh publishes the whole workspace or nothing (ADR 0012, #316): a failed fetch or index
+  stops it before publication and the current generation stays served. `meada index --workspace`
+  ends its failures with `index failed for <n> repositories`, and the Compose `fetch.sh` names
+  the repository and stage of a failed fetch and refuses a `REPOSITORIES` URL carrying
+  credentials, without echoing it.
 - `context` and `trace` show the overloads of one method (an ambiguous call whose candidates share a
   file, a class and a name) as one set: `Class.m (one of N overloads)` in `context`, a leaf
   `Class.m (N overloads)` in `trace`. The level, target and candidates in the export do not change.

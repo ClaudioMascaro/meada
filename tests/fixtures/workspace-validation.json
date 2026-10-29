@@ -103,5 +103,1711 @@
         "entries: a.com/../x: não é uma identidade de repositório: um segmento está vazio ou é `.` ou `..`"
       ]
     }
+  },
+  {
+    "name": "owner not a string",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = 1\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.owner`: must be one string, the name of one group"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.owner`: deve ser uma única string, o nome de um grupo"
+      ]
+    }
+  },
+  {
+    "name": "owner an array",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = [\"a\", \"b\"]\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.owner`: must be one string, the name of one group"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.owner`: deve ser uma única string, o nome de um grupo"
+      ]
+    }
+  },
+  {
+    "name": "owner empty",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \"\"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.owner`: is empty"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.owner`: está vazio"
+      ]
+    }
+  },
+  {
+    "name": "owner over 256 characters",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \"ggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg\"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.owner`: is longer than 256 characters"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.owner`: tem mais de 256 caracteres"
+      ]
+    }
+  },
+  {
+    "name": "owner with a control character",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \"te\\u0007am\"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.owner`: holds a control character"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.owner`: contém um caractere de controle"
+      ]
+    }
+  },
+  {
+    "name": "owner with a leading space",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \" team\"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.owner`: has whitespace at either end"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.owner`: tem espaço em branco numa das pontas"
+      ]
+    }
+  },
+  {
+    "name": "owner with a trailing space",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \"team \"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.owner`: has whitespace at either end"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.owner`: tem espaço em branco numa das pontas"
+      ]
+    }
+  },
+  {
+    "name": "owner of 256 characters",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \"gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg\"\n",
+    "errors": {
+      "en": [],
+      "pt-BR": []
+    }
+  },
+  {
+    "name": "owner of 1 character",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \"g\"\n",
+    "errors": {
+      "en": [],
+      "pt-BR": []
+    }
+  },
+  {
+    "name": "owner with inner spaces, commas and non-ASCII letters",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \"Equipe de Cobrança, São Paulo\"\n",
+    "errors": {
+      "en": [],
+      "pt-BR": []
+    }
+  },
+  {
+    "name": "authorize: an addition outside the grant",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/z",
+        "path": "z",
+        "owner": "team-a"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/z",
+        "change": "add",
+        "reason": "outside_grant"
+      }
+    ]
+  },
+  {
+    "name": "authorize: an edit of an entry its team owns outside the grant",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s2",
+        "owner": "team-a"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/s",
+        "change": "edit",
+        "reason": "outside_grant"
+      }
+    ]
+  },
+  {
+    "name": "authorize: a removal outside the grant",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/s",
+        "change": "remove",
+        "reason": "outside_grant"
+      }
+    ]
+  },
+  {
+    "name": "authorize: an addition with no owner",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/n",
+        "path": "n"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/n",
+        "change": "add",
+        "reason": "ownerless"
+      }
+    ]
+  },
+  {
+    "name": "authorize: an edit of an ownerless entry",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o2"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/o",
+        "change": "edit",
+        "reason": "ownerless"
+      }
+    ]
+  },
+  {
+    "name": "authorize: an owner set on an ownerless entry",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/o",
+        "change": "edit",
+        "reason": "ownerless"
+      }
+    ]
+  },
+  {
+    "name": "authorize: a removal of an ownerless entry",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/o",
+        "change": "remove",
+        "reason": "ownerless"
+      }
+    ]
+  },
+  {
+    "name": "authorize: an owner cleared",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/a",
+        "change": "edit",
+        "reason": "owner_change"
+      }
+    ]
+  },
+  {
+    "name": "authorize: an owner replaced",
+    "role": "team_operator",
+    "groups": [
+      "team-a",
+      "team-b"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/a",
+        "change": "edit",
+        "reason": "owner_change"
+      }
+    ]
+  },
+  {
+    "name": "authorize: an addition another team owns",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/n",
+        "path": "n",
+        "owner": "team-x"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/n",
+        "change": "add",
+        "reason": "not_your_team"
+      }
+    ]
+  },
+  {
+    "name": "authorize: a block edited on another team's entry",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x",
+        "serve": {
+          "prefix": "/x"
+        }
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/x",
+        "change": "edit",
+        "reason": "not_your_team"
+      }
+    ]
+  },
+  {
+    "name": "authorize: a removal of another team's entry",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/x",
+        "change": "remove",
+        "reason": "not_your_team"
+      }
+    ]
+  },
+  {
+    "name": "authorize: an addition owned by a group of the subject that owns nothing yet",
+    "role": "team_operator",
+    "groups": [
+      "team-a",
+      "team-new"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/n",
+        "path": "n",
+        "owner": "team-new"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/n",
+        "change": "add",
+        "reason": "not_your_team"
+      }
+    ]
+  },
+  {
+    "name": "authorize: precedence, the first failing rule is the reason",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s"
+      },
+      {
+        "repo": "a.com/z",
+        "path": "z"
+      },
+      {
+        "repo": "a.com/n",
+        "path": "n"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/x",
+        "change": "edit",
+        "reason": "owner_change"
+      },
+      {
+        "identity": "a.com/s",
+        "change": "edit",
+        "reason": "outside_grant"
+      },
+      {
+        "identity": "a.com/z",
+        "change": "add",
+        "reason": "outside_grant"
+      },
+      {
+        "identity": "a.com/n",
+        "change": "add",
+        "reason": "ownerless"
+      }
+    ]
+  },
+  {
+    "name": "authorize: a team operator in several teams changes an entry of each",
+    "role": "team_operator",
+    "groups": [
+      "team-b",
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a2",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/n",
+        "path": "n",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "refused": []
+  },
+  {
+    "name": "authorize: moved entries with nothing else changed",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      }
+    ],
+    "refused": []
+  },
+  {
+    "name": "authorize: refused entries follow the new entries, then the removed ones",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/b",
+        "path": "b2",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/z",
+        "path": "z",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "a"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/b",
+        "change": "edit",
+        "reason": "not_your_team"
+      },
+      {
+        "identity": "a.com/z",
+        "change": "add",
+        "reason": "outside_grant"
+      },
+      {
+        "identity": "a.com/a",
+        "change": "edit",
+        "reason": "owner_change"
+      },
+      {
+        "identity": "a.com/o",
+        "change": "remove",
+        "reason": "ownerless"
+      },
+      {
+        "identity": "a.com/x",
+        "change": "remove",
+        "reason": "not_your_team"
+      }
+    ]
+  },
+  {
+    "name": "authorize: a viewer passed in is answered by the team operator's rules",
+    "role": "viewer",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a2",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b2",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/b",
+        "change": "edit",
+        "reason": "not_your_team"
+      }
+    ]
+  },
+  {
+    "name": "authorize: the global operator is refused nothing",
+    "role": "operator",
+    "groups": [],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x",
+        "serve": {
+          "prefix": "/x"
+        }
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s2",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/z",
+        "path": "z"
+      },
+      {
+        "repo": "a.com/n",
+        "path": "n",
+        "owner": "team-x"
+      }
+    ],
+    "refused": []
+  },
+  {
+    "name": "authorize: the global operator is refused nothing for removals",
+    "role": "operator",
+    "groups": [],
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/n",
+      "a.com/o",
+      "a.com/x"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/x",
+        "path": "x",
+        "owner": "team-x"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [],
+    "refused": []
+  },
+  {
+    "name": "compose: an edit, a removal and additions keep the entries outside the grant in place",
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/m",
+      "a.com/n"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/t",
+        "path": "t",
+        "owner": "team-t"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/m",
+        "path": "m",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "a2",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/n",
+        "path": "n",
+        "owner": "team-a"
+      }
+    ],
+    "composed": [
+      {
+        "repo": "a.com/a",
+        "path": "a2",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/t",
+        "path": "t",
+        "owner": "team-t"
+      },
+      {
+        "repo": "a.com/m",
+        "path": "m",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/n",
+        "path": "n",
+        "owner": "team-a"
+      }
+    ]
+  },
+  {
+    "name": "compose: a submission that reorders the entries it reads keeps the current order",
+    "grant": [
+      "a.com/a",
+      "a.com/b",
+      "a.com/m",
+      "a.com/n"
+    ],
+    "current": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      }
+    ],
+    "new": [
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      }
+    ],
+    "composed": [
+      {
+        "repo": "a.com/a",
+        "path": "a",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/b",
+        "path": "b",
+        "owner": "team-b"
+      }
+    ]
   }
 ]

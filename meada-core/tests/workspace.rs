@@ -1,6 +1,7 @@
 //! Workspace changes at the public deterministic core seam shared by CLI and browser.
 
-use meada_core::workspace::diff;
+use meada_core::workspace::{diff, entries_text, version_entries};
+use serde_json::json;
 
 #[test]
 fn changes_name_entries_and_dotted_keys_in_manifest_order() {
@@ -90,5 +91,78 @@ fn a_declared_empty_serve_table_keeps_its_presence_when_a_child_changes() {
     assert_eq!(
         diff("entries", entry, &empty).unwrap().changed[0].keys,
         ["repository.serve"]
+    );
+}
+
+/// An entry's owner is printed right after its `path`, before its block tables, and the text
+/// reads back to the same entries; entries with no owner print as they did before owners.
+#[test]
+fn entries_text_prints_the_owner_after_the_path() {
+    let entries = [
+        json!({"repo": "a.com/x", "path": "x", "owner": "team-x", "serve": {"prefix": "/x"}}),
+        json!({"repo": "a.com/y", "path": "y"}),
+    ];
+    let text = entries_text(&entries).unwrap();
+    assert_eq!(
+        text,
+        "[[repository]]\npath = \"x\"\nowner = \"team-x\"\nrepo = \"a.com/x\"\n\n\
+         [repository.serve]\nprefix = \"/x\"\n\n\
+         [[repository]]\npath = \"y\"\nrepo = \"a.com/y\"\n"
+    );
+    let ownerless = entries_text(&entries[1..]).unwrap();
+    assert_eq!(
+        ownerless,
+        "[[repository]]\npath = \"y\"\nrepo = \"a.com/y\"\n"
+    );
+    let read = meada_core::manifest::validate("entries", &text).unwrap();
+    assert_eq!(read[0].owner.as_deref(), Some("team-x"));
+}
+
+/// Two versions that differ only in an entry's owner list it as changed with the dotted key
+/// `repository.owner`, set, cleared or replaced (ADR 0015, #325).
+#[test]
+fn an_owner_change_alone_is_the_dotted_key_repository_owner() {
+    let entry = "[[repository]]\nrepo='a.test/team/web'\npath='web'\n";
+    let owned = |owner: &str| {
+        format!("[[repository]]\nrepo='a.test/team/web'\npath='web'\nowner='{owner}'\n")
+    };
+    for (before, after) in [
+        (entry.to_string(), owned("team-a")),
+        (owned("team-a"), entry.to_string()),
+        (owned("team-a"), owned("team-b")),
+    ] {
+        let changes = diff("entries", &before, &after).unwrap();
+        assert!(changes.added.is_empty() && changes.removed.is_empty());
+        assert_eq!(changes.changed.len(), 1);
+        assert_eq!(changes.changed[0].repo, "a.test/team/web");
+        assert_eq!(changes.changed[0].keys, ["repository.owner"]);
+    }
+    assert_eq!(
+        diff("entries", &owned("team-a"), &owned("team-a")).unwrap(),
+        Default::default()
+    );
+}
+
+/// The text read as a version document's entries: `repo`, `path`, the owner when there is one,
+/// then the blocks, the form the authorization functions take.
+#[test]
+fn version_entries_reads_a_text_as_a_documents_entries() {
+    let text = "[[repository]]\nrepo='a.test/x'\npath='x'\nowner='team-x'\n\
+                [repository.serve]\nprefix='/x'\n\n\
+                [[repository]]\nrepo='a.test/y'\npath='y'\n";
+    assert_eq!(
+        version_entries("entries", text).unwrap(),
+        [
+            json!({"repo": "a.test/x", "path": "x", "owner": "team-x", "serve": {"prefix": "/x"}}),
+            json!({"repo": "a.test/y", "path": "y"}),
+        ]
+    );
+    assert_eq!(
+        version_entries("entries", "").unwrap(),
+        Vec::<serde_json::Value>::new()
+    );
+    assert_eq!(
+        version_entries("entries", "[[repository]]\npath='x'\n").unwrap_err(),
+        ["entries:1: `repository.repo` is missing"]
     );
 }

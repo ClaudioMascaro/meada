@@ -88,8 +88,8 @@ The repository is a Cargo workspace (ADR 0014): the `meada` binary's crate at th
 share. Both take one version from the workspace, and `meada` depends on `meada-core` at exactly
 it. `meada-core` has no rusqlite, tree-sitter, filesystem, process or network code and no async
 runtime; it builds for `wasm32-unknown-unknown`, its `wasm-bindgen` feature (never the binary's)
-exporting `init`, `validate`, `workspaceVersionId`, `workspaceDiff`, `entriesText` and
-`parseExport`. CI's `core` job builds it
+exporting `init`, `validate`, `workspaceVersionId`, `workspaceDiff`, `entriesText`,
+`entriesJson`, `authorizeEntries`, `composeEntries` and `parseExport`. CI's `core` job builds it
 with wasm-pack and checks both trees.
 
 Every tree-sitter grammar is a crate except Kotlin's: `vendor/tree-sitter-kotlin-ng/` holds
@@ -102,18 +102,44 @@ other Kotlin grammar may enter the dependency tree: they all export `tree_sitter
   `Resource`, `Role`, `declared`, `gateway_path`); `parse` and `error_at`, the errors naming
   the file, the line and the dotted key (`line_of`); `identity_problem` and `entry_problems`
   (an identity listed twice); `validate`, a workspace text's entries or its problems as the CLI
-  prints them (a text holding only `[[repository]]` entries). `validate_import(file, src)`
+  prints them (a text holding only `[[repository]]` entries). `EntryFile::owner` is an entry's
+  optional `owner` (ADR 0015), checked where the entry is read (`owner_problem`: one string, not
+  empty, at most `OWNER_MAX` characters, no control character, no whitespace at either end;
+  compared exactly), so the browser's validation, every import, every pull and every read of a
+  stored version check it alike; `authorize` reads it to decide a write (#323).
+  `validate_import(file, src)`
   validates entries while ignoring other top-level keys, with CLI import's file prefix on
   identity errors; CLI, HTTP and WASM import validation share it, preserving empty workspaces and ignored
   bootstrap sections.
 - `meada-core/src/ids.rs`: `bundle_id`, `generation_id` (ADR 0012), `workspace_version_id`
-  (ADR 0014: the canonical JSON of the entries, `{"blocks","path","repo"}` in manifest order),
-  `is_id`, `fence`, `entry_blocks`.
+  (ADR 0014: the canonical JSON of the entries, `{"blocks","path","repo"}` in manifest order, with
+  `"owner"` between `blocks` and `path` only when the entry has one, so an ownerless entry keeps
+  its text and its version id), `is_id`, `fence`, `entry_blocks` (every key of an entry but
+  `repo`, `path` and `owner`; the owner is no block, so no bundle id reads it).
 - `meada-core/src/workspace.rs`: `diff(file, before, after)` validates through `validate_import`
   and lists added/removed/changed identities and changed dotted keys in manifest order. Array
   tables retain each field's row position and absence; common entries reordered relative to
   one another report the `repository` array key. Formatting is ignored. `entries_text` is the
-  pure JSON-repositories-to-TOML conversion shared with `snapshot::versions` and WASM.
+  pure JSON-repositories-to-TOML conversion shared with `snapshot::versions` and WASM; it prints
+  an entry's `owner` right after its `path`, before the block tables, so the text reads back to
+  the same id. `version_entries` (`entriesJson`) is the opposite way, a text to the entries a
+  version document holds, so the browser authorizes and composes the same entries the server
+  stores: `entry`, which builds one, is the function `snapshot::versions` stores them with. An owner change alone is the
+  changed dotted key `repository.owner`.
+- `meada-core/src/authorize.rs` (ADR 0015): what a subject may change in a workspace version,
+  over a version document's JSON `repositories`. `authorize_entries(role, groups, grant,
+  current, new)` returns the refused entries (`Refusal`: `identity`, `change` `add`/`edit`/
+  `remove`, `reason`), the new entries' order then the removed ones in the current order; the
+  global operator (`Role::Operator`) gets none. For anyone else, entries pair by `repo`, one is
+  changed when anything but its position differs, and each changed entry gets the first rule it
+  fails: `outside_grant`, `ownerless` (the current entry has no owner, or the addition has
+  none), `owner_change` (an edit's owner differs, cleared included), `not_your_team` (the owner
+  is none of its teams: its groups owning an entry of `current` the `Grant` reads). `role` is
+  admission's rule (#324): the global operator stays one, anyone else is a team operator while
+  it has a team, else a viewer. `compose_entries(grant, current, submitted)` is the version a
+  team operator's save stores: the current entries in place, those the grant reads replaced or
+  dropped, those outside it kept, additions appended in submitted order. The binary's apply and
+  the browser (`authorizeEntries`, `composeEntries` in `wasm.rs`) call the same functions.
 - `meada-core/src/msg.rs`: the messages of those checks and the language flag the binary's
   `msg.rs` reads too; `meada-core/src/http.rs`: `normalize_path` and `PARAM`, which the HTTP
   kind re-exports. `qualify` and `parent` (dotted names) live in its `lib.rs`.
@@ -182,6 +208,17 @@ Every edit validates through WASM `validate_import`; JSON entries become TOML th
 same `entries_text` as `workspace show`. Saves require a message, accepted saves read the
 immutable first metadata independently of read refresh failures, and older applies are labelled
 as rollback for the next refresh. The shared confirmation dialog sends nothing before acceptance.
+A team operator (#325) edits the entries its grant reads, as `GET .../versions/<id>` returns
+them (`workspace.ts`: `teamEditorModel` composes the text with `composeEntries`, diffs the
+composed version and runs `authorizeEntries`, so a refusal is marked with its reason in the diff
+and the save disabled with no request; `entryRows` shows each entry's owner and the answer to
+changing it alone). `plainEntries` projects the flags a view adds (`may_change`, `refusal`) out
+before any TOML or id, and a partial view's hash is never a saved id: a team save reads the
+server's `result`. Its save and apply confirmations name the teams that authorize them (the
+owners of the entries touched) instead of a CLI command, an apply is offered only when
+`authorizeEntries` over the entries it reads refuses nothing, `ApiError.body` carries a 403
+`entries_refused` (entries and `hidden`) to the dialog, and any other 403 reloads the session
+and turns the editor read-only. Every role sees owners in the versions page and its diffs.
 The frontend container stage copies the one shared validation fixture because TypeScript also
 checks its tests; Rust/default stages gain no frontend input.
 Vitest exercises the built WASM and the public client, view-model and DOM
@@ -198,9 +235,12 @@ console's public assets, config and PKCE callback reach its listener before OIDC
 its proxy preserves Host, Origin and Authorization. MCP keeps its separate admission rules.
 
 Managed writers pull the workspace before the external fetch, index and publish, inside one
-refresh lock. Seeding and applying the first version are explicit operator actions. The fetch
-list/script and mirror provisioning still belong to the operator: applying a new identity or
-path does not clone it. `scripts/compose-check` and `scripts/helm-check` check the rendered
+refresh lock. A failed stage ends the job before publish, so the pointer stays (#316, ADR
+0012): the compose `fetch.sh` refuses URLs carrying credentials and names the identity whose
+fetch failed, and `meada index --workspace` ends a failure with the stage and the count.
+Seeding and applying the first version are explicit operator actions. The fetch list/script and
+mirror provisioning still belong to the operator: applying a new identity or path does not
+clone it. `scripts/compose-check` and `scripts/helm-check` check the rendered
 configuration, module dependencies, storage, selectors and refresh order.
 
 ## Modules (`src/`)
@@ -346,7 +386,16 @@ one for the area a change touches.
   when a token was sent) or a 403 for a missing scope, both as JSON errors. The static files
   and `config` need no token, since the browser needs them to log in. A verified subject in
   `operator_groups`, or with the top-level `operator_claim` equal to JSON boolean true, is an
-  operator; string `"true"` is a viewer. `Session::reads` and `whole` let operators see the
+  operator; string `"true"` is a viewer. With `[ui] operations = true`, `[workspace] source =
+  "store"` and a token carrying groups, a non-operator is a team operator (ADR 0015, #324) when
+  one of its groups owns an entry of the current workspace version whose identity its grant
+  reads: `Console::teams` (`ui/read.rs`) reads the pointer `{<key_prefix>}:workspace` and its
+  document on each `session` and write request (the reads need no role, since a team operator
+  reads what a viewer reads), through the readers' permits and two-second deadline, and keeps the
+  last document by id (a version is immutable); `meada_core::authorize::teams` gives the
+  groups, sorted, as `Session::teams`. No pointer, or a pointer or document that cannot be read
+  or fails its checks, makes a viewer, so a read failure never grants a write. The global operator
+  stays one whatever it owns. `Session::reads` and `whole` let operators see the
   entire fleet regardless of grant. The request's `Session` carries the token's grant, and
   `Session::reads` is the one check every view of a repository goes through, as #290 bounds a
   node's answers: a repository outside the grant is absent, state that belongs to no repository
@@ -355,7 +404,8 @@ one for the area a change touches.
   and with `[oidc]` `admission` and `POST admission/check`; errors `{"error": {"code",
   "message"}}`, an unknown path a 404 in that shape, as the admission routes are without
   `[oidc]`); `config` adds, with `[oidc]`, the issuer, `client_id`, the scopes and the audience
-  the browser's authorization code flow with PKCE needs; `session` is the subject and role;
+  the browser's authorization code flow with PKCE needs; `session` is the subject and role (`viewer`, `team_operator`, `operator`) and, with `[oidc]`, `groups`
+  (sorted), `grant` (`"*"` or sorted identities) and, for a team operator, `teams`;
   `manifest` answers the file as loaded at start (a TOML table as JSON: secrets' variable and
   file names only), the module table with what this build has, and the errors of the file as it
   now stands on disk, read again per request, for a session that does not read everything
@@ -367,7 +417,10 @@ one for the area a change touches.
   only for that request, and a body that does not parse is a fixed 400, never serde's text.
   `ui/write.rs` owns four POST routes, all disabled unless `operations` is true and the
   admitted operator has a nonempty subject. Host, Origin, admission and role are checked before
-  reading any body, carrying that same session into routing. `pointer` takes `{action,
+  reading any body, carrying that same session into routing. A team operator passes the role
+  check for `workspace/versions` and `workspace/apply` only; `pointer` and `fence/recover` give
+  it the 403 `Msg::UiGlobalOperatorRequired`, before the body is read, and a viewer keeps S2's
+  `Msg::UiOperatorRequired`. `pointer` takes `{action,
   generation}` (`set`, `retain`, `drop`) and calls `snapshot::operation::pointer_set`,
   `pointer_retain` or `pointer_drop`; `fence/recover` takes `{at_least?}` (u64 or checked decimal
   string) and calls `fence_recover`; `workspace/versions` takes `{entries, message}` and calls
@@ -375,9 +428,22 @@ one for the area a change touches.
   owner functions keep the CLI checks, refresh lock and holder (operation plus escaped subject),
   with the admitted subject as author. Success is 200 `{result: "<CLI line>"}`; operational
   refusals are 409 with the CLI message; entry validation is 422 with CLI line/key diagnostics;
-  malformed JSON, extra keys or malformed ids/fences are safe fixed 400s; caps are 413s. Every
-  accepted or refused write logs one stderr line `ui: <subject> <action> <arguments>: <outcome>`,
-  with controls escaped throughout. Pre-authentication refusals use absent subject `-` and safe
+  malformed JSON, extra keys or malformed ids/fences are safe fixed 400s; caps are 413s. A team
+  operator's save runs `versions::save` as `Role::TeamOperator`: after validation (422), under
+  the refresh lock and against the version then current, its role recomputed, `authorize_entries`
+  over the current entries its grant reads, and `compose_entries` over the whole current version
+  makes the stored one (author its subject); its apply is `versions::apply`'s authorized path.
+  A refused change is a 403 `{"error": {"code": "entries_refused", "message":
+  <Msg::WorkspaceRefused>, "refused": [{"identity", "change", "reason"}], "hidden": <n>}}` with
+  nothing written and the lock released: a save names every refused entry (it refuses only what
+  the subject submitted or reads), an apply names those whose identity the grant reads and counts
+  the rest in `hidden`. A role lost at admission, or under the lock, gets the viewer's refusal.
+  Every accepted or refused write logs one stderr line `ui: <subject> <action> <arguments>:
+  <outcome>`, with controls escaped throughout; a team operator's is `ui: <subject> as <owners>
+  <action> <arguments>: <outcome>`, `<owners>` a JSON array: the owner groups of the entries an
+  accepted change touched (`versions::touched_owners`, sorted, without repeats), the subject's
+  teams for a refusal, whose outcome is the message with the named identities and the hidden
+  count. Pre-authentication refusals use absent subject `-` and safe
   fixed arguments, never body or token text. Save validation keeps its full CLI diagnostics in
   the 422 response but logs only the fixed outcome `workspace entries failed validation`, so
   invalid identities cannot copy editor contents into stderr. No route releases locks or
@@ -614,9 +680,11 @@ one for the area a change touches.
   versions: the `[[repository]]` entries of a workspace as immutable documents in the store, at
   `workspaces/<version id>.json` under `[snapshot] prefix` (`Version`: `id`, `author`, `time`
   in RFC 3339 UTC, `message`, and `repositories` in manifest order, each entry its `repo` and
-  `path` as written plus its blocks as `entry_blocks` gives them), stored with the size and
-  hash metadata every object carries and never rewritten. The id is
-  `meada_core::ids::workspace_version_id` of the entries alone. The current version is
+  `path` as written, its `owner` when it has one, plus its blocks as `entry_blocks` gives
+  them), stored with the size and hash metadata every object carries and never rewritten. The
+  id is `meada_core::ids::workspace_version_id` of the entries alone, owners included.
+  `meada index`, `status`, `export` and `snapshot publish` ignore the owner of a pulled version,
+  and a generation document's entry blocks holding an `owner` are refused (`snapshot/pull.rs`). The current version is
   `{<key_prefix>}:workspace`, a hash `{id, fence}` under the pointer's hash tag (`pointer_key`,
   read by `current`, moved by `meada workspace apply`, #302). `import` (`meada workspace import
   <file> --message <text> [--author <name>] --workspace <bootstrap manifest>`) reads the file's
@@ -643,7 +711,15 @@ one for the area a change touches.
   `apply` (`meada workspace apply <version>`, feature `refresh-lock`) checks the id first
   (`Msg::BadVersionArg`), needs `[refresh_lock]` (`operation::sections`), reads and checks the
   version's document in the store (missing, `Msg::WorkspaceNoVersion` naming its key), then runs
-  under `operation::locked` (holder `workspace apply <author>`) the `APPLY` script: it sets
+  under `operation::locked` (holder `workspace apply <author>`), for a subject other than the
+  global operator (its `Role`, groups and `Grant`), the authorization against the version then
+  current: its role recomputed (`authorize::role`; none current, or no team left, is
+  `ApplyError::RoleLost`), then `authorize_entries` over the whole current entries and the
+  applied ones (`ApplyError::Refused` with the refusals; `Msg::WorkspaceRefused` counts them).
+  Either releases the lock and moves nothing; two applies serialize on the lock, so a version is
+  checked against the one it replaces. The CLI passes the global operator, which reads nothing
+  more; the console passes the session's role (#324). `apply` returns `Applied`: the line and
+  the owner groups of the entries it touched. Then the `APPLY` script: it sets
   `{<key_prefix>}:workspace` to `{id, fence}` only while the lock holds the token and the
   operation's fence is above the stored one (decimal text, as `POINT` compares;
   `Msg::FenceRefused` otherwise); it prints `<id> <fence>`. Rolling back is applying an older
@@ -745,7 +821,10 @@ one for the area a change touches.
   `snapshot/versions.rs`). `source = "store"` without `generation-pointer` is an error naming
   the feature (`Msg::WorkspaceStoreNeedsFeature`), without `[snapshot]` or `[generations]` one
   naming them (`modules::needs`), and beside a `[[repository]]` one naming both
-  (`Msg::WorkspaceStoreBeside`); `Manifest::store` records it, with no entries from `read`.
+  (`Msg::WorkspaceStoreBeside`); `Manifest::store` records it, with no entries from `read`. An
+  `owner` in the bootstrap manifest's own `[[repository]]` entries (`source = "file"`) is an
+  error naming the file, the line, `repository.owner` and `source = "store"`
+  (`Msg::WorkspaceOwnerStatic`); `meada workspace import` reads the same entries with it allowed.
   `Manifest::read_listed`, which `index`, `status`, `export` without `--generations` and
   `snapshot publish` call, reads the entries of the version `meada workspace pull` left under
   `<index_dir>/workspace/` (`versions::pulled`, from disk, once per read, `Manifest::version`
@@ -2104,9 +2183,11 @@ one for the area a change touches.
   binary's (both crates are default members): `ids.rs`, the bundle and generation ids against
   their canonical texts (the cases the `snapshot` module held), `is_id`, `fence`,
   `entry_blocks`, and the workspace version id (its canonical text, the same for the same
-  entries however written, changed by a swap, a path or a block); `manifest.rs`, `validate`
-  (the entries in order, text errors with file, line and dotted key, every unservable identity
-  named); `export.rs`, every `*.export.json` golden read with `export::parse` and written
+  entries however written, changed by a swap, a path, a block or an owner, an entry without one
+  keeping its ownerless text, two owners differing in case giving two ids); `manifest.rs`,
+  `validate` (the entries in order, text errors with file, line and dotted key, every
+  unservable identity named, each `owner` error and the names it accepts); `workspace.rs`,
+  `diff` and `entries_text` (the owner printed after the path); `export.rs`, every `*.export.json` golden read with `export::parse` and written
   again byte for byte, and `parse` refusing a missing field or one of the wrong type, naming it.
   The binary's manifest errors stay in `tests/it/manifest.rs`.
 - The integration tests are one binary, `tests/it/main.rs`, so `cargo test` links it once: a
@@ -2185,6 +2266,12 @@ one for the area a change touches.
 
 ## Known ceilings
 
+- `meada-core/src/manifest.rs`: an entry's `owner` holds at most `OWNER_MAX` (256) characters
+  (ADR 0015); a longer name is an error naming its line and key, wherever the entry is read
+  (import, a stored version, a pull, the browser).
+- `meada-core/src/authorize.rs`: a refusal's `refused` list (ADR 0015) holds one `Refusal` per
+  changed entry, so it is bounded by the version's entries, which `VERSION_MAX` in `src/snapshot/versions.rs` (4 MiB, S2's
+  document size cap) bounds; it is not truncated.
 - `resolve.rs` (`Resolver::may_declare`, ADR 0019): a base among a pack's known outside members is
   matched by its spelling, so a same-named type of a wildcard-imported outside package that
   declares an overload of the called name may give a wrong `exact`; a Swift entry is compared

@@ -4,9 +4,9 @@
 //!
 //! A version is stored at `workspaces/<version id>.json` under the store's prefix, with its size
 //! and BLAKE3 hash as metadata, and never rewritten: `id`, `author`, `time` (RFC 3339, UTC),
-//! `message` and `repositories`, in manifest order, each entry its `repo` and `path` as written
-//! and its blocks as `entry_blocks` gives them. The id is `meada_core`'s workspace version id of
-//! the entries alone. The current version is `{<key_prefix>}:workspace`, a hash `{id, fence}`
+//! `message` and `repositories`, in manifest order, each entry its `repo` and `path` as written,
+//! its `owner` when it has one (ADR 0015) and its blocks as `entry_blocks` gives them. The id is
+//! `meada_core`'s workspace version id of the entries alone. The current version is `{<key_prefix>}:workspace`, a hash `{id, fence}`
 //! under the pointer's hash tag, which `meada workspace apply` moves. Everything read back from
 //! the store or Valkey is hostile: each name, id and fence is checked against its pattern, and a
 //! document is bounded in size, its entries validated again and its id derived from them again
@@ -18,15 +18,19 @@
 //! time. `index`, `status`, `export` and `snapshot publish` read the version `current` names
 //! from there (`pulled`, through `Manifest::read_listed`), checked again, and never connect.
 
+#[cfg(feature = "refresh-lock")]
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "refresh-lock")]
+use meada_core::authorize::{self, Grant, Refusal, Role, authorize_entries, compose_entries};
 use meada_core::ids::workspace_version_id;
 use meada_core::manifest::{EntryFile, validate, validate_import};
-use meada_core::workspace::entries_text;
+use meada_core::workspace::{entries_text, entry};
 use redis::cmd;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value as Json};
+use serde_json::Value as Json;
 
 use super::generations::{now, rfc3339};
 use super::store::Store;
@@ -52,7 +56,8 @@ pub struct Version {
     /// RFC 3339, UTC, to the second.
     pub time: String,
     pub message: String,
-    /// In manifest order: each entry's `repo` and `path` as written, and its blocks.
+    /// In manifest order: each entry's `repo` and `path` as written, its `owner` if any, and its
+    /// blocks.
     pub repositories: Vec<Json>,
 }
 
@@ -203,17 +208,29 @@ async fn store_version(
 pub(crate) enum SaveError {
     Invalid(Vec<String>),
     Refused(String),
+    /// The entries a team operator may not change, as `authorize_entries` lists them.
+    Unauthorized(Vec<Refusal>),
+    /// A team operator that the current version no longer makes one.
+    RoleLost,
 }
 
 /// The console's save is CLI import's text preparation and storage under the refresh lock.
 /// CLI import deliberately remains available with generation-pointer alone and takes no lock.
+/// Anyone but the global operator (`role`, its `groups` and `grant`) is authorized under the
+/// lock against the version then current, which two writes cannot move at once: its role
+/// recomputed, `authorize_entries` over the current entries its grant reads, then the version
+/// stored is `compose_entries`' (ADR 0015). Returns what was stored with the owner groups of the
+/// entries the change touches, for a team operator's audit line.
 #[cfg(all(feature = "ui", feature = "refresh-lock"))]
 pub(crate) fn save(
     manifest: &Path,
     src: &str,
     message: &str,
     author: &str,
-) -> Result<Imported, SaveError> {
+    role: Role,
+    groups: &[String],
+    grant: &Grant,
+) -> Result<(Imported, Vec<String>), SaveError> {
     let version = prepared("entries", src, message, author).map_err(SaveError::Invalid)?;
     let sections =
         super::operation::sections(manifest).map_err(|e| SaveError::Refused(e.to_string()))?;
@@ -222,33 +239,88 @@ pub(crate) fn save(
     super::operation::locked(&sections, &holds, async move |valkey, config, _, held| {
         super::lock::holds(valkey, config, &held.token).await?;
         let store = Store::connect(&snapshot)?;
+        let (mut version, mut owners) = (version, Vec::new());
+        if role != Role::Operator {
+            let Some(current) = current_entries(valkey, config, &snapshot).await? else {
+                return Ok(Err(SaveError::RoleLost));
+            };
+            if authorize::role(role, groups, grant, &current) == Role::Viewer {
+                return Ok(Err(SaveError::RoleLost));
+            }
+            let read: Vec<Json> = (current.iter())
+                .filter(|e| grant.reads(authorize::repo(e)))
+                .cloned()
+                .collect();
+            let refused = authorize_entries(role, groups, grant, &read, &version.repositories);
+            if !refused.is_empty() {
+                return Ok(Err(SaveError::Unauthorized(refused)));
+            }
+            let composed = compose_entries(grant, &current, &version.repositories);
+            owners = touched_owners(&current, &composed);
+            let text = entries_text(&composed).ok_or_else(|| Msg::UiEntriesInvalid.text())?;
+            version = match prepared("entries", &text, message, author) {
+                Ok(version) => version,
+                Err(problems) => return Ok(Err(SaveError::Invalid(problems))),
+            };
+        }
         let imported = store_version(&store, &snapshot, &version).await?;
         super::lock::holds(valkey, config, &held.token).await?;
-        Ok(imported)
+        Ok(Ok((imported, owners)))
     })
-    .map_err(|e| SaveError::Refused(e.to_string()))
+    .map_err(|e| SaveError::Refused(e.to_string()))?
 }
 
-/// One entry of a version document: `repo` and `path`, then the entry's blocks.
-fn entry(repo: &str, path: &str, blocks: Json) -> Json {
-    let mut entry = Map::new();
-    entry.insert("repo".into(), repo.into());
-    entry.insert("path".into(), path.into());
-    if let Json::Object(blocks) = blocks {
-        entry.extend(blocks);
-    }
-    Json::Object(entry)
+/// The entries of the version current in Valkey, checked; `None` when there is no pointer.
+#[cfg(feature = "refresh-lock")]
+async fn current_entries(
+    valkey: &Valkey,
+    config: &valkey::Config,
+    snapshot: &Config,
+) -> Result<Option<Vec<Json>>, String> {
+    let Some((id, _)) = current(valkey, config).await? else {
+        return Ok(None);
+    };
+    let store = Store::connect(snapshot)?;
+    let key = version_key(snapshot, &id);
+    let document = stored(&store, &key, &id).await?;
+    Ok(Some(
+        document
+            .ok_or_else(|| Msg::WorkspaceNoVersion(&key).text())?
+            .0
+            .repositories,
+    ))
+}
+
+/// The owners, sorted and without repeats, of the entries that differ between `current` and
+/// `new`: the groups a team operator's change touched.
+#[cfg(feature = "refresh-lock")]
+fn touched_owners(current: &[Json], new: &[Json]) -> Vec<String> {
+    let keyed = |entries: &[Json]| -> BTreeMap<String, Json> {
+        (entries.iter())
+            .map(|e| (authorize::repo(e).to_string(), e.clone()))
+            .collect()
+    };
+    let (old, new) = (keyed(current), keyed(new));
+    let touched = old.keys().chain(new.keys()).collect::<BTreeSet<_>>();
+    (touched.into_iter())
+        .filter(|repo| old.get(*repo) != new.get(*repo))
+        .filter_map(|repo| new.get(repo).or_else(|| old.get(repo)))
+        .filter_map(|entry| entry["owner"].as_str())
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
 }
 
 /// The version id of `entries`, their blocks being `blocks` (`entry_blocks`), and the entries as
 /// a version document holds them.
 fn versioned(entries: &[EntryFile], blocks: Vec<Json>) -> (String, Vec<Json>) {
-    let ids: Vec<(&str, &str, &Json)> = (entries.iter().zip(&blocks))
-        .map(|(e, blocks)| (e.repo.as_str(), e.path.as_str(), blocks))
+    let ids: Vec<(&str, &str, &Json, Option<&str>)> = (entries.iter().zip(&blocks))
+        .map(|(e, blocks)| (e.repo.as_str(), e.path.as_str(), blocks, e.owner.as_deref()))
         .collect();
     let id = workspace_version_id(&ids);
     let repositories = (entries.iter().zip(blocks))
-        .map(|(e, blocks)| entry(&e.repo, &e.path, blocks))
+        .map(|(e, blocks)| entry(e, blocks))
         .collect();
     (id, repositories)
 }
@@ -427,38 +499,106 @@ pub fn cli_author() -> String {
     format!("cli:{login}@{}", host.to_lowercase())
 }
 
+/// Why `apply` moved nothing, kept apart for the console's answer and audit.
+#[cfg(feature = "refresh-lock")]
+#[derive(Debug)]
+pub enum ApplyError {
+    /// The entries the subject may not change, as `authorize_entries` lists them.
+    Refused(Vec<Refusal>),
+    /// A team operator that the current version no longer makes one (`authorize::role`).
+    RoleLost,
+    /// Anything else: the argument, the manifest, the store, Valkey, the lock or the pointer.
+    Failed(String),
+}
+
+#[cfg(feature = "refresh-lock")]
+impl std::fmt::Display for ApplyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ApplyError::Refused(refused) => {
+                f.write_str(&Msg::WorkspaceRefused(refused.len()).text())
+            }
+            ApplyError::RoleLost => f.write_str(&Msg::WorkspaceRoleLost.text()),
+            ApplyError::Failed(problem) => f.write_str(problem),
+        }
+    }
+}
+
+#[cfg(feature = "refresh-lock")]
+impl std::error::Error for ApplyError {}
+
+/// What `apply` did: the `<id> <fence>` line and, for a team operator, the owner groups of the
+/// entries the change touched (none for the global operator).
+#[cfg(feature = "refresh-lock")]
+pub struct Applied {
+    pub line: String,
+    pub owners: Vec<String>,
+}
+
 /// `meada workspace apply <version> --workspace <manifest>` (feature `refresh-lock`): once the
 /// store holds the version `id`'s document, checked, moves `{<key_prefix>}:workspace` to `id`
 /// with the operation's fence under the refresh lock (`APPLY`); `<id> <fence>`. The id is
-/// checked before anything is read.
+/// checked before anything is read. Anyone but the global operator (`role`, its `groups` and
+/// `grant`) is authorized under the lock, before the pointer moves, against the version then
+/// current: its role recomputed from it, then `authorize_entries` over its whole entries. The
+/// CLI passes the global operator.
 #[cfg(feature = "refresh-lock")]
-pub fn apply(manifest: &Path, id: &str, author: &str) -> crate::Result<String> {
-    if !is_id(id) {
-        return Err(Msg::BadVersionArg(&id.escape_debug().to_string())
-            .text()
-            .into());
+pub fn apply(
+    manifest: &Path,
+    id: &str,
+    author: &str,
+    role: Role,
+    groups: &[String],
+    grant: &Grant,
+) -> Result<Applied, ApplyError> {
+    fn failed(e: impl std::fmt::Display) -> ApplyError {
+        ApplyError::Failed(e.to_string())
     }
-    let sections = super::operation::sections(manifest)?;
+    if !is_id(id) {
+        let shown = id.escape_debug().to_string();
+        return Err(ApplyError::Failed(Msg::BadVersionArg(&shown).text()));
+    }
+    let sections = super::operation::sections(manifest).map_err(failed)?;
     let key = version_key(&sections.snapshot, id);
     let check = async {
         let store = Store::connect(&sections.snapshot)?;
         match stored(&store, &key, id).await? {
-            Some(_) => Ok(()),
+            Some((version, _)) => Ok(version.repositories),
             None => Err(Msg::WorkspaceNoVersion(&key).text()),
         }
     };
-    crate::modules::block_on(check)??;
-    super::operation::locked(
+    let entries = crate::modules::block_on(check)
+        .map_err(failed)?
+        .map_err(ApplyError::Failed)?;
+    let snapshot = &sections.snapshot;
+    let done = super::operation::locked(
         &sections,
         &format!("workspace apply {}", author.escape_debug()),
         async |valkey, config, _, held| {
+            let mut owners = Vec::new();
+            if role != Role::Operator {
+                let Some(current) = current_entries(valkey, config, snapshot).await? else {
+                    return Ok(Err(ApplyError::RoleLost));
+                };
+                if authorize::role(role, groups, grant, &current) == Role::Viewer {
+                    return Ok(Err(ApplyError::RoleLost));
+                }
+                let refused = authorize_entries(role, groups, grant, &current, &entries);
+                if !refused.is_empty() {
+                    return Ok(Err(ApplyError::Refused(refused)));
+                }
+                owners = touched_owners(&current, &entries);
+            }
             let (lock, pointer) = (config.key("lock", true), pointer_key(config));
             let mut script = cmd("EVAL");
             script.arg(APPLY).arg(2).arg(&lock).arg(&pointer);
             script.arg(&held.token).arg(id).arg(held.fence);
             let wrote = valkey.query::<i64>(&script).await;
             match wrote.map_err(|e| format!("{pointer}: {e}"))? {
-                1 => Ok(format!("{id} {}", held.fence)),
+                1 => Ok(Ok(Applied {
+                    line: format!("{id} {}", held.fence),
+                    owners,
+                })),
                 0 => Err(Msg::LockNotHeld(&lock).text()),
                 -1 => Err(Msg::FenceRefused {
                     fence: held.fence,
@@ -469,7 +609,8 @@ pub fn apply(manifest: &Path, id: &str, author: &str) -> crate::Result<String> {
                 _ => Err(Msg::WorkspaceBadPointer(&pointer).text()),
             }
         },
-    )
+    );
+    done.map_err(failed)?
 }
 
 /// Points the workspace (`KEYS[2]`) at the version `ARGV[2]` with the fence `ARGV[3]` while the

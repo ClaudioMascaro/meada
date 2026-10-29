@@ -116,8 +116,10 @@ remaining points. This ADR records the decisions; the spec fixes the details the
 
 ### What stays out of this ADR
 
-- What one repository's failed fetch or index does to the refresh is decided by #316. Until
-  then, a repository one team owns can stop new generations for every team.
+- What one repository's failed fetch or index does to the refresh, which #316 decided in ADR
+  0012: the whole publication stops and the current generation stays, so a repository one team
+  owns stops new generations for every team until its cause is repaired, and no repository is
+  left out or carried over from an earlier generation.
 
 ## Considered options
 
@@ -125,6 +127,11 @@ remaining points. This ADR records the decisions; the spec fixes the details the
   version and one console switcher per workspace, and a route that names the workspace. It splits
   the link universe the teams share and multiplies the operator's state, for a separation that
   shared trust does not need. ADR 0014's one workspace per deployment stands.
+  (Amended 2026-10-23; #322: ADR 0020 records the direction of spec S5 (#339), a named query
+  context over shared indexing and publication, which neither splits the link universe's
+  indexes nor multiplies the operator's publication. The rejection stands for isolated
+  workspaces; spec S5 owns the runtime and the final contracts, and the ownership of entries
+  here is unchanged.)
 - **A federation of workspaces**, where each repository has one owning workspace and the others
   read it from that workspace's generation. Cross-workspace links would need generations of
   several workspaces at once on every node, a pin that names several generations and a fence per
@@ -182,8 +189,9 @@ remaining points. This ADR records the decisions; the spec fixes the details the
   as a second source, unioned with it.
 - The operator owns more: mapping each team's group in `[oidc.groups]` to the identities it
   owns, assigning a team its first entry, and accepting that a team may add a repository the job
-  fetches with the fleet's credentials. Until #316 decides, one team's failing repository can
-  stop new generations for every team.
+  fetches with the fleet's credentials. One team's failing repository stops new generations for
+  every team until it is repaired, while the nodes keep the last complete generation (#316, ADR
+  0012).
 - Everything is additive under Spec R1's stability rule (a key of the workspace version entry, a
   role, a refusal of the API): a minor change. Without owners, the console behaves as ADR 0014
   says.

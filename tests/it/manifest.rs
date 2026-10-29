@@ -276,7 +276,8 @@ fn each_unservable_entry_is_refused_and_the_others_are_still_indexed() {
          meada: example.com/chain/bare: `ops/../bare.git` is not the root of a checkout with a working tree\n\
          meada: example.com/chain/ops: `ops/.` is not the root of a checkout with a working tree\n\
          meada: example.com/chain/src: `ops/../chain-web/src` is not the root of a checkout with a working tree\n\
-         meada: example.com/chain/other: the mirror's remote is `example.com/chain/gateway`, not `example.com/chain/other`\n"
+         meada: example.com/chain/other: the mirror's remote is `example.com/chain/gateway`, not `example.com/chain/other`\n\
+         meada: index failed for 10 repositories\n"
     );
     let served = ["example.com/chain/web", "example.com/chain/catalog"];
     assert_nothing_else_written(&dir, &served);
@@ -318,7 +319,8 @@ fn each_unservable_entry_is_refused_and_the_others_are_still_indexed() {
         "meada: example.com/chain/web: its index directory \
          `ops/../chain-web/./x/../example.com/chain/web` would be inside the mirror `ops/../chain-web`\n\
          meada: example.com/chain/catalog: its index directory \
-         `ops/../chain-web/./x/../example.com/chain/catalog` would be inside the mirror `ops/../chain-web`\n"
+         `ops/../chain-web/./x/../example.com/chain/catalog` would be inside the mirror `ops/../chain-web`\n\
+         meada: index failed for 2 repositories\n"
     );
     assert!(!dir.join("chain-web/example.com").exists());
     assert!(!dir.join("chain-web/x").exists());
@@ -356,6 +358,27 @@ fn manifest_errors_name_the_file_the_line_and_the_key() {
             "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
              path = \"../chain-web\"\n\n[repository.serve]\nprefix = \"edge\"\n",
             "meada: ops/meada.workspace.toml:8: `repository.serve.prefix`: `edge` must start with `/`\n",
+        ),
+        // An owner belongs to a workspace version (ADR 0015): a static manifest names the key
+        // of the first entry that holds one, and `source = "store"`.
+        (
+            "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
+             path = \"../chain-web\"\n\n[[repository]]\nrepo = \"example.com/chain/gateway\"\n\
+             path = \"../chain-gateway\"\nowner = \"team-gateway\"\n",
+            "meada: ops/meada.workspace.toml:10: `repository.owner`: an owner belongs to the \
+             entries of a workspace version, which a static manifest has none of: use [workspace] \
+             source = \"store\" and `meada workspace import`\n",
+        ),
+        (
+            "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
+             path = \"../chain-web\"\nowner = \" team\"\n",
+            "meada: ops/meada.workspace.toml:6: `repository.owner`: has whitespace at either end\n",
+        ),
+        (
+            "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
+             path = \"../chain-web\"\nowner = [\"a\", \"b\"]\n",
+            "meada: ops/meada.workspace.toml:6: `repository.owner`: must be one string, the name \
+             of one group\n",
         ),
     ] {
         write_manifest(&dir, toml);

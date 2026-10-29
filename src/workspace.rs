@@ -352,6 +352,11 @@ impl Manifest {
                 return Err(config::error_at(file, &src, "repository", &beside));
             }
         }
+        // Only a workspace version has owners (ADR 0015): a static manifest has no editor.
+        if parsed.repositories.iter().any(|e| e.owner.is_some()) {
+            let owner = Msg::WorkspaceOwnerStatic.text();
+            return Err(config::error_at(file, &src, "repository.owner", &owner));
+        }
         let index_dir = base.join(index_dir);
         #[cfg(feature = "snapshot")]
         #[cfg_attr(not(feature = "generation-pointer"), allow(unused_mut))]

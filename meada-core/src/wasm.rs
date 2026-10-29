@@ -1,6 +1,7 @@
 //! The browser's bindings (feature `wasm-bindgen`): the console's workspace editor validates and
-//! names a version with the same functions as the CLI, and the graph views read an export with
-//! the types the binary writes it with.
+//! names a version with the same functions as the CLI and marks what a subject may not change
+//! with the server's authorization, and the graph views read an export with the types the binary
+//! writes it with.
 
 use wasm_bindgen::prelude::*;
 
@@ -26,7 +27,7 @@ pub fn workspace_version_id(src: &str) -> Option<String> {
     let entries = crate::manifest::validate_import("entries", src).ok()?;
     let blocks = crate::ids::entry_blocks(src);
     let entries: Vec<_> = (entries.iter().zip(&blocks))
-        .map(|(e, blocks)| (e.repo.as_str(), e.path.as_str(), blocks))
+        .map(|(e, blocks)| (e.repo.as_str(), e.path.as_str(), blocks, e.owner.as_deref()))
         .collect();
     Some(crate::ids::workspace_version_id(&entries))
 }
@@ -55,4 +56,51 @@ pub fn entries_text(repositories: &str) -> Result<String, String> {
         serde_json::from_str(repositories).map_err(|error| error.to_string())?;
     crate::workspace::entries_text(&repositories)
         .ok_or_else(|| "not repository entries".to_string())
+}
+
+/// The workspace text `src` as the JSON entries of a version document, the form
+/// `authorizeEntries` and `composeEntries` take; throws import's problems when it is not valid.
+#[wasm_bindgen(js_name = entriesJson)]
+pub fn entries_json(src: &str) -> Result<String, String> {
+    let entries = crate::workspace::version_entries("entries", src).map_err(|e| e.join("\n"))?;
+    serde_json::to_string(&entries).map_err(|error| error.to_string())
+}
+
+/// The entries `role` (`operator`, `team_operator` or `viewer`) may not change from `current` to `entries`,
+/// as JSON `[{identity, change, reason}]`, none when it may. Every other argument is JSON:
+/// `groups` an array of names, `grant` `"*"` or an array of identities, the entries a version's
+/// `repositories`.
+#[wasm_bindgen(js_name = authorizeEntries)]
+pub fn authorize_entries(
+    role: &str,
+    groups: &str,
+    grant: &str,
+    current: &str,
+    entries: &str,
+) -> Result<String, String> {
+    let role = serde_json::Value::from(role);
+    let refused = crate::authorize::authorize_entries(
+        serde_json::from_value(role).map_err(|e| e.to_string())?,
+        &from_json::<Vec<String>>(groups)?,
+        &from_json(grant)?,
+        &from_json::<Vec<_>>(current)?,
+        &from_json::<Vec<_>>(entries)?,
+    );
+    serde_json::to_string(&refused).map_err(|e| e.to_string())
+}
+
+/// The entries a team operator's save stores (`compose_entries`), as JSON; the arguments as
+/// `authorizeEntries` takes them.
+#[wasm_bindgen(js_name = composeEntries)]
+pub fn compose_entries(grant: &str, current: &str, submitted: &str) -> Result<String, String> {
+    let composed = crate::authorize::compose_entries(
+        &from_json(grant)?,
+        &from_json::<Vec<_>>(current)?,
+        &from_json::<Vec<_>>(submitted)?,
+    );
+    serde_json::to_string(&composed).map_err(|e| e.to_string())
+}
+
+fn from_json<T: serde::de::DeserializeOwned>(text: &str) -> Result<T, String> {
+    serde_json::from_str(text).map_err(|e| e.to_string())
 }

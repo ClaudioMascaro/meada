@@ -159,7 +159,7 @@ fn admits_a_bearer_token_for_the_console_s_audience() {
     assert_eq!(session.status, 200);
     assert_eq!(
         session.json(),
-        json!({"subject": SUBJECT, "role": "viewer"})
+        json!({"subject": SUBJECT, "role": "viewer", "groups": [], "grant": [WEB]})
     );
 
     let config = get(&console, "/api/v1/config");
@@ -985,5 +985,7 @@ fn refused_writes_are_authorized_and_audited_before_any_body_is_consumed() {
     }
 }
 
+#[cfg(feature = "refresh-lock")]
+mod team;
 #[cfg(feature = "refresh-lock")]
 mod writes;

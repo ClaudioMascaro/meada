@@ -163,6 +163,61 @@ fn workspace_section_errors_follow_lang() {
     }
 }
 
+/// An entry's `owner` (ADR 0015) under `pt_BR` and `en_US`: each rule it breaks, and the static
+/// manifest that holds one at all.
+#[test]
+fn owner_errors_follow_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_owner");
+    let head = "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
+                path = \"../chain-web\"\n";
+    let manifest = "meada: ops/meada.workspace.toml:6: `repository.owner`";
+    let long = "g".repeat(257);
+    let cases = [
+        (
+            "owner = 1\n".to_string(),
+            "must be one string, the name of one group",
+            "deve ser uma única string, o nome de um grupo",
+        ),
+        (
+            "owner = [\"a\"]\n".into(),
+            "must be one string, the name of one group",
+            "deve ser uma única string, o nome de um grupo",
+        ),
+        ("owner = \"\"\n".into(), "is empty", "está vazio"),
+        (
+            format!("owner = \"{long}\"\n"),
+            "is longer than 256 characters",
+            "tem mais de 256 caracteres",
+        ),
+        (
+            "owner = \"te\\u0007am\"\n".into(),
+            "holds a control character",
+            "contém um caractere de controle",
+        ),
+        (
+            "owner = \"team \"\n".into(),
+            "has whitespace at either end",
+            "tem espaço em branco numa das pontas",
+        ),
+        (
+            "owner = \"team\"\n".into(),
+            "an owner belongs to the entries of a workspace version, which a static manifest \
+             has none of: use [workspace] source = \"store\" and `meada workspace import`",
+            "um dono pertence às entradas de uma versão do workspace, que um manifest estático \
+             não tem: use [workspace] source = \"store\" e `meada workspace import`",
+        ),
+    ];
+    for (owner, en, pt) in cases {
+        fs::write(dir.join(MANIFEST), format!("{head}{owner}")).unwrap();
+        for (lang, what) in [("en_US.UTF-8", en), ("pt_BR.UTF-8", pt)] {
+            let refused = (String::new(), format!("{manifest}: {what}\n"), Some(1));
+            let args = ["index", "--workspace", MANIFEST];
+            assert_eq!(run_lang(&dir, lang, &args), refused, "{lang} {owner}");
+        }
+    }
+}
+
 /// With `generation-pointer`, under `pt_BR` and `en_US`: `[workspace] source = "store"` without
 /// its sections and beside `[[repository]]`, a command that reads entries refusing it, and the
 /// refusals of `meada workspace` that need no service (a malformed id, checked first, and a

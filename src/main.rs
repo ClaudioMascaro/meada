@@ -162,7 +162,12 @@ fn workspace(command: WorkspaceCommand) -> ! {
         #[cfg(feature = "refresh-lock")]
         WorkspaceCommand::Apply { version, workspace } => {
             let author = versions::cli_author();
-            versions::apply(&workspace, &version, &author).map(|state| format!("{state}\n"))
+            // The CLI holds the store's and Valkey's credentials: the global operator (ADR 0015).
+            let operator = meada_core::authorize::Role::Operator;
+            let grant = meada_core::authorize::Grant::All;
+            versions::apply(&workspace, &version, &author, operator, &[], &grant)
+                .map(|applied| format!("{}\n", applied.line))
+                .map_err(Into::into)
         }
         // The id on stdout either way; that nothing changed on stderr.
         WorkspaceCommand::Pull { workspace } => versions::pull(&workspace).map(|pulled| {
@@ -576,7 +581,8 @@ fn main() -> ExitCode {
         Command::Status {
             workspace: None, ..
         } => engine::status(here).map(|status| print!("{status}")),
-        // Every repository's problem on its own line; the others are refreshed all the same.
+        // Every repository's problem on its own line, then the stage and the count, exit 1;
+        // the others are refreshed all the same.
         Command::Index {
             workspace: Some(manifest),
         } => engine::index_workspace(&manifest).map(|problems| {
@@ -584,6 +590,7 @@ fn main() -> ExitCode {
                 eprintln!("meada: {problem}");
             }
             if !problems.is_empty() {
+                eprintln!("meada: {}", Msg::IndexFailed(problems.len()).text());
                 std::process::exit(1);
             }
         }),

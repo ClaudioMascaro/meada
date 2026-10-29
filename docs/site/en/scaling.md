@@ -28,7 +28,7 @@ Configure the same bucket, prefix and Valkey domain on the job and replicas. Giv
 
 S3 is accessed through its object API, not as a mounted volume. The shipped snapshot backend uses an S3-compatible endpoint, with TLS outside loopback. There is no `file://` backend.
 
-See [snapshots](snapshots.md) for store configuration, [generations](generations.md) for retention and [refresh](refresh.md) for lock and fence. The guarantee that any fetch or indexing failure aborts the entire publication is [planned in #316](https://github.com/ClaudioMascaro/meada/issues/316); job chaining and fence protection are already documented.
+See [snapshots](snapshots.md) for store configuration, [generations](generations.md) for retention and [refresh](refresh.md) for lock and fence. Any fetch or indexing failure aborts the entire publication and keeps the current generation ([#316](https://github.com/ClaudioMascaro/meada/issues/316)).
 
 ## Choose how to distribute indexes
 

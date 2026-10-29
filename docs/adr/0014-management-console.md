@@ -326,7 +326,9 @@ the spec fixes the details the slices build.
   workspace; left to #294. A deployment has one bootstrap manifest, one key prefix and one
   current version. (Amended 2026-10-22; #294: ADR 0015 keeps one workspace per deployment, with
   several workspaces per fleet and multi-tenant isolation out of scope, and lets teams own the
-  entries of the one workspace instead.)
+  entries of the one workspace instead. Amended 2026-10-23; #322: ADR 0020 records the direction
+  of spec S5, a named query context over shared indexing and publication, so the rejection
+  stands for isolated workspaces with their own indexing and publication, not for that.)
 
 ## Consequences
 

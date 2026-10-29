@@ -155,7 +155,9 @@ _Avoid_: reader, guest, read-only user
 The OIDC group, read from the token's `groups_claim`, that an entry of the workspace version
 names as the team answering for that repository. An entry has at most one owner; one without an
 owner is the global operator's. The owner is part of the workspace version, never of a
-generation, and never widens what a token may read (ADR 0015).
+generation (ADR 0012's bundle and generation ids never read it), and never widens what a token
+may read. It is entry metadata, not an access list of a workspace and not a source grant
+(ADR 0015).
 _Avoid_: tenant, maintainer, team lead, CODEOWNER
 
 **Team operator**:
@@ -230,6 +232,18 @@ with its author, time and message and named by a 16-hex id derived from the entr
 the same list gets the same id anywhere. One version is current at a time; applying an older one
 is the rollback, and each generation records the version that produced it.
 _Avoid_: revision, snapshot, manifest version
+
+**Named workspace**:
+A named query context: a name under which a query reads a chosen set of the repositories a
+deployment serves, and the links between them. It decides what an answer can see, and says
+nothing about how a repository is indexed or published; spec S5 owns its runtime (ADR 0020).
+_Avoid_: tenant, project, environment, isolated workspace
+
+**Shared indexing**:
+Indexing a repository and publishing its bundle and generation once, whatever number of named
+workspaces read it: no name costs a second index of the same repository at the same commit, and
+`meada index` reads no name (ADR 0020).
+_Avoid_: shared index, index sharing, replication
 
 **Provider**:
 The side of a contract that serves or defines it, such as the code handling a route or the

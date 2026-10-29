@@ -109,6 +109,8 @@ Un nodo sin heartbeat no aparece en la flota. Heartbeats malformados aparecen se
 
 Con OIDC, los lectores ven solo las identidades admitidas por su token. Para conceder el rol de operador, elige **una** opción: grupo en `ui.operator_groups` o claim en `ui.operator_claim` con valor booleano `true`. Los operadores ven toda la flota.
 
+Con `[workspace] source = "store"`, `operations = true` y `oidc.groups_claim`, quien tiene un grupo que es dueño (`owner = "<grupo>"`) de una entrada de la versión actual del workspace que su token lee es operador de equipo. Ve lo que un lector con el mismo grant ve y puede guardar y aplicar cambios en las entradas de su equipo; cambiar cualquier otra entrada, un owner o una entrada sin owner se rechaza con un 403 `entries_refused` que nombra las entradas (un apply cuenta las que están fuera del grant). Pointer y fence siguen siendo del operador. Mapea el grupo del equipo a sus identidades en `[oidc.groups]`: ser dueño nunca amplía lo que un token lee. La página de versiones muestra el equipo responsable de cada entrada a todos los roles, y el editor del operador de equipo contiene solo las entradas que su token lee, marca un cambio que la API rechazaría (con su motivo) antes de poder guardarlo y nombra los equipos que lo autorizan en sus confirmaciones, en lugar de un comando de la CLI.
+
 Las cuatro operaciones HTTP exigen OIDC y `operations = true`. Cada acción muestra el comando CLI y pide confirmación. Si se rechaza, muestra el mensaje del CLI, incluido el titular de un bloqueo ocupado. Cada intento genera una línea de auditoría en stderr, sin tokens ni bodies.
 
 <details markdown="1" class="reference-details">
@@ -117,6 +119,45 @@ Las cuatro operaciones HTTP exigen OIDC y `operations = true`. Cada acción mues
 Las operaciones de la consola requieren OIDC y están desactivadas por defecto. Al habilitarlas, usan el mismo bloqueo y las mismas comprobaciones del CLI para cambiar el puntero, recuperar el fence y gestionar versiones. Cada intento genera una línea de auditoría. El grant también limita grupos y errores del manifiesto; el login conserva los parámetros del issuer, y la recuperación respeta el reloj y el límite del contador de Valkey.
 
 </details>
+
+## Equipos
+
+Varios equipos pueden compartir un workspace: cada uno modifica sus propias entradas y el operador global responde por el resto. Las reglas numeradas son todo el contrato.
+
+1. **Confianza compartida.** El ownership por equipo es delegación, no aislamiento. Una entrada que un equipo añade la busca el job con las credenciales de la flota (una instalación de GitHub App o las credenciales git del job) y la lee todo grant `*`. Acepta esto antes de delegar.
+2. **La clave `owner`.** Una entrada de versión del workspace puede llevar `owner = "<grupo OIDC>"`: de 1 a 256 caracteres, sin carácter de control ni espacio en blanco en los extremos, comparada exactamente, con mayúsculas y minúsculas. Un grupo que el proveedor envía con un carácter de control, o con más de 256 caracteres, no puede ser dueño de una entrada.
+
+    ```toml
+    [[repository]]
+    repo = "github.exemplo.internal/acme/billing"
+    path = "/var/lib/meada/mirrors/billing"
+    owner = "team-billing"
+
+    [[repository]]
+    repo = "github.exemplo.internal/acme/api"
+    path = "/var/lib/meada/mirrors/api"
+    ```
+
+    ```sh
+    meada workspace import repositories.toml --message "Assign billing to its team" --workspace /etc/meada/job.workspace.toml
+    ```
+
+3. **Quién cambia qué.** El operador de equipo puede editar y eliminar las entradas que sus equipos poseen y añadir entradas cuyo owner sea uno de sus equipos. El operador global conserva los cambios de owner (asignar, borrar o sustituir), las entradas sin owner, las entradas de otros owners y todas las operaciones de generación (`pointer` y `fence`).
+4. **Delegación.** Un grupo se vuelve equipo cuando el operador global le asigna su primera entrada. Un equipo que elimina su última entrada deja de serlo hasta que el operador global le asigne una de nuevo.
+5. **Configuración.** Ser dueño nunca amplía lo que lee un token. Mapea el grupo de cada equipo en `[oidc.groups]` a las identidades que posee, y a una identidad antes de que el equipo pueda añadirla; sin eso, el equipo no ve sus entradas, y una adición fuera del grant se rechaza con `outside_grant`.
+
+    ```toml
+    [oidc.groups]
+    "meada-operators" = ["*"]
+    # Un equipo: mapea su grupo a las identidades que posee.
+    "team-billing" = ["github.exemplo.internal/acme/billing"]
+    ```
+
+6. **Manifests estáticos.** `owner` en las entradas `[[repository]]` del propio manifest de bootstrap es un error: un manifest estático no tiene editor para delegar. Usa `[workspace] source = "store"` e importa las entradas.
+7. **CLI.** `meada workspace import` y `apply` actúan como operador global: guardan las credenciales del store y de Valkey, que ya permiten toda escritura.
+8. **Apply solo de owners.** La indexación nunca lee `owner`, así que aplicar una versión que solo cambia owners no genera una nueva generación. La vista de la flota sigue nombrando la versión que produjo primero la generación servida; no es un refresh atascado.
+9. **Posición.** Los propios saves del operador de equipo nunca mueven una entrada (la versión guardada deja en su sitio las entradas fuera del grant). Puede aplicar una versión almacenada cuya única diferencia sea el orden de las entradas.
+10. **Un repositorio con fallo.** Con la regla de aborto de la publicación completa, el repositorio con fallo de un equipo (credencial revocada, remoto borrado, fallo de parse) impide nuevas generaciones para todos los equipos hasta reparar la causa. Los nodos siguen sirviendo la última generación completa. Ver [Refresh](refresh.md).
 
 ## Operaciones por CLI
 

@@ -30,6 +30,9 @@ pub enum Msg<'a> {
     OtherVersion,
     Indexed(i64),
     OtherVersionWorkspace,
+    /// The last line of a failed `meada index --workspace`: the stage and how many of its
+    /// repositories, each named on its own line before it, failed (#316).
+    IndexFailed(usize),
     /// `meada_core::msg::Msg::ListedTwice`.
     ListedTwice,
     NoMirror(&'a str),
@@ -653,6 +656,9 @@ pub enum Msg<'a> {
     /// A write needs an admitted operator with an authenticated subject.
     #[cfg(feature = "ui")]
     UiOperatorRequired,
+    /// A team operator asking for an action that stays the global operator's (ADR 0015).
+    #[cfg(feature = "ui")]
+    UiGlobalOperatorRequired,
     /// A fixed audit refusal that never records invalid editor identities or text.
     #[cfg(feature = "ui")]
     UiEntriesInvalid,
@@ -738,6 +744,8 @@ pub enum Msg<'a> {
     /// `[[repository]]` entries beside `[workspace] source = "store"`.
     #[cfg(feature = "generation-pointer")]
     WorkspaceStoreBeside,
+    /// `owner` in the `[[repository]]` entries of a bootstrap manifest (`source = "file"`).
+    WorkspaceOwnerStatic,
     /// `meada mcp --listen` without `--generations`, given a `source = "store"` manifest.
     #[cfg(feature = "generation-pointer")]
     WorkspaceStoreRefused(&'a str),
@@ -800,6 +808,13 @@ pub enum Msg<'a> {
     WorkspaceNotVersion(&'a str),
     #[cfg(feature = "generation-pointer")]
     WorkspaceNoVersion(&'a str),
+    /// How many entries a version's apply may not change (ADR 0015); the console answers its
+    /// English text.
+    #[cfg(feature = "refresh-lock")]
+    WorkspaceRefused(usize),
+    /// A team operator whose groups own no entry it reads in the current version any more.
+    #[cfg(feature = "refresh-lock")]
+    WorkspaceRoleLost,
     /// A serialized import that its bounded reader could not read back.
     #[cfg(feature = "generation-pointer")]
     WorkspaceVersionTooLarge {
@@ -837,6 +852,14 @@ impl Msg<'_> {
             Msg::OtherVersionWorkspace => pick(
                 "indexed by another version; rebuilt by meada index --workspace".into(),
                 "indexado por outra versão; reconstruído por meada index --workspace".into(),
+            ),
+            Msg::IndexFailed(1) => pick(
+                "index failed for 1 repository".into(),
+                "a indexação falhou em 1 repositório".into(),
+            ),
+            Msg::IndexFailed(n) => pick(
+                format!("index failed for {n} repositories"),
+                format!("a indexação falhou em {n} repositórios"),
             ),
             Msg::ListedTwice => Core::ListedTwice.text(),
             Msg::NoMirror(path) => pick(
@@ -2180,6 +2203,15 @@ impl Msg<'_> {
                 "as escritas da console exigem um operador autenticado com subject".into(),
             ),
             #[cfg(feature = "ui")]
+            Msg::UiGlobalOperatorRequired => pick(
+                "this action needs the global operator: a team operator may only save and apply \
+                 workspace versions"
+                    .into(),
+                "esta ação exige o operador global: um operador de time só salva e aplica \
+                 versões do workspace"
+                    .into(),
+            ),
+            #[cfg(feature = "ui")]
             Msg::UiEntriesInvalid => pick(
                 "workspace entries failed validation".into(),
                 "as entradas do workspace falharam na validação".into(),
@@ -2444,6 +2476,14 @@ impl Msg<'_> {
                 "\"store\" needs a Meada built with the generation-pointer feature".into(),
                 "\"store\" exige um Meada compilado com a feature generation-pointer".into(),
             ),
+            Msg::WorkspaceOwnerStatic => pick(
+                "an owner belongs to the entries of a workspace version, which a static manifest \
+                 has none of: use [workspace] source = \"store\" and `meada workspace import`"
+                    .into(),
+                "um dono pertence às entradas de uma versão do workspace, que um manifest \
+                 estático não tem: use [workspace] source = \"store\" e `meada workspace import`"
+                    .into(),
+            ),
             #[cfg(feature = "generation-pointer")]
             Msg::WorkspaceStoreBeside => pick(
                 "[[repository]] entries beside [workspace] source = \"store\": the repositories \
@@ -2623,6 +2663,26 @@ impl Msg<'_> {
             Msg::WorkspaceNoVersion(key) => pick(
                 format!("{key}: no such workspace version in the store"),
                 format!("{key}: essa versão do workspace não está no store"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::WorkspaceRefused(n) => pick(
+                format!(
+                    "this change touches {n} entr{} you may not change: nothing applied",
+                    if *n == 1 { "y" } else { "ies" }
+                ),
+                format!(
+                    "esta mudança toca {n} {} que você não pode mudar: nada aplicado",
+                    if *n == 1 { "entrada" } else { "entradas" }
+                ),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::WorkspaceRoleLost => pick(
+                "no group of yours owns an entry you read in the current workspace version any \
+                 more: nothing applied"
+                    .into(),
+                "nenhum grupo seu é mais owner de uma entrada que você lê na versão atual do \
+                 workspace: nada aplicado"
+                    .into(),
             ),
             #[cfg(feature = "generation-pointer")]
             Msg::WorkspaceVersionTooLarge { key, max } => pick(

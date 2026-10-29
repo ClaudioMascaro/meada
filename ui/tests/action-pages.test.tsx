@@ -94,9 +94,9 @@ test.each(['en', 'pt-BR'] as const)('stuck cases offer named keyboard recovery c
 });
 afterEach(async () => { await act(() => root.render(null)); vi.unstubAllGlobals(); });
 
-test.each(['fleet', 'store'] as const)('the %s page hides actions from viewers and when operations are off', async kind => {
-  for (const role of ['viewer', 'operator'] as const) {
-    const settings = { ...config, operations: role === 'viewer' };
+test.each(['fleet', 'store'] as const)('the %s page hides actions from viewers, team operators and when operations are off', async kind => {
+  for (const role of ['viewer', 'team_operator', 'operator'] as const) {
+    const settings = { ...config, operations: role !== 'operator' };
     const fetch = vi.fn().mockResolvedValue(Response.json(kind === 'fleet' ? fleet : fixtures.store));
     vi.stubGlobal('fetch', fetch);
     await act(() => root.render(<OperationalPage kind={kind} api={new Api(new Auth(settings))} locale="en"
