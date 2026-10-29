@@ -204,6 +204,136 @@ fn oidc_type_errors_follow_lang() {
     }
 }
 
+/// The GitHub grant provider and the role check (#331) under `pt_BR` and `en_US`:
+/// `[oidc.github]` without `[postgres]`, a key error, the role check without `[oidc.github]`,
+/// without a `[[github_app]]` block for its host and, under `[refresh_lock]`, without
+/// `MEADA_REFRESH_FENCE`; and a reader of the pulled version without the exclusions file.
+#[cfg(all(feature = "oidc", feature = "postgres"))]
+#[test]
+fn oidc_github_and_role_check_refusals_follow_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_oidc_github");
+    let oidc = "index_dir = \"../indexes\"\n\n[oidc]\nissuer = \"https://id.example\"\npublic_url = \
+                \"https://meada.example\"\n";
+    let table = "[oidc.github]\nlogin_claim = \"github_login\"\nmax_age_seconds = 5400\n";
+    let postgres = "\n[postgres]\nschema = \"m\"\n";
+    let at = "meada: ops/meada.workspace.toml";
+    let index: &[&str] = &["index", "--workspace", MANIFEST];
+    let mut cases: Vec<(String, &[&str], String, String)> = vec![
+        (
+            format!("{oidc}{table}"),
+            index,
+            format!("{at}:6: `oidc.github`: [oidc.github] needs [postgres]\n"),
+            format!("{at}:6: `oidc.github`: [oidc.github] exige [postgres]\n"),
+        ),
+        (
+            format!(
+                "{oidc}{}{postgres}",
+                table.replace("login_claim", "host = \"A\"\nlogin_claim")
+            ),
+            index,
+            format!("{at}:7: `oidc.github.host`: must be a lowercase host name\n"),
+            format!("{at}:7: `oidc.github.host`: deve ser um nome de host em minúsculas\n"),
+        ),
+        (
+            format!(
+                "{oidc}{}{postgres}",
+                table.replace("max_age", "roles = []\nmax_age")
+            ),
+            index,
+            format!(
+                "{at}:8: `oidc.github.roles`: must be a non-empty array of distinct role names of 1 \
+                 to 100 characters with no control character\n"
+            ),
+            format!(
+                "{at}:8: `oidc.github.roles`: deve ser um array não vazio de nomes de papel \
+                 distintos, de 1 a 100 caracteres e sem caractere de controle\n"
+            ),
+        ),
+    ];
+    let roles: &[&str] = &["github-app", "roles", "--workspace", MANIFEST];
+    if cfg!(feature = "github-app") {
+        cases.push((
+            format!("{oidc}identities_claim = \"r\"\n{postgres}"),
+            roles,
+            "meada: ops/meada.workspace.toml: meada github-app roles needs [oidc.github]\n".into(),
+            "meada: ops/meada.workspace.toml: meada github-app roles exige [oidc.github]\n".into(),
+        ));
+        cases.push((
+            format!("{oidc}{table}{postgres}"),
+            roles,
+            format!(
+                "{at}:6: `oidc.github`: meada github-app roles needs a [[github_app]] block for \
+                 host github.com\n"
+            ),
+            format!(
+                "{at}:6: `oidc.github`: meada github-app roles exige um bloco [[github_app]] para \
+                 o host github.com\n"
+            ),
+        ));
+    }
+    #[cfg(all(feature = "github-app", feature = "refresh-lock"))]
+    {
+        fs::write(dir.join("ops/s3-secret"), "x\n").unwrap();
+        let fenced = format!(
+            "{oidc}{table}{postgres}{}\n[valkey]\nurl = \"redis://127.0.0.1:9\"\n\n\
+             [generations]\nkeep = 3\n\n[refresh_lock]\nttl_seconds = 10\n\n[[github_app]]\n\
+             host = \"github.com\"\napi = \"https://api.github.com\"\napp_id = 1\n\
+             private_key_env = \"K\"\n",
+            crate::snapshot::section("http://127.0.0.1:9", "unused")
+        );
+        cases.push((
+            fenced,
+            roles,
+            "meada: [refresh_lock] needs MEADA_REFRESH_FENCE: run meada github-app roles under \
+             meada snapshot lock\n"
+                .into(),
+            "meada: [refresh_lock] exige MEADA_REFRESH_FENCE: rode o meada github-app roles sob \
+             meada snapshot lock\n"
+                .into(),
+        ));
+    }
+    #[cfg(feature = "generation-pointer")]
+    {
+        fs::write(dir.join("ops/s3-secret"), "x\n").unwrap();
+        let pulled = dir.join("indexes/workspace");
+        let _ = fs::remove_dir_all(&pulled);
+        fs::create_dir_all(&pulled).unwrap();
+        let id = meada_core::ids::workspace_version_id(&[]);
+        let document = format!(
+            "{{\"id\":\"{id}\",\"author\":\"a\",\"time\":\"2026-10-29T00:00:00Z\",\"message\":\"m\",\
+             \"repositories\":[]}}"
+        );
+        fs::write(pulled.join(format!("{id}.json")), document).unwrap();
+        fs::write(pulled.join("current"), format!("{id} 1\n")).unwrap();
+        let store = format!(
+            "{oidc}{table}{postgres}{}\n[valkey]\nurl = \"redis://127.0.0.1:9\"\n\n\
+             [generations]\nkeep = 3\n\n[workspace]\nsource = \"store\"\n",
+            crate::snapshot::section("http://127.0.0.1:9", "unused")
+        );
+        let file = "ops/../indexes/workspace/excluded";
+        cases.push((
+            store,
+            index,
+            format!(
+                "meada: {file} is missing: run `meada github-app roles` after `meada workspace \
+                 pull`\n"
+            ),
+            format!(
+                "meada: {file} não existe: rode `meada github-app roles` depois de `meada \
+                 workspace pull`\n"
+            ),
+        ));
+    }
+    for (toml, args, en, pt) in cases {
+        fs::write(dir.join(MANIFEST), &toml).unwrap();
+        for (lang, expected) in [("en_US.UTF-8", en.clone()), ("pt_BR.UTF-8", pt)] {
+            let refused = (String::new(), expected, Some(1));
+            assert_eq!(run_lang(&dir, lang, args), refused, "{lang}: {toml}");
+        }
+    }
+}
+
 /// An entry's `owner` (ADR 0015) under `pt_BR` and `en_US`: each rule it breaks, and the static
 /// manifest that holds one at all.
 #[test]
@@ -974,26 +1104,26 @@ fn postgres_refusals_follow_lang() {
     assert_eq!(
         line(en, "9"),
         format!(
-            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 4: \
+            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 5: \
              run meada postgres migrate)"
         )
     );
     assert_eq!(
         line(pt, "9"),
         format!(
-            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da 4 deste Meada: \
+            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da 5 deste Meada: \
              rode meada postgres migrate)"
         )
     );
-    assert_eq!(meada(&dir, en, &at("9"), &MIGRATE).0, "4\n");
+    assert_eq!(meada(&dir, en, &at("9"), &MIGRATE).0, "5\n");
     for (lang, expected) in [
         (
             en,
-            format!("the schema {schema} is at version 4, above this Meada's 0: upgrade Meada"),
+            format!("the schema {schema} is at version 5, above this Meada's 0: upgrade Meada"),
         ),
         (
             pt,
-            format!("o schema {schema} está na versão 4, acima da 0 deste Meada: atualize o Meada"),
+            format!("o schema {schema} está na versão 5, acima da 0 deste Meada: atualize o Meada"),
         ),
     ] {
         let (_, stderr, code) = meada(&dir, lang, &at("0"), &MIGRATE);

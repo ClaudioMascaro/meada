@@ -342,6 +342,20 @@ impl Manifest {
         let ui = crate::ui::validated(file, &src, base, parsed.ui)?;
         #[cfg(feature = "postgres")]
         let postgres = modules::validated(file, &src, parsed.postgres, |p| p.validate(base))?;
+        // `[oidc.github]` keeps its permissions set in the data layer (ADR 0016); without the
+        // `postgres` feature its own check already named it.
+        #[cfg(all(feature = "oidc", feature = "postgres"))]
+        if oidc.as_ref().is_some_and(|o| o.github.is_some()) && postgres.is_none() {
+            let needed = Msg::NeedsSections {
+                section: "oidc.github",
+                needed: &["postgres"],
+            };
+            return Err(config::error_at(file, &src, "oidc.github", &needed.text()));
+        }
+        #[cfg(feature = "oidc")]
+        let github = oidc.as_ref().is_some_and(|o| o.github.is_some());
+        #[cfg(not(feature = "oidc"))]
+        let github = false;
         #[cfg(feature = "directory")]
         let directory = modules::validated(file, &src, parsed.directory, |d| d.validate(base))?;
         #[cfg(feature = "directory")]
@@ -401,22 +415,19 @@ impl Manifest {
         #[cfg(feature = "generation-pointer")]
         if store && pulled {
             let dir = index_dir.join(crate::snapshot::versions::DIR);
-            let not_pulled = || {
-                let (manifest, dir) = (file.display().to_string(), dir.display().to_string());
-                Msg::WorkspaceNotPulled {
-                    manifest: &manifest,
-                    dir: &dir,
-                }
-                .text()
+            // Under `[oidc.github]` without the additions the role check left out (#331).
+            let read = match github {
+                true => crate::snapshot::versions::eligible(&dir)?,
+                false => crate::snapshot::versions::pulled(&dir)?,
             };
-            let (id, repositories, text) =
-                crate::snapshot::versions::pulled(&dir)?.ok_or_else(not_pulled)?;
+            let not_pulled = || crate::snapshot::versions::not_pulled(file, &dir);
+            let (id, repositories, text) = read.ok_or_else(not_pulled)?;
             parsed.repositories = repositories;
             entries_src = text;
             version = Some(id);
         }
         #[cfg(not(feature = "generation-pointer"))]
-        let _ = pulled;
+        let _ = (pulled, github);
         // Each entry's blocks as written, in manifest order: the typed read checked them.
         #[cfg(feature = "snapshot")]
         let mut written = crate::snapshot::entry_blocks(&entries_src).into_iter();
@@ -499,6 +510,17 @@ impl Manifest {
     /// paths relative to `file`'s directory; without one it is refused, naming the pull.
     pub fn read_listed(file: &Path) -> Result<Self> {
         Self::read_from(file, true)
+    }
+
+    /// Whether the readers of the pulled version leave out what the exclusions file names:
+    /// `[oidc.github]` with `source = "store"` (#331).
+    #[cfg(feature = "generation-pointer")]
+    pub(crate) fn excludes(&self) -> bool {
+        #[cfg(feature = "oidc")]
+        let github = self.oidc.as_ref().is_some_and(|o| o.github.is_some());
+        #[cfg(not(feature = "oidc"))]
+        let github = false;
+        self.store && github
     }
 
     /// The `[valkey]` section and the `[[github_app]]` blocks of the manifest at `file`,

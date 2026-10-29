@@ -119,6 +119,8 @@ enum WorkspaceCommand {
     },
     Show {
         version: Option<String>,
+        #[arg(long, conflicts_with = "version")]
+        pulled: bool,
         #[arg(long)]
         workspace: PathBuf,
     },
@@ -183,9 +185,14 @@ fn workspace(command: WorkspaceCommand) -> ! {
             }
             listing.text()
         }),
-        WorkspaceCommand::Show { version, workspace } => {
-            versions::show(&workspace, version.as_deref())
-        }
+        WorkspaceCommand::Show {
+            pulled: true,
+            workspace,
+            ..
+        } => versions::show_pulled(&workspace),
+        WorkspaceCommand::Show {
+            version, workspace, ..
+        } => versions::show(&workspace, version.as_deref()),
         #[cfg(feature = "refresh-lock")]
         WorkspaceCommand::Apply { version, workspace } => {
             let author = versions::cli_author();
@@ -273,6 +280,11 @@ enum GithubAppCommand {
         #[arg(long, value_name = "SECONDS")]
         retry_after: Option<u64>,
     },
+    #[cfg(all(feature = "postgres", feature = "oidc"))]
+    Roles {
+        #[arg(long)]
+        workspace: PathBuf,
+    },
 }
 
 /// `meada github-app`: git's answer on stdout, notes on stderr; on a failure every line on
@@ -288,6 +300,8 @@ fn github_app(command: GithubAppCommand) -> ! {
             repository,
             retry_after,
         } => meada::github_app::throttled(&workspace, &repository, retry_after),
+        #[cfg(all(feature = "postgres", feature = "oidc"))]
+        GithubAppCommand::Roles { workspace } => meada::github_app::roles(&workspace),
     };
     match reply {
         Ok(reply) => {
@@ -533,6 +547,13 @@ fn main() -> ExitCode {
                     .mut_arg("retry_after", |a| a.help(Msg::GithubAppRetryAfter.text()))
             })
     });
+    #[cfg(all(feature = "github-app", feature = "postgres", feature = "oidc"))]
+    let matches = matches.mut_subcommand("github-app", |c| {
+        c.mut_subcommand("roles", |c| {
+            (c.about(Msg::GithubAppRoles.text()))
+                .mut_arg("workspace", |a| a.help(Msg::PostgresWorkspaceHelp.text()))
+        })
+    });
     #[cfg(feature = "ui")]
     let matches = matches.mut_subcommand("ui", |c| {
         (c.about(Msg::Ui.text()))
@@ -556,6 +577,7 @@ fn main() -> ExitCode {
             .mut_subcommand("show", |c| {
                 (c.about(Msg::WorkspaceShow.text()))
                     .mut_arg("version", |a| a.help(Msg::WorkspaceShowVersion.text()))
+                    .mut_arg("pulled", |a| a.help(Msg::WorkspaceShowPulled.text()))
                     .mut_arg("workspace", bootstrap)
             })
             .mut_subcommand("pull", |c| {

@@ -19,6 +19,8 @@
 //! (#291; `*` from either for all): the identity provider's claims grant, the one grant provider
 //! the grant is the union of (ADR 0016). `type` names the identity provider; none changes what a
 //! token is granted, and `[oidc.entra] overage = "ignore"` leaves a token in overage no groups.
+//! `[oidc.github]` configures the GitHub grant provider, whose permissions set `meada github-app
+//! roles` writes (#331); until its grant at admission (#332) it adds nothing to a grant.
 //! Routing checks it (403) and lists it (404), and it bounds the workspace of every answer behind
 //! it (#290): a repository outside it is absent. An identity the
 //! server does not serve grants nothing.
@@ -97,6 +99,15 @@ const TYPES: [&str; 4] = ["generic", "entra", "okta", "keycloak"];
 /// What `[oidc.entra] overage` accepts: `ignore`, a token in overage having no groups.
 const OVERAGES: [&str; 1] = ["ignore"];
 
+/// `[oidc.github] roles` by default: GitHub's five built-in repository roles, as `role_name`
+/// spells them.
+const ROLES: [&str; 5] = ["read", "triage", "write", "maintain", "admin"];
+// ponytail: the longest role name `[oidc.github] roles` takes, in characters, and the longest
+// `role_name` from GitHub the role check stores; a longer one is refused (a skipped row).
+const ROLE_MAX: usize = 100;
+/// The shortest `[oidc.github] max_age_seconds`.
+const MAX_AGE_MIN: i64 = 60;
+
 /// The `[oidc]` section as written: the identity provider.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -114,6 +125,7 @@ pub struct File {
     scopes: Option<Vec<String>>,
     jwks_refresh_seconds: Option<i64>,
     entra: Option<Entra>,
+    github: Option<GithubFile>,
 }
 
 /// `[oidc.entra]`: the settings only Entra ID needs.
@@ -121,6 +133,79 @@ pub struct File {
 #[serde(deny_unknown_fields)]
 struct Entra {
     overage: Option<toml::Value>,
+}
+
+/// `[oidc.github]`: the GitHub grant provider (ADR 0016).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GithubFile {
+    host: Option<String>,
+    login_claim: Option<String>,
+    roles: Option<Vec<String>>,
+    max_age_seconds: Option<i64>,
+}
+
+/// The validated `[oidc.github]`: what `meada github-app roles` checks against (#331); the grant
+/// at admission, which reads `login_claim` and `max_age`, is #332's.
+#[allow(dead_code)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct Github {
+    /// The git host whose identities it grants, a lowercase host name.
+    pub host: String,
+    /// The top-level claim holding a subject's GitHub login.
+    pub login_claim: String,
+    /// The accepted roles, compared exactly with GitHub's `role_name`.
+    pub roles: Vec<String>,
+    /// How old the newest permissions set may be and still grant.
+    pub max_age: Duration,
+}
+
+/// Whether `role` is a role name `[oidc.github] roles` takes: 1 to `ROLE_MAX` characters with no
+/// control character. GitHub's `role_name`s are checked alike before they are stored.
+pub(crate) fn role_ok(role: &str) -> bool {
+    (1..=ROLE_MAX).contains(&role.chars().count()) && !role.chars().any(char::is_control)
+}
+
+impl GithubFile {
+    fn validate(self) -> Result<Github, crate::modules::Problem> {
+        // Without the data layer there is no permissions set to read or write.
+        if !cfg!(feature = "postgres") {
+            let (section, feature) = ("oidc.github", "postgres");
+            return Err(("oidc.github", Msg::NeedsFeature { section, feature }.text()));
+        }
+        let host = self.host.unwrap_or_else(|| "github.com".into());
+        let named = !host.is_empty()
+            && (host.bytes()).all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.'));
+        if !named {
+            return Err(("oidc.github.host", Msg::OidcGithubHost.text()));
+        }
+        let login_claim = match self.login_claim {
+            None => {
+                let missing = Msg::KeyMissing("oidc.github.login_claim").text();
+                return Err(("oidc.github", missing));
+            }
+            Some(claim) if claim.is_empty() => {
+                return Err(("oidc.github.login_claim", Msg::OidcEmpty.text()));
+            }
+            Some(claim) => claim,
+        };
+        let roles = (self.roles).unwrap_or_else(|| ROLES.map(str::to_string).to_vec());
+        let distinct = (roles.iter().enumerate()).all(|(n, r)| !roles[..n].contains(r));
+        if roles.is_empty() || !roles.iter().all(|r| role_ok(r)) || !distinct {
+            return Err(("oidc.github.roles", Msg::OidcGithubRoles(ROLE_MAX).text()));
+        }
+        let key = "oidc.github.max_age_seconds";
+        let Some(max_age) = self.max_age_seconds else {
+            return Err(("oidc.github", Msg::KeyMissing(key).text()));
+        };
+        let max_age = crate::modules::at_least(key, Some(max_age), MAX_AGE_MIN, MAX_AGE_MIN)?;
+        Ok(Github {
+            host,
+            login_claim,
+            roles,
+            max_age: Duration::from_secs(max_age),
+        })
+    }
 }
 
 /// The validated section.
@@ -142,6 +227,8 @@ pub struct Config {
     pub scopes: Vec<String>,
     /// How often the JWKS is fetched again.
     pub refresh: Duration,
+    /// `[oidc.github]`, the GitHub grant provider.
+    pub github: Option<Github>,
 }
 
 impl File {
@@ -171,7 +258,9 @@ impl File {
             }
             (None, None) => None,
         };
-        if self.identities_claim.is_none() && groups.is_none() {
+        let github = self.github.map(GithubFile::validate).transpose()?;
+        // The GitHub grant provider alone may grant: no claim is needed beside it.
+        if self.identities_claim.is_none() && groups.is_none() && github.is_none() {
             return Err(("oidc.identities_claim", Msg::OidcNoClaim.text()));
         }
         let scopes = self.scopes.unwrap_or_default();
@@ -214,6 +303,7 @@ impl File {
             groups,
             scopes,
             refresh,
+            github,
         })
     }
 }
@@ -943,6 +1033,67 @@ mod tests {
     }
 
     #[test]
+    fn the_github_table_takes_its_defaults_and_names_each_bad_key() {
+        let table = |rest: &str| format!("[github]\nlogin_claim = \"github_login\"\n{rest}");
+        let parsed = bare(&table("max_age_seconds = 5400\n"));
+        if !cfg!(feature = "postgres") {
+            // Without the data layer the table is the error naming the feature.
+            assert_eq!(parsed.err().map(|e| e.0), Some("oidc.github"));
+            return;
+        }
+        // Alone, with neither `identities_claim` nor `groups_claim`.
+        let github = parsed.unwrap().github.unwrap();
+        assert_eq!(github.host, "github.com");
+        assert_eq!(github.login_claim, "github_login");
+        assert_eq!(github.roles, ROLES);
+        assert_eq!(github.max_age, Duration::from_secs(5400));
+        let custom = "host = \"ghe.example\"\nroles = [\"Custom Role\", \"read\"]\n\
+                      max_age_seconds = 60\n";
+        let github = bare(&table(custom)).unwrap().github.unwrap();
+        assert_eq!(github.host, "ghe.example");
+        assert_eq!(github.roles, ["Custom Role", "read"]);
+        let long = format!("roles = [\"{}\"]\nmax_age_seconds = 60\n", "r".repeat(101));
+        for (rest, key) in [
+            ("max_age_seconds = 59\n", "oidc.github.max_age_seconds"),
+            ("", "oidc.github"),
+            (
+                "host = \"GitHub.com\"\nmax_age_seconds = 60\n",
+                "oidc.github.host",
+            ),
+            ("host = \"\"\nmax_age_seconds = 60\n", "oidc.github.host"),
+            (
+                "host = \"github.com:443\"\nmax_age_seconds = 60\n",
+                "oidc.github.host",
+            ),
+            ("roles = []\nmax_age_seconds = 60\n", "oidc.github.roles"),
+            (
+                "roles = [\"read\", \"read\"]\nmax_age_seconds = 60\n",
+                "oidc.github.roles",
+            ),
+            (
+                "roles = [\"\"]\nmax_age_seconds = 60\n",
+                "oidc.github.roles",
+            ),
+            (
+                "roles = [\"re\\nad\"]\nmax_age_seconds = 60\n",
+                "oidc.github.roles",
+            ),
+            (&long, "oidc.github.roles"),
+        ] {
+            assert_eq!(bare(&table(rest)).err().map(|e| e.0), Some(key), "{rest}");
+        }
+        let claimless = "[github]\nmax_age_seconds = 60\n";
+        assert_eq!(bare(claimless).err().map(|e| e.0), Some("oidc.github"));
+        let empty = "[github]\nlogin_claim = \"\"\nmax_age_seconds = 60\n";
+        assert_eq!(
+            bare(empty).err().map(|e| e.0),
+            Some("oidc.github.login_claim")
+        );
+        let at_most = format!("roles = [\"{}\"]\nmax_age_seconds = 60\n", "é".repeat(100));
+        assert!(bare(&table(&at_most)).is_ok());
+    }
+
+    #[test]
     fn the_claims_and_the_groups_table_are_checked_together() {
         let groups = "[groups]\n\"team-a\" = [\"a\"]\n";
         let config = bare(&format!("groups_claim = \"groups\"\n{groups}")).unwrap();
@@ -1171,6 +1322,7 @@ mod tests {
             groups: None,
             scopes: scopes.iter().map(|s| s.to_string()).collect(),
             refresh: Duration::from_secs(3600),
+            github: None,
         }
     }
 

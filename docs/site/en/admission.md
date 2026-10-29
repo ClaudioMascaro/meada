@@ -19,7 +19,7 @@ type = "generic"                                # default; "entra", "okta" or "k
 issuer = "https://id.example.internal/realms/agents"
 public_url = "https://meada.example.internal"   # the URL clients use, behind the proxy
 audience = "https://meada.example.internal"     # optional; default: the endpoint's canonical URL
-identities_claim = "meada_repositories"          # optional with groups_claim
+identities_claim = "meada_repositories"          # optional with groups_claim or [oidc.github]
 groups_claim = "groups"                          # optional, together with [oidc.groups]
 scopes = ["meada:read"]                          # optional, announced and required
 jwks_refresh_seconds = 3600                      # default; at least 60
@@ -33,7 +33,9 @@ jwks_refresh_seconds = 3600                      # default; at least 60
 or `keycloak`. None changes the admission, the grant or an answer; the type shows on the
 console's admission page. Only `entra` takes a table of its own, `[oidc.entra]`, with one key,
 `overage`, which for now accepts only `"ignore"` (the default): a token in overage, with no
-`groups`, has no groups. `[oidc.entra]` under another `type` is an error.
+`groups`, has no groups. `[oidc.entra]` under another `type` is an error. `[oidc.github]`, the
+GitHub grant provider, has its own section in [GitHub App credentials](github-app.md#role-check);
+with it neither claim is required, and for now it adds nothing to the grant.
 
 ## Prepare the identity provider
 
