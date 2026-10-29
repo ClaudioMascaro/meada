@@ -10,7 +10,7 @@ export interface Config {
   audience?: string;
 }
 
-export interface Session { subject: string | null; role: 'viewer' | 'team_operator' | 'operator' }
+export interface Session { subject: string | null; role: 'viewer' | 'team_operator' | 'operator'; groups?: string[]; grant?: '*' | string[]; teams?: string[] }
 export interface Module { section: string; feature: string; built: boolean }
 export interface Manifest {
   file: string;

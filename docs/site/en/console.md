@@ -109,6 +109,8 @@ A node without a heartbeat is absent from the fleet. Malformed heartbeats appear
 
 With OIDC, viewers see only identities admitted by their token. To grant the operator role, choose **one** setting: membership in `ui.operator_groups` or a `ui.operator_claim` with boolean value `true`. Operators see the whole fleet.
 
+With `[workspace] source = "store"`, `operations = true` and `oidc.groups_claim`, a subject one of whose groups owns (`owner = "<group>"`) an entry of the current workspace version that its token reads is a team operator. It sees what a viewer with its grant sees and may save and apply changes to its team's entries; a change to any other entry, to an owner or to an entry without an owner is refused with a 403 `entries_refused` that names the entries (an apply counts the ones outside the grant). Pointer and fence operations stay with the operator. Map the team's group to its identities in `[oidc.groups]`: ownership never widens what a token reads.
+
 The four HTTP operations require OIDC and `operations = true`. Each action shows its CLI command and asks for confirmation. Refusals show the CLI message, including a busy lock's holder. Every attempt writes an audit line to stderr, without tokens or bodies.
 
 <details markdown="1" class="reference-details">

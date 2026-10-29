@@ -529,8 +529,9 @@ impl Console {
             // A team operator saves and applies workspace versions; the generation operations
             // stay the global operator's (ADR 0015).
             let team = session.team() && route.is_some_and(|r| r.starts_with("workspace/"));
-            if !(session.operator || team) || session.subject.as_deref().is_none_or(str::is_empty) {
-                let message = match session.team() {
+            let anonymous = session.subject.as_deref().is_none_or(str::is_empty);
+            if !(session.operator || team) || anonymous {
+                let message = match session.team() && !anonymous {
                     true => Msg::UiGlobalOperatorRequired.text(),
                     false => Msg::UiOperatorRequired.text(),
                 };
