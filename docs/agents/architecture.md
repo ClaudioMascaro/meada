@@ -2467,6 +2467,9 @@ one for the area a change touches.
 
 ## Known ceilings
 
+- `directory/read.rs`: the owner picker lists at most `PICKER_MAX` (100) group names and says
+  nothing when it cut the list; the global operator narrows it by typing more of the prefix
+  (#335).
 - `meada-core/src/manifest.rs`: an entry's `owner` holds at most `OWNER_MAX` (256) characters
   (ADR 0015); a longer name is an error naming its line and key, wherever the entry is read
   (import, a stored version, a pull, the browser).

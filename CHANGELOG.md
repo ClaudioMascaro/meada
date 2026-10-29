@@ -64,7 +64,8 @@ All notable changes to Meada are recorded here. The format follows
   page. A user never provisioned is admitted. With the directory unreadable, reads are admitted
   and a write is a 503 `audit_unavailable` before any audit insert, with one stderr line that
   names the directory and never the claim. Migration 4 adds the directory's state row (the schema
-  version is now 4).
+  version is now 4); a directory that had already lost its last group before the upgrade starts
+  with no group ever provisioned, so nothing is flagged until a group is provisioned again.
 - The owner picker: `GET /api/v1/directory/groups?prefix=<text>`, for the global operator alone,
   lists at most 100 group names starting with the prefix (compared exactly, sorted), and the
   workspace editor offers them while the caret is inside an `owner = "..."` string.

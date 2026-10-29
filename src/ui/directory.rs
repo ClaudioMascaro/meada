@@ -60,8 +60,8 @@ impl Console {
     }
 
     /// `GET directory/groups?prefix=<text>` (global operator only, S2's role refusal for anyone
-    /// else): `{"groups": [...]}`, at most 100 values of `group_attribute` starting with the
-    /// percent-decoded prefix (none lists the first 100), exactly compared, sorted by byte. More
+    /// else): `{"groups": [...]}`, at most `PICKER_MAX` values of `group_attribute` starting with the
+    /// percent-decoded prefix (none lists the first `PICKER_MAX`), exactly compared, sorted by byte. More
     /// than one parameter, another name or a prefix over `OWNER_MAX` characters is a 400.
     pub(super) fn directory_groups(&self, query: Option<&str>, session: &Session) -> Answer {
         if !session.operator {

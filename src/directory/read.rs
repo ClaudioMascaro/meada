@@ -68,16 +68,13 @@ impl Directory {
             return Ok(false);
         }
         let (opened, schema) = self.connect().await?;
-        let (user, marker) = match self.user_attribute {
-            "externalId" => ("external_id = $1", "external_id = $1"),
-            _ => (
-                "lower(user_name) = lower($1)",
-                "lower(user_name) = lower($1)",
-            ),
+        let matches = match self.user_attribute {
+            "externalId" => "external_id = $1",
+            _ => "lower(user_name) = lower($1)",
         };
         let sql = format!(
-            "SELECT EXISTS (SELECT 1 FROM {schema}.directory_users WHERE {user} AND NOT active) \
-             OR EXISTS (SELECT 1 FROM {schema}.directory_revoked WHERE {marker})"
+            "SELECT EXISTS (SELECT 1 FROM {schema}.directory_users WHERE {matches} AND NOT active) \
+             OR EXISTS (SELECT 1 FROM {schema}.directory_revoked WHERE {matches})"
         );
         let row = (opened.client).query_one(&sql, &[&claim]).await;
         let row = row.map_err(|e| opened.scrub(e))?;
