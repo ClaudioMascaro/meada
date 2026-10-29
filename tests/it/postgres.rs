@@ -25,7 +25,7 @@ pub(crate) fn service() -> Option<String> {
     url
 }
 
-/// A schema of this test's own, dropped first in case a previous run left it.
+/// A schema of this test's own; each test drops it first, in case a previous run left it.
 pub(crate) fn schema(case: &str) -> String {
     format!("meada_t{}_{case}", std::process::id())
 }
@@ -286,15 +286,18 @@ fn migrate_creates_the_schema_once_and_a_second_run_changes_nothing() {
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
 }
 
-/// Two runs serialize on the schema's advisory lock: one waits while the lock is held, and two
-/// started together both succeed at the binary's version.
+/// Two runs serialize on the schema's advisory lock: one waits while the lock is held, longer
+/// than `statement_timeout_seconds`, and two started together both succeed at the binary's
+/// version.
 #[test]
 fn two_migrations_serialize_on_the_advisory_lock() {
     let Some(url) = service() else { return };
     let schema = schema("lock");
     let admin = Admin::new(&url);
     admin.run(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"));
-    let dir = manifest("postgres_lock", &format!("schema = \"{schema}\"\n"));
+    // A one-second statement bound: the wait on the lock outlasts it.
+    let lines = format!("schema = \"{schema}\"\nstatement_timeout_seconds = 1\n");
+    let dir = manifest("postgres_lock", &lines);
     let spawn = || {
         Command::new(env!("CARGO_BIN_EXE_meada"))
             .current_dir(&dir)

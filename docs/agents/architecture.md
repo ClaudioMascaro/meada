@@ -337,17 +337,20 @@ one for the area a change touches.
   (default `MEADA_POSTGRES_URL`) or `url_file`, at most one; `ca_file`; `schema` (default
   `meada`, lowercase letters, digits and `_`, starting with a letter, 1 to 63 characters);
   `pool_size` (4), `connect_timeout_seconds` (5) and `statement_timeout_seconds` (10), each at
-  least 1; every problem names its key. The URL is read only when a process connects
+  least 1, the last at most `STATEMENT_MAX` (Postgres's `INT_MAX` milliseconds); every problem names its key. The URL is read only when a process connects
   (`Config::url`), kept in memory, and `parse` accepts only `postgres://` or `postgresql://` with
   a TCP host (a name or an address rustls can verify, so no Unix socket path and no host list),
   optionally a user, a password, a port and a database, and no query or fragment, so no
-  `sslmode`: an error names `postgres.url_env` or `postgres.url_file`, never the URL or a part of
-  it. The TLS rule is `over_tls`: a host outside loopback (`modules::loopback`) always connects
+  `sslmode`: such a refusal, an unset variable or an unreadable file is an error naming
+  `postgres.url_env` or `postgres.url_file`, never the URL or a part of it; once connected an
+  error never carries the password, but may name the host (a certificate for another name) or
+  the user (a refused login). The TLS rule is `over_tls`: a host outside loopback (`modules::loopback`) always connects
   over TLS with its name verified, against `ca_file` alone when set, else the platform verifier;
   a loopback host connects in plain TCP unless `ca_file` is set, then over TLS against that file.
   `open` makes the TCP connection itself and hands it to tokio-postgres (`connect_raw`, no
   `runtime` feature) with its own `TlsConnect` over tokio-rustls and ring (no channel binding),
-  bounded by `connect_timeout_seconds`, every statement bounded by `statement_timeout_seconds`
+  the URL read, the TCP connection and the handshake bounded together by
+  `connect_timeout_seconds`, every statement bounded by `statement_timeout_seconds`
   (`-c statement_timeout`), the password scrubbed from every error. Every table lives in
   `[postgres] schema` and every statement names it, quoted (`Config::quoted`): Meada writes
   nothing outside it (ADR 0002, invariant 3). `MIGRATIONS` lists the migrations in order; a
@@ -356,8 +359,8 @@ one for the area a change touches.
   created in its transaction when absent. `migrate` (`meada postgres migrate --workspace
   <bootstrap manifest>`, reading `Manifest::postgres`, no mirror) is the only command that
   creates or alters a table: it takes `pg_advisory_lock` on `lock_key(schema)` (the first eight
-  bytes of BLAKE3 of `meada postgres migrate <schema>`, so two runs serialize; the wait is a
-  statement, bounded by `statement_timeout_seconds`), applies each migration from the stored
+  bytes of BLAKE3 of `meada postgres migrate <schema>`, so two runs serialize; the wait runs
+  with `statement_timeout` off, so a run waits for the one before it whatever it takes), applies each migration from the stored
   version to the binary's in its own transaction, prints the version reached and refuses a
   stored version above the binary's, never lowering it. The version check, `connect`, is the
   one function every other connection goes through: it reads the version (`stored`, 0 for an
@@ -368,7 +371,8 @@ one for the area a change touches.
   `MEADA_POSTGRES_VERSION_MAX` caps the version the binary knows (`known`), a test knob as
   `MEADA_DRAIN_MS` is, ignored by release builds. `status --workspace` prints `postgres:
   reachable, schema <name> version <n>` or `postgres: unreachable (<reason>)` within
-  `connect_timeout_seconds`, a version refusal being the reason, since every process treats it
+  `connect_timeout_seconds` (a readiness probe running `status --workspace` waits that long for
+  a Postgres that does not answer, where the Valkey line waits at most `PING_TIMEOUT`), a version refusal being the reason, since every process treats it
   as unreachable; the line never changes the exit code, as the Valkey line does. Who connects:
   the console (audit, directory, permissions, overage), nodes with `[oidc.github]` or overage
   through the directory (reads only), the job's `meada github-app roles` and the CLI twins that

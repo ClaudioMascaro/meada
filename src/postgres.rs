@@ -1,8 +1,10 @@
 //! The data layer (ADR 0016, feature `postgres`): the durable mutable state of server mode, in a
 //! Postgres (15 and later) that the bootstrap manifest's `[postgres]` section names without a
 //! secret. The URL comes only from the variable `url_env` or the file `url_file` names, is read
-//! when a process connects and kept in memory only; an error names the key, never the URL or a
-//! part of it. A host outside loopback always connects over TLS with its name verified, against
+//! when a process connects and kept in memory only; a URL that fails a check, an unset variable
+//! or an unreadable file is an error naming the key, never the URL or a part of it. Once
+//! connected, an error never carries the password, but may name the host (a certificate for
+//! another name) or the user (a refused login). A host outside loopback always connects over TLS with its name verified, against
 //! `ca_file` alone when set, else the system roots; a loopback host connects in plain TCP unless
 //! `ca_file` is set (`over_tls`). The client is tokio-postgres on the binary's tokio runtime,
 //! with rustls and ring: no ORM and no second TLS stack.
@@ -47,6 +49,8 @@ const URL_MAX: u64 = 4096;
 const CA_MAX: u64 = 1 << 20;
 /// Postgres's longest identifier (`NAMEDATALEN - 1`).
 const SCHEMA_MAX: usize = 63;
+/// The longest `statement_timeout` Postgres takes, in seconds (`INT_MAX` milliseconds).
+const STATEMENT_MAX: u64 = i32::MAX as u64 / 1000;
 
 /// The migrations in order: migration `n` is `MIGRATIONS[n - 1]`, `{schema}` standing for the
 /// quoted schema. `migrate` creates the schema itself, in migration 1's transaction, when it is
@@ -95,6 +99,7 @@ impl File {
         }
         let seconds =
             |key, value, default| at_least(key, value, default, 1).map(Duration::from_secs);
+        let statement = "postgres.statement_timeout_seconds";
         Ok(Config {
             url: url.unwrap_or_else(|| Secret::Env(URL_ENV.into())),
             ca_file: self.ca_file.map(|f| base.join(f)),
@@ -105,11 +110,12 @@ impl File {
                 self.connect_timeout_seconds,
                 5,
             )?,
-            statement_timeout: seconds(
-                "postgres.statement_timeout_seconds",
-                self.statement_timeout_seconds,
-                10,
-            )?,
+            statement_timeout: match seconds(statement, self.statement_timeout_seconds, 10)? {
+                bound if bound.as_secs() > STATEMENT_MAX => {
+                    return Err((statement, Msg::AtMost(STATEMENT_MAX).text()));
+                }
+                bound => bound,
+            },
         })
     }
 }
@@ -323,9 +329,19 @@ impl AsyncWrite for Stream {
 }
 
 /// A connection to the configured Postgres, its version not checked (`migrate` alone uses it as
-/// is): the URL read, TCP to its host, TLS by `over_tls`, within `connect_timeout_seconds`, and
-/// every statement bounded by `statement_timeout_seconds`. An error never carries the password.
+/// is): the URL read, TCP to its host, TLS by `over_tls`, all within `connect_timeout_seconds`,
+/// and every statement bounded by `statement_timeout_seconds`. An error never carries the
+/// password.
 async fn open(config: &Config) -> Result<Opened, String> {
+    let bound = config.connect_timeout;
+    match tokio::time::timeout(bound, handshake(config)).await {
+        Ok(opened) => opened,
+        Err(_) => Err(Msg::PostgresTimeout(bound.as_millis() as u64).text()),
+    }
+}
+
+/// `open` without its bound.
+async fn handshake(config: &Config) -> Result<Opened, String> {
     let url = config.url().await?;
     let secret = (url.password.as_deref()).map(|p| String::from_utf8_lossy(p).into_owned());
     let mut pg = tokio_postgres::Config::new();
@@ -343,7 +359,7 @@ async fn open(config: &Config) -> Result<Opened, String> {
         .options(format!("-c statement_timeout={statement}"));
     let tls = over_tls(&url.host, config.ca_file.is_some());
     let ca_file = config.ca_file.clone();
-    let connected = async {
+    let connected: Result<_, String> = async {
         let tcp = TcpStream::connect((url.host.as_str(), url.port)).await;
         let tcp = tcp.map_err(|e| e.to_string())?;
         let _ = tcp.set_nodelay(true);
@@ -365,13 +381,9 @@ async fn open(config: &Config) -> Result<Opened, String> {
             client
         };
         Ok(client)
-    };
-    let bound = config.connect_timeout;
-    let client = match tokio::time::timeout(bound, connected).await {
-        Ok(connected) => connected,
-        Err(_) => Err(Msg::PostgresTimeout(bound.as_millis() as u64).text()),
-    };
-    let client = client.map_err(|e: String| scrub(&e, secret.as_deref()))?;
+    }
+    .await;
+    let client = connected.map_err(|e| scrub(&e, secret.as_deref()))?;
     Ok(Opened { client, secret })
 }
 
@@ -478,7 +490,7 @@ fn lock_key(schema: &str) -> i64 {
 
 /// `meada postgres migrate --workspace <manifest>`: brings the schema `[postgres]` names to the
 /// version this binary knows, under the advisory lock of `lock_key`, so two runs serialize (the
-/// lock's wait is a statement, bounded by `statement_timeout_seconds`). Each migration runs in
+/// lock's wait has no bound: a run waits for the one before it to finish). Each migration runs in
 /// its own transaction, migration 1 creating the schema when it is absent. A version above the
 /// binary's is refused, never lowered. Returns the version reached.
 pub fn migrate(manifest: &Path) -> crate::Result<i32> {
@@ -487,10 +499,19 @@ pub fn migrate(manifest: &Path) -> crate::Result<i32> {
     let run = async {
         let mut opened = open(&config).await?;
         let key = lock_key(&config.schema);
+        // The wait is a statement: `statement_timeout_seconds` would cancel it.
+        let unbounded = (opened.client)
+            .batch_execute("SET statement_timeout = 0")
+            .await;
+        unbounded.map_err(|e| opened.scrub(e))?;
         let lock = (opened.client)
             .execute("SELECT pg_advisory_lock($1)", &[&key])
             .await;
         lock.map_err(|e| opened.scrub(e))?;
+        let bounded = (opened.client)
+            .batch_execute("RESET statement_timeout")
+            .await;
+        bounded.map_err(|e| opened.scrub(e))?;
         let reached = steps(&mut opened, &config).await;
         // Closing the connection releases the lock too.
         let _ = (opened.client)
@@ -536,7 +557,8 @@ async fn steps(opened: &mut Opened, config: &Config) -> Result<i32, String> {
 
 /// The `postgres:` line `meada status --workspace` prints: reachable with the schema and its
 /// version, or unreachable with the reason, a version this binary does not know included, since
-/// every process treats it as unreachable. Bounded by `connect_timeout_seconds`.
+/// every process treats it as unreachable. Bounded by `connect_timeout_seconds`: a readiness
+/// probe that runs `status --workspace` waits that long for a Postgres that does not answer.
 pub fn status_line(config: &Config) -> String {
     let bound = config.connect_timeout;
     let probe = async { connect(config).await.map(|(_, version)| version) };
@@ -603,9 +625,14 @@ mod tests {
                 "statement_timeout_seconds = -1",
                 "postgres.statement_timeout_seconds",
             ),
+            (
+                "statement_timeout_seconds = 2147484",
+                "postgres.statement_timeout_seconds",
+            ),
         ] {
             assert_eq!(section(toml).err().map(|e| e.0), Some(key), "{toml}");
         }
+        assert!(section("statement_timeout_seconds = 2147483").is_ok());
         assert!(section(&format!("schema = \"{}\"", "a".repeat(63))).is_ok());
         assert!(section("schema = \"m_9\"").is_ok());
     }
@@ -720,5 +747,16 @@ mod tests {
         );
         let err = runtime.block_on(missing.url()).unwrap_err();
         assert!(err.starts_with("`postgres.url_file`: "), "{err}");
+        // Past `URL_MAX`, the file is refused, naming it.
+        let big = std::env::temp_dir().join(format!("meada-postgres-url-{pid}"));
+        std::fs::write(&big, vec![b'x'; URL_MAX as usize + 1]).unwrap();
+        let config = section(&format!("url_file = \"{}\"", big.display())).unwrap();
+        let err = runtime.block_on(config.url()).unwrap_err();
+        assert!(err.ends_with("larger than 4096 bytes"), "{err}");
+        // Past `CA_MAX`, so is the CA.
+        let ca = std::env::temp_dir().join(format!("meada-postgres-ca-{pid}"));
+        std::fs::write(&ca, vec![b'x'; CA_MAX as usize + 1]).unwrap();
+        let err = tls(Some(&ca)).err().unwrap();
+        assert!(err.ends_with("larger than 1048576 bytes"), "{err}");
     }
 }

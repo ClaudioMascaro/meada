@@ -220,6 +220,8 @@ pub enum Msg<'a> {
     #[cfg(feature = "valkey")]
     ValkeyUnreachable(&'a str),
     #[cfg(feature = "postgres")]
+    AtMost(u64),
+    #[cfg(feature = "postgres")]
     PostgresBoth,
     #[cfg(feature = "postgres")]
     PostgresSchema,
@@ -1260,6 +1262,11 @@ impl Msg<'_> {
             Msg::ValkeyUnreachable(reason) => pick(
                 format!("valkey: unreachable ({reason})"),
                 format!("valkey: inalcançável ({reason})"),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::AtMost(max) => pick(
+                format!("must be at most {max}"),
+                format!("deve ser no máximo {max}"),
             ),
             #[cfg(feature = "postgres")]
             Msg::PostgresBoth => pick(
