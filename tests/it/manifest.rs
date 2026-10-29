@@ -369,6 +369,14 @@ fn manifest_errors_name_the_file_the_line_and_the_key() {
              entries of a workspace version, which a static manifest has none of: use [workspace] \
              source = \"store\" and `meada workspace import`\n",
         ),
+        // Likewise an `added_by` (#330); a repository's own `meada.toml` keeps it unknown.
+        (
+            "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
+             path = \"../chain-web\"\nadded_by = \"ana\"\n",
+            "meada: ops/meada.workspace.toml:6: `repository.added_by`: an `added_by` belongs to \
+             the entries of a workspace version, which a static manifest has none of: use \
+             [workspace] source = \"store\" and `meada workspace import`\n",
+        ),
         (
             "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
              path = \"../chain-web\"\nowner = \" team\"\n",

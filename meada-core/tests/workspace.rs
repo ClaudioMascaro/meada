@@ -166,3 +166,43 @@ fn version_entries_reads_a_text_as_a_documents_entries() {
         ["entries:1: `repository.repo` is missing"]
     );
 }
+
+/// An entry's `added_by` is printed right after its `owner` (after its `path` without one),
+/// before its block tables, and the text reads back to the same entry (#330).
+#[test]
+fn entries_text_prints_added_by_after_the_owner() {
+    let entries = [
+        json!({"repo": "a.com/x", "path": "x", "owner": "team-x", "added_by": "ana", "serve": {"prefix": "/x"}}),
+        json!({"repo": "a.com/y", "path": "y", "added_by": "ana"}),
+    ];
+    let text = entries_text(&entries).unwrap();
+    assert_eq!(
+        text,
+        "[[repository]]\npath = \"x\"\nowner = \"team-x\"\nadded_by = \"ana\"\nrepo = \"a.com/x\"\n\n\
+         [repository.serve]\nprefix = \"/x\"\n\n\
+         [[repository]]\npath = \"y\"\nadded_by = \"ana\"\nrepo = \"a.com/y\"\n"
+    );
+    assert_eq!(version_entries("entries", &text).unwrap(), entries);
+}
+
+/// Two versions that differ only in an entry's `added_by` list it as changed with the dotted key
+/// `repository.added_by`, set, cleared or replaced (#330).
+#[test]
+fn an_added_by_change_alone_is_the_dotted_key_repository_added_by() {
+    let entry = "[[repository]]\nrepo='a.test/team/web'\npath='web'\n";
+    let added = |login: &str| format!("{entry}added_by='{login}'\n");
+    for (before, after) in [
+        (entry.to_string(), added("ana")),
+        (added("ana"), entry.to_string()),
+        (added("ana"), added("bia")),
+    ] {
+        let changes = diff("entries", &before, &after).unwrap();
+        assert!(changes.added.is_empty() && changes.removed.is_empty());
+        assert_eq!(changes.changed.len(), 1);
+        assert_eq!(changes.changed[0].keys, ["repository.added_by"]);
+    }
+    assert_eq!(
+        diff("entries", &added("ana"), &added("ana")).unwrap(),
+        Default::default()
+    );
+}

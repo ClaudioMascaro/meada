@@ -91,7 +91,7 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `refresh-lock`, `workspace apply`'s malformed id and missing `[refresh_lock]`, and against the
   services `apply` of a version not stored, `pull` with no current version, below the current
   file's fence and already current; with `snapshot`, the `[snapshot] node_name` error in both
-  languages; `owner`'s errors and the static manifest's `owner` error in both languages),
+  languages; `owner`'s and `added_by`'s errors and the static manifest's `owner` and `added_by` errors in both languages; an `added_by` stored, shown after the owner, pulled and refused when malformed, #330),
   `mcp`
   (the binary over stdio), `server` (`meada mcp --listen` as a child process over the chain's
   mirrors, through rmcp's streamable HTTP client and plain HTTP requests: the stdio tools and
@@ -132,11 +132,11 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   pointer whose fence is not above the current file's; a malformed pointer id or fence, a
   document of another id, one whose id does not derive from its entries, an oversized one and
   one with invalid entries each refused, the directory unchanged; `index` over a pulled version
-  opening no connection to its `[snapshot]` and `[valkey]` ports, the export goldens after it (the pulled version holds owners);
+  opening no connection to its `[snapshot]` and `[valkey]` ports, the export goldens after it (the pulled version holds owners and `added_by` logins);
   with the chain stored, applied and pulled, `index` and `export` giving the export goldens,
   `status` the file's report, `publish` recording the version in the document's `workspace`
   field with the ids of a file's publish, the stored document unchanged by a file's publish and
-  after another version and after one that only changes owners (the document still naming the first version), no field from a file's new generation, a node pulling and serving it
+  after another version and after one that only changes owners or only `added_by` (the document still naming the first version), no field from a file's new generation, a node pulling and serving it
   and refusing a field that is no version id; and without a pulled version `index`, `status`,
   `export` and `snapshot publish` naming `meada workspace pull` and `mcp --listen` naming
   `--generations`, while the `--generations` commands serve),
@@ -153,7 +153,7 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   heartbeats written by hand; `workspace apply` moving `{<key_prefix>}:workspace` with a fence
   above the previous one and rolling back with a new one, refused for a version not stored,
   while a job holds the lock and with the fence lowered, `fence recover` counting the workspace
-  pointer, and a malformed id refused before any connection; `apply` of versions that set, change and clear owners and touch an ownerless entry), `postgres` (the data layer, ADR 0016, feature `postgres`; a test that needs Postgres, `MEADA_TEST_POSTGRES_URL`, prints why and skips without it, or fails with `MEADA_TEST_SERVICES_REQUIRED=1`, each in a schema `meada_t<pid>_<case>` of its own: each URL refusal (another scheme, a Unix socket path, a query, `sslmode=disable`, a zero port, an unset variable, an unreadable file, a refused URL in a file) naming `postgres.url_env` or `postgres.url_file` and neither the URL, its password nor its host in `migrate`'s stderr or `status`'s line; `migrate` without `[postgres]` naming the manifest, and `meada index` with it opening no connection; `migrate` on an empty schema printing the binary's version, a second run printing it again with the schema unchanged (its columns and the version row's `xmin`) and no table outside it, a schema the operator created beforehand migrated; a run waiting on the advisory lock the test holds, past a one-second `statement_timeout_seconds`, writing nothing until it is released, and two runs started together both succeeding; with `MEADA_POSTGRES_VERSION_MAX`, an absent schema making `status` print the unreachable form naming `meada postgres migrate`, a higher version the form naming both, and a capped `migrate` refusing to lower it, naming both, the schema unchanged; `status`'s `postgres:` line, unreachable against a closed port and reachable against the local Postgres, with the exit code it has without `[postgres]`, indexed or not, and a loopback `ca_file` asking for TLS), `oidc` (`[oidc]`
+  pointer, and a malformed id refused before any connection; `apply` of versions that set, change and clear owners and touch an ownerless entry, and of versions that set, change and clear `added_by`), `postgres` (the data layer, ADR 0016, feature `postgres`; a test that needs Postgres, `MEADA_TEST_POSTGRES_URL`, prints why and skips without it, or fails with `MEADA_TEST_SERVICES_REQUIRED=1`, each in a schema `meada_t<pid>_<case>` of its own: each URL refusal (another scheme, a Unix socket path, a query, `sslmode=disable`, a zero port, an unset variable, an unreadable file, a refused URL in a file) naming `postgres.url_env` or `postgres.url_file` and neither the URL, its password nor its host in `migrate`'s stderr or `status`'s line; `migrate` without `[postgres]` naming the manifest, and `meada index` with it opening no connection; `migrate` on an empty schema printing the binary's version, a second run printing it again with the schema unchanged (its columns and the version row's `xmin`) and no table outside it, a schema the operator created beforehand migrated; a run waiting on the advisory lock the test holds, past a one-second `statement_timeout_seconds`, writing nothing until it is released, and two runs started together both succeeding; with `MEADA_POSTGRES_VERSION_MAX`, an absent schema making `status` print the unreachable form naming `meada postgres migrate`, a higher version the form naming both, and a capped `migrate` refusing to lower it, naming both, the schema unchanged; `status`'s `postgres:` line, unreachable against a closed port and reachable against the local Postgres, with the exit code it has without `[postgres]`, indexed or not, and a loopback `ca_file` asking for TLS), `oidc` (`[oidc]`
   against an issuer and a JWKS served on loopback: a token admits what its claim lists and leaks
   nowhere, a rotated key, an oversized JWKS refusing the start, a pinned path admitted as its
   identity; the identity provider's `type` (no key, `generic`, `okta`, `keycloak`, and `entra`
@@ -483,8 +483,10 @@ versions, nested keys, reordered entries and absent fields moving between array-
 `entries_text` printing an entry's `owner` after its `path`, an owner set, cleared or replaced
 alone being the changed key `repository.owner`, and `version_entries` reading a text as a
 document's entries (#325). `meada-core/tests/ids.rs` and
-`meada-core/tests/manifest.rs` hold the `owner` cases (canonical text, version id, each rule and
-the names accepted); the shared validation table below carries the `owner` rows in both languages.
+`meada-core/tests/manifest.rs` hold the `owner` and `added_by` cases (canonical text, version id,
+each rule and the names accepted; an `added_by` printed after the owner, its change alone the
+changed key `repository.added_by`, and `authorize_entries` treating it as an edit, #330); the
+shared validation table below carries the `owner` and `added_by` rows in both languages.
 `tests/fixtures/workspace-validation.json` is the single pt-BR/English validation table used
 by the real WASM in `ui/tests/core.test.ts` and the binary `workspace import` in
 `tests/it/generations/imports.rs` with generation-pointer and real configured store services.

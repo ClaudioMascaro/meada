@@ -8,6 +8,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- `added_by`, an optional key of a workspace version's `[[repository]]` entries beside `repo`,
+  `path` and `owner` (ADR 0016): the GitHub login that added the entry, 1 to 39 characters of
+  lowercase ASCII letters, digits, `-` and `_`. It is imported, stored, shown (`meada workspace
+  show` prints it right after `owner`) and pulled like `owner`, joins the version id and no
+  generation or bundle id, and nothing reads it to decide anything yet. An entry without it keeps
+  its version id. A bad value is an error naming the file, the line and the key, in a
+  bootstrap manifest's own `[[repository]]` entries (`source = "file"`) the key is an error
+  naming `source = "store"`, and a repository's `meada.toml` still rejects it as unknown.
 - `[oidc] type` names the identity provider that issues the deployment's tokens (ADR 0016):
   `generic` (the default), `entra`, `okta` or `keycloak`. None changes the admission, the grant or
   any answer, and a bootstrap manifest without the key works as before; the console's `GET

@@ -25,7 +25,7 @@ use std::path::{Path, PathBuf};
 
 #[cfg(feature = "refresh-lock")]
 use meada_core::authorize::{self, Grant, Refusal, Role, authorize_entries, compose_entries};
-use meada_core::ids::workspace_version_id;
+use meada_core::ids::{VersionEntry, workspace_version_id};
 use meada_core::manifest::{EntryFile, validate, validate_import};
 use meada_core::workspace::{entries_text, entry};
 use redis::cmd;
@@ -329,8 +329,11 @@ fn touched_owners(current: &[Json], new: &[Json]) -> Vec<String> {
 /// The version id of `entries`, their blocks being `blocks` (`entry_blocks`), and the entries as
 /// a version document holds them.
 fn versioned(entries: &[EntryFile], blocks: Vec<Json>) -> (String, Vec<Json>) {
-    let ids: Vec<(&str, &str, &Json, Option<&str>)> = (entries.iter().zip(&blocks))
-        .map(|(e, blocks)| (e.repo.as_str(), e.path.as_str(), blocks, e.owner.as_deref()))
+    let ids: Vec<VersionEntry> = (entries.iter().zip(&blocks))
+        .map(|(e, blocks)| {
+            let (owner, added_by) = (e.owner.as_deref(), e.added_by.as_deref());
+            (e.repo.as_str(), e.path.as_str(), blocks, owner, added_by)
+        })
         .collect();
     let id = workspace_version_id(&ids);
     let repositories = (entries.iter().zip(blocks))

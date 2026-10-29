@@ -383,6 +383,15 @@ impl Manifest {
             let owner = Msg::WorkspaceOwnerStatic.text();
             return Err(config::error_at(file, &src, "repository.owner", &owner));
         }
+        if parsed.repositories.iter().any(|e| e.added_by.is_some()) {
+            let added_by = Msg::WorkspaceAddedByStatic.text();
+            return Err(config::error_at(
+                file,
+                &src,
+                "repository.added_by",
+                &added_by,
+            ));
+        }
         let index_dir = base.join(index_dir);
         #[cfg(feature = "snapshot")]
         #[cfg_attr(not(feature = "generation-pointer"), allow(unused_mut))]

@@ -83,3 +83,31 @@ fn the_role_follows_the_entries_the_grant_reads() {
     assert_eq!(star, Grant::All);
     assert!(serde_json::from_value::<Grant>(json!("a.com/a")).is_err());
 }
+
+/// An entry whose only difference is `added_by` is edited, so S3's rules apply to it (#330).
+#[test]
+fn an_added_by_change_alone_is_an_edit() {
+    let entry = |added_by: Option<&str>| match added_by {
+        Some(login) => {
+            json!({"repo": "a.com/a", "path": "a", "owner": "team-a", "added_by": login})
+        }
+        None => json!({"repo": "a.com/a", "path": "a", "owner": "team-a"}),
+    };
+    let groups = ["team-a".to_string()];
+    let team = Role::TeamOperator;
+    for (before, after) in [
+        (None, Some("ana")),
+        (Some("ana"), None),
+        (Some("ana"), Some("bia")),
+    ] {
+        let (current, new) = ([entry(before)], [entry(after)]);
+        assert!(authorize_entries(team, &groups, &Grant::All, &current, &new).is_empty());
+        let outside = Grant::Only(["a.com/b".to_string()].into());
+        let refused = authorize_entries(team, &groups, &outside, &current, &new);
+        assert_eq!(refused.len(), 1);
+        assert_eq!(refused[0].change, meada_core::authorize::Change::Edit);
+        let other = ["team-b".to_string()];
+        let refused = authorize_entries(team, &other, &Grant::All, &current, &new);
+        assert_eq!(refused[0].change, meada_core::authorize::Change::Edit);
+    }
+}

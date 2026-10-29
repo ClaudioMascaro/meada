@@ -31,6 +31,9 @@ pub enum Msg<'a> {
     OwnerTooLong,
     OwnerControl,
     OwnerPadded,
+    AddedByNotString,
+    AddedByTooLong,
+    AddedByChars,
 }
 
 impl Msg<'_> {
@@ -87,6 +90,18 @@ impl Msg<'_> {
             Msg::OwnerPadded => pick(
                 "has whitespace at either end".into(),
                 "tem espaço em branco numa das pontas".into(),
+            ),
+            Msg::AddedByNotString => pick(
+                "must be one string, a GitHub login".into(),
+                "deve ser uma única string, um login do GitHub".into(),
+            ),
+            Msg::AddedByTooLong => pick(
+                "is longer than 39 characters".into(),
+                "tem mais de 39 caracteres".into(),
+            ),
+            Msg::AddedByChars => pick(
+                "holds a character other than lowercase ASCII letters, digits, `-` and `_`".into(),
+                "contém um caractere além de letras ASCII minúsculas, dígitos, `-` e `_`".into(),
             ),
         }
     }

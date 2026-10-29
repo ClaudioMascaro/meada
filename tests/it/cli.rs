@@ -259,6 +259,51 @@ fn owner_errors_follow_lang() {
     }
 }
 
+/// An entry's `added_by` (#330) under `pt_BR` and `en_US`: each rule it breaks, and the static
+/// manifest that holds one at all.
+#[test]
+fn added_by_errors_follow_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_added_by");
+    let head = "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
+                path = \"../chain-web\"\n";
+    let manifest = "meada: ops/meada.workspace.toml:6: `repository.added_by`";
+    let chars = (
+        "holds a character other than lowercase ASCII letters, digits, `-` and `_`",
+        "contém um caractere além de letras ASCII minúsculas, dígitos, `-` e `_`",
+    );
+    let cases = [
+        (
+            "added_by = 1\n".to_string(),
+            "must be one string, a GitHub login",
+            "deve ser uma única string, um login do GitHub",
+        ),
+        ("added_by = \"\"\n".into(), "is empty", "está vazio"),
+        (
+            format!("added_by = \"{}\"\n", "a".repeat(40)),
+            "is longer than 39 characters",
+            "tem mais de 39 caracteres",
+        ),
+        ("added_by = \"Ana\"\n".into(), chars.0, chars.1),
+        ("added_by = \"ana.souza\"\n".into(), chars.0, chars.1),
+        (
+            "added_by = \"ana\"\n".into(),
+            "an `added_by` belongs to the entries of a workspace version, which a static \
+             manifest has none of: use [workspace] source = \"store\" and `meada workspace import`",
+            "um `added_by` pertence às entradas de uma versão do workspace, que um manifest \
+             estático não tem: use [workspace] source = \"store\" e `meada workspace import`",
+        ),
+    ];
+    for (added_by, en, pt) in cases {
+        fs::write(dir.join(MANIFEST), format!("{head}{added_by}")).unwrap();
+        for (lang, what) in [("en_US.UTF-8", en), ("pt_BR.UTF-8", pt)] {
+            let refused = (String::new(), format!("{manifest}: {what}\n"), Some(1));
+            let args = ["index", "--workspace", MANIFEST];
+            assert_eq!(run_lang(&dir, lang, &args), refused, "{lang} {added_by}");
+        }
+    }
+}
+
 /// With `generation-pointer`, under `pt_BR` and `en_US`: `[workspace] source = "store"` without
 /// its sections and beside `[[repository]]`, a command that reads entries refusing it, and the
 /// refusals of `meada workspace` that need no service (a malformed id, checked first, and a

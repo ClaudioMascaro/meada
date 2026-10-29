@@ -820,6 +820,8 @@ pub enum Msg<'a> {
     WorkspaceStoreBeside,
     /// `owner` in the `[[repository]]` entries of a bootstrap manifest (`source = "file"`).
     WorkspaceOwnerStatic,
+    /// `added_by` in the `[[repository]]` entries of a bootstrap manifest (`source = "file"`).
+    WorkspaceAddedByStatic,
     /// `meada mcp --listen` without `--generations`, given a `source = "store"` manifest.
     #[cfg(feature = "generation-pointer")]
     WorkspaceStoreRefused(&'a str),
@@ -2718,6 +2720,14 @@ impl Msg<'_> {
                  has none of: use [workspace] source = \"store\" and `meada workspace import`"
                     .into(),
                 "um dono pertence às entradas de uma versão do workspace, que um manifest \
+                 estático não tem: use [workspace] source = \"store\" e `meada workspace import`"
+                    .into(),
+            ),
+            Msg::WorkspaceAddedByStatic => pick(
+                "an `added_by` belongs to the entries of a workspace version, which a static \
+                 manifest has none of: use [workspace] source = \"store\" and `meada workspace import`"
+                    .into(),
+                "um `added_by` pertence às entradas de uma versão do workspace, que um manifest \
                  estático não tem: use [workspace] source = \"store\" e `meada workspace import`"
                     .into(),
             ),
