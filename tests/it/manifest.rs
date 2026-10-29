@@ -436,6 +436,13 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
             "meada: ops/meada.workspace.toml:2: [oidc] needs a Meada built with the oidc feature\n",
         ));
     }
+    // Nor does `postgres`.
+    if !cfg!(feature = "postgres") {
+        cases.push((
+            "index_dir = \"../indexes\"\n\n[postgres]\nschema = \"meada\"\n",
+            "meada: ops/meada.workspace.toml:3: [postgres] needs a Meada built with the postgres feature\n",
+        ));
+    }
     // `ui` needs no `valkey` either.
     if !cfg!(feature = "ui") {
         cases.push((
@@ -622,6 +629,65 @@ fn valkey_section_errors_name_the_file_the_line_and_the_key() {
             assert!(!ok && stdout.is_empty(), "{command}: {body}");
             assert_eq!(stderr, expected, "{command}: {body}");
         }
+    }
+}
+
+/// The `[postgres]` section of a build that has the module (ADR 0016): each key error names the
+/// file, the line and the key.
+#[cfg(feature = "postgres")]
+#[test]
+fn postgres_section_errors_name_the_file_the_line_and_the_key() {
+    let dir = mirrors("manifest_postgres_errors");
+    let head = "index_dir = \"../indexes\"\n\n[postgres]\n";
+    let at = "meada: ops/meada.workspace.toml";
+    let schema = "must be 1 to 63 lowercase letters, digits or `_`, starting with a letter";
+    let long = "a".repeat(64);
+    for (body, expected) in [
+        (
+            "schema = \"m\"\nurl = \"postgres://localhost\"\n".to_string(),
+            format!("{at}:5: `postgres.url` is not a meada.workspace.toml key\n"),
+        ),
+        (
+            "url_env = \"P\"\nurl_file = \"p\"\n".into(),
+            format!(
+                "{at}:5: `postgres.url_file`: is set together with url_env: use one of the two\n"
+            ),
+        ),
+        (
+            "schema = \"Meada\"\n".into(),
+            format!("{at}:4: `postgres.schema`: {schema}\n"),
+        ),
+        (
+            "\nschema = \"1meada\"\n".into(),
+            format!("{at}:5: `postgres.schema`: {schema}\n"),
+        ),
+        (
+            format!("schema = \"{long}\"\n"),
+            format!("{at}:4: `postgres.schema`: {schema}\n"),
+        ),
+        (
+            "pool_size = 0\n".into(),
+            format!("{at}:4: `postgres.pool_size`: must be at least 1\n"),
+        ),
+        (
+            "connect_timeout_seconds = 0\n".into(),
+            format!("{at}:4: `postgres.connect_timeout_seconds`: must be at least 1\n"),
+        ),
+        (
+            "schema = \"m\"\nstatement_timeout_seconds = 0\n".into(),
+            format!("{at}:5: `postgres.statement_timeout_seconds`: must be at least 1\n"),
+        ),
+    ] {
+        write_manifest(&dir, &format!("{head}{body}"));
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {body}");
+            assert_eq!(stderr, expected, "{command}: {body}");
+        }
+        let migrate = ["postgres", "migrate", "--workspace", MANIFEST];
+        let (stdout, stderr, code) = run_args(&dir, &migrate);
+        assert!(code == Some(1) && stdout.is_empty(), "migrate: {body}");
+        assert_eq!(stderr, expected, "migrate: {body}");
     }
 }
 

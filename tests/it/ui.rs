@@ -210,7 +210,8 @@ fn serves_config_session_and_manifest() {
             "refresh_lock",
             "oidc",
             "github_app",
-            "ui"
+            "ui",
+            "postgres"
         ]
     );
     for module in modules {
@@ -222,6 +223,7 @@ fn serves_config_session_and_manifest() {
             "oidc" => cfg!(feature = "oidc"),
             "github-app" => cfg!(feature = "github-app"),
             "ui" => true,
+            "postgres" => cfg!(feature = "postgres"),
             other => panic!("{other}"),
         };
         assert_eq!(module["built"], json!(built), "{module}");

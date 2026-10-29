@@ -302,7 +302,7 @@ one for the area a change touches.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `modules.rs`, `valkey.rs`: the cloud modules (ADR 0012). `modules.rs` is the section table,
   in every build: each module section of `meada.workspace.toml` (`[valkey]`, `[snapshot]`,
-  `[generations]`, `[refresh_lock]`, `[oidc]`, `[[github_app]]`, `[ui]`) with the cargo feature that
+  `[generations]`, `[refresh_lock]`, `[oidc]`, `[[github_app]]`, `[ui]`, `[postgres]`) with the cargo feature that
   owns it and whether this build has it. `Manifest::read` checks it before the typed parse, so a
   section whose feature is missing is an error naming the file, the line, the section and the
   feature, and a section the table lacks stays an unknown key. A module ticket adds its row and
@@ -330,6 +330,56 @@ one for the area a change touches.
   reachable` or `valkey: unreachable (<reason>)` after waiting at most `PING_TIMEOUT`; the
   line is informational and never changes the probe's exit code. With a `ca_file` the client
   trusts that file alone, not the system roots as well (redis-rs replaces them).
+- `postgres.rs` (feature `postgres`, enabled by `cloud`; ADR 0016's row of ADR 0012's module
+  table, section `[postgres]`, needing no other section; the only place `tokio-postgres` and
+  `tokio-rustls` are used): the data layer, the durable mutable state of server mode in Postgres
+  15 and later. `File` is the `[postgres]` section and `File::validate` its `Config`: `url_env`
+  (default `MEADA_POSTGRES_URL`) or `url_file`, at most one; `ca_file`; `schema` (default
+  `meada`, lowercase letters, digits and `_`, starting with a letter, 1 to 63 characters);
+  `pool_size` (4), `connect_timeout_seconds` (5) and `statement_timeout_seconds` (10), each at
+  least 1, the last at most `STATEMENT_MAX` (Postgres's `INT_MAX` milliseconds); every problem names its key. The URL is read only when a process connects
+  (`Config::url`), kept in memory, and `parse` accepts only `postgres://` or `postgresql://` with
+  a TCP host (a name or an address rustls can verify, so no Unix socket path and no host list),
+  optionally a user, a password, a port and a database, and no query or fragment, so no
+  `sslmode`: such a refusal, an unset variable or an unreadable file is an error naming
+  `postgres.url_env` or `postgres.url_file`, never the URL or a part of it; once connected an
+  error never carries the password, but may name the host (a certificate for another name) or
+  the user (a refused login). The TLS rule is `over_tls`: a host outside loopback (`modules::loopback`) always connects
+  over TLS with its name verified, against `ca_file` alone when set, else the platform verifier;
+  a loopback host connects in plain TCP unless `ca_file` is set, then over TLS against that file.
+  `open` makes the TCP connection itself and hands it to tokio-postgres (`connect_raw`, no
+  `runtime` feature) with its own `TlsConnect` over tokio-rustls and ring (no channel binding),
+  the URL read, the TCP connection and the handshake bounded together by
+  `connect_timeout_seconds`, every statement bounded by `statement_timeout_seconds`
+  (`-c statement_timeout`), the password scrubbed from every error. Every table lives in
+  `[postgres] schema` and every statement names it, quoted (`Config::quoted`): Meada writes
+  nothing outside it (ADR 0002, invariant 3). `MIGRATIONS` lists the migrations in order; a
+  ticket appends the next number when it integrates, never editing one before it. Migration 1
+  creates the version table, `<schema>.schema_version` (one row, `version`), the schema itself
+  created in its transaction when absent. `migrate` (`meada postgres migrate --workspace
+  <bootstrap manifest>`, reading `Manifest::postgres`, no mirror) is the only command that
+  creates or alters a table: it takes `pg_advisory_lock` on `lock_key(schema)` (the first eight
+  bytes of BLAKE3 of `meada postgres migrate <schema>`, so two runs serialize; the wait runs
+  with `statement_timeout` off, so a run waits for the one before it whatever it takes), applies each migration from the stored
+  version to the binary's in its own transaction, prints the version reached and refuses a
+  stored version above the binary's, never lowering it. The version check, `connect`, is the
+  one function every other connection goes through: it reads the version (`stored`, 0 for an
+  absent schema or table) and `check` refuses one the binary does not know, lower naming `meada
+  postgres migrate`, higher naming both versions. A CLI command or the console refuses on it
+  (exit 1, or no start); a node writes it once on stderr and treats Postgres as unreachable,
+  keeping its readiness (the callers come with S4 tickets 2, 5, 6 and 8). In debug builds
+  `MEADA_POSTGRES_VERSION_MAX` caps the version the binary knows (`known`), a test knob as
+  `MEADA_DRAIN_MS` is, ignored by release builds. `status --workspace` prints `postgres:
+  reachable, schema <name> version <n>` or `postgres: unreachable (<reason>)` within
+  `connect_timeout_seconds` (a readiness probe running `status --workspace` waits that long for
+  a Postgres that does not answer, where the Valkey line waits at most `PING_TIMEOUT`), a version refusal being the reason, since every process treats it
+  as unreachable; the line never changes the exit code, as the Valkey line does. Who connects:
+  the console (audit, directory, permissions, overage), nodes with `[oidc.github]` or overage
+  through the directory (reads only), the job's `meada github-app roles` and the CLI twins that
+  write; `meada index` never does. Three Postgres roles are recommended: one for `migrate`,
+  which owns the schema; one that writes (the console, the role check, the CLI twins); one that
+  reads (nodes). `pool_size` is read by the callers that pool connections; `migrate` and
+  `status` open one.
 - `oidc.rs` (feature `oidc`; with `github_app.rs` the only places `jsonwebtoken` is used, with
   RustCrypto as its backend, never aws-lc-rs): server mode as an OAuth 2.1 resource server. `File`
   is the `[oidc]` section and `File::validate` its `Config` (`issuer` `https` or loopback `http`
@@ -2462,6 +2512,8 @@ qualification budget does (ADR 0017).
   An empty CA file or invalid certificate is also refused before connecting.
 - `valkey.rs`: `password_file` holds at most `PASSWORD_MAX` (4096 bytes) and `ca_file` at most
   `CA_MAX` (1 MiB); past either the connection fails, naming the file.
+- `postgres.rs`: `url_file` holds at most `URL_MAX` (4096 bytes) and `ca_file` at most `CA_MAX`
+  (1 MiB); past either the connection fails, naming the file.
 - `oidc.rs`: each metadata and JWKS request takes at most `FETCH_TIMEOUT` (10 seconds), a
   metadata document at most `METADATA_MAX` (64 KiB) and a JWKS at most `JWKS_MAX` (256 KiB);
   past any of them the request fails (at start, the start is refused; on a refresh, the cached

@@ -83,6 +83,21 @@ enum Command {
         #[command(subcommand)]
         command: WorkspaceCommand,
     },
+    #[cfg(feature = "postgres")]
+    Postgres {
+        #[command(subcommand)]
+        command: PostgresCommand,
+    },
+}
+
+/// `meada postgres` (ADR 0016, feature `postgres`).
+#[cfg(feature = "postgres")]
+#[derive(Subcommand)]
+enum PostgresCommand {
+    Migrate {
+        #[arg(long)]
+        workspace: PathBuf,
+    },
 }
 
 /// `meada workspace` (ADR 0014, feature `generation-pointer`).
@@ -512,6 +527,13 @@ fn main() -> ExitCode {
                 .mut_arg("workspace", |a| a.help(Msg::WorkspaceBootstrapHelp.text()))
         })
     });
+    #[cfg(feature = "postgres")]
+    let matches = matches.mut_subcommand("postgres", |c| {
+        (c.about(Msg::Postgres.text())).mut_subcommand("migrate", |c| {
+            (c.about(Msg::PostgresMigrate.text()))
+                .mut_arg("workspace", |a| a.help(Msg::PostgresWorkspaceHelp.text()))
+        })
+    });
     #[cfg(feature = "snapshot")]
     let matches = ["status", "export", "mcp"]
         .into_iter()
@@ -619,6 +641,11 @@ fn main() -> ExitCode {
         Command::GithubApp { command } => github_app(command),
         #[cfg(feature = "generation-pointer")]
         Command::Workspace { command } => workspace(command),
+        // The version reached is the only line on stdout.
+        #[cfg(feature = "postgres")]
+        Command::Postgres {
+            command: PostgresCommand::Migrate { workspace },
+        } => meada::postgres::migrate(&workspace).map(|version| println!("{version}")),
         // Every problem that refuses the start on its own line. The API is English whatever
         // `LANG` says, as the MCP surface is (ADR 0008).
         #[cfg(feature = "ui")]

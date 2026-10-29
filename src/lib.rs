@@ -31,6 +31,8 @@ mod names;
 #[cfg(feature = "oidc")]
 mod oidc;
 mod package;
+#[cfg(feature = "postgres")]
+pub mod postgres;
 mod render;
 pub mod repo;
 mod resolve;

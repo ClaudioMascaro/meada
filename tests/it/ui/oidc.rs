@@ -451,7 +451,7 @@ fn a_viewer_s_grant_bounds_every_view() {
         manifest["manifest"]["ui"]["client_id"],
         json!("meada-console")
     );
-    assert_eq!(manifest["modules"].as_array().unwrap().len(), 7);
+    assert_eq!(manifest["modules"].as_array().unwrap().len(), 8);
     assert!(!manifest.to_string().contains("../gateway"));
     assert!(!manifest.to_string().contains(GATEWAY), "{manifest}");
     assert_eq!(

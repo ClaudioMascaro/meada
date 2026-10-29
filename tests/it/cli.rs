@@ -75,8 +75,13 @@ fn config_errors_follow_lang() {
 }
 
 /// The default build's help: a feature's subcommand (`meada snapshot`, `meada github-app`,
-/// `meada ui`) is absent from it.
-#[cfg(not(any(feature = "snapshot", feature = "github-app", feature = "ui")))]
+/// `meada ui`, `meada postgres`) is absent from it.
+#[cfg(not(any(
+    feature = "snapshot",
+    feature = "github-app",
+    feature = "ui",
+    feature = "postgres"
+)))]
 #[test]
 fn help_follows_lang() {
     let repo = fixture_repo("cli_help", "ts-basic", None);
@@ -691,4 +696,158 @@ fn workspace_apply_and_pull_refusals_follow_lang() {
     ] {
         assert_eq!(run_in(dir, lang, &pull), refused(expected), "{lang}");
     }
+}
+
+/// `[postgres]` in a build without its feature, under `pt_BR` and `en_US`.
+#[cfg(not(feature = "postgres"))]
+#[test]
+fn the_postgres_section_without_its_feature_follows_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_postgres_feature");
+    let toml = "index_dir = \"../indexes\"\n\n[postgres]\nschema = \"meada\"\n";
+    fs::write(dir.join(MANIFEST), toml).unwrap();
+    for (lang, expected) in [
+        (
+            "en_US.UTF-8",
+            "meada: ops/meada.workspace.toml:3: [postgres] needs a Meada built with the postgres \
+             feature\n",
+        ),
+        (
+            "pt_BR.UTF-8",
+            "meada: ops/meada.workspace.toml:3: [postgres] exige um Meada compilado com a feature \
+             postgres\n",
+        ),
+    ] {
+        let refused = (String::new(), expected.to_string(), Some(1));
+        let args = ["status", "--workspace", MANIFEST];
+        assert_eq!(run_lang(&dir, lang, &args), refused, "{lang}");
+    }
+    let (_, stderr, code) = run_lang(&dir, "en_US.UTF-8", &["postgres", "migrate"]);
+    assert_eq!(code, Some(2));
+    assert!(stderr.contains("unrecognized subcommand"), "{stderr}");
+}
+
+/// With `postgres`, under `pt_BR` and `en_US`: a `[postgres]` key error, the URL refusals and,
+/// against the local Postgres, both version refusals.
+#[cfg(feature = "postgres")]
+#[test]
+fn postgres_refusals_follow_lang() {
+    use crate::postgres::{Admin, MIGRATE, manifest, meada, schema, service};
+    let (en, pt) = ("en_US.UTF-8", "pt_BR.UTF-8");
+    let dir = manifest("cli_postgres_key", "schema = \"Meada\"\n");
+    for (lang, expected) in [
+        (
+            en,
+            "meada: ops/meada.workspace.toml:4: `postgres.schema`: must be 1 to 63 lowercase \
+             letters, digits or `_`, starting with a letter\n",
+        ),
+        (
+            pt,
+            "meada: ops/meada.workspace.toml:4: `postgres.schema`: deve ter de 1 a 63 letras \
+             minúsculas, dígitos ou `_`, começando por uma letra\n",
+        ),
+    ] {
+        assert_eq!(meada(&dir, lang, &[], &MIGRATE).1, expected, "{lang}");
+    }
+    let dir = manifest("cli_postgres_url", "schema = \"meada\"\n");
+    let query = [(
+        "MEADA_POSTGRES_URL",
+        "postgres://db.example.internal/m?sslmode=disable",
+    )];
+    let socket = [("MEADA_POSTGRES_URL", "postgres://%2Fvar%2Frun/m")];
+    for (env, lang, expected) in [
+        (
+            &[][..],
+            en,
+            "`postgres.url_env`: the variable MEADA_POSTGRES_URL is not set",
+        ),
+        (
+            &[][..],
+            pt,
+            "`postgres.url_env`: a variável MEADA_POSTGRES_URL não está definida",
+        ),
+        (
+            &query[..],
+            en,
+            "`postgres.url_env`: holds a URL with a query: no parameter is accepted, TLS is \
+             decided by the host",
+        ),
+        (
+            &query[..],
+            pt,
+            "`postgres.url_env`: traz uma URL com query: nenhum parâmetro é aceito, o TLS é \
+             decidido pelo host",
+        ),
+        (
+            &socket[..],
+            en,
+            "`postgres.url_env`: does not hold a postgres:// or postgresql:// URL with a TCP host",
+        ),
+        (
+            &socket[..],
+            pt,
+            "`postgres.url_env`: não traz uma URL postgres:// ou postgresql:// com um host TCP",
+        ),
+    ] {
+        let (_, stderr, code) = meada(&dir, lang, env, &MIGRATE);
+        assert_eq!(
+            (stderr, code),
+            (format!("meada: {expected}\n"), 1),
+            "{lang}"
+        );
+    }
+
+    let Some(url) = service() else { return };
+    let schema = schema("cli_version");
+    let admin = Admin::new(&url);
+    admin.run(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"));
+    let dir = manifest("cli_postgres_version", &format!("schema = \"{schema}\"\n"));
+    let at = |cap| {
+        vec![
+            ("MEADA_POSTGRES_URL", url.as_str()),
+            ("MEADA_POSTGRES_VERSION_MAX", cap),
+        ]
+    };
+    let status = ["status", "--workspace", crate::manifest::MANIFEST];
+    let line = |lang, cap| {
+        let (status, _, _) = meada(&dir, lang, &at(cap), &status);
+        status
+            .lines()
+            .find(|l| l.starts_with("postgres: "))
+            .unwrap()
+            .to_string()
+    };
+    assert_eq!(
+        line(en, "9"),
+        format!(
+            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 1: \
+             run meada postgres migrate)"
+        )
+    );
+    assert_eq!(
+        line(pt, "9"),
+        format!(
+            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da 1 deste Meada: \
+             rode meada postgres migrate)"
+        )
+    );
+    assert_eq!(meada(&dir, en, &at("9"), &MIGRATE).0, "1\n");
+    for (lang, expected) in [
+        (
+            en,
+            format!("the schema {schema} is at version 1, above this Meada's 0: upgrade Meada"),
+        ),
+        (
+            pt,
+            format!("o schema {schema} está na versão 1, acima da 0 deste Meada: atualize o Meada"),
+        ),
+    ] {
+        let (_, stderr, code) = meada(&dir, lang, &at("0"), &MIGRATE);
+        assert_eq!(
+            (stderr, code),
+            (format!("meada: {expected}\n"), 1),
+            "{lang}"
+        );
+    }
+    admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
 }

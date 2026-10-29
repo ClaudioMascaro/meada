@@ -219,6 +219,51 @@ pub enum Msg<'a> {
     ValkeyReachable,
     #[cfg(feature = "valkey")]
     ValkeyUnreachable(&'a str),
+    #[cfg(feature = "postgres")]
+    AtMost(u64),
+    #[cfg(feature = "postgres")]
+    PostgresBoth,
+    #[cfg(feature = "postgres")]
+    PostgresSchema,
+    /// A connection URL that is no `postgres://` URL with a TCP host.
+    #[cfg(feature = "postgres")]
+    PostgresUrlInvalid,
+    #[cfg(feature = "postgres")]
+    PostgresUrlQuery,
+    #[cfg(feature = "postgres")]
+    PostgresUrlUnset(&'a str),
+    #[cfg(feature = "postgres")]
+    PostgresTimeout(u64),
+    /// A schema below the binary's version, or absent.
+    #[cfg(feature = "postgres")]
+    PostgresVersionLower {
+        schema: &'a str,
+        stored: i32,
+        known: i32,
+    },
+    /// A schema above the binary's version.
+    #[cfg(feature = "postgres")]
+    PostgresVersionHigher {
+        schema: &'a str,
+        stored: i32,
+        known: i32,
+    },
+    #[cfg(feature = "postgres")]
+    PostgresReachable {
+        schema: &'a str,
+        version: i32,
+    },
+    #[cfg(feature = "postgres")]
+    PostgresUnreachable(&'a str),
+    /// `meada postgres migrate` with a manifest that has no `[postgres]`.
+    #[cfg(feature = "postgres")]
+    PostgresMissing(&'a str),
+    #[cfg(feature = "postgres")]
+    Postgres,
+    #[cfg(feature = "postgres")]
+    PostgresMigrate,
+    #[cfg(feature = "postgres")]
+    PostgresWorkspaceHelp,
     #[cfg(feature = "snapshot")]
     SnapshotEndpointInvalid,
     #[cfg(feature = "snapshot")]
@@ -334,7 +379,8 @@ pub enum Msg<'a> {
     #[cfg(any(
         feature = "generation-pointer",
         feature = "oidc",
-        feature = "github-app"
+        feature = "github-app",
+        feature = "postgres"
     ))]
     AtLeast(i64),
     #[cfg(feature = "generation-pointer")]
@@ -1217,6 +1263,104 @@ impl Msg<'_> {
                 format!("valkey: unreachable ({reason})"),
                 format!("valkey: inalcançável ({reason})"),
             ),
+            #[cfg(feature = "postgres")]
+            Msg::AtMost(max) => pick(
+                format!("must be at most {max}"),
+                format!("deve ser no máximo {max}"),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresBoth => pick(
+                "is set together with url_env: use one of the two".into(),
+                "está junto de url_env: use um dos dois".into(),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresSchema => pick(
+                "must be 1 to 63 lowercase letters, digits or `_`, starting with a letter".into(),
+                "deve ter de 1 a 63 letras minúsculas, dígitos ou `_`, começando por uma letra"
+                    .into(),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresUrlInvalid => pick(
+                "does not hold a postgres:// or postgresql:// URL with a TCP host".into(),
+                "não traz uma URL postgres:// ou postgresql:// com um host TCP".into(),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresUrlQuery => pick(
+                "holds a URL with a query: no parameter is accepted, TLS is decided by the host"
+                    .into(),
+                "traz uma URL com query: nenhum parâmetro é aceito, o TLS é decidido pelo host"
+                    .into(),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresUrlUnset(var) => pick(
+                format!("the variable {var} is not set"),
+                format!("a variável {var} não está definida"),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresTimeout(ms) => pick(
+                format!("no answer within {ms} ms"),
+                format!("sem resposta em {ms} ms"),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresVersionLower {
+                schema,
+                stored,
+                known,
+            } => pick(
+                format!(
+                    "the schema {schema} is at version {stored}, below this Meada's {known}: run \
+                     meada postgres migrate"
+                ),
+                format!(
+                    "o schema {schema} está na versão {stored}, abaixo da {known} deste Meada: \
+                     rode meada postgres migrate"
+                ),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresVersionHigher {
+                schema,
+                stored,
+                known,
+            } => pick(
+                format!(
+                    "the schema {schema} is at version {stored}, above this Meada's {known}: \
+                     upgrade Meada"
+                ),
+                format!(
+                    "o schema {schema} está na versão {stored}, acima da {known} deste Meada: \
+                     atualize o Meada"
+                ),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresReachable { schema, version } => pick(
+                format!("postgres: reachable, schema {schema} version {version}"),
+                format!("postgres: alcançável, schema {schema} versão {version}"),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresUnreachable(reason) => pick(
+                format!("postgres: unreachable ({reason})"),
+                format!("postgres: inalcançável ({reason})"),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresMissing(manifest) => pick(
+                format!("{manifest}: no [postgres] section: meada postgres migrate needs one"),
+                format!("{manifest}: sem seção [postgres]: meada postgres migrate precisa de uma"),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::Postgres => pick(
+                "The data layer in Postgres (the [postgres] section).".into(),
+                "A camada de dados no Postgres (a seção [postgres]).".into(),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresMigrate => pick(
+                "Create the schema [postgres] names, or bring it to this Meada's version.".into(),
+                "Cria o schema que [postgres] nomeia, ou o leva à versão deste Meada.".into(),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresWorkspaceHelp => pick(
+                "The bootstrap manifest, with its [postgres] section".into(),
+                "O manifesto de bootstrap, com a seção [postgres]".into(),
+            ),
             #[cfg(feature = "snapshot")]
             Msg::SnapshotEndpointInvalid => pick(
                 "is not an http:// or https:// URL with a host and nothing after it".into(),
@@ -1520,7 +1664,12 @@ impl Msg<'_> {
                     format!("[{section}] exige {}", needed.join(" e ")),
                 )
             }
-            #[cfg(any(feature = "generation-pointer", feature = "oidc", feature = "github-app"))]
+            #[cfg(any(
+                feature = "generation-pointer",
+                feature = "oidc",
+                feature = "github-app",
+                feature = "postgres"
+            ))]
             Msg::AtLeast(min) => pick(
                 format!("must be at least {min}"),
                 format!("deve ser pelo menos {min}"),
