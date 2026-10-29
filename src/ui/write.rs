@@ -2,6 +2,11 @@
 
 use super::*;
 
+#[cfg(feature = "refresh-lock")]
+use crate::snapshot::versions::ApplyError;
+#[cfg(feature = "refresh-lock")]
+use meada_core::authorize::{Grant, Refusal, Role};
+
 // ponytail: a pointer operation needs only an action and a generation id.
 pub(super) const POINTER_MAX: usize = 1024;
 
@@ -49,20 +54,36 @@ fn refused(
     code: &str,
     message: &str,
 ) -> Answer {
-    audit(session.subject.as_deref(), action, arguments, message);
+    audit(
+        session.subject.as_deref(),
+        session.owners(),
+        action,
+        arguments,
+        message,
+    );
     error(status, code, message)
 }
 
+/// An accepted write answers its CLI line; `owners` are the groups a team operator's change
+/// touched, for its audit line. An operational refusal is a 409 with the CLI message.
 #[cfg(feature = "refresh-lock")]
 fn result(
     session: &Session,
     action: &str,
     arguments: &str,
     result: std::result::Result<String, String>,
+    owners: &[String],
 ) -> Answer {
     match result {
         Ok(result) => {
-            audit(session.subject.as_deref(), action, arguments, &result);
+            let owners = session.team().then_some(owners);
+            audit(
+                session.subject.as_deref(),
+                owners,
+                action,
+                arguments,
+                &result,
+            );
             json_answer(StatusCode::OK, &json!({"result": result}))
         }
         Err(message) => refused(
@@ -74,6 +95,82 @@ fn result(
             &message,
         ),
     }
+}
+
+/// The role and grant a write is authorized as: the global operator's reads everything.
+#[cfg(feature = "refresh-lock")]
+fn acting(session: &Session) -> (Role, Grant) {
+    match session.operator {
+        true => (Role::Operator, Grant::All),
+        false => (Role::TeamOperator, session.core_grant()),
+    }
+}
+
+/// A refusal whose audit outcome is not its message.
+#[cfg(feature = "refresh-lock")]
+fn refusal(
+    session: &Session,
+    action: &str,
+    outcome: &str,
+    status: StatusCode,
+    code: &str,
+    message: &str,
+) -> Answer {
+    audit(
+        session.subject.as_deref(),
+        session.owners(),
+        action,
+        "-",
+        outcome,
+    );
+    error(status, code, message)
+}
+
+/// A team operator that lost its role between admission and the lock gets a viewer's refusal.
+#[cfg(feature = "refresh-lock")]
+fn role_lost(session: &Session, action: &str, arguments: &str) -> Answer {
+    let message = Msg::UiOperatorRequired.text();
+    refused(
+        session,
+        action,
+        arguments,
+        StatusCode::FORBIDDEN,
+        "forbidden",
+        &message,
+    )
+}
+
+/// The 403 `entries_refused` (ADR 0015): each refused entry with its change and reason, and
+/// `hidden`, the count of those whose identity `hiding` does not read (an apply names no
+/// identity outside the grant; a save refuses only what the subject submitted or reads).
+/// Nothing was written. The audit outcome is the message, the named identities and the count.
+#[cfg(feature = "refresh-lock")]
+fn entries_refused(
+    session: &Session,
+    action: &str,
+    arguments: &str,
+    hiding: Option<&Grant>,
+    refused: Vec<Refusal>,
+) -> Answer {
+    let message = Msg::WorkspaceRefused(refused.len()).text();
+    let (named, hidden): (Vec<_>, Vec<_>) =
+        (refused.iter()).partition(|r| hiding.is_none_or(|grant| grant.reads(&r.identity)));
+    let names: Vec<&str> = named.iter().map(|r| r.identity.as_str()).collect();
+    let outcome = format!("{message} ({}; hidden {})", names.join(", "), hidden.len());
+    audit(
+        session.subject.as_deref(),
+        session.owners(),
+        action,
+        arguments,
+        &outcome,
+    );
+    let body = json!({"error": {
+        "code": "entries_refused",
+        "message": message,
+        "refused": named,
+        "hidden": hidden.len(),
+    }});
+    json_answer(StatusCode::FORBIDDEN, &body)
 }
 
 impl Console {
@@ -134,7 +231,7 @@ impl Console {
             let result_line =
                 run(&self.file, &pointer.generation, author).map_err(|e| e.to_string());
             let action = format!("pointer {}", pointer.action);
-            return result(session, &action, &pointer.generation, result_line);
+            return result(session, &action, &pointer.generation, result_line, &[]);
         }
         #[cfg(feature = "refresh-lock")]
         if route == "fence/recover" {
@@ -177,7 +274,7 @@ impl Console {
                 crate::snapshot::operation::fence_recover(&self.file, floor.as_deref(), author)
                     .map(|(fence, _)| fence.to_string())
                     .map_err(|e| e.to_string());
-            return result(session, action, floor.as_deref().unwrap_or("-"), done);
+            return result(session, action, floor.as_deref().unwrap_or("-"), done, &[]);
         }
         #[cfg(feature = "refresh-lock")]
         if route == "workspace/versions" {
@@ -194,25 +291,32 @@ impl Console {
                 }
             };
             let author = session.subject.as_deref().expect("write subject admitted");
+            let (role, grant) = acting(session);
             return match crate::snapshot::versions::save(
                 &self.file,
                 &save.entries,
                 &save.message,
                 author,
+                role,
+                &session.groups,
+                &grant,
             ) {
-                Ok(saved) => result(session, action, &saved.id, Ok(saved.id.clone())),
-                Err(crate::snapshot::versions::SaveError::Invalid(problems)) => {
-                    audit(
-                        session.subject.as_deref(),
-                        action,
-                        "-",
-                        &Msg::UiEntriesInvalid.text(),
-                    );
-                    error(
-                        StatusCode::UNPROCESSABLE_ENTITY,
-                        "invalid_entries",
-                        &problems.join("\n"),
-                    )
+                Ok((saved, owners)) => {
+                    result(session, action, &saved.id, Ok(saved.id.clone()), &owners)
+                }
+                Err(crate::snapshot::versions::SaveError::Invalid(problems)) => refusal(
+                    session,
+                    action,
+                    &Msg::UiEntriesInvalid.text(),
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "invalid_entries",
+                    &problems.join("\n"),
+                ),
+                Err(crate::snapshot::versions::SaveError::Unauthorized(refused)) => {
+                    entries_refused(session, action, "-", None, refused)
+                }
+                Err(crate::snapshot::versions::SaveError::RoleLost) => {
+                    role_lost(session, action, "-")
                 }
                 Err(crate::snapshot::versions::SaveError::Refused(message)) => refused(
                     session,
@@ -248,21 +352,31 @@ impl Console {
                 }
             };
             let author = session.subject.as_deref().expect("write subject admitted");
-            // Only the global operator reaches a write until #324 passes a team operator.
-            let (operator, grant) = (
-                meada_core::authorize::Role::Operator,
-                meada_core::authorize::Grant::All,
-            );
+            let (role, grant) = acting(session);
             let done = crate::snapshot::versions::apply(
                 &self.file,
                 &apply.version,
                 author,
-                operator,
-                &[],
+                role,
+                &session.groups,
                 &grant,
-            )
-            .map_err(|e| e.to_string());
-            return result(session, action, &apply.version, done);
+            );
+            return match done {
+                Ok(applied) => result(
+                    session,
+                    action,
+                    &apply.version,
+                    Ok(applied.line),
+                    &applied.owners,
+                ),
+                Err(ApplyError::Refused(refused)) => {
+                    entries_refused(session, action, &apply.version, Some(&grant), refused)
+                }
+                Err(ApplyError::RoleLost) => role_lost(session, action, &apply.version),
+                Err(ApplyError::Failed(message)) => {
+                    result(session, action, &apply.version, Err(message), &[])
+                }
+            };
         }
         let _ = body;
         refused(
@@ -293,9 +407,18 @@ pub(super) fn operation(route: &str) -> Option<&'static str> {
 
 /// One line even for hostile subjects, arguments and multiline catalog messages. Neither
 /// tokens nor raw request bodies enter this function; pre-authentication subjects are absent.
-pub(super) fn audit(subject: Option<&str>, action: &str, arguments: &str, outcome: &str) {
+pub(super) fn audit(
+    subject: Option<&str>,
+    owners: Option<&[String]>,
+    action: &str,
+    arguments: &str,
+    outcome: &str,
+) {
+    // A team operator's line names the owner groups after the subject (ADR 0015, #324); the
+    // JSON array escapes its own controls.
+    let as_owners = owners.map_or(String::new(), |owners| format!(" as {}", json!(owners)));
     eprintln!(
-        "ui: {} {} {}: {}",
+        "ui: {}{as_owners} {} {}: {}",
         subject.unwrap_or("-").escape_debug(),
         action.escape_debug(),
         arguments.escape_debug(),

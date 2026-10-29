@@ -656,6 +656,9 @@ pub enum Msg<'a> {
     /// A write needs an admitted operator with an authenticated subject.
     #[cfg(feature = "ui")]
     UiOperatorRequired,
+    /// A team operator asking for an action that stays the global operator's (ADR 0015).
+    #[cfg(feature = "ui")]
+    UiGlobalOperatorRequired,
     /// A fixed audit refusal that never records invalid editor identities or text.
     #[cfg(feature = "ui")]
     UiEntriesInvalid,
@@ -2198,6 +2201,15 @@ impl Msg<'_> {
             Msg::UiOperatorRequired => pick(
                 "console writes require an authenticated operator with a subject".into(),
                 "as escritas da console exigem um operador autenticado com subject".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiGlobalOperatorRequired => pick(
+                "this action needs the global operator: a team operator may only save and apply \
+                 workspace versions"
+                    .into(),
+                "esta ação exige o operador global: um operador de time só salva e aplica \
+                 versões do workspace"
+                    .into(),
             ),
             #[cfg(feature = "ui")]
             Msg::UiEntriesInvalid => pick(

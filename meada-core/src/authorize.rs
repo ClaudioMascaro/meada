@@ -95,7 +95,7 @@ fn owner(entry: &Json) -> Option<&str> {
 }
 
 /// The subject's teams: its groups that own an entry of `current` whose identity `grant` reads.
-fn teams<'a>(groups: &'a [String], grant: &Grant, current: &[Json]) -> Vec<&'a str> {
+pub fn teams<'a>(groups: &'a [String], grant: &Grant, current: &[Json]) -> Vec<&'a str> {
     let owned: BTreeSet<&str> = (current.iter())
         .filter(|entry| grant.reads(repo(entry)))
         .filter_map(owner)
