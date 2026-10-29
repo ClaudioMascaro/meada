@@ -45,7 +45,8 @@
         "path": "src/main/java/com/example/api/AuditClient.java",
         "start": 271,
         "end": 527
-      }
+      },
+      "hash": "cc14717cdaf8cc7da3714f2d7eab5a4e9e759c575dbe466950c73f7b537fdf49"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api.AuditClient.record()",
@@ -53,7 +54,8 @@
         "path": "src/main/java/com/example/api/AuditClient.java",
         "start": 428,
         "end": 525
-      }
+      },
+      "hash": "cbdf4595dfb0bb573953a6d532bc3395308c872d95f1ca34cdefde8c8dd8429a"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/CatalogClient.java::com.example.api.CatalogClient",
@@ -61,7 +63,8 @@
         "path": "src/main/java/com/example/api/CatalogClient.java",
         "start": 277,
         "end": 385
-      }
+      },
+      "hash": "c093e3ce4825fbbd24a2a4a8084bd2396782dd80f2458a8b3f53166061ffe630"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/CatalogClient.java::com.example.api.CatalogClient.all()",
@@ -69,7 +72,8 @@
         "path": "src/main/java/com/example/api/CatalogClient.java",
         "start": 338,
         "end": 383
-      }
+      },
+      "hash": "22024d2ff194e49037abe07923305e30ccf6965cb3a0c05b17ce49ea2ad98f75"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/InventoryClient.java::com.example.api.InventoryClient",
@@ -77,7 +81,8 @@
         "path": "src/main/java/com/example/api/InventoryClient.java",
         "start": 365,
         "end": 550
-      }
+      },
+      "hash": "2dcf6e800beb432ddb9d52b1aca410513e22b3887ece7b1dae27fd37a4a7e262"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/InventoryClient.java::com.example.api.InventoryClient.left(String)",
@@ -85,7 +90,8 @@
         "path": "src/main/java/com/example/api/InventoryClient.java",
         "start": 463,
         "end": 548
-      }
+      },
+      "hash": "3bfc7840acbe39520d8d7231d20d7e809ad84a3b0b1164e36a0c8dcd40eb5cf2"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController",
@@ -93,7 +99,8 @@
         "path": "src/main/java/com/example/api/OrderController.java",
         "start": 333,
         "end": 1479
-      }
+      },
+      "hash": "c4fae52b5313697321e83eeccd5911e27388d606f5e5163aa3794ca45043a55b"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.OrderController(PriceClient,StockClient,AuditClient,PromotionClient,ReportClient,InventoryClient,CatalogClient)",
@@ -101,7 +108,8 @@
         "path": "src/main/java/com/example/api/OrderController.java",
         "start": 696,
         "end": 1125
-      }
+      },
+      "hash": "b711e6ef611367f790ecb1f3465c5dc99e8fbc06d5bf0c2ffaaa4cc9b25ffd11"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.reserve()",
@@ -109,7 +117,8 @@
         "path": "src/main/java/com/example/api/OrderController.java",
         "start": 1285,
         "end": 1477
-      }
+      },
+      "hash": "08dd5e0ab3baaf3dc2ce60e8f4a15f41fe5947338c6093ab88a819adc2920cf9"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)",
@@ -117,7 +126,8 @@
         "path": "src/main/java/com/example/api/OrderController.java",
         "start": 1131,
         "end": 1279
-      }
+      },
+      "hash": "2abbbc5d1d4e01b63506e593a4ae5994ba179731444b22df03e8d7ef4d6e02b3"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/PriceClient.java::com.example.api.PriceClient",
@@ -125,7 +135,8 @@
         "path": "src/main/java/com/example/api/PriceClient.java",
         "start": 271,
         "end": 546
-      }
+      },
+      "hash": "57f1aef0ad3a23d5d6eaf9bbe7c875175324e2d8dbbdfd913632a9fecaf90227"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/PriceClient.java::com.example.api.PriceClient.priceOf(String)",
@@ -133,7 +144,8 @@
         "path": "src/main/java/com/example/api/PriceClient.java",
         "start": 424,
         "end": 544
-      }
+      },
+      "hash": "f1da449c8468444b5b08dfa6f61a8e3d14513a7ee70c3d3e5ee15f093ae560a6"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient",
@@ -141,7 +153,8 @@
         "path": "src/main/java/com/example/api/PromotionClient.java",
         "start": 274,
         "end": 577
-      }
+      },
+      "hash": "80581648b66ce2dee217382d5e7ab8167522f765a40734f09f4ee4bdf10db2c4"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient.current()",
@@ -149,7 +162,8 @@
         "path": "src/main/java/com/example/api/PromotionClient.java",
         "start": 470,
         "end": 575
-      }
+      },
+      "hash": "07af341027791e09367b60bf7a9009c4a86130f9bbec5cfacf9fb9c7bf42b7bb"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient",
@@ -157,7 +171,8 @@
         "path": "src/main/java/com/example/api/ReportClient.java",
         "start": 192,
         "end": 364
-      }
+      },
+      "hash": "0bf79fa68fec810cde48787d3827182f07d63f775d2ae1313017937d86bf9fe6"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()",
@@ -165,7 +180,8 @@
         "path": "src/main/java/com/example/api/ReportClient.java",
         "start": 235,
         "end": 362
-      }
+      },
+      "hash": "98e7f679b3434dedff1871a1c84780e53a52c13a12dc984a0d1f2d4e2511eab0"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener",
@@ -173,7 +189,8 @@
         "path": "src/main/java/com/example/api/ShipmentListener.java",
         "start": 174,
         "end": 352
-      }
+      },
+      "hash": "8a75a9194f09f02f878ad5ba0f21c0cb94a67a278713b7f69fb303931f8ec36c"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener.apply(String)",
@@ -181,7 +198,8 @@
         "path": "src/main/java/com/example/api/ShipmentListener.java",
         "start": 326,
         "end": 350
-      }
+      },
+      "hash": "0b5e50a88c8d85f909550e65d40c2b32355d89b8e9072d543f9b739cd0f6521b"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener.onShipment(String)",
@@ -189,7 +207,8 @@
         "path": "src/main/java/com/example/api/ShipmentListener.java",
         "start": 210,
         "end": 320
-      }
+      },
+      "hash": "241d1ff1c5324ddf7336753144045b106c80dbadace1872be0456473fe5b6f0b"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient",
@@ -197,7 +216,8 @@
         "path": "src/main/java/com/example/api/StockClient.java",
         "start": 286,
         "end": 550
-      }
+      },
+      "hash": "e8640e1e6c32da1215eecfaa18d449b1239120bc4859e0e8f8960f6fdc59b353"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.StockClient(String)",
@@ -205,7 +225,8 @@
         "path": "src/main/java/com/example/api/StockClient.java",
         "start": 362,
         "end": 467
-      }
+      },
+      "hash": "88f68877d1a0871d0881c81e3f60d4604b03b5d15984a4822ac6b8e7ed8e6aac"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.level()",
@@ -213,7 +234,8 @@
         "path": "src/main/java/com/example/api/StockClient.java",
         "start": 473,
         "end": 548
-      }
+      },
+      "hash": "580f3be7b4fa273bb6365a8d5580fff08f4c03b29c309e13772426749e6c296a"
     }
   ],
   "calls": [
@@ -248,7 +270,8 @@
         "path": "src/main/java/com/example/api/AuditClient.java",
         "start": 271,
         "end": 281
-      }
+      },
+      "decorates": "example.com/xlang-java/api::src/main/java/com/example/api/AuditClient.java::com.example.api.AuditClient"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/CatalogClient.java::com.example.api.CatalogClient::GetMapping#0",
@@ -259,7 +282,8 @@
         "path": "src/main/java/com/example/api/CatalogClient.java",
         "start": 338,
         "end": 365
-      }
+      },
+      "decorates": "example.com/xlang-java/api::src/main/java/com/example/api/CatalogClient.java::com.example.api.CatalogClient.all()"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/CatalogClient.java::com.example.api::FeignClient#0",
@@ -270,7 +294,8 @@
         "path": "src/main/java/com/example/api/CatalogClient.java",
         "start": 277,
         "end": 300
-      }
+      },
+      "decorates": "example.com/xlang-java/api::src/main/java/com/example/api/CatalogClient.java::com.example.api.CatalogClient"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/InventoryClient.java::com.example.api.InventoryClient::GetMapping#0",
@@ -281,7 +306,8 @@
         "path": "src/main/java/com/example/api/InventoryClient.java",
         "start": 463,
         "end": 498
-      }
+      },
+      "decorates": "example.com/xlang-java/api::src/main/java/com/example/api/InventoryClient.java::com.example.api.InventoryClient.left(String)"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/InventoryClient.java::com.example.api::FeignClient#0",
@@ -292,7 +318,8 @@
         "path": "src/main/java/com/example/api/InventoryClient.java",
         "start": 365,
         "end": 423
-      }
+      },
+      "decorates": "example.com/xlang-java/api::src/main/java/com/example/api/InventoryClient.java::com.example.api.InventoryClient"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.reserve()::audit.record#0",
@@ -380,7 +407,8 @@
         "path": "src/main/java/com/example/api/OrderController.java",
         "start": 1131,
         "end": 1151
-      }
+      },
+      "decorates": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.status(String)"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController::PostMapping#0",
@@ -391,7 +419,8 @@
         "path": "src/main/java/com/example/api/OrderController.java",
         "start": 1285,
         "end": 1309
-      }
+      },
+      "decorates": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController.reserve()"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api::RequestMapping#0",
@@ -402,7 +431,8 @@
         "path": "src/main/java/com/example/api/OrderController.java",
         "start": 349,
         "end": 375
-      }
+      },
+      "decorates": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api::RestController#0",
@@ -413,7 +443,8 @@
         "path": "src/main/java/com/example/api/OrderController.java",
         "start": 333,
         "end": 348
-      }
+      },
+      "decorates": "example.com/xlang-java/api::src/main/java/com/example/api/OrderController.java::com.example.api.OrderController"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/PriceClient.java::com.example.api.PriceClient.priceOf(String)::rest.getForObject#0",
@@ -446,7 +477,8 @@
         "path": "src/main/java/com/example/api/PriceClient.java",
         "start": 271,
         "end": 281
-      }
+      },
+      "decorates": "example.com/xlang-java/api::src/main/java/com/example/api/PriceClient.java::com.example.api.PriceClient"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient.current()::rest.getForObject#0",
@@ -479,7 +511,8 @@
         "path": "src/main/java/com/example/api/PromotionClient.java",
         "start": 274,
         "end": 284
-      }
+      },
+      "decorates": "example.com/xlang-java/api::src/main/java/com/example/api/PromotionClient.java::com.example.api.PromotionClient"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient.send()::(method_invocation).build#0",
@@ -545,7 +578,8 @@
         "path": "src/main/java/com/example/api/ReportClient.java",
         "start": 192,
         "end": 202
-      }
+      },
+      "decorates": "example.com/xlang-java/api::src/main/java/com/example/api/ReportClient.java::com.example.api.ReportClient"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener.onShipment(String)::apply#0",
@@ -567,7 +601,8 @@
         "path": "src/main/java/com/example/api/ShipmentListener.java",
         "start": 210,
         "end": 255
-      }
+      },
+      "decorates": "example.com/xlang-java/api::src/main/java/com/example/api/ShipmentListener.java::com.example.api.ShipmentListener.onShipment(String)"
     },
     {
       "id": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient.StockClient(String)::WebClient.create#0",
@@ -622,7 +657,8 @@
         "path": "src/main/java/com/example/api/StockClient.java",
         "start": 286,
         "end": 296
-      }
+      },
+      "decorates": "example.com/xlang-java/api::src/main/java/com/example/api/StockClient.java::com.example.api.StockClient"
     }
   ],
   "providers": [

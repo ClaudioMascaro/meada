@@ -1118,6 +1118,7 @@ fn def(name: &str, kind: Kind, node: Node) -> Def {
         type_params: Vec::new(),
         result: None,
         suspends: false,
+        hash: String::new(),
     }
 }
 

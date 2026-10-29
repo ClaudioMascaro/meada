@@ -2,6 +2,7 @@ example.com/chain/web (.) indexado, 5 arquivos
   decisão obsoleta: example.com/chain/web::src/status.ts::gone::fetch#0 -> example.com/chain/catalog::http::POST::/api/events (chamada removida)
   decisão aguardando o par ausente example.com/chain/billing: example.com/chain/web::src/status.ts::health::fetch#0 -> example.com/chain/billing::http::GET::/api/health
   decisão aguardando o par ausente example.com/chain/billing: example.com/chain/web::src/status.ts::track::fetch#0 -> example.com/chain/billing::http::POST::/api/events
+  conclusão errada? relate: https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml
 example.com/chain/gateway (../chain-gateway) indexado, 8 arquivos
 example.com/chain/catalog (../chain-catalog) indexado, 4 arquivos
 example.com/chain/worker (../chain-worker) indexado, 3 arquivos

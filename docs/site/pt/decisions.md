@@ -52,6 +52,8 @@ Quatro variáveis de ambiente o configuram (nada vem de arquivo):
 Qualquer gateway que fale um dos dois protocolos serve: basta trocar a URL. HTTPS em qualquer
 lugar; HTTP só para `localhost` ou um endereço de loopback.
 
+No modo servidor, as decisões são feitas em um pipeline, não pelo servidor: veja [Decidir em um pipeline](server.md#decidir-em-um-pipeline).
+
 O que sai da máquina, por item: a chamada, a função que a contém (lida do disco) e a lista de
 candidatos (repositório, método e caminho), mais o id do repositório que a chama. Nenhum
 código do provedor, nenhum outro arquivo. `--show-request` mostra tudo isso antes, com a chave

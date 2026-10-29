@@ -17,7 +17,8 @@
         "path": "app/src/main.rs",
         "start": 149,
         "end": 196
-      }
+      },
+      "hash": "e2c382f231dcfa0212c8d67caf4d476f75775fed95eb2f266ad2aba68396a1c2"
     },
     {
       "id": "example.com/cargo/web::app/src/main.rs::encode",
@@ -25,7 +26,8 @@
         "path": "app/src/main.rs",
         "start": 376,
         "end": 419
-      }
+      },
+      "hash": "4733a19732306c6ed2c8706ab0adfa121baefbf13607cbed371868262c9e5180"
     },
     {
       "id": "example.com/cargo/web::app/src/main.rs::faraway",
@@ -33,7 +35,8 @@
         "path": "app/src/main.rs",
         "start": 232,
         "end": 273
-      }
+      },
+      "hash": "3bd7a264761e57eb807155778b5870dd4995c0b2dc07f674a5711e4651fb4f16"
     },
     {
       "id": "example.com/cargo/web::app/src/main.rs::haunt",
@@ -41,7 +44,8 @@
         "path": "app/src/main.rs",
         "start": 275,
         "end": 315
-      }
+      },
+      "hash": "092cdd8a137a242c4bb5e75d1c111287ca048f154d32b7062abebf2f2c184898"
     },
     {
       "id": "example.com/cargo/web::app/src/main.rs::lift",
@@ -49,7 +53,8 @@
         "path": "app/src/main.rs",
         "start": 198,
         "end": 230
-      }
+      },
+      "hash": "b128a7299e6b44a208cd1842c7626c461fea89d7f0211788aec2d182aa860b41"
     },
     {
       "id": "example.com/cargo/web::app/src/main.rs::main",
@@ -57,7 +62,8 @@
         "path": "app/src/main.rs",
         "start": 74,
         "end": 102
-      }
+      },
+      "hash": "8af8de867f27e1a5f4e7544ee431626964d5b8ce3bf3b0e1b586903bf0924568"
     },
     {
       "id": "example.com/cargo/web::app/src/main.rs::peek",
@@ -65,7 +71,8 @@
         "path": "app/src/main.rs",
         "start": 317,
         "end": 374
-      }
+      },
+      "hash": "ee26ab9f659e1ac41d0723da58f76f32b08cf296199a3bdcafdbefc1fcd73c3c"
     },
     {
       "id": "example.com/cargo/web::app/src/main.rs::welcome",
@@ -73,7 +80,8 @@
         "path": "app/src/main.rs",
         "start": 104,
         "end": 147
-      }
+      },
+      "hash": "2fdaf2b88f689ddc4a0134e4af1f0e8b7427a8da3d335930fab8fe30d3a4a691"
     },
     {
       "id": "example.com/cargo/web::worker/src/lib.rs::loud",
@@ -81,7 +89,8 @@
         "path": "worker/src/lib.rs",
         "start": 61,
         "end": 113
-      }
+      },
+      "hash": "083f7847dd53b86229818769082e1a6f185a72691ddd2e31fd5daa6fc2726d3a"
     },
     {
       "id": "example.com/cargo/web::worker/src/lib.rs::run",
@@ -89,7 +98,8 @@
         "path": "worker/src/lib.rs",
         "start": 0,
         "end": 59
-      }
+      },
+      "hash": "216ebccb8da3f98d8fe8c64cdce110abe06294b707de4a477d3cef094aeccea1"
     }
   ],
   "calls": [

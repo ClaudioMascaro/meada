@@ -9,4 +9,5 @@ example.com/chain/gateway (.) indexed, 8 files
   docs/missing.yaml: listed in `serve.documents`, not found
 example.com/chain/catalog (../chain-catalog) indexed, 4 files
 example.com/chain/web (../chain-web) indexed, 6 files
+  wrong conclusion? report it: https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml
 example.com/chain/worker (../chain-worker) indexed, 3 files

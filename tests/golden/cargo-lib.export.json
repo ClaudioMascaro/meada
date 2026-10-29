@@ -29,7 +29,8 @@
         "path": "app/src/main.rs",
         "start": 25,
         "end": 56
-      }
+      },
+      "hash": "825df0a0edda36d4edb4a55918634a81ac0025e945be47402c69bfdd2ac44ae9"
     },
     {
       "id": "example.com/cargo/lib::core/src/api.rs::Client",
@@ -37,7 +38,8 @@
         "path": "core/src/api.rs",
         "start": 0,
         "end": 18
-      }
+      },
+      "hash": "fd612f0cd344f30419d3d0ce818f4f52574aa8505d56e89e8eba13aee2f5e11a"
     },
     {
       "id": "example.com/cargo/lib::core/src/api.rs::Client.create",
@@ -45,7 +47,8 @@
         "path": "core/src/api.rs",
         "start": 38,
         "end": 86
-      }
+      },
+      "hash": "b71599b6bec65636ac8ee16c1511bc7f55787c7523f49818aad1d1bd7b6057f6"
     },
     {
       "id": "example.com/cargo/lib::core/src/lib.rs::api",
@@ -53,7 +56,8 @@
         "path": "core/src/lib.rs",
         "start": 0,
         "end": 12
-      }
+      },
+      "hash": "238e8d673eded2c6e9eab21b1f71456d080e5f8c6aa712669e99255889e3f38e"
     },
     {
       "id": "example.com/cargo/lib::core/src/lib.rs::text",
@@ -61,7 +65,8 @@
         "path": "core/src/lib.rs",
         "start": 13,
         "end": 22
-      }
+      },
+      "hash": "96cab8f717a34bec3d15411e3d12c6756c3c5189fef8ddb027984bfc7b9626f7"
     },
     {
       "id": "example.com/cargo/lib::core/src/text.rs::greet",
@@ -69,7 +74,8 @@
         "path": "core/src/text.rs",
         "start": 0,
         "end": 74
-      }
+      },
+      "hash": "2f099c9411af3927901218c154c5f9a2f47b7ef09fdf4a8727851b0f8b8b39fc"
     },
     {
       "id": "example.com/cargo/lib::core/src/text.rs::shout",
@@ -77,7 +83,8 @@
         "path": "core/src/text.rs",
         "start": 76,
         "end": 138
-      }
+      },
+      "hash": "6156db83faac1e43f69525473e3d09ebe62e661a6efc68f6e0d568dcd63ecfbe"
     },
     {
       "id": "example.com/cargo/lib::extras/src/lib.rs::boost",
@@ -85,7 +92,8 @@
         "path": "extras/src/lib.rs",
         "start": 0,
         "end": 31
-      }
+      },
+      "hash": "35df4fd30be4cb257a5ee438f05dfe90b67de15678e82d43f49f24872542176b"
     }
   ],
   "calls": [

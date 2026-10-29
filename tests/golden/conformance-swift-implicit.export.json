@@ -13,7 +13,8 @@
         "path": "Sources/Implicit.swift",
         "start": 103,
         "end": 260
-      }
+      },
+      "hash": "b928dd66efca0ad63419e9f86301cb4a4f0367c24a6949293824b9c6d3cf53cb"
     },
     {
       "id": "example.com/acme/conformance::Sources/Implicit.swift::Config.build()",
@@ -21,7 +22,8 @@
         "path": "Sources/Implicit.swift",
         "start": 212,
         "end": 258
-      }
+      },
+      "hash": "c3063f3550264e0a2c2eb80d35a8b4d0deadc820ad3fa60d0879c0dabd564dda"
     },
     {
       "id": "example.com/acme/conformance::Sources/Implicit.swift::Config.init(x:)",
@@ -29,7 +31,8 @@
         "path": "Sources/Implicit.swift",
         "start": 134,
         "end": 161
-      }
+      },
+      "hash": "449a31babde7a5eee0741d1a2297205fa10fd43810f751b3823611d46c6ba5cb"
     },
     {
       "id": "example.com/acme/conformance::Sources/Implicit.swift::Config.make()",
@@ -37,7 +40,8 @@
         "path": "Sources/Implicit.swift",
         "start": 164,
         "end": 209
-      }
+      },
+      "hash": "86d18bfc817de333eaf4ecdabf729ca0e4b81f47db3fe2f5ac6dfb54d515bfb8"
     },
     {
       "id": "example.com/acme/conformance::Sources/Implicit.swift::Duration",
@@ -45,7 +49,8 @@
         "path": "Sources/Implicit.swift",
         "start": 0,
         "end": 35
-      }
+      },
+      "hash": "8b74cc20b4151b2272efb833d3aa85965b6efa91336920f78bc7473a5ea13e2d"
     },
     {
       "id": "example.com/acme/conformance::Sources/Implicit.swift::Other",
@@ -53,7 +58,8 @@
         "path": "Sources/Implicit.swift",
         "start": 262,
         "end": 320
-      }
+      },
+      "hash": "e5c9dd838ec9fa36b8f55287f60d7c0b00ccb8d9adacf9e9855c5be94cf0a6cc"
     },
     {
       "id": "example.com/acme/conformance::Sources/Implicit.swift::Other.make()",
@@ -61,7 +67,8 @@
         "path": "Sources/Implicit.swift",
         "start": 279,
         "end": 318
-      }
+      },
+      "hash": "a2c4bc9ea46f122f289560115378f7c6d1a1feea5c9497699e8b11969c1d4c53"
     },
     {
       "id": "example.com/acme/conformance::Sources/Implicit.swift::configure()",
@@ -69,7 +76,8 @@
         "path": "Sources/Implicit.swift",
         "start": 361,
         "end": 455
-      }
+      },
+      "hash": "140b822526bb0c45e50014e540256ab6ca78147bbc7545add42402a1fcad3688"
     },
     {
       "id": "example.com/acme/conformance::Sources/Implicit.swift::fresh()",
@@ -77,7 +85,8 @@
         "path": "Sources/Implicit.swift",
         "start": 457,
         "end": 504
-      }
+      },
+      "hash": "f58bb29dd005f780ca228e6b7ad2e3d3b1361831b7f297caa34182abe02c3a2e"
     },
     {
       "id": "example.com/acme/conformance::Sources/Implicit.swift::seconds(_:)",
@@ -85,7 +94,8 @@
         "path": "Sources/Implicit.swift",
         "start": 66,
         "end": 101
-      }
+      },
+      "hash": "aeafbacf4b8a69651f574a55364e64eac13039f2290a52a35cfe2aa391985ed9"
     },
     {
       "id": "example.com/acme/conformance::Sources/Implicit.swift::sleepy()",
@@ -93,7 +103,8 @@
         "path": "Sources/Implicit.swift",
         "start": 322,
         "end": 359
-      }
+      },
+      "hash": "ca9df1da26486c9667c51a62533dc3128f3bdfcafc7b801ab0a365f988b0baee"
     },
     {
       "id": "example.com/acme/conformance::Sources/Implicit.swift::swapped()",
@@ -101,7 +112,8 @@
         "path": "Sources/Implicit.swift",
         "start": 506,
         "end": 563
-      }
+      },
+      "hash": "bddf2ea842804e50c258aeed347e2bf28b61626e8da6042bd483069e32f25ff4"
     },
     {
       "id": "example.com/acme/conformance::Sources/Implicit.swift::wait(_:)",
@@ -109,7 +121,8 @@
         "path": "Sources/Implicit.swift",
         "start": 37,
         "end": 64
-      }
+      },
+      "hash": "88d632806791468ddabffd16346fda83f507f07b8fbb8b98ef5fb580631beef0"
     }
   ],
   "calls": [

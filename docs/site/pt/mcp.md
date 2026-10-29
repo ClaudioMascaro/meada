@@ -22,14 +22,21 @@ São três ferramentas, sempre em inglês, e nenhuma escreve:
 
 - `search` acha um símbolo, uma rota ou um contrato pelo nome; com o tipo `resource`, um
   recurso pelo tipo ou pelo id; com o tipo `channel`, um canal (fila ou tópico) pelo broker ou
-  pelo nome; com o tipo `ambiguous` ou `unresolved`, lista os itens abertos
+  pelo nome; com o tipo `duplicate`, grupos de símbolos com texto idêntico em dois ou mais lugares;
+  com o tipo `ambiguous` ou `unresolved`, lista os itens abertos
   (veja Decisões);
 - `context` descreve um símbolo: o trecho de código lido do disco, quem o chama, quem ele
-  chama e os contratos que ele toca; num recurso (`resource::postgres::orders`), lista quem
+  chama e os contratos que ele toca; as anotações, atributos e decoradores escritos sobre uma
+  definição (`@Override`, `[Fact]`, `@app.get("/x")`) são chamadas do escopo que a envolve, e por
+  isso o `context` as lista à parte, na seção `annotations:`, cada uma com a definição que ela
+  decora (o ponto de chamada do export traz isso em `decorates`); num recurso (`resource::postgres::orders`), lista quem
   escreve e quem lê, com o símbolo e a linha, ou `(repository-level)` para o repositório
   inteiro; num canal (`channel::kafka::orders.created`), lista produtores e consumidores,
   inclusive os que chegam a ele por um curinga ou por um binding, com o nível e o motivo, e um
-  lado cujo nome Meada não consegue avaliar aparece como `(unresolved)` e nunca é ligado;
+  lado cujo nome Meada não consegue avaliar aparece como `(unresolved)` e nunca é ligado; os candidatos de uma chamada ambígua que
+  são sobrecargas de um método (um arquivo, uma classe, um nome) aparecem como um conjunto,
+  `(one of N overloads)`, e o `trace` os escreve como `Class.name (N overloads)`; a chamada
+  continua `ambiguous` e o export lista cada candidato como antes;
 - `trace` segue uma cadeia de chamadas por vários repositórios, rio abaixo (`down`) ou rio
   acima (`up`); com `changes: uncommitted`, parte do diff da árvore de trabalho e serve para
   analisar o impacto do que acabou de ser editado.

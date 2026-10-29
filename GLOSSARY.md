@@ -16,8 +16,9 @@ What Meada builds for one repository: its symbols, calls and contracts, with no 
 _Avoid_: database, cache
 
 **Span**:
-A range in a source file, stored as a location and a content hash. Its text is read from disk
-when shown.
+A range in a source file, stored as a location. The file's content hash (for freshness and before
+showing the text) and, for a symbol's span, the hash of its exact bytes (for duplicates) are
+stored beside it. Its text is read from disk when shown.
 _Avoid_: snippet, line range
 
 **Language pack**:

@@ -93,6 +93,7 @@ impl LanguagePack for TsJs {
                     type_params: types::type_parameters(node, src),
                     result: None,
                     suspends: false,
+                    hash: String::new(),
                     name: inner.clone(),
                     kind,
                     range,

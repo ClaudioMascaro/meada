@@ -617,6 +617,7 @@ fn walk(
                 facts.defs.push(Def {
                     params: signature.params,
                     suspends: children(node).any(|c| c.kind() == "async"),
+                    hash: String::new(),
                     ..definition(&inner, kind, node.byte_range(), Vec::new())
                 });
                 if place == Place::Top {
@@ -1778,6 +1779,7 @@ fn definition(name: &str, kind: Kind, range: Range<usize>, bases: Vec<String>) -
         type_params: Vec::new(),
         result: None,
         suspends: false,
+        hash: String::new(),
     }
 }
 

@@ -29,7 +29,8 @@
         "path": "src/handlers.ts",
         "start": 7,
         "end": 118
-      }
+      },
+      "hash": "9d6941c4e45f60ec202f78616c33e73cf8fc379892ca6f758ebf88b3dd1adbbe"
     },
     {
       "id": "example.com/acme/backend::src/routes/users.ts::find",
@@ -37,7 +38,8 @@
         "path": "src/routes/users.ts",
         "start": 600,
         "end": 646
-      }
+      },
+      "hash": "d962b195b198bdbc69802c6b2450d60894c784b8cbfa3ffd66763856d641c483"
     },
     {
       "id": "example.com/acme/backend::src/routes/users.ts::list",
@@ -45,7 +47,8 @@
         "path": "src/routes/users.ts",
         "start": 566,
         "end": 598
-      }
+      },
+      "hash": "a14875eb366a91e5e9dde779abf3384ce8393b0bc1544ca3c2d99924af5499c7"
     },
     {
       "id": "example.com/acme/backend::src/routes/users.ts::register",
@@ -53,7 +56,8 @@
         "path": "src/routes/users.ts",
         "start": 227,
         "end": 491
-      }
+      },
+      "hash": "36976856457858d78e7777150859a23eccd388020a1faba5add2449f634bf749"
     },
     {
       "id": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users",
@@ -61,7 +65,8 @@
         "path": "src/routes/users.ts",
         "start": 281,
         "end": 312
-      }
+      },
+      "hash": "50910c4526b8ad0b15ffde0d8213b600bcbc14dda7b9131dbf2185bb52fd6340"
     },
     {
       "id": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}",
@@ -69,7 +74,8 @@
         "path": "src/routes/users.ts",
         "start": 357,
         "end": 404
-      }
+      },
+      "hash": "2d759cfcaa3ee6ae6532c7ec1afe0520cdb3cf4505383f415d8a5a8f46272936"
     },
     {
       "id": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}#1",
@@ -77,7 +83,8 @@
         "path": "src/routes/users.ts",
         "start": 440,
         "end": 483
-      }
+      },
+      "hash": "849b22a03a28c6283bede6dc048cf96a9521d2865009450945d92055bafad265"
     },
     {
       "id": "example.com/acme/backend::src/server.ts::GET /health",
@@ -85,7 +92,8 @@
         "path": "src/server.ts",
         "start": 256,
         "end": 285
-      }
+      },
+      "hash": "d20a5e68bc19266d19ea40faf79732e57fd758c7bc5c67974a7235a5dc03be85"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::GET /guarded",
@@ -93,7 +101,8 @@
         "path": "src/unreadable.ts",
         "start": 1119,
         "end": 1153
-      }
+      },
+      "hash": "453bc52c605bb0458ee8c8ab8bf3d4744e5f03b4b1b419300776150fe038c2c9"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::GET /orders/{}",
@@ -101,7 +110,8 @@
         "path": "src/unreadable.ts",
         "start": 361,
         "end": 393
-      }
+      },
+      "hash": "fa46f8b3b86e0fa0c859ab6608735bca6b99262f0339a89e2f3e707daaf84466"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::GET /v1/old",
@@ -109,7 +119,8 @@
         "path": "src/unreadable.ts",
         "start": 612,
         "end": 642
-      }
+      },
+      "hash": "ca8a15c5be37945dca54aac1b30425058c1070c271f7e81069d802a3387e8826"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::auth",
@@ -117,7 +128,8 @@
         "path": "src/unreadable.ts",
         "start": 1156,
         "end": 1201
-      }
+      },
+      "hash": "3e6098a41a27efa469aa7bcc93f9764adf360b91741d56b6f9b9f3a39b8749db"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::mountAt",
@@ -125,7 +137,8 @@
         "path": "src/unreadable.ts",
         "start": 202,
         "end": 299
-      }
+      },
+      "hash": "7f98f98deadfae32d9f4f7e776ca7a732158101fa886bb2439903eaab5b26bc0"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::mountLegacy",
@@ -133,7 +146,8 @@
         "path": "src/unreadable.ts",
         "start": 652,
         "end": 734
-      }
+      },
+      "hash": "91f5c93f44899545c2e07d49592c4839e4e565857b71af67e8a8366df3c75495"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::mountPlugin",
@@ -141,7 +155,8 @@
         "path": "src/unreadable.ts",
         "start": 1001,
         "end": 1068
-      }
+      },
+      "hash": "a955e62a59d80f71ef4f96263dcbbc7c8ac970c427ef1c72f01900c4fd687639"
     }
   ],
   "calls": [

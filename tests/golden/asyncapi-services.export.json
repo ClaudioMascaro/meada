@@ -17,7 +17,8 @@
         "path": "src/kafka.ts",
         "start": 211,
         "end": 400
-      }
+      },
+      "hash": "e8a090e30a71b594ff1ef4ff97f647a8528f005997e8923526045d50c7d544a9"
     },
     {
       "id": "example.com/asyncapi/services::src/kafka.ts::onOrder",
@@ -25,7 +26,8 @@
         "path": "src/kafka.ts",
         "start": 409,
         "end": 504
-      }
+      },
+      "hash": "2e131d20f8486723233177c617713bc6f3afccc9bf22602b67bcfab0ffefda22"
     },
     {
       "id": "example.com/asyncapi/services::src/kafka.ts::requestPayment",
@@ -33,7 +35,8 @@
         "path": "src/kafka.ts",
         "start": 595,
         "end": 733
-      }
+      },
+      "hash": "f9add22e4c21476c2905332bb3620009e33e8d8162b75604ae6aa03bad2a4992"
     },
     {
       "id": "example.com/asyncapi/services::src/queues.ts::cancel",
@@ -41,7 +44,8 @@
         "path": "src/queues.ts",
         "start": 489,
         "end": 597
-      }
+      },
+      "hash": "c48f0df6bbbb6f155d3741d555894a107558003aa43b35b5396907c41d41166e"
     },
     {
       "id": "example.com/asyncapi/services::src/queues.ts::onInvoice",
@@ -49,7 +53,8 @@
         "path": "src/queues.ts",
         "start": 307,
         "end": 365
-      }
+      },
+      "hash": "94302f7a49cb0a20b440ae185d25441cc3e3b6e47a0edc1f7bd05ae1c4d32a99"
     },
     {
       "id": "example.com/asyncapi/services::src/queues.ts::ship",
@@ -57,7 +62,8 @@
         "path": "src/queues.ts",
         "start": 374,
         "end": 480
-      }
+      },
+      "hash": "49ab982bb9a891f112f13c7821e74baa38fac984086d8cc1ec350dbda790f2d7"
     },
     {
       "id": "example.com/asyncapi/services::src/queues.ts::work",
@@ -65,7 +71,8 @@
         "path": "src/queues.ts",
         "start": 225,
         "end": 305
-      }
+      },
+      "hash": "75253b9f616c9ccf47159df6a36ad596b00ef45fd2ce29dca7af5e2d43058f3c"
     }
   ],
   "calls": [

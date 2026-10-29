@@ -13,7 +13,8 @@
         "path": "src/emit.ts",
         "start": 261,
         "end": 385
-      }
+      },
+      "hash": "c29a4d1694811f9e628e604a03b37d8fca6e5c57516f05bc19ca689da5365b2e"
     },
     {
       "id": "example.com/asyncapi/events::src/emit.ts::onCancellation",
@@ -21,7 +22,8 @@
         "path": "src/emit.ts",
         "start": 653,
         "end": 716
-      }
+      },
+      "hash": "756594a0bbdf26e67b902ceeb84c2c9659aacfd2b6339f9a0b7a4625f8d68d19"
     },
     {
       "id": "example.com/asyncapi/events::src/emit.ts::work",
@@ -29,7 +31,8 @@
         "path": "src/emit.ts",
         "start": 562,
         "end": 651
-      }
+      },
+      "hash": "569e7d8bf4e3e8758b99fef40a0ac5a5e8cf72d148f9c960a4fb5b0f429b03dc"
     }
   ],
   "calls": [

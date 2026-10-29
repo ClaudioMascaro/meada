@@ -325,7 +325,8 @@
         "path": "bindings.py",
         "start": 1754,
         "end": 1824
-      }
+      },
+      "hash": "eeb5c872d9d077d742e7346820954849e003f14aac759ffa6fbaa732a5e1c0cb"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Both.go",
@@ -333,7 +334,8 @@
         "path": "bindings.py",
         "start": 1783,
         "end": 1824
-      }
+      },
+      "hash": "24fa56faee26fad78ed33fb3f331ffddca22e739cb24af6b15422e3dc5a9312c"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Left",
@@ -341,7 +343,8 @@
         "path": "bindings.py",
         "start": 1640,
         "end": 1693
-      }
+      },
+      "hash": "61ee8d71ef3998315f57e04dbc311093fbd22c8acb25b253c5b4c575a4e7e139"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Left.left",
@@ -349,7 +352,8 @@
         "path": "bindings.py",
         "start": 1661,
         "end": 1693
-      }
+      },
+      "hash": "137a6321ce782a9a3f698393415ba4f79b55f18fd9c42b09654d2bda622e7043"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Line",
@@ -357,7 +361,8 @@
         "path": "bindings.py",
         "start": 117,
         "end": 165
-      }
+      },
+      "hash": "3f889e4bd42d3cde7c1cf11de8d5f9075576a4f320af6d0503e90352450bcfd8"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Line.dial",
@@ -365,7 +370,8 @@
         "path": "bindings.py",
         "start": 133,
         "end": 165
-      }
+      },
+      "hash": "c6fcb7af3542917c1c5753effe25cbbc12f8e5f4a8fba92d071dbaeb3b2b12bc"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Looped",
@@ -373,7 +379,8 @@
         "path": "bindings.py",
         "start": 330,
         "end": 495
-      }
+      },
+      "hash": "e62a79e28bfdff35dc5beb6b9f4db1d687b60b202a42c07bb9d4f4b617177ddf"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Looped.__init__",
@@ -381,7 +388,8 @@
         "path": "bindings.py",
         "start": 367,
         "end": 442
-      }
+      },
+      "hash": "af2993aa47554b1d09d34ee2a4a94ec9544404370ab423b3878b043053842651"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Looped.call",
@@ -389,7 +397,8 @@
         "path": "bindings.py",
         "start": 448,
         "end": 495
-      }
+      },
+      "hash": "868dba32fa29c444bdbd788d9e585ddac1f61537ba9129d2142440d37801ea6d"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Mixed",
@@ -397,7 +406,8 @@
         "path": "bindings.py",
         "start": 2106,
         "end": 2180
-      }
+      },
+      "hash": "432b6cbad0aeb3392c7164eee6afab384f27b0e72256093f5d09d356988e0ee5"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Mixed.go",
@@ -405,7 +415,8 @@
         "path": "bindings.py",
         "start": 2139,
         "end": 2180
-      }
+      },
+      "hash": "cdbd7dec5b5f9cf7a62e1bc9d923286cf260eb4b0b79e783e38d51b2a8b2dd43"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::ObjectBoth",
@@ -413,7 +424,8 @@
         "path": "bindings.py",
         "start": 1930,
         "end": 2017
-      }
+      },
+      "hash": "82f54e975085ab2eec65cfc7c7c43c791ed6a712644901f98a593ba6bee36984"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::ObjectBoth.go",
@@ -421,7 +433,8 @@
         "path": "bindings.py",
         "start": 1977,
         "end": 2017
-      }
+      },
+      "hash": "d69b57764de8de09ffc58694327d1200ade77327defafdc5ca3b606005346a43"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::ObjectLeft",
@@ -429,7 +442,8 @@
         "path": "bindings.py",
         "start": 1827,
         "end": 1861
-      }
+      },
+      "hash": "5d07f7e83603906f414326f65f2606c8ef95fe86e91a2f504c2d2f5adcea29d4"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::ObjectRight",
@@ -437,7 +451,8 @@
         "path": "bindings.py",
         "start": 1864,
         "end": 1927
-      }
+      },
+      "hash": "81f6a6e5b046bfedfce5e980330a7fd5a8d3e351a729197fc5ddc8ce723d4b6c"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::ObjectRight.side",
@@ -445,7 +460,8 @@
         "path": "bindings.py",
         "start": 1895,
         "end": 1927
-      }
+      },
+      "hash": "8fcb3e3f8232e94e0cb3189b2283836b8fa1fc231dd7934571e8c7b628893abd"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Opened",
@@ -453,7 +469,8 @@
         "path": "bindings.py",
         "start": 498,
         "end": 674
-      }
+      },
+      "hash": "a2f76da2ac19624b166ea805380251493d20108a94b1fa6e701c9d27c311c312"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Opened.__init__",
@@ -461,7 +478,8 @@
         "path": "bindings.py",
         "start": 535,
         "end": 621
-      }
+      },
+      "hash": "7878af519d529a946c746453c249f0b8e0598d6f3b9b116305ee20713a314f19"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Opened.call",
@@ -469,7 +487,8 @@
         "path": "bindings.py",
         "start": 627,
         "end": 674
-      }
+      },
+      "hash": "868dba32fa29c444bdbd788d9e585ddac1f61537ba9129d2142440d37801ea6d"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Outside",
@@ -477,7 +496,8 @@
         "path": "bindings.py",
         "start": 838,
         "end": 923
-      }
+      },
+      "hash": "3c9274311683c8bc2dd9347c7494e84cc46e6b5a3f4fcff4f762e33b200aff50"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Outside.call",
@@ -485,7 +505,8 @@
         "path": "bindings.py",
         "start": 876,
         "end": 923
-      }
+      },
+      "hash": "868dba32fa29c444bdbd788d9e585ddac1f61537ba9129d2142440d37801ea6d"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Reset",
@@ -493,7 +514,8 @@
         "path": "bindings.py",
         "start": 677,
         "end": 835
-      }
+      },
+      "hash": "ccd6f4d47ae994b91746e4ccf1337bf36547e8b3b99f2ecab3b5924c04c4e71d"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Reset.call",
@@ -501,7 +523,8 @@
         "path": "bindings.py",
         "start": 713,
         "end": 835
-      }
+      },
+      "hash": "1b1cb6bce729142ec999ce89da2947630dfba5e64c8e786360291064a5af609c"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Reset.call.reset",
@@ -509,7 +532,8 @@
         "path": "bindings.py",
         "start": 743,
         "end": 786
-      }
+      },
+      "hash": "1649d4b4f02456d6c3961d4542ccaca10316b3016024ad03be16483b09eae41c"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Right",
@@ -517,7 +541,8 @@
         "path": "bindings.py",
         "start": 1696,
         "end": 1751
-      }
+      },
+      "hash": "6c706ed9a25a3d90c42780af01cbcb230f545a779a57a6dbebdee0994c314235"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Right.right",
@@ -525,7 +550,8 @@
         "path": "bindings.py",
         "start": 1718,
         "end": 1751
-      }
+      },
+      "hash": "8bfbd22495565755092d23dfce6f18f0f19e8eb9c838cd0c1aa5d324b53d1e77"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Store",
@@ -533,7 +559,8 @@
         "path": "bindings.py",
         "start": 2053,
         "end": 2103
-      }
+      },
+      "hash": "5f562761af0096d161b364ab6f55eafcb20529b1833ec9a394a33b646ebe6669"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Store.stash",
@@ -541,7 +568,8 @@
         "path": "bindings.py",
         "start": 2070,
         "end": 2103
-      }
+      },
+      "hash": "d8b6c17d7a51b821c4571c5fbfde3c92099f06322849dedf22ec9cc22be05571"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Unpacked",
@@ -549,7 +577,8 @@
         "path": "bindings.py",
         "start": 168,
         "end": 327
-      }
+      },
+      "hash": "a74ddd5e64fc006f2e25ceda4dcab5f15e27ce6209c571462bfd36924baacc64"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Unpacked.__init__",
@@ -557,7 +586,8 @@
         "path": "bindings.py",
         "start": 207,
         "end": 274
-      }
+      },
+      "hash": "a909c4b0e887264ac60ed0114f6b4c5499ca4582625784ae4b83281295297b10"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::Unpacked.call",
@@ -565,7 +595,8 @@
         "path": "bindings.py",
         "start": 280,
         "end": 327
-      }
+      },
+      "hash": "868dba32fa29c444bdbd788d9e585ddac1f61537ba9129d2142440d37801ea6d"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::factory",
@@ -573,7 +604,8 @@
         "path": "bindings.py",
         "start": 1166,
         "end": 1364
-      }
+      },
+      "hash": "9a847542ba435062c87bd9afca684337703583af54f9b5a1c63c6d2af33187b4"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::factory.Inner",
@@ -581,7 +613,8 @@
         "path": "bindings.py",
         "start": 1208,
         "end": 1320
-      }
+      },
+      "hash": "02859262e021ab80d34ef8b550810170ce87e4867a236964d24aab8015f2b2e2"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::factory.Inner.reset",
@@ -589,7 +622,8 @@
         "path": "bindings.py",
         "start": 1252,
         "end": 1320
-      }
+      },
+      "hash": "28774eacc1a9ced5e3c4b981c741a2ea6da516bbb60e57595fc3b577f61ac3ee"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::imported",
@@ -597,7 +631,8 @@
         "path": "bindings.py",
         "start": 1485,
         "end": 1564
-      }
+      },
+      "hash": "024b2feaa86dd1f3802af854727ec9d655b723ecc936809fcaf7435c4736d609"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::lazy",
@@ -605,7 +640,8 @@
         "path": "bindings.py",
         "start": 1567,
         "end": 1637
-      }
+      },
+      "hash": "b5aef0c40b31993e65a34420523f792775d27699eb278e5e855a03c3e5d290cf"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::matched",
@@ -613,7 +649,8 @@
         "path": "bindings.py",
         "start": 1367,
         "end": 1482
-      }
+      },
+      "hash": "a4672c4767e0432e07019c49e686916848e437688a3f794a1560ffdd6a9021ef"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::mixin",
@@ -621,7 +658,8 @@
         "path": "bindings.py",
         "start": 2020,
         "end": 2050
-      }
+      },
+      "hash": "ac2909ec527d957dc7791f0cdc12dd26bdd5be887a65b29a5121e77e595a12cd"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::nested",
@@ -629,7 +667,8 @@
         "path": "bindings.py",
         "start": 988,
         "end": 1163
-      }
+      },
+      "hash": "d7f5bb813434f578852eda7b0add0fabc59c2e777acd693a505218ae298bb3e0"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::nested.mid",
@@ -637,7 +676,8 @@
         "path": "bindings.py",
         "start": 1029,
         "end": 1129
-      }
+      },
+      "hash": "6e981650dfcd92a4abc249fc2c41dd241e66f082325316c2f9e894c3d671eaa4"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::nested.mid.inner",
@@ -645,7 +685,8 @@
         "path": "bindings.py",
         "start": 1048,
         "end": 1112
-      }
+      },
+      "hash": "c04f662f5b91bbf00be24b8e6e27eba1e40fd96035765abcef26de2b365503eb"
     },
     {
       "id": "example.com/acme/conformance::bindings.py::poke",
@@ -653,7 +694,8 @@
         "path": "bindings.py",
         "start": 926,
         "end": 985
-      }
+      },
+      "hash": "03521862b2e0374cbb88cf6d45acad42243c9a546aa7adb5968e36455619c3eb"
     },
     {
       "id": "example.com/acme/conformance::clients/defaults.py::call_keyword_only",
@@ -661,7 +703,8 @@
         "path": "clients/defaults.py",
         "start": 662,
         "end": 725
-      }
+      },
+      "hash": "224397c0106cfc456b2735c0e0223b6c01db83c4e2f2d62ffa5d559b38b44ca6"
     },
     {
       "id": "example.com/acme/conformance::clients/defaults.py::call_with_splats",
@@ -669,7 +712,8 @@
         "path": "clients/defaults.py",
         "start": 934,
         "end": 1087
-      }
+      },
+      "hash": "0fa8126fea33ba6cf846a8fdcda18232a63bba9c19c11588f6d0fbe03d9f79e2"
     },
     {
       "id": "example.com/acme/conformance::clients/defaults.py::create_default",
@@ -677,7 +721,8 @@
         "path": "clients/defaults.py",
         "start": 326,
         "end": 436
-      }
+      },
+      "hash": "2be2047dadb984e02e99d2465601cc962eeb03a5a36bd5035c765a1f1caed200"
     },
     {
       "id": "example.com/acme/conformance::clients/defaults.py::keyword_only",
@@ -685,7 +730,8 @@
         "path": "clients/defaults.py",
         "start": 570,
         "end": 659
-      }
+      },
+      "hash": "56d441c2d5bfd76cc901ec188f745f7c488fb99ca2def7d0378d692d7ac55d50"
     },
     {
       "id": "example.com/acme/conformance::clients/defaults.py::list_defaults",
@@ -693,7 +739,8 @@
         "path": "clients/defaults.py",
         "start": 234,
         "end": 323
-      }
+      },
+      "hash": "dfb50a576d1ea34a5b2145949b39bd104dfb34bc4fc6a31fbe56e8995be74d6f"
     },
     {
       "id": "example.com/acme/conformance::clients/defaults.py::other_base",
@@ -701,7 +748,8 @@
         "path": "clients/defaults.py",
         "start": 439,
         "end": 567
-      }
+      },
+      "hash": "239c5e4218961ebc7a82a281058d69a4df47a8a59ebaa64d4b6a6c4120b97606"
     },
     {
       "id": "example.com/acme/conformance::clients/defaults.py::override_keyword_only",
@@ -709,7 +757,8 @@
         "path": "clients/defaults.py",
         "start": 728,
         "end": 812
-      }
+      },
+      "hash": "6b6d40a98488f004f557d68ae13f7d9acff7b5233cc147a402a602bc68114609"
     },
     {
       "id": "example.com/acme/conformance::clients/defaults.py::request",
@@ -717,7 +766,8 @@
         "path": "clients/defaults.py",
         "start": 139,
         "end": 231
-      }
+      },
+      "hash": "28a0272e74d1b4509812ee683f6a59d4c2cb799ed52f2ad78e28dfaea3050965"
     },
     {
       "id": "example.com/acme/conformance::clients/defaults.py::with_splats",
@@ -725,7 +775,8 @@
         "path": "clients/defaults.py",
         "start": 815,
         "end": 931
-      }
+      },
+      "hash": "3810f8ccb44009d5ceb58b2e2fdbcc2cd77b929af51b03defd8e76aa849fe6d4"
     },
     {
       "id": "example.com/acme/conformance::clients/dynamic.py::build_url",
@@ -733,7 +784,8 @@
         "path": "clients/dynamic.py",
         "start": 428,
         "end": 471
-      }
+      },
+      "hash": "24ae8a76d5d97d80c5706c5eb7c24e243ccfd77666b671e12f76d8cc8627ef65"
     },
     {
       "id": "example.com/acme/conformance::clients/dynamic.py::computed",
@@ -741,7 +793,8 @@
         "path": "clients/dynamic.py",
         "start": 372,
         "end": 425
-      }
+      },
+      "hash": "887b4d831cba0b10bd73e912d949143ea4b75cf3324fa2fbd969ce442a3b2796"
     },
     {
       "id": "example.com/acme/conformance::clients/dynamic.py::formatted",
@@ -749,7 +802,8 @@
         "path": "clients/dynamic.py",
         "start": 143,
         "end": 264
-      }
+      },
+      "hash": "ad7b674dda0c1324e49a9add6dbbec24342709c6e1e34e74886d7e87d96503f4"
     },
     {
       "id": "example.com/acme/conformance::clients/dynamic.py::from_environment",
@@ -757,7 +811,8 @@
         "path": "clients/dynamic.py",
         "start": 474,
         "end": 645
-      }
+      },
+      "hash": "6af45405738047506ea4670eeb953bbccf145e7c98fbfc31d9d299cc11dbcb5a"
     },
     {
       "id": "example.com/acme/conformance::clients/dynamic.py::percent",
@@ -765,7 +820,8 @@
         "path": "clients/dynamic.py",
         "start": 267,
         "end": 369
-      }
+      },
+      "hash": "a042a789492cb8271826bb1061251015dfcab625f301606b40c3e437a4595c6b"
     },
     {
       "id": "example.com/acme/conformance::clients/dynamic.py::unknown_method",
@@ -773,7 +829,8 @@
         "path": "clients/dynamic.py",
         "start": 648,
         "end": 778
-      }
+      },
+      "hash": "e8b5ba8d88b7de1165ec7beee676589915039eff32c2959e43537f831b5b9c88"
     },
     {
       "id": "example.com/acme/conformance::clients/environment.py::client_base_url",
@@ -781,7 +838,8 @@
         "path": "clients/environment.py",
         "start": 1209,
         "end": 1358
-      }
+      },
+      "hash": "66ea5fb57d96c3bd7814acfa13345db64c0aee8870062593a590704fb8fd91b6"
     },
     {
       "id": "example.com/acme/conformance::clients/environment.py::computed_name",
@@ -789,7 +847,8 @@
         "path": "clients/environment.py",
         "start": 1635,
         "end": 1791
-      }
+      },
+      "hash": "73ab8b44154015eeeda816c34296c933a57a92ac78456befee3445504bc1bfd7"
     },
     {
       "id": "example.com/acme/conformance::clients/environment.py::default_argument",
@@ -797,7 +856,8 @@
         "path": "clients/environment.py",
         "start": 730,
         "end": 839
-      }
+      },
+      "hash": "83c4c6ef940916d70dc51ea75ccf226b77d11160e4a9e38ba892f57920c6341e"
     },
     {
       "id": "example.com/acme/conformance::clients/environment.py::default_in_environ_get",
@@ -805,7 +865,8 @@
         "path": "clients/environment.py",
         "start": 842,
         "end": 959
-      }
+      },
+      "hash": "c0f5b39bf01b5cc26dced0be47c04586b928679a05c76a8d9fa3f0bef9f7c9e7"
     },
     {
       "id": "example.com/acme/conformance::clients/environment.py::default_reads_another",
@@ -813,7 +874,8 @@
         "path": "clients/environment.py",
         "start": 1521,
         "end": 1632
-      }
+      },
+      "hash": "9ba0a4bede1f26fc26e929f536234926913f6994bce65593e681bb0076b92f70"
     },
     {
       "id": "example.com/acme/conformance::clients/environment.py::environ_get",
@@ -821,7 +883,8 @@
         "path": "clients/environment.py",
         "start": 370,
         "end": 454
-      }
+      },
+      "hash": "88b3a444e93d6b6ff5f5d0963c8a470097939289a22d08b4ae906520b8e98ba9"
     },
     {
       "id": "example.com/acme/conformance::clients/environment.py::fallback",
@@ -829,7 +892,8 @@
         "path": "clients/environment.py",
         "start": 622,
         "end": 727
-      }
+      },
+      "hash": "805d5af74795622fe80255e62d364c5fc7dbf6e8985ad4609306b1776ac32023"
     },
     {
       "id": "example.com/acme/conformance::clients/environment.py::getenv_call",
@@ -837,7 +901,8 @@
         "path": "clients/environment.py",
         "start": 457,
         "end": 536
-      }
+      },
+      "hash": "7c8559788e5e8cf52002d816217c2e4d571ec44ff66eda1931536965fdff75e1"
     },
     {
       "id": "example.com/acme/conformance::clients/environment.py::imported_getenv",
@@ -845,7 +910,8 @@
         "path": "clients/environment.py",
         "start": 539,
         "end": 619
-      }
+      },
+      "hash": "26d945b9f164bb520e572aa23b71edb06f07864fcedae606c3c62cef7a740420"
     },
     {
       "id": "example.com/acme/conformance::clients/environment.py::imported_subscript",
@@ -853,7 +919,8 @@
         "path": "clients/environment.py",
         "start": 283,
         "end": 367
-      }
+      },
+      "hash": "f56b0c22843e347c212d6f4063ad478589e594ef0646b92a98a3bda7ca09373f"
     },
     {
       "id": "example.com/acme/conformance::clients/environment.py::interpolated",
@@ -861,7 +928,8 @@
         "path": "clients/environment.py",
         "start": 1125,
         "end": 1206
-      }
+      },
+      "hash": "79670091adae6549e6c10761a28f8f4e573d123de5bf321f6d9587ff9084dba1"
     },
     {
       "id": "example.com/acme/conformance::clients/environment.py::named",
@@ -869,7 +937,8 @@
         "path": "clients/environment.py",
         "start": 1068,
         "end": 1122
-      }
+      },
+      "hash": "b177c702ec6ca6146e97265f24dcc777557140947678cfd22e54338005278477"
     },
     {
       "id": "example.com/acme/conformance::clients/environment.py::string_methods",
@@ -877,7 +946,8 @@
         "path": "clients/environment.py",
         "start": 962,
         "end": 1065
-      }
+      },
+      "hash": "510964d737d657be9b54fc9ad540b0808f5b86e4bba89bfbe7781776b7f0158f"
     },
     {
       "id": "example.com/acme/conformance::clients/environment.py::subscript",
@@ -885,7 +955,8 @@
         "path": "clients/environment.py",
         "start": 202,
         "end": 280
-      }
+      },
+      "hash": "ec8fd1f50a557bdf1cbf0c15cc348c1313f85a8f53620682431569ffb6fc9688"
     },
     {
       "id": "example.com/acme/conformance::clients/environment.py::two_variables",
@@ -893,7 +964,8 @@
         "path": "clients/environment.py",
         "start": 1361,
         "end": 1518
-      }
+      },
+      "hash": "d2bf06d20e1a333c50c310a97bc868ff18d7d020362a22b48aae766a5a5cfcf2"
     },
     {
       "id": "example.com/acme/conformance::clients/modules.py::create_user",
@@ -901,7 +973,8 @@
         "path": "clients/modules.py",
         "start": 334,
         "end": 460
-      }
+      },
+      "hash": "d79475fe871a47a78310eeccecfb51549a973f64696b5765764a3f8bb93b0eed"
     },
     {
       "id": "example.com/acme/conformance::clients/modules.py::list_orders",
@@ -909,7 +982,8 @@
         "path": "clients/modules.py",
         "start": 1071,
         "end": 1182
-      }
+      },
+      "hash": "e78f33edb5cfab3766c1c0c6470e479170a49e09c53484a752482778ed9e4586"
     },
     {
       "id": "example.com/acme/conformance::clients/modules.py::list_users",
@@ -917,7 +991,8 @@
         "path": "clients/modules.py",
         "start": 211,
         "end": 331
-      }
+      },
+      "hash": "63dc6535228e6b56f2f92c341bb7bd54610f52a94b7c3cd532d3955b9f9e990b"
     },
     {
       "id": "example.com/acme/conformance::clients/modules.py::lookup",
@@ -925,7 +1000,8 @@
         "path": "clients/modules.py",
         "start": 932,
         "end": 1068
-      }
+      },
+      "hash": "826db0c3c43fc67d52c88e6e20e36dcafd71cda98e166f90d2fdc948613b7d7f"
     },
     {
       "id": "example.com/acme/conformance::clients/modules.py::purge",
@@ -933,7 +1009,8 @@
         "path": "clients/modules.py",
         "start": 747,
         "end": 929
-      }
+      },
+      "hash": "a13419cdd0e6664a3d1f7ab1ea1b995ed0a8e02c7ca33d9aa9dacff4c10727a0"
     },
     {
       "id": "example.com/acme/conformance::clients/modules.py::read_order",
@@ -941,7 +1018,8 @@
         "path": "clients/modules.py",
         "start": 1185,
         "end": 1317
-      }
+      },
+      "hash": "07476309eeaf8faa27a716cd1f36ee3ee56606eb287fc66fc9b4aba2260257c3"
     },
     {
       "id": "example.com/acme/conformance::clients/modules.py::rename_user",
@@ -949,7 +1027,8 @@
         "path": "clients/modules.py",
         "start": 463,
         "end": 614
-      }
+      },
+      "hash": "e20955633b4760ea6ec2d63db54ef01e58dcbfcf5b6fc321821e080a45fb2948"
     },
     {
       "id": "example.com/acme/conformance::clients/modules.py::status",
@@ -957,7 +1036,8 @@
         "path": "clients/modules.py",
         "start": 617,
         "end": 744
-      }
+      },
+      "hash": "11206c953c10309b30894a11746f3ca038b9a1806241d8a4074709f0f8938980"
     },
     {
       "id": "example.com/acme/conformance::clients/sessions.py::Cache",
@@ -965,7 +1045,8 @@
         "path": "clients/sessions.py",
         "start": 1223,
         "end": 1322
-      }
+      },
+      "hash": "3051eba1d33b1f0303be6d2c29087c71c9de0eecd970d1d727c3591ee52faabc"
     },
     {
       "id": "example.com/acme/conformance::clients/sessions.py::Cache.get",
@@ -973,7 +1054,8 @@
         "path": "clients/sessions.py",
         "start": 1284,
         "end": 1322
-      }
+      },
+      "hash": "91e0abc5e096c63d5eb7f35250e652e02baca17c5e54667f11adeafce054b640"
     },
     {
       "id": "example.com/acme/conformance::clients/sessions.py::Gateway",
@@ -981,7 +1063,8 @@
         "path": "clients/sessions.py",
         "start": 1325,
         "end": 1549
-      }
+      },
+      "hash": "8379bca7b5bef23c63eddefeee915f904bd9a7237026d6404658a4935855a2bf"
     },
     {
       "id": "example.com/acme/conformance::clients/sessions.py::Gateway.__init__",
@@ -989,7 +1072,8 @@
         "path": "clients/sessions.py",
         "start": 1344,
         "end": 1453
-      }
+      },
+      "hash": "516c8ced5712d641968e973f2f4d769366835736868a9471c5c864a8959d7f24"
     },
     {
       "id": "example.com/acme/conformance::clients/sessions.py::Gateway.health",
@@ -997,7 +1081,8 @@
         "path": "clients/sessions.py",
         "start": 1459,
         "end": 1549
-      }
+      },
+      "hash": "37897a82e9a37ea160f073cbeabcfd2694ceec45cc633648212d192edbc65cd7"
     },
     {
       "id": "example.com/acme/conformance::clients/sessions.py::annotated",
@@ -1005,7 +1090,8 @@
         "path": "clients/sessions.py",
         "start": 1552,
         "end": 1712
-      }
+      },
+      "hash": "6aef2790e6a06b2fb3c2037d4f03fd5d79e767d833898fa342b2fdd7101a458c"
     },
     {
       "id": "example.com/acme/conformance::clients/sessions.py::bound_by_async_with",
@@ -1013,7 +1099,8 @@
         "path": "clients/sessions.py",
         "start": 887,
         "end": 1220
-      }
+      },
+      "hash": "68b2edbc8519ba4633988d317f0ad95bb642b11c4dec30defb7ce5802dd37c87"
     },
     {
       "id": "example.com/acme/conformance::clients/sessions.py::bound_by_with",
@@ -1021,7 +1108,8 @@
         "path": "clients/sessions.py",
         "start": 782,
         "end": 884
-      }
+      },
+      "hash": "bf8c6aa28582fff3aafbe90e5c6dbd45988aac0c6a45d44793688307a84b471c"
     },
     {
       "id": "example.com/acme/conformance::clients/sessions.py::from_module",
@@ -1029,7 +1117,8 @@
         "path": "clients/sessions.py",
         "start": 236,
         "end": 296
-      }
+      },
+      "hash": "db2b1559b2db2db8ed5d87c0ebc607235a3c2f0e623fa6d627924dbd783d2e75"
     },
     {
       "id": "example.com/acme/conformance::clients/sessions.py::from_scope",
@@ -1037,7 +1126,8 @@
         "path": "clients/sessions.py",
         "start": 299,
         "end": 379
-      }
+      },
+      "hash": "f74dbf8831f24f481c622d5065c29a72ae2a1d179f438c4d9c350e75d883991f"
     },
     {
       "id": "example.com/acme/conformance::clients/sessions.py::hand_over",
@@ -1045,7 +1135,8 @@
         "path": "clients/sessions.py",
         "start": 1770,
         "end": 1845
-      }
+      },
+      "hash": "ca54741d44b53d6a5cdea96589330e4763753fe313b789d288ff7aa9317fd99c"
     },
     {
       "id": "example.com/acme/conformance::clients/sessions.py::no_base",
@@ -1053,7 +1144,8 @@
         "path": "clients/sessions.py",
         "start": 653,
         "end": 779
-      }
+      },
+      "hash": "4c22dd9a870f3f5c5a048afb3b0cd79cd3bdfcbd62a696b8e4c6558b3fd12ca4"
     },
     {
       "id": "example.com/acme/conformance::clients/sessions.py::passed",
@@ -1061,7 +1153,8 @@
         "path": "clients/sessions.py",
         "start": 1715,
         "end": 1767
-      }
+      },
+      "hash": "e708b1e4e6ab7a55f1abc24d83e7042cf25ac1803d26ff551c2d6bb1debc26c4"
     },
     {
       "id": "example.com/acme/conformance::clients/sessions.py::with_base",
@@ -1069,7 +1162,8 @@
         "path": "clients/sessions.py",
         "start": 382,
         "end": 650
-      }
+      },
+      "hash": "51bf5c6118319cf9e8d81a1238dab5318958c4a2acc5d71250e40807601ef0c2"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::Api",
@@ -1077,7 +1171,8 @@
         "path": "clients/wrappers.py",
         "start": 830,
         "end": 1126
-      }
+      },
+      "hash": "69ba043f4eac75f52f363ada4a1180203430eccfcc47b01b877440fd10adfe31"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::Api.__init__",
@@ -1085,7 +1180,8 @@
         "path": "clients/wrappers.py",
         "start": 915,
         "end": 991
-      }
+      },
+      "hash": "bcd3816554a81593bedf8e59c45bc5f6dfe16206101174bb122f322f6d2d2009"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::Api.profile",
@@ -1093,7 +1189,8 @@
         "path": "clients/wrappers.py",
         "start": 1077,
         "end": 1126
-      }
+      },
+      "hash": "a3f81daafc0bb12cdccc355284166cd3ff096c9989f0613de19a4abd85f623b2"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::Api.user",
@@ -1101,7 +1198,8 @@
         "path": "clients/wrappers.py",
         "start": 997,
         "end": 1071
-      }
+      },
+      "hash": "fd630cd6e495440ac795fa15ec751045b34a942af02576f88a7e1d6cd5566a85"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::Inventory",
@@ -1109,7 +1207,8 @@
         "path": "clients/wrappers.py",
         "start": 1129,
         "end": 1357
-      }
+      },
+      "hash": "f2c077b5ec424111cd44e1eec03a9309d6e235f806a6f1bf4876f676c2005b00"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::Inventory.__init__",
@@ -1117,7 +1216,8 @@
         "path": "clients/wrappers.py",
         "start": 1218,
         "end": 1279
-      }
+      },
+      "hash": "65be754a4756937764b1d3fe93b55cb6ae0fd5f538fc17bd1379c71a6c6e13f1"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::Inventory.fetch_item",
@@ -1125,7 +1225,8 @@
         "path": "clients/wrappers.py",
         "start": 1285,
         "end": 1357
-      }
+      },
+      "hash": "3a24015c3a07bd88381c9e428b50dd9e10dc0a83c143deebcbc14a23d9b9c8ed"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::Pages",
@@ -1133,7 +1234,8 @@
         "path": "clients/wrappers.py",
         "start": 1631,
         "end": 1959
-      }
+      },
+      "hash": "fee1babeb0d6cfaefdc2127fe30a5f92a1a6fa8cce422d4fcdca01c196354802"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::Pages.__init__",
@@ -1141,7 +1243,8 @@
         "path": "clients/wrappers.py",
         "start": 1739,
         "end": 1806
-      }
+      },
+      "hash": "9ca7fa1f65a0c44b82a2c72c76573557d5d6d8e96a4801acc5a015d8071b6eba"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::Pages.load",
@@ -1149,7 +1252,8 @@
         "path": "clients/wrappers.py",
         "start": 1812,
         "end": 1868
-      }
+      },
+      "hash": "5aa1103990381d0bc83bf5d6d7e6492787590c0a40c8039cc084b309a85f720a"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::Pages.load_shared",
@@ -1157,7 +1261,8 @@
         "path": "clients/wrappers.py",
         "start": 1874,
         "end": 1959
-      }
+      },
+      "hash": "a7fffc9535a4c300ddb9f5a29f5510fa68e3b87763fb5cee7aae44509cb02a6f"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::Reports",
@@ -1165,7 +1270,8 @@
         "path": "clients/wrappers.py",
         "start": 2286,
         "end": 2366
-      }
+      },
+      "hash": "5ae24370eb72091a439982ba763828316865900ef495700b6c32bfa8b0e68f31"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::Reports.pull",
@@ -1173,7 +1279,8 @@
         "path": "clients/wrappers.py",
         "start": 2305,
         "end": 2366
-      }
+      },
+      "hash": "15e6a6d9872b81c62066e2d2b1ad5075af5c386b97eedf08be805bae824334d3"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::backoff",
@@ -1181,7 +1288,8 @@
         "path": "clients/wrappers.py",
         "start": 702,
         "end": 767
-      }
+      },
+      "hash": "9bd3b1b7c90e0e137ca5361e86227346af02dc8ed1a99cf4b2c73765a43c3389"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::class_method",
@@ -1189,7 +1297,8 @@
         "path": "clients/wrappers.py",
         "start": 2048,
         "end": 2107
-      }
+      },
+      "hash": "dc848052786845338aafc729d2c38b3ba98357c08ba4db96a16d21872fab70ab"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::drop_order",
@@ -1197,7 +1306,8 @@
         "path": "clients/wrappers.py",
         "start": 448,
         "end": 514
-      }
+      },
+      "hash": "a9c5b64c55c010a63c97c151c8e9ba1afcab9f605ea45e1e98336551bdeaed88"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::explicit_instance",
@@ -1205,7 +1315,8 @@
         "path": "clients/wrappers.py",
         "start": 1962,
         "end": 2045
-      }
+      },
+      "hash": "05467211ac1ee653b439ac0bb1699c0d1fa089fa92ae963840174fcd7b6b4074"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::get",
@@ -1213,7 +1324,8 @@
         "path": "clients/wrappers.py",
         "start": 244,
         "end": 287
-      }
+      },
+      "hash": "82ef08632ac7dffd65724b9a7cd4484dc8974af613cb28773429eccbccf4d24e"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::list_by_keyword",
@@ -1221,7 +1333,8 @@
         "path": "clients/wrappers.py",
         "start": 389,
         "end": 445
-      }
+      },
+      "hash": "595d6195333d34398072039656ed28ce647c9f87313914d5978064c7b274f079"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::list_orders",
@@ -1229,7 +1342,8 @@
         "path": "clients/wrappers.py",
         "start": 342,
         "end": 386
-      }
+      },
+      "hash": "013abeef1d7c2eeb4f7fd9197743ace07b9bd6a1713ad19e297c1f603f6cbaac"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::list_patiently",
@@ -1237,7 +1351,8 @@
         "path": "clients/wrappers.py",
         "start": 770,
         "end": 827
-      }
+      },
+      "hash": "ad0dd9ede85fcce719fad32ba5bdd87f7b5b6962e263ad959b64fd6d038a38e1"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::not_a_client",
@@ -1245,7 +1360,8 @@
         "path": "clients/wrappers.py",
         "start": 1445,
         "end": 1628
-      }
+      },
+      "hash": "d93a238d51692ddb349b7718a1124528323b56b6bad19901ddacc0640b6275a9"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::remove",
@@ -1253,7 +1369,8 @@
         "path": "clients/wrappers.py",
         "start": 290,
         "end": 339
-      }
+      },
+      "hash": "62d5b426cbded5e4a8754a8cb0f3a9b6e2a1785c6906d029c908471e1ce5e0f4"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::retry",
@@ -1261,7 +1378,8 @@
         "path": "clients/wrappers.py",
         "start": 592,
         "end": 699
-      }
+      },
+      "hash": "600c8db2dcf9ce19e0b3336f75cb01eeeca6ac6a084a4575ab85c7314209ae3e"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::send",
@@ -1269,7 +1387,8 @@
         "path": "clients/wrappers.py",
         "start": 139,
         "end": 211
-      }
+      },
+      "hash": "de61912d79d7df38949af2c8f388cd1450eb5becc66147942183a7a47a62e14d"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::stock",
@@ -1277,7 +1396,8 @@
         "path": "clients/wrappers.py",
         "start": 1360,
         "end": 1442
-      }
+      },
+      "hash": "0d177c2efb2b51616f7f9eeab28457bd9402bfaacf49869d2cdc65fb6febf291"
     },
     {
       "id": "example.com/acme/conformance::clients/wrappers.py::unrelated",
@@ -1285,7 +1405,8 @@
         "path": "clients/wrappers.py",
         "start": 2369,
         "end": 2457
-      }
+      },
+      "hash": "caa974f1c8af956eb8dcdca7260dcb8c5920adda8d60eb9ed1f1e1000dcd7f37"
     },
     {
       "id": "example.com/acme/conformance::cycle_b.py::use",
@@ -1293,7 +1414,8 @@
         "path": "cycle_b.py",
         "start": 55,
         "end": 89
-      }
+      },
+      "hash": "b434f3e55f95ba2a887486564192c22d221dbc5c76bd9f4079a4dbef56fb1667"
     },
     {
       "id": "example.com/acme/conformance::cycles.py::Deep",
@@ -1301,7 +1423,8 @@
         "path": "cycles.py",
         "start": 332,
         "end": 411
-      }
+      },
+      "hash": "991bd3ffcbb563a81e9a0993cd31e151e030a019464fdc48a35f6532a678e510"
     },
     {
       "id": "example.com/acme/conformance::cycles.py::Deep.go",
@@ -1309,7 +1432,8 @@
         "path": "cycles.py",
         "start": 367,
         "end": 411
-      }
+      },
+      "hash": "beaacff999fe388dbeae911b0cfcf0d82d00e7d20869a0e151e38153d8ef7702"
     },
     {
       "id": "example.com/acme/conformance::cycles.py::Knot",
@@ -1317,7 +1441,8 @@
         "path": "cycles.py",
         "start": 199,
         "end": 267
-      }
+      },
+      "hash": "195e1cc72f2cf08df716a7053800429bca79e3e71ccd5167c5d6c992dd96299f"
     },
     {
       "id": "example.com/acme/conformance::cycles.py::Knot.go",
@@ -1325,7 +1450,8 @@
         "path": "cycles.py",
         "start": 227,
         "end": 267
-      }
+      },
+      "hash": "0b22251c05c77335e9fbadd8aad4fe31a7791b687dd3bd9b8f613fc969afec48"
     },
     {
       "id": "example.com/acme/conformance::cycles.py::Loop",
@@ -1333,7 +1459,8 @@
         "path": "cycles.py",
         "start": 270,
         "end": 329
-      }
+      },
+      "hash": "8320d32be97f02aae1e752ba56b419d96c135c16533150a2e8c348b6e5497a6c"
     },
     {
       "id": "example.com/acme/conformance::cycles.py::Loop.Inner",
@@ -1341,7 +1468,8 @@
         "path": "cycles.py",
         "start": 298,
         "end": 329
-      }
+      },
+      "hash": "6e112cec3c5b8fd3cd73421882be3d15d176a2872a5fc1f51fdca7780cc675b9"
     },
     {
       "id": "example.com/acme/conformance::cycles.py::Ping",
@@ -1349,7 +1477,8 @@
         "path": "cycles.py",
         "start": 77,
         "end": 139
-      }
+      },
+      "hash": "eb11eb50c8d051f13ee4447ba18b4ecfeb1fd99d07f3fd2f22989a57413c12e9"
     },
     {
       "id": "example.com/acme/conformance::cycles.py::Ping.go",
@@ -1357,7 +1486,8 @@
         "path": "cycles.py",
         "start": 99,
         "end": 139
-      }
+      },
+      "hash": "0b22251c05c77335e9fbadd8aad4fe31a7791b687dd3bd9b8f613fc969afec48"
     },
     {
       "id": "example.com/acme/conformance::cycles.py::Pong",
@@ -1365,7 +1495,8 @@
         "path": "cycles.py",
         "start": 142,
         "end": 196
-      }
+      },
+      "hash": "e346e4d17069c4e5baf2c0c1068f68cbd3412bea1f9b77b02763eb06cf13fa7c"
     },
     {
       "id": "example.com/acme/conformance::cycles.py::Pong.ring",
@@ -1373,7 +1504,8 @@
         "path": "cycles.py",
         "start": 164,
         "end": 196
-      }
+      },
+      "hash": "830797316f1361338991a4b60955a395a2552f5fb2fc8e10b07e785a94e026cc"
     },
     {
       "id": "example.com/acme/conformance::cycles.py::crossed",
@@ -1381,7 +1513,8 @@
         "path": "cycles.py",
         "start": 414,
         "end": 472
-      }
+      },
+      "hash": "5b7c404c265a27c1b3cc2269cb8a16dd62c8ec7f84c5b989d9039cda9920ed79"
     },
     {
       "id": "example.com/acme/conformance::defs.py::Registry",
@@ -1389,7 +1522,8 @@
         "path": "defs.py",
         "start": 424,
         "end": 856
-      }
+      },
+      "hash": "4b602ad5a75d7eb825bee9e9ba8f8106f815193756c16953814f5eff9ed097ae"
     },
     {
       "id": "example.com/acme/conformance::defs.py::Registry.Meta",
@@ -1397,7 +1531,8 @@
         "path": "defs.py",
         "start": 792,
         "end": 856
-      }
+      },
+      "hash": "dc25438f040ad457aa1b9ecafdb7684ba4524cffdab70924d266f3ae96dd7b2e"
     },
     {
       "id": "example.com/acme/conformance::defs.py::Registry.Meta.label",
@@ -1405,7 +1540,8 @@
         "path": "defs.py",
         "start": 812,
         "end": 856
-      }
+      },
+      "hash": "e20b29965e354f41052dcedc4b8a451290ec00fc3eda76fb8e0eb15ad3cc782d"
     },
     {
       "id": "example.com/acme/conformance::defs.py::Registry.add",
@@ -1413,7 +1549,8 @@
         "path": "defs.py",
         "start": 478,
         "end": 537
-      }
+      },
+      "hash": "899f44216884d4ad4497fc5b94d39c3293f0417ae8adededa96c9b86c542a418"
     },
     {
       "id": "example.com/acme/conformance::defs.py::Registry.build",
@@ -1421,7 +1558,8 @@
         "path": "defs.py",
         "start": 672,
         "end": 725
-      }
+      },
+      "hash": "58ed7048d6accb11c30fe35633dde7955325b9ab4a7230191b9bbcb5a0019fc9"
     },
     {
       "id": "example.com/acme/conformance::defs.py::Registry.load",
@@ -1429,7 +1567,8 @@
         "path": "defs.py",
         "start": 543,
         "end": 607
-      }
+      },
+      "hash": "0eaaea4895fca07682cb06fd885e704cfd0fba4af300297807951359bdc1e10b"
     },
     {
       "id": "example.com/acme/conformance::defs.py::Registry.tagged",
@@ -1437,7 +1576,8 @@
         "path": "defs.py",
         "start": 731,
         "end": 786
-      }
+      },
+      "hash": "c5472d0718aeb63d0867a7e4fd6feebc42f046fdbe0ec92870b701a32e681f72"
     },
     {
       "id": "example.com/acme/conformance::defs.py::Registry.unit",
@@ -1445,7 +1585,8 @@
         "path": "defs.py",
         "start": 613,
         "end": 666
-      }
+      },
+      "hash": "76f8106f01f34b965ee7bd876ce0b9c25d0c8738c3a877e8859b3cdfe683332f"
     },
     {
       "id": "example.com/acme/conformance::defs.py::decorated",
@@ -1453,7 +1594,8 @@
         "path": "defs.py",
         "start": 375,
         "end": 421
-      }
+      },
+      "hash": "da7966d7b385af3beb51e1a6a20c7b2851d95601090a5ab9cfbac8c1dc88834e"
     },
     {
       "id": "example.com/acme/conformance::defs.py::fetch_all",
@@ -1461,7 +1603,8 @@
         "path": "defs.py",
         "start": 86,
         "end": 156
-      }
+      },
+      "hash": "40237bd22462cc5ffe9493c5ee6f1e91be9f0997136b3a0038a8a560b47e7e0d"
     },
     {
       "id": "example.com/acme/conformance::defs.py::outer",
@@ -1469,7 +1612,8 @@
         "path": "defs.py",
         "start": 159,
         "end": 232
-      }
+      },
+      "hash": "6569745197ae02ec1836e5796371628a6146754d8aa6d5db2ac35c2b104759ac"
     },
     {
       "id": "example.com/acme/conformance::defs.py::outer.inner",
@@ -1477,7 +1621,8 @@
         "path": "defs.py",
         "start": 176,
         "end": 212
-      }
+      },
+      "hash": "ae1b595d547a48658e09faacf0dfdbe9b5abc631b64b698f161ce9fdf82bd554"
     },
     {
       "id": "example.com/acme/conformance::defs.py::plain",
@@ -1485,7 +1630,8 @@
         "path": "defs.py",
         "start": 49,
         "end": 83
-      }
+      },
+      "hash": "7366c81d2a942cc4c2c728aef912178013826111d9ed3ccbf715cb3511451bb7"
     },
     {
       "id": "example.com/acme/conformance::defs.py::register",
@@ -1493,7 +1639,8 @@
         "path": "defs.py",
         "start": 235,
         "end": 372
-      }
+      },
+      "hash": "c175462abcd1d1fb1634b88ce325afdf66a7cab1f5f0f0121594af58fdd9e3a9"
     },
     {
       "id": "example.com/acme/conformance::defs.py::register.wrapper",
@@ -1501,7 +1648,8 @@
         "path": "defs.py",
         "start": 259,
         "end": 352
-      }
+      },
+      "hash": "83e3f4490f9fbc1683279ef473547adc08a75eb6aa20f357076e051381b4faf3"
     },
     {
       "id": "example.com/acme/conformance::defs.py::sorted_names",
@@ -1509,7 +1657,8 @@
         "path": "defs.py",
         "start": 894,
         "end": 973
-      }
+      },
+      "hash": "ab3bf2752ea0313164161ba2611c60c0bb70bee6118e29b6edb6b14d7f0aa824"
     },
     {
       "id": "example.com/acme/conformance::explicit/core.py::default",
@@ -1517,7 +1666,8 @@
         "path": "explicit/core.py",
         "start": 0,
         "end": 27
-      }
+      },
+      "hash": "f2593b888e97550cbd9ddb300efa04b2ad1af252a2502d49dbba7b6b286c5f2a"
     },
     {
       "id": "example.com/acme/conformance::explicit/early.py::kept",
@@ -1525,7 +1675,8 @@
         "path": "explicit/early.py",
         "start": 56,
         "end": 80
-      }
+      },
+      "hash": "7846dfa294c4b326f01efd34f0bc36ad0836806e80f9395ce7e3497debc63dff"
     },
     {
       "id": "example.com/acme/conformance::explicit/early.py::swept",
@@ -1533,7 +1684,8 @@
         "path": "explicit/early.py",
         "start": 28,
         "end": 53
-      }
+      },
+      "hash": "7683b91f3c15d2a96ecf71d2ad375e1a53263b0ca654ae7300cab6b3fe310229"
     },
     {
       "id": "example.com/acme/conformance::explicit/early.py::taken",
@@ -1541,7 +1693,8 @@
         "path": "explicit/early.py",
         "start": 0,
         "end": 25
-      }
+      },
+      "hash": "3af5de296723dcd1b015ea54e6faf10f21cd1c4ff1ed3c58797bb4af9854532a"
     },
     {
       "id": "example.com/acme/conformance::explicit/first.py::pick",
@@ -1549,7 +1702,8 @@
         "path": "explicit/first.py",
         "start": 0,
         "end": 24
-      }
+      },
+      "hash": "44d59c44098f42ff942ef2032d7f77969ee03bad0f2ca160c9144af2da8e4db2"
     },
     {
       "id": "example.com/acme/conformance::explicit/letters.py::alpha",
@@ -1557,7 +1711,8 @@
         "path": "explicit/letters.py",
         "start": 0,
         "end": 25
-      }
+      },
+      "hash": "df1dac6feaed157230fc794cde0ad040bfa6070d084b79a3bbc44d331b3f55aa"
     },
     {
       "id": "example.com/acme/conformance::explicit/letters.py::beta",
@@ -1565,7 +1720,8 @@
         "path": "explicit/letters.py",
         "start": 28,
         "end": 52
-      }
+      },
+      "hash": "564b90030ae9de2b12dd1d684a0ff4339ffbc70f83e8457d3ea4e970d8396d24"
     },
     {
       "id": "example.com/acme/conformance::explicit/mod.py::_hidden",
@@ -1573,7 +1729,8 @@
         "path": "explicit/mod.py",
         "start": 167,
         "end": 194
-      }
+      },
+      "hash": "ad497d4aa0ae5bf3953dfac3f43939425f07c7cab920a91c2fecf03d6ae1ec3e"
     },
     {
       "id": "example.com/acme/conformance::explicit/mod.py::outside",
@@ -1581,7 +1738,8 @@
         "path": "explicit/mod.py",
         "start": 137,
         "end": 164
-      }
+      },
+      "hash": "83d867453ab95def4fcfa5ac5f9e4de9f7b7c7f2403b2c3150f72c82123f82a1"
     },
     {
       "id": "example.com/acme/conformance::explicit/mod.py::public",
@@ -1589,7 +1747,8 @@
         "path": "explicit/mod.py",
         "start": 108,
         "end": 134
-      }
+      },
+      "hash": "ec90a47d095d34078e79bab8c3d9cbfa846424b2025e43deb1c9f58e504858cb"
     },
     {
       "id": "example.com/acme/conformance::explicit/order.py::order",
@@ -1597,7 +1756,8 @@
         "path": "explicit/order.py",
         "start": 183,
         "end": 230
-      }
+      },
+      "hash": "9a5ebe120a2fb155419a2f271d3f474642914ceacfc5a6d6eaa8af2f0cedae9c"
     },
     {
       "id": "example.com/acme/conformance::explicit/second.py::pick",
@@ -1605,7 +1765,8 @@
         "path": "explicit/second.py",
         "start": 0,
         "end": 24
-      }
+      },
+      "hash": "a7f2c1400874979794ec2a3ba2857d3e5df6c7ecc56b57a1c6d5c6c11131e6cd"
     },
     {
       "id": "example.com/acme/conformance::explicit/sweeper.py::swept",
@@ -1613,7 +1774,8 @@
         "path": "explicit/sweeper.py",
         "start": 0,
         "end": 25
-      }
+      },
+      "hash": "d152a0027c5cc2edd69cbb1478b44910fb2bfad1fdd740efc36c14bd185bebef"
     },
     {
       "id": "example.com/acme/conformance::explicit/use.py::report",
@@ -1621,7 +1783,8 @@
         "path": "explicit/use.py",
         "start": 357,
         "end": 646
-      }
+      },
+      "hash": "195c8a44ed01669740183d695ae57957199b0dfd5cd91c714420f640af040b7c"
     },
     {
       "id": "example.com/acme/conformance::explicit/util.py::get",
@@ -1629,7 +1792,8 @@
         "path": "explicit/util.py",
         "start": 0,
         "end": 23
-      }
+      },
+      "hash": "59cfc9a821d487273fea6ec7747eb2744cb621147827249e6907f18ad7160240"
     },
     {
       "id": "example.com/acme/conformance::families.py::A",
@@ -1637,7 +1801,8 @@
         "path": "families.py",
         "start": 310,
         "end": 369
-      }
+      },
+      "hash": "a27dd78a50f3cb0e663cdf54486bf4f3f460a04c6e51e385ad16a91b5bfbedba"
     },
     {
       "id": "example.com/acme/conformance::families.py::A.go",
@@ -1645,7 +1810,8 @@
         "path": "families.py",
         "start": 329,
         "end": 369
-      }
+      },
+      "hash": "59d110c4452b7c49b6f804d6bcd6f520e164fe3942baf2a9d392599dcb6eee6a"
     },
     {
       "id": "example.com/acme/conformance::families.py::B",
@@ -1653,7 +1819,8 @@
         "path": "families.py",
         "start": 284,
         "end": 307
-      }
+      },
+      "hash": "5e79dff8a61663921fa9db332fe81273d7b1524d94b893bfb2533bae9d2ba8ca"
     },
     {
       "id": "example.com/acme/conformance::families.py::C",
@@ -1661,7 +1828,8 @@
         "path": "families.py",
         "start": 258,
         "end": 281
-      }
+      },
+      "hash": "35e8c6e7608e9f739bee036783ef30a305a1afb7e957673d1fa060bac1995f45"
     },
     {
       "id": "example.com/acme/conformance::families.py::Client",
@@ -1669,7 +1837,8 @@
         "path": "families.py",
         "start": 570,
         "end": 606
-      }
+      },
+      "hash": "03d50e3c3d955bcd3af9351b0af27afeb1f2283443749df2460f06a833aaeb78"
     },
     {
       "id": "example.com/acme/conformance::families.py::D",
@@ -1677,7 +1846,8 @@
         "path": "families.py",
         "start": 208,
         "end": 255
-      }
+      },
+      "hash": "4329836cbdb9343fcc7eba73e18d3180985cb092046b1940855c7e53862547b6"
     },
     {
       "id": "example.com/acme/conformance::families.py::D.pick",
@@ -1685,7 +1855,8 @@
         "path": "families.py",
         "start": 221,
         "end": 255
-      }
+      },
+      "hash": "5f681901482ed570e78750f175f0dd37be8ec25a27a37c738a6c4ea30683a84c"
     },
     {
       "id": "example.com/acme/conformance::families.py::E",
@@ -1693,7 +1864,8 @@
         "path": "families.py",
         "start": 158,
         "end": 205
-      }
+      },
+      "hash": "d9238752632c85d60fa15e33c6ad9d5fc76d1cf066786cbeeb53bc63a1110947"
     },
     {
       "id": "example.com/acme/conformance::families.py::E.pick",
@@ -1701,7 +1873,8 @@
         "path": "families.py",
         "start": 171,
         "end": 205
-      }
+      },
+      "hash": "da33d280298b32f3984513b38524b5b8b08c9961bd74fcae3abf5c54548e5bfb"
     },
     {
       "id": "example.com/acme/conformance::families.py::F",
@@ -1709,7 +1882,8 @@
         "path": "families.py",
         "start": 138,
         "end": 155
-      }
+      },
+      "hash": "4805987dde1c7dfaac2938646f7a2140720e2d7e4c394ac694055a4ee026a64a"
     },
     {
       "id": "example.com/acme/conformance::families.py::Lone",
@@ -1717,7 +1891,8 @@
         "path": "families.py",
         "start": 790,
         "end": 909
-      }
+      },
+      "hash": "d32b628152caf4f49c4265bdf9382841eb9723b162901d326ef68bf091de5d0d"
     },
     {
       "id": "example.com/acme/conformance::families.py::Lone.go",
@@ -1725,7 +1900,8 @@
         "path": "families.py",
         "start": 806,
         "end": 846
-      }
+      },
+      "hash": "59d110c4452b7c49b6f804d6bcd6f520e164fe3942baf2a9d392599dcb6eee6a"
     },
     {
       "id": "example.com/acme/conformance::families.py::Lone.make",
@@ -1733,7 +1909,8 @@
         "path": "families.py",
         "start": 852,
         "end": 909
-      }
+      },
+      "hash": "473083b5beb3ba6673d298849064a8b50dcffc3252c1d367b0181610951b0f1d"
     },
     {
       "id": "example.com/acme/conformance::families.py::Model",
@@ -1741,7 +1918,8 @@
         "path": "families.py",
         "start": 493,
         "end": 567
-      }
+      },
+      "hash": "501c1f1f907f29b69e2db659847a533c4660898581c5fa7694998d3e18578498"
     },
     {
       "id": "example.com/acme/conformance::families.py::Model.go",
@@ -1749,7 +1927,8 @@
         "path": "families.py",
         "start": 527,
         "end": 567
-      }
+      },
+      "hash": "bbe889b28cfc61ef9e551b473d9168a557b6a5289696347f97a6810af7c8b750"
     },
     {
       "id": "example.com/acme/conformance::families.py::Plain",
@@ -1757,7 +1936,8 @@
         "path": "families.py",
         "start": 686,
         "end": 787
-      }
+      },
+      "hash": "3e562552aff549589c2b7b5d1ca37ca921e553a4ac896811ebf06aef2fe5e3c0"
     },
     {
       "id": "example.com/acme/conformance::families.py::Plain.go",
@@ -1765,7 +1945,8 @@
         "path": "families.py",
         "start": 757,
         "end": 787
-      }
+      },
+      "hash": "aa4597752476ce7e9020ed27309be41ba1b299e2d3c041464ed92156475fb565"
     },
     {
       "id": "example.com/acme/conformance::families.py::Plain.keep",
@@ -1773,7 +1954,8 @@
         "path": "families.py",
         "start": 711,
         "end": 751
-      }
+      },
+      "hash": "43373c1a8cde0d32e188b10db08e6cdf61f51bf05b969d09b52a072c57becc0d"
     },
     {
       "id": "example.com/acme/conformance::families.py::Remote",
@@ -1781,7 +1963,8 @@
         "path": "families.py",
         "start": 609,
         "end": 683
-      }
+      },
+      "hash": "a3fbbea8c2033c3179dd0ba9a29efcc54b9f4ad225536c0a6b53409e77893b38"
     },
     {
       "id": "example.com/acme/conformance::families.py::Remote.go",
@@ -1789,7 +1972,8 @@
         "path": "families.py",
         "start": 643,
         "end": 683
-      }
+      },
+      "hash": "bbe889b28cfc61ef9e551b473d9168a557b6a5289696347f97a6810af7c8b750"
     },
     {
       "id": "example.com/acme/conformance::families.py::Stored",
@@ -1797,7 +1981,8 @@
         "path": "families.py",
         "start": 440,
         "end": 490
-      }
+      },
+      "hash": "1ac59f3410e4fa7bff889bd319e288c8a59c916d0e0aafa484658068b8deb2f9"
     },
     {
       "id": "example.com/acme/conformance::families.py::Stored.save",
@@ -1805,7 +1990,8 @@
         "path": "families.py",
         "start": 458,
         "end": 490
-      }
+      },
+      "hash": "76cce33493dcc0898366204f75bb4f2a74807fd41c7851c6b874981e0b3780f1"
     },
     {
       "id": "example.com/acme/conformance::families.py::Tangled",
@@ -1813,7 +1999,8 @@
         "path": "families.py",
         "start": 372,
         "end": 437
-      }
+      },
+      "hash": "10a7262c96230766f53f7ef936bf0915ca7ef14dd5e1ff2030afa78ae162aace"
     },
     {
       "id": "example.com/acme/conformance::families.py::Tangled.go",
@@ -1821,7 +2008,8 @@
         "path": "families.py",
         "start": 397,
         "end": 437
-      }
+      },
+      "hash": "59d110c4452b7c49b6f804d6bcd6f520e164fe3942baf2a9d392599dcb6eee6a"
     },
     {
       "id": "example.com/acme/conformance::geometry/extra/measure.py::perimeter",
@@ -1829,7 +2017,8 @@
         "path": "geometry/extra/measure.py",
         "start": 76,
         "end": 163
-      }
+      },
+      "hash": "dff6b12fb8a5bfc83877347c13276c53f3dc77f7a4fd5609f5251ad5649438b4"
     },
     {
       "id": "example.com/acme/conformance::geometry/shapes.py::Circle",
@@ -1837,7 +2026,8 @@
         "path": "geometry/shapes.py",
         "start": 178,
         "end": 379
-      }
+      },
+      "hash": "97139c28add2ef2a93b1982f1660bf7e3226be8bef5cf51ac13035cd5197f03f"
     },
     {
       "id": "example.com/acme/conformance::geometry/shapes.py::Circle.__init__",
@@ -1845,7 +2035,8 @@
         "path": "geometry/shapes.py",
         "start": 203,
         "end": 259
-      }
+      },
+      "hash": "0f5284b5a378d0518aeb070d1497eaa57e958b60e3a2ef3f6c4546394d765525"
     },
     {
       "id": "example.com/acme/conformance::geometry/shapes.py::Circle.area",
@@ -1853,7 +2044,8 @@
         "path": "geometry/shapes.py",
         "start": 265,
         "end": 314
-      }
+      },
+      "hash": "1b5b3a8d33c030687919cc8fb95b15a0ee34297e190ef1f55e88352bae331082"
     },
     {
       "id": "example.com/acme/conformance::geometry/shapes.py::Circle.describe",
@@ -1861,7 +2053,8 @@
         "path": "geometry/shapes.py",
         "start": 320,
         "end": 379
-      }
+      },
+      "hash": "dab81373defa4522adf1dcc2b9f9e1640e022d657bfb813ba89c732747629a69"
     },
     {
       "id": "example.com/acme/conformance::geometry/shapes.py::Shape",
@@ -1869,7 +2062,8 @@
         "path": "geometry/shapes.py",
         "start": 71,
         "end": 175
-      }
+      },
+      "hash": "5eba3492055802ea50626f9a7740f5db4a9f0912e00c19d82edeff7a7a567420"
     },
     {
       "id": "example.com/acme/conformance::geometry/shapes.py::Shape.area",
@@ -1877,7 +2071,8 @@
         "path": "geometry/shapes.py",
         "start": 88,
         "end": 120
-      }
+      },
+      "hash": "cdaed7cb760ae04835d3709defecfaa6dc09fe407b2127491fd5bf742c4195bd"
     },
     {
       "id": "example.com/acme/conformance::geometry/shapes.py::Shape.unit",
@@ -1885,7 +2080,8 @@
         "path": "geometry/shapes.py",
         "start": 126,
         "end": 175
-      }
+      },
+      "hash": "8e5727ca187817dd070a51327d2dae025ab15afac04c0f823b33be1ab2064e72"
     },
     {
       "id": "example.com/acme/conformance::geometry/shapes.py::area_of",
@@ -1893,7 +2089,8 @@
         "path": "geometry/shapes.py",
         "start": 382,
         "end": 425
-      }
+      },
+      "hash": "902c4da0a5685501799d4cf0c84938a3c290e4fbbc4259365a7c3bf69586df0a"
     },
     {
       "id": "example.com/acme/conformance::geometry/shapes.py::scale",
@@ -1901,7 +2098,8 @@
         "path": "geometry/shapes.py",
         "start": 27,
         "end": 68
-      }
+      },
+      "hash": "51c86e3433cb85c38307164222db00894702d078c70e9d980f0718f80b06dc09"
     },
     {
       "id": "example.com/acme/conformance::geometry/units.py::to_cm",
@@ -1909,7 +2107,8 @@
         "path": "geometry/units.py",
         "start": 0,
         "end": 40
-      }
+      },
+      "hash": "9c29fd57837d8a93167bcd0f4fb45e570fd87e90cb0251905b4896f42339ff3b"
     },
     {
       "id": "example.com/acme/conformance::helpers.py::clamp",
@@ -1917,7 +2116,8 @@
         "path": "helpers.py",
         "start": 49,
         "end": 102
-      }
+      },
+      "hash": "266bf42a33872f0542a69c127d4b78f5e7b284213d73416031ef75738444d79a"
     },
     {
       "id": "example.com/acme/conformance::helpers.py::format_name",
@@ -1925,7 +2125,8 @@
         "path": "helpers.py",
         "start": 0,
         "end": 46
-      }
+      },
+      "hash": "c12339102e99f572b547073481a2e8e9cfaae22c07851caa69c19bd65098f573"
     },
     {
       "id": "example.com/acme/conformance::jobs/internal.py::_helper",
@@ -1933,7 +2134,8 @@
         "path": "jobs/internal.py",
         "start": 105,
         "end": 132
-      }
+      },
+      "hash": "3bb9d7a56bc11d456f7a7e7c800bd77b9c4ecc32af33cf01a897f2c0e748fda8"
     },
     {
       "id": "example.com/acme/conformance::jobs/internal.py::public",
@@ -1941,7 +2143,8 @@
         "path": "jobs/internal.py",
         "start": 76,
         "end": 102
-      }
+      },
+      "hash": "ec90a47d095d34078e79bab8c3d9cbfa846424b2025e43deb1c9f58e504858cb"
     },
     {
       "id": "example.com/acme/conformance::jobs/listed.py::left_out",
@@ -1949,7 +2152,8 @@
         "path": "jobs/listed.py",
         "start": 145,
         "end": 173
-      }
+      },
+      "hash": "08f51513f8958d3b44d5c49feafbdeaf6a2112fd572e9e4b2559a002741240ae"
     },
     {
       "id": "example.com/acme/conformance::jobs/listed.py::listed",
@@ -1957,7 +2161,8 @@
         "path": "jobs/listed.py",
         "start": 116,
         "end": 142
-      }
+      },
+      "hash": "f6c2ebe12c522ee6bc34f541d6226c4b72ff110dbe5acc950c002f46d6982602"
     },
     {
       "id": "example.com/acme/conformance::jobs/single.py::__main__",
@@ -1965,7 +2170,8 @@
         "path": "jobs/single.py",
         "start": 93,
         "end": 137
-      }
+      },
+      "hash": "5b522f8ecf896de0aa9d8bdbdee1848b98b6e21ad304652c0c2ca70103847705"
     },
     {
       "id": "example.com/acme/conformance::jobs/steps.py::fetch",
@@ -1973,7 +2179,8 @@
         "path": "jobs/steps.py",
         "start": 32,
         "end": 57
-      }
+      },
+      "hash": "583a651dd8d71d7bcafd14c24ec1e256bec737a49ab38a74d9e8934513383137"
     },
     {
       "id": "example.com/acme/conformance::jobs/steps.py::store",
@@ -1981,7 +2188,8 @@
         "path": "jobs/steps.py",
         "start": 60,
         "end": 85
-      }
+      },
+      "hash": "e71b4f16cdf6c3f73474baf80336783ad056ccb8889d26e3c340a79e82649eef"
     },
     {
       "id": "example.com/acme/conformance::jobs/sync.py::__main__",
@@ -1989,7 +2197,8 @@
         "path": "jobs/sync.py",
         "start": 151,
         "end": 199
-      }
+      },
+      "hash": "c8d5734fc168aa2544e4278b4fa70bd4744ff937cf8f5d1ee50b2a31954f81cb"
     },
     {
       "id": "example.com/acme/conformance::jobs/sync.py::run",
@@ -1997,7 +2206,8 @@
         "path": "jobs/sync.py",
         "start": 114,
         "end": 148
-      }
+      },
+      "hash": "12e236393e6f38c0fd066d061d814f2c7468f4c088a191938ae9ab3c9652639c"
     },
     {
       "id": "example.com/acme/conformance::legacy.py::legacy",
@@ -2005,7 +2215,8 @@
         "path": "legacy.py",
         "start": 0,
         "end": 26
-      }
+      },
+      "hash": "0c54a86b430905df866d20a17d7029b00b76a75ff26916dc689158c5d099c777"
     },
     {
       "id": "example.com/acme/conformance::main.py::main",
@@ -2013,7 +2224,8 @@
         "path": "main.py",
         "start": 399,
         "end": 798
-      }
+      },
+      "hash": "14866644565bba7dc4745d2b8056df31d75133b1734ae5543043515d5a6f3b06"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.py::Bus",
@@ -2021,7 +2233,8 @@
         "path": "messages/confluent.py",
         "start": 1550,
         "end": 1634
-      }
+      },
+      "hash": "1f51a3e08835a28fd382a56d2cd123d575c0853c32e734396b45c70cda9a5313"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.py::Bus.relay",
@@ -2029,7 +2242,8 @@
         "path": "messages/confluent.py",
         "start": 1565,
         "end": 1634
-      }
+      },
+      "hash": "ce9d812e604105dec60bd577e042ed90fe28b392b94b7181010f9d08fdc2a2fa"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.py::Counter",
@@ -2037,7 +2251,8 @@
         "path": "messages/confluent.py",
         "start": 1820,
         "end": 1885
-      }
+      },
+      "hash": "53dfafcf4e5222dc9684b3c6d6049bf2b2f7f1a3577db51ecfad586f675d8b86"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.py::Counter.produce",
@@ -2045,7 +2260,8 @@
         "path": "messages/confluent.py",
         "start": 1839,
         "end": 1885
-      }
+      },
+      "hash": "76e16e59f27891291da4660b8202aebf523dcb851475a5524204749b716b31ce"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.py::consume_orders",
@@ -2053,7 +2269,8 @@
         "path": "messages/confluent.py",
         "start": 795,
         "end": 1001
-      }
+      },
+      "hash": "070c370136bb9f4af0d0f8609e2c74ded0a4ece34cc68461726e3eff108bd7c8"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.py::consume_pattern",
@@ -2061,7 +2278,8 @@
         "path": "messages/confluent.py",
         "start": 1166,
         "end": 1388
-      }
+      },
+      "hash": "e1a051d3455e5c2ec9227dabb5449cd0dbad3eee50000cf1f75ad9a88151e386"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.py::consume_refunds",
@@ -2069,7 +2287,8 @@
         "path": "messages/confluent.py",
         "start": 1004,
         "end": 1163
-      }
+      },
+      "hash": "5c573d7af877c0ab715907b8501c2578a77802922e666034a2a57c472d2c5308"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.py::emit",
@@ -2077,7 +2296,8 @@
         "path": "messages/confluent.py",
         "start": 688,
         "end": 746
-      }
+      },
+      "hash": "0d746b20dde3b1cd857aceea61484c4c7732e29a9dfeac9333ae97826926a7aa"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.py::emit_refund",
@@ -2085,7 +2305,8 @@
         "path": "messages/confluent.py",
         "start": 749,
         "end": 792
-      }
+      },
+      "hash": "437419e1ea77bf8a6871e6b9933b0982d72572303f460998cc45de5a9b06b811"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.py::not_produced",
@@ -2093,7 +2314,8 @@
         "path": "messages/confluent.py",
         "start": 1888,
         "end": 2067
-      }
+      },
+      "hash": "afcc845b5f8b0f22cb46ac5e296fa1ece73225675d7cf5bc26e896282653340f"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.py::produce_all",
@@ -2101,7 +2323,8 @@
         "path": "messages/confluent.py",
         "start": 388,
         "end": 614
-      }
+      },
+      "hash": "f3a68d15061afaabd8602e90596e1a7ae9d66f9bfd3ad5657ab46b88291a125f"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.py::produce_unknown",
@@ -2109,7 +2332,8 @@
         "path": "messages/confluent.py",
         "start": 1391,
         "end": 1547
-      }
+      },
+      "hash": "b1ed753a6a8ab88daa28134351410b5a29d21bac8ecbfa945e60cef688890661"
     },
     {
       "id": "example.com/acme/conformance::messages/confluent.py::relay_dynamic",
@@ -2117,7 +2341,8 @@
         "path": "messages/confluent.py",
         "start": 1637,
         "end": 1817
-      }
+      },
+      "hash": "cc2dd99a22aeb33e10346f0205538b50ab7854bcdf51cfa85e79f8717b9a16e6"
     },
     {
       "id": "example.com/acme/conformance::messages/kafka_python.py::Relay",
@@ -2125,7 +2350,8 @@
         "path": "messages/kafka_python.py",
         "start": 442,
         "end": 734
-      }
+      },
+      "hash": "8b322e53b882b1438240afcbf199a38ee77451d7d29213154d9e6e83e526ce56"
     },
     {
       "id": "example.com/acme/conformance::messages/kafka_python.py::Relay.__init__",
@@ -2133,7 +2359,8 @@
         "path": "messages/kafka_python.py",
         "start": 459,
         "end": 554
-      }
+      },
+      "hash": "90142998238dcbf31bb9fb652ee10135cfe6576e7208021238053bbd4c8a2b6c"
     },
     {
       "id": "example.com/acme/conformance::messages/kafka_python.py::Relay.forward",
@@ -2141,7 +2368,8 @@
         "path": "messages/kafka_python.py",
         "start": 560,
         "end": 734
-      }
+      },
+      "hash": "327107f23ce22e8c5fc5d06cbc01fa5b7613fcea6c25078dcfe4208039cc45c9"
     },
     {
       "id": "example.com/acme/conformance::messages/kafka_python.py::idle",
@@ -2149,7 +2377,8 @@
         "path": "messages/kafka_python.py",
         "start": 1275,
         "end": 1400
-      }
+      },
+      "hash": "70ff4d00c6a5d8038f585bf6cb9cc4255238950f4841161179b719b436af547d"
     },
     {
       "id": "example.com/acme/conformance::messages/kafka_python.py::listen_alias",
@@ -2157,7 +2386,8 @@
         "path": "messages/kafka_python.py",
         "start": 1149,
         "end": 1272
-      }
+      },
+      "hash": "ff76af87d942e01709d31535668f939b1fdce9f36ed77a790fb9295a8551d8b4"
     },
     {
       "id": "example.com/acme/conformance::messages/kafka_python.py::listen_invoices",
@@ -2165,7 +2395,8 @@
         "path": "messages/kafka_python.py",
         "start": 737,
         "end": 992
-      }
+      },
+      "hash": "32be0ba661b1274dae89ff82aec127e6bdc12928600abec81ef164a0424101d3"
     },
     {
       "id": "example.com/acme/conformance::messages/kafka_python.py::listen_retries",
@@ -2173,7 +2404,8 @@
         "path": "messages/kafka_python.py",
         "start": 995,
         "end": 1146
-      }
+      },
+      "hash": "4794c951180aa04c20b00a9b79a013fe97b42ca57c2626b523ed2ec21355449c"
     },
     {
       "id": "example.com/acme/conformance::messages/kafka_python.py::not_sent",
@@ -2181,7 +2413,8 @@
         "path": "messages/kafka_python.py",
         "start": 1403,
         "end": 1444
-      }
+      },
+      "hash": "fce7031c7d654f1d72b0827e1ad60636b66cd9bd5e37a3b75b066cf2e5719cd2"
     },
     {
       "id": "example.com/acme/conformance::messages/kafka_python.py::send_invoice",
@@ -2189,7 +2422,8 @@
         "path": "messages/kafka_python.py",
         "start": 327,
         "end": 383
-      }
+      },
+      "hash": "b4fa78a23e0e3076d79bc236ca257457405166444890798ceff015ae44504f0f"
     },
     {
       "id": "example.com/acme/conformance::messages/kafka_python.py::send_retry",
@@ -2197,7 +2431,8 @@
         "path": "messages/kafka_python.py",
         "start": 386,
         "end": 439
-      }
+      },
+      "hash": "6a83145ae0655348e8078179a430ee7f51e28942d9217b0e542647de8a6e7c08"
     },
     {
       "id": "example.com/acme/conformance::messages/nats_py.py::Plain",
@@ -2205,7 +2440,8 @@
         "path": "messages/nats_py.py",
         "start": 2159,
         "end": 2232
-      }
+      },
+      "hash": "96ec6c79bb15915845e535731fa3ff3ffe463f60c1db315a05b58278f9e9bebf"
     },
     {
       "id": "example.com/acme/conformance::messages/nats_py.py::Plain.publish",
@@ -2213,7 +2449,8 @@
         "path": "messages/nats_py.py",
         "start": 2176,
         "end": 2232
-      }
+      },
+      "hash": "067e09a04e3a057bc5f5c25dc39a6cc979f6e4759004bdfef8e36d6a20c32b11"
     },
     {
       "id": "example.com/acme/conformance::messages/nats_py.py::announce",
@@ -2221,7 +2458,8 @@
         "path": "messages/nats_py.py",
         "start": 933,
         "end": 1038
-      }
+      },
+      "hash": "e9e49e729f614878548f472e6ee1183425c36b8e131d0e328361e6a1c6196e3c"
     },
     {
       "id": "example.com/acme/conformance::messages/nats_py.py::announce_all",
@@ -2229,7 +2467,8 @@
         "path": "messages/nats_py.py",
         "start": 1041,
         "end": 1132
-      }
+      },
+      "hash": "6f68616c38f57e316cf34e681685afd70e277756878d14b7b13db1441310a80a"
     },
     {
       "id": "example.com/acme/conformance::messages/nats_py.py::bus",
@@ -2237,7 +2476,8 @@
         "path": "messages/nats_py.py",
         "start": 230,
         "end": 296
-      }
+      },
+      "hash": "1f6622059bd5d559430ba6baebbe792fea7547d28960bd34068c4904a8928f7a"
     },
     {
       "id": "example.com/acme/conformance::messages/nats_py.py::not_published",
@@ -2245,7 +2485,8 @@
         "path": "messages/nats_py.py",
         "start": 1942,
         "end": 2156
-      }
+      },
+      "hash": "ac9e05269758ec3076429040727f5f34f039d86bec69e6a75101e6bc19d248cd"
     },
     {
       "id": "example.com/acme/conformance::messages/nats_py.py::on_job",
@@ -2253,7 +2494,8 @@
         "path": "messages/nats_py.py",
         "start": 2235,
         "end": 2288
-      }
+      },
+      "hash": "5779f9da8edc6379584342d784554bb15a62dd6ad6ac21ff9e60fccf95162544"
     },
     {
       "id": "example.com/acme/conformance::messages/nats_py.py::publish_all",
@@ -2261,7 +2503,8 @@
         "path": "messages/nats_py.py",
         "start": 299,
         "end": 671
-      }
+      },
+      "hash": "b702968ea48c301dde002a41e22a4969e0e6294531819cf77c1e2ae5570c3b19"
     },
     {
       "id": "example.com/acme/conformance::messages/nats_py.py::publish_legacy",
@@ -2269,7 +2512,8 @@
         "path": "messages/nats_py.py",
         "start": 674,
         "end": 801
-      }
+      },
+      "hash": "27dad1c2b781d05510dac2a89e89233d0fccc101e95884f9d9676d6e04acb276"
     },
     {
       "id": "example.com/acme/conformance::messages/nats_py.py::publish_returned",
@@ -2277,7 +2521,8 @@
         "path": "messages/nats_py.py",
         "start": 804,
         "end": 930
-      }
+      },
+      "hash": "5a3449374de13097ffa3d833d7e910ca00cf827405fd9464d0603c9c085e6f5c"
     },
     {
       "id": "example.com/acme/conformance::messages/nats_py.py::publish_unknown",
@@ -2285,7 +2530,8 @@
         "path": "messages/nats_py.py",
         "start": 1135,
         "end": 1270
-      }
+      },
+      "hash": "930f35e189bb7bfdc7c70b1eae74af24170dd30bfc678b5ddef34da5aee90afc"
     },
     {
       "id": "example.com/acme/conformance::messages/nats_py.py::record",
@@ -2293,7 +2539,8 @@
         "path": "messages/nats_py.py",
         "start": 2291,
         "end": 2326
-      }
+      },
+      "hash": "f3a72d302137bc858390b83445c9b42d244b911a09c6e80e637b09fcae13b97d"
     },
     {
       "id": "example.com/acme/conformance::messages/nats_py.py::subscribe_middle",
@@ -2301,7 +2548,8 @@
         "path": "messages/nats_py.py",
         "start": 1755,
         "end": 1939
-      }
+      },
+      "hash": "21a78e807460972465a7b7a207bd710fbfb562921fea57bfdd3ee414de2d4e0d"
     },
     {
       "id": "example.com/acme/conformance::messages/nats_py.py::subscribe_one",
@@ -2309,7 +2557,8 @@
         "path": "messages/nats_py.py",
         "start": 1273,
         "end": 1440
-      }
+      },
+      "hash": "e2a962b1ddae7d4050f5cb7bb0463bb7b461738e25f70df7b568161867ee93d3"
     },
     {
       "id": "example.com/acme/conformance::messages/nats_py.py::subscribe_rest",
@@ -2317,7 +2566,8 @@
         "path": "messages/nats_py.py",
         "start": 1443,
         "end": 1752
-      }
+      },
+      "hash": "d4bc2eb934f43cd2a5cbe4876a708dd45cacaca5bb101c1b29c32f1df3265f71"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::Worker",
@@ -2325,7 +2575,8 @@
         "path": "messages/pika_amqp.py",
         "start": 3046,
         "end": 3563
-      }
+      },
+      "hash": "4976c3a597ef14659ad5d92a6346eaa489b5173b68cefb4755048bd1369d51e3"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::Worker.__init__",
@@ -2333,7 +2584,8 @@
         "path": "messages/pika_amqp.py",
         "start": 3064,
         "end": 3214
-      }
+      },
+      "hash": "5ed4eed08a4485c8e8376be0beebef43c22a81644eab2ec04cff7e67e94d7746"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::Worker.consume",
@@ -2341,7 +2593,8 @@
         "path": "messages/pika_amqp.py",
         "start": 3220,
         "end": 3398
-      }
+      },
+      "hash": "e0b32da18cdef650c6fafb833498559e33e126723865f6202bddd975039fa651"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::Worker.enqueue",
@@ -2349,7 +2602,8 @@
         "path": "messages/pika_amqp.py",
         "start": 3488,
         "end": 3563
-      }
+      },
+      "hash": "8d335e9b3e80819331c2c8a09a20a8339b1992ee8eab66f7cc8c1c8355853c80"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::Worker.on_report",
@@ -2357,7 +2611,8 @@
         "path": "messages/pika_amqp.py",
         "start": 3404,
         "end": 3482
-      }
+      },
+      "hash": "4189e8b05bd031176426fcb9d1cc54c48a554224141dd97c8f60458a8cd45dac"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::announce",
@@ -2365,7 +2620,8 @@
         "path": "messages/pika_amqp.py",
         "start": 944,
         "end": 1260
-      }
+      },
+      "hash": "e7118c12b25302848df0b7667436dd426b4225044f7e19e5534830d824b69b8e"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::bind",
@@ -2373,7 +2629,8 @@
         "path": "messages/pika_amqp.py",
         "start": 1263,
         "end": 1573
-      }
+      },
+      "hash": "b14744a94ec7d04d7e22cf8199d60c46eef0a95482df3e4928aa8942cd891166"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::enqueue",
@@ -2381,7 +2638,8 @@
         "path": "messages/pika_amqp.py",
         "start": 414,
         "end": 612
-      }
+      },
+      "hash": "57c770f143c5f9b72d74049568956ba6afa5ffc11b76597cdfd113a2343dd685"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::enqueue_reports",
@@ -2389,7 +2647,8 @@
         "path": "messages/pika_amqp.py",
         "start": 782,
         "end": 832
-      }
+      },
+      "hash": "05f6f4eb0e916ad90bd0b6f0abcff2dd6dbb910c938bbe23a32cd7501ba7b1b4"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::enqueue_unknown",
@@ -2397,7 +2656,8 @@
         "path": "messages/pika_amqp.py",
         "start": 835,
         "end": 941
-      }
+      },
+      "hash": "80e40313ffc0e0c636fae9ad88f6b6365ad3ef3d258bbb97a96173f425406b79"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::listen",
@@ -2405,7 +2665,8 @@
         "path": "messages/pika_amqp.py",
         "start": 1576,
         "end": 2095
-      }
+      },
+      "hash": "276e83d987c8b0359d35994bb5b749b89d66753e435bda9345d3ac8db04932ca"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::not_published",
@@ -2413,7 +2674,8 @@
         "path": "messages/pika_amqp.py",
         "start": 3566,
         "end": 3706
-      }
+      },
+      "hash": "27d9099d0955931424e3caf24c7bd7079e47d1863d96ba848ff7f3a10064ae0e"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::on_alert",
@@ -2421,7 +2683,8 @@
         "path": "messages/pika_amqp.py",
         "start": 2168,
         "end": 2235
-      }
+      },
+      "hash": "8fe1040a0ce06fa1f2b5ed47e9985339aa1cbb67819784f9c4fdaae371a3b6a8"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::on_audit",
@@ -2429,7 +2692,8 @@
         "path": "messages/pika_amqp.py",
         "start": 2098,
         "end": 2165
-      }
+      },
+      "hash": "d0ce69383dfdc9eaa01397e22500575c3c13eb36cbc35e94c3019439d7721711"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::on_mail",
@@ -2437,7 +2701,8 @@
         "path": "messages/pika_amqp.py",
         "start": 2307,
         "end": 2373
-      }
+      },
+      "hash": "f13cbbd2d0f6aed0874be31c4355010cf61dd369954890b8eaf3dfd00b2012a5"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::on_task",
@@ -2445,7 +2710,8 @@
         "path": "messages/pika_amqp.py",
         "start": 2238,
         "end": 2304
-      }
+      },
+      "hash": "e8354a9b8f512d7ce25a3c1a68156343842b2af069a00cfea139e50284b76f63"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::queue",
@@ -2453,7 +2719,8 @@
         "path": "messages/pika_amqp.py",
         "start": 687,
         "end": 779
-      }
+      },
+      "hash": "8b6511565b53d84a308f8f8ac42ed6b3f051b4d8d069b02e79879530c9c0fa21"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::record",
@@ -2461,7 +2728,8 @@
         "path": "messages/pika_amqp.py",
         "start": 2376,
         "end": 2411
-      }
+      },
+      "hash": "f3a72d302137bc858390b83445c9b42d244b911a09c6e80e637b09fcae13b97d"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::send_chained",
@@ -2469,7 +2737,8 @@
         "path": "messages/pika_amqp.py",
         "start": 2647,
         "end": 3043
-      }
+      },
+      "hash": "74596399ef398247a0d9639a0d46c0466a352ac3f098c5a5596eb9c3a7fba573"
     },
     {
       "id": "example.com/acme/conformance::messages/pika_amqp.py::send_mail",
@@ -2477,7 +2746,8 @@
         "path": "messages/pika_amqp.py",
         "start": 2414,
         "end": 2644
-      }
+      },
+      "hash": "c4ee06a965161cd9f6331c71c647c04259b45a9f2a2997df809d20860a4f5542"
     },
     {
       "id": "example.com/acme/conformance::messages/redis_streams.py::append",
@@ -2485,7 +2755,8 @@
         "path": "messages/redis_streams.py",
         "start": 1082,
         "end": 1145
-      }
+      },
+      "hash": "a6109256160f5879bda1d8b2619f58fcef0e766bb2b8273f3c2880747615389a"
     },
     {
       "id": "example.com/acme/conformance::messages/redis_streams.py::append_all",
@@ -2493,7 +2764,8 @@
         "path": "messages/redis_streams.py",
         "start": 493,
         "end": 766
-      }
+      },
+      "hash": "9b382a1c0fc4ab4f943e7b60812471367e8401115dc064e267838382d3e54ed8"
     },
     {
       "id": "example.com/acme/conformance::messages/redis_streams.py::append_audit",
@@ -2501,7 +2773,8 @@
         "path": "messages/redis_streams.py",
         "start": 1148,
         "end": 1201
-      }
+      },
+      "hash": "d5fd8316709c32b1dcbb4c268b8cf5da455c3c7f63527021ed7b295441cd335e"
     },
     {
       "id": "example.com/acme/conformance::messages/redis_streams.py::append_more",
@@ -2509,7 +2782,8 @@
         "path": "messages/redis_streams.py",
         "start": 769,
         "end": 1005
-      }
+      },
+      "hash": "4daad36bf257503ac848dc0576432854cec22e7ed4464ecb62cc9ea28ad1ddb3"
     },
     {
       "id": "example.com/acme/conformance::messages/redis_streams.py::append_unknown",
@@ -2517,7 +2791,8 @@
         "path": "messages/redis_streams.py",
         "start": 1204,
         "end": 1283
-      }
+      },
+      "hash": "7a2c4765f5ea1024ff4b1380dd73a9b97b26821c52a9c80c3e7246bdf637fcba"
     },
     {
       "id": "example.com/acme/conformance::messages/redis_streams.py::not_streamed",
@@ -2525,7 +2800,8 @@
         "path": "messages/redis_streams.py",
         "start": 1922,
         "end": 2067
-      }
+      },
+      "hash": "da9ab0e32c41540da7dc351424191a75b7fa7edaf61da45255fbb3d060aa2c93"
     },
     {
       "id": "example.com/acme/conformance::messages/redis_streams.py::read_many",
@@ -2533,7 +2809,8 @@
         "path": "messages/redis_streams.py",
         "start": 1447,
         "end": 1706
-      }
+      },
+      "hash": "80effaaafb16f43bb9b23fa3f7d5aa7d0dd78bda6e9dc36a1849c920357a8b93"
     },
     {
       "id": "example.com/acme/conformance::messages/redis_streams.py::read_orders",
@@ -2541,7 +2818,8 @@
         "path": "messages/redis_streams.py",
         "start": 1286,
         "end": 1444
-      }
+      },
+      "hash": "329d72581f8322db8495ef95272a22227d91921eec79456c07a4a50e25466749"
     },
     {
       "id": "example.com/acme/conformance::messages/redis_streams.py::read_plain",
@@ -2549,7 +2827,8 @@
         "path": "messages/redis_streams.py",
         "start": 1709,
         "end": 1822
-      }
+      },
+      "hash": "572552c72de99e1104719668dc0163069786affbdd8fa485bfa49204956787a1"
     },
     {
       "id": "example.com/acme/conformance::messages/redis_streams.py::read_unknown",
@@ -2557,7 +2836,8 @@
         "path": "messages/redis_streams.py",
         "start": 1825,
         "end": 1919
-      }
+      },
+      "hash": "8630fdc9e158d11b2cc44426f5a361f4ad56755e9c12b9f23166e72676ff3938"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.py::rebound_by_except",
@@ -2565,7 +2845,8 @@
         "path": "messages/shadowed.py",
         "start": 428,
         "end": 545
-      }
+      },
+      "hash": "01499f6414df3224357b6f389b3ae632b1964c769c1006bb20c578e090317cdf"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.py::rebound_by_loop",
@@ -2573,7 +2854,8 @@
         "path": "messages/shadowed.py",
         "start": 326,
         "end": 425
-      }
+      },
+      "hash": "88ff1fc67632365444252b34de851929c468cd0026633fbc0770a68b18df27d0"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.py::rebound_by_parameter",
@@ -2581,7 +2863,8 @@
         "path": "messages/shadowed.py",
         "start": 149,
         "end": 224
-      }
+      },
+      "hash": "97b350e7dcf48615e3e2047070e84bdc3150f057ded2104fed609dcc4765da89"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.py::rebound_by_with",
@@ -2589,7 +2872,8 @@
         "path": "messages/shadowed.py",
         "start": 227,
         "end": 323
-      }
+      },
+      "hash": "9a5a4112af4be34acdd108784498acaee5f8c1886afdc017c609769a1a90fbbb"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.py::rebound_constructor",
@@ -2597,7 +2881,8 @@
         "path": "messages/shadowed.py",
         "start": 548,
         "end": 646
-      }
+      },
+      "hash": "9e14e021a0e584fe6e09a6fc0a7529b605ca48151611b6a9ef44320af70f8dc8"
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::enqueue",
@@ -2605,7 +2890,8 @@
         "path": "messages/sqs_boto.py",
         "start": 1046,
         "end": 1135
-      }
+      },
+      "hash": "3bb964194ccf6d8019ad8555fc49d70404398d68493647b506248d6cf62bce12"
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::enqueue_billing",
@@ -2613,7 +2899,8 @@
         "path": "messages/sqs_boto.py",
         "start": 1138,
         "end": 1204
-      }
+      },
+      "hash": "f27e6faf493ecd5618b24f06af38c485f737fda9f6b7ec0a03dd7a51172c1c77"
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::not_queued",
@@ -2621,7 +2908,8 @@
         "path": "messages/sqs_boto.py",
         "start": 2387,
         "end": 2609
-      }
+      },
+      "hash": "ae6057970df6b9c3a13d62799d45fa0fca65a3967ddb6681cf4325b56dc99bec"
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::receive_billing",
@@ -2629,7 +2917,8 @@
         "path": "messages/sqs_boto.py",
         "start": 2036,
         "end": 2123
-      }
+      },
+      "hash": "22db35f5cbaf64aa1aa9aca991d72a0327ccf2eef84f286e6f048691fbee4310"
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::receive_jobs",
@@ -2637,7 +2926,8 @@
         "path": "messages/sqs_boto.py",
         "start": 1818,
         "end": 1949
-      }
+      },
+      "hash": "2da1d058c71e72664b35892d8e9e75c9988c19f02f972dc02a835ba7a869e18e"
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::receive_mail",
@@ -2645,7 +2935,8 @@
         "path": "messages/sqs_boto.py",
         "start": 1952,
         "end": 2033
-      }
+      },
+      "hash": "b13542d0ee0696a7ab0e737ede9af31bbf3fccea12df79179224129063fa5b29"
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::receive_session",
@@ -2653,7 +2944,8 @@
         "path": "messages/sqs_boto.py",
         "start": 2126,
         "end": 2216
-      }
+      },
+      "hash": "4bfc2471cbe154a236bb126368dae723694057650fd36d969475d9763dd440a9"
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::receive_unknown",
@@ -2661,7 +2953,8 @@
         "path": "messages/sqs_boto.py",
         "start": 2219,
         "end": 2384
-      }
+      },
+      "hash": "6f412977eb3cfd972e536f5ba33ea384dfdd431acbb43208a185d38743d14833"
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::send_batch",
@@ -2669,7 +2962,8 @@
         "path": "messages/sqs_boto.py",
         "start": 883,
         "end": 971
-      }
+      },
+      "hash": "25abc3997d9e3fb9027774b441e29ab04fb96f860aff7ae699a073c0c31f8d67"
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::send_chained",
@@ -2677,7 +2971,8 @@
         "path": "messages/sqs_boto.py",
         "start": 1305,
         "end": 1815
-      }
+      },
+      "hash": "88c490450da3aca8287d049259daf23e3af53f8dddb22c95c7fc6f49bd199f2c"
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::send_job",
@@ -2685,7 +2980,8 @@
         "path": "messages/sqs_boto.py",
         "start": 483,
         "end": 714
-      }
+      },
+      "hash": "6ff5b47e0484ff7eefceb08cb04565b53edc79110d01adc2ee43758edf7a4593"
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::send_joined",
@@ -2693,7 +2989,8 @@
         "path": "messages/sqs_boto.py",
         "start": 717,
         "end": 880
-      }
+      },
+      "hash": "980766e4f4afcf1b9b081190e6aae69c3c3b2a0ed223500afaec015044cc48bf"
     },
     {
       "id": "example.com/acme/conformance::messages/sqs_boto.py::send_session",
@@ -2701,7 +2998,8 @@
         "path": "messages/sqs_boto.py",
         "start": 1207,
         "end": 1302
-      }
+      },
+      "hash": "f928117f0797cfe7e8db9d5440f5cffe1c66ee78520f4f9820c595c6be432e83"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Base",
@@ -2709,7 +3007,8 @@
         "path": "methods.py",
         "start": 215,
         "end": 303
-      }
+      },
+      "hash": "4ea25e8a275f1cbda4a6754f7406238a24277d61fb463404df7132081b46b6e5"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Base.ping",
@@ -2717,7 +3016,8 @@
         "path": "methods.py",
         "start": 231,
         "end": 263
-      }
+      },
+      "hash": "cd4d25d545817017b2d177a4e9a6c5302e95fc8d76148960e93a1bc08fce053c"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Base.shared",
@@ -2725,7 +3025,8 @@
         "path": "methods.py",
         "start": 269,
         "end": 303
-      }
+      },
+      "hash": "14ad00e635a0833a0edd00d2d54e450a687a0e334cc6ba78cac573c01260f127"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Dial",
@@ -2733,7 +3034,8 @@
         "path": "methods.py",
         "start": 399,
         "end": 447
-      }
+      },
+      "hash": "c14e552ba26cdb32e00ae196ddf7f802ac4bb04446093b586d38c5d96237e566"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Dial.spin",
@@ -2741,7 +3043,8 @@
         "path": "methods.py",
         "start": 415,
         "end": 447
-      }
+      },
+      "hash": "171cf223d43fc156121b599162f7851b4f2017792c8c5f1c74e369bd43be9f41"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Leaf",
@@ -2749,7 +3052,8 @@
         "path": "methods.py",
         "start": 1207,
         "end": 1277
-      }
+      },
+      "hash": "1834e51fded1759b00d9f38e9aa3ac43be7cbe52f8a395a9baccff603801ce45"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Leaf.run",
@@ -2757,7 +3061,8 @@
         "path": "methods.py",
         "start": 1236,
         "end": 1277
-      }
+      },
+      "hash": "3e94208be15bad2f769e21887463cc64cc7497fec45b7190e5e4e11e9a8095b2"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Left",
@@ -2765,7 +3070,8 @@
         "path": "methods.py",
         "start": 1120,
         "end": 1146
-      }
+      },
+      "hash": "d3d133ef16665892f42f55a9cfd39e492ad73b6121e3e9c4df2b6a9197bd2d79"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Mixin",
@@ -2773,7 +3079,8 @@
         "path": "methods.py",
         "start": 306,
         "end": 396
-      }
+      },
+      "hash": "114e606bba26b545fb582da5e4dacbd4575e1c343e505c2e9dd9f412d776a709"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Mixin.mixed",
@@ -2781,7 +3088,8 @@
         "path": "methods.py",
         "start": 363,
         "end": 396
-      }
+      },
+      "hash": "eebc0991bd5493af15758ef7866b926018c48d8e09ce624ba8a2068972f60d93"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Mixin.shared",
@@ -2789,7 +3097,8 @@
         "path": "methods.py",
         "start": 323,
         "end": 357
-      }
+      },
+      "hash": "778832ee4ffc6b6f32295b51120525b1ed5a3f16b19eaa73319697362b9be1a6"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel",
@@ -2797,7 +3106,8 @@
         "path": "methods.py",
         "start": 450,
         "end": 1066
-      }
+      },
+      "hash": "f83dba3c537cc3c11b3b8f9a32d1bbf77ce79da3bf8f06ea7428e616de4bff3f"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel.__init__",
@@ -2805,7 +3115,8 @@
         "path": "methods.py",
         "start": 499,
         "end": 566
-      }
+      },
+      "hash": "9b267c4cdc188e4e1cc34e2b63209e6fbfbfdba7395b69e8228c5c55c716ca4e"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel.build",
@@ -2813,7 +3124,8 @@
         "path": "methods.py",
         "start": 873,
         "end": 933
-      }
+      },
+      "hash": "40abfe87b3bc6869899f288f602ced11ad86e5320946265ef89a3130d8dd59ad"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel.check",
@@ -2821,7 +3133,8 @@
         "path": "methods.py",
         "start": 1003,
         "end": 1066
-      }
+      },
+      "hash": "5d7e79056f550cdec23ad37086aa3dbd8186a9c7278b459c39e859e2f095c9e5"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel.create",
@@ -2829,7 +3142,8 @@
         "path": "methods.py",
         "start": 939,
         "end": 997
-      }
+      },
+      "hash": "1a6c6e48bf7b8c76ab311c9e9b959a57e14f088464ae993b11e82a2518d75921"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel.draw",
@@ -2837,7 +3151,8 @@
         "path": "methods.py",
         "start": 572,
         "end": 827
-      }
+      },
+      "hash": "0d8b085cd1309e9a9e8ba0b8e62b8ef80eb32d5bfd3058ddfb416281cc908ea7"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel.draw.later",
@@ -2845,7 +3160,8 @@
         "path": "methods.py",
         "start": 758,
         "end": 803
-      }
+      },
+      "hash": "443f41c1a3d5819210a13359e7286f6c6761dd427f599b9214e6c01b71a6e148"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Panel.render",
@@ -2853,7 +3169,8 @@
         "path": "methods.py",
         "start": 833,
         "end": 867
-      }
+      },
+      "hash": "5b6f8a4a748a0a83eac1684789c649bdce8c0eca3c81d379f88771963d5a18e9"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Right",
@@ -2861,7 +3178,8 @@
         "path": "methods.py",
         "start": 1149,
         "end": 1204
-      }
+      },
+      "hash": "c92934d72acfbed7f8cbf95599356dca7ba64e30913fda049938ba7df0b15854"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Right.hook",
@@ -2869,7 +3187,8 @@
         "path": "methods.py",
         "start": 1172,
         "end": 1204
-      }
+      },
+      "hash": "769e12a97da185700a8331f3c06bb807e6d38f4a7a4ca27bfe2354ba60c80d62"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Root",
@@ -2877,7 +3196,8 @@
         "path": "methods.py",
         "start": 1069,
         "end": 1117
-      }
+      },
+      "hash": "b06306ae143fd78eadd7c2d4693566827626c7e76eb9de0ab6f1ab97e65cee15"
     },
     {
       "id": "example.com/acme/conformance::methods.py::Root.hook",
@@ -2885,7 +3205,8 @@
         "path": "methods.py",
         "start": 1085,
         "end": 1117
-      }
+      },
+      "hash": "2c3b677e0016429450a4b87a3294197d3207106a61dfe4bd676ab565d0623672"
     },
     {
       "id": "example.com/acme/conformance::methods.py::make",
@@ -2893,7 +3214,8 @@
         "path": "methods.py",
         "start": 1280,
         "end": 1314
-      }
+      },
+      "hash": "4e36d3f131cf26e4d6a5d97188cb013aa5266a30d205c1aa6b1a0f3ce68464d0"
     },
     {
       "id": "example.com/acme/conformance::methods.py::module_level",
@@ -2901,7 +3223,8 @@
         "path": "methods.py",
         "start": 1554,
         "end": 1601
-      }
+      },
+      "hash": "b12fadfe60ed4d77c087856b1e9157cb51b090e439edae66c37b120100b6068c"
     },
     {
       "id": "example.com/acme/conformance::methods.py::outside",
@@ -2909,7 +3232,8 @@
         "path": "methods.py",
         "start": 1716,
         "end": 1837
-      }
+      },
+      "hash": "40c1f5bf0c9e52a334adb8ae2d34b0ae9e2e5b5ee4f3a827c62e68c7fed08641"
     },
     {
       "id": "example.com/acme/conformance::methods.py::shadowed",
@@ -2917,7 +3241,8 @@
         "path": "methods.py",
         "start": 1604,
         "end": 1677
-      }
+      },
+      "hash": "c0a285ab2f5557d876f998fea747a095103af59fbe9d304c740dbd989f37850c"
     },
     {
       "id": "example.com/acme/conformance::methods.py::use",
@@ -2925,7 +3250,8 @@
         "path": "methods.py",
         "start": 1317,
         "end": 1527
-      }
+      },
+      "hash": "d2caac8fa19c070604f0f6da71630829dc0ffcc29581c8712ed493119da84e7a"
     },
     {
       "id": "example.com/acme/conformance::rebound.py::deleted",
@@ -2933,7 +3259,8 @@
         "path": "rebound.py",
         "start": 146,
         "end": 173
-      }
+      },
+      "hash": "a5e2d25fe993e72cc83ea52b37e931ed097d2f5602ef2dca9ee8c0f3376216ca"
     },
     {
       "id": "example.com/acme/conformance::rebound.py::grown",
@@ -2941,7 +3268,8 @@
         "path": "rebound.py",
         "start": 190,
         "end": 215
-      }
+      },
+      "hash": "307ae33760eba8a31b0bbee351687ab060fea8189588ecad678d891330975229"
     },
     {
       "id": "example.com/acme/conformance::rebound.py::nested",
@@ -2949,7 +3277,8 @@
         "path": "rebound.py",
         "start": 358,
         "end": 432
-      }
+      },
+      "hash": "d4d152a57f2ced1707d9fec14da2ab26e521b681c874edabd840dd5273b09166"
     },
     {
       "id": "example.com/acme/conformance::rebound.py::nested.inner",
@@ -2957,7 +3286,8 @@
         "path": "rebound.py",
         "start": 376,
         "end": 405
-      }
+      },
+      "hash": "2a0eb9786da8cea2e96c127fbad2ab12492b0695ed00514cb69972f393939fb8"
     },
     {
       "id": "example.com/acme/conformance::rebound.py::reach",
@@ -2965,7 +3295,8 @@
         "path": "rebound.py",
         "start": 260,
         "end": 313
-      }
+      },
+      "hash": "d3e7b9277d48bc311de863700bbc668940bc30b9b325a87dfec1e70ef4e8e351"
     },
     {
       "id": "example.com/acme/conformance::rebound.py::replaced",
@@ -2973,7 +3304,8 @@
         "path": "rebound.py",
         "start": 100,
         "end": 128
-      }
+      },
+      "hash": "a2d293cdf9a20ecfd7349dbeb372e2d1d4344d4b68b830908682065471123677"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::Engine",
@@ -2981,7 +3313,8 @@
         "path": "receivers.py",
         "start": 172,
         "end": 223
-      }
+      },
+      "hash": "166e2c243e3731d3a9f646f4935c3ffb830978e73aa8183d33ec254e7caa181c"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::Engine.start",
@@ -2989,7 +3322,8 @@
         "path": "receivers.py",
         "start": 190,
         "end": 223
-      }
+      },
+      "hash": "4025e6cc2a933d8590e5c13230ca05038e46cb6380e8b751738f0fd66d4bfaeb"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::Runner",
@@ -2997,7 +3331,8 @@
         "path": "receivers.py",
         "start": 533,
         "end": 666
-      }
+      },
+      "hash": "dd18aff7ad4d897ae9bc797b24605c97ddced5e82232009b57325499653b3691"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::Runner.each",
@@ -3005,7 +3340,8 @@
         "path": "receivers.py",
         "start": 591,
         "end": 666
-      }
+      },
+      "hash": "1c74c318bf93c621d75ca9805cea3361ea52d3d8a05a2bdc0bf2a2c646310f12"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::Runner.stride",
@@ -3013,7 +3349,8 @@
         "path": "receivers.py",
         "start": 551,
         "end": 585
-      }
+      },
+      "hash": "b12d526899b078147c196afae2c2aa0376f31a086e3eb4b4c7a2c89b7e3fe453"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::Typed",
@@ -3021,7 +3358,8 @@
         "path": "receivers.py",
         "start": 382,
         "end": 530
-      }
+      },
+      "hash": "3594167bac72a033f4fbeb054fbed1197c8b33a1caf834ea34e2ed97a3a09ff7"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::Typed.__init__",
@@ -3029,7 +3367,8 @@
         "path": "receivers.py",
         "start": 419,
         "end": 475
-      }
+      },
+      "hash": "4a340f9771cb2e7c073b72ebb8e87af9d9b26ca6052151dbd0f80155ab32afc6"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::Typed.run",
@@ -3037,7 +3376,8 @@
         "path": "receivers.py",
         "start": 481,
         "end": 530
-      }
+      },
+      "hash": "a017c087752d26dd72773b1e728a18b84d5f5792a873760dcc92efada75aee08"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::Untyped",
@@ -3045,7 +3385,8 @@
         "path": "receivers.py",
         "start": 226,
         "end": 379
-      }
+      },
+      "hash": "6782ea7374f3dab786bb6677a9af38db51b219241037f2ecb537ac4e77b960a0"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::Untyped.__init__",
@@ -3053,7 +3394,8 @@
         "path": "receivers.py",
         "start": 268,
         "end": 324
-      }
+      },
+      "hash": "4a340f9771cb2e7c073b72ebb8e87af9d9b26ca6052151dbd0f80155ab32afc6"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::Untyped.run",
@@ -3061,7 +3403,8 @@
         "path": "receivers.py",
         "start": 330,
         "end": 379
-      }
+      },
+      "hash": "a017c087752d26dd72773b1e728a18b84d5f5792a873760dcc92efada75aee08"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::comprehension",
@@ -3069,7 +3412,8 @@
         "path": "receivers.py",
         "start": 838,
         "end": 911
-      }
+      },
+      "hash": "d97393d5de5430086d94d9107a9d2d1eeec65bcc29160ff973c28bb13a5d79c7"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::except_as",
@@ -3077,7 +3421,8 @@
         "path": "receivers.py",
         "start": 985,
         "end": 1078
-      }
+      },
+      "hash": "016623bcde58e14ad8f1baf38c0b73d84bf694e6e2e08caccbc20e9c8875a559"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::fallback",
@@ -3085,7 +3430,8 @@
         "path": "receivers.py",
         "start": 1337,
         "end": 1373
-      }
+      },
+      "hash": "6a2300ac0508dc923d78c335b6ee891177655170e7bfeed5bceb6d7663a2293d"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::lacking",
@@ -3093,7 +3439,8 @@
         "path": "receivers.py",
         "start": 1376,
         "end": 1431
-      }
+      },
+      "hash": "9d4f7ac373727b20df66dde2c00b9481d1f4fb9ede538c52b186fe593e52e280"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::lambdas",
@@ -3101,7 +3448,8 @@
         "path": "receivers.py",
         "start": 1081,
         "end": 1136
-      }
+      },
+      "hash": "82c3713ac287e8b041afdc5182efe7272f14d7b9ba3af9127c5e09e36f044453"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::module_read",
@@ -3109,7 +3457,8 @@
         "path": "receivers.py",
         "start": 706,
         "end": 750
-      }
+      },
+      "hash": "7303873baedeaca8d5011f98930937d3b0754aeb3b40f2761ec6c66b0e75ecdb"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::optional",
@@ -3117,7 +3466,8 @@
         "path": "receivers.py",
         "start": 1434,
         "end": 1529
-      }
+      },
+      "hash": "70085ab98ddd1b3aa52c4c7848a9a10408477cf06306e6b485aeefbe0f3ab0a3"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::param_reassigned",
@@ -3125,7 +3475,8 @@
         "path": "receivers.py",
         "start": 1139,
         "end": 1241
-      }
+      },
+      "hash": "dfd66e06ec5f0b8fee0db77c6d517043745aaf842edcb2383caa985586afa851"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::spare_read",
@@ -3133,7 +3484,8 @@
         "path": "receivers.py",
         "start": 1292,
         "end": 1334
-      }
+      },
+      "hash": "5bf4b088f9392af3df044ae555f22c4ba1c214615c644f81ff4029d7e16eed4d"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::swap",
@@ -3141,7 +3493,8 @@
         "path": "receivers.py",
         "start": 1244,
         "end": 1289
-      }
+      },
+      "hash": "cec453f44e7ba08f47a3c43def5c28482f22812fb1fa92db7490f67a2e1fe1b2"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::walrus",
@@ -3149,7 +3502,8 @@
         "path": "receivers.py",
         "start": 914,
         "end": 982
-      }
+      },
+      "hash": "896a8665dd93af31d0f7d705140cd12229564ff73a3adf582adad87d0b51820f"
     },
     {
       "id": "example.com/acme/conformance::receivers.py::with_as",
@@ -3157,7 +3511,8 @@
         "path": "receivers.py",
         "start": 753,
         "end": 835
-      }
+      },
+      "hash": "31422179ac7cafff5b29529597ed92e3fd3c9369e0f8b496c347392d88063928"
     },
     {
       "id": "example.com/acme/conformance::reports/__init__.py::build",
@@ -3165,7 +3520,8 @@
         "path": "reports/__init__.py",
         "start": 107,
         "end": 131
-      }
+      },
+      "hash": "6ca1142fbe372a3dedaae1f133c6f4d891dd7a8dacdfbaa54e25692bda578f82"
     },
     {
       "id": "example.com/acme/conformance::scopes.py::Helper",
@@ -3173,7 +3529,8 @@
         "path": "scopes.py",
         "start": 87,
         "end": 113
-      }
+      },
+      "hash": "5818a81cf886c41e654a68b8d417743e54c5677c15a330645b5afbd7d7e0fe9a"
     },
     {
       "id": "example.com/acme/conformance::scopes.py::Outer",
@@ -3181,7 +3538,8 @@
         "path": "scopes.py",
         "start": 116,
         "end": 222
-      }
+      },
+      "hash": "fb1c11552e531175c2f9742743c28355a61b46e92a78be59285f578a60f4a2a5"
     },
     {
       "id": "example.com/acme/conformance::scopes.py::Outer.Helper",
@@ -3189,7 +3547,8 @@
         "path": "scopes.py",
         "start": 133,
         "end": 159
-      }
+      },
+      "hash": "3a778050d6e484017c9467ba28e03e3c78b33b51454b3fd0d0187ded91cc54f5"
     },
     {
       "id": "example.com/acme/conformance::scopes.py::Outer.m",
@@ -3197,7 +3556,8 @@
         "path": "scopes.py",
         "start": 186,
         "end": 222
-      }
+      },
+      "hash": "c4fd031be54fc61f73222b595148dbf5f15a7ad8ecfb3d4c2d57707ff39286d1"
     },
     {
       "id": "example.com/acme/conformance::shadow.py::from_module",
@@ -3205,7 +3565,8 @@
         "path": "shadow.py",
         "start": 65,
         "end": 96
-      }
+      },
+      "hash": "15e5dddb4ba4602ffcfe6aac8eac21d6cfd982cfee18898dfee9482dca9fa21b"
     },
     {
       "id": "example.com/acme/conformance::shadow/__init__.py::from_package",
@@ -3213,7 +3574,8 @@
         "path": "shadow/__init__.py",
         "start": 0,
         "end": 32
-      }
+      },
+      "hash": "9fff61698efca24a1562cdaefbb16dd3f4aa0d9f7c51eddbf43aae99973712bb"
     },
     {
       "id": "example.com/acme/conformance::shop/catalog/urls.py::products",
@@ -3221,7 +3583,8 @@
         "path": "shop/catalog/urls.py",
         "start": 98,
         "end": 147
-      }
+      },
+      "hash": "f6cff097cbe3158c438a9fec9da950df49bd6e7688979be471cb272478b4b83a"
     },
     {
       "id": "example.com/acme/conformance::shop/catalog/urls.py::upload",
@@ -3229,7 +3592,8 @@
         "path": "shop/catalog/urls.py",
         "start": 150,
         "end": 200
-      }
+      },
+      "hash": "cd8a9933dc33ed879deecc7eb82b72f16029bf1fe69c86069bc35da1253db8ec"
     },
     {
       "id": "example.com/acme/conformance::shop/orders/items.py::stock",
@@ -3237,7 +3601,8 @@
         "path": "shop/orders/items.py",
         "start": 120,
         "end": 178
-      }
+      },
+      "hash": "ca2dd3ee7d1556abf9b3c2192d0a5f029a4dcf61c051ebef0af48e9bfb86afc0"
     },
     {
       "id": "example.com/acme/conformance::shop/orders/views.py::OrderList",
@@ -3245,7 +3610,8 @@
         "path": "shop/orders/views.py",
         "start": 180,
         "end": 406
-      }
+      },
+      "hash": "9e4e79c8f311509212d2dd32ae2ca06bff95ea464802ed6aa06b71fa056a0418"
     },
     {
       "id": "example.com/acme/conformance::shop/orders/views.py::OrderList.get",
@@ -3253,7 +3619,8 @@
         "path": "shop/orders/views.py",
         "start": 268,
         "end": 309
-      }
+      },
+      "hash": "e508d7cd7b94a301fe597bf9132dce9f959df11199baa80806e8695c3dc8d7c6"
     },
     {
       "id": "example.com/acme/conformance::shop/orders/views.py::OrderList.post",
@@ -3261,7 +3628,8 @@
         "path": "shop/orders/views.py",
         "start": 315,
         "end": 367
-      }
+      },
+      "hash": "aee7468a910d6e788720fd07c37406400537d5458edf9b446f57be1d29355c3e"
     },
     {
       "id": "example.com/acme/conformance::shop/orders/views.py::OrderList.total",
@@ -3269,7 +3637,8 @@
         "path": "shop/orders/views.py",
         "start": 373,
         "end": 406
-      }
+      },
+      "hash": "9facfb6009bed08bd57d35bf0d3a053734a75caa95e8f0b6c8b1a7b8b780dca0"
     },
     {
       "id": "example.com/acme/conformance::shop/orders/views.py::order",
@@ -3277,7 +3646,8 @@
         "path": "shop/orders/views.py",
         "start": 94,
         "end": 177
-      }
+      },
+      "hash": "c226d2a3db413c5f4b7f6a8d1aa890a00e3009543f4f7736963312f01258fccd"
     },
     {
       "id": "example.com/acme/conformance::shop/views.py::about",
@@ -3285,7 +3655,8 @@
         "path": "shop/views.py",
         "start": 207,
         "end": 245
-      }
+      },
+      "hash": "3f9ce5433e47f1bca20dd528f05c6729d668bf45135194f85a9118c612f8d1d0"
     },
     {
       "id": "example.com/acme/conformance::shop/views.py::archive",
@@ -3293,7 +3664,8 @@
         "path": "shop/views.py",
         "start": 161,
         "end": 204
-      }
+      },
+      "hash": "ece5ce85f3445cafd097b37a53647ac3b0a10d2263f3644c91f73af3ceea7fa2"
     },
     {
       "id": "example.com/acme/conformance::shop/views.py::contact",
@@ -3301,7 +3673,8 @@
         "path": "shop/views.py",
         "start": 248,
         "end": 290
-      }
+      },
+      "hash": "d14f7764419c3414e4f08f7cacaed10946007273e09bf474283d8c02120187cc"
     },
     {
       "id": "example.com/acme/conformance::shop/views.py::health",
@@ -3309,7 +3682,8 @@
         "path": "shop/views.py",
         "start": 76,
         "end": 112
-      }
+      },
+      "hash": "4aa31552181436223219ce2475c1643c40cab581b67aae5e4c39d06635547601"
     },
     {
       "id": "example.com/acme/conformance::shop/views.py::legal",
@@ -3317,7 +3691,8 @@
         "path": "shop/views.py",
         "start": 293,
         "end": 331
-      }
+      },
+      "hash": "18e4448ff752faffd77b2e295e097e6dde5f10fc1dd1d3784195e07f2feb8e21"
     },
     {
       "id": "example.com/acme/conformance::shop/views.py::vintage",
@@ -3325,7 +3700,8 @@
         "path": "shop/views.py",
         "start": 115,
         "end": 158
-      }
+      },
+      "hash": "5469d1920b7d0f10241bb69dae0a6f195bf4587b7c8e3d808511e34f617dd145"
     },
     {
       "id": "example.com/acme/conformance::src/billing/invoice.py::total",
@@ -3333,7 +3709,8 @@
         "path": "src/billing/invoice.py",
         "start": 41,
         "end": 109
-      }
+      },
+      "hash": "14fec55a86237ec993e1d5de7727035cd997d01c0453468f6a38b8144a679000"
     },
     {
       "id": "example.com/acme/conformance::src/billing/tax.py::fee",
@@ -3341,7 +3718,8 @@
         "path": "src/billing/tax.py",
         "start": 57,
         "end": 86
-      }
+      },
+      "hash": "337838280171ff4f1389ec52d5bae8894553791b5423e5421e5d00e1e3710dcc"
     },
     {
       "id": "example.com/acme/conformance::src/billing/tax.py::vat",
@@ -3349,7 +3727,8 @@
         "path": "src/billing/tax.py",
         "start": 13,
         "end": 54
-      }
+      },
+      "hash": "dc0075cc5c0d9a252d19120210347adf9085bd147c9a03ad94deafbebede0291"
     },
     {
       "id": "example.com/acme/conformance::stars/computed.py::named",
@@ -3357,7 +3736,8 @@
         "path": "stars/computed.py",
         "start": 50,
         "end": 75
-      }
+      },
+      "hash": "52dd4bebe57687d8a9adad16612b9364a6c8b8cc4e7727d34de9c3bd0c8c342c"
     },
     {
       "id": "example.com/acme/conformance::stars/computed.py::unnamed",
@@ -3365,7 +3745,8 @@
         "path": "stars/computed.py",
         "start": 78,
         "end": 105
-      }
+      },
+      "hash": "536ca36f3898c2f74d8047ad763ae10fc5e1f7cf55243cf88d215eac23b32f5d"
     },
     {
       "id": "example.com/acme/conformance::stars/grown.py::grown",
@@ -3373,7 +3754,8 @@
         "path": "stars/grown.py",
         "start": 69,
         "end": 94
-      }
+      },
+      "hash": "6bd4f72a2da386c47cc19acf0e7e41648fb7f9e561bb829d6d940760460ffd72"
     },
     {
       "id": "example.com/acme/conformance::stars/grown.py::seed",
@@ -3381,7 +3763,8 @@
         "path": "stars/grown.py",
         "start": 42,
         "end": 66
-      }
+      },
+      "hash": "3e259f8786e17e2df0fe4650cce86b3ba8e754260bc2aff5bfadec788989f766"
     },
     {
       "id": "example.com/acme/conformance::stars/literal.py::Shown",
@@ -3389,7 +3772,8 @@
         "path": "stars/literal.py",
         "start": 92,
         "end": 113
-      }
+      },
+      "hash": "ed30fe198f8b14df72c8ecb8fc134017c8005b4bfd1475acc2ba8a41281a8a0b"
     },
     {
       "id": "example.com/acme/conformance::stars/literal.py::listed",
@@ -3397,7 +3781,8 @@
         "path": "stars/literal.py",
         "start": 32,
         "end": 58
-      }
+      },
+      "hash": "f6c2ebe12c522ee6bc34f541d6226c4b72ff110dbe5acc950c002f46d6982602"
     },
     {
       "id": "example.com/acme/conformance::stars/literal.py::unlisted",
@@ -3405,7 +3790,8 @@
         "path": "stars/literal.py",
         "start": 61,
         "end": 89
-      }
+      },
+      "hash": "49e69815b583d93c23af0fb37220b22bc66c00ac14e8088eae3f8dbc1184ac40"
     },
     {
       "id": "example.com/acme/conformance::stars/underscore.py::_internal",
@@ -3413,7 +3799,8 @@
         "path": "stars/underscore.py",
         "start": 30,
         "end": 59
-      }
+      },
+      "hash": "c9871d81ae14a58a05e5bb5c1129f11aefbc5cf3c86ba7d3abfa42c52ea0909e"
     },
     {
       "id": "example.com/acme/conformance::stars/underscore.py::visible",
@@ -3421,7 +3808,8 @@
         "path": "stars/underscore.py",
         "start": 0,
         "end": 27
-      }
+      },
+      "hash": "b5a8ddee89ec3e6cad30c242f46b69bb72ab6c9ab6d9fcac9cb430ca3940abc3"
     },
     {
       "id": "example.com/acme/conformance::web/accounts.py::update",
@@ -3429,7 +3817,8 @@
         "path": "web/accounts.py",
         "start": 98,
         "end": 175
-      }
+      },
+      "hash": "21296ab61f2990c8c44911439787977c7b9f6eb0d26b32ddf299e57dc1068301"
     },
     {
       "id": "example.com/acme/conformance::web/api.py::echo",
@@ -3437,7 +3826,8 @@
         "path": "web/api.py",
         "start": 364,
         "end": 417
-      }
+      },
+      "hash": "91c52329de62190995493519c6ff1085f7e99c8798983a8a9d1d8d709baf4b52"
     },
     {
       "id": "example.com/acme/conformance::web/api.py::health",
@@ -3445,7 +3835,8 @@
         "path": "web/api.py",
         "start": 223,
         "end": 280
-      }
+      },
+      "hash": "257cefc0363f60c497914ef765436d267bff929da5f71db3fafbda6484262e7b"
     },
     {
       "id": "example.com/acme/conformance::web/api.py::ping",
@@ -3453,7 +3844,8 @@
         "path": "web/api.py",
         "start": 283,
         "end": 361
-      }
+      },
+      "hash": "725760a7ae11c4f620e457446a1b995ef3ee3aa0bef6306d4d7c309b51a1a0cb"
     },
     {
       "id": "example.com/acme/conformance::web/factory.py::build_admin",
@@ -3461,7 +3853,8 @@
         "path": "web/factory.py",
         "start": 96,
         "end": 268
-      }
+      },
+      "hash": "820373498bbcc0a8e7e369cc1855d040313112648cf494a7ca6d9eaced6aef7f"
     },
     {
       "id": "example.com/acme/conformance::web/factory.py::build_admin.remove_user",
@@ -3469,7 +3862,8 @@
         "path": "web/factory.py",
         "start": 159,
         "end": 250
-      }
+      },
+      "hash": "05d8a2efc13850fc98f1f90ebb9201ef54b434e556aaf7a65d0e614e6b4c75a7"
     },
     {
       "id": "example.com/acme/conformance::web/factory.py::mount",
@@ -3477,7 +3871,8 @@
         "path": "web/factory.py",
         "start": 271,
         "end": 351
-      }
+      },
+      "hash": "836c9e8ecc621b09ec533d088750c775c7aaa413239e23e4d64071e9c98e89ee"
     },
     {
       "id": "example.com/acme/conformance::web/factory.py::relay",
@@ -3485,7 +3880,8 @@
         "path": "web/factory.py",
         "start": 354,
         "end": 451
-      }
+      },
+      "hash": "7c5601cd99b253e2e9cb9d0caae0422763eb3a53a0cd20f8a90969f33048c4cf"
     },
     {
       "id": "example.com/acme/conformance::web/items.py::create_item",
@@ -3493,7 +3889,8 @@
         "path": "web/items.py",
         "start": 169,
         "end": 220
-      }
+      },
+      "hash": "9026d4da3c3310ce84c13f1f5bc5e1367757158550c81c6e34a2708859683a7b"
     },
     {
       "id": "example.com/acme/conformance::web/items.py::read_item",
@@ -3501,7 +3898,8 @@
         "path": "web/items.py",
         "start": 87,
         "end": 166
-      }
+      },
+      "hash": "32e7dc4776881cec0d7a55be06ac8ec8e7dbec24e4a4da984fb8945b943a363b"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::daily",
@@ -3509,7 +3907,8 @@
         "path": "web/pages.py",
         "start": 414,
         "end": 475
-      }
+      },
+      "hash": "c964882c2c1e444ceec79ca153a4036486b384b2fed0c797a7b6e40defaa9820"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::fetch",
@@ -3517,7 +3916,8 @@
         "path": "web/pages.py",
         "start": 585,
         "end": 694
-      }
+      },
+      "hash": "409885e6677d08a0412be8930db6291da7d6f26f73ad90de2e0254ba1c0241a8"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::index",
@@ -3525,7 +3925,8 @@
         "path": "web/pages.py",
         "start": 253,
         "end": 299
-      }
+      },
+      "hash": "b5aa66f04db892702ec73f1ff088bda7e6b93061b7f702253054b66a20172966"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::order",
@@ -3533,7 +3934,8 @@
         "path": "web/pages.py",
         "start": 302,
         "end": 411
-      }
+      },
+      "hash": "1b5fcaaea8a6c3dfa7eb39c2a0d3a5a4ed8196915a5ebf19b08103dcbc3e3662"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::shortcut",
@@ -3541,7 +3943,8 @@
         "path": "web/pages.py",
         "start": 478,
         "end": 582
-      }
+      },
+      "hash": "182412e0ce7bd1da20f67256818950877466bfc4805f7be74477ca175af5b7da"
     },
     {
       "id": "example.com/acme/conformance::web/partial.py::build",
@@ -3549,7 +3952,8 @@
         "path": "web/partial.py",
         "start": 384,
         "end": 514
-      }
+      },
+      "hash": "1d7228b8548bdd6ed320240b0845e06dd32cb54ab99cf75e81c6cda8acd63c03"
     },
     {
       "id": "example.com/acme/conformance::web/partial.py::build.items",
@@ -3557,7 +3961,8 @@
         "path": "web/partial.py",
         "start": 431,
         "end": 495
-      }
+      },
+      "hash": "a9e34f11a4f615c92658f3007ddcd77d876d2dcf1ca1ea9e02f9732c77638e06"
     },
     {
       "id": "example.com/acme/conformance::web/partial.py::read_part",
@@ -3565,7 +3970,8 @@
         "path": "web/partial.py",
         "start": 303,
         "end": 381
-      }
+      },
+      "hash": "f0e2cdce3678dd90f2b5cca161ea8eeae6b3215ef44e5b6ca8f5c30bbcddd60d"
     },
     {
       "id": "example.com/acme/conformance::web/partial.py::read_user",
@@ -3573,7 +3979,8 @@
         "path": "web/partial.py",
         "start": 228,
         "end": 300
-      }
+      },
+      "hash": "aba167271211384bb64211ce83b0152f09b2c198455a3e8aa22e405a49f3cc0a"
     }
   ],
   "calls": [
@@ -5411,7 +5818,8 @@
         "path": "defs.py",
         "start": 260,
         "end": 281
-      }
+      },
+      "decorates": "example.com/acme/conformance::defs.py::register.wrapper"
     },
     {
       "id": "example.com/acme/conformance::defs.py::sorted_names::plain#0",
@@ -8731,7 +9139,8 @@
         "path": "shop/orders/views.py",
         "start": 95,
         "end": 134
-      }
+      },
+      "decorates": "example.com/acme/conformance::shop/orders/views.py::order"
     },
     {
       "id": "example.com/acme/conformance::shop/urls.py::include#0",
@@ -8896,7 +9305,8 @@
         "path": "web/accounts.py",
         "start": 99,
         "end": 141
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/accounts.py::update"
     },
     {
       "id": "example.com/acme/conformance::web/api.py::APIRouter#0",
@@ -8929,7 +9339,8 @@
         "path": "web/api.py",
         "start": 284,
         "end": 331
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/api.py::ping"
     },
     {
       "id": "example.com/acme/conformance::web/api.py::app.api_route#1",
@@ -8940,7 +9351,8 @@
         "path": "web/api.py",
         "start": 365,
         "end": 387
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/api.py::echo"
     },
     {
       "id": "example.com/acme/conformance::web/api.py::app.get#0",
@@ -8951,7 +9363,8 @@
         "path": "web/api.py",
         "start": 224,
         "end": 242
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/api.py::health"
     },
     {
       "id": "example.com/acme/conformance::web/api.py::app.include_router#0",
@@ -9050,7 +9463,8 @@
         "path": "web/factory.py",
         "start": 160,
         "end": 192
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/factory.py::build_admin.remove_user"
     },
     {
       "id": "example.com/acme/conformance::web/factory.py::mount::target.include_router#0",
@@ -9094,7 +9508,8 @@
         "path": "web/items.py",
         "start": 88,
         "end": 112
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/items.py::read_item"
     },
     {
       "id": "example.com/acme/conformance::web/items.py::router.post#0",
@@ -9105,7 +9520,8 @@
         "path": "web/items.py",
         "start": 170,
         "end": 185
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/items.py::create_item"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::Blueprint#0",
@@ -9138,7 +9554,8 @@
         "path": "web/pages.py",
         "start": 479,
         "end": 499
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/pages.py::shortcut"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::app.register_blueprint#0",
@@ -9171,7 +9588,8 @@
         "path": "web/pages.py",
         "start": 254,
         "end": 268
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/pages.py::index"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::app.route#1",
@@ -9182,7 +9600,8 @@
         "path": "web/pages.py",
         "start": 303,
         "end": 365
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/pages.py::order"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::fetch#0",
@@ -9215,7 +9634,8 @@
         "path": "web/pages.py",
         "start": 415,
         "end": 444
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/pages.py::daily"
     },
     {
       "id": "example.com/acme/conformance::web/partial.py::APIRouter#0",
@@ -9248,7 +9668,8 @@
         "path": "web/partial.py",
         "start": 304,
         "end": 333
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/partial.py::read_part"
     },
     {
       "id": "example.com/acme/conformance::web/partial.py::app.include_router#0",
@@ -9303,7 +9724,8 @@
         "path": "web/partial.py",
         "start": 432,
         "end": 460
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/partial.py::build.items"
     },
     {
       "id": "example.com/acme/conformance::web/partial.py::users.get#0",
@@ -9314,7 +9736,8 @@
         "path": "web/partial.py",
         "start": 229,
         "end": 252
-      }
+      },
+      "decorates": "example.com/acme/conformance::web/partial.py::read_user"
     }
   ],
   "providers": [

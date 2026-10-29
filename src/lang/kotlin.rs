@@ -602,6 +602,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 facts.defs.push(Def {
                     result: Some(Class::Type(class.to_string())),
                     suspends: false,
+                    hash: String::new(),
                     ..definition(&ctor, Kind::Method, node.byte_range(), params)
                 });
                 if access.max(own_access(node, src)) != Access::Public {
@@ -919,6 +920,7 @@ fn definition(name: &str, kind: Kind, range: Range<usize>, params: Vec<Param>) -
         type_params: Vec::new(),
         result: None,
         suspends: false,
+        hash: String::new(),
     }
 }
 

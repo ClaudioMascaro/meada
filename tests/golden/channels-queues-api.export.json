@@ -17,7 +17,8 @@
         "path": "src/nats.ts",
         "start": 224,
         "end": 288
-      }
+      },
+      "hash": "691819f839b40404e0842c0e3919a21b0c14618b1a6962198100f23ca30d475d"
     },
     {
       "id": "example.com/queues/api::src/nats.ts::orderCreated",
@@ -25,7 +26,8 @@
         "path": "src/nats.ts",
         "start": 114,
         "end": 215
-      }
+      },
+      "hash": "99b0e7f49e8f7437155420dd318cc461ec4d5e7b8c89672f4fc4e0889946cfe8"
     },
     {
       "id": "example.com/queues/api::src/sqs.ts::enqueue",
@@ -33,7 +35,8 @@
         "path": "src/sqs.ts",
         "start": 449,
         "end": 590
-      }
+      },
+      "hash": "c1f147615f9728336c051548effa0c80da0b232d82b80342b9c2b38a709a37c5"
     },
     {
       "id": "example.com/queues/api::src/sqs.ts::enqueueOrder",
@@ -41,7 +44,8 @@
         "path": "src/sqs.ts",
         "start": 230,
         "end": 380
-      }
+      },
+      "hash": "48b1460c581fa8232c192d24f2c12034bbacf517db88674d08c33c69b9ac26c9"
     },
     {
       "id": "example.com/queues/api::src/sqs.ts::enqueueRefund",
@@ -49,7 +53,8 @@
         "path": "src/sqs.ts",
         "start": 599,
         "end": 711
-      }
+      },
+      "hash": "645877609c403524c9ad802c49106e04cc6e19c83be47fab917d3387c0af8e59"
     }
   ],
   "calls": [

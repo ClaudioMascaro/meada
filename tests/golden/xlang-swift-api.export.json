@@ -33,7 +33,8 @@
         "path": "Sources/Audit.swift",
         "start": 65,
         "end": 318
-      }
+      },
+      "hash": "5622430e8974cb0534ab2e852e28ff308c681c851f01de7d32193667587cec67"
     },
     {
       "id": "example.com/xlang-swift/api::Sources/Entrypoint.swift::Entrypoint",
@@ -41,7 +42,8 @@
         "path": "Sources/Entrypoint.swift",
         "start": 14,
         "end": 204
-      }
+      },
+      "hash": "211a57a8f412f06c04cbea450f45d5d237b4e111f35fa835c655615b42543d60"
     },
     {
       "id": "example.com/xlang-swift/api::Sources/Entrypoint.swift::Entrypoint.main()",
@@ -49,7 +51,8 @@
         "path": "Sources/Entrypoint.swift",
         "start": 42,
         "end": 202
-      }
+      },
+      "hash": "eef13ea76bf4b34aaf779e602f9aefc5c9cf3c04fe7bbcf7440121a30318d869"
     },
     {
       "id": "example.com/xlang-swift/api::Sources/Entrypoint.swift::configure(_:)",
@@ -57,7 +60,8 @@
         "path": "Sources/Entrypoint.swift",
         "start": 206,
         "end": 277
-      }
+      },
+      "hash": "bf8ad0e59eb5221623a58ca26a3b80f0b0f528fd2d25a1820d46de1f8409692a"
     },
     {
       "id": "example.com/xlang-swift/api::Sources/Orders.swift::reserve(_:)",
@@ -65,7 +69,8 @@
         "path": "Sources/Orders.swift",
         "start": 162,
         "end": 291
-      }
+      },
+      "hash": "0e5727d1661a78e6cade75e8724eec8b4d1507f6205b1b14d6772935a119fd0e"
     },
     {
       "id": "example.com/xlang-swift/api::Sources/Orders.swift::status(_:)",
@@ -73,7 +78,8 @@
         "path": "Sources/Orders.swift",
         "start": 14,
         "end": 160
-      }
+      },
+      "hash": "05bbb5a82dfcfe50855e7a89a09d286278c1505add9ae50c7a9b6bda460b4486"
     },
     {
       "id": "example.com/xlang-swift/api::Sources/Pricing.swift::priceOf(_:)",
@@ -81,7 +87,8 @@
         "path": "Sources/Pricing.swift",
         "start": 99,
         "end": 425
-      }
+      },
+      "hash": "8945f044f138b025da8aa8e3027f9b5f2820bb7a3402579f03f54ec51c3cfcbb"
     },
     {
       "id": "example.com/xlang-swift/api::Sources/Pricing.swift::promotions()",
@@ -89,7 +96,8 @@
         "path": "Sources/Pricing.swift",
         "start": 467,
         "end": 640
-      }
+      },
+      "hash": "114b46581869a7e05f25f35df5e319a31b6f3e766b19978c26dc653fa90380dd"
     },
     {
       "id": "example.com/xlang-swift/api::Sources/Routes.swift::routes(_:)",
@@ -97,7 +105,8 @@
         "path": "Sources/Routes.swift",
         "start": 14,
         "end": 146
-      }
+      },
+      "hash": "1fe71a28087c7ea148cec3f4bf8e5cf75db57c69baee91f91dae7360fa61163d"
     },
     {
       "id": "example.com/xlang-swift/api::Sources/Stock.swift::stock()",
@@ -105,7 +114,8 @@
         "path": "Sources/Stock.swift",
         "start": 93,
         "end": 261
-      }
+      },
+      "hash": "0c48913a0a7a2ae04e88f05f9fd12243500c5a0a070aa9a24ccf85d8ed5d5ae0"
     }
   ],
   "calls": [

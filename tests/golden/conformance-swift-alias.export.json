@@ -21,7 +21,8 @@
         "path": "Sources/App/Aliases.swift",
         "start": 118,
         "end": 201
-      }
+      },
+      "hash": "7df9d121f1d832cb862502d21def8cf08ae27b44756f659d621244a58bee825c"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/Aliases.swift::Feature.tap()",
@@ -29,7 +30,8 @@
         "path": "Sources/App/Aliases.swift",
         "start": 167,
         "end": 199
-      }
+      },
+      "hash": "9f9ec03b55e1cba45d7c8725b54f1ff8a920ed2de58c41ae00807be5a1ae9b4c"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::Box",
@@ -37,7 +39,8 @@
         "path": "Sources/App/main.swift",
         "start": 905,
         "end": 987
-      }
+      },
+      "hash": "67d9916e6ec0801bf4d511583d0c0a055448b1b9299bb36fb1a589aee422c8f7"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::Box.g(_:)",
@@ -45,7 +48,8 @@
         "path": "Sources/App/main.swift",
         "start": 950,
         "end": 985
-      }
+      },
+      "hash": "b32c50c8ad9e81287dcaf56b46f05bda0b4781edd1b61fb3d27e8e6b6ca44042"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::Other",
@@ -53,7 +57,8 @@
         "path": "Sources/App/main.swift",
         "start": 857,
         "end": 903
-      }
+      },
+      "hash": "f3c493fe3623080e10c57fa24b0618ea7cc72db864d05339d32b684b26286232"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::Other.ping()",
@@ -61,7 +66,8 @@
         "path": "Sources/App/main.swift",
         "start": 877,
         "end": 901
-      }
+      },
+      "hash": "784b5535140e43dc2e979e2d066ee1c22b607f44d232af8c73ddc9063338feea"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::Sender",
@@ -69,7 +75,8 @@
         "path": "Sources/App/main.swift",
         "start": 308,
         "end": 523
-      }
+      },
+      "hash": "fa7543ebfc91ae2d01e73dbe780a1849b74e18e528665382471944579fb9a6b0"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::Sender.on(_:h:)",
@@ -77,7 +84,8 @@
         "path": "Sources/App/main.swift",
         "start": 442,
         "end": 481
-      }
+      },
+      "hash": "601bbbdfd7a95448bee4a54754c7a1d74254a70ad272cdb3401f1be9c007aac6"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::Sender.on(_:n:)",
@@ -85,7 +93,8 @@
         "path": "Sources/App/main.swift",
         "start": 486,
         "end": 521
-      }
+      },
+      "hash": "66bd75934002bc0d39e6eeb4b03a61a2eb609532e7400742125964eb0e115735"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::Sender.send(_:animation:)",
@@ -93,7 +102,8 @@
         "path": "Sources/App/main.swift",
         "start": 333,
         "end": 378
-      }
+      },
+      "hash": "6b15bd56c2cd9614e124338fff4e76bd826066b85e43997aaa6290ad3b407b88"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::Sender.send(_:assert:)",
@@ -101,7 +111,8 @@
         "path": "Sources/App/main.swift",
         "start": 383,
         "end": 437
-      }
+      },
+      "hash": "b9262433049c3ede5f8d77beb63394e1d6d1aa4b75d6710d7ead9f0ff87bfee8"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::Wheel",
@@ -109,7 +120,8 @@
         "path": "Sources/App/main.swift",
         "start": 695,
         "end": 731
-      }
+      },
+      "hash": "105224302137709aa2c26552adce0eb4760533f3d08a257c3d2f1326639e78a2"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::Wheel.spin()",
@@ -117,7 +129,8 @@
         "path": "Sources/App/main.swift",
         "start": 715,
         "end": 729
-      }
+      },
+      "hash": "43a3195a96414ff4ee498b795b08329c4f0d73eaeaebfd21c4d51fc92feac71b"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::cycle(_:_:)",
@@ -125,7 +138,8 @@
         "path": "Sources/App/main.swift",
         "start": 241,
         "end": 306
-      }
+      },
+      "hash": "5a3d2d1839f14fbbea8abfa9bd9bfedc1923585ae7a4af44a672109ca9cdcd22"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::generic(_:)",
@@ -133,7 +147,8 @@
         "path": "Sources/App/main.swift",
         "start": 802,
         "end": 855
-      }
+      },
+      "hash": "fac1155ac0cdd94af9204d26dd5e29afc13ef8c35b3e139cb046d4b19b042656"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::hidden(_:)",
@@ -141,7 +156,8 @@
         "path": "Sources/App/main.swift",
         "start": 651,
         "end": 693
-      }
+      },
+      "hash": "b65e7ceb46f8aa4c74ffb5906883f95a1e6180ff169a767d1f38bd0ed1f02a01"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::local()",
@@ -149,7 +165,8 @@
         "path": "Sources/App/main.swift",
         "start": 733,
         "end": 800
-      }
+      },
+      "hash": "3de830d85290c525e63435954c21321385ef18987a1adccfb4e177d7a7055171"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::main",
@@ -157,7 +174,8 @@
         "path": "Sources/App/main.swift",
         "start": 0,
         "end": 1040
-      }
+      },
+      "hash": "ff7a42ba9678c733d5ba7be5f2ec4a4d4f99ae56f6180cf291ce08f32fa191ef"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::run(_:)",
@@ -165,7 +183,8 @@
         "path": "Sources/App/main.swift",
         "start": 525,
         "end": 547
-      }
+      },
+      "hash": "01185b44b9c9a446acddf91dc24340c8b99e532a5c86e25153298f15c08df91c"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::trailing(_:)",
@@ -173,7 +192,8 @@
         "path": "Sources/App/main.swift",
         "start": 549,
         "end": 649
-      }
+      },
+      "hash": "e4d60f308b63f97f98117a9605197bd681965dd7bcb83fbcc9e73c1b91a90cc5"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::untyped()",
@@ -181,7 +201,8 @@
         "path": "Sources/App/main.swift",
         "start": 989,
         "end": 1039
-      }
+      },
+      "hash": "5f5186ad6efd8e951b07d0b90af9829b6c0126cc502c2e8aaa31b4c486347559"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::use(_:_:_:_:)",
@@ -189,7 +210,8 @@
         "path": "Sources/App/main.swift",
         "start": 12,
         "end": 239
-      }
+      },
+      "hash": "5d30e11673c0d2c78f46e6b87921ed8594f5720a28de5ddb7045ad11aa0845d9"
     },
     {
       "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce",
@@ -197,7 +219,8 @@
         "path": "Sources/Lib/Lib.swift",
         "start": 0,
         "end": 211
-      }
+      },
+      "hash": "e762b7dfb3370af709948a4cdfaf17d4f590bcc6ea19af9643d55f029a1875fe"
     },
     {
       "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce.init(_:(S,A)->Int)",
@@ -205,7 +228,8 @@
         "path": "Sources/Lib/Lib.swift",
         "start": 87,
         "end": 165
-      }
+      },
+      "hash": "eefe1e00596599db5e9faf4be22edd00951fa3d72e3d7af61bfa97b28b488ee3"
     },
     {
       "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce.init(_:someReducer)",
@@ -213,7 +237,8 @@
         "path": "Sources/Lib/Lib.swift",
         "start": 170,
         "end": 209
-      }
+      },
+      "hash": "9474920e95b447282b2668f3f1d0f3b22fa061ba43bc28dfe61db3d0b3afd812"
     },
     {
       "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reduce.init(internal:)",
@@ -221,7 +246,8 @@
         "path": "Sources/Lib/Lib.swift",
         "start": 33,
         "end": 82
-      }
+      },
+      "hash": "226eb4dcb949d28ca471dea5812561f1260b4d1d134000648922faac8b75f124"
     },
     {
       "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::Reducer",
@@ -229,7 +255,8 @@
         "path": "Sources/Lib/Lib.swift",
         "start": 213,
         "end": 239
-      }
+      },
+      "hash": "8988fc5aaa1b54705d2220eda9cfcdc8f014da081eb0c8b8dc4746badda581de"
     },
     {
       "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::Store",
@@ -237,7 +264,8 @@
         "path": "Sources/Lib/Lib.swift",
         "start": 241,
         "end": 318
-      }
+      },
+      "hash": "4c3c3e6dab7304e01a9c647bb698708f2f5141091ce0634b0c061e02232a9dc8"
     },
     {
       "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::Store.send(_:)",
@@ -245,7 +273,8 @@
         "path": "Sources/Lib/Lib.swift",
         "start": 274,
         "end": 316
-      }
+      },
+      "hash": "bda2107bbf86e7d8d6bac50d399cd58b94b85fdb78c84607026e8c3287099d45"
     },
     {
       "id": "example.com/acme/conformance::Sources/Lib/Lib.swift::inside()",
@@ -253,7 +282,8 @@
         "path": "Sources/Lib/Lib.swift",
         "start": 406,
         "end": 473
-      }
+      },
+      "hash": "f36fcb053d09274d6f7ae69f0084bf87df9ce9e351e103fbe989d7f50a9c5956"
     }
   ],
   "calls": [

@@ -25,7 +25,8 @@
         "path": "app/api/events/route.ts",
         "start": 7,
         "end": 72
-      }
+      },
+      "hash": "ae57c145379470514c9766e272ba013fe3c02033cb2fcf98428ff4fd417bfb49"
     },
     {
       "id": "example.com/chain/catalog::app/api/health/route.ts::GET",
@@ -33,7 +34,8 @@
         "path": "app/api/health/route.ts",
         "start": 7,
         "end": 54
-      }
+      },
+      "hash": "0a728023f345645c2a35de3d2dafd0123f34ba29a57694662ff946b7c1510238"
     },
     {
       "id": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
@@ -41,7 +43,8 @@
         "path": "app/api/products/[id]/route.ts",
         "start": 57,
         "end": 182
-      }
+      },
+      "hash": "693d940e62fed29a36779c64994b42f663645235268adbeb988ce1103eb9d0b2"
     },
     {
       "id": "example.com/chain/catalog::lib/products.ts::find",
@@ -49,7 +52,8 @@
         "path": "lib/products.ts",
         "start": 277,
         "end": 323
-      }
+      },
+      "hash": "d962b195b198bdbc69802c6b2450d60894c784b8cbfa3ffd66763856d641c483"
     },
     {
       "id": "example.com/chain/catalog::lib/products.ts::load",
@@ -57,7 +61,8 @@
         "path": "lib/products.ts",
         "start": 81,
         "end": 185
-      }
+      },
+      "hash": "a8237f2305c9448229f264bcec395a0c3d6929a733058918402a954471afb435"
     },
     {
       "id": "example.com/chain/catalog::lib/products.ts::parent",
@@ -65,7 +70,8 @@
         "path": "lib/products.ts",
         "start": 187,
         "end": 275
-      }
+      },
+      "hash": "a6e21edf5db8f717b6387dc48a723fdbbe22bbf282fd42e01ddb7e5b85ba7ec7"
     }
   ],
   "calls": [

@@ -6,6 +6,32 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `meada status` ends a repository's lines with a pointer to the new `inference` issue form when the
+  repository holds a shape drift or an `inferred` link, so a wrong conclusion can be reported.
+  The MCP tools never print it.
+- `search` with kind `duplicate` lists the symbols whose text is the same in two or more places
+  of the workspace, across repositories or within one: groups of exact copies (no
+  normalisation), longest first, found by a member's name or path. Each symbol stores the BLAKE3
+  of its span's bytes and the export's `symbols` carry it as `hash`. The index schema version
+  changes, so existing indexes are rebuilt.
+
+### Changed
+
+- `context` and `trace` show the overloads of one method (an ambiguous call whose candidates share a
+  file, a class and a name) as one set: `Class.m (one of N overloads)` in `context`, a leaf
+  `Class.m (N overloads)` in `trace`. The level, target and candidates in the export do not change.
+- A workspace of any number of repositories opens and answers: each index is read through its
+  own connection, so the limit of eleven repositories (SQLite attaches ten databases to one
+  connection) and its error are gone. Answers and exports of a workspace of eleven or fewer
+  are unchanged.
+- A call that decorates a definition (a Java or Kotlin annotation, a C# attribute, a Python
+  decorator, a Rust route attribute) carries the definition in the index and in the export's call
+  site (`decorates`), and `context` lists it in an `annotations:` section instead of among the
+  callees of its enclosing class or package. Targets, levels and callers do not change. The index
+  schema version changes, so existing indexes are rebuilt.
+
 ### Fixed
 
 - Imports of a project under a nested `pyproject.toml` resolve: the nearest manifest above an

@@ -1,0 +1,4 @@
+local/overloads-two src/main/java/ex/Pair.java:14 ex.Pair.run(Object)
+  local/overloads-two src/main/java/ex/Pair.java:5 ex.Left.m (2 overloads) [ambiguous: 4 methods named m]
+  local/overloads-two src/main/java/ex/Pair.java:10 ex.Right.m (2 overloads) [ambiguous: 4 methods named m]
+chain: ambiguous · 0 hops · 1 repos · 84 tokens

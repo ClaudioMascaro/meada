@@ -1,0 +1,3 @@
+# A: holds the same function twice and a near copy; the peer holds it once more.
+[[peer]]
+repo = "example.com/duplicates/b"

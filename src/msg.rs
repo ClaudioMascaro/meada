@@ -22,6 +22,9 @@ pub enum Fix<'a> {
     Generation { id: &'a str, dir: &'a str },
 }
 
+const REPORT_URL: &str =
+    "https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml";
+
 pub enum Msg<'a> {
     NotIndexed,
     OtherVersion,
@@ -101,10 +104,6 @@ pub enum Msg<'a> {
         target: &'a str,
         peer: &'a str,
     },
-    TooManyRepos {
-        found: usize,
-        max: usize,
-    },
     ViaUnmatched {
         contract: &'a str,
         via: &'a str,
@@ -113,6 +112,9 @@ pub enum Msg<'a> {
     UnlinkedResource(&'a str),
     /// The missing reads of the repository's consumers against the routes they call (spec #23).
     Drift(usize),
+    /// The line for the human at the end of a repository's status when it holds a drift or an
+    /// `inferred` link: where a wrong conclusion goes.
+    ReportHint,
     /// A source file whose qualified names passed a pack's budget: no symbols, no calls.
     FileTooBroad {
         path: &'a str,
@@ -1028,10 +1030,6 @@ impl Msg<'_> {
                 format!("decision waiting on missing peer {peer}: {call} -> {target}"),
                 format!("decisão aguardando o par ausente {peer}: {call} -> {target}"),
             ),
-            Msg::TooManyRepos { found, max } => pick(
-                format!("the workspace has {found} repositories; v0.1 reads at most {max}"),
-                format!("o workspace tem {found} repositórios; a v0.1 lê no máximo {max}"),
-            ),
             Msg::ViaUnmatched { contract, via } => pick(
                 format!("{contract}: `via` {via} matches no symbol, ignored"),
                 format!("{contract}: `via` {via} não corresponde a nenhum símbolo, ignorado"),
@@ -1047,6 +1045,10 @@ impl Msg<'_> {
             Msg::Drift(n) => pick(
                 format!("shape drift, missing reads: {n}"),
                 format!("drift de formato, leituras ausentes: {n}"),
+            ),
+            Msg::ReportHint => pick(
+                format!("wrong conclusion? report it: {REPORT_URL}"),
+                format!("conclusão errada? relate: {REPORT_URL}"),
             ),
             Msg::FileTooBroad { path, limit } => pick(
                 format!("{path}: too broad, its qualified names passed the {limit}-byte budget: no symbols or calls"),

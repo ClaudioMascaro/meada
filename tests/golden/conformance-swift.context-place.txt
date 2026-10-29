@@ -14,6 +14,4 @@ example.com/acme/conformance Sources/Store/OrderService.swift:45 OrderService.va
 example.com/acme/conformance Sources/Store/Order+Pricing.swift:6 Order.price(quantity:)
 example.com/acme/conformance Sources/Store/OrderService.swift:4 Notifier.notify(order:)
 example.com/acme/conformance Sources/Store/OrderService+Audit.swift:2 OrderService.audit(_:) [ambiguous: 4 functions or classes named audit]
-example.com/acme/conformance Sources/Store/OrderService.swift:68 OrderService.audit(_:Bool) [ambiguous: 4 functions or classes named audit]
-example.com/acme/conformance Sources/Store/OrderService.swift:41 OrderService.audit(_:Order) [ambiguous: 4 functions or classes named audit]
-example.com/acme/conformance Sources/Store/OrderService.swift:43 OrderService.audit(_:String) [ambiguous: 4 functions or classes named audit]
+example.com/acme/conformance Sources/Store/OrderService.swift:68 OrderService.audit (one of 3 overloads) [ambiguous: 4 functions or classes named audit]

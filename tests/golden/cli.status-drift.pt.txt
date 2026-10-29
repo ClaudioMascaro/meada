@@ -1,5 +1,6 @@
 example.com/chain/web (.) indexado, 17 arquivos
   drift de formato, leituras ausentes: 39
+  conclusão errada? relate: https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml
 example.com/chain/gateway (../chain-gateway) indexado, 12 arquivos
   broken.openapi.yaml:7: documento ilegível (while parsing a flow sequence, expected ',' or ']'), ignorado
   docs/api-contract.yaml: openapi 3.0.3, rotas: 1

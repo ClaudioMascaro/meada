@@ -478,15 +478,24 @@ impl<'a> Walk<'_, 'a> {
         shown: &mut HashSet<(&'a str, bool)>,
     ) {
         let graph = self.graph;
-        for t in c.target.iter().chain(&c.candidates) {
-            let Some(&(m, s)) = graph.symbols.get(t.as_str()) else {
-                continue;
-            };
+        let targets = (c.target.iter().chain(&c.candidates))
+            .filter_map(|t| graph.symbols.get(t.as_str()).copied())
+            .collect();
+        for set in render::overload_sets(targets, |(_, s)| &s.id) {
+            let &(m, s) = &set[0];
             if !shown.insert((&s.id, false)) {
                 continue;
             }
-            let text = self.node(&s.id).1 + &mark(c);
-            self.enter(&s.id, depth, Row::call(text, m, c.level));
+            let mut text = self.node(&s.id).1;
+            if set.len() > 1 {
+                // Overloads of one method are one guess: a leaf, as an ambiguous step is.
+                let (name, n) = (render::overload_name(&s.id), set.len());
+                text.truncate(text.len() - label(&s.id).len());
+                text += &format!("{name} ({n} overloads)");
+                self.push(depth, Row::call(text + &mark(c), m, c.level));
+                continue;
+            }
+            self.enter(&s.id, depth, Row::call(text + &mark(c), m, c.level));
         }
         let place = self.site(call);
         self.consumers_down(&c.id, n, &place, depth, false, shown);
@@ -1036,7 +1045,17 @@ impl<'a> Walk<'_, 'a> {
         let contract = step.contract.unwrap_or_default();
         let row = match step.mark {
             Some(Mark::Ambiguous) => {
-                let candidates = step.candidates.join(", ");
+                let sets = render::overload_sets(step.candidates.clone(), |c| c);
+                let candidates = (sets.iter())
+                    .map(|set| match set.as_slice() {
+                        [one] => one.to_string(),
+                        [first, ..] => {
+                            format!("{} ({} overloads)", render::overload_name(first), set.len())
+                        }
+                        [] => unreachable!(),
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 let text = format!(
                     "{} {}{}: {candidates}",
                     self.place(step.node),
@@ -1108,6 +1127,7 @@ mod tests {
                 .map(|n| Symbol {
                     id: id(n),
                     span: span(),
+                    hash: String::new(),
                 })
                 .collect(),
             calls: (0..length)
@@ -1118,6 +1138,7 @@ mod tests {
                     level: Some(Level::Exact),
                     candidates: Vec::new(),
                     narrowed: false,
+                    decorates: None,
                     span: span(),
                 })
                 .collect(),

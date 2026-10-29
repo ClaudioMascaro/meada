@@ -109,7 +109,8 @@
         "path": "app/api/batches/route.ts",
         "start": 148,
         "end": 291
-      }
+      },
+      "hash": "fcb00c27b6448c9c9d359603340c316f3339ed394f5165234fff44339641975f"
     },
     {
       "id": "example.com/chain/catalog::app/api/cached/route.ts::GET",
@@ -117,7 +118,8 @@
         "path": "app/api/cached/route.ts",
         "start": 214,
         "end": 389
-      }
+      },
+      "hash": "f887ce9cc2b6f4df215f14d45016ddef218bc60fcf4ee19d50427df10ea74974"
     },
     {
       "id": "example.com/chain/catalog::app/api/cached/route.ts::ok",
@@ -125,7 +127,8 @@
         "path": "app/api/cached/route.ts",
         "start": 45,
         "end": 108
-      }
+      },
+      "hash": "9d4293bbc112ebb6c4cacb9e2e9a1379ebb2bd637410f27fc5497d2835cab98a"
     },
     {
       "id": "example.com/chain/catalog::app/api/comments/route.ts::GET",
@@ -133,7 +136,8 @@
         "path": "app/api/comments/route.ts",
         "start": 244,
         "end": 456
-      }
+      },
+      "hash": "92bb01b309853a21d0ced7a6dc05e0daf676965b8c1e3ea44e9b6042ca6468d3"
     },
     {
       "id": "example.com/chain/catalog::app/api/comments/route.ts::POST",
@@ -141,7 +145,8 @@
         "path": "app/api/comments/route.ts",
         "start": 526,
         "end": 792
-      }
+      },
+      "hash": "898f928258be9a32c7e6c28e2e7e7b6510d336e886ffcc21dad23607ad81fe9d"
     },
     {
       "id": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
@@ -149,7 +154,8 @@
         "path": "app/api/comments/summary/route.ts",
         "start": 241,
         "end": 360
-      }
+      },
+      "hash": "afb495c054264c2de055ef98c77ce621324d0f237663f2520ea925a4424b89ca"
     },
     {
       "id": "example.com/chain/catalog::app/api/events/route.ts::POST",
@@ -157,7 +163,8 @@
         "path": "app/api/events/route.ts",
         "start": 7,
         "end": 72
-      }
+      },
+      "hash": "ae57c145379470514c9766e272ba013fe3c02033cb2fcf98428ff4fd417bfb49"
     },
     {
       "id": "example.com/chain/catalog::app/api/health/route.ts::GET",
@@ -165,7 +172,8 @@
         "path": "app/api/health/route.ts",
         "start": 7,
         "end": 54
-      }
+      },
+      "hash": "0a728023f345645c2a35de3d2dafd0123f34ba29a57694662ff946b7c1510238"
     },
     {
       "id": "example.com/chain/catalog::app/api/labels/route.ts::GET",
@@ -173,7 +181,8 @@
         "path": "app/api/labels/route.ts",
         "start": 241,
         "end": 365
-      }
+      },
+      "hash": "40d353d93cb68230363dd547fb9509b95f5c3d54e0e8a824cd7d5f26ec800a7c"
     },
     {
       "id": "example.com/chain/catalog::app/api/offers/route.ts::GET",
@@ -181,7 +190,8 @@
         "path": "app/api/offers/route.ts",
         "start": 192,
         "end": 273
-      }
+      },
+      "hash": "2dd52a2accedcd37c7c3db621205ef319d59bec03c4f9ccfc1f00128e39582fb"
     },
     {
       "id": "example.com/chain/catalog::app/api/ping/route.ts::GET",
@@ -189,7 +199,8 @@
         "path": "app/api/ping/route.ts",
         "start": 103,
         "end": 165
-      }
+      },
+      "hash": "71ca2cf6fe888ffa66f83b20651b5e62239997ccc7b97449780b435a00734ab6"
     },
     {
       "id": "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
@@ -197,7 +208,8 @@
         "path": "app/api/products/[id]/route.ts",
         "start": 57,
         "end": 182
-      }
+      },
+      "hash": "693d940e62fed29a36779c64994b42f663645235268adbeb988ce1103eb9d0b2"
     },
     {
       "id": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
@@ -205,7 +217,8 @@
         "path": "app/api/profiles/route.ts",
         "start": 402,
         "end": 480
-      }
+      },
+      "hash": "46e81a797f2b71e321f4e7fcebde6f365b58fb0f7a40520ca8e69638f7592e4f"
     },
     {
       "id": "example.com/chain/catalog::app/api/quotes/route.ts::GET",
@@ -213,7 +226,8 @@
         "path": "app/api/quotes/route.ts",
         "start": 203,
         "end": 282
-      }
+      },
+      "hash": "0ba9a226aff96cf4db0664d9e5f80c833541fdf2c293bf62b3957f61d0fbaa6d"
     },
     {
       "id": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
@@ -221,7 +235,8 @@
         "path": "app/api/receipts/route.ts",
         "start": 118,
         "end": 194
-      }
+      },
+      "hash": "245b5e2510fed382996a54cd309ce5e7b440f1fc5db8aad596440b1667944175"
     },
     {
       "id": "example.com/chain/catalog::app/api/reviews/route.ts::GET",
@@ -229,7 +244,8 @@
         "path": "app/api/reviews/route.ts",
         "start": 93,
         "end": 276
-      }
+      },
+      "hash": "baf4627234934e29b9b9812a57f03f84b1592ddeca2c90cbfe6803151bf32bd3"
     },
     {
       "id": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET",
@@ -237,7 +253,8 @@
         "path": "app/api/stock/[sku]/route.ts",
         "start": 29,
         "end": 320
-      }
+      },
+      "hash": "94b0d9a0c6524833d520310568efa59d2a00e97269a247c8c3d1126aac41243e"
     },
     {
       "id": "example.com/chain/catalog::app/api/stock/route.ts::GET",
@@ -245,7 +262,8 @@
         "path": "app/api/stock/route.ts",
         "start": 218,
         "end": 390
-      }
+      },
+      "hash": "a05f042d87945b0003313d156022cf6d62e13609ce8a6a99bd65f634b3e1b856"
     },
     {
       "id": "example.com/chain/catalog::app/api/stock/route.ts::POST",
@@ -253,7 +271,8 @@
         "path": "app/api/stock/route.ts",
         "start": 455,
         "end": 586
-      }
+      },
+      "hash": "f8ea4129aa1b73bdb679462532fa6338bf5a4bc4adad8e721f22dae178dcab5b"
     },
     {
       "id": "example.com/chain/catalog::app/api/tags/route.ts::GET",
@@ -261,7 +280,8 @@
         "path": "app/api/tags/route.ts",
         "start": 179,
         "end": 303
-      }
+      },
+      "hash": "6dfedba223b91d75c81f60a6091b7d870828c45b3f98e49345e32af034f63518"
     },
     {
       "id": "example.com/chain/catalog::app/api/tickets/route.ts::GET",
@@ -269,7 +289,8 @@
         "path": "app/api/tickets/route.ts",
         "start": 168,
         "end": 248
-      }
+      },
+      "hash": "20c12b832d579d491f80c334c59767d82bbcdbbf9bd9a0103727f18acf956c02"
     },
     {
       "id": "example.com/chain/catalog::lib/products.ts::find",
@@ -277,7 +298,8 @@
         "path": "lib/products.ts",
         "start": 277,
         "end": 323
-      }
+      },
+      "hash": "d962b195b198bdbc69802c6b2450d60894c784b8cbfa3ffd66763856d641c483"
     },
     {
       "id": "example.com/chain/catalog::lib/products.ts::load",
@@ -285,7 +307,8 @@
         "path": "lib/products.ts",
         "start": 81,
         "end": 185
-      }
+      },
+      "hash": "a8237f2305c9448229f264bcec395a0c3d6929a733058918402a954471afb435"
     },
     {
       "id": "example.com/chain/catalog::lib/products.ts::parent",
@@ -293,7 +316,8 @@
         "path": "lib/products.ts",
         "start": 187,
         "end": 275
-      }
+      },
+      "hash": "a6e21edf5db8f717b6387dc48a723fdbbe22bbf282fd42e01ddb7e5b85ba7ec7"
     }
   ],
   "calls": [

@@ -4,4 +4,5 @@ example.com/chain/catalog (../chain-catalog) indexado, 4 arquivos
   resource::postgres::orders: `via` lib/gone.ts::sync não corresponde a nenhum símbolo, ignorado
   resource::postgres::orders: nenhum `via` corresponde a um símbolo, então o repositório inteiro é o lado
 example.com/chain/web (../chain-web) indexado, 5 arquivos
+  conclusão errada? relate: https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml
 example.com/chain/worker (../chain-worker) indexado, 3 arquivos

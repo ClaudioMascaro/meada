@@ -104,6 +104,15 @@ modules updates it.
   `list` skips the ambiguous links of a kind that says `decidable` is false (packages): several
   providers of a package name are no call for a person to decide. Decision replay asks the
   seam's `serves` whether a provider serves a decided contract.
+- `search` kind `duplicate` (`search_duplicates`, an early branch, #254) groups the symbols of the
+  workspace by `Symbol::hash` (the BLAKE3 of the span's exact bytes, set by `lang::hash_spans`
+  when a file is parsed and kept in `Def::hash`, `symbols.hash` and the export). A group of two
+  or more is listed when any member's name or path matches: a header `<n> copies`, then one
+  symbol line per member by identity; groups by span length descending, then smallest member
+  identity. A duplicated class lists its methods as groups of their own.
+- Overload sets (#397): `render::overload_sets` groups ambiguous candidates sharing file, class
+  and method name. `context` writes a set as one callee line; `trace` writes it as one leaf
+  (`Walk::call_down`, `Walk::show`) and does not descend into its overloads.
 - Communities and processes in `search` and `context` (spec #31): `search` kind `community`
   (`search_communities`, an early branch) lists `<repository> <name> (members: <n>)`, matched by
   name; kind `process` (`search_processes`) lists `<repository> <label> process::<identity>
@@ -122,8 +131,9 @@ modules updates it.
   line. The room is what the budget leaves after the header and community, less the note of
   the final cut. `context::Symbol::answer` cuts in this order: the span text first (`render::cut`, with
   its own note; left out when not even the note fits, so the agent reads it from the lines the
-  header's range names), then the tail (callers, callees, consumers, contracts) by
-  the usual cut; the header, community and processes lines survive it. An answer that fits
+  header's range names), then the tail (callers, callees, annotations, consumers, contracts) by
+  the usual cut (`annotations:` lists, only when non-empty, the symbol's calls with `CallSite::decorates`
+  set, each as its callee line ending in ` on <decorated definition>`, apart from the callees); the header, community and processes lines survive it. An answer that fits
   names every process and is cut nowhere. Two processes of one repository
   with the same label show as their `process::<identity>`.
 - `trace.rs` process walk (spec #31): `Graph::process(entry)` is the one walk (`Descent`, its own

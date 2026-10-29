@@ -17,7 +17,8 @@
         "path": "main.go",
         "start": 293,
         "end": 354
-      }
+      },
+      "hash": "606c96ea01010996f99d5107f110a80264379561368fb902c4c4a84562121f3b"
     },
     {
       "id": "example.com/gopkg/web::main.go::dup",
@@ -25,7 +26,8 @@
         "path": "main.go",
         "start": 674,
         "end": 699
-      }
+      },
+      "hash": "01738fa288ba42f7c5496265a1768b3270995e2ac675bafe02a2d3010480c27e"
     },
     {
       "id": "example.com/gopkg/web::main.go::encode",
@@ -33,7 +35,8 @@
         "path": "main.go",
         "start": 701,
         "end": 734
-      }
+      },
+      "hash": "784f237a01c2794eb875055d7b2546cfbfd7679562d1724c9c95ba79557a89b9"
     },
     {
       "id": "example.com/gopkg/web::main.go::localKit",
@@ -41,7 +44,8 @@
         "path": "main.go",
         "start": 807,
         "end": 824
-      }
+      },
+      "hash": "aadd9f3e10851252d0bba00e93992264c0088b87307a95f5267c470270ed56fc"
     },
     {
       "id": "example.com/gopkg/web::main.go::localKit.Greet",
@@ -49,7 +53,8 @@
         "path": "main.go",
         "start": 826,
         "end": 876
-      }
+      },
+      "hash": "b77dba3f5148d66fc9b390a478e2e0e182c52a50475f01c088e02b8a12837ced"
     },
     {
       "id": "example.com/gopkg/web::main.go::main",
@@ -57,7 +62,8 @@
         "path": "main.go",
         "start": 202,
         "end": 241
-      }
+      },
+      "hash": "e2cd3727cc1c8bec1f9f752a40856fae5e51fa16fc2ea0c4f2abd797a9b44d2c"
     },
     {
       "id": "example.com/gopkg/web::main.go::nested",
@@ -65,7 +71,8 @@
         "path": "main.go",
         "start": 629,
         "end": 672
-      }
+      },
+      "hash": "76c961f2631ef1a20a6caf10f13947da55020135acf7ffad32e50a876c4cbf57"
     },
     {
       "id": "example.com/gopkg/web::main.go::peek",
@@ -73,7 +80,8 @@
         "path": "main.go",
         "start": 356,
         "end": 388
-      }
+      },
+      "hash": "60799e612da5ba24e5959c3889115e0c935006a625e5fe38372a7fdf4d42711c"
     },
     {
       "id": "example.com/gopkg/web::main.go::shadowed",
@@ -81,7 +89,8 @@
         "path": "main.go",
         "start": 736,
         "end": 800
-      }
+      },
+      "hash": "73facfa2c07226e291459e4ed37f710946f7af3745a293fce435d2f528685465"
     },
     {
       "id": "example.com/gopkg/web::main.go::testOnly",
@@ -89,7 +98,8 @@
         "path": "main.go",
         "start": 549,
         "end": 594
-      }
+      },
+      "hash": "af86c09cc111fb235ae80dd36d2cc1cc6052123957674cadc8557a2c5be6f8ab"
     },
     {
       "id": "example.com/gopkg/web::main.go::welcome",
@@ -97,7 +107,8 @@
         "path": "main.go",
         "start": 243,
         "end": 291
-      }
+      },
+      "hash": "8260ef8d6729b1e7ea14c1d7172262f6e1bfd797ddb33e1ee953d4e8fce50e91"
     },
     {
       "id": "example.com/gopkg/web::main.go::windows",
@@ -105,7 +116,8 @@
         "path": "main.go",
         "start": 596,
         "end": 627
-      }
+      },
+      "hash": "2e827e6ec49b1abafab648f94ac8615026fca8c635e675ca820ec431461c048d"
     },
     {
       "id": "example.com/gopkg/web::worker/worker.go::Run",
@@ -113,7 +125,8 @@
         "path": "worker/worker.go",
         "start": 52,
         "end": 94
-      }
+      },
+      "hash": "9d08e6b2b62772a7932df49c3d3da6ca5b94d347d13d88972a1b0f29d0efa18e"
     }
   ],
   "calls": [

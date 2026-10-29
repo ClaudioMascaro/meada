@@ -313,7 +313,8 @@
         "path": "scripts/seed.kts",
         "start": 59,
         "end": 93
-      }
+      },
+      "hash": "5fe71e1b5f6cad72217d3fcd51ff1ef896aa8d62d9f70fde1b975df6dff0558e"
     },
     {
       "id": "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock",
@@ -321,7 +322,8 @@
         "path": "src/commonMain/kotlin/example/platform/Clock.kt",
         "start": 26,
         "end": 76
-      }
+      },
+      "hash": "b63b342c7b3903d1a42288d3b5f85ea459053d70b5ea56080ca13eb5fc5487b7"
     },
     {
       "id": "example.com/acme/conformance::src/commonMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
@@ -329,7 +331,8 @@
         "path": "src/commonMain/kotlin/example/platform/Clock.kt",
         "start": 58,
         "end": 74
-      }
+      },
+      "hash": "2b842aa8eb4a1c8a193378a96a92870cf71b01f9cf82c2ea2375bdce3016e30b"
     },
     {
       "id": "example.com/acme/conformance::src/jsMain/kotlin/example/platform/Clock.kt::example.platform.Clock",
@@ -337,7 +340,8 @@
         "path": "src/jsMain/kotlin/example/platform/Clock.kt",
         "start": 26,
         "end": 105
-      }
+      },
+      "hash": "dd41e092f61f5b97eea012132e21df1a71b51d4e90f4fa90311ee2b45b3984d3"
     },
     {
       "id": "example.com/acme/conformance::src/jsMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
@@ -345,7 +349,8 @@
         "path": "src/jsMain/kotlin/example/platform/Clock.kt",
         "start": 77,
         "end": 103
-      }
+      },
+      "hash": "47cab988a83aad82dc27d5a5cb8da8afc6317eeb9467b31a2aaafe0ce5f26ef1"
     },
     {
       "id": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock",
@@ -353,7 +358,8 @@
         "path": "src/jvmMain/kotlin/example/platform/Clock.kt",
         "start": 26,
         "end": 124
-      }
+      },
+      "hash": "c010a92f209dc5e3a5967bbb9cb6517774df518c562eaf1662348183ff972add"
     },
     {
       "id": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.mark(Int)",
@@ -361,7 +367,8 @@
         "path": "src/jvmMain/kotlin/example/platform/Clock.kt",
         "start": 77,
         "end": 103
-      }
+      },
+      "hash": "47cab988a83aad82dc27d5a5cb8da8afc6317eeb9467b31a2aaafe0ce5f26ef1"
     },
     {
       "id": "example.com/acme/conformance::src/jvmMain/kotlin/example/platform/Clock.kt::example.platform.Clock.tick()",
@@ -369,7 +376,8 @@
         "path": "src/jvmMain/kotlin/example/platform/Clock.kt",
         "start": 109,
         "end": 122
-      }
+      },
+      "hash": "890c11bf8e244d7e6233e5ae5c4e06d061497c15dcd13015dcbeb0be2a4569b1"
     },
     {
       "id": "example.com/acme/conformance::src/main/java/example/legacy/Gauges.java::example.legacy.Gauges",
@@ -377,7 +385,8 @@
         "path": "src/main/java/example/legacy/Gauges.java",
         "start": 148,
         "end": 263
-      }
+      },
+      "hash": "6c13afb8630087758a684a4f86feda78dd9584f9fb4ce3e1cfc4dbe1766376a0"
     },
     {
       "id": "example.com/acme/conformance::src/main/java/example/legacy/Gauges.java::example.legacy.Gauges.use(Gauge,Meter)",
@@ -385,7 +394,8 @@
         "path": "src/main/java/example/legacy/Gauges.java",
         "start": 174,
         "end": 261
-      }
+      },
+      "hash": "36d0b06929d3c783bcb7b87ce188c8dcee00c08b31fadb52a5786e1e4f8ad4ca"
     },
     {
       "id": "example.com/acme/conformance::src/main/java/example/legacy/Legacy.java::example.legacy.Legacy",
@@ -393,7 +403,8 @@
         "path": "src/main/java/example/legacy/Legacy.java",
         "start": 135,
         "end": 333
-      }
+      },
+      "hash": "aab051e634781f3d2d8ec34b7d86289fa439ff371c9455b24f56844153e4653c"
     },
     {
       "id": "example.com/acme/conformance::src/main/java/example/legacy/Legacy.java::example.legacy.Legacy.make()",
@@ -401,7 +412,8 @@
         "path": "src/main/java/example/legacy/Legacy.java",
         "start": 161,
         "end": 331
-      }
+      },
+      "hash": "f57c4d28f5d3abfd9b22e4a59cd5fd0f5242749a25e54601d3d638bc65db5718"
     },
     {
       "id": "example.com/acme/conformance::src/main/java/example/legacy/Port.java::example.legacy.Port",
@@ -409,7 +421,8 @@
         "path": "src/main/java/example/legacy/Port.java",
         "start": 108,
         "end": 243
-      }
+      },
+      "hash": "fae4477ae3d7e3187613ec968c8f233a013081755f5e44752deb142cbd12cb12"
     },
     {
       "id": "example.com/acme/conformance::src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)",
@@ -417,7 +430,8 @@
         "path": "src/main/java/example/legacy/Port.java",
         "start": 132,
         "end": 157
-      }
+      },
+      "hash": "6f68e66cb14544c5d32d5775fc2b5a13615b4e8bc0a29e54e27599e8bc133d45"
     },
     {
       "id": "example.com/acme/conformance::src/main/java/example/legacy/Port.java::example.legacy.Port.use(Port,String)",
@@ -425,7 +439,8 @@
         "path": "src/main/java/example/legacy/Port.java",
         "start": 163,
         "end": 241
-      }
+      },
+      "hash": "7f6a61a4c5b08d82514a3bb29e0e5c3ad477116f3cd7c4894b47a9b82dca3e45"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket",
@@ -433,7 +448,8 @@
         "path": "src/main/kotlin/example/Known.kt",
         "start": 274,
         "end": 524
-      }
+      },
+      "hash": "741f5aea1185b328db20abe4932bdbc37ca23fe4bb0c9e20298460433db8074e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)",
@@ -441,7 +457,8 @@
         "path": "src/main/kotlin/example/Known.kt",
         "start": 442,
         "end": 522
-      }
+      },
+      "hash": "7192029c12b6c378afe5b1eff79f7f618df5fe71ddc511903cf2b8560fb771ba"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.compareTo(Ticket)",
@@ -449,7 +466,8 @@
         "path": "src/main/kotlin/example/Known.kt",
         "start": 390,
         "end": 436
-      }
+      },
+      "hash": "500703ecfcc59e81fd2f30b012f4ba7320b8b3a9dd9daf9910fdbf112fa9f129"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.open()",
@@ -457,7 +475,8 @@
         "path": "src/main/kotlin/example/Known.kt",
         "start": 328,
         "end": 347
-      }
+      },
+      "hash": "a0630468b24081f1a8e1464ff0e7816c479ecaccc608e7440982dabb3710f783"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Known.kt::example.Ticket.open(Int)",
@@ -465,7 +484,8 @@
         "path": "src/main/kotlin/example/Known.kt",
         "start": 353,
         "end": 384
-      }
+      },
+      "hash": "cfff7422a544aa79923e67b90643a079f73e05393380f2deef03ef771e4b938f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Launcher",
@@ -473,7 +493,8 @@
         "path": "src/main/kotlin/example/Main.kt",
         "start": 198,
         "end": 235
-      }
+      },
+      "hash": "51437e0e777f7add125e4bfad7d27387c4053065c24c28e758773c5149ba80f0"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Launcher.main()",
@@ -481,7 +502,8 @@
         "path": "src/main/kotlin/example/Main.kt",
         "start": 220,
         "end": 233
-      }
+      },
+      "hash": "6e85a005d401dd01978f05cc7ee28557f03b3b49ba4df91b21574f80a3492d77"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Runner",
@@ -489,7 +511,8 @@
         "path": "src/main/kotlin/example/Main.kt",
         "start": 162,
         "end": 196
-      }
+      },
+      "hash": "29ed890be68f75f9812983a68c0bf2281011a5d9e7f4badec8288c9c4ec0936f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.Runner.main()",
@@ -497,7 +520,8 @@
         "path": "src/main/kotlin/example/Main.kt",
         "start": 181,
         "end": 194
-      }
+      },
+      "hash": "6e85a005d401dd01978f05cc7ee28557f03b3b49ba4df91b21574f80a3492d77"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.String.main()",
@@ -505,7 +529,8 @@
         "path": "src/main/kotlin/example/Main.kt",
         "start": 292,
         "end": 312
-      }
+      },
+      "hash": "b4e4244a4e5ba5801a30bbd8ede514ba318d9744a9f74a305e05dd0bb883ab94"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Main.kt::example.main(Array<String>)",
@@ -513,7 +538,8 @@
         "path": "src/main/kotlin/example/Main.kt",
         "start": 57,
         "end": 110
-      }
+      },
+      "hash": "d17153b86c6b5fc9679574be3c8222c58e8d8b0ff095ff5e24da52679806b9fe"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Base",
@@ -521,7 +547,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 213,
         "end": 270
-      }
+      },
+      "hash": "ccdc581269bbf0046a526b8a52a2dbd701571d45c0cb8d61ee30614b0d83fa7c"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Base.log(String)",
@@ -529,7 +556,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 235,
         "end": 268
-      }
+      },
+      "hash": "a7329ab96f0f61d191b2b7c587604c7c3e73bb6c09b3aff4d07f523b570bd6e8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Derived",
@@ -537,7 +565,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 330,
         "end": 478
-      }
+      },
+      "hash": "e867865226745f921d1a38421eeec79fda19c78d2bf18391be0b2dddeb00b351"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Derived.Companion",
@@ -545,7 +574,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 422,
         "end": 476
-      }
+      },
+      "hash": "45d65771828c46c17d93eef629b506b5efd8e1c0e690abb88c283ac0a081a9c9"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Derived.Companion.origin()",
@@ -553,7 +583,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 449,
         "end": 470
-      }
+      },
+      "hash": "45fc2d009f7ba76440072bd64200e5fd88d0bff54141a3ecf9cc7c4ec2839237"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Derived.first()",
@@ -561,7 +592,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 389,
         "end": 416
-      }
+      },
+      "hash": "243cbfb69769fd92f05d38a5e7ff759269e6c532fccf5808df460b61690e0b3f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Derived.go()",
@@ -569,7 +601,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 359,
         "end": 383
-      }
+      },
+      "hash": "362945f99ee6bc5f9aea818743572832a7a162ead36c96419612edc98cd227c1"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Init",
@@ -577,7 +610,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 1118,
         "end": 1290
-      }
+      },
+      "hash": "5c7bea0c619b73bc4be5f102bed34129b0f21679d1d309c5b89b5f557de52e8a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Init.Init()",
@@ -585,7 +619,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 1228,
         "end": 1288
-      }
+      },
+      "hash": "b72c302e2f69d2f3aadb9a21f27ecaf2071f0fc1fe328b6f2426fe88dcf7eb97"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Level",
@@ -593,7 +628,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 1373,
         "end": 1535
-      }
+      },
+      "hash": "c3ce864a6081889adb124f15997b4f981a909e15b1ed8a3cc0bf2ba025b8a3aa"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Level.label()",
@@ -601,7 +637,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 1504,
         "end": 1533
-      }
+      },
+      "hash": "4b8d9d616ee890adebad514cd3d07deac5f3a8d9790943a090fc654d7adf80cb"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Logged",
@@ -609,7 +646,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 561,
         "end": 676
-      }
+      },
+      "hash": "efa8355436edc09d577c66a0b4b50a929b37fa4801e54de16db799c1aedf02f7"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Logged.go()",
@@ -617,7 +655,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 592,
         "end": 616
-      }
+      },
+      "hash": "362945f99ee6bc5f9aea818743572832a7a162ead36c96419612edc98cd227c1"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Logged.own()",
@@ -625,7 +664,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 656,
         "end": 674
-      }
+      },
+      "hash": "ac7e92c33d86ba0e459593f24f4cb5a7a6fdafb9d39b3b099443df2d60a81f4a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Logged.self()",
@@ -633,7 +673,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 622,
         "end": 650
-      }
+      },
+      "hash": "d6d3667f51f55a0f53f37822d7661cb849419096a600d367259c300e132aecf1"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet",
@@ -641,7 +682,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 748,
         "end": 926
-      }
+      },
+      "hash": "370f2d7ccf5649cb5806a5274df7a7200863220245f11bfdebb30cc6211f711a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.Companion",
@@ -649,7 +691,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 859,
         "end": 924
-      }
+      },
+      "hash": "b972d44b5757c799d4f8d8b87da6fa169c8f73c5a9106977d5bcdb19be458983"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.Companion.build()",
@@ -657,7 +700,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 898,
         "end": 918
-      }
+      },
+      "hash": "ed270fc7e90c8ea3ea077f6164ce280e7afa26dba2883c589f3e389863962f62"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.go()",
@@ -665,7 +709,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 766,
         "end": 792
-      }
+      },
+      "hash": "585f7c0d9e563be8fb1b213b2b081355e94d8c8bb04ae92c952bc34a4561c1b2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.make()",
@@ -673,7 +718,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 822,
         "end": 853
-      }
+      },
+      "hash": "e916d1b43fb0002fd9dd7158fc1154eb98ec4c25c68ca8862eb41a193c694900"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Quiet.own()",
@@ -681,7 +727,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 798,
         "end": 816
-      }
+      },
+      "hash": "ac7e92c33d86ba0e459593f24f4cb5a7a6fdafb9d39b3b099443df2d60a81f4a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin",
@@ -689,7 +736,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 1689,
         "end": 1810
-      }
+      },
+      "hash": "95369a4dd394e8f9a81d017f9e9a3853f6fb9bdc88f4362ae607d54fdb32d2b2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.Companion",
@@ -697,7 +745,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 1759,
         "end": 1808
-      }
+      },
+      "hash": "91f8ff34b038126ea8457079d8dbd29c4fac5f6d8a0ba49ecd035da257b6d3b4"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.Companion.m()",
@@ -705,7 +754,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 1786,
         "end": 1802
-      }
+      },
+      "hash": "647ab2649a0de71443051913e9b7d412eb6c5f885262c7f59cafae44caf2275f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.m()",
@@ -713,7 +763,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 1706,
         "end": 1722
-      }
+      },
+      "hash": "8146c3be89f7e05c5762cdd87c2fd100f18a428f98b035c9394b3c8018a67b27"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.Twin.own()",
@@ -721,7 +772,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 1728,
         "end": 1753
-      }
+      },
+      "hash": "1821da87f9b80d0505d78d9201626c9f849cdf30aef8a49c070a226ab3ac7775"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.log(String)",
@@ -729,7 +781,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 272,
         "end": 305
-      }
+      },
+      "hash": "237863b3418740cd4da19f0f88c369c07c247c5fb37284e051fa01347c5b590b"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.origin()",
@@ -737,7 +790,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 307,
         "end": 328
-      }
+      },
+      "hash": "6136ca8738031f212232b9cdd101f93a9393948967ac034f4b8e80a19d32dce9"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.twins(Twin)",
@@ -745,7 +799,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 1812,
         "end": 1860
-      }
+      },
+      "hash": "d05dfe2b36fcde667f2fe4ffaedfa0de773e1b0de4248e395b58ec54ad19967f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Members.kt::example.util()",
@@ -753,7 +808,8 @@
         "path": "src/main/kotlin/example/Members.kt",
         "start": 1020,
         "end": 1039
-      }
+      },
+      "hash": "c90fc8a82eea7f233f8ce22266c824c0c6405960413186ae9d638766a9e00f38"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/OneLine.kt::example.Twins",
@@ -761,7 +817,8 @@
         "path": "src/main/kotlin/example/OneLine.kt",
         "start": 82,
         "end": 128
-      }
+      },
+      "hash": "347a3354f12084e93ddccbf13abceca166bc1faa5acafde4b78560aacfdae05c"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/OneLine.kt::example.Twins.left()",
@@ -769,7 +826,8 @@
         "path": "src/main/kotlin/example/OneLine.kt",
         "start": 96,
         "end": 110
-      }
+      },
+      "hash": "3fbf0bc52bce59da9e1a7c36182c2a4bf7f41d00cc6cb7f24e2590e16a998999"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/OneLine.kt::example.Twins.right()",
@@ -777,7 +835,8 @@
         "path": "src/main/kotlin/example/OneLine.kt",
         "start": 111,
         "end": 126
-      }
+      },
+      "hash": "b3f24d5365000040865cb1515fb3bb10704dce6e46d8486e9ac8f2d8ba84b7a9"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Any.toJson()",
@@ -785,7 +844,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 3390,
         "end": 3419
-      }
+      },
+      "hash": "ca4e6f840a603126e0330ade9854d69987c14edf6fc8dc64f63627f323aa032d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache",
@@ -793,7 +853,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 268,
         "end": 557
-      }
+      },
+      "hash": "0bad66ec88b9b6bc196d46fa540326ee99408be3f4e07b4b856c1df016c8d042"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.add(Int)",
@@ -801,7 +862,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 534,
         "end": 555
-      }
+      },
+      "hash": "c351294636a2c5ac7730a82022176e4fb43f089d2136d00d2ccdc5eb466c9699"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.add(String)",
@@ -809,7 +871,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 504,
         "end": 528
-      }
+      },
+      "hash": "8ff701751517b20d2274779e21dbd133c2b8a45fd1b00b7dfd095fa0983674b8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.clear()",
@@ -817,7 +880,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 465,
         "end": 479
-      }
+      },
+      "hash": "27c923d9673b28f1dc98511c3cf38454c244a499c70e039881cc43c0ab30d61e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.get(String)",
@@ -825,7 +889,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 299,
         "end": 342
-      }
+      },
+      "hash": "53bc303b44f1de692f187f68ca5ea4ce864b0e4bf5c6c7f327b0d5fbb3c48704"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.put(String,String)",
@@ -833,7 +898,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 348,
         "end": 395
-      }
+      },
+      "hash": "04c6721b2e74965605c027a7e8e55851709ea7a49a5a556f7c4d44cd598c0c83"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.size()",
@@ -841,7 +907,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 401,
         "end": 420
-      }
+      },
+      "hash": "f7955d95db8fa597a2cf8669ffa541a26fe79d9bd8c440c34c83601836fe1c22"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.size(Int)",
@@ -849,7 +916,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 426,
         "end": 459
-      }
+      },
+      "hash": "5cc036d87fe80df11f68579d492900153a5feef9e5fba2b29295d122e9c208dd"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Cache.wipe()",
@@ -857,7 +925,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 485,
         "end": 498
-      }
+      },
+      "hash": "dcec65c87799a3c2ae56d67ff306287f11322353ee43c731370bcd9b9aa06cbd"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.CharSequence.blankish()",
@@ -865,7 +934,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 3451,
         "end": 3494
-      }
+      },
+      "hash": "ba5ceaa0de3deb9fde786536b3f2391ee6089e2f98092929bed24ef67f205ceb"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Disk",
@@ -873,7 +943,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 559,
         "end": 1007
-      }
+      },
+      "hash": "a595355129dd84b180c64115743279d418895b24b577f64946057840e9203984"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Disk.flush()",
@@ -881,7 +952,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 784,
         "end": 965
-      }
+      },
+      "hash": "33eb7a80cdba866ab255c7edb75c9df5b877996bc9068fdb22f4e09dc1cb64f1"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Disk.inherited()",
@@ -889,7 +961,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 971,
         "end": 1005
-      }
+      },
+      "hash": "af7c5665cb8cc929f3ef396e9859dd62d7743e9fa2e57fba0d4fc944c9c587d0"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Map.Entry.entryLabel()",
@@ -897,7 +970,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 3093,
         "end": 3146
-      }
+      },
+      "hash": "05ca4fe78c95d5f8e7791808cd8f69a99fa643a72906db0e75dbbc4779622975"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Mixed",
@@ -905,7 +979,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 2277,
         "end": 2412
-      }
+      },
+      "hash": "62a82957551409410da4b666aec3637c865ad317be501ac8df1877325dd57706"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Mixed.get(String)",
@@ -913,7 +988,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 2314,
         "end": 2357
-      }
+      },
+      "hash": "53bc303b44f1de692f187f68ca5ea4ce864b0e4bf5c6c7f327b0d5fbb3c48704"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Mixed.put(String,String)",
@@ -921,7 +997,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 2363,
         "end": 2410
-      }
+      },
+      "hash": "04c6721b2e74965605c027a7e8e55851709ea7a49a5a556f7c4d44cd598c0c83"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Outside.items()",
@@ -929,7 +1006,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 3014,
         "end": 3036
-      }
+      },
+      "hash": "4d25cd2b739339a95abe5788293ddc463c9c9e5b43f4e10684f670edfa022b0d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Outside.orders()",
@@ -937,7 +1015,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 3038,
         "end": 3091
-      }
+      },
+      "hash": "da7f61165635c470c89f76f5c6133a911d429e6d01ecf6b9c0f37e601223f3a6"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Outside.pretty()",
@@ -945,7 +1024,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 3687,
         "end": 3720
-      }
+      },
+      "hash": "69f77978a179d8dfa59691e66ee0043da8ea722dd13fa703e6656d1bf62455de"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Outside.spawn()",
@@ -953,7 +1033,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 2984,
         "end": 3012
-      }
+      },
+      "hash": "73d7f33f288c5908bb1c9e68cb582b8df7366092593429ae643c13937e673c88"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Shelf",
@@ -961,7 +1042,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 4522,
         "end": 4551
-      }
+      },
+      "hash": "71803798439a9f9ccb518373e06cfa4cc7cd589240351b66626670ddb9edd41e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Store",
@@ -969,7 +1051,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 173,
         "end": 266
-      }
+      },
+      "hash": "c7655ab005b5efeaa394c0c390dda0f042b8969292f879c6b15bd01cc63bd055"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Store.get(String)",
@@ -977,7 +1060,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 195,
         "end": 223
-      }
+      },
+      "hash": "3656fcaa43c5b32155854072ae209cff383e6d3927eb0365920af6633866b4ac"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.Store.put(String,String)",
@@ -985,7 +1069,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 229,
         "end": 264
-      }
+      },
+      "hash": "13d1c22aac3279f759d37270640dc27d995f6aa0ecac4c82421dad45ce1fe924"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.String.loud()",
@@ -993,7 +1078,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 1444,
         "end": 1476
-      }
+      },
+      "hash": "55235914dec6ad61595b06f74d641d564e26812b5c7238538b943b84ce7607d3"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.String.pretty()",
@@ -1001,7 +1087,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 3722,
         "end": 3756
-      }
+      },
+      "hash": "d492982754a57d1ab3ba97ae9a3b4eb4d8abc6d524354b08ceb308bd0d305c69"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.T.logged()",
@@ -1009,7 +1096,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 3421,
         "end": 3449
-      }
+      },
+      "hash": "68982fc4d233725805d84f7e07d115804dea5bf152eda64a195a690a462836a4"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.asserted(Cache?)",
@@ -1017,7 +1105,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 4804,
         "end": 4853
-      }
+      },
+      "hash": "6d1e47d106c07dd3a698f3455cba53c6f625317591775532cc191caeaae09700"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.build()",
@@ -1025,7 +1114,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 1009,
         "end": 1037
-      }
+      },
+      "hash": "85085d7a0d809b1b3427f7cbbc8af34c608a1e3a60febbc911a7c69bcc62d3ef"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.called()",
@@ -1033,7 +1123,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 3758,
         "end": 3876
-      }
+      },
+      "hash": "85c9e35afa8ae4dee969894c312d48eef569204cb47b01e4646ace36fd11bc74"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.extensions(Cache,Store,Disk,String)",
@@ -1041,7 +1132,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 1478,
         "end": 1698
-      }
+      },
+      "hash": "69acb79edafe21b40a9ee0d46e09aeaf084f9e319d62476fe967873d81088cbf"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.general(Cache,String)",
@@ -1049,7 +1141,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 3496,
         "end": 3614
-      }
+      },
+      "hash": "532d759c0f35ba786ef342114c8a8c03e70dab2f8665d366ec922e5681db90c1"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.implicitMember(Shelf)",
@@ -1057,7 +1150,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 4581,
         "end": 4651
-      }
+      },
+      "hash": "9925693dba22d55525e2572a9b612369735f277f3578bafe69ec2e39ccd8c836"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.local()",
@@ -1065,7 +1159,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 1228,
         "end": 1442
-      }
+      },
+      "hash": "00398ada2b2d69cbb38922249fc248fc6a407ffef7bda194f71868b1eed41af8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.localBeforeMember(Shelf,Store)",
@@ -1073,7 +1168,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 4653,
         "end": 4741
-      }
+      },
+      "hash": "6e4b09a3eb423dfacddda260d63d855010519b8e086687c28b65620ebfc547e5"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.localFirst(Cache)",
@@ -1081,7 +1177,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 4167,
         "end": 4250
-      }
+      },
+      "hash": "58d5a3a681956986d7f3d2487c9b0bd90eca88661f2a593e643a5786c0e6e842"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.localFirst(Cache).size()",
@@ -1089,7 +1186,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 4202,
         "end": 4221
-      }
+      },
+      "hash": "9abfe58fa39e3797708bfb25c89c1cab7e94eabee77b3883250e71eef956a967"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.nestedIt(Cache,List<Disk>)",
@@ -1097,7 +1195,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 3961,
         "end": 4088
-      }
+      },
+      "hash": "688edbe5fcce3fafecbf0eefe2a4041066f6bd9b85acc7c1abefa740037f91da"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.opaque(Outside,Map<String,Int>)",
@@ -1105,7 +1204,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 3148,
         "end": 3272
-      }
+      },
+      "hash": "50ce81d5071158f7ea3d2808094793336d7ad37e0e65960ce2ef6894f6e9a377"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.outsiders(Outside,Mixed,List<Int>)",
@@ -1113,7 +1213,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 2414,
         "end": 2557
-      }
+      },
+      "hash": "71e62ecbc71057b7a8afa5a947080b21613b53ae1ea3ed09cecc002b81eb4f49"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.parameter(Cache,Store,Disk)",
@@ -1121,7 +1222,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 1039,
         "end": 1226
-      }
+      },
+      "hash": "4f7034129ee23616639d8228684317d5b2099561a7274a2d4c347bd4ed3b22a6"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.scoped(String)",
@@ -1129,7 +1231,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 2750,
         "end": 2798
-      }
+      },
+      "hash": "2b002bf657878ca491c82c4aa218696146e13d60c29426dfe5ae6fae80e8c2e7"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.scopes(Cache,Disk,Store)",
@@ -1137,7 +1240,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 1700,
         "end": 2102
-      }
+      },
+      "hash": "804a027b84f3652f196d67df216f63e2e165d09fa25ea736b8537aec16c49bab"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Receivers.kt::example.unknownReceiver()",
@@ -1145,7 +1249,8 @@
         "path": "src/main/kotlin/example/Receivers.kt",
         "start": 4320,
         "end": 4364
-      }
+      },
+      "hash": "9ac07b4625af26268cfcfb15687368ea3c32de032949f1628f58a58c4116a62b"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Same.kt::example.notSecret()",
@@ -1153,7 +1258,8 @@
         "path": "src/main/kotlin/example/Same.kt",
         "start": 193,
         "end": 224
-      }
+      },
+      "hash": "b6f989d8bab0dae5237223318daf2d4bab5b54d6804c4926324f92d6e189ab2c"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Same.kt::example.same()",
@@ -1161,7 +1267,8 @@
         "path": "src/main/kotlin/example/Same.kt",
         "start": 67,
         "end": 126
-      }
+      },
+      "hash": "d309d5e0a4a74cc1258e8c19a8512fe6aab17c7a44da87e6e59d5787b9af942d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Box",
@@ -1169,7 +1276,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 890,
         "end": 1298
-      }
+      },
+      "hash": "9ed6c10c5957a648b1930dbd63a41e43c11b03e98e84c266f0ea179177a16987"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Box.Factory",
@@ -1177,7 +1285,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1230,
         "end": 1296
-      }
+      },
+      "hash": "fa09ad451deb7824ed7c98bfb52ea624fa2cd7896c59221f21c5743b827821f9"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Box.Factory.create()",
@@ -1185,7 +1294,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1265,
         "end": 1290
-      }
+      },
+      "hash": "eaa16cf0354842efa463a6d8cc89243679ef1200a1074bceb0a25c4659f2b245"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Box.label()",
@@ -1193,7 +1303,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 957,
         "end": 984
-      }
+      },
+      "hash": "2f5429c4601401e8586e9caab5b42addde674cdc1803e69faff3835ed8d3cb03"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Box.later()",
@@ -1201,7 +1312,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1180,
         "end": 1224
-      }
+      },
+      "hash": "f93c26ad3fafde8429a83598d65a174157a1dfb6adeb38655be91dd27b1bd951"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Box.name()",
@@ -1209,7 +1321,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 914,
         "end": 951
-      }
+      },
+      "hash": "7211825cf8bd1ec6b140101661d9069451c35dd4777f43f65e7aa44215dd9a2b"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Box.relabel()",
@@ -1217,7 +1330,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1036,
         "end": 1094
-      }
+      },
+      "hash": "17313a836146e932a2892468fd6287c3809788cfd474c9acb2eb07fcfa420ce7"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Color",
@@ -1225,7 +1339,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 788,
         "end": 819
-      }
+      },
+      "hash": "1a27aa3796b0cd9e57d2364b2ce4a3ea4029735fdf63491bffc0cd9b648a3652"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Marker",
@@ -1233,7 +1348,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 821,
         "end": 844
-      }
+      },
+      "hash": "b21177404809f1596cc4b6fdf00e6b829486803d90ead9e638deea3fc67b43aa"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Named",
@@ -1241,7 +1357,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 846,
         "end": 888
-      }
+      },
+      "hash": "d3cfbade32fb7b7f6b8bd1a32c8757651060d827084fcc2e6583be295b6ed72d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Named.name()",
@@ -1249,7 +1366,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 868,
         "end": 886
-      }
+      },
+      "hash": "852071f7a59b6874c79e923be510fbf60f5e174e9f7225f94f7cd5b27c3b8f08"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Point",
@@ -1257,7 +1375,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 103,
         "end": 563
-      }
+      },
+      "hash": "ba1d0ed8d4906e66ded2ba8be1ee53b907387af846cb60e72517d59dd68e8f0a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Point.Companion",
@@ -1265,7 +1384,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 446,
         "end": 561
-      }
+      },
+      "hash": "6ca72e7544b6752277805f78d453159f3659c632873ba8118a81b5f46a053bf1"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin()",
@@ -1273,7 +1393,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 473,
         "end": 506
-      }
+      },
+      "hash": "daac3535fdac36aefbca53c137a7c6842914b16685b4a28dcc2341ff663b0a47"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Point.Companion.origin(Int)",
@@ -1281,7 +1402,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 516,
         "end": 555
-      }
+      },
+      "hash": "47ab90d9fd70e95bdc95b5928d506be4de7db8688b8e68e54cd803f966362632"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Point.fromOrigin()",
@@ -1289,7 +1411,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 338,
         "end": 372
-      }
+      },
+      "hash": "d415a4d4d0a52bf964a48513041668b39d04425b269041c7820fb0d08c2eff0e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Point.moved(Int)",
@@ -1297,7 +1420,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 150,
         "end": 194
-      }
+      },
+      "hash": "232e1163e8131b34c35f8c529bd59cd28c95760faadb42451c9e2af3c69abce6"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Point.norm()",
@@ -1305,7 +1429,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1479,
         "end": 1516
-      }
+      },
+      "hash": "56985d9ae8b9d0102e29bee905d75a08070a0db93c7325e279cb292ce8e196d1"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Point.scaled(Int)",
@@ -1313,7 +1438,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 378,
         "end": 440
-      }
+      },
+      "hash": "dc45e9ec54da1fd62d16268cc7890b0e92dfedd4f82f519899d3ba2d83a536be"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Point.twice()",
@@ -1321,7 +1447,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 287,
         "end": 332
-      }
+      },
+      "hash": "0eb561bd09593fcab273ed0d1f77cbdbb2f02c2833054cd8a24a324b82c54b4c"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Registry",
@@ -1329,7 +1456,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1300,
         "end": 1477
-      }
+      },
+      "hash": "79cc788100481a862713ef2797aaef950ebaa0ceaf186c67e6c2683410cf773f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Registry.all()",
@@ -1337,7 +1465,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1439,
         "end": 1475
-      }
+      },
+      "hash": "c350145faf6a783c60bb9e5f5a950b836787b6b10389170eae6ae5c058b66323"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Registry.find(String)",
@@ -1345,7 +1474,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1322,
         "end": 1358
-      }
+      },
+      "hash": "18174eac3c90b991b0a68c74b000a46ba1771d2e513b4bd08a32d5f48461e066"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Registry.find(String,Point)",
@@ -1353,7 +1483,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1364,
         "end": 1433
-      }
+      },
+      "hash": "cc2721bbd801ea61014e0903f5af625543e97944c5389f1da36d0fc5b5823cbf"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Shape",
@@ -1361,7 +1492,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 565,
         "end": 786
-      }
+      },
+      "hash": "0044f7e5496a9424c27eee16281a9cd6e1122c55b8d3c556ecdf4cdd28797ade"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Shape.Square",
@@ -1369,7 +1501,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 620,
         "end": 784
-      }
+      },
+      "hash": "fd564ccfc8d951b913f03d7f225e9b7f2583037fcd0ab11470cac4176467052f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Shape.Square.Corner",
@@ -1377,7 +1510,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 716,
         "end": 778
-      }
+      },
+      "hash": "4ce7dd4d116ee5623344268943ae16812dc2f8f00f468d91dba8f63748d43749"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Shape.Square.Corner.area()",
@@ -1385,7 +1519,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 749,
         "end": 768
-      }
+      },
+      "hash": "cf103ac9a63aa9e1bb3c407018ff8e97ee28d48ed1cf1959de956ad3b629784f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Shape.Square.area()",
@@ -1393,7 +1528,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 668,
         "end": 706
-      }
+      },
+      "hash": "2089b01690b9cf8c333ff4bf345bf19359acd13e6ffaa6eb723bd7d56560c962"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.Shape.area()",
@@ -1401,7 +1537,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 590,
         "end": 614
-      }
+      },
+      "hash": "e93ff707d0bb47e89751b669ba6a9cb11768cc7993aeb6284fe1f6bb6ac3af8e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.String.shout()",
@@ -1409,7 +1546,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1518,
         "end": 1558
-      }
+      },
+      "hash": "aa4c1f0628926368ca21a98c1ea4cdbc357639f54ad47f6d2b721317c1103bd9"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.calls()",
@@ -1417,7 +1555,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1898,
         "end": 2222
-      }
+      },
+      "hash": "d892900351794633b4358ff8c255af6eb23d452d4861b32943a4c8f0e6132bf5"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.defaults(Int,Int)",
@@ -1425,7 +1564,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1808,
         "end": 1853
-      }
+      },
+      "hash": "a52df33afe7b28b10015d3989bcee15ef0165666a825589c7758a96c4953eef2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.greeting",
@@ -1433,7 +1573,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1639,
         "end": 1697
-      }
+      },
+      "hash": "014d2db808bff156bc66237bec3c51c84ed5137f5dcf46a34608371489a83130"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.helper()",
@@ -1441,7 +1582,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1699,
         "end": 1738
-      }
+      },
+      "hash": "d6683c60e5d7761367c0708bee2e95203751575ff9498ffe559fa27c784ba0fa"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.helper(Int)",
@@ -1449,7 +1591,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1740,
         "end": 1767
-      }
+      },
+      "hash": "8351006da3d67c6ab3a1f376f8c9cacdf70e262c27428b2ae601c6474cb31c77"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.helper(String)",
@@ -1457,7 +1600,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1769,
         "end": 1806
-      }
+      },
+      "hash": "2877a3b3449ab0b2e8c0d7f79a2b1e8a88142bed4a042ef1e8a6ad9a86f4d0ed"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.hiding((Int)->Int,List<()->Int>)",
@@ -1465,7 +1609,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 2425,
         "end": 2677
-      }
+      },
+      "hash": "fefe266c79ab5a2b1c9a00d1e20389d83367b70f1bf22729d185154785cc874a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.hiding((Int)->Int,List<()->Int>).inside()",
@@ -1473,7 +1618,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 2634,
         "end": 2655
-      }
+      },
+      "hash": "79c54d0e1b79dcfb21b4c2dc12bdbfee79e571ec03133d3bf0c870c03e27d5ad"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.inside()",
@@ -1481,7 +1627,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 2224,
         "end": 2261
-      }
+      },
+      "hash": "a920a855433c6047391fe90adcb8502a8163e6eae0f3cd0f071d756492599183"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.many(vararg Int)",
@@ -1489,7 +1636,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 1855,
         "end": 1896
-      }
+      },
+      "hash": "9f222571e6c035c8e9c0334696b5760802f0da40652cd6ff6b19e5263cd4df84"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.open()",
@@ -1497,7 +1645,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 2301,
         "end": 2335
-      }
+      },
+      "hash": "e1dfddcb9d41c30010b57a0efe0467f6c1c0bfb7e39d38524b015a772f068eb1"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.secret()",
@@ -1505,7 +1654,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 2263,
         "end": 2299
-      }
+      },
+      "hash": "f9cc6eb0ca19511762427c644c3b3065bb46d2efb0be8f3fd53698ae7eb60ff8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/calls/Imports.kt::example.calls.imported()",
@@ -1513,7 +1663,8 @@
         "path": "src/main/kotlin/example/calls/Imports.kt",
         "start": 346,
         "end": 538
-      }
+      },
+      "hash": "61031bad066bdbf9f2d54d4a4f713f54e479f2591f7c5cb37302c35c45cafb89"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/calls/Imports.kt::example.calls.qualified()",
@@ -1521,7 +1672,8 @@
         "path": "src/main/kotlin/example/calls/Imports.kt",
         "start": 677,
         "end": 747
-      }
+      },
+      "hash": "a1379b3d79b4feb8eb1ba3cce53cbd11f4ba132dc86de54217e8d003b0414c32"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/calls/Imports.kt::example.calls.shadowed(()->Int)",
@@ -1529,7 +1681,8 @@
         "path": "src/main/kotlin/example/calls/Imports.kt",
         "start": 591,
         "end": 675
-      }
+      },
+      "hash": "23034e4d24bcd37dbd31e509c61057a1e1a696ef8b86af45190ffb18739a1f28"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/calls/Imports.kt::example.calls.unknown()",
@@ -1537,7 +1690,8 @@
         "path": "src/main/kotlin/example/calls/Imports.kt",
         "start": 749,
         "end": 796
-      }
+      },
+      "hash": "ad32cfe430d464fdc2204b5a625a78b77cc32ec27098905977f88751816077bf"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/calls/Other.kt::example.calls.greet()",
@@ -1545,7 +1699,8 @@
         "path": "src/main/kotlin/example/calls/Other.kt",
         "start": 111,
         "end": 131
-      }
+      },
+      "hash": "52604cbc97baf5e0c65b033d11c748693d83daec3af6c359cc3ff861213059da"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Box",
@@ -1553,7 +1708,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 58,
         "end": 128
-      }
+      },
+      "hash": "21dd3c45d14b3f24e8335fbec308c3e4f5516de01742747d964ec01b192c1757"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Box.stamp()",
@@ -1561,7 +1717,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 130,
         "end": 148
-      }
+      },
+      "hash": "b71cdd34277b07a67d39ecf19245be23b706aea5b869298ece7dea7721536ca2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()",
@@ -1569,7 +1726,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 100,
         "end": 126
-      }
+      },
+      "hash": "2555963486c79ac9b9953fe73248fcbeedf56acc5d1f40fc9fa4288bf2249faf"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Crate",
@@ -1577,7 +1735,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 220,
         "end": 266
-      }
+      },
+      "hash": "bbc2a0c481a8eb4a087737963855e3390418f1752caec7bbb254fb23ec09a368"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Crate.peek()",
@@ -1585,7 +1744,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 241,
         "end": 264
-      }
+      },
+      "hash": "cb881393ef742f3630ade4ff5e794d31e16e39f26043564959aa5a3f04c3494a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Epoch",
@@ -1593,7 +1753,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 170,
         "end": 218
-      }
+      },
+      "hash": "16664a51870afd0cced47edc4144e2640cbec5260eb3bccdc07b24aad0934a3f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Epoch.toEpochMilli()",
@@ -1601,7 +1762,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 188,
         "end": 216
-      }
+      },
+      "hash": "51e23e6709c61ce1d6a6b3d016ca478df06863624f5bc424221c0c833160e0f1"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Lid",
@@ -1609,7 +1771,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 24,
         "end": 56
-      }
+      },
+      "hash": "ff4015132bc4e6b23958fe3a2b0b893dee4123b6eb7042496436ea5e23a67f47"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Lid.latch()",
@@ -1617,7 +1780,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 40,
         "end": 54
-      }
+      },
+      "hash": "6b58c8586c077039e02a405c3be8cbc06fe6857c2c626b50f41bbd87d08f80e7"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.Lid.stamp()",
@@ -1625,7 +1789,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 150,
         "end": 168
-      }
+      },
+      "hash": "ebf40b739e0e0cba0220bb12e2d4a874a6ca105da0e8b8d6e534ffd6d6b83f03"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.crate()",
@@ -1633,7 +1798,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 293,
         "end": 326
-      }
+      },
+      "hash": "0fa4373612419db9650b94c5eaea9c2eaf8c54d0157d1322470e4e450413dbec"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.find()",
@@ -1641,7 +1807,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 361,
         "end": 384
-      }
+      },
+      "hash": "97db01935ba006510076ae5a2766f498e4ecb17fb23547e8985cd1e67b6780a8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.g()",
@@ -1649,7 +1816,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 386,
         "end": 401
-      }
+      },
+      "hash": "1d8e8fa6acb13eff27bf0c6a538bfca7b84eab68b7fcd453d8a75dce118452a9"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.make()",
@@ -1657,7 +1825,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 268,
         "end": 291
-      }
+      },
+      "hash": "1c4e4adb14c6da3b4fe5c84ad14f4d1a0bd3267227b521e2b9ca382170165912"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.maker()",
@@ -1665,7 +1834,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 328,
         "end": 359
-      }
+      },
+      "hash": "90309fdf3841f97b1063a138c834f70a55b785a9f50d94e4a3b982fa0fff5042"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.now()",
@@ -1673,7 +1843,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 431,
         "end": 468
-      }
+      },
+      "hash": "03d92c1859fd34b313d978e2f055e9c39ad40657440ac1033e5ed93489287a3b"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.pick()",
@@ -1681,7 +1852,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 403,
         "end": 429
-      }
+      },
+      "hash": "4db267edf074f16083e4bdad784c8db84bdc609d24fc1fe188a267a70b7d3875"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/chains/Chains.kt::example.chains.use()",
@@ -1689,7 +1861,8 @@
         "path": "src/main/kotlin/example/chains/Chains.kt",
         "start": 470,
         "end": 710
-      }
+      },
+      "hash": "3d7680c1e52738dc689b165f45d19404305ac3a2b724f081e973c1ad9b762879"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing",
@@ -1697,7 +1870,8 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 645,
         "end": 1654
-      }
+      },
+      "hash": "99957d9fe9b087a29997a338d269eb98fddbc038dff35b1ef957ea73b814adb5"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.auditBinding()",
@@ -1705,7 +1879,8 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 1020,
         "end": 1140
-      }
+      },
+      "hash": "95e65c36531dbf3900070d98f7b6e48c7796f80ddd913e2d895832764d7b5370"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.invoice(String)",
@@ -1713,7 +1888,8 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 701,
         "end": 796
-      }
+      },
+      "hash": "9ffebba11308de3cdec3cfdfa30046a6ed18ef665440349414e9df8bad2c0637"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)",
@@ -1721,7 +1897,8 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 1146,
         "end": 1486
-      }
+      },
+      "hash": "234656ddcaa66662eeb7a6e2b93181463e78acb81e011eb055bb9043865f5129"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)",
@@ -1729,7 +1906,8 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 1492,
         "end": 1575
-      }
+      },
+      "hash": "8e0a02b328b2b07d67937ddade4b601fda03d09ba350f265b4915e30a973cbe4"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRepo(Order)",
@@ -1737,7 +1915,8 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 1581,
         "end": 1652
-      }
+      },
+      "hash": "6f64a4af0a9bf87a8e5b1b3c40d21006f5d3f2c5df2179d58faca87c5fa60e6d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.refund(String)",
@@ -1745,7 +1924,8 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 802,
         "end": 877
-      }
+      },
+      "hash": "62226d0803cbd64f5945e2344cb65ea95598da92be72daf8ad3cf4ccdb8d0882"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.repoType(Order)",
@@ -1753,7 +1933,8 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 883,
         "end": 1014
-      }
+      },
+      "hash": "c85cfd7cb79c5863e7619c097d93338ca3acda5d3e29cea53a01f08347614d92"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Order",
@@ -1761,7 +1942,8 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 1656,
         "end": 1688
-      }
+      },
+      "hash": "87f7e2714e8cef7f6d998bbdff806c57b612094a725b094923d0933fefabb934"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery",
@@ -1769,7 +1951,8 @@
         "path": "src/main/kotlin/example/channels/Delivery.kt",
         "start": 614,
         "end": 1446
-      }
+      },
+      "hash": "bdf2f1b588acb4f3cd28fe3d04a2663857a180141fff22ae0d2511918e186fc7"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.loop(Any)",
@@ -1777,7 +1960,8 @@
         "path": "src/main/kotlin/example/channels/Delivery.kt",
         "start": 1219,
         "end": 1245
-      }
+      },
+      "hash": "4b958ff0994d26aaf8c6a2d4fd1ce4ec848af9cb9ab5fa97138ee525caabd524"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.notifyCustomer(String)",
@@ -1785,7 +1969,8 @@
         "path": "src/main/kotlin/example/channels/Delivery.kt",
         "start": 738,
         "end": 824
-      }
+      },
+      "hash": "d2d50473fd62bffc609ec488139ba1434094ffdcf0823842cdb080ca4e156ec8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.onNotification(String)",
@@ -1793,7 +1978,8 @@
         "path": "src/main/kotlin/example/channels/Delivery.kt",
         "start": 830,
         "end": 916
-      }
+      },
+      "hash": "9efbe0f6a7200fe8a304cb746acfd07da20591a522d4b19b73a0ac4d59e6795f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.receive(String)",
@@ -1801,7 +1987,8 @@
         "path": "src/main/kotlin/example/channels/Delivery.kt",
         "start": 1050,
         "end": 1155
-      }
+      },
+      "hash": "74cc1f55d62c19bc959ec5c1cb613896b2889b462f1ca790cd91e1c3b7077a00"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.ship(String)",
@@ -1809,7 +1996,8 @@
         "path": "src/main/kotlin/example/channels/Delivery.kt",
         "start": 922,
         "end": 1044
-      }
+      },
+      "hash": "f0b283f40141000e3b7dfcc95d00031b46851b402d70e255a44485276ba19472"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.shipments()",
@@ -1817,7 +2005,8 @@
         "path": "src/main/kotlin/example/channels/Delivery.kt",
         "start": 1161,
         "end": 1213
-      }
+      },
+      "hash": "00fc776e68f5f628fb0f357ff84a2bda5b152b244aa230acee70aee981a85b9d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.track(String)",
@@ -1825,7 +2014,8 @@
         "path": "src/main/kotlin/example/channels/Delivery.kt",
         "start": 1251,
         "end": 1342
-      }
+      },
+      "hash": "a7e1a08dc46c1a1207cce4f2f20bf3f89003a89d49357b857fa5fe58f33bfff2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.watch(Dispatcher)",
@@ -1833,7 +2023,8 @@
         "path": "src/main/kotlin/example/channels/Delivery.kt",
         "start": 1348,
         "end": 1444
-      }
+      },
+      "hash": "58e7b227449f672268c1812390aa7b5b9fcbc27fe118153a15ae62c97304b64a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Receivers.kt::example.channels.Holder",
@@ -1841,7 +2032,8 @@
         "path": "src/main/kotlin/example/channels/Receivers.kt",
         "start": 174,
         "end": 203
-      }
+      },
+      "hash": "9190565d43f82c63a7d9a522bcb33787d94bb50b5b36064f10b06424a715c242"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Receivers.kt::example.channels.Pipe",
@@ -1849,7 +2041,8 @@
         "path": "src/main/kotlin/example/channels/Receivers.kt",
         "start": 110,
         "end": 172
-      }
+      },
+      "hash": "62a3a9d8e0c6f02c3777c77fe1bce27c41ef1c63439bd1b091c315df57a4c11e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Receivers.kt::example.channels.Pipe.send(String,String)",
@@ -1857,7 +2050,8 @@
         "path": "src/main/kotlin/example/channels/Receivers.kt",
         "start": 127,
         "end": 170
-      }
+      },
+      "hash": "2c48bad36260706d60590df480542b931bc6bad7463bea5255146762c3e87b39"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Receivers.kt::example.channels.Plain",
@@ -1865,7 +2059,8 @@
         "path": "src/main/kotlin/example/channels/Receivers.kt",
         "start": 205,
         "end": 233
-      }
+      },
+      "hash": "7a50b5136252fa5a732d11bf0e5ca26c5d555f7b123a863ec32a7a43a91e3e68"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers",
@@ -1873,7 +2068,8 @@
         "path": "src/main/kotlin/example/channels/Receivers.kt",
         "start": 424,
         "end": 1175
-      }
+      },
+      "hash": "2a45c6519efff44662cfc2bcb1f50a9709aee8986471b61fd96e26c909192036"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.Holder.viaExtension()",
@@ -1881,7 +2077,8 @@
         "path": "src/main/kotlin/example/channels/Receivers.kt",
         "start": 987,
         "end": 1072
-      }
+      },
+      "hash": "a7acc0a08f3acf512b8c6629e5cdc7fc192951a9a13829b44c277752afecbc85"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.Plain.viaPlainExtension()",
@@ -1889,7 +2086,8 @@
         "path": "src/main/kotlin/example/channels/Receivers.kt",
         "start": 1078,
         "end": 1173
-      }
+      },
+      "hash": "805df5a85cf19c9d2c5b95a4a8b9b2d936cdc0753e526e8aba4c8e1a1aa2b0a4"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.viaApply(Holder)",
@@ -1897,7 +2095,8 @@
         "path": "src/main/kotlin/example/channels/Receivers.kt",
         "start": 686,
         "end": 779
-      }
+      },
+      "hash": "f81b29e25d905de303ea6b1e541432440461bab7092a78510f3b2f2236bd9fa8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.viaOutside(Foreign)",
@@ -1905,7 +2104,8 @@
         "path": "src/main/kotlin/example/channels/Receivers.kt",
         "start": 785,
         "end": 885
-      }
+      },
+      "hash": "309cb7b767fb087fddcb549786c135422e9760df63389e0c3a0a58e863920e25"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.viaPlain(Plain)",
@@ -1913,7 +2113,8 @@
         "path": "src/main/kotlin/example/channels/Receivers.kt",
         "start": 891,
         "end": 981
-      }
+      },
+      "hash": "9daf702a546bb73d5eccacbb993d8bb4974346c2b7712b47ca77002f289f32da"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.viaRun(Holder)",
@@ -1921,7 +2122,8 @@
         "path": "src/main/kotlin/example/channels/Receivers.kt",
         "start": 593,
         "end": 680
-      }
+      },
+      "hash": "556d6643c3dd6c7b39159c8a80f4d29a5c772c9f964e8b4b552fd823ec0b1479"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.viaWith(Holder)",
@@ -1929,7 +2131,8 @@
         "path": "src/main/kotlin/example/channels/Receivers.kt",
         "start": 496,
         "end": 587
-      }
+      },
+      "hash": "395a19ea0803316ad7c0d2b11da6bfc3894950b03ff33a2e71b576f3b5ceab9c"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales",
@@ -1937,7 +2140,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 454,
         "end": 1663
-      }
+      },
+      "hash": "81fe40c02167ddec954ec2e0d4878a12d0b808400fdc3af03302697505878491"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.Companion",
@@ -1945,7 +2149,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 1592,
         "end": 1661
-      }
+      },
+      "hash": "c63fe170f387f29e035b8b5529ed79b4db3fd39109131fe0f05693f64ec064ab"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.computed(String)",
@@ -1953,7 +2158,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 878,
         "end": 964
-      }
+      },
+      "hash": "a2191576aed6c256922f371c21486eb96eeebc0f1753d25109cec9257f05662e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.created(String)",
@@ -1961,7 +2167,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 594,
         "end": 657
-      }
+      },
+      "hash": "6d3250815bb0ab7760004dfb93fb3271ef50815eaa2b8afa918d297586e3f639"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.emit(String,String)",
@@ -1969,7 +2176,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 1059,
         "end": 1140
-      }
+      },
+      "hash": "eece21a13c26bf14399772c5c3498dba30590bfb7203518eda05e52d4f458541"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.fromConfig(String)",
@@ -1977,7 +2185,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 798,
         "end": 872
-      }
+      },
+      "hash": "7e84d496555d9a5e41bc9b1a3edb4351ee37bd915ed33d265c23f679aaf5ffbd"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onEurope(String)",
@@ -1985,7 +2194,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 1458,
         "end": 1586
-      }
+      },
+      "hash": "cbf5e7f6bb0a793e48b146611e50afb30c74401b336fd06f727debf9f37ff71a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onMissing(String)",
@@ -1993,7 +2203,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 1262,
         "end": 1349
-      }
+      },
+      "hash": "f860f317fd658ef075bb33e26146ca5a446ab11ac28f86a91122d0b2bb5bf1c2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)",
@@ -2001,7 +2212,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 1146,
         "end": 1256
-      }
+      },
+      "hash": "30f58918637882ad173a421881ac6593bacbf6ec7be16f7f72131fdbea9e231a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onShipped(String)",
@@ -2009,7 +2221,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 1355,
         "end": 1452
-      }
+      },
+      "hash": "974d621c2071ce87a5e6527e28d3dbaae583bafb7a2f28739b5dd4f2c15dc1c6"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.paid(String)",
@@ -2017,7 +2230,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 663,
         "end": 729
-      }
+      },
+      "hash": "da0298e16b180716c633c03c2c0d5e12064deb47d1b3069933dc219dc41087cc"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.shipped(String)",
@@ -2025,7 +2239,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 735,
         "end": 792
-      }
+      },
+      "hash": "68407d4838d17fb13e1cc5d8be3544a709d6ccf45502f02669f012729edb423c"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.suffixed(String,String)",
@@ -2033,7 +2248,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 970,
         "end": 1053
-      }
+      },
+      "hash": "de80ac34f66448cbbfec75648c73cf913e6280be7eb64eddcb720c54ff63e7cb"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams",
@@ -2041,7 +2257,8 @@
         "path": "src/main/kotlin/example/channels/Streams.kt",
         "start": 259,
         "end": 747
-      }
+      },
+      "hash": "1984ce442ff7ca559933d1bf630605d411eb8b3d0a2b7ea433fa3b7a1d3cdfaa"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()",
@@ -2049,7 +2266,8 @@
         "path": "src/main/kotlin/example/channels/Streams.kt",
         "start": 533,
         "end": 745
-      }
+      },
+      "hash": "f063fa6569601c2076e9f88867c45d4f1fa50ef2d79c05644c0200ae8503db70"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.record(String)",
@@ -2057,7 +2275,8 @@
         "path": "src/main/kotlin/example/channels/Streams.kt",
         "start": 374,
         "end": 527
-      }
+      },
+      "hash": "85592fe7bb92073a6625e01e3fd33e3999459a2bc6b1057c683e1f8596f8e042"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway",
@@ -2065,7 +2284,8 @@
         "path": "src/main/kotlin/example/clients/Client.kt",
         "start": 1931,
         "end": 2109
-      }
+      },
+      "hash": "471aebb8795d37ecb62a495c4e5596a371213303c25565b58445a0f076b9e1ed"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.Gateway.health()",
@@ -2073,7 +2293,8 @@
         "path": "src/main/kotlin/example/clients/Client.kt",
         "start": 2063,
         "end": 2107
-      }
+      },
+      "hash": "a96c2635b382309e9fe081d57ca20343293a3eb7389ff9c6e38e1f2317807fbf"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.based()",
@@ -2081,7 +2302,8 @@
         "path": "src/main/kotlin/example/clients/Client.kt",
         "start": 1100,
         "end": 1236
-      }
+      },
+      "hash": "5930db5b2c247aad4648ac3b49c0d011ac6eeb360c5beca43a57537c790e9634"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.builder()",
@@ -2089,7 +2311,8 @@
         "path": "src/main/kotlin/example/clients/Client.kt",
         "start": 1789,
         "end": 1869
-      }
+      },
+      "hash": "f87ff418dbd757479433f570725aee4552ac202cc25ddc2647fae6c20c12f22a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.count()",
@@ -2097,7 +2320,8 @@
         "path": "src/main/kotlin/example/clients/Client.kt",
         "start": 1529,
         "end": 1549
-      }
+      },
+      "hash": "36d388917a815c4f66f222d5448ab5c76c57235ffdf1a3aa06cfcdaaf1e705be"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.folds()",
@@ -2105,7 +2329,8 @@
         "path": "src/main/kotlin/example/clients/Client.kt",
         "start": 1327,
         "end": 1527
-      }
+      },
+      "hash": "c870bc2b13f2188d80d5b09bf598141dff06ac39d9b400b4aab5b5796270b3bd"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.lookup()",
@@ -2113,7 +2338,8 @@
         "path": "src/main/kotlin/example/clients/Client.kt",
         "start": 1608,
         "end": 1681
-      }
+      },
+      "hash": "2337337b8ca1cd0b3ffb9c390fe1a0084be0f6062db174219eba6380628b23ff"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.reassigned()",
@@ -2121,7 +2347,8 @@
         "path": "src/main/kotlin/example/clients/Client.kt",
         "start": 1683,
         "end": 1742
-      }
+      },
+      "hash": "55c41d1af7ee24f846e43bddd65aef826c3f589334a12f188555c313a922240e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.verbs()",
@@ -2129,7 +2356,8 @@
         "path": "src/main/kotlin/example/clients/Client.kt",
         "start": 424,
         "end": 826
-      }
+      },
+      "hash": "1cb080a4bd3aefe528ea92ef5a166943956d3b9f44a23c6a4814da5f327b59dd"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Legacy.kt::example.clients.old()",
@@ -2137,7 +2365,8 @@
         "path": "src/main/kotlin/example/clients/Legacy.kt",
         "start": 334,
         "end": 373
-      }
+      },
+      "hash": "1edaa618831e95b80a50689534df54a2a3f779efe904b53afd9a58e5080cbe4e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.Rack",
@@ -2145,7 +2374,8 @@
         "path": "src/main/kotlin/example/clients/Local.kt",
         "start": 1600,
         "end": 1658
-      }
+      },
+      "hash": "04969b17515ab769582e9c891c88a13fbf1da79c90b772e13518814eddb73912"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.closing()",
@@ -2153,7 +2383,8 @@
         "path": "src/main/kotlin/example/clients/Local.kt",
         "start": 372,
         "end": 465
-      }
+      },
+      "hash": "7e6318bdf4f55ae51f2515ceebbc1449b9737cc4c7cfd3be60d4d5f308236b16"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.closingNamed()",
@@ -2161,7 +2392,8 @@
         "path": "src/main/kotlin/example/clients/Local.kt",
         "start": 467,
         "end": 627
-      }
+      },
+      "hash": "77aec93c7ce3fcd8a529d275947e37299f13a1d840a3c8d320edfdae8cc07923"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.implicitClient(Rack)",
@@ -2169,7 +2401,8 @@
         "path": "src/main/kotlin/example/clients/Local.kt",
         "start": 1660,
         "end": 1744
-      }
+      },
+      "hash": "8c58fbaa94f3e7e14fa1daa0567cd3ed808cc852adbb24b8132a4d2588931554"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.localBase()",
@@ -2177,7 +2410,8 @@
         "path": "src/main/kotlin/example/clients/Local.kt",
         "start": 1851,
         "end": 2015
-      }
+      },
+      "hash": "f94363fab32b201ef01883e25f89ae045c5cedcfcc453d78ff3395ada281859c"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.shadows()",
@@ -2185,7 +2419,8 @@
         "path": "src/main/kotlin/example/clients/Local.kt",
         "start": 998,
         "end": 1139
-      }
+      },
+      "hash": "38bc1029793e3be5dcf13aab8fb245a8d87f736879c825f6872a8d24d83e769d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.two()",
@@ -2193,7 +2428,8 @@
         "path": "src/main/kotlin/example/clients/Local.kt",
         "start": 694,
         "end": 912
-      }
+      },
+      "hash": "ed9b50dfdf038285ff6b60bdd61c92ab4e2551327d3cf33a3b9ad36fececedb5"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.untyped()",
@@ -2201,7 +2437,8 @@
         "path": "src/main/kotlin/example/clients/Local.kt",
         "start": 260,
         "end": 370
-      }
+      },
+      "hash": "98d3bdfdaeefd51d1a0109bb723d386316fd2e723844f7295b2857bf10687416"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.varBase()",
@@ -2209,7 +2446,8 @@
         "path": "src/main/kotlin/example/clients/Local.kt",
         "start": 2017,
         "end": 2166
-      }
+      },
+      "hash": "3bb8ae802df024df42244ba07d9cb7c2e01d07c9244d5449365ec67eb174e4fb"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.variable()",
@@ -2217,7 +2455,8 @@
         "path": "src/main/kotlin/example/clients/Local.kt",
         "start": 1210,
         "end": 1383
-      }
+      },
+      "hash": "13fc6c66c1b9be5552dd6fa14d4fbce7282872c89403581a334ed26602d5a256"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.blockNamed()",
@@ -2225,7 +2464,8 @@
         "path": "src/main/kotlin/example/clients/Methods.kt",
         "start": 940,
         "end": 1045
-      }
+      },
+      "hash": "edeafa65d006ef721b143c6e46ee220e8d5dcfa856391983559ae7e290f72d04"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.blockValue(HttpRequestBuilder.()->Unit)",
@@ -2233,7 +2473,8 @@
         "path": "src/main/kotlin/example/clients/Methods.kt",
         "start": 1319,
         "end": 1424
-      }
+      },
+      "hash": "077968a7ce97a3f75677f0362119f8e04d8ebad742bf866b103ee14344e27b12"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.callsFixed()",
@@ -2241,7 +2482,8 @@
         "path": "src/main/kotlin/example/clients/Methods.kt",
         "start": 722,
         "end": 782
-      }
+      },
+      "hash": "c0d6ad7e477204f693028372fbe6839a07dee6d964b751b485c1a111911c9f50"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.conditional(Boolean)",
@@ -2249,7 +2491,8 @@
         "path": "src/main/kotlin/example/clients/Methods.kt",
         "start": 1426,
         "end": 1533
-      }
+      },
+      "hash": "c0804e9cf32cd8b2dd7e79cbe634d6aa0fdf6f073bffc6d0c31219864c03ed93"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.named()",
@@ -2257,7 +2500,8 @@
         "path": "src/main/kotlin/example/clients/Methods.kt",
         "start": 844,
         "end": 938
-      }
+      },
+      "hash": "6c500d9be31343759bcf839fd5e763c85c6b1b50694f37add3818db7345f7f18"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.nested()",
@@ -2265,7 +2509,8 @@
         "path": "src/main/kotlin/example/clients/Methods.kt",
         "start": 1535,
         "end": 1631
-      }
+      },
+      "hash": "82cbf15b4bbe47d7d6dde9b374f089201f773f1c364f6bfec4e085ae6a849b59"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.parsed()",
@@ -2273,7 +2518,8 @@
         "path": "src/main/kotlin/example/clients/Methods.kt",
         "start": 1633,
         "end": 1725
-      }
+      },
+      "hash": "91554b3d8cb7a6d3181817c066948a512160132507f2084b17745eea64be8aca"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.send(HttpMethod,String)",
@@ -2281,7 +2527,8 @@
         "path": "src/main/kotlin/example/clients/Methods.kt",
         "start": 215,
         "end": 327
-      }
+      },
+      "hash": "a2827014184741e09309b1274dd9c6739caa0cbb927a4736e260979eb211c019"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.sendFixed(HttpMethod)",
@@ -2289,7 +2536,8 @@
         "path": "src/main/kotlin/example/clients/Methods.kt",
         "start": 645,
         "end": 720
-      }
+      },
+      "hash": "02c5fa8b314cf7593baf71bff8d55dd2475de87c2177e851fbae13308a266453"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.sendFrom(HttpMethod,String)",
@@ -2297,7 +2545,8 @@
         "path": "src/main/kotlin/example/clients/Methods.kt",
         "start": 430,
         "end": 527
-      }
+      },
+      "hash": "c91a29480c1359d63e49b121f5ef9c596f338c56709eb533013244503aa11e16"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.sends()",
@@ -2305,7 +2554,8 @@
         "path": "src/main/kotlin/example/clients/Methods.kt",
         "start": 329,
         "end": 428
-      }
+      },
+      "hash": "2037802630cbf64e8edac872c891321e4d805f5e5db07121668e634149f71069"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.sendsFrom()",
@@ -2313,7 +2563,8 @@
         "path": "src/main/kotlin/example/clients/Methods.kt",
         "start": 529,
         "end": 592
-      }
+      },
+      "hash": "0b174d5ad15b610f09d50157002c11c3834ac63b9fb7809e8bf11e6d86d6c6a2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.thisPut()",
@@ -2321,7 +2572,8 @@
         "path": "src/main/kotlin/example/clients/Methods.kt",
         "start": 1047,
         "end": 1134
-      }
+      },
+      "hash": "470423419f5fcf55f0004ee948c2512c7447fd560c4d987449f2308a0820868b"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.Cache",
@@ -2329,7 +2581,8 @@
         "path": "src/main/kotlin/example/clients/Probes.kt",
         "start": 725,
         "end": 736
-      }
+      },
+      "hash": "aa5de3c51b01d658b31c23a56a2d5a8952c2e3371520236286581d4c7b0f0620"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByLocal()",
@@ -2337,7 +2590,8 @@
         "path": "src/main/kotlin/example/clients/Probes.kt",
         "start": 422,
         "end": 531
-      }
+      },
+      "hash": "2948b6facde3b0480c1aa7e47ffc1d7ccbde14a9bc5bb57e3f5c2eea1b1abc02"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByOtherLocal()",
@@ -2345,7 +2599,8 @@
         "path": "src/main/kotlin/example/clients/Probes.kt",
         "start": 811,
         "end": 915
-      }
+      },
+      "hash": "5ddab15e131114c6143ed42a5813e1f021a154ab2bbbb110574a55ea8f90f027"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.hiddenByParameter(Map<String,String>)",
@@ -2353,7 +2608,8 @@
         "path": "src/main/kotlin/example/clients/Probes.kt",
         "start": 315,
         "end": 420
-      }
+      },
+      "hash": "05fe13a5146fbbc08b1323035f44bc979549e2fd363e29511f77839f7fadf554"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.otherLibrary()",
@@ -2361,7 +2617,8 @@
         "path": "src/main/kotlin/example/clients/Probes.kt",
         "start": 596,
         "end": 723
-      }
+      },
+      "hash": "521ed17313becfbaab353210e6c4a74f2a13b4a15cedddf08ed00b3951b16ec6"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Probes.kt::example.clients.typed(HttpClient)",
@@ -2369,7 +2626,8 @@
         "path": "src/main/kotlin/example/clients/Probes.kt",
         "start": 166,
         "end": 252
-      }
+      },
+      "hash": "8e9449267c89d8e4f299464ec0336d5cd9856e2da8bbb2a412fddb55be476f58"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Star.kt::example.clients.star()",
@@ -2377,7 +2635,8 @@
         "path": "src/main/kotlin/example/clients/Star.kt",
         "start": 260,
         "end": 324
-      }
+      },
+      "hash": "0821aca43861820229f3c4662d2bca9fd40e21f29ad0aaaa7ce4804293e830ed"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.fetch(HttpClient,String)",
@@ -2385,7 +2644,8 @@
         "path": "src/main/kotlin/example/clients/Wrappers.kt",
         "start": 241,
         "end": 321
-      }
+      },
+      "hash": "b8dd15d8e288a641bb7a938d3d4130233c0c724dcbdff34de71cab694433c392"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.order(String)",
@@ -2393,7 +2653,8 @@
         "path": "src/main/kotlin/example/clients/Wrappers.kt",
         "start": 323,
         "end": 383
-      }
+      },
+      "hash": "6d8165097afee48a8f7e7add509c27e6740fc04edfa640edc43325807913875a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.ping(String)",
@@ -2401,7 +2662,8 @@
         "path": "src/main/kotlin/example/clients/Wrappers.kt",
         "start": 483,
         "end": 531
-      }
+      },
+      "hash": "2e6ec9a05a37b4f46b204238a1d567c5af152450a40750e3d1a4ce8b072c938c"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.pong(String)",
@@ -2409,7 +2671,8 @@
         "path": "src/main/kotlin/example/clients/Wrappers.kt",
         "start": 533,
         "end": 625
-      }
+      },
+      "hash": "25345cf48a644f8fe1e252ddf3ea4e4cdbfe96255c5d3c89ccf1368f15dd8eed"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.report()",
@@ -2417,7 +2680,8 @@
         "path": "src/main/kotlin/example/clients/Wrappers.kt",
         "start": 385,
         "end": 441
-      }
+      },
+      "hash": "54c7b48c9d0e80324fa355267a234b55e25edf652b827afbaa90986278d7c2df"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.start()",
@@ -2425,7 +2689,8 @@
         "path": "src/main/kotlin/example/clients/Wrappers.kt",
         "start": 627,
         "end": 668
-      }
+      },
+      "hash": "140da852ef73c3bcfa95d4a6e893bb17f2a5a3f07792d69ad9bdf595d44fae15"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/Wrappers.kt::example.clients.user(Int)",
@@ -2433,7 +2698,8 @@
         "path": "src/main/kotlin/example/clients/Wrappers.kt",
         "start": 715,
         "end": 774
-      }
+      },
+      "hash": "b9b2f0c3f653c5fb214d7e1f66fb7aa8bacea80031e1606f488f51a692101de3"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.HttpClient",
@@ -2441,7 +2707,8 @@
         "path": "src/main/kotlin/example/clients/fake/Fake.kt",
         "start": 141,
         "end": 196
-      }
+      },
+      "hash": "a35741815591ff7fcf71bd5098917673f26004ca3d82dc9c9b00273901980881"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.HttpClient.options(String)",
@@ -2449,7 +2716,8 @@
         "path": "src/main/kotlin/example/clients/fake/Fake.kt",
         "start": 164,
         "end": 194
-      }
+      },
+      "hash": "b8a8ce5a7b07dbbf7d16789e3a6a5c19310bddabcec886a2e916cba4123e5040"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/fake/Fake.kt::example.clients.fake.fake(HttpClient,Map<String,String>)",
@@ -2457,7 +2725,8 @@
         "path": "src/main/kotlin/example/clients/fake/Fake.kt",
         "start": 198,
         "end": 356
-      }
+      },
+      "hash": "7c23dfb5017541332eaf91abedad5e600874ac2775525b6eb1ee45a827752c29"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/clients/urls/Urls.kt::example.clients.urls.Paths",
@@ -2465,7 +2734,8 @@
         "path": "src/main/kotlin/example/clients/urls/Urls.kt",
         "start": 179,
         "end": 402
-      }
+      },
+      "hash": "7a6ffa0e4419be6a30391567e9bb1c9fe5245e39442f72150a97e56cbad6d560"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel",
@@ -2473,7 +2743,8 @@
         "path": "src/main/kotlin/example/ctors/Ctors.kt",
         "start": 23,
         "end": 283
-      }
+      },
+      "hash": "b1016f4b81e17b9e79f2e680108956cf43b68f6514a1ec8712ae046826468bbd"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker",
@@ -2481,7 +2752,8 @@
         "path": "src/main/kotlin/example/ctors/Ctors.kt",
         "start": 138,
         "end": 281
-      }
+      },
+      "hash": "6fdb5fac0c50c9dba52affd83bef82cd02f738393c206f425e2a88dfdcb03960"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.Maker()",
@@ -2489,7 +2761,8 @@
         "path": "src/main/kotlin/example/ctors/Ctors.kt",
         "start": 165,
         "end": 181
-      }
+      },
+      "hash": "743b45e92505a7e647c1901e1588f2234e844c8e97b5299e6208a2d8e7a7fe47"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.Maker(Parcel)",
@@ -2497,7 +2770,8 @@
         "path": "src/main/kotlin/example/ctors/Ctors.kt",
         "start": 190,
         "end": 229
-      }
+      },
+      "hash": "351ad58e91da0e2632e0481787ef8f1007b5554d56c73ca39c5bc5507408524a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.assemble()",
@@ -2505,7 +2779,8 @@
         "path": "src/main/kotlin/example/ctors/Ctors.kt",
         "start": 239,
         "end": 275
-      }
+      },
+      "hash": "172688d866495bb7f343245a0b013af7662ca73db989c9f9b717f260cd83263d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Parcel(String,String)",
@@ -2513,7 +2788,8 @@
         "path": "src/main/kotlin/example/ctors/Ctors.kt",
         "start": 80,
         "end": 132
-      }
+      },
+      "hash": "7bb4a70411daaba4b1cfb0eca5a9ac3c2ac22797d0a41ce50d21cd78c2b88972"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Plain",
@@ -2521,7 +2797,8 @@
         "path": "src/main/kotlin/example/ctors/Ctors.kt",
         "start": 285,
         "end": 319
-      }
+      },
+      "hash": "d1f887de7b5cd514810de830529a4ed777462390e8b8bdd6b58c25475ab77149"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same",
@@ -2529,7 +2806,8 @@
         "path": "src/main/kotlin/example/ctors/Ctors.kt",
         "start": 390,
         "end": 461
-      }
+      },
+      "hash": "75259dff562a47b16eea00854cc98c2c0584058f5587059cd9d33f6e415a6355"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(Int)",
@@ -2537,7 +2815,8 @@
         "path": "src/main/kotlin/example/ctors/Ctors.kt",
         "start": 407,
         "end": 429
-      }
+      },
+      "hash": "7f210f8442566a07e860fbbc2cc9b195d5d22ab827fb532b20b6ad76be724ac4"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(String)",
@@ -2545,7 +2824,8 @@
         "path": "src/main/kotlin/example/ctors/Ctors.kt",
         "start": 434,
         "end": 459
-      }
+      },
+      "hash": "5e7f5698a3561adb677b2f85583c381a0446ed39a71d5b54f4f81ec10a7be679"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two",
@@ -2553,7 +2833,8 @@
         "path": "src/main/kotlin/example/ctors/Ctors.kt",
         "start": 321,
         "end": 388
-      }
+      },
+      "hash": "4f44ba47ed7eb48358f6c74c986850ad33857a3588fa901bebb80efef3b1a90a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two()",
@@ -2561,7 +2842,8 @@
         "path": "src/main/kotlin/example/ctors/Ctors.kt",
         "start": 370,
         "end": 386
-      }
+      },
+      "hash": "743b45e92505a7e647c1901e1588f2234e844c8e97b5299e6208a2d8e7a7fe47"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Two.Two(String)",
@@ -2569,7 +2851,8 @@
         "path": "src/main/kotlin/example/ctors/Ctors.kt",
         "start": 337,
         "end": 365
-      }
+      },
+      "hash": "1b3acfa05d5e597da7dfd5576a5671761ee34121088f80a4ca4d77b2b57b177f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ctors/Ctors.kt::example.ctors.construct()",
@@ -2577,7 +2860,8 @@
         "path": "src/main/kotlin/example/ctors/Ctors.kt",
         "start": 463,
         "end": 634
-      }
+      },
+      "hash": "df67505b4ea612fc10b8ff0f6cea2532fd533d66d24c85155cd0babd05cd10b9"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive",
@@ -2585,7 +2869,8 @@
         "path": "src/main/kotlin/example/declarative/Archive.kt",
         "start": 137,
         "end": 234
-      }
+      },
+      "hash": "3f378b3b62720df703a72ce753c4904985afff31d3c7ff94948f308b47b94561"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive.find(String)",
@@ -2593,7 +2878,8 @@
         "path": "src/main/kotlin/example/declarative/Archive.kt",
         "start": 161,
         "end": 232
-      }
+      },
+      "hash": "d42ba2c630346ad0d1e2aa83fde0b4ea9a8b7d687c68add9825de069912d12b1"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal",
@@ -2601,7 +2887,8 @@
         "path": "src/main/kotlin/example/declarative/Archive.kt",
         "start": 288,
         "end": 388
-      }
+      },
+      "hash": "55a7fcc5b9b9e2da3244615ec1e723fd545c9fb91996408bddb113ff15f98111"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal.drop(String)",
@@ -2609,7 +2896,8 @@
         "path": "src/main/kotlin/example/declarative/Archive.kt",
         "start": 312,
         "end": 386
-      }
+      },
+      "hash": "7fb636ba219045aa6d218a9a4d7250bd2b1fa7e0e440d0ecc7e75797fcdefcdb"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes",
@@ -2617,7 +2905,8 @@
         "path": "src/main/kotlin/example/declarative/Archive.kt",
         "start": 480,
         "end": 546
-      }
+      },
+      "hash": "614724b2408cbf2da3e88f59c9694bf84a53879a58b9081fc7497e426955d43a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes.save()",
@@ -2625,7 +2914,8 @@
         "path": "src/main/kotlin/example/declarative/Archive.kt",
         "start": 502,
         "end": 544
-      }
+      },
+      "hash": "04eefca17109ba794c2d0863869d80c362a66caae10b63e272b789e791d870a7"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere",
@@ -2633,7 +2923,8 @@
         "path": "src/main/kotlin/example/declarative/Elsewhere.kt",
         "start": 222,
         "end": 385
-      }
+      },
+      "hash": "b352d2a50964e283ef0b78c32d0c9441286440ccee80d67b814fc716282f17b4"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere.notes()",
@@ -2641,7 +2932,8 @@
         "path": "src/main/kotlin/example/declarative/Elsewhere.kt",
         "start": 338,
         "end": 383
-      }
+      },
+      "hash": "3a43cfd368b486339414ec06e27cd5d027b697fd86532652b5e26fbbdea60e04"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Retrofit.create()",
@@ -2649,7 +2941,8 @@
         "path": "src/main/kotlin/example/declarative/Elsewhere.kt",
         "start": 145,
         "end": 220
-      }
+      },
+      "hash": "1e101779c9a775091d06bc8b02a8b837fe35af358b1795594830a500d41ac23e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger",
@@ -2657,7 +2950,8 @@
         "path": "src/main/kotlin/example/declarative/Ledger.kt",
         "start": 226,
         "end": 376
-      }
+      },
+      "hash": "ad7127dedc719cb6728870358d63e6a1e09bc7c194a25822121711928f43ec5f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.entry(String)",
@@ -2665,7 +2959,8 @@
         "path": "src/main/kotlin/example/declarative/Ledger.kt",
         "start": 249,
         "end": 321
-      }
+      },
+      "hash": "43dffca05ac6cd6ed89e84ddfee5164ada9deb383ab76ed3e90115558fe64139"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.record()",
@@ -2673,7 +2968,8 @@
         "path": "src/main/kotlin/example/declarative/Ledger.kt",
         "start": 327,
         "end": 374
-      }
+      },
+      "hash": "6f6f0a22156222b90aee4d0b15638757e7e035783037d40fc688ed2cd71adf89"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan",
@@ -2681,7 +2977,8 @@
         "path": "src/main/kotlin/example/declarative/Orphan.kt",
         "start": 124,
         "end": 192
-      }
+      },
+      "hash": "25ade0e590585e3059d70c3205e44d49ccaa2d0c762863b395c3b6b940752328"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan.get()",
@@ -2689,7 +2986,8 @@
         "path": "src/main/kotlin/example/declarative/Orphan.kt",
         "start": 147,
         "end": 190
-      }
+      },
+      "hash": "bb62e24e226bb7e08499c38b62ad6625ca4dcb5767649ef59e2c8282be7f25ee"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified",
@@ -2697,7 +2995,8 @@
         "path": "src/main/kotlin/example/declarative/Qualified.kt",
         "start": 86,
         "end": 158
-      }
+      },
+      "hash": "b6177b4b7118718acd6fce2d711f6934e668ddaf06e8e0e04e7907dfe56553a2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified.a()",
@@ -2705,7 +3004,8 @@
         "path": "src/main/kotlin/example/declarative/Qualified.kt",
         "start": 112,
         "end": 156
-      }
+      },
+      "hash": "2b2738348cfcfd247f7a51078db019b53d95b3d5deef89edbd72bc6029a58025"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified",
@@ -2713,7 +3013,8 @@
         "path": "src/main/kotlin/example/declarative/Reified.kt",
         "start": 142,
         "end": 557
-      }
+      },
+      "hash": "3f1361d3b5b0f732b7b5fc4c82370182b8cdc5182d42675ebcb68afcb477e938"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.archive()",
@@ -2721,7 +3022,8 @@
         "path": "src/main/kotlin/example/declarative/Reified.kt",
         "start": 258,
         "end": 309
-      }
+      },
+      "hash": "7e6da214d7f323bb4763412e30bc13a2ae67b1453a872586e3fc6575c0cca578"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.journal()",
@@ -2729,7 +3031,8 @@
         "path": "src/main/kotlin/example/declarative/Reified.kt",
         "start": 389,
         "end": 555
-      }
+      },
+      "hash": "d3e1b03ca04a0ef3916466ca154aa6ec22ce7664eb718b6259cbf45894176bb3"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Books",
@@ -2737,7 +3040,8 @@
         "path": "src/main/kotlin/example/declarative/Remotes.kt",
         "start": 717,
         "end": 839
-      }
+      },
+      "hash": "e9f1396b99d1bcb6f171cb24124ef45175f8ea2eda892861e1977f70064d851f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Books.open(String)",
@@ -2745,7 +3049,8 @@
         "path": "src/main/kotlin/example/declarative/Remotes.kt",
         "start": 763,
         "end": 802
-      }
+      },
+      "hash": "a37fdae9fd3dbbf5eaa54f05f46ddd5f90390c7ed4d113a7579970692c2f2296"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Books.write()",
@@ -2753,7 +3058,8 @@
         "path": "src/main/kotlin/example/declarative/Remotes.kt",
         "start": 808,
         "end": 837
-      }
+      },
+      "hash": "de1816336fa9e49e2e013c29ce5ed111f25dfc271ebbc9c7f0fa2fc9077e92f6"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Configured",
@@ -2761,7 +3067,8 @@
         "path": "src/main/kotlin/example/declarative/Remotes.kt",
         "start": 917,
         "end": 1321
-      }
+      },
+      "hash": "c164906c4f57bbc4ae7daea76a696fd63630ac28ec040994b95b3bbf078e159d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Configured.fromEnvironment()",
@@ -2769,7 +3076,8 @@
         "path": "src/main/kotlin/example/declarative/Remotes.kt",
         "start": 1115,
         "end": 1319
-      }
+      },
+      "hash": "adb7dde627608ff00dd8f71a61397cd031dc25ba2f541edf3d27d3b646434b8e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Configured.ledger()",
@@ -2777,7 +3085,8 @@
         "path": "src/main/kotlin/example/declarative/Remotes.kt",
         "start": 1004,
         "end": 1109
-      }
+      },
+      "hash": "b72e60e113dbef8b2ca28926e9aa076880f62f4b2d2299cf278079d92e305d1c"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Remotes",
@@ -2785,7 +3094,8 @@
         "path": "src/main/kotlin/example/declarative/Remotes.kt",
         "start": 114,
         "end": 398
-      }
+      },
+      "hash": "7b4d904afbc0777d93cc25d051bd82987f6fe79de8e5d7841228ee2a57e42634"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Remotes.ledger()",
@@ -2793,7 +3103,8 @@
         "path": "src/main/kotlin/example/declarative/Remotes.kt",
         "start": 291,
         "end": 396
-      }
+      },
+      "hash": "ac0cb312b94c3636291b70e343ac9c9785b7743f4f32528f3585a349bd302761"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Shared",
@@ -2801,7 +3112,8 @@
         "path": "src/main/kotlin/example/declarative/Remotes.kt",
         "start": 482,
         "end": 656
-      }
+      },
+      "hash": "5bdd7d8a775cb11b2fa750727f934250723d65c078df44aa501370f971e2905b"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Shared.ledger()",
@@ -2809,7 +3121,8 @@
         "path": "src/main/kotlin/example/declarative/Remotes.kt",
         "start": 596,
         "end": 654
-      }
+      },
+      "hash": "b071fea6dd2389de3b93ff734abeccb48cd929b9c89eed275f3ab708b6ca254c"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.describe()",
@@ -2817,7 +3130,8 @@
         "path": "src/main/kotlin/example/ext/Extensions.kt",
         "start": 143,
         "end": 181
-      }
+      },
+      "hash": "fad183fea3e5fe5f47363aeef9265551f85cf700e1881370b234b591d9093d16"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.describe(Boolean)",
@@ -2825,7 +3139,8 @@
         "path": "src/main/kotlin/example/ext/Extensions.kt",
         "start": 183,
         "end": 237
-      }
+      },
+      "hash": "69ceff4b07f1ad3cf281b72dde5d199741b57b1c9128b39e4afe441c0ecc3f11"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.tag()",
@@ -2833,7 +3148,8 @@
         "path": "src/main/kotlin/example/ext/Extensions.kt",
         "start": 274,
         "end": 307
-      }
+      },
+      "hash": "50f70795aff8d3036c8084f5c36b824eb61baf50bb2e8526539e7a325f57afe3"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ext/Extensions.kt::example.ext.Store.tag()",
@@ -2841,7 +3157,8 @@
         "path": "src/main/kotlin/example/ext/Extensions.kt",
         "start": 239,
         "end": 272
-      }
+      },
+      "hash": "496637c9c980d220469ccb09fac85bb1fb933ccc6a9553409934c7b123f365b4"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Assigned.kt::example.jvm.Assigned",
@@ -2849,7 +3166,8 @@
         "path": "src/main/kotlin/example/jvm/Assigned.kt",
         "start": 205,
         "end": 482
-      }
+      },
+      "hash": "84645a97d28f5f93fdcaabadfd044490d2a16c28dde57ac3d6dceef2a033bbac"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Assigned.kt::example.jvm.Assigned.rebase(String)",
@@ -2857,7 +3175,8 @@
         "path": "src/main/kotlin/example/jvm/Assigned.kt",
         "start": 340,
         "end": 399
-      }
+      },
+      "hash": "02483e2401a30ae808f92528b3109d388a05dae2e111a143e9dfbc71e29ad4e8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Assigned.kt::example.jvm.Assigned.send()",
@@ -2865,7 +3184,8 @@
         "path": "src/main/kotlin/example/jvm/Assigned.kt",
         "start": 405,
         "end": 480
-      }
+      },
+      "hash": "499d193e1c7e36592113674aa972dc9fec33ba238076f0b16e5f902fd039a78f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Gate",
@@ -2873,7 +3193,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 1520,
         "end": 1565
-      }
+      },
+      "hash": "62494611a47b626749a432266a901cca4b4afc5335cccd5ecea3a3f8c1699ae9"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Gate.delete(String)",
@@ -2881,7 +3202,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 1537,
         "end": 1563
-      }
+      },
+      "hash": "14375f4dc7a0e912d0efd0c92e92b7db643af6a7411e2c424e7b9e83b2b45dd7"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden",
@@ -2889,7 +3211,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 297,
         "end": 1518
-      }
+      },
+      "hash": "797d485505de22a2f0ff439a98c84da7c5c6ea06c959204202d875c8404f561a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.caught()",
@@ -2897,7 +3220,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 1111,
         "end": 1343
-      }
+      },
+      "hash": "7309f50e6fb1ac1264a369ab8e0ed690c20c6947f1529c104d297ad0dfc1dd4f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.client()",
@@ -2905,7 +3229,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 758,
         "end": 844
-      }
+      },
+      "hash": "cff480160ed080a6db50b123f889c61032b3408bd5c5f5259847e5b1cec99dd7"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.lambda(List<Any>)",
@@ -2913,7 +3238,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 633,
         "end": 752
-      }
+      },
+      "hash": "c18162ad26a589e001075b3cc34765d4cf86553228fa19e02cd1b1acb2c502be"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.local()",
@@ -2921,7 +3247,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 424,
         "end": 529
-      }
+      },
+      "hash": "f7f1ce3b056742c057e8d8d23ee2e10a8e0a46374edef06cbe09678e4ddb6e17"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.loop(List<Any>)",
@@ -2929,7 +3256,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 944,
         "end": 1105
-      }
+      },
+      "hash": "3bfdc42cf10615b0a2041b2a8881b54bad3348d75d1a049568ddeaa41000530d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.own()",
@@ -2937,7 +3265,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 1407,
         "end": 1516
-      }
+      },
+      "hash": "e69020612b2da5cda9dc3854f72d21d11f12038d5d682f6b5874b53fa7e9c675"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Hidden.parameter(Any)",
@@ -2945,7 +3274,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 535,
         "end": 627
-      }
+      },
+      "hash": "31d1ea9075aa89b2a1cce2413ab9e89fbe41f6ab6a72db8113ebbe9a5cdc6c98"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Plain",
@@ -2953,7 +3283,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 1595,
         "end": 1623
-      }
+      },
+      "hash": "ab30a75d82676690c5d18691c4842332239596c41873e132719785a1e1148fdf"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers",
@@ -2961,7 +3292,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 1811,
         "end": 2637
-      }
+      },
+      "hash": "128ea1896614560a42b2b87312c32b385ec22e64d53cf60d8760340ebc390bfc"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers.Plain.viaPlainExtension()",
@@ -2969,7 +3301,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 2524,
         "end": 2635
-      }
+      },
+      "hash": "66e9e8740936a93e94dfd586736f86701d4757fded31b6708813f1a7586757e2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers.Slot.viaExtension()",
@@ -2977,7 +3310,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 2419,
         "end": 2518
-      }
+      },
+      "hash": "cb44ca6db9dd64602a940c8ba0573ef34d563d01c86cdc94b910b57c049bc9c7"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers.viaApply(Slot)",
@@ -2985,7 +3319,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 2075,
         "end": 2178
-      }
+      },
+      "hash": "54579ad3427622d6c299ef14339f5d2b44609a49b5493bdb46992db8be6835ee"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers.viaOutside(HttpClient)",
@@ -2993,7 +3328,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 2184,
         "end": 2301
-      }
+      },
+      "hash": "1a1161b3ec8a13f5c50aac780082373d406ac1761cc3cda11d3bdd6b0329b34e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers.viaPlain(Plain)",
@@ -3001,7 +3337,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 2307,
         "end": 2413
-      }
+      },
+      "hash": "39bd0c9859b4253c5fed87308d36ad25c8883af2d4a0b4e4dc4450c03ee56fe8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers.viaRun(Slot)",
@@ -3009,7 +3346,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 1972,
         "end": 2069
-      }
+      },
+      "hash": "227bf08224d3d30e2221ae968a205fea9e47bb8cfd69c6b2c7eb55b7b68747c9"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Receivers.viaWith(Slot)",
@@ -3017,7 +3355,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 1865,
         "end": 1966
-      }
+      },
+      "hash": "9a8df150e92349300c3a24e8d9061aa48683b983ef1fc7b7b807f0495fbcc0c8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.Slot",
@@ -3025,7 +3364,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 1567,
         "end": 1593
-      }
+      },
+      "hash": "a00fe02d4b9a0763028addfe4dd187f8bc87e7d4e48dbad8d19a2b14c046cf59"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Hidden.kt::example.jvm.anything()",
@@ -3033,7 +3373,8 @@
         "path": "src/main/kotlin/example/jvm/Hidden.kt",
         "start": 171,
         "end": 198
-      }
+      },
+      "hash": "df6a7e6f3ac553de26de1b57f751674ba42e6a0be9f375807df5778d90f4ed7b"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Injected.kt::example.jvm.Injected",
@@ -3041,7 +3382,8 @@
         "path": "src/main/kotlin/example/jvm/Injected.kt",
         "start": 291,
         "end": 798
-      }
+      },
+      "hash": "ac18a482954404f4b513f6ead70a10b49bdf0f0940ab79fbd319544392c9ef85"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Injected.kt::example.jvm.Injected.send()",
@@ -3049,7 +3391,8 @@
         "path": "src/main/kotlin/example/jvm/Injected.kt",
         "start": 594,
         "end": 796
-      }
+      },
+      "hash": "563429c4137934be35d46d9774a4ffbcbd87d54cb9c056e6562f37f8e738c391"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk",
@@ -3057,7 +3400,8 @@
         "path": "src/main/kotlin/example/jvm/Jdk.kt",
         "start": 184,
         "end": 461
-      }
+      },
+      "hash": "61a57bd24a48e5a2fbf13f86509b219001bb8b40ae0bf6946393e7ba07b61124"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.create()",
@@ -3065,7 +3409,8 @@
         "path": "src/main/kotlin/example/jvm/Jdk.kt",
         "start": 301,
         "end": 459
-      }
+      },
+      "hash": "3495da6991443a6e7fe52ca5b9361c30010d002874f1d9c249c4d94ff1cfaf8b"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Jdk.kt::example.jvm.Jdk.list()",
@@ -3073,7 +3418,8 @@
         "path": "src/main/kotlin/example/jvm/Jdk.kt",
         "start": 200,
         "end": 295
-      }
+      },
+      "hash": "ba32e5ed828448351e0b2f9ca5371cdffd5e8dfe6c26990bb05ca5a773751038"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok",
@@ -3081,7 +3427,8 @@
         "path": "src/main/kotlin/example/jvm/Ok.kt",
         "start": 152,
         "end": 623
-      }
+      },
+      "hash": "23bf88e10c14f06670f366ad9322bd1e1ae8635c0486b56f2ac1406bcf476e05"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.create()",
@@ -3089,7 +3436,8 @@
         "path": "src/main/kotlin/example/jvm/Ok.kt",
         "start": 387,
         "end": 509
-      }
+      },
+      "hash": "8191be6eed0058eb939ea16bdd6223e40b5735bb2bbd43435c0e8e92ba4ae5b1"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.list()",
@@ -3097,7 +3445,8 @@
         "path": "src/main/kotlin/example/jvm/Ok.kt",
         "start": 198,
         "end": 280
-      }
+      },
+      "hash": "150668f9c74ab4025e2d574aa502f611c0da5010c1b31293892d64e63f1bc708"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.remove()",
@@ -3105,7 +3454,8 @@
         "path": "src/main/kotlin/example/jvm/Ok.kt",
         "start": 286,
         "end": 381
-      }
+      },
+      "hash": "0990df0e71b6fa383b0f791e2d265909885e08fa18488c1f67f492053e4b36cd"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Ok.kt::example.jvm.Ok.replace()",
@@ -3113,7 +3463,8 @@
         "path": "src/main/kotlin/example/jvm/Ok.kt",
         "start": 515,
         "end": 621
-      }
+      },
+      "hash": "22141cae4cf4a69e50f580f7b97b552245c8960e4e3d3ecde21a2fdab89da9b2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Ok.kt::example.jvm.notOkHttp()",
@@ -3121,7 +3472,8 @@
         "path": "src/main/kotlin/example/jvm/Ok.kt",
         "start": 679,
         "end": 774
-      }
+      },
+      "hash": "4ce8de0c05b25c6d4617548c24f877c612da5a280736aed5e898fd629af17681"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other",
@@ -3129,7 +3481,8 @@
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
         "start": 1473,
         "end": 1542
-      }
+      },
+      "hash": "d62bf965ca8eb75ed67be1a6f9b8b4aa9ea238a42aa9f5869f88429bfe7df525"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.get()",
@@ -3137,7 +3490,8 @@
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
         "start": 1491,
         "end": 1507
-      }
+      },
+      "hash": "84542c9c8d7419f6e5d6a0add29ee2c14de0db8415d8fb7320dadb5026dd9fe9"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
@@ -3145,7 +3499,8 @@
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
         "start": 1512,
         "end": 1540
-      }
+      },
+      "hash": "9378d7a338103f4a594dc72d2bad0c47fbba5557f70d048877348ff83050b071"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive",
@@ -3153,7 +3508,8 @@
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
         "start": 384,
         "end": 1471
-      }
+      },
+      "hash": "9480d693c1bd03e977c286aba600318a816ecca4f264a39024eb5d0b85e5e363"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.builtLocal()",
@@ -3161,7 +3517,8 @@
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
         "start": 1045,
         "end": 1216
-      }
+      },
+      "hash": "f2af7f00df249aeca053df79f35f5caacc1fba3fcea74e8a776995bea6131bf4"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.flag()",
@@ -3169,7 +3526,8 @@
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
         "start": 525,
         "end": 624
-      }
+      },
+      "hash": "1e41874fc175d7ee419b40447288fab430e5362adc79bc04b7c2a12b1d117cbe"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.get()",
@@ -3177,7 +3535,8 @@
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
         "start": 438,
         "end": 519
-      }
+      },
+      "hash": "006f6277184a9321155bb0e188abb8017b3505b26038b5062fb3c57572457e72"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.local()",
@@ -3185,7 +3544,8 @@
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
         "start": 895,
         "end": 1039
-      }
+      },
+      "hash": "5a9103a7d9a730c2f7fc8b7074027316e149483cff62decf764ca756bc4fce7d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.other(Other)",
@@ -3193,7 +3553,8 @@
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
         "start": 1393,
         "end": 1469
-      }
+      },
+      "hash": "7bac9e093d219ae2a0a1652bf4592525c0eec529fa9bc837ed1fe7fad7c12a50"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typed()",
@@ -3201,7 +3562,8 @@
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
         "start": 693,
         "end": 789
-      }
+      },
+      "hash": "13b02965453a57da82e6835844611c42e1137bdbf73e1e97c309411b189e180a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Reactive.typedLocal()",
@@ -3209,7 +3571,8 @@
         "path": "src/main/kotlin/example/jvm/Reactive.kt",
         "start": 1222,
         "end": 1387
-      }
+      },
+      "hash": "2202fac2fba06bd7058aabd8980e4d592bef3fbf5c2b4e8bfb6c8e9d73f4540f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake",
@@ -3217,7 +3580,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 1738,
         "end": 1922
-      }
+      },
+      "hash": "c99463c1121159b40b3c301ee9005c491c1e39ba67bfdb434a775b52c4ac7d0b"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake.delete(String)",
@@ -3225,7 +3589,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 1755,
         "end": 1782
-      }
+      },
+      "hash": "818578b9e004a0085de03ad876fcb88da59ba9087f6fe3005ceb47ce91cb1367"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Fake.probe(Fake,Map<String,String>)",
@@ -3233,7 +3598,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 1788,
         "end": 1920
-      }
+      },
+      "hash": "a1f07b8274b97260dc8141fa0f4945e4d9045d911132292117eb28df5c6ab955"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Made",
@@ -3241,7 +3607,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 1433,
         "end": 1694
-      }
+      },
+      "hash": "7aa1b494c28ca182e3d99269f4a6738430e92c519db67949d41e8c159e4c2b62"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Made.local()",
@@ -3249,7 +3616,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 1563,
         "end": 1692
-      }
+      },
+      "hash": "f169d935e9436146b136fd485947e10a81c3293e8a73dcfc807644e0bee922da"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Made.property()",
@@ -3257,7 +3625,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 1489,
         "end": 1557
-      }
+      },
+      "hash": "5846365a6b35b63156f3df808f07fb31f8b36a410d44423bca599b537f16cca3"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest",
@@ -3265,7 +3634,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 241,
         "end": 1353
-      }
+      },
+      "hash": "4c25d24d72e764c58a02be6780a18488e318f84ac160a230195099f04d324a1c"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.change(String)",
@@ -3273,7 +3643,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 632,
         "end": 784
-      }
+      },
+      "hash": "32ca21b2b694adf2c84e32b79ee27d7c0744d8ff03dd3763487f6566454ddd99"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.create()",
@@ -3281,7 +3652,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 456,
         "end": 626
-      }
+      },
+      "hash": "d9e675313b4cc293810b4b0b7b06afb0c9efc47b616b650f6552ef858d13f664"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.drop()",
@@ -3289,7 +3661,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 1174,
         "end": 1198
-      }
+      },
+      "hash": "d9ade3aee2534f793be330407dba8b5edfae8b792c4fcf10afcefd179e1cab73"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.list()",
@@ -3297,7 +3670,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 290,
         "end": 365
-      }
+      },
+      "hash": "12fa8ea01bca9d6b8051cd1ce1626d07cff79a4c79aee101aabdd78412b97687"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.lookup()",
@@ -3305,7 +3679,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 1256,
         "end": 1351
-      }
+      },
+      "hash": "a4678346076cf5c93d0c9cc764290e534d460cd7b28f5bef75a9870267b5dd92"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.one(String)",
@@ -3313,7 +3688,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 371,
         "end": 450
-      }
+      },
+      "hash": "35b0a24a2e87ec4f3fc06d086a5388b4513177e815257ce717d4a650841eba2b"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.remove(String)",
@@ -3321,7 +3697,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 1112,
         "end": 1168
-      }
+      },
+      "hash": "a2e96fa52e7982d22a76f530a886e51288c4ce2068fd2004c2707968ee5f5391"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.send(HttpMethod,String)",
@@ -3329,7 +3706,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 979,
         "end": 1106
-      }
+      },
+      "hash": "6cc8977f51172e6a4505fe0025c05411a2c70875f5f91e2d14cf913c81114fce"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.single()",
@@ -3337,7 +3715,8 @@
         "path": "src/main/kotlin/example/jvm/Rest.kt",
         "start": 790,
         "end": 898
-      }
+      },
+      "hash": "8795f959a27295d52da7e6191536915fde5fe30855c91e97373704bb2ae6ef24"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Star.kt::example.jvm.Star",
@@ -3345,7 +3724,8 @@
         "path": "src/main/kotlin/example/jvm/Star.kt",
         "start": 200,
         "end": 486
-      }
+      },
+      "hash": "43324496a5b86717bf36f143bf24ae94ef3fc85871ede7ff30a32bb4efd73082"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Star.kt::example.jvm.Star.rest()",
@@ -3353,7 +3733,8 @@
         "path": "src/main/kotlin/example/jvm/Star.kt",
         "start": 323,
         "end": 415
-      }
+      },
+      "hash": "85c939e803dfb4074560c7b8e210ff2030ee7d1fd9f2028db3817f74a3ec97e6"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Star.kt::example.jvm.Star.web()",
@@ -3361,7 +3742,8 @@
         "path": "src/main/kotlin/example/jvm/Star.kt",
         "start": 421,
         "end": 484
-      }
+      },
+      "hash": "5929ba4f3a2ff159337b8d94a750374c69d369b4abb2cd16fa63c33bc9e01221"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing",
@@ -3369,7 +3751,8 @@
         "path": "src/main/kotlin/example/jvm/Typed.kt",
         "start": 388,
         "end": 556
-      }
+      },
+      "hash": "5b861abde28aca97d5d64b565f06dcfd38f8d35fcf3942e5648050eb9702c331"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()",
@@ -3377,7 +3760,8 @@
         "path": "src/main/kotlin/example/jvm/Typed.kt",
         "start": 440,
         "end": 554
-      }
+      },
+      "hash": "339c7b9efbe3a3b7811898167c174d3bac1db9e883eda0515c3fc53b8ecd418f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed",
@@ -3385,7 +3769,8 @@
         "path": "src/main/kotlin/example/jvm/Typed.kt",
         "start": 254,
         "end": 386
-      }
+      },
+      "hash": "432031a927465088ae916b0678e616d3c533270522796e646c1e709aed759fbe"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()",
@@ -3393,7 +3778,8 @@
         "path": "src/main/kotlin/example/jvm/Typed.kt",
         "start": 272,
         "end": 384
-      }
+      },
+      "hash": "7b53bf7fa8530a9eaa2c5be2d6be777342cefa9efbb40a0d9ca14e51b928148a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.make()",
@@ -3401,7 +3787,8 @@
         "path": "src/main/kotlin/example/jvm/Typed.kt",
         "start": 88,
         "end": 157
-      }
+      },
+      "hash": "55fe5021167bd07aa4ea6178a962c614f4ea8bba9ed7d92162e5079790090492"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.RestTemplate",
@@ -3409,7 +3796,8 @@
         "path": "src/main/kotlin/example/jvm/fake/Fake.kt",
         "start": 158,
         "end": 213
-      }
+      },
+      "hash": "f54ca3d7d02b01151e98125536f911c79009068294431f6f050ec4075817b01e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.RestTemplate.exchange(String)",
@@ -3417,7 +3805,8 @@
         "path": "src/main/kotlin/example/jvm/fake/Fake.kt",
         "start": 183,
         "end": 211
-      }
+      },
+      "hash": "564b35b4a52906d4d54d30e713b1500f1c5c8da244caa124473656d165ed4b8b"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient",
@@ -3425,7 +3814,8 @@
         "path": "src/main/kotlin/example/jvm/fake/Fake.kt",
         "start": 215,
         "end": 289
-      }
+      },
+      "hash": "2e7800d6b0ded7610b7cf2c595896228fd1c0bbd04165c6980e64a912e333702"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.get()",
@@ -3433,7 +3823,8 @@
         "path": "src/main/kotlin/example/jvm/fake/Fake.kt",
         "start": 237,
         "end": 253
-      }
+      },
+      "hash": "84542c9c8d7419f6e5d6a0add29ee2c14de0db8415d8fb7320dadb5026dd9fe9"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)",
@@ -3441,7 +3832,8 @@
         "path": "src/main/kotlin/example/jvm/fake/Fake.kt",
         "start": 259,
         "end": 287
-      }
+      },
+      "hash": "9378d7a338103f4a594dc72d2bad0c47fbba5557f70d048877348ff83050b071"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.probe(RestTemplate,WebClient)",
@@ -3449,7 +3841,8 @@
         "path": "src/main/kotlin/example/jvm/fake/Fake.kt",
         "start": 291,
         "end": 500
-      }
+      },
+      "hash": "5fa8724f268a4c08233f316e08b287a9a4b4dde6e531c903152775a7f5483a65"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.configured()",
@@ -3457,7 +3850,8 @@
         "path": "src/main/kotlin/example/ktor/Locals.kt",
         "start": 609,
         "end": 691
-      }
+      },
+      "hash": "8632e0d991abe31215beef2b4beae541fe398b6b3b0da63bcd94d51264d7ac99"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.keyed()",
@@ -3465,7 +3859,8 @@
         "path": "src/main/kotlin/example/ktor/Locals.kt",
         "start": 784,
         "end": 854
-      }
+      },
+      "hash": "cbd4570d86456f624892ccc3eef8b94245304c83180d38f79a20d59879d6ebeb"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()",
@@ -3473,7 +3868,8 @@
         "path": "src/main/kotlin/example/ktor/Locals.kt",
         "start": 273,
         "end": 490
-      }
+      },
+      "hash": "dd54edc6c2afeff3d8f0c248db7b039121099bab913981b09063ad2e96989a4e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /",
@@ -3481,7 +3877,8 @@
         "path": "src/main/kotlin/example/ktor/Locals.kt",
         "start": 451,
         "end": 482
-      }
+      },
+      "hash": "3d5311f51787b6fc93a99cac8f309c8d209cc5ca7e7ad148d3bacfff830e5b9e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /local",
@@ -3489,7 +3886,8 @@
         "path": "src/main/kotlin/example/ktor/Locals.kt",
         "start": 368,
         "end": 399
-      }
+      },
+      "hash": "3d5311f51787b6fc93a99cac8f309c8d209cc5ca7e7ad148d3bacfff830e5b9e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spaced()",
@@ -3497,7 +3895,8 @@
         "path": "src/main/kotlin/example/ktor/Locals.kt",
         "start": 856,
         "end": 928
-      }
+      },
+      "hash": "7c1ef2dcc98f7b773e85fa951cd43c99adaa7c692c61b2f9543e5e1421e5681d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spacedPair()",
@@ -3505,7 +3904,8 @@
         "path": "src/main/kotlin/example/ktor/Locals.kt",
         "start": 930,
         "end": 999
-      }
+      },
+      "hash": "1708d3628ff8e4e7e83bed47996b1cb8f2fd52841f2529523ad76feb8df6ca34"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.stored()",
@@ -3513,7 +3913,8 @@
         "path": "src/main/kotlin/example/ktor/Locals.kt",
         "start": 492,
         "end": 556
-      }
+      },
+      "hash": "e382bc65d0bca973a69c324eb3c77560ecf74ca94966ba79f5747acdb4ee0c9f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Locals.kt::example.ktor.afterLocals()",
@@ -3521,7 +3922,8 @@
         "path": "src/main/kotlin/example/ktor/Locals.kt",
         "start": 1001,
         "end": 1021
-      }
+      },
+      "hash": "47d167217062f2221b81a7333961733d0d177abda5033969207079e8deb3c4c3"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
@@ -3529,7 +3931,8 @@
         "path": "src/main/kotlin/example/ktor/Server.kt",
         "start": 392,
         "end": 1295
-      }
+      },
+      "hash": "760c6d55b656f429aa543896267eb821669d564d4ae59b6a5b8cbdec69b1863b"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/kw",
@@ -3537,7 +3940,8 @@
         "path": "src/main/kotlin/example/ktor/Server.kt",
         "start": 995,
         "end": 998
-      }
+      },
+      "hash": "bdb534fba3e8f2530bda34b5d3b953c0c9b6d811fa339b5579661ac4e05fdf2d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/named",
@@ -3545,7 +3949,8 @@
         "path": "src/main/kotlin/example/ktor/Server.kt",
         "start": 937,
         "end": 940
-      }
+      },
+      "hash": "bdb534fba3e8f2530bda34b5d3b953c0c9b6d811fa339b5579661ac4e05fdf2d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/v1",
@@ -3553,7 +3958,8 @@
         "path": "src/main/kotlin/example/ktor/Server.kt",
         "start": 571,
         "end": 633
-      }
+      },
+      "hash": "17055ae540e5f6e8483616e8217110816f02b9242a7f31cc82296a9e83c08c03"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /health",
@@ -3561,7 +3967,8 @@
         "path": "src/main/kotlin/example/ktor/Server.kt",
         "start": 456,
         "end": 502
-      }
+      },
+      "hash": "de90071320f1de1b10325f507178ca5602c66263006129d3db4428e6bb620fac"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().HEAD /api/ping",
@@ -3569,7 +3976,8 @@
         "path": "src/main/kotlin/example/ktor/Server.kt",
         "start": 1057,
         "end": 1156
-      }
+      },
+      "hash": "06e6300d5225e4880a177421ae7730f649e48ab5cff09b1def63b84dd1180585"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().POST /api/v1/items/{}",
@@ -3577,7 +3985,8 @@
         "path": "src/main/kotlin/example/ktor/Server.kt",
         "start": 670,
         "end": 717
-      }
+      },
+      "hash": "841520996d7e71178945366b721e062abcbc42c16ded00179f8f3bfa8c645d73"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes()",
@@ -3585,7 +3994,8 @@
         "path": "src/main/kotlin/example/ktor/Server.kt",
         "start": 1419,
         "end": 1491
-      }
+      },
+      "hash": "b9c095f6ecfeb05f35b894b2db8b5d5400a427e14095ff5ba86ce2bf262b4f64"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.adminRoutes().DELETE /api/admin/cache",
@@ -3593,7 +4003,8 @@
         "path": "src/main/kotlin/example/ktor/Server.kt",
         "start": 1466,
         "end": 1489
-      }
+      },
+      "hash": "2d12ab622cf2a93cdfe75ecfe4f18e9ade2e23536626fb4a10d8edaee9fe5f7d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.Route.orphan()",
@@ -3601,7 +4012,8 @@
         "path": "src/main/kotlin/example/ktor/Server.kt",
         "start": 1372,
         "end": 1417
-      }
+      },
+      "hash": "c8f2b7c689cc9740cdbc6df7b8e817ff0d70ae8b9e2e1cb48c8b715477bc1a69"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.audit()",
@@ -3609,7 +4021,8 @@
         "path": "src/main/kotlin/example/ktor/Server.kt",
         "start": 1493,
         "end": 1507
-      }
+      },
+      "hash": "3d791c473cffafae3ad254247b25aab097968ff16af19052f87da8740878bc6f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/Server.kt::example.ktor.prefix()",
@@ -3617,7 +4030,8 @@
         "path": "src/main/kotlin/example/ktor/Server.kt",
         "start": 1297,
         "end": 1324
-      }
+      },
+      "hash": "e04aabcec1722417c7f9800a08d22a64c2249891807dfe4f6a1a8ce8693832d3"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.fake()",
@@ -3625,7 +4039,8 @@
         "path": "src/main/kotlin/example/ktor/fake/Fake.kt",
         "start": 186,
         "end": 249
-      }
+      },
+      "hash": "648a05cbc6b871b2b6603faf23ce48bed80c3ce1071bf159beb1d77e3304eb07"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.options(String,()->Unit)",
@@ -3633,7 +4048,8 @@
         "path": "src/main/kotlin/example/ktor/fake/Fake.kt",
         "start": 130,
         "end": 184
-      }
+      },
+      "hash": "ac02868ddec44b57eb6c8aad42507431ad96fd9613aefd7b522bf376e3c58e14"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Fake.kt::example.ktor.fake.routing(()->Unit)",
@@ -3641,7 +4057,8 @@
         "path": "src/main/kotlin/example/ktor/fake/Fake.kt",
         "start": 88,
         "end": 128
-      }
+      },
+      "hash": "2fe36e80e074f8852fe955e206ecf0b814289c05b578aa7bb101d4d9b8307d0a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Application.typed()",
@@ -3649,7 +4066,8 @@
         "path": "src/main/kotlin/example/ktor/fake/Typed.kt",
         "start": 212,
         "end": 322
-      }
+      },
+      "hash": "265cdf42de845edc0c7a546252ab0f333566bdd935ccd12d7a31ffa62e4d1498"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Route.orderRoutes()",
@@ -3657,7 +4075,8 @@
         "path": "src/main/kotlin/example/ktor/fake/Typed.kt",
         "start": 415,
         "end": 464
-      }
+      },
+      "hash": "13f7c7ea430b4f978860ed657a61a06f9d298079ab6abda4f0696c1440b533c8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/fake/Typed.kt::example.ktor.fake.typed.Typed",
@@ -3665,7 +4084,8 @@
         "path": "src/main/kotlin/example/ktor/fake/Typed.kt",
         "start": 146,
         "end": 157
-      }
+      },
+      "hash": "be630c117c0c4b9cc5c555d171d935724bca28fd6e47ee498fab5c24236feb27"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Application.cycle()",
@@ -3673,7 +4093,8 @@
         "path": "src/main/kotlin/example/ktor/hidden/Hidden.kt",
         "start": 717,
         "end": 913
-      }
+      },
+      "hash": "8008d27dc1c423358a673b374390e595f4f420e803319f2a54a9f6c925a9308f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Application.hidden(Route.()->Unit)",
@@ -3681,7 +4102,8 @@
         "path": "src/main/kotlin/example/ktor/hidden/Hidden.kt",
         "start": 192,
         "end": 304
-      }
+      },
+      "hash": "3d8171a8d1a7f6172a7ebeebb5ae4adb7aedc606a673397c2f8c6f8345c10fd2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Application.local()",
@@ -3689,7 +4111,8 @@
         "path": "src/main/kotlin/example/ktor/hidden/Hidden.kt",
         "start": 383,
         "end": 537
-      }
+      },
+      "hash": "196fbdc1aced211c4d0fa7e1a68f49900787d7ac2f04c074cb1a125edc91e53e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.again()",
@@ -3697,7 +4120,8 @@
         "path": "src/main/kotlin/example/ktor/hidden/Hidden.kt",
         "start": 958,
         "end": 1046
-      }
+      },
+      "hash": "ea43c39dda7dc68dc14c20f68dc1e16a1426a72aa43c49bd65485a6987ca6224"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.again().GET /cyc/loop",
@@ -3705,7 +4129,8 @@
         "path": "src/main/kotlin/example/ktor/hidden/Hidden.kt",
         "start": 1035,
         "end": 1038
-      }
+      },
+      "hash": "bdb534fba3e8f2530bda34b5d3b953c0c9b6d811fa339b5579661ac4e05fdf2d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.catalog()",
@@ -3713,7 +4138,8 @@
         "path": "src/main/kotlin/example/ktor/hidden/Hidden.kt",
         "start": 539,
         "end": 580
-      }
+      },
+      "hash": "7199dc9f5b22f636695ba151f6287327f82759c0b802d71e8c2969b54adb3196"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.users()",
@@ -3721,7 +4147,8 @@
         "path": "src/main/kotlin/example/ktor/hidden/Hidden.kt",
         "start": 582,
         "end": 621
-      }
+      },
+      "hash": "cfb284dc4cd8a199d5a4e5344117fbdeba843483e881dfb786b523e021529e22"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Routing.top()",
@@ -3729,7 +4156,8 @@
         "path": "src/main/kotlin/example/ktor/hidden/Hidden.kt",
         "start": 915,
         "end": 956
-      }
+      },
+      "hash": "d4b54a4f79cddfdb4122804087a88b2fa841119e0e83ad5c69589068524213c6"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Routing.top().GET /top",
@@ -3737,7 +4165,8 @@
         "path": "src/main/kotlin/example/ktor/hidden/Hidden.kt",
         "start": 951,
         "end": 954
-      }
+      },
+      "hash": "bdb534fba3e8f2530bda34b5d3b953c0c9b6d811fa339b5579661ac4e05fdf2d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes()",
@@ -3745,7 +4174,8 @@
         "path": "src/main/kotlin/example/ktor/orders/OrderRoutes.kt",
         "start": 330,
         "end": 519
-      }
+      },
+      "hash": "4e532de32f0128afa8216b81fd7dd67d9aa6ce9022896896f54573fa5fc88680"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().GET /api/admin/orders",
@@ -3753,7 +4183,8 @@
         "path": "src/main/kotlin/example/ktor/orders/OrderRoutes.kt",
         "start": 391,
         "end": 442
-      }
+      },
+      "hash": "01000af017970e0115db93d6b4f438995ca64195174564c4a70367567fc3d958"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.Route.orderRoutes().PATCH /api/admin/orders/{}",
@@ -3761,7 +4192,8 @@
         "path": "src/main/kotlin/example/ktor/orders/OrderRoutes.kt",
         "start": 467,
         "end": 511
-      }
+      },
+      "hash": "4344e7b01f9a6beb415b5881ac36ac7bda290ec428e7e9e9c4d0af3a3d48375d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/ktor/orders/OrderRoutes.kt::example.ktor.orders.listing()",
@@ -3769,7 +4201,8 @@
         "path": "src/main/kotlin/example/ktor/orders/OrderRoutes.kt",
         "start": 521,
         "end": 553
-      }
+      },
+      "hash": "4297444a7837592d0c059be7a4573564d0fc72e39ff3726024642d02bbf4e1d2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge",
@@ -3777,7 +4210,8 @@
         "path": "src/main/kotlin/example/legacy/Gauge.kt",
         "start": 165,
         "end": 204
-      }
+      },
+      "hash": "428ddde07247c391d7cb4cbb985e75f7535914258f588865c6946d07be0cb36e"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.read()",
@@ -3785,7 +4219,8 @@
         "path": "src/main/kotlin/example/legacy/Gauge.kt",
         "start": 183,
         "end": 202
-      }
+      },
+      "hash": "3c4df1f89fb2ae281a79d69bbdb366ee6bb379f145462b85f86747cecd20d3b1"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Gauge.reset()",
@@ -3793,7 +4228,8 @@
         "path": "src/main/kotlin/example/legacy/Gauge.kt",
         "start": 206,
         "end": 226
-      }
+      },
+      "hash": "5714e7a50b32e87d6fb6f5b17568e090f72441636a23953d83679ca6cf7b65d8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Meter",
@@ -3801,7 +4237,8 @@
         "path": "src/main/kotlin/example/legacy/Gauge.kt",
         "start": 228,
         "end": 248
-      }
+      },
+      "hash": "4607f7c39743d29fe5d75671a6743958ee6aaf31987c5b1a0757d20542eea15a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.Meter.ext(Int)",
@@ -3809,7 +4246,8 @@
         "path": "src/main/kotlin/example/legacy/Gauge.kt",
         "start": 250,
         "end": 274
-      }
+      },
+      "hash": "1e18cab63832dd40cf9016b06020fc7256fa1516ae0b193a9a3e697e5c711e19"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)",
@@ -3817,7 +4255,8 @@
         "path": "src/main/kotlin/example/legacy/Gauge.kt",
         "start": 276,
         "end": 353
-      }
+      },
+      "hash": "d63c50af30a43a7a0a89f1b0872034f6976bfda19d8d679f2f0e42149d848516"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/PortExt.kt::example.legacy.Port.ext(String)",
@@ -3825,7 +4264,8 @@
         "path": "src/main/kotlin/example/legacy/PortExt.kt",
         "start": 99,
         "end": 125
-      }
+      },
+      "hash": "265c0e4f56037768dcd70f2115f81640bbb27e431604f78f4bde747f130c606d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/legacy/PortExt.kt::example.legacy.String.length()",
@@ -3833,7 +4273,8 @@
         "path": "src/main/kotlin/example/legacy/PortExt.kt",
         "start": 127,
         "end": 155
-      }
+      },
+      "hash": "60328af0a079c4121a46a5833a255bb9cb2862e67aeb07cd95fbd2864e29d7e5"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/other/Locals.kt::example.other.param(String)",
@@ -3841,7 +4282,8 @@
         "path": "src/main/kotlin/example/other/Locals.kt",
         "start": 204,
         "end": 274
-      }
+      },
+      "hash": "efd15d045a7749b7c99ac6352ef92af3c25beb89ac14cb5283460b95640ff001"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/other/Locals.kt::example.other.shadow()",
@@ -3849,7 +4291,8 @@
         "path": "src/main/kotlin/example/other/Locals.kt",
         "start": 140,
         "end": 202
-      }
+      },
+      "hash": "60c249f0057655e10f110fe49113e5a90dd785f28445feca745c99ab49349b29"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/other/Others.kt::example.other.Cache.describe()",
@@ -3857,7 +4300,8 @@
         "path": "src/main/kotlin/example/other/Others.kt",
         "start": 115,
         "end": 153
-      }
+      },
+      "hash": "9d811d37817caff7542686254c640dea1851c5c9340fe3f5d91b1cf7fe9a79be"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/other/Others.kt::example.other.String.reversed()",
@@ -3865,7 +4309,8 @@
         "path": "src/main/kotlin/example/other/Others.kt",
         "start": 155,
         "end": 191
-      }
+      },
+      "hash": "cac5de1ddfb2c4b72bd3118d767bd608bf0a3eeee3d2155581a82764e902610d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named",
@@ -3873,7 +4318,8 @@
         "path": "src/main/kotlin/example/platform/named/Named.kt",
         "start": 194,
         "end": 366
-      }
+      },
+      "hash": "635dd24d4b3052e43b9e2a1f24026edfff9de965b9e91514ff9abc02a755f9ae"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()",
@@ -3881,7 +4327,8 @@
         "path": "src/main/kotlin/example/platform/named/Named.kt",
         "start": 222,
         "end": 285
-      }
+      },
+      "hash": "5c3835f51dd6afec661ce2bb1619fe1987946a03b8c026944ae2f07bfb4fac6d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.hold(Clock)",
@@ -3889,7 +4336,8 @@
         "path": "src/main/kotlin/example/platform/named/Named.kt",
         "start": 291,
         "end": 364
-      }
+      },
+      "hash": "88c1b4010517490918dc3f5aadc9df58aefb41b0199e90928b6210944f16df3d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred",
@@ -3897,7 +4345,8 @@
         "path": "src/main/kotlin/example/platform/star/Starred.kt",
         "start": 58,
         "end": 122
-      }
+      },
+      "hash": "de35bc41f48cadfd329f343f5ea69b3d4e142ebeae9b283d0ea47c118c0d1760"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/platform/star/Starred.kt::example.platform.star.Starred.go()",
@@ -3905,7 +4354,8 @@
         "path": "src/main/kotlin/example/platform/star/Starred.kt",
         "start": 88,
         "end": 120
-      }
+      },
+      "hash": "1d21cd0ce032d9938b6c873341e510494506da179e620966a50cb067ec0876f7"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base",
@@ -3913,7 +4363,8 @@
         "path": "src/main/kotlin/example/stars/Base.kt",
         "start": 23,
         "end": 115
-      }
+      },
+      "hash": "40474b54d7bb6dc3cf85de5e10f9d32096011bb0e803108f20a6f7c0798581be"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base.mark(Int)",
@@ -3921,7 +4372,8 @@
         "path": "src/main/kotlin/example/stars/Base.kt",
         "start": 45,
         "end": 64
-      }
+      },
+      "hash": "8199a6b562d0247ed1c9bdcd78ee0fe3e7301beeab60b0214ba8ae10d98b24d0"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Base.runIt(Int,()->Unit)",
@@ -3929,7 +4381,8 @@
         "path": "src/main/kotlin/example/stars/Base.kt",
         "start": 70,
         "end": 113
-      }
+      },
+      "hash": "80cd78007cc4147c0891f0d6da12a6344b6168f3cf3748caadd26aef5239e8c2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Face",
@@ -3937,7 +4390,8 @@
         "path": "src/main/kotlin/example/stars/Base.kt",
         "start": 117,
         "end": 153
-      }
+      },
+      "hash": "0ed90f95b42b15a9a6f2b1cac724760b8f0d5ad4d260944d8199c4e2ff5e3746"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/stars/Base.kt::example.stars.Face.face()",
@@ -3945,7 +4399,8 @@
         "path": "src/main/kotlin/example/stars/Base.kt",
         "start": 138,
         "end": 151
-      }
+      },
+      "hash": "ebe47fe02370674f06ffd359367bb95541b49071bbc2ab346aedc5b73e34ffa0"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both",
@@ -3953,7 +4408,8 @@
         "path": "src/main/kotlin/example/stars/both/Both.kt",
         "start": 131,
         "end": 206
-      }
+      },
+      "hash": "417dfb5e691d479fa1c26956369cff032bf88c38c20d4aa97eff176fbf93013b"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()",
@@ -3961,7 +4417,8 @@
         "path": "src/main/kotlin/example/stars/both/Both.kt",
         "start": 157,
         "end": 204
-      }
+      },
+      "hash": "53457072d5dd18b68e28f48c7678f0036e23a1ad0f423092dc983b5709010703"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base",
@@ -3969,7 +4426,8 @@
         "path": "src/main/kotlin/example/stars/other/Base.kt",
         "start": 29,
         "end": 72
-      }
+      },
+      "hash": "7536a463f7353f077c7395db47c831727a4b34bd980492d7cb344e83c2ab74d2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/stars/other/Base.kt::example.stars.other.Base.mark(Int)",
@@ -3977,7 +4435,8 @@
         "path": "src/main/kotlin/example/stars/other/Base.kt",
         "start": 51,
         "end": 70
-      }
+      },
+      "hash": "8199a6b562d0247ed1c9bdcd78ee0fe3e7301beeab60b0214ba8ae10d98b24d0"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub",
@@ -3985,7 +4444,8 @@
         "path": "src/main/kotlin/example/stars/sub/Sub.kt",
         "start": 144,
         "end": 273
-      }
+      },
+      "hash": "c5e52afa9b686b82730f95af6973e973227887ea0e5c23ea4ef1dd5b8bfaf923"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()",
@@ -3993,7 +4453,8 @@
         "path": "src/main/kotlin/example/stars/sub/Sub.kt",
         "start": 175,
         "end": 271
-      }
+      },
+      "hash": "be97db5209d42667dd3bdd17bd3f8fb22b47c926024cee6e9ccff013216071d8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two",
@@ -4001,7 +4462,8 @@
         "path": "src/main/kotlin/example/stars/two/Two.kt",
         "start": 139,
         "end": 213
-      }
+      },
+      "hash": "7726b8487ac08fd298fd0f5c2a920c2bdf2410a3f2728d042f3b4fb6bb30a203"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/stars/two/Two.kt::example.stars.two.Two.go()",
@@ -4009,7 +4471,8 @@
         "path": "src/main/kotlin/example/stars/two/Two.kt",
         "start": 164,
         "end": 211
-      }
+      },
+      "hash": "53457072d5dd18b68e28f48c7678f0036e23a1ad0f423092dc983b5709010703"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.FilePrivate",
@@ -4017,7 +4480,8 @@
         "path": "src/main/kotlin/example/util/Hidden.kt",
         "start": 237,
         "end": 262
-      }
+      },
+      "hash": "df0424b0561b70368a347dbb4faeedec0d2780e54896075f47df25c0797ef6b2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.Hidden",
@@ -4025,7 +4489,8 @@
         "path": "src/main/kotlin/example/util/Hidden.kt",
         "start": 22,
         "end": 143
-      }
+      },
+      "hash": "8c6f18d2882b46e098e2f2205a4d71f3760c0eca286421e6f708d0353e44f76d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.closed()",
@@ -4033,7 +4498,8 @@
         "path": "src/main/kotlin/example/util/Hidden.kt",
         "start": 41,
         "end": 70
-      }
+      },
+      "hash": "81fdd1720e074f8a792d66bcedaca4678a24289c89329ae0d147e29aebb2a6b2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.shared()",
@@ -4041,7 +4507,8 @@
         "path": "src/main/kotlin/example/util/Hidden.kt",
         "start": 76,
         "end": 113
-      }
+      },
+      "hash": "eb9dba398b7855f421437ee83b536999d8c42f326ab2b0428369ba7808a0b72b"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.Hidden.visible()",
@@ -4049,7 +4516,8 @@
         "path": "src/main/kotlin/example/util/Hidden.kt",
         "start": 119,
         "end": 141
-      }
+      },
+      "hash": "c209c8ff4bb3fe5f561315e2f3ca158377993409d94afa6c2d55c796cdec09d9"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Hidden.kt::example.util.viaPackage()",
@@ -4057,7 +4525,8 @@
         "path": "src/main/kotlin/example/util/Hidden.kt",
         "start": 205,
         "end": 235
-      }
+      },
+      "hash": "0cff2d0cf8cbfae20e7c5894317c632e2933005a3491c6b2aa7c35eccab02153"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Tools.kt::example.util.Tools",
@@ -4065,7 +4534,8 @@
         "path": "src/main/kotlin/example/util/Tools.kt",
         "start": 22,
         "end": 100
-      }
+      },
+      "hash": "855ebe1e367964ef061176823f9849ff181942ba96f142f697d2d7fa544ffe5d"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Tools.kt::example.util.Tools.doubled()",
@@ -4073,7 +4543,8 @@
         "path": "src/main/kotlin/example/util/Tools.kt",
         "start": 76,
         "end": 98
-      }
+      },
+      "hash": "d6b0f2392cb697740cdd53ce374dacb7bc836ac25dabfdd7fac70f7862827d6c"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Tools.kt::example.util.Tools.single()",
@@ -4081,7 +4552,8 @@
         "path": "src/main/kotlin/example/util/Tools.kt",
         "start": 41,
         "end": 70
-      }
+      },
+      "hash": "6d1dc227895feb2a23db6e4cbca76729aed47480891f1e2fb4c1e9f2bed4e48b"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Tools.kt::example.util.internalTool()",
@@ -4089,7 +4561,8 @@
         "path": "src/main/kotlin/example/util/Tools.kt",
         "start": 175,
         "end": 211
-      }
+      },
+      "hash": "e44be2ba67f9b8bdd51df0380f5c0ee2a1e073ef481281d07440fc370cce0b46"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Tools.kt::example.util.tool()",
@@ -4097,7 +4570,8 @@
         "path": "src/main/kotlin/example/util/Tools.kt",
         "start": 102,
         "end": 134
-      }
+      },
+      "hash": "b3ae75913bd20c72a35c0d6b54c1c629f446afbb7e590f7facd204dd35334d48"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/util/Tools.kt::example.util.tool(Int,Int)",
@@ -4105,7 +4579,8 @@
         "path": "src/main/kotlin/example/util/Tools.kt",
         "start": 136,
         "end": 173
-      }
+      },
+      "hash": "ad36c7490e954bb6cf4a9afc35879525cfd6acdd7888986eda52845f50a16213"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/Api.kt::example.web.Api",
@@ -4113,7 +4588,8 @@
         "path": "src/main/kotlin/example/web/Api.kt",
         "start": 55,
         "end": 98
-      }
+      },
+      "hash": "922c299461b10b79421822dda4e0d660a084447d3372c62b0ea144fcb1abda27"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController",
@@ -4121,7 +4597,8 @@
         "path": "src/main/kotlin/example/web/HealthController.kt",
         "start": 354,
         "end": 532
-      }
+      },
+      "hash": "fa044ea1127a9b02dadfb6f963bd9f68b87aeaa98992f7932914a0d9c2270e0c"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.Companion",
@@ -4129,7 +4606,8 @@
         "path": "src/main/kotlin/example/web/HealthController.kt",
         "start": 426,
         "end": 472
-      }
+      },
+      "hash": "e067af68e5be550ad27c2889b633de7edc21ce9bb502473142fc224e23d3caf0"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.live()",
@@ -4137,7 +4615,8 @@
         "path": "src/main/kotlin/example/web/HealthController.kt",
         "start": 478,
         "end": 530
-      }
+      },
+      "hash": "d56f7ac1f8f78083ad77a39a0df82a3c65547a3bca3d520d0c987e4a96e79051"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController",
@@ -4145,7 +4624,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 563,
         "end": 1385
-      }
+      },
+      "hash": "aaf62012a56e1911d58c17aef140206301ee523f001df196abc1332c696261d8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.Companion",
@@ -4153,7 +4633,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 631,
         "end": 690
-      }
+      },
+      "hash": "8c6f8267a3bcf45e5a52fee6ae2e566f9d2c74cc449448cbf9e5eb35ef9794d8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.any()",
@@ -4161,7 +4642,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 1333,
         "end": 1383
-      }
+      },
+      "hash": "4fe88e2fe48c691d6359e232b2ef885773dfb4963900cf0725f7676806eeb67c"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()",
@@ -4169,7 +4651,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 827,
         "end": 897
-      }
+      },
+      "hash": "ba0d4ae61067d00fd7482a732ea45cf3131c2744579ff430027335a822321c5f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.fetch(String)",
@@ -4177,7 +4660,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 741,
         "end": 821
-      }
+      },
+      "hash": "4293cbe9e07a0aec2e6d4c918dc9dcffeb630c75be7d6ce51323adeeb11df097"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.flag()",
@@ -4185,7 +4669,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 994,
         "end": 1054
-      }
+      },
+      "hash": "1fbfefe0f8f8b8e4e1cb601400d8bd6629c5b201b212e0852fa5624b537c86e2"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.list()",
@@ -4193,7 +4678,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 696,
         "end": 735
-      }
+      },
+      "hash": "ae1451c826e770d68054c8ff7a6785bd0a3c8a1883839776c962755711513a5f"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.remove()",
@@ -4201,7 +4687,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 1060,
         "end": 1103
-      }
+      },
+      "hash": "9cafe050313ce6b3a60cbd6261f88ef564346226e59a8e7097ded129b052ac4c"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.replace()",
@@ -4209,7 +4696,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 903,
         "end": 988
-      }
+      },
+      "hash": "adb6bc5c10094ec001a16fbb6efd55c810d701fd503ce3e147e39b3d947d2df4"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.several()",
@@ -4217,7 +4705,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 1109,
         "end": 1225
-      }
+      },
+      "hash": "cca1788323adf0fb0cb167d53e84a60fb627b83836c2cc99f986e4b480c08a10"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.single()",
@@ -4225,7 +4714,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 1231,
         "end": 1327
-      }
+      },
+      "hash": "c6e364463d932570e75b868856caa8dd6422515ea75d0b0646e92f14ef9911eb"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web.PageController",
@@ -4233,7 +4723,8 @@
         "path": "src/main/kotlin/example/web/PageController.kt",
         "start": 129,
         "end": 224
-      }
+      },
+      "hash": "d14b31f048e27d4c1e7b488dc67ce1f4d58fce8041a4c724bbfc3b6f7dd006dc"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web.PageController.page()",
@@ -4241,7 +4732,8 @@
         "path": "src/main/kotlin/example/web/PageController.kt",
         "start": 168,
         "end": 222
-      }
+      },
+      "hash": "3d03fdb83fdb056e9ca96b84286242e8aae22ef0cb4559219071a2e66bde15a7"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController",
@@ -4249,7 +4741,8 @@
         "path": "src/main/kotlin/example/web/StarController.kt",
         "start": 71,
         "end": 272
-      }
+      },
+      "hash": "b933c5c29649b4f93790a1c8db0b2b7607eb1f1f92b3df4ae8033d893c0d7ae3"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.one()",
@@ -4257,7 +4750,8 @@
         "path": "src/main/kotlin/example/web/StarController.kt",
         "start": 139,
         "end": 185
-      }
+      },
+      "hash": "fda62c8c31a6f7a75ac3dc145a01a6cc2a206c2d5ebc4905321d78aed5d34f26"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.removeAll()",
@@ -4265,7 +4759,8 @@
         "path": "src/main/kotlin/example/web/StarController.kt",
         "start": 191,
         "end": 270
-      }
+      },
+      "hash": "c58adab4fb56a46b3580a5ebf849c83ab7453fa85a9f90c478b90eb995b6d9f1"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController",
@@ -4273,7 +4768,8 @@
         "path": "src/main/kotlin/example/web/VarargController.kt",
         "start": 324,
         "end": 627
-      }
+      },
+      "hash": "b6ec7e945ae9b96b179d097e773443d2d4d7e16384df199db37ee74503cfed14"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()",
@@ -4281,7 +4777,8 @@
         "path": "src/main/kotlin/example/web/VarargController.kt",
         "start": 454,
         "end": 525
-      }
+      },
+      "hash": "2ec240e2d1bba4fe857f9b29cd50469b51caec71fc6aa2849e6db2afbeef6de8"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()",
@@ -4289,7 +4786,8 @@
         "path": "src/main/kotlin/example/web/VarargController.kt",
         "start": 397,
         "end": 448
-      }
+      },
+      "hash": "8834f2f1468d7bee35c70ce4f644426887dafc75c22ca85429419e8304074e5a"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()",
@@ -4297,7 +4795,8 @@
         "path": "src/main/kotlin/example/web/VarargController.kt",
         "start": 531,
         "end": 625
-      }
+      },
+      "hash": "b7353b88414d04b8c01017117829bca35b5b1c0b100e4528358dddb1bcb4c570"
     }
   ],
   "calls": [
@@ -6218,7 +6717,8 @@
         "path": "src/main/kotlin/example/Shapes.kt",
         "start": 2301,
         "end": 2308
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/Shapes.kt::example.open()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/calls/Imports.kt::example.calls.imported()::Legacy.make#0",
@@ -6849,7 +7349,8 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 1146,
         "end": 1448
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onInvoice(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing::RabbitListener#1",
@@ -6860,7 +7361,8 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 1492,
         "end": 1538
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRefund(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing::RabbitListener#2",
@@ -6871,7 +7373,8 @@
         "path": "src/main/kotlin/example/channels/Billing.kt",
         "start": 1581,
         "end": 1618
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Billing.kt::example.channels.Billing.onRepo(Order)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.notifyCustomer(String)::jms.convertAndSend#0",
@@ -7055,7 +7558,8 @@
         "path": "src/main/kotlin/example/channels/Delivery.kt",
         "start": 830,
         "end": 873
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Delivery.kt::example.channels.Delivery.onNotification(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Receivers.kt::example.channels.Receivers.Holder.viaExtension()::kafka.send#0",
@@ -7308,7 +7812,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 1146,
         "end": 1221
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onSale(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales::KafkaListener#1",
@@ -7319,7 +7824,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 1262,
         "end": 1311
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onMissing(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales::KafkaListener#2",
@@ -7330,7 +7836,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 1355,
         "end": 1414
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onShipped(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales::KafkaListener#3",
@@ -7341,7 +7848,8 @@
         "path": "src/main/kotlin/example/channels/Sales.kt",
         "start": 1458,
         "end": 1549
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/channels/Sales.kt::example.channels.Sales.onEurope(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/channels/Streams.kt::example.channels.Streams.consume()::Consumer.from#0",
@@ -8817,7 +9325,8 @@
         "path": "src/main/kotlin/example/declarative/Archive.kt",
         "start": 161,
         "end": 181
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Archive.find(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal::DELETE#0",
@@ -8828,7 +9337,8 @@
         "path": "src/main/kotlin/example/declarative/Archive.kt",
         "start": 312,
         "end": 335
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Journal.drop(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes::PUT#0",
@@ -8839,7 +9349,8 @@
         "path": "src/main/kotlin/example/declarative/Archive.kt",
         "start": 502,
         "end": 515
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes.save()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Elsewhere.kt::example.declarative.Elsewhere.notes()::retrofit.create#0",
@@ -8917,7 +9428,8 @@
         "path": "src/main/kotlin/example/declarative/Ledger.kt",
         "start": 249,
         "end": 269
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.entry(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger::POST#0",
@@ -8928,7 +9440,8 @@
         "path": "src/main/kotlin/example/declarative/Ledger.kt",
         "start": 327,
         "end": 343
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.record()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan::GET#0",
@@ -8939,7 +9452,8 @@
         "path": "src/main/kotlin/example/declarative/Orphan.kt",
         "start": 147,
         "end": 162
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/declarative/Orphan.kt::example.declarative.Orphan.get()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified::retrofit2.http.GET#0",
@@ -8950,7 +9464,8 @@
         "path": "src/main/kotlin/example/declarative/Qualified.kt",
         "start": 112,
         "end": 136
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified.a()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/declarative/Reified.kt::example.declarative.Reified.archive()::retrofit.create#0",
@@ -11942,7 +12457,8 @@
         "path": "src/main/kotlin/example/web/HealthController.kt",
         "start": 478,
         "end": 498
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.live()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web::RequestMapping#0",
@@ -11953,7 +12469,8 @@
         "path": "src/main/kotlin/example/web/HealthController.kt",
         "start": 370,
         "end": 396
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web::RestController#0",
@@ -11964,7 +12481,8 @@
         "path": "src/main/kotlin/example/web/HealthController.kt",
         "start": 354,
         "end": 369
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/HealthController.kt::example.web.HealthController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::DeleteMapping#0",
@@ -11975,7 +12493,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 1060,
         "end": 1083
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.remove()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::GetMapping#0",
@@ -11986,7 +12505,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 696,
         "end": 707
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.list()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::GetMapping#1",
@@ -11997,7 +12517,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 741,
         "end": 762
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.fetch(String)"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::PatchMapping#0",
@@ -12008,7 +12529,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 994,
         "end": 1026
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.flag()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::PostMapping#0",
@@ -12019,7 +12541,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 827,
         "end": 867
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.create()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::PutMapping#0",
@@ -12030,7 +12553,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 903,
         "end": 957
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.replace()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::RequestMapping#0",
@@ -12041,7 +12565,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 1109,
         "end": 1194
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.several()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::RequestMapping#1",
@@ -12052,7 +12577,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 1231,
         "end": 1297
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.single()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController::RequestMapping#2",
@@ -12063,7 +12589,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 1333,
         "end": 1356
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController.any()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web::RequestMapping#0",
@@ -12074,7 +12601,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 579,
         "end": 602
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web::RestController#0",
@@ -12085,7 +12613,8 @@
         "path": "src/main/kotlin/example/web/OrderController.kt",
         "start": 563,
         "end": 578
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/OrderController.kt::example.web.OrderController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web.PageController::GetMapping#0",
@@ -12096,7 +12625,8 @@
         "path": "src/main/kotlin/example/web/PageController.kt",
         "start": 168,
         "end": 194
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web.PageController.page()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web::Controller#0",
@@ -12107,7 +12637,8 @@
         "path": "src/main/kotlin/example/web/PageController.kt",
         "start": 129,
         "end": 140
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/PageController.kt::example.web.PageController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController::GetMapping#0",
@@ -12118,7 +12649,8 @@
         "path": "src/main/kotlin/example/web/StarController.kt",
         "start": 139,
         "end": 158
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.one()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController::RequestMapping#0",
@@ -12129,7 +12661,8 @@
         "path": "src/main/kotlin/example/web/StarController.kt",
         "start": 191,
         "end": 247
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController.removeAll()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web::RequestMapping#0",
@@ -12140,7 +12673,8 @@
         "path": "src/main/kotlin/example/web/StarController.kt",
         "start": 87,
         "end": 111
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web::RestController#0",
@@ -12151,7 +12685,8 @@
         "path": "src/main/kotlin/example/web/StarController.kt",
         "start": 71,
         "end": 86
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/StarController.kt::example.web.StarController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()::arrayOf#0",
@@ -12184,7 +12719,8 @@
         "path": "src/main/kotlin/example/web/VarargController.kt",
         "start": 397,
         "end": 420
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController::PostMapping#0",
@@ -12195,7 +12731,8 @@
         "path": "src/main/kotlin/example/web/VarargController.kt",
         "start": 454,
         "end": 495
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController::RequestMapping#0",
@@ -12206,7 +12743,8 @@
         "path": "src/main/kotlin/example/web/VarargController.kt",
         "start": 531,
         "end": 598
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web::RequestMapping#0",
@@ -12217,7 +12755,8 @@
         "path": "src/main/kotlin/example/web/VarargController.kt",
         "start": 340,
         "end": 367
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController"
     },
     {
       "id": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web::RestController#0",
@@ -12228,7 +12767,8 @@
         "path": "src/main/kotlin/example/web/VarargController.kt",
         "start": 324,
         "end": 339
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController"
     }
   ],
   "providers": [

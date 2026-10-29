@@ -26,6 +26,8 @@ qué espera el proyecto de ti. Al participar, aceptas seguir el
 
 - Busca un issue abierto que ya cubra tu idea. Si no hay, abre uno. Para cambios grandes,
   conversa en el issue antes de escribir código.
+- Para una conclusión errónea de Meada (drift, enlace o nivel), usa el formulario `inference`, junto
+  a los de bug y de feature; reemplaza los nombres privados por marcadores como `repoA` y `fn1`.
 - Los issues con la etiqueta `good first issue` están pensados para quien llega, y `help wanted`
   marca dónde hace más falta ayuda.
 - El alcance de la v1 y el orden del trabajo están en el

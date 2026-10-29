@@ -554,6 +554,7 @@ serve = "acme.cli:main"
                         start: 0,
                         end: 0,
                     },
+                    hash: String::new(),
                 })
                 .collect(),
             manifests: (manifests.iter())

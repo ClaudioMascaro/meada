@@ -17,7 +17,8 @@
         "path": "src/Kit/Pricing/Order.cs",
         "start": 384,
         "end": 441
-      }
+      },
+      "hash": "bff8c44e9b6b3dd61dbe303ea7fd746cb3eee310f86a69cd70c4bde0f34490c7"
     },
     {
       "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Audit.Run()",
@@ -25,7 +26,8 @@
         "path": "src/Kit/Pricing/Order.cs",
         "start": 411,
         "end": 439
-      }
+      },
+      "hash": "7f312ae6de6e245663ffb447bfd607c3fa0350b92039af204bd431c185d3874c"
     },
     {
       "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order",
@@ -33,7 +35,8 @@
         "path": "src/Kit/Pricing/Order.cs",
         "start": 32,
         "end": 382
-      }
+      },
+      "hash": "446de5d23421539618f59c8069ae92684978c6f3af517565d29965314fb1144a"
     },
     {
       "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Of(int)",
@@ -41,7 +44,8 @@
         "path": "src/Kit/Pricing/Order.cs",
         "start": 171,
         "end": 231
-      }
+      },
+      "hash": "9bb9a9ad90e219d5a4ae5a0bed0e53958f7926cfb8efd6838a62042fcc5267cd"
     },
     {
       "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Order(int)",
@@ -49,7 +53,8 @@
         "path": "src/Kit/Pricing/Order.cs",
         "start": 93,
         "end": 165
-      }
+      },
+      "hash": "51c467b5bf5d6017fbac9c58d47cbbc2f6e9ebed04dd18a72487cb14d5f24ddb"
     },
     {
       "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Subtotal()",
@@ -57,7 +62,8 @@
         "path": "src/Kit/Pricing/Order.cs",
         "start": 281,
         "end": 322
-      }
+      },
+      "hash": "49431f2c13f6de59d03cc9a3df7c3085d1f1d4b8383830bd5c095cafed817dde"
     },
     {
       "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Tax(int)",
@@ -65,7 +71,8 @@
         "path": "src/Kit/Pricing/Order.cs",
         "start": 328,
         "end": 380
-      }
+      },
+      "hash": "7e37b314fdef2d63d0dbb7d6f0c9d386dfc3fda98d64b08f5c1dd2d485655a4a"
     },
     {
       "id": "example.com/dotnet/lib::src/Kit/Pricing/Order.cs::Example.Kit.Pricing.Order.Total()",
@@ -73,7 +80,8 @@
         "path": "src/Kit/Pricing/Order.cs",
         "start": 237,
         "end": 275
-      }
+      },
+      "hash": "2d2f42a86d58aa531f5df50e89294a3ed48fff451064d6e20bd63540c79320ea"
     },
     {
       "id": "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency",
@@ -81,7 +89,8 @@
         "path": "src/Money/Currency.cs",
         "start": 26,
         "end": 143
-      }
+      },
+      "hash": "32ddbcb008902c37903cab4358f713a4cd38f2e0dd12b357f0df39d670004ad5"
     },
     {
       "id": "example.com/dotnet/lib::src/Money/Currency.cs::Example.Money.Currency.Cents(int)",
@@ -89,7 +98,8 @@
         "path": "src/Money/Currency.cs",
         "start": 61,
         "end": 141
-      }
+      },
+      "hash": "7e6c386c4749dfeec501b08df6beae7d91eb42b1bf3024537469161b6c83d73b"
     }
   ],
   "calls": [

@@ -1,0 +1,3 @@
+local/overloads-one src/main/java/ex/Box.java:8 ex.Box.run(Object)
+  local/overloads-one src/main/java/ex/Box.java:5 ex.Box.m (3 overloads) [ambiguous: 3 functions or classes named m]
+chain: ambiguous · 0 hops · 1 repos · 59 tokens

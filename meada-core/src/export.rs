@@ -114,6 +114,9 @@ pub struct Span {
 pub struct Symbol {
     pub id: String,
     pub span: Span,
+    /// The BLAKE3 of the span's exact bytes, in hex.
+    #[serde(default)]
+    pub hash: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -128,6 +131,10 @@ pub struct CallSite {
     /// An `inferred` name match narrowed to one of several definitions of its name.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub narrowed: bool,
+    /// The definition an annotation, attribute or decorator call decorates; absent for an
+    /// ordinary call. The caller stays the enclosing scope.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decorates: Option<String>,
 }
 
 /// The provider side of a contract: a symbol that serves it, a file, a repository, the call

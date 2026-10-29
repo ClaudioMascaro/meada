@@ -13,7 +13,8 @@
         "path": "src/call.ts",
         "start": 181,
         "end": 265
-      }
+      },
+      "hash": "6a6958983d08e3827f9901b6438bb8f1a9cfd1c1ff9ac4e971ccb451c8ead32b"
     },
     {
       "id": "example.com/acme/portal::src/call.ts::createReport",
@@ -21,7 +22,8 @@
         "path": "src/call.ts",
         "start": 905,
         "end": 939
-      }
+      },
+      "hash": "6c16bb8b40532b68eed88b79605a230072202b381ec346312d5ec10689acb704"
     },
     {
       "id": "example.com/acme/portal::src/call.ts::fetchAll",
@@ -29,7 +31,8 @@
         "path": "src/call.ts",
         "start": 637,
         "end": 716
-      }
+      },
+      "hash": "426886007173e43212f5f7da4feb2c0e0455b31bf164e167a1c02717da5dc9d6"
     },
     {
       "id": "example.com/acme/portal::src/call.ts::forward",
@@ -37,7 +40,8 @@
         "path": "src/call.ts",
         "start": 1043,
         "end": 1105
-      }
+      },
+      "hash": "6a67699ec3ab0faee96faed0c27d0c9df0755ede56e355b94074ca49bd814c23"
     },
     {
       "id": "example.com/acme/portal::src/call.ts::listAll",
@@ -45,7 +49,8 @@
         "path": "src/call.ts",
         "start": 955,
         "end": 981
-      }
+      },
+      "hash": "3c75d95d3d37d37f3eb150303d33efe3672d717059e697cdad57c39d46feb878"
     },
     {
       "id": "example.com/acme/portal::src/call.ts::listReports",
@@ -53,7 +58,8 @@
         "path": "src/call.ts",
         "start": 767,
         "end": 821
-      }
+      },
+      "hash": "fa0a61003f0f9f28e4539c05e67bd20f0fcb701bf9ebda86e307232749600f87"
     },
     {
       "id": "example.com/acme/portal::src/call.ts::post",
@@ -61,7 +67,8 @@
         "path": "src/call.ts",
         "start": 539,
         "end": 628
-      }
+      },
+      "hash": "641d448d85838906142b7d37e55cf319122b5edae93a3b18e3526509b06381ac"
     },
     {
       "id": "example.com/acme/portal::src/call.ts::putReport",
@@ -69,7 +76,8 @@
         "path": "src/call.ts",
         "start": 837,
         "end": 889
-      }
+      },
+      "hash": "14fcaa43f02fcf93d4f70e86379d071922ccb7b03af26a662f61e4c1bc3149d6"
     },
     {
       "id": "example.com/acme/portal::src/call.ts::send",
@@ -77,7 +85,8 @@
         "path": "src/call.ts",
         "start": 331,
         "end": 438
-      }
+      },
+      "hash": "c3aca08f6051d0428b64c4790a4b89b02415d1f192de06f7fccdd2350abe63de"
     }
   ],
   "calls": [

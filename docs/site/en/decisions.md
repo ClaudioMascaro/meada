@@ -52,6 +52,8 @@ ask. Four environment variables configure it (nothing comes from a file):
 Any gateway that speaks either protocol works: just change the URL. HTTPS anywhere; HTTP only
 to `localhost` or a loopback address.
 
+In server mode, decisions are made in a pipeline, not by the server: see [Decide in a pipeline](server.md#decide-in-a-pipeline).
+
 What leaves the machine, per item: the call, the function that contains it (read from disk) and
 the list of candidates (repository, method and path), plus the id of the repository that makes
 the call. No provider code, no other file. `--show-request` shows all of it first, with the key

@@ -8,8 +8,10 @@ list below. Terms are `GLOSSARY.md`'s; decisions are in `docs/adr/`.
 ## Flow
 
 `Engine::open(dir)` finds the **workspace**, creates or recreates each **repository**'s **index**
-where `Repository::index` says it lives, and ATTACHes every **peer** to the first repository's
-connection as `peer<n>`. Locally the index is the checkout's own `.meada/index.db`. In
+where `Repository::index` says it lives, and keeps one connection per repository (`Engine::dbs`,
+workspace order; SQLite attaches at most 10 databases to one connection, so none is attached):
+`Engine::exports` reads each index through its own, so a workspace has any number of
+repositories. Locally the index is the checkout's own `.meada/index.db`. In
 **server mode**, `Engine::open_manifest(manifest, repo)` builds the workspace from the
 **workspace manifest** instead (`workspace::Manifest`: every listed repository, `repo` first,
 then manifest order, nothing discovered; under an OIDC grant only the granted ones) and each
@@ -19,9 +21,9 @@ The status report and readiness share one `Manifest::read_listed`, including a m
 swap during the informational Valkey probe; `ready` also reuses one listed manifest across
 its normal and locked-index checks. An
 engine opened from a
-manifest opens every index read-only on one connection (`index::open_read`: nothing created,
+manifest opens every index read-only, one connection each (`index::open_read`: nothing created,
 `trusted_schema` off and `SQLITE_DBCONFIG_DEFENSIVE` on, since a generation's index comes from
-a store, one read transaction held until the engine drops, so an answer sees each index as one commit left
+a store, one read transaction per connection held until the engine drops, so an answer sees each index as one commit left
 it and a commit waits for the answer, both up to a busy timeout) and its `refresh()` does
 nothing, so only `meada index --workspace` writes; `open_manifest` is also what `meada export --workspace --repo`
 opens. With the snapshot module (feature `snapshot`, `--generations`), `Engine::open_held`
@@ -866,7 +868,8 @@ one for the area a change touches.
   is `{}`. A provider of every method is `http::ANY::<path>`.
 - Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, documents,
   publishes, packages, dependencies, imports, communities, links, processes}`;
-  `communities` (absent when empty) lists each community as `{name, members}`, by name, with
+  each `symbols` entry is `{id, span, hash}`, `hash` the hex BLAKE3 of the span's exact bytes (`search` kind
+  `duplicate` groups by it); `communities` (absent when empty) lists each community as `{name, members}`, by name, with
   its sorted member identities; `processes` (absent when
   empty) lists the repository's entry points by identity as `{entry_point, kind, label, steps}`,
   `kind` being `route`, `export`, `channel` or `program`, each step `{depth, level, repository, via, node, ...}`: `via`
@@ -1990,7 +1993,8 @@ one for the area a change touches.
   unreadable one, is rebuilt beside it and renamed over it, and `status` says so. One whose stored facts do not
   parse is rebuilt by the first refresh that reads them (when a file changed), which `status`
   cannot tell.
-- The index holds no source text and no values, apart from the argument count, the argument
+- The index holds no source text and no values, apart from the BLAKE3 of each symbol's span
+  (`symbols.hash`, `Def::hash`), the argument count, the argument
   labels and constructor form of an overloaded call (`Call::arity`, `Call::labels`,
   `Call::constructs`), the argument label of a parameter and whether its written type takes a
   trailing closure, or the name it is written as (`Param::label`, `Param::closure`), the names
@@ -1998,7 +2002,8 @@ one for the area a change touches.
   chained call is made on (`Call::on`), whether a Swift call is written under `await` and
   whether a function needs one (`Call::awaited`, `Def::suspends`), the modules a Swift file imports
   `@testable` and the names only their file sees (`Facts::testable`, `Facts::confined`), whether an `inferred` call was narrowed from several
-  definitions of its name (`calls.narrowed`), callable-to-signature and
+  definitions of its name (`calls.narrowed`), the definition a decorating call decorates (`calls.decorates`, the
+  call site's `decorates`), callable-to-signature and
   static-member names (`Facts::overloads`, `Facts::constructors` and
   `Facts::statics`), the namespaces and types a C# file's `global using` directives name
   (`Facts::project`, names as `Facts::imports` holds them), the qualified names of the types a C#
@@ -2416,8 +2421,8 @@ qualification budget does (ADR 0017).
   regular file of at most `SOURCE_MAX` (16 MiB); anything else renders as unavailable, the path
   without its line, as a missing file does. An answer keeps each file it reads, so several
   large files add up.
-- `engine.rs`: one connection attaches every peer, so a workspace reads at most 10 peers
-  (`MAX_PEERS`, SQLite's attach limit). `search` scans every symbol.
+- `engine.rs`: `search` scans every symbol. Kind `duplicate` folds no nested groups (a duplicated
+  class and each of its methods are groups of their own) and has no minimum span size (#254).
 - `index.rs`: every contract is extracted again and every call resolved again on any change
   (rows rewritten only when they differ), and every file whose values the last extraction read
   (`valued`) is parsed again for it: on this repository, a one-line edit of a Rust file parses

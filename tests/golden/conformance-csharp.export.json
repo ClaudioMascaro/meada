@@ -201,7 +201,8 @@
         "path": "legacy/Old.cs",
         "start": 89,
         "end": 145
-      }
+      },
+      "hash": "2cd897b8abaf560e516d1cfa0cf71ac432cdf6fd0fbe1bb7ea84eb6d5c35ef62"
     },
     {
       "id": "example.com/acme/conformance::legacy/Old.cs::Legacy.Old.Run()",
@@ -209,7 +210,8 @@
         "path": "legacy/Old.cs",
         "start": 113,
         "end": 139
-      }
+      },
+      "hash": "417cf5cf6d05c48902f29d090c1f3f03de2afc71cd8aec3f02fc61fd4b708e9a"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board",
@@ -217,7 +219,8 @@
         "path": "src/Acme.Api/Board.Show.cs",
         "start": 58,
         "end": 127
-      }
+      },
+      "hash": "64ab4df6452ddba5ae69b7d9482dfad288044e4e318ad5ae42033c83c8c00c59"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Board.Show.cs::Acme.Api.Board.Show()",
@@ -225,7 +228,8 @@
         "path": "src/Acme.Api/Board.Show.cs",
         "start": 91,
         "end": 125
-      }
+      },
+      "hash": "8349b11e72807df1f365ca1f629838a610f0955d05ec45fb27627b33239509e4"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery",
@@ -233,7 +237,8 @@
         "path": "src/Acme.Api/Channels.Nats.cs",
         "start": 150,
         "end": 801
-      }
+      },
+      "hash": "fd70abfdf20f62f384bf8a3332db3ad8f48aa0a491f88fb49e90bc3de4b78791"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.NatsDelivery(IConnection)",
@@ -241,7 +246,8 @@
         "path": "src/Acme.Api/Channels.Nats.cs",
         "start": 241,
         "end": 314
-      }
+      },
+      "hash": "63ac8a28e506614a31b47d72f86c24d4a1245393f28f12baf92107a8108578af"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Poll()",
@@ -249,7 +255,8 @@
         "path": "src/Acme.Api/Channels.Nats.cs",
         "start": 593,
         "end": 795
-      }
+      },
+      "hash": "0e572e318673e19d78ec774160ddff92d5b35d4ee62b6d8a3bb955ad6089b6d9"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Track(byte[])",
@@ -257,7 +264,8 @@
         "path": "src/Acme.Api/Channels.Nats.cs",
         "start": 324,
         "end": 408
-      }
+      },
+      "hash": "d1a4667c0879937a6d74352f13c78f251b4b9f1169c0aadb5388e2fbba297670"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Watch()",
@@ -265,7 +273,8 @@
         "path": "src/Acme.Api/Channels.Nats.cs",
         "start": 418,
         "end": 583
-      }
+      },
+      "hash": "aa4b75b9e26262801b41125d735e73704b4da9a085653727dd461a9122c33e34"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Nats.cs::Acme.Api.Channels.NatsDelivery.Watch().nats delivery.*.tracked",
@@ -273,7 +282,8 @@
         "path": "src/Acme.Api/Channels.Nats.cs",
         "start": 509,
         "end": 571
-      }
+      },
+      "hash": "d5e35782e84b3eb6dc2627a008186b41769e58500255564d9774e6ce193f677f"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten",
@@ -281,7 +291,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 352,
         "end": 1772
-      }
+      },
+      "hash": "c9cf63139c62a06b0988dbd2b9302ecb473296891507703b99906c9f3bb2127c"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.BusRewritten(ServiceBusClient)",
@@ -289,7 +300,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 666,
         "end": 878
-      }
+      },
+      "hash": "f40cf1579e016f2c1995e928bbb7a74d0a276caaa7f305b5b26b2776b670f0e8"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.BusRewritten(ServiceBusSender)",
@@ -297,7 +309,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 888,
         "end": 959
-      }
+      },
+      "hash": "1f0c95b14614566947e20f4be66a196a9cabff2bd4b1e11079e0ef5e39914ba6"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Constructed(ServiceBusMessage)",
@@ -305,7 +318,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 1124,
         "end": 1230
-      }
+      },
+      "hash": "f1bf7d972832ccd1c28f1c320b36bd82f977fbee60310951e3cbdbd69fb1f937"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Replaced(ServiceBusMessage)",
@@ -313,7 +327,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 1348,
         "end": 1448
-      }
+      },
+      "hash": "859aba53caf3676830093577f5b81fd7dc966dfedf0d87da050ac5b451389694"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Reset()",
@@ -321,7 +336,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 1039,
         "end": 1114
-      }
+      },
+      "hash": "f846832cfe54a9cb89f5cb4bb330b323eaec07ad36e94b8690662df96fb4e42c"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Swapped(ServiceBusMessage)",
@@ -329,7 +345,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 1240,
         "end": 1338
-      }
+      },
+      "hash": "261136626929908e540c85768de72076957cb7e9a1242f1d9a8b4ca0de481a56"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Twice(ServiceBusMessage)",
@@ -337,7 +354,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 1458,
         "end": 1766
-      }
+      },
+      "hash": "cbc17cf5601c2b256204058e0a50aa9546f24b50b08bc4579abbbfb190eb62db"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusRewritten.Use(ServiceBusSender)",
@@ -345,7 +363,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 969,
         "end": 1029
-      }
+      },
+      "hash": "1d1c8f89622cff7a9c39c4713635cbcc4f812f4820687bff7ea126b16937a5a8"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped",
@@ -353,7 +372,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 1870,
         "end": 2763
-      }
+      },
+      "hash": "bfd8091ab14d48cde6976a46f7c6498b9dc28aa4dd6f1129b94b9397bf3ebcc2"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Audit(ServiceBusMessage)",
@@ -361,7 +381,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 2351,
         "end": 2443
-      }
+      },
+      "hash": "0c6a90966821552ace03cbd43a3981cf43a506dffea28b8869435826df82d25e"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.BusWrapped(ServiceBusClient)",
@@ -369,7 +390,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 1960,
         "end": 2024
-      }
+      },
+      "hash": "785680218c8581befeb8e28d94920a756e85690adf63320e2cd00a31a7a40f9b"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.OnOrder(ProcessMessageEventArgs)",
@@ -377,7 +399,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 2684,
         "end": 2757
-      }
+      },
+      "hash": "17ee6102cb5cb7dc259e64b056f0b83d44b9f911d9bb5720e8eca284d55f7bc5"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Order(ServiceBusMessage)",
@@ -385,7 +408,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 2248,
         "end": 2341
-      }
+      },
+      "hash": "c510eb032412402d6e8e07dd060fd95e576fe65f10d2c40bca1a42d59b81c318"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Send(string,ServiceBusMessage)",
@@ -393,7 +417,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 2034,
         "end": 2238
-      }
+      },
+      "hash": "0d09c6b63109d042035357010300e13da5760c9e0b739ce2fd5a98b68d4bd80b"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.BusWrapped.Work()",
@@ -401,7 +426,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 2453,
         "end": 2674
-      }
+      },
+      "hash": "03f999d636ac91bb45011de48b2aa9932e6c1853411f2d291302b00e8f65bcf6"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut",
@@ -409,7 +435,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 2953,
         "end": 4030
-      }
+      },
+      "hash": "51a5708d9afaf64e3f46b6284281fb418fb1173d39e40c82d7d3adb504749fab"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Announce()",
@@ -417,7 +444,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 3181,
         "end": 3517
-      }
+      },
+      "hash": "5dbd10e7f95c7fb238c00700ae1569ea75d377ecde7afb9994c1695380e9cc6c"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.Attend(IChannel)",
@@ -425,7 +453,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 3527,
         "end": 3823
-      }
+      },
+      "hash": "b08423bea774b9cfb8e89b4b5d1597721588d7ebe4602a1bd4ee978082d2b24a"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.OnFirst(object,BasicDeliverEventArgs)",
@@ -433,7 +462,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 3833,
         "end": 3923
-      }
+      },
+      "hash": "bdc69770eeb30b9b9cbb187544dae410dc199c7ed9fac0a029826f94228ec1f6"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.OnSecond(object,BasicDeliverEventArgs)",
@@ -441,7 +471,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 3933,
         "end": 4024
-      }
+      },
+      "hash": "1818c737476fdea7c196de6089631616d27dfd46da7709a3364f37f20883a3bf"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.Writes.cs::Acme.Api.Channels.RabbitFanOut.RabbitFanOut(ConnectionFactory)",
@@ -449,7 +480,8 @@
         "path": "src/Acme.Api/Channels.Writes.cs",
         "start": 3101,
         "end": 3171
-      }
+      },
+      "hash": "4994cd158c7fad0542dfe5ff37203f9404fbd3e5b9f1eeb7ff2c64130a585d90"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch",
@@ -457,7 +489,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 4254,
         "end": 5707
-      }
+      },
+      "hash": "4076f237314213be924fe66c83972832a8ab6ed37b95b3eab0086a732a61229b"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.BusDispatch(ServiceBusClient)",
@@ -465,7 +498,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 4345,
         "end": 4410
-      }
+      },
+      "hash": "74a0e2d55d009ac3e41f7054652f0943342a39877f9df8338bd7323eeb5592a8"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)",
@@ -473,7 +507,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 4708,
         "end": 4933
-      }
+      },
+      "hash": "fd1bca7db3e3d3b9378768a1c65357f4a446cc0a8b17b44617f57801f5632f9d"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.OnDispatch(ProcessMessageEventArgs)",
@@ -481,7 +516,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 5625,
         "end": 5701
-      }
+      },
+      "hash": "cacec20402ccddcecc21c822327516e90086b9fe5a8fd68c05d7153a87206176"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)",
@@ -489,7 +525,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 4420,
         "end": 4698
-      }
+      },
+      "hash": "0b0cbd4ec2412978d35f5cf63bed25cce82a33ecaf4d655429ae81efc379ff7b"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch()",
@@ -497,7 +534,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 5205,
         "end": 5615
-      }
+      },
+      "hash": "40a174c682bc223e684cd7504a11a9d0db28b2c3203a6180d8b61e87decb4184"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch().servicebus dispatch.events",
@@ -505,7 +543,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 5492,
         "end": 5556
-      }
+      },
+      "hash": "ec2287f9138b331e7719d70f952b644bbc90b9b8645d3bf2a6f3e6faa359a4b9"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Work()",
@@ -513,7 +552,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 4943,
         "end": 5195
-      }
+      },
+      "hash": "5d2d024f9876302df921fc3c2593de7a21ef91148cb9690cf8c870303b16e674"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed",
@@ -521,7 +561,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 1186,
         "end": 1612
-      }
+      },
+      "hash": "6ec852a2398813f7e2f26ee856c0743593dd86ef0d7f6180b6b6bb21f3a9993f"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnMissing(IConsumer<string,string>)",
@@ -529,7 +570,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 1444,
         "end": 1606
-      }
+      },
+      "hash": "4d97063e1066525c86bdb5b49ad6ac3591e25d7e73150fcd8ffc8174c440dda5"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaFeed.OnSale()",
@@ -537,7 +579,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 1223,
         "end": 1434
-      }
+      },
+      "hash": "9b7d1cc6a02e9be877981115305ef62da539793784f91d92807c52d8437d12db"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales",
@@ -545,7 +588,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 589,
         "end": 1180
-      }
+      },
+      "hash": "9047c02bbd1efb19cb00e0e5bf628babe642e02bbd6b66408cc7636109320dff"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Created()",
@@ -553,7 +597,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 779,
         "end": 870
-      }
+      },
+      "hash": "674402e907b77d6b517b910060763721108b7dc940b26b07e6d681538a30d46e"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Dynamic()",
@@ -561,7 +606,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 1020,
         "end": 1174
-      }
+      },
+      "hash": "280dce0192d881bbba821b1859b34455bdd81dbb6c4597f7d3c840f459c879bd"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.KafkaSales(IProducer<string,string>)",
@@ -569,7 +615,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 690,
         "end": 769
-      }
+      },
+      "hash": "24adc5c4b52762a6378a48df13f667ce95d330a331c75698017ef25800ef8dd8"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.KafkaSales.Paid()",
@@ -577,7 +624,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 880,
         "end": 1010
-      }
+      },
+      "hash": "d443428c88ccc6e601d87137b102730d27025fac938efb55975f2d731834add5"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing",
@@ -585,7 +633,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 1812,
         "end": 2971
-      }
+      },
+      "hash": "4705db8318c94550764e3bcbe8928cc57a642968d9c51f323841b95fa43a63f8"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend()",
@@ -593,7 +642,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 2289,
         "end": 2863
-      }
+      },
+      "hash": "7a1b23d6d433c849b3056b7056d10d37972594a8813445c0c50a262807769313"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Attend().amqp refunds",
@@ -601,7 +651,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 2704,
         "end": 2754
-      }
+      },
+      "hash": "fb66fd7f5a08edebaeec80f3ff5ac3c89ff4a5eebaed544f256b23ad197c53f1"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Invoice()",
@@ -609,7 +660,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 1974,
         "end": 2133
-      }
+      },
+      "hash": "bcc0aeff509a9bf6e76d64d43437746d78e1f7919eabe21edaee67cbed61ef81"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.OnInvoice(object,BasicDeliverEventArgs)",
@@ -617,7 +669,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 2873,
         "end": 2965
-      }
+      },
+      "hash": "9f72e670001213f54313babb823512c6c9fc816c56ff771a6a74cfc465676520"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.RabbitInvoicing(IChannel)",
@@ -625,7 +678,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 1900,
         "end": 1964
-      }
+      },
+      "hash": "48cbdc0d5dbd93b4312c182d02645384707a323016f9df89ab82e0d23854ab91"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RabbitInvoicing.Refund()",
@@ -633,7 +687,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 2143,
         "end": 2279
-      }
+      },
+      "hash": "9fa966d4351eaddd7eaec1746cbc3ea774185227a2deaed2be95fb17334dca27"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits",
@@ -641,7 +696,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 3572,
         "end": 4083
-      }
+      },
+      "hash": "b679b60bcc581e788c2912b574bf67bb3eabf4ab94570ff02f16b3bf5bad6f51"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Drain()",
@@ -649,7 +705,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 3912,
         "end": 4077
-      }
+      },
+      "hash": "c0e794b645632a65b7e9fb9fbe174ca80c12de16ffa7f9e7ec67382520371268"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Record()",
@@ -657,7 +714,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 3746,
         "end": 3902
-      }
+      },
+      "hash": "8cb20042abc7bb5d700d6cc37a3b41507986acb1169505e18f4b67bbe07ef8b6"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.RedisAudits(IConnectionMultiplexer)",
@@ -665,7 +723,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 3668,
         "end": 3736
-      }
+      },
+      "hash": "a478ec19ca8d81f976fdc75703716e7bc1fcc7ec4250f8a4620676c4d391ec4c"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments",
@@ -673,7 +732,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 3031,
         "end": 3518
-      }
+      },
+      "hash": "18047d53e222dc9b3508a6c87c46605303c3b7aac47fc32bb1826b20fba06998"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Poll()",
@@ -681,7 +741,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 3352,
         "end": 3512
-      }
+      },
+      "hash": "e1f59ab787aba21e971d268ad21adf3ce1474a586c513d1cb17c1f40879af5d7"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Ship()",
@@ -689,7 +750,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 3272,
         "end": 3342
-      }
+      },
+      "hash": "f8a07a90fefb247ffaaa3838abe7dd853f1b6f37393bf26423ffcff1c1e645a7"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.SqsShipments(IAmazonSQS)",
@@ -697,7 +759,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 3211,
         "end": 3262
-      }
+      },
+      "hash": "45efb552424d5c2506a0a7e5a9edd7f190f00147a28d65e30f8b423e79897636"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.Topics",
@@ -705,7 +768,8 @@
         "path": "src/Acme.Api/Channels.cs",
         "start": 258,
         "end": 402
-      }
+      },
+      "hash": "83919bfd94f608a1acaa564782ba1c08a2ac0f53cdbcbc186e29806c2dedc84f"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout",
@@ -713,7 +777,8 @@
         "path": "src/Acme.Api/Checkout.cs",
         "start": 235,
         "end": 884
-      }
+      },
+      "hash": "fd567837a9b3044afacc89befb9da9129652d55ac4dd432e338aad00efa0b277"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Checkout.cs::Acme.Api.Checkout.Run()",
@@ -721,7 +786,8 @@
         "path": "src/Acme.Api/Checkout.cs",
         "start": 343,
         "end": 878
-      }
+      },
+      "hash": "b6319b9c901b21540ec9c2e830338c2eed53cf00a8c3b748d6e43d7fa31e8d2d"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Cli.cs::Acme.Api.Cli",
@@ -729,7 +795,8 @@
         "path": "src/Acme.Api/Cli.cs",
         "start": 102,
         "end": 269
-      }
+      },
+      "hash": "a424416742d4101df1a0395d5cd6583c5470a2a9e63fd9da8183fd6b380c6cb6"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Cli.cs::Acme.Api.Cli.Main(int)",
@@ -737,7 +804,8 @@
         "path": "src/Acme.Api/Cli.cs",
         "start": 208,
         "end": 238
-      }
+      },
+      "hash": "248953f04000daf8acac592b948924668f92443962271fc6a99c4d590b5f9615"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Cli.cs::Acme.Api.Cli.Main(string[])",
@@ -745,7 +813,8 @@
         "path": "src/Acme.Api/Cli.cs",
         "start": 125,
         "end": 202
-      }
+      },
+      "hash": "9f200c7159a9708315707a72738d1d21c007020e5bbd1ab3b3adaab06c3e2929"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Cli.cs::Acme.Api.Cli.Start()",
@@ -753,7 +822,8 @@
         "path": "src/Acme.Api/Cli.cs",
         "start": 244,
         "end": 267
-      }
+      },
+      "hash": "6e30b0e3c59fec29f0cfbc90e73cf7b369ce10a49694570cffbe76f817bded38"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based",
@@ -761,7 +831,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 1779,
         "end": 2653
-      }
+      },
+      "hash": "2f35f15633d8a127f0c204d0734e03f1f108b91412b3503501eb196e5a29dbc3"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Based.Run()",
@@ -769,7 +840,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 2043,
         "end": 2647
-      }
+      },
+      "hash": "a54a13dcd0782e36da17df8dc5dee28a06eee2cd32cda01617e032e6724144a9"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Folds",
@@ -777,7 +849,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 2739,
         "end": 3455
-      }
+      },
+      "hash": "4df9f6f5693378534e46374bdb9510da0eefd3352bf5897700476155185607f5"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Folds.Folds(HttpClient)",
@@ -785,7 +858,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 2881,
         "end": 2932
-      }
+      },
+      "hash": "d90f175018c55bc1e841d714b7c7b70c8bdf67a2246ffcae376e0334cbd28bb6"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Folds.Run(string)",
@@ -793,7 +867,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 2942,
         "end": 3449
-      }
+      },
+      "hash": "8f9e6038e922bfba09132656dde049131854cdb5837caba56c738db0c1d2b172"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Hosts",
@@ -801,7 +876,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 171,
         "end": 353
-      }
+      },
+      "hash": "f5b35653c4e5d547405e3df0a09f933576dee1e35a510abc582d0b556617c366"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads",
@@ -809,7 +885,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 7118,
         "end": 8566
-      }
+      },
+      "hash": "23b0afc7c3b4cfa59952b258b25a20cd79d89601b315e9c67c319e4fdf23578c"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Config()",
@@ -817,7 +894,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 7589,
         "end": 7645
-      }
+      },
+      "hash": "a1ca94e2e4e0f4adac9c3649abd8b40a1a76486b7f8de16850c1633976cefa6e"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Reads(HttpClient,IHttpClientFactory)",
@@ -825,7 +903,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 7419,
         "end": 7579
-      }
+      },
+      "hash": "b857368b81bf13c7825c6035f7e8a26f95babd6a3a72eab65e08c28e501b183b"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)",
@@ -833,7 +912,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 7655,
         "end": 8560
-      }
+      },
+      "hash": "5d4530deb38de49a1993aa3c87659540f461a8c25765b49f8405ba8a045e7706"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned",
@@ -841,7 +921,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 4795,
         "end": 7051
-      }
+      },
+      "hash": "42a3cab20486af432ab0e793f6b9c2a7d2a2b7ad4b0943c0c181bd3c1ae0d4a2"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Hidden(HttpClient)",
@@ -849,7 +930,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 6625,
         "end": 6706
-      }
+      },
+      "hash": "37ca99702e0ccf1a98ebdc33ca354ee5618cc78b8516ec75d49f733fda74f4bf"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Inner",
@@ -857,7 +939,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 6885,
         "end": 7045
-      }
+      },
+      "hash": "6f709816b4b93161ecbdbc2b634393d03acd1283b5258c67ca942869137d3247"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Inner.Run()",
@@ -865,7 +948,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 6975,
         "end": 7035
-      }
+      },
+      "hash": "c0ee108e6b18f9f26bccb885f707683836bf43a24bd798067ef0c43ad0432767"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Prod()",
@@ -873,7 +957,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 5353,
         "end": 5432
-      }
+      },
+      "hash": "561c3b626b24ea3eeb38f288f064ade542a704cbb13ec23e3dc3f4d0c8dab682"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Reassigned(HttpClient)",
@@ -881,7 +966,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 5154,
         "end": 5343
-      }
+      },
+      "hash": "d3a324018c2c9e79718d1b06060b41b2eb7742790b8cd1380a0be2aadf940efb"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)",
@@ -889,7 +975,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 5533,
         "end": 6541
-      }
+      },
+      "hash": "8db0d8b3a7d4d8e437b6086a309084490db9672a21a26389e902b848c22a4495"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Stage()",
@@ -897,7 +984,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 5442,
         "end": 5523
-      }
+      },
+      "hash": "09ab12b33bc84d89431aa8e60d23bedfbc349f2ea7973fd2dbe5c7d2a914ec33"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Use()",
@@ -905,7 +993,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 6716,
         "end": 6826
-      }
+      },
+      "hash": "38f384f93e0608cecda3bb8c296d9110bcf53b634825329b80ae8127be3f8099"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Repo",
@@ -913,7 +1002,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 9243,
         "end": 9337
-      }
+      },
+      "hash": "f9d80458b7ed2df221c6484596cb1b907434d7caca8477d29df5c86327cf1ce7"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Repo.GetAsync(string)",
@@ -921,7 +1011,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 9275,
         "end": 9331
-      }
+      },
+      "hash": "334883ffe3402e2e172bdb1ae9542f63a013a84c4d64ba8889b693413305a4ca"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Settings",
@@ -929,7 +1020,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 8655,
         "end": 9153
-      }
+      },
+      "hash": "723df4cf3a892df8bfc1f38669cb2f24f2259f7125237253a31431124ddc19cb"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Settings.Run()",
@@ -937,7 +1029,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 8931,
         "end": 9147
-      }
+      },
+      "hash": "f779c663ea63c8b3a469eac709e8dbd2a324ecd55a0692be3f388774aaae88b4"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Settings.Settings(HttpClient,IConfiguration)",
@@ -945,7 +1038,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 8782,
         "end": 8921
-      }
+      },
+      "hash": "7503012cfe43cfb823032ca335dca4ed7d07723a5d72d3daf24e2bb217d1ff89"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread",
@@ -953,7 +1047,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 4117,
         "end": 4668
-      }
+      },
+      "hash": "3fbca3efc627c38d6ac43e8c8a897ac512d6270e07e93303146259e13fcff0cf"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Lookup()",
@@ -961,7 +1056,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 4401,
         "end": 4459
-      }
+      },
+      "hash": "06e685ee7b7df1cb771bcc43751d9dca597e13c9e2c64d9e966201866f71c7e4"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Run()",
@@ -969,7 +1065,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 4469,
         "end": 4662
-      }
+      },
+      "hash": "b227d3359789297de5c2a756281ad8802ca02cb4af48a8507e947ac4ea11d7aa"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Unread(HttpClient,IHttpClientFactory)",
@@ -977,7 +1074,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 4247,
         "end": 4391
-      }
+      },
+      "hash": "3d8eb0a354cb71973a31ed322ed12d483eb40cd55314ed7b7ab2a66eebbd670d"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Verbs",
@@ -985,7 +1083,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 409,
         "end": 1681
-      }
+      },
+      "hash": "35c8f11639a5b4420ea68cc05fac9a4065c3f4ddb5cb872e678ceaa8b3a28751"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Verbs.Run(int)",
@@ -993,7 +1092,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 546,
         "end": 1675
-      }
+      },
+      "hash": "405b644a4970c3624630a37df02d4dc98c65a724ad671e0863afa1093e483ac5"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Verbs.Verbs(HttpClient)",
@@ -1001,7 +1101,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 485,
         "end": 536
-      }
+      },
+      "hash": "c9b9bf5b87a3e81f04730a6f499c2cbe66425a06cadeb035da5b5dc86dc9a274"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Wrappers",
@@ -1009,7 +1110,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 3528,
         "end": 4018
-      }
+      },
+      "hash": "b16aaf1c5a3176db1d965fea00677cd48593cbcfb809c678fffabb7414bfb5b2"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Wrappers.Fetch(string)",
@@ -1017,7 +1119,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 3671,
         "end": 3772
-      }
+      },
+      "hash": "e1b55465749f027a939257c4270fe209ed4e5090297706aac5ead9a0d85b6863"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Wrappers.ForOrder(string)",
@@ -1025,7 +1128,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 3782,
         "end": 3849
-      }
+      },
+      "hash": "97b8e09c4494ca4c1f6f67a0ec20239b3a1184ef280f4027d0593bd97e35f4ec"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Wrappers.Run(string)",
@@ -1033,7 +1137,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 3859,
         "end": 4012
-      }
+      },
+      "hash": "3ef824967a528fac638a1b7531a2da1fedafbdc7a56a9fe94765408dab7ddc02"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Wrappers.Wrappers(HttpClient)",
@@ -1041,7 +1146,8 @@
         "path": "src/Acme.Api/Clients.cs",
         "start": 3607,
         "end": 3661
-      }
+      },
+      "hash": "b235115925fbc960d5a97c94c667dc8f9ad76b9fa6c61f73dd77e2b02f45202b"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Contracts.OrderDto",
@@ -1049,7 +1155,8 @@
         "path": "src/Acme.Api/Contracts.cs",
         "start": 31,
         "end": 56
-      }
+      },
+      "hash": "d6ceb26474de4f25350a51497db15a9c7156d0b8b6a915f015c4efcda9c48e96"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Hosting.Shell",
@@ -1057,7 +1164,8 @@
         "path": "src/Acme.Api/Contracts.cs",
         "start": 89,
         "end": 159
-      }
+      },
+      "hash": "5e85ce0317370afba2ab7d07c617212080165987250d7657f36b8ef74e127816"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Contracts.cs::Acme.Hosting.Shell.Start()",
@@ -1065,7 +1173,8 @@
         "path": "src/Acme.Api/Contracts.cs",
         "start": 130,
         "end": 153
-      }
+      },
+      "hash": "ab1c86c038c7f23bd213109eefb241f3cb6deb51cb4817a7ef4a581a04d7ee84"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.OldController",
@@ -1073,7 +1182,8 @@
         "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
         "start": 178,
         "end": 306
-      }
+      },
+      "hash": "d0c8e403e6ffa636cbc450226da4727ca7261caf9f14b78dde7d855cdb6a10af"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.OldController.Old()",
@@ -1081,7 +1191,8 @@
         "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
         "start": 262,
         "end": 304
-      }
+      },
+      "hash": "763c0a9312820f703df7cb0272056bab2fb5d284573c9bce214c0b17649c7314"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.Route",
@@ -1089,7 +1200,8 @@
         "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
         "start": 154,
         "end": 176
-      }
+      },
+      "hash": "7d331ecc9923f71ffff9346acd60c56f5bfed918b15593afd31bc9ffb9055d0c"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Parts.cs::Acme.Api.Edges.PartsController",
@@ -1097,7 +1209,8 @@
         "path": "src/Acme.Api/ControllerEdges.Parts.cs",
         "start": 60,
         "end": 166
-      }
+      },
+      "hash": "481a940e3330cf7b46a135d9b9bc3210bd3571e387a611730b86bc0a0b06d076"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Parts.cs::Acme.Api.Edges.PartsController.Part()",
@@ -1105,7 +1218,8 @@
         "path": "src/Acme.Api/ControllerEdges.Parts.cs",
         "start": 120,
         "end": 164
-      }
+      },
+      "hash": "5d0d851f0c288367722038f221c460a5a352ffeaed29ca0b3fdf8ff24a9a16d7"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController",
@@ -1113,7 +1227,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 1197,
         "end": 1364
-      }
+      },
+      "hash": "79ddfbcf7f15dd1e7f302c6180f07da0abb86f593065b2ac50225e53b2506085"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController.All()",
@@ -1121,7 +1236,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 1319,
         "end": 1358
-      }
+      },
+      "hash": "82cb43af11cd42b8127be1b607a04bbd9d4db5a6e84e7cd8252ba382b869d5e5"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.GadgetsController",
@@ -1129,7 +1245,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 1370,
         "end": 1421
-      }
+      },
+      "hash": "04f2339e17c196c55c8abd03d2a193fa3e943f6eed5f4508ab6beffcb80dff28"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController",
@@ -1137,7 +1254,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 245,
         "end": 684
-      }
+      },
+      "hash": "5ec89603cd9fd73bf76c1386d00d42c61cac8936bfa62dc21e6da9926b8b4e5c"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.FinishAsync()",
@@ -1145,7 +1263,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 402,
         "end": 469
-      }
+      },
+      "hash": "9cfb32cc31b6dfc14e52d282558f513c76b19cd7996b3cb9c8925ba0447948f0"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Helper()",
@@ -1153,7 +1272,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 556,
         "end": 619
-      }
+      },
+      "hash": "099d4825985d5765891749a29fd87fccd98ce5f9f014fe8ec20c251955a887bd"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Internal()",
@@ -1161,7 +1281,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 629,
         "end": 678
-      }
+      },
+      "hash": "fe35bad9485fe8c9c89d5350df93913d2159f901f501049fedf7776be47a203f"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.ListAsync()",
@@ -1169,7 +1290,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 347,
         "end": 392
-      }
+      },
+      "hash": "568c6917859824e1f399c544cad7e3582117159642d3953d8c06613456ac776d"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Skipped()",
@@ -1177,7 +1299,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 479,
         "end": 546
-      }
+      },
+      "hash": "6926228e630c195a3d528076bfa6f64c88ba902633bdc754e888579ebe4e2b5e"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PagesController",
@@ -1185,7 +1308,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 774,
         "end": 877
-      }
+      },
+      "hash": "840755b20cdeb70dd16e79d76f8ca04a4eecd70eaee36b8c39d47cfd61817c72"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PagesController.Index()",
@@ -1193,7 +1317,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 830,
         "end": 871
-      }
+      },
+      "hash": "c262b080bb08367dec8564151ed4de7ccddf42ad7eea6102671e39213e9bc572"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PartsController",
@@ -1201,7 +1326,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 1467,
         "end": 1558
-      }
+      },
+      "hash": "89f41231b2ffb618dd4908cee3e7ebf46574883fd12b365fdd9de14466782124"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.RootController",
@@ -1209,7 +1335,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 917,
         "end": 1035
-      }
+      },
+      "hash": "a731ad2b473798802e1bd7ceaef85196b63a7f6e6b000bfcb427022dd160876d"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.RootController.Index()",
@@ -1217,7 +1344,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 988,
         "end": 1029
-      }
+      },
+      "hash": "c262b080bb08367dec8564151ed4de7ccddf42ad7eea6102671e39213e9bc572"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.ApiBase",
@@ -1225,7 +1353,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 1487,
         "end": 1542
-      }
+      },
+      "hash": "d5b61b185b935d1f85567cbc38240326fc8078b10add06fe5f0ba2c1f91e6b47"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController",
@@ -1233,7 +1362,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 216,
         "end": 1123
-      }
+      },
+      "hash": "9ffa08f7f8d88368a2f8664a79f7afcde951b5c34ace75279423cec9c161ad82"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Allowed()",
@@ -1241,7 +1371,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 693,
         "end": 736
-      }
+      },
+      "hash": "e8ec391a191f82768af6be563a25a4947cd98434e91b0f7935a119c45e82b765"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Anything()",
@@ -1249,7 +1380,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 1002,
         "end": 1056
-      }
+      },
+      "hash": "cfae3f5e3a756b70bb5a759b0f2188b89be2c1d08fe6ca81f556b20c5f7dac56"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Create()",
@@ -1257,7 +1389,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 414,
         "end": 453
-      }
+      },
+      "hash": "8ae9f25c4ac08221b575407f019ce0c5510e2fba013cc8f7be5f80e2c3ae2c19"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Get(int)",
@@ -1265,7 +1398,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 355,
         "end": 408
-      }
+      },
+      "hash": "07f64a316b30ffc2ab4f370fc54e11936c999b250bc2373bd09767ab26fb3334"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Health()",
@@ -1273,7 +1407,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 807,
         "end": 856
-      }
+      },
+      "hash": "7e57e7694dec38b182f370f8fc2d993bd67e461170159a38aa47d801f15915f3"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Helper()",
@@ -1281,7 +1416,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 1097,
         "end": 1121
-      }
+      },
+      "hash": "fe5a0e509e4c57623c67b2f8db42abe0bf4a980b7508ecf70987b4b5f28eb297"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.List()",
@@ -1289,7 +1425,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 313,
         "end": 349
-      }
+      },
+      "hash": "d4538599037ecb0ec2cbcdf7b9e316538e957ed121faa82a3a86afb67ddeff83"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Probe()",
@@ -1297,7 +1434,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 649,
         "end": 687
-      }
+      },
+      "hash": "18de0d081d08488defe335b75933a44bbc26d7a046caf755d1d3952e1a786079"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Remove(int?)",
@@ -1305,7 +1443,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 586,
         "end": 643
-      }
+      },
+      "hash": "0185a57964addd5e608aea26c111e772534259d34036facc3795420a9d3b16ad"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Replace(int)",
@@ -1313,7 +1452,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 459,
         "end": 512
-      }
+      },
+      "hash": "9083d299729647359b92722cf6baf49abcb7fc418ae2cf56d8ce1e83d96a144a"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Status(int?)",
@@ -1321,7 +1461,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 862,
         "end": 929
-      }
+      },
+      "hash": "0d27c17549e869f3fa07cda11f01b92e4458915a0b8d615a2d2247816919382e"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Touch(int)",
@@ -1329,7 +1470,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 518,
         "end": 580
-      }
+      },
+      "hash": "efb7c5fc85f94112652bc955ee548f8b5b8135bedda2aa5b9bca4b11cd46adc3"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.PingController",
@@ -1337,7 +1479,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 1220,
         "end": 1313
-      }
+      },
+      "hash": "7da25ffe2227239ffa64073dd28fd00bdf2108334bb975674a5fb8661c018d6c"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.PingController.Pong()",
@@ -1345,7 +1488,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 1267,
         "end": 1311
-      }
+      },
+      "hash": "e47dc5e2711a7219f465065cfd25ab1dff34cb750c0af04cd312a2775432e0b9"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.UsersController",
@@ -1353,7 +1497,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 1393,
         "end": 1485
-      }
+      },
+      "hash": "1a6f71dbdc330d156db5349cbf68c22cf783220cedb4cbe7fa2e95f533f679cd"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.UsersController.List()",
@@ -1361,7 +1506,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 1438,
         "end": 1483
-      }
+      },
+      "hash": "7285a8b784af1557e4ce10561707cf0e7cd55f5b05fedc2fc05218f9e63bc7f0"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Booth",
@@ -1369,7 +1515,8 @@
         "path": "src/Acme.Api/Desk.cs",
         "start": 335,
         "end": 417
-      }
+      },
+      "hash": "49a51dc44795448da55f630b2fb73fc6f1c5f32d4110225164557a8459f7cf27"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Booth.Open()",
@@ -1377,7 +1524,8 @@
         "path": "src/Acme.Api/Desk.cs",
         "start": 375,
         "end": 415
-      }
+      },
+      "hash": "2b4f42b3c5f618688946d09b1bccce0d9d33ae810e4061125138afe1a45606f4"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Desk",
@@ -1385,7 +1533,8 @@
         "path": "src/Acme.Api/Desk.cs",
         "start": 132,
         "end": 333
-      }
+      },
+      "hash": "5984473c3c4ad2ccd4385f892f42c5968a10059d527c09f95e5a00f41112c220"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Desk.Desk(Teller)",
@@ -1393,7 +1542,8 @@
         "path": "src/Acme.Api/Desk.cs",
         "start": 193,
         "end": 245
-      }
+      },
+      "hash": "7e8323b00e412eaadce987db43b7ca8d412dacbdf619cf0c581d64e5c7d82a2d"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Desk.Serve(Account)",
@@ -1401,7 +1551,8 @@
         "path": "src/Acme.Api/Desk.cs",
         "start": 251,
         "end": 331
-      }
+      },
+      "hash": "9e6238baea3a593f6f7b598c6ac7b2d2a21af29390ad9b9ab92fec8a3fdd82a5"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Block/Internal/Gen.cs::Acme.Block.Internal.Gen",
@@ -1409,7 +1560,8 @@
         "path": "src/Acme.Api/Enclosing/Block/Internal/Gen.cs",
         "start": 149,
         "end": 324
-      }
+      },
+      "hash": "efb2c9db45e75a85642d05ad8260185783a607e40d0f115779b97fb9e776cb26"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Block/Internal/Gen.cs::Acme.Block.Internal.Gen.M()",
@@ -1417,7 +1569,8 @@
         "path": "src/Acme.Api/Enclosing/Block/Internal/Gen.cs",
         "start": 196,
         "end": 310
-      }
+      },
+      "hash": "d38fd540ffed6bdd1ebda4f63b656d2cb4d15b7007507be9949da74f98259496"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Block/Internal/Gen.cs::Acme.Block.Internal.Sub",
@@ -1425,7 +1578,8 @@
         "path": "src/Acme.Api/Enclosing/Block/Internal/Gen.cs",
         "start": 338,
         "end": 434
-      }
+      },
+      "hash": "37462f0877e474e93000ac9249a624cebc4d779872f35526f371dfe2c4bb84f6"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Block/Internal/Gen.cs::Acme.Block.Internal.Sub.N()",
@@ -1433,7 +1587,8 @@
         "path": "src/Acme.Api/Enclosing/Block/Internal/Gen.cs",
         "start": 392,
         "end": 420
-      }
+      },
+      "hash": "b9d1f2df357e9694b41a3452d58e8c302729eef0391e598ddff730615185da02"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Block/Util.cs::Acme.Block.Util",
@@ -1441,7 +1596,8 @@
         "path": "src/Acme.Api/Enclosing/Block/Util.cs",
         "start": 51,
         "end": 165
-      }
+      },
+      "hash": "3935e5bdf51fd5283ee0007b14abda09ef71cccd756f4f0dfd1cb2697a0446b0"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Block/Util.cs::Acme.Block.Util.Go()",
@@ -1449,7 +1605,8 @@
         "path": "src/Acme.Api/Enclosing/Block/Util.cs",
         "start": 91,
         "end": 118
-      }
+      },
+      "hash": "65989a1a6196f5fc2a20ba95d1df6a4a9775b826180a9c577c3a80a623d4b1bf"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Block/Util.cs::Acme.Block.Util.Hello()",
@@ -1457,7 +1614,8 @@
         "path": "src/Acme.Api/Enclosing/Block/Util.cs",
         "start": 132,
         "end": 155
-      }
+      },
+      "hash": "d0b2ca4e988a9ccae6f2d1e2322a7bcd72682e0c13d6186cccf46cb2dfb1caa3"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Internal/Gen.cs::Acme.Query.Internal.Gen",
@@ -1465,7 +1623,8 @@
         "path": "src/Acme.Api/Enclosing/Internal/Gen.cs",
         "start": 127,
         "end": 218
-      }
+      },
+      "hash": "d67c7983941bb55a33151538929f0caa2307a898cbcc95b4f789c3935070c574"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Internal/Gen.cs::Acme.Query.Internal.Gen.M()",
@@ -1473,7 +1632,8 @@
         "path": "src/Acme.Api/Enclosing/Internal/Gen.cs",
         "start": 150,
         "end": 216
-      }
+      },
+      "hash": "1471cd3ce0067887215cea13b0ec9b89dc940a3e4f7e6ed78dd94eb1823e5e35"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Internal/Gen.cs::Acme.Query.Internal.Sub",
@@ -1481,7 +1641,8 @@
         "path": "src/Acme.Api/Enclosing/Internal/Gen.cs",
         "start": 220,
         "end": 280
-      }
+      },
+      "hash": "02cd762bdf4d2bb8e71aefb3936b94e6f64d6205b0f18d334fbfb9b5ff565e73"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Internal/Gen.cs::Acme.Query.Internal.Sub.N()",
@@ -1489,7 +1650,8 @@
         "path": "src/Acme.Api/Enclosing/Internal/Gen.cs",
         "start": 250,
         "end": 278
-      }
+      },
+      "hash": "b9d1f2df357e9694b41a3452d58e8c302729eef0391e598ddff730615185da02"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Other.cs::Other.Util",
@@ -1497,7 +1659,8 @@
         "path": "src/Acme.Api/Enclosing/Other.cs",
         "start": 18,
         "end": 71
-      }
+      },
+      "hash": "f9581e5a70734e60f8a75ff56e90878c9a9c6903c77be646e3f862e6e7f485ec"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Other.cs::Other.Util.Go()",
@@ -1505,7 +1668,8 @@
         "path": "src/Acme.Api/Enclosing/Other.cs",
         "start": 42,
         "end": 69
-      }
+      },
+      "hash": "65989a1a6196f5fc2a20ba95d1df6a4a9775b826180a9c577c3a80a623d4b1bf"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Outer.cs::Acme.Util",
@@ -1513,7 +1677,8 @@
         "path": "src/Acme.Api/Enclosing/Outer.cs",
         "start": 114,
         "end": 196
-      }
+      },
+      "hash": "75aaed2ed7315aeddd620709d052329f16517f397156da4e2ed444d4698fe4e0"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Outer.cs::Acme.Util.Go()",
@@ -1521,7 +1686,8 @@
         "path": "src/Acme.Api/Enclosing/Outer.cs",
         "start": 138,
         "end": 165
-      }
+      },
+      "hash": "65989a1a6196f5fc2a20ba95d1df6a4a9775b826180a9c577c3a80a623d4b1bf"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Outer.cs::Acme.Util.Hello()",
@@ -1529,7 +1695,8 @@
         "path": "src/Acme.Api/Enclosing/Outer.cs",
         "start": 171,
         "end": 194
-      }
+      },
+      "hash": "d0b2ca4e988a9ccae6f2d1e2322a7bcd72682e0c13d6186cccf46cb2dfb1caa3"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Used.cs::Acme.Query.Imports.Used",
@@ -1537,7 +1704,8 @@
         "path": "src/Acme.Api/Enclosing/Used.cs",
         "start": 122,
         "end": 178
-      }
+      },
+      "hash": "183d161f06b4df378e61fcb9580b8526d755601aab7a7e533378c496f216e3f5"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Used.cs::Acme.Query.Imports.Used.M()",
@@ -1545,7 +1713,8 @@
         "path": "src/Acme.Api/Enclosing/Used.cs",
         "start": 146,
         "end": 176
-      }
+      },
+      "hash": "17dfb243e02de7f573e2117fe6d09d1b54a63d8e27f16234f49246e6c98d1fde"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Util.cs::Acme.Query.Util",
@@ -1553,7 +1722,8 @@
         "path": "src/Acme.Api/Enclosing/Util.cs",
         "start": 23,
         "end": 105
-      }
+      },
+      "hash": "75aaed2ed7315aeddd620709d052329f16517f397156da4e2ed444d4698fe4e0"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Util.cs::Acme.Query.Util.Go()",
@@ -1561,7 +1731,8 @@
         "path": "src/Acme.Api/Enclosing/Util.cs",
         "start": 47,
         "end": 74
-      }
+      },
+      "hash": "65989a1a6196f5fc2a20ba95d1df6a4a9775b826180a9c577c3a80a623d4b1bf"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Enclosing/Util.cs::Acme.Query.Util.Hello()",
@@ -1569,7 +1740,8 @@
         "path": "src/Acme.Api/Enclosing/Util.cs",
         "start": 80,
         "end": 103
-      }
+      },
+      "hash": "d0b2ca4e988a9ccae6f2d1e2322a7bcd72682e0c13d6186cccf46cb2dfb1caa3"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside",
@@ -1577,7 +1749,8 @@
         "path": "src/Acme.Api/Inside.cs",
         "start": 55,
         "end": 131
-      }
+      },
+      "hash": "4965a63f7ad24c550af2020fb93180f83a99dc3941bdcc8bd0a615ba87510395"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Inside.cs::Acme.Api.Inside.Run()",
@@ -1585,7 +1758,8 @@
         "path": "src/Acme.Api/Inside.cs",
         "start": 89,
         "end": 125
-      }
+      },
+      "hash": "43e21e231b46f7745d5116c9730aead99c34ba578b01648a68e2c65b7731b422"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease",
@@ -1593,7 +1767,8 @@
         "path": "src/Acme.Api/Known.cs",
         "start": 255,
         "end": 568
-      }
+      },
+      "hash": "3af93f698d071ec906a970eb722b33dcc8115a194f97da991bbfd65361eaa0dc"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.CompareTo(object)",
@@ -1601,7 +1776,8 @@
         "path": "src/Acme.Api/Known.cs",
         "start": 399,
         "end": 447
-      }
+      },
+      "hash": "0f8790ae022889bc9783752c024586e186f5bf356f2802f7afd6042fba048a3f"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Dispose()",
@@ -1609,7 +1785,8 @@
         "path": "src/Acme.Api/Known.cs",
         "start": 369,
         "end": 394
-      }
+      },
+      "hash": "0efe1f94a004fefea5d4bbbfe0b94c01fd37545471310eb1b8884c2123bb1fe2"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Open()",
@@ -1617,7 +1794,8 @@
         "path": "src/Acme.Api/Known.cs",
         "start": 307,
         "end": 329
-      }
+      },
+      "hash": "4e89839b641252779565db8efeba1fa02b4184fad353a0397325e923e4b21a92"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Open(int)",
@@ -1625,7 +1803,8 @@
         "path": "src/Acme.Api/Known.cs",
         "start": 334,
         "end": 364
-      }
+      },
+      "hash": "231e0523200c4c8711f5038e64f818a90cb878ef0d3d58b951b9786fed1c369e"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Known.cs::Acme.Api.Lease.Use(Lease)",
@@ -1633,7 +1812,8 @@
         "path": "src/Acme.Api/Known.cs",
         "start": 453,
         "end": 566
-      }
+      },
+      "hash": "c3662e13e0377c0f8a79d8b65cc61146ef36ae52c68e823d26d0b4257d301556"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside",
@@ -1641,7 +1821,8 @@
         "path": "src/Acme.Api/Namespaces.cs",
         "start": 49,
         "end": 211
-      }
+      },
+      "hash": "0076a323d866e86ecad1ef9a20a1ad681d6ed9453fd86fae8e8e4b8803715cc6"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Namespaces.cs::Acme.Api.Outside.Run()",
@@ -1649,7 +1830,8 @@
         "path": "src/Acme.Api/Namespaces.cs",
         "start": 169,
         "end": 205
-      }
+      },
+      "hash": "43e21e231b46f7745d5116c9730aead99c34ba578b01648a68e2c65b7731b422"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Board",
@@ -1657,7 +1839,8 @@
         "path": "src/Acme.Api/Opaque.cs",
         "start": 278,
         "end": 325
-      }
+      },
+      "hash": "79f2ad9c004dc61706ef16f7807aaa8197cb13c68395108fe028fc99a1fb8f4f"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home",
@@ -1665,7 +1848,8 @@
         "path": "src/Acme.Api/Opaque.cs",
         "start": 147,
         "end": 225
-      }
+      },
+      "hash": "5d7e570496e09a639bbd4b00bb0fd76618f7f815a50d479cd6aa1193ca6bfb45"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Opaque.cs::Acme.Api.Home.Index()",
@@ -1673,7 +1857,8 @@
         "path": "src/Acme.Api/Opaque.cs",
         "start": 188,
         "end": 223
-      }
+      },
+      "hash": "788196d6df9396b2bfe564ca4c540eeeb835b78a0fb56204e15ee83267cd4af8"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IHealthApi",
@@ -1681,7 +1866,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 726,
         "end": 809
-      }
+      },
+      "hash": "abe132198b68bea2bff2ee52b2c4bb2d8d52a5a4cbe99637e4bd7f265c73b689"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IHealthApi.Ping()",
@@ -1689,7 +1875,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 768,
         "end": 803
-      }
+      },
+      "hash": "d49268ea31b42d1491b6b4d820e24b27cf94a570a10b2e6df58c2c51ede34f20"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi",
@@ -1697,7 +1884,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 223,
         "end": 458
-      }
+      },
+      "hash": "afc92743775b2ef2029701ba33975426143785c86d246c6666906c6d32c8ad83"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Add(string)",
@@ -1705,7 +1893,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 338,
         "end": 385
-      }
+      },
+      "hash": "d47ae269f29b728a0f95e3c044a362565ab1707972744d267aa90a1da8c84ec8"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Delete(string)",
@@ -1713,7 +1902,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 395,
         "end": 452
-      }
+      },
+      "hash": "44eecbdbdba8360dd4f12163542e2ae8d1040385f4bf876cf9ba3ea191565a92"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Item(string)",
@@ -1721,7 +1911,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 268,
         "end": 328
-      }
+      },
+      "hash": "274610c0aa782f63c9c5cfc61cd5a2a1605bfe027fa69364b7acc4083b06a14e"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IOrdersApi",
@@ -1729,7 +1920,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 815,
         "end": 921
-      }
+      },
+      "hash": "af2c1ee938182e2e538d2e93106cf1780146a75a088c3e156190b5dc5f25b099"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IOrdersApi.List()",
@@ -1737,7 +1929,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 870,
         "end": 915
-      }
+      },
+      "hash": "bfc181944cf90b62298b37f66bbd09a2f29465151febbdace7db0639cc6a63c3"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IReportsApi",
@@ -1745,7 +1938,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 534,
         "end": 628
-      }
+      },
+      "hash": "611ba9e669bd7f790f1588dae35a48ee30dda32e03b9e61956cd6c80e14f4932"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IReportsApi.All()",
@@ -1753,7 +1947,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 577,
         "end": 622
-      }
+      },
+      "hash": "2df8cb6932354bef9eb41a7494d862dbe28a1365f0875a3631189be6f802d673"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.Inventory",
@@ -1761,7 +1956,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 992,
         "end": 1495
-      }
+      },
+      "hash": "83b7fe02b331bd3a4b02210b759ad23aeb41bfe15eed9dfc71e2fe5e136b0bcf"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.Inventory.AddReports(IServiceCollection)",
@@ -1769,7 +1965,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 1316,
         "end": 1489
-      }
+      },
+      "hash": "bdfb474c36ed0b4a8fa674e85d1ec01c4305ca69a50a3c8195dbfbc0985b218d"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.Inventory.Find(string)",
@@ -1777,7 +1974,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 1251,
         "end": 1306
-      }
+      },
+      "hash": "54ba77b89b63d80825e83e045cceca414a3fdb8f0f77fb4d602f085ad505d124"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.FieldShadow",
@@ -1785,7 +1983,8 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 751,
         "end": 852
-      }
+      },
+      "hash": "f08ea729ad7525bdaab13abb2867b7ef829cc0bd46960113d8e40c6b4b7ecd10"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.FieldShadow.Run()",
@@ -1793,7 +1992,8 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 810,
         "end": 850
-      }
+      },
+      "hash": "b1ea8e90dea129c2cb85008c3bf9df251c779441844c6ae3ba697606b1438863"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.ReadonlyShadow",
@@ -1801,7 +2001,8 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 937,
         "end": 1118
-      }
+      },
+      "hash": "88d02b1bb12e306b94e70a5ed2175c172ea2f2649b23f9c32cf8e889df1e8120"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.ReadonlyShadow.ReadonlyShadow(object)",
@@ -1809,7 +2010,8 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 1008,
         "end": 1070
-      }
+      },
+      "hash": "6bad0f0fa1b07cc464ff6a8f468c928be268711d8ecc346ba706124b39e657e8"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.ReadonlyShadow.Run()",
@@ -1817,7 +2019,8 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 1076,
         "end": 1116
-      }
+      },
+      "hash": "c2c30f7ed5cf0808cd0d540f7348d9ee88ff401b873ca9714b1c9302201b05ac"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows",
@@ -1825,7 +2028,8 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 98,
         "end": 749
-      }
+      },
+      "hash": "c9e3d6fab0354dfb02aa5e231183e38fae82c7f22b49a5d70af61c1cd5f4d82a"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Caught()",
@@ -1833,7 +2037,8 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 445,
         "end": 532
-      }
+      },
+      "hash": "65ba4225dc565f7c9da0771c77f4f9c16e6c6e40fdf576529cf88f0d82d60a19"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Lambda()",
@@ -1841,7 +2046,8 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 265,
         "end": 344
-      }
+      },
+      "hash": "b83cb312ac0d94787d3f469c7d867cab8d067c64f0a526c989da82b971b0c632"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Local()",
@@ -1849,7 +2055,8 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 190,
         "end": 259
-      }
+      },
+      "hash": "85ad064ce82d592da89a42b6ad3e0259a1614dd103c8543e315bd78152a70d17"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Loop(object[])",
@@ -1857,7 +2064,8 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 350,
         "end": 439
-      }
+      },
+      "hash": "3ec6aaaaf194a41aa373de1bcf1ec804102d4aabc5da401f39bcc79b6a4ba2e3"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Out()",
@@ -1865,7 +2073,8 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 538,
         "end": 601
-      }
+      },
+      "hash": "4cfee8e4d37295a5d99bdabafc523fb6fd9be9e9f560fafa73a14e7ac90f70e5"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parameter(object)",
@@ -1873,7 +2082,8 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 125,
         "end": 184
-      }
+      },
+      "hash": "e6b77cf6553a193f1ec6b724956d89bf2ab668552a3dfe76a9e70933f00c6f39"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Parse(object)",
@@ -1881,7 +2091,8 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 693,
         "end": 747
-      }
+      },
+      "hash": "dca9444b5dee90ef4cf909133b9d0438c8680b34f5f77c50eb0372ef158598b8"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Shadows.cs::Acme.Api.Shadows.Pattern(object)",
@@ -1889,7 +2100,8 @@
         "path": "src/Acme.Api/Shadows.cs",
         "start": 607,
         "end": 687
-      }
+      },
+      "hash": "a42a36098b21d43dee5ea446de849d7b192750d71df1d8bea174e12aa5a34191"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Top.cs::Main",
@@ -1897,7 +2109,8 @@
         "path": "src/Acme.Api/Top.cs",
         "start": 152,
         "end": 241
-      }
+      },
+      "hash": "c1cdbd17ab60da82a259a4fd8e61aa53c14f0e45d5815f77ea0be8fa624e4f75"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Top.cs::Main.Shout",
@@ -1905,7 +2118,8 @@
         "path": "src/Acme.Api/Top.cs",
         "start": 217,
         "end": 241
-      }
+      },
+      "hash": "42f0833982f5cee8e6e996f60f48be0da90f78065e39d1ddb0b4717d89b761ce"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient",
@@ -1913,7 +2127,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 1481,
         "end": 1693
-      }
+      },
+      "hash": "e1bf43513b5cdc636310a10c0d457fdd8d7f37c2ef952e4a9dbdd48294be125e"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.BuiltClient(HttpClient)",
@@ -1921,7 +2136,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 1564,
         "end": 1617
-      }
+      },
+      "hash": "bcf9637dbdd9019f77e048221ad3956764613b66a69813de1905f33005ec2d0c"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.BuiltClient.Run()",
@@ -1929,7 +2145,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 1627,
         "end": 1687
-      }
+      },
+      "hash": "918b3c9b4e12d4f1bc9ecb066e527a8aedd2999902495e23696e04765021b5cd"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.CatalogClient",
@@ -1937,7 +2154,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 321,
         "end": 638
-      }
+      },
+      "hash": "6f86fcb7df36a6d7ca39a0dfe2be98df1c4192297d39a76d947bdbfdb7aa2311"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.CatalogClient.CatalogClient(HttpClient)",
@@ -1945,7 +2163,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 406,
         "end": 461
-      }
+      },
+      "hash": "8ca67595939e0e0d11bbea20b47ffe2e78c90fe6c68d68b30d22e6419baa30c2"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.CatalogClient.Product(int)",
@@ -1953,7 +2172,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 548,
         "end": 632
-      }
+      },
+      "hash": "a99f080b591fb640545d4c7504f294e3034ea00d774a032175f37a9646de7ef4"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.CatalogClient.Products()",
@@ -1961,7 +2181,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 471,
         "end": 538
-      }
+      },
+      "hash": "62412c4a7a639542f168a3df1fb15001d8ea818df33dd6bc5400a90f0c77a392"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations",
@@ -1969,7 +2190,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 1699,
         "end": 2459
-      }
+      },
+      "hash": "47427281865526853d672e162786de613f3000027268119c0f7757cb6868f6c1"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.AddClients(IServiceCollection)",
@@ -1977,7 +2199,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 1747,
         "end": 2309
-      }
+      },
+      "hash": "7aa6cee39d4d4679aaebb8afa6c8b3099ba9dda763b4d6b5aac731f3da17419c"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.Registrations.Build()",
@@ -1985,7 +2208,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 2319,
         "end": 2453
-      }
+      },
+      "hash": "baa78f9095fe662222567106459b88f6dd63e1ddb9695bb5f4631b41adff18b2"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.StockClient",
@@ -1993,7 +2217,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 722,
         "end": 1033
-      }
+      },
+      "hash": "6c4e4575fc9a6a930ec39baeaec0c72e300faa05ebb0b048dca1f74189d125d0"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.StockClient.Level()",
@@ -2001,7 +2226,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 966,
         "end": 1027
-      }
+      },
+      "hash": "4992bc67c22468fa6287c5d06d5fae30682ebf0184f8b62261ad49c21436b53f"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.StockClient.StockClient(HttpClient)",
@@ -2009,7 +2235,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 805,
         "end": 956
-      }
+      },
+      "hash": "1caffdb0a4b10d82557ffff1142decaf222ca3c3579632ecfacc02f0ecdcee6a"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.TwiceClient",
@@ -2017,7 +2244,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 1113,
         "end": 1325
-      }
+      },
+      "hash": "dc871f15177ce43cd71af22463ed5ec99985c6aca6caec74916952dd122b09be"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.TwiceClient.Run()",
@@ -2025,7 +2253,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 1259,
         "end": 1319
-      }
+      },
+      "hash": "aed742215b3dfcd655d8056072fd86c258fd3d7b10a7cb42bd95746d883b9df1"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Typed.cs::Acme.Api.Typed.TwiceClient.TwiceClient(HttpClient)",
@@ -2033,7 +2262,8 @@
         "path": "src/Acme.Api/Typed.cs",
         "start": 1196,
         "end": 1249
-      }
+      },
+      "hash": "51d0ac5686f8d6c977177b74a7ba465d970e1c665d8a8ecc6ce99aed8edefaa3"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account",
@@ -2041,7 +2271,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 242,
         "end": 497
-      }
+      },
+      "hash": "7c5360dc6b549d5523ab24c2265292b68b50c1074a40e4deb19e0e12d0e877ed"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Close(int)",
@@ -2049,7 +2280,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 364,
         "end": 395
-      }
+      },
+      "hash": "fbb9785682af5b2b7a327e340e88f3660fdd63279d289083dfd239492f94a44d"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Close(string)",
@@ -2057,7 +2289,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 401,
         "end": 437
-      }
+      },
+      "hash": "9a29c3865bf40a6e15955164ca62999ab9a0faf4fca816daeeb1670318917e47"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Deposit(int)",
@@ -2065,7 +2298,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 269,
         "end": 304
-      }
+      },
+      "hash": "4a1ac0fb47ce96addf5e9ff8605a5b6f59f54882fbbb275f17f82ee219ecbaba"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Deposit(int,string)",
@@ -2073,7 +2307,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 310,
         "end": 358
-      }
+      },
+      "hash": "f614b888ef41609b3c9b448c6fbef2104dc028f719eb695831810dd751a0865c"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Freeze()",
@@ -2081,7 +2316,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 443,
         "end": 467
-      }
+      },
+      "hash": "3323ac78151bd770673a4987a2723819f742b0758b3cbffca9c84760f7f04fcc"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Account.Thaw()",
@@ -2089,7 +2325,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 473,
         "end": 495
-      }
+      },
+      "hash": "9fe0e4ef9f367f30d01e9e62addf27eadd6776301a6d14ee730f61d134c7770f"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions",
@@ -2097,7 +2334,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 718,
         "end": 946
-      }
+      },
+      "hash": "893d21ca5116ba5aa7ead7f16ffe540242fb9a649890bffaf57f2d0a202cabfb"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Archive(IEnumerable<Account>)",
@@ -2105,7 +2343,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 878,
         "end": 944
-      }
+      },
+      "hash": "775c16c1ec8332fcffdc8a4dd35695e3429b5f8e494da2efeb7cb43b658b2e07"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Audit(Account)",
@@ -2113,7 +2352,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 822,
         "end": 872
-      }
+      },
+      "hash": "2ab1672796678effba63f3f68abffd596047678a8d93da2d4dbe73f9cb7cbb3a"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.AccountExtensions.Summarize(Account)",
@@ -2121,7 +2361,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 762,
         "end": 816
-      }
+      },
+      "hash": "0fb47471897d06b08843c83284233892ceb03692a8cc20d2684fa02c052ae1b9"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Auditor",
@@ -2129,7 +2370,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 176,
         "end": 240
-      }
+      },
+      "hash": "b9a06790c48c094ddd0f7e157cbad09aea5f70d62b1505439c4f35b8be48fd6e"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Auditor.Review()",
@@ -2137,7 +2379,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 214,
         "end": 238
-      }
+      },
+      "hash": "2646a84ab272d22e1ac6e1e8e338b637fbb1d6a5ba8b01a139f54aca9e17102b"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IAuditor",
@@ -2145,7 +2388,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 30,
         "end": 78
-      }
+      },
+      "hash": "d746faeb47e1278ffebf2a727facbe3ee22e451e6d15b8e4f074e6e789291fe8"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IAuditor.Review()",
@@ -2153,7 +2397,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 62,
         "end": 76
-      }
+      },
+      "hash": "de1b44bd2535403bc03481921c50abe984cddd118f80dc1db1ab200efc0d5c29"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IReviewer",
@@ -2161,7 +2406,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 80,
         "end": 142
-      }
+      },
+      "hash": "9f65d57b87b51e7b92b66420b34216b1fb7ea2fc679c2af9a8ab37bbd18161df"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IReviewer.Escalate()",
@@ -2169,7 +2415,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 124,
         "end": 140
-      }
+      },
+      "hash": "0ddde247f5f9522c9b96cfb2aa446d3540e85569719c74f457787623a72d09ed"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.IServices",
@@ -2177,7 +2424,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 144,
         "end": 174
-      }
+      },
+      "hash": "9260174a1b6268ffd1fc0d1f50e831fa8923b6e446fa633089bbfabd03cb52e4"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Ledger",
@@ -2185,7 +2433,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 948,
         "end": 1081
-      }
+      },
+      "hash": "47682b43a43b6b33a4f872cad101c8b41a6b75fc0fb93eface723976de04530a"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Ledger.Post(T)",
@@ -2193,7 +2442,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 1034,
         "end": 1079
-      }
+      },
+      "hash": "e6e028a3d43351440da20343b17b4af2aceeffe591731784330d338dd0e70959"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings",
@@ -2201,7 +2451,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 499,
         "end": 716
-      }
+      },
+      "hash": "e999900e4d4aad0e911688f59a1b43092651f2e9b07d476edd3ece33c8e13c59"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Accrue()",
@@ -2209,7 +2460,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 536,
         "end": 560
-      }
+      },
+      "hash": "67f5417bd0ce16588535cf3eb3d3a1d209f6ec8eb8fc49695dc98676cacc6634"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.Savings.Sweep()",
@@ -2217,7 +2469,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 644,
         "end": 714
-      }
+      },
+      "hash": "c02d68a1242dd268f2a9190fa54b2a057d4742080d680cb953c511511c6cd61a"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.SavingsExtensions",
@@ -2225,7 +2478,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 1083,
         "end": 1179
-      }
+      },
+      "hash": "cb1cded77be6cb164e1fc618f20dcb069653ed3af2b801a63a6b1019690d603c"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.SavingsExtensions.Audit(Savings)",
@@ -2233,7 +2487,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 1127,
         "end": 1177
-      }
+      },
+      "hash": "a9246ed47644e2b9dd198ecf8abab43c673ccddd18cff2ce3f0f8bc44d6f3e47"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.ServiceExtensions",
@@ -2241,7 +2496,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 1265,
         "end": 1458
-      }
+      },
+      "hash": "d28b901f1b0361c4b025c08d843adac2ed6b52a73e5aa01d1c38ff39c1c3bf8a"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.ServiceExtensions.AddOrders(IServices)",
@@ -2249,7 +2505,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 1309,
         "end": 1366
-      }
+      },
+      "hash": "d9be497d6a18d93117418121aefeeb29a9f41cef7c85aea12c9f439a3863dd92"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Accounts.cs::Acme.Core.Billing.ServiceExtensions.AddOrders(IServices,Action<Account>)",
@@ -2257,7 +2514,8 @@
         "path": "src/Acme.Core/Billing/Accounts.cs",
         "start": 1372,
         "end": 1456
-      }
+      },
+      "hash": "3abf470e95ca33be2f583ebea0bdcf701a66cf35595efd44f433c7cb3801859f"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Batch",
@@ -2265,7 +2523,8 @@
         "path": "src/Acme.Core/Billing/Probes.cs",
         "start": 1872,
         "end": 1963
-      }
+      },
+      "hash": "f8060721a8e042329eacf179ba62afa7f5d25fd1bee49043aa71a8660b7085d5"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Batch.Run()",
@@ -2273,7 +2532,8 @@
         "path": "src/Acme.Core/Billing/Probes.cs",
         "start": 1921,
         "end": 1961
-      }
+      },
+      "hash": "02a5b0c147fd08486ea5d08d9b5bd9a635009721b1df166002c6218c4d99da51"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Pane",
@@ -2281,7 +2541,8 @@
         "path": "src/Acme.Core/Billing/Probes.cs",
         "start": 92,
         "end": 197
-      }
+      },
+      "hash": "c4878b019e35b81c93bc517576eb63b514ee5028f0d6f0299eeab5b7af237ed5"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Pane.Touch()",
@@ -2289,7 +2550,8 @@
         "path": "src/Acme.Core/Billing/Probes.cs",
         "start": 125,
         "end": 195
-      }
+      },
+      "hash": "a18ebd9cbcbabd996a0f433d6066793cae6bcd3ef0837fe6e579b5aed316d15a"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes",
@@ -2297,7 +2559,8 @@
         "path": "src/Acme.Core/Billing/Probes.cs",
         "start": 199,
         "end": 1797
-      }
+      },
+      "hash": "7ba5ba4156ac419f39a308872b6c5f696199e05a2f8dd266a7f5b739bfe140aa"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Blocks(bool)",
@@ -2305,7 +2568,8 @@
         "path": "src/Acme.Core/Billing/Probes.cs",
         "start": 651,
         "end": 803
-      }
+      },
+      "hash": "a38c70741a8c6760b276404e9cb298bd4a996c5dacaa837d1965fd02cbac41da"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Field()",
@@ -2313,7 +2577,8 @@
         "path": "src/Acme.Core/Billing/Probes.cs",
         "start": 1188,
         "end": 1226
-      }
+      },
+      "hash": "50ec0fedf2b7b102d977d1774d0726b103bebd542f6be851d4e04b7286a83e7d"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Generic(T)",
@@ -2321,7 +2586,8 @@
         "path": "src/Acme.Core/Billing/Probes.cs",
         "start": 809,
         "end": 860
-      }
+      },
+      "hash": "ef2be4b9c338d9f0826c4b1db3992296f0e4dfd135b2d28649cbd0e41ddd7b51"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Hides(List<Savings>,object)",
@@ -2329,7 +2595,8 @@
         "path": "src/Acme.Core/Billing/Probes.cs",
         "start": 948,
         "end": 1182
-      }
+      },
+      "hash": "9ca182a897d7b94088d92da4f6eb429a4bc5146485312d75c1513f456d357756"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Outside(List<Account>,Account,IReviewer,IServices)",
@@ -2337,7 +2604,8 @@
         "path": "src/Acme.Core/Billing/Probes.cs",
         "start": 1388,
         "end": 1795
-      }
+      },
+      "hash": "4735c4426c9499e6fb3d021525d20a60376cee4a34199897998edb807e175551"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Probes.cs::Acme.Core.Billing.Probes.Written(Ledger<Account>,Account?,Acme.Core.Billing.Account,Pane)",
@@ -2345,7 +2613,8 @@
         "path": "src/Acme.Core/Billing/Probes.cs",
         "start": 336,
         "end": 554
-      }
+      },
+      "hash": "3e7a507a3706ea047bac743e41655b79822ec96b5355689b1d0762e037a35c65"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller",
@@ -2353,7 +2622,8 @@
         "path": "src/Acme.Core/Billing/Teller.cs",
         "start": 30,
         "end": 1708
-      }
+      },
+      "hash": "3071af2f7370585d6b25d91cd1afad4ff4464fefc8e3071f90cbced7d1752cc2"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Current()",
@@ -2361,7 +2631,8 @@
         "path": "src/Acme.Core/Billing/Teller.cs",
         "start": 311,
         "end": 353
-      }
+      },
+      "hash": "716a42fd88b94dad1cf198837387b48fa5ee7da538fd9c26b77a56d5828075d2"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Open()",
@@ -2369,7 +2640,8 @@
         "path": "src/Acme.Core/Billing/Teller.cs",
         "start": 259,
         "end": 305
-      }
+      },
+      "hash": "c16a171eadc8f0900fb06c6b93f72b9b3d143ff64ae32dee6855f5f0a8277acc"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
@@ -2377,7 +2649,8 @@
         "path": "src/Acme.Core/Billing/Teller.cs",
         "start": 359,
         "end": 1706
-      }
+      },
+      "hash": "fe970fdbe15f746d21d253e13691ec7eeb07f4e09f462896104d87a4f259c2bf"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Teller(IAuditor)",
@@ -2385,7 +2658,8 @@
         "path": "src/Acme.Core/Billing/Teller.cs",
         "start": 194,
         "end": 253
-      }
+      },
+      "hash": "3b5082cc0e2a55b249db8c06691a8dcac8b11789c786985b54b67eb02844af91"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Contracts.OrderDto",
@@ -2393,7 +2667,8 @@
         "path": "src/Acme.Core/Contracts/Copies.cs",
         "start": 31,
         "end": 56
-      }
+      },
+      "hash": "d6ceb26474de4f25350a51497db15a9c7156d0b8b6a915f015c4efcda9c48e96"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Hosting.Shell",
@@ -2401,7 +2676,8 @@
         "path": "src/Acme.Core/Contracts/Copies.cs",
         "start": 89,
         "end": 158
-      }
+      },
+      "hash": "becba5ae266bf3baec7764b5c1e428d5392157645abd341f99d0edd7ae54cf1d"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Contracts/Copies.cs::Acme.Hosting.Shell.Stop()",
@@ -2409,7 +2685,8 @@
         "path": "src/Acme.Core/Contracts/Copies.cs",
         "start": 130,
         "end": 152
-      }
+      },
+      "hash": "caca701f6664aa989793051b2d79c5766a260ac38b8682bed13267df4cc49a3f"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Carrier.Fees.cs::Acme.Core.Orders.Carrier",
@@ -2417,7 +2694,8 @@
         "path": "src/Acme.Core/Orders/Carrier.Fees.cs",
         "start": 103,
         "end": 171
-      }
+      },
+      "hash": "805022b1cab38abe76f39dd6fb5906301c579c2c3fffc146c5514125103aff70"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Carrier.Fees.cs::Acme.Core.Orders.Carrier.Bill()",
@@ -2425,7 +2703,8 @@
         "path": "src/Acme.Core/Orders/Carrier.Fees.cs",
         "start": 147,
         "end": 169
-      }
+      },
+      "hash": "d7e030ffb574a94b3fa1dceb1911c89c70cba353d387476e744d21aaf779d049"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier",
@@ -2433,7 +2712,8 @@
         "path": "src/Acme.Core/Orders/Courier.cs",
         "start": 29,
         "end": 212
-      }
+      },
+      "hash": "cb8f002ea925a0b9e0042e33d8e9bf9fe0370a50874e423c472042b4977ffd9b"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Courier()",
@@ -2441,7 +2721,8 @@
         "path": "src/Acme.Core/Orders/Courier.cs",
         "start": 73,
         "end": 111
-      }
+      },
+      "hash": "c2c060bb9ca01c14cbaacce593e81838f548392ce5981b91ee4d34bac994becf"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Courier.cs::Acme.Core.Orders.Courier.Ship()",
@@ -2449,7 +2730,8 @@
         "path": "src/Acme.Core/Orders/Courier.cs",
         "start": 117,
         "end": 210
-      }
+      },
+      "hash": "631ad64d108c22e13cc7a4029489d6d5a2a538398aba69306394e0f8195a57ce"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order",
@@ -2457,7 +2739,8 @@
         "path": "src/Acme.Core/Orders/Order.Lines.cs",
         "start": 29,
         "end": 141
-      }
+      },
+      "hash": "40e2fc8f92c2b2aae0ffcfde151a83f8b9644a75820e215120339fbe8b860c12"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Create()",
@@ -2465,7 +2748,8 @@
         "path": "src/Acme.Core/Orders/Order.Lines.cs",
         "start": 95,
         "end": 139
-      }
+      },
+      "hash": "3a7082fe0696fb79d62974381c404c467ddf47ddce5947e6b18389ca21de6fc3"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Order.Lines.cs::Acme.Core.Orders.Order.Sum()",
@@ -2473,7 +2757,8 @@
         "path": "src/Acme.Core/Orders/Order.Lines.cs",
         "start": 62,
         "end": 89
-      }
+      },
+      "hash": "a1c2cef49b1b52b7508ffa7a7ac5a8a16c781913ad72a595500958767acf2539"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Order.cs::Acme.Core.Orders.Order",
@@ -2481,7 +2766,8 @@
         "path": "src/Acme.Core/Orders/Order.cs",
         "start": 29,
         "end": 96
-      }
+      },
+      "hash": "bcc0be811f3fa9d35b09aaf49cdfb79349d356f4a9d9af47a0fb2b58c41e856d"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Order.cs::Acme.Core.Orders.Order.Total()",
@@ -2489,7 +2775,8 @@
         "path": "src/Acme.Core/Orders/Order.cs",
         "start": 62,
         "end": 94
-      }
+      },
+      "hash": "b9f6763bc5e9392540b7f4bcd08315313899a216d2a574757af6f06ca213d67f"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService",
@@ -2497,7 +2784,8 @@
         "path": "src/Acme.Core/Orders/OrderService.cs",
         "start": 29,
         "end": 905
-      }
+      },
+      "hash": "a1415b0906c93cdee3938a741d8ff94b90810d82ddffb7002b2c55091280a7b8"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Audit()",
@@ -2505,7 +2793,8 @@
         "path": "src/Acme.Core/Orders/OrderService.cs",
         "start": 579,
         "end": 605
-      }
+      },
+      "hash": "8db73f387c32fae7cbb15a601bb84334fdb08b07db0e1448b81b9bd7493d2c33"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Default()",
@@ -2513,7 +2802,8 @@
         "path": "src/Acme.Core/Orders/OrderService.cs",
         "start": 736,
         "end": 795
-      }
+      },
+      "hash": "710ffc89fb16943bbc726d009e631a988fd66abff358c02e3bcc91362a00699f"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line",
@@ -2521,7 +2811,8 @@
         "path": "src/Acme.Core/Orders/OrderService.cs",
         "start": 801,
         "end": 903
-      }
+      },
+      "hash": "4241d1b442f0edfae9e7f4211d866eed6cb5efb95a3e37d646744b0f97f566ed"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Add()",
@@ -2529,7 +2820,8 @@
         "path": "src/Acme.Core/Orders/OrderService.cs",
         "start": 833,
         "end": 863
-      }
+      },
+      "hash": "7cc28ef0dbd917e2a59b235fc77312736feb64189650e0faada9f535649f8e0d"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Line.Count()",
@@ -2537,7 +2829,8 @@
         "path": "src/Acme.Core/Orders/OrderService.cs",
         "start": 873,
         "end": 897
-      }
+      },
+      "hash": "677bdaeecef8e1eac87a89a031c5c00ac2c67a61169637ed78789b0f442caf25"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Notify(int)",
@@ -2545,7 +2838,8 @@
         "path": "src/Acme.Core/Orders/OrderService.cs",
         "start": 698,
         "end": 730
-      }
+      },
+      "hash": "b8da0dd0e05525278dfb5974f732545e396b197f7eb29d5de52bb57bd290a924"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Notify(string)",
@@ -2553,7 +2847,8 @@
         "path": "src/Acme.Core/Orders/OrderService.cs",
         "start": 654,
         "end": 692
-      }
+      },
+      "hash": "e2ae1361fe82436c157b7ba28a9b6da3e36cd18e425fd161ec36f6697eff94c9"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService()",
@@ -2561,7 +2856,8 @@
         "path": "src/Acme.Core/Orders/OrderService.cs",
         "start": 61,
         "end": 104
-      }
+      },
+      "hash": "317c7c58d234099c3a86eccab7096518d9eade547a51d9d26f7b42c51e124d9a"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.OrderService(string)",
@@ -2569,7 +2865,8 @@
         "path": "src/Acme.Core/Orders/OrderService.cs",
         "start": 110,
         "end": 148
-      }
+      },
+      "hash": "754008d89239b742a1385f87b75eda96fd7f3fd3f3fc18bb64ae314779758d63"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string)",
@@ -2577,7 +2874,8 @@
         "path": "src/Acme.Core/Orders/OrderService.cs",
         "start": 540,
         "end": 573
-      }
+      },
+      "hash": "7de064e648342939438e049f7a4a7841ffcfb5f3bf119450ef271b8a94e78f23"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int)",
@@ -2585,7 +2883,8 @@
         "path": "src/Acme.Core/Orders/OrderService.cs",
         "start": 154,
         "end": 534
-      }
+      },
+      "hash": "e8a29d8b5dec618e08deb6297cc9f9d4016bfd531772f2bfb9345bad5570e907"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Place(string,int).Check",
@@ -2593,7 +2892,8 @@
         "path": "src/Acme.Core/Orders/OrderService.cs",
         "start": 209,
         "end": 231
-      }
+      },
+      "hash": "24c9b1a169d85a1af6b579432a950e1b4dee214d724811ac2db544f00d204c7c"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/OrderService.cs::Acme.Core.Orders.OrderService.Validate(string)",
@@ -2601,7 +2901,8 @@
         "path": "src/Acme.Core/Orders/OrderService.cs",
         "start": 611,
         "end": 648
-      }
+      },
+      "hash": "4cea3aedd03e20874b2ac4c726d5c02005a9f787a3622e35bceea7da97198609"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Routes.cs::Acme.Core.Orders.Routes",
@@ -2609,7 +2910,8 @@
         "path": "src/Acme.Core/Orders/Routes.cs",
         "start": 76,
         "end": 226
-      }
+      },
+      "hash": "5f5c287d3f604e050fd629b6d65e6e391ba67a0b3a08158e3fcaea4a74d07e92"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier",
@@ -2617,7 +2919,8 @@
         "path": "src/Acme.Core/Orders/Shipping.cs",
         "start": 29,
         "end": 301
-      }
+      },
+      "hash": "32a025d16227f0d032398c642c14e6d7399a0d18684cafc8cba201efdb24894b"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Carrier(string)",
@@ -2625,7 +2928,8 @@
         "path": "src/Acme.Core/Orders/Shipping.cs",
         "start": 88,
         "end": 122
-      }
+      },
+      "hash": "ff2acc00c315cd838ae1aee780d4f3df68daee7fb5c4e4461262f7a37e2e1336"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Purge()",
@@ -2633,7 +2937,8 @@
         "path": "src/Acme.Core/Orders/Shipping.cs",
         "start": 275,
         "end": 299
-      }
+      },
+      "hash": "3d41e0ff5b49bd966ab87241a36df1bf2be7d70aed24378959938762798cb647"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Rate()",
@@ -2641,7 +2946,8 @@
         "path": "src/Acme.Core/Orders/Shipping.cs",
         "start": 244,
         "end": 269
-      }
+      },
+      "hash": "9c802109d15d9adf79c3aa160ef1c1e633e863fb0d44a0b7c59da4c655637513"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Ship()",
@@ -2649,7 +2955,8 @@
         "path": "src/Acme.Core/Orders/Shipping.cs",
         "start": 128,
         "end": 158
-      }
+      },
+      "hash": "1eb04e2f056c0e1125e04f17615aa32b135143f4477eaa99022327797fd4552e"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Track()",
@@ -2657,7 +2964,8 @@
         "path": "src/Acme.Core/Orders/Shipping.cs",
         "start": 164,
         "end": 238
-      }
+      },
+      "hash": "77fc1ea7169bcb872f99fa1d5a8379704affacd8832582076e0b3c015bcd78ab"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository",
@@ -2665,7 +2973,8 @@
         "path": "src/Acme.Core/Store/Repository.cs",
         "start": 56,
         "end": 445
-      }
+      },
+      "hash": "fce68432d454a603cba356d0720da7da564cbc05cc6953689a41ed2e25f7ebba"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Flush()",
@@ -2673,7 +2982,8 @@
         "path": "src/Acme.Core/Store/Repository.cs",
         "start": 318,
         "end": 435
-      }
+      },
+      "hash": "cc9cad356bcb9c9c3b8a649f84e8a9f94573d8dcc2e59392e669e4018ead3a9b"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Save(List<T>,int)",
@@ -2681,7 +2991,8 @@
         "path": "src/Acme.Core/Store/Repository.cs",
         "start": 147,
         "end": 193
-      }
+      },
+      "hash": "5f51c251476203070dbf8451aea0695f496dbb9246ecc664f52dded39fa8016d"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Save(T)",
@@ -2689,7 +3000,8 @@
         "path": "src/Acme.Core/Store/Repository.cs",
         "start": 105,
         "end": 133
-      }
+      },
+      "hash": "623d9e15edaad2c7dc548f9eb692194d53f59191e02d78ab9a154d6024774e9c"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.SaveAll(T[])",
@@ -2697,7 +3009,8 @@
         "path": "src/Acme.Core/Store/Repository.cs",
         "start": 207,
         "end": 304
-      }
+      },
+      "hash": "e58d121d1d06a9e878a967a5fcde9161b7e6163d3e97d6d0d76f9b2dd8f0f66a"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing",
@@ -2705,7 +3018,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 309,
         "end": 406
-      }
+      },
+      "hash": "73933c31d9ab7ab6adae447b856e9ec31158ff0b0fb440d0548d455bd66aa359"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Casing.Lower(string)",
@@ -2713,7 +3027,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 350,
         "end": 400
-      }
+      },
+      "hash": "57d13b559ea7ea1b38fa8bf2b0d3c100a9fcca4795dab7e05e0e227f1519ed54"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format",
@@ -2721,7 +3036,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 31,
         "end": 303
-      }
+      },
+      "hash": "65ee64c725b1d505eb29949cd627c364dccf0b8520d247cd442074aba9bcbcff"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Hidden()",
@@ -2729,7 +3045,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 259,
         "end": 297
-      }
+      },
+      "hash": "6137365396f8141ce4cabddb07280388ed50646b06941ae48cf03dd2e83d5389"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string)",
@@ -2737,7 +3054,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 132,
         "end": 180
-      }
+      },
+      "hash": "0098ce5a0396186dd18b64fa6c25e09747a7f1f3e5edeca56475e597d62a4305"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Pad(string,int)",
@@ -2745,7 +3063,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 190,
         "end": 249
-      }
+      },
+      "hash": "4a8b2454f20c31ebf16e57dcae0b7422e4b212aa22d7ef859ca136be313f820e"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Format.Upper(string)",
@@ -2753,7 +3072,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 72,
         "end": 122
-      }
+      },
+      "hash": "e29301df86d9f08b02afda394636ad8c66132d0c3e215b8afa1e55654aff41d4"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.IClock",
@@ -2761,7 +3081,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 664,
         "end": 719
-      }
+      },
+      "hash": "1fe46003511e9ffeaf9097dabaa840395490cfe234f858b6da6b0210a39af1ab"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.IClock.Now()",
@@ -2769,7 +3090,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 702,
         "end": 713
-      }
+      },
+      "hash": "5d90a5a07e9f2d1ffd0d0794429ae917afd150d80376325810569a4a01519151"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Money",
@@ -2777,7 +3099,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 412,
         "end": 465
-      }
+      },
+      "hash": "50659eef6d72abe78d2f284c93a4e534bf2a5058fe6950ace0e1233a962e867d"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point",
@@ -2785,7 +3108,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 471,
         "end": 658
-      }
+      },
+      "hash": "b6b3757d370048bada809395bfd4b7ab665f22c61485be125d44c50818156ecf"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Double(int)",
@@ -2793,7 +3117,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 610,
         "end": 652
-      }
+      },
+      "hash": "4f707807b3ed7d70c9e1a6cfd6f31747ed47e1216f40dc131098221ca0a90a86"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Point(int)",
@@ -2801,7 +3126,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 528,
         "end": 558
-      }
+      },
+      "hash": "928b1a93ebc93189b0d4e2106a644f96824269db7af80858a1e980429aefa951"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.Point.Twice()",
@@ -2809,7 +3135,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 568,
         "end": 600
-      }
+      },
+      "hash": "f94f6e6231ea391da1d52b35777d502e61f5703456c88a2c0d1f857d7143c7f4"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock",
@@ -2817,7 +3144,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 725,
         "end": 928
-      }
+      },
+      "hash": "ae9d810f172adbb64b91c810ff07c86e78f9bb6145b0a7ba6f3df15cefeae88c"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Format.cs::Acme.Core.Text.SystemClock.Now()",
@@ -2825,7 +3153,8 @@
         "path": "src/Acme.Core/Text/Format.cs",
         "start": 773,
         "end": 796
-      }
+      },
+      "hash": "b2e05b0005cf76959b2b7a75a671227a9b7db4dce25ead13860b202d0c057cce"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.First",
@@ -2833,7 +3162,8 @@
         "path": "src/Acme.Core/Text/Nested.cs",
         "start": 94,
         "end": 116
-      }
+      },
+      "hash": "b840b51bb3b4f2cad017b2f00586dabf48311909e09df573dafb15879fc78148"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second",
@@ -2841,7 +3171,8 @@
         "path": "src/Acme.Core/Text/Nested.cs",
         "start": 152,
         "end": 233
-      }
+      },
+      "hash": "c7825af87451f02ce57e50f18651b8c4fa177be7c2be3a4bb46ba048fc732aa9"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Text/Nested.cs::Acme.Core.Outer.Inner.Second.Make()",
@@ -2849,7 +3180,8 @@
         "path": "src/Acme.Core/Text/Nested.cs",
         "start": 194,
         "end": 223
-      }
+      },
+      "hash": "c9cd46202094a795ce6ad1731fea50f9c805f289996c00917e76ce929acc09bf"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main",
@@ -2857,7 +3189,8 @@
         "path": "src/Acme.Web/Program.cs",
         "start": 376,
         "end": 1558
-      }
+      },
+      "hash": "7eff6cac203e134ca635f1e430b699926fce5deec0038c8fcb365e06fb490686"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Program.cs::Main.GET /health",
@@ -2865,7 +3198,8 @@
         "path": "src/Acme.Web/Program.cs",
         "start": 476,
         "end": 486
-      }
+      },
+      "hash": "af294ba9d497518b2f1f2ce03005fbd0a15ab44a5ed3f94170cb8a4c3ff0a748"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Admin",
@@ -2873,7 +3207,8 @@
         "path": "src/Acme.Web/Routes/Admin.cs",
         "start": 80,
         "end": 227
-      }
+      },
+      "hash": "8e9da114aeb34f5f2127348c4d2ce622535d917a699d0e8cc935a2696954d692"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Admin.Map(RouteGroupBuilder)",
@@ -2881,7 +3216,8 @@
         "path": "src/Acme.Web/Routes/Admin.cs",
         "start": 112,
         "end": 225
-      }
+      },
+      "hash": "9934283d5f255afbd3070431eda590349439237e7c89e20f5439ec8d9ef7b5a8"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Reports",
@@ -2889,7 +3225,8 @@
         "path": "src/Acme.Web/Routes/Admin.cs",
         "start": 229,
         "end": 351
-      }
+      },
+      "hash": "9143913940ed56fddb01864b8ffb8a459091804cbb9f28b52ecc9a46492c068e"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Admin.cs::Acme.Web.Routes.Reports.Group(WebApplication)",
@@ -2897,7 +3234,8 @@
         "path": "src/Acme.Web/Routes/Admin.cs",
         "start": 263,
         "end": 349
-      }
+      },
+      "hash": "28f4f54f9b2d1dac658c0635bf8e8b7d4ed8a3627a08bb0bd10a0ff1d5d1a768"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate",
@@ -2905,7 +3243,8 @@
         "path": "src/Acme.Web/Routes/Handlers.cs",
         "start": 450,
         "end": 500
-      }
+      },
+      "hash": "110c3a5b6bb36ad76c76e8450b29859de74656c18afcadd6d3875ba74d616358"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Crate.Stock()",
@@ -2913,7 +3252,8 @@
         "path": "src/Acme.Web/Routes/Handlers.cs",
         "start": 475,
         "end": 498
-      }
+      },
+      "hash": "ea248bfc3a93e8e0af2988f65c6aee5fa4525531a87b6779322e82bc98680ae3"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers",
@@ -2921,7 +3261,8 @@
         "path": "src/Acme.Web/Routes/Handlers.cs",
         "start": 28,
         "end": 288
-      }
+      },
+      "hash": "9614f78c796b54bc2537b4eb5b5aa9ecf8e2995ab0ea2325d9f7ba4f56fe003a"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Ban(int)",
@@ -2929,7 +3270,8 @@
         "path": "src/Acme.Web/Routes/Handlers.cs",
         "start": 252,
         "end": 286
-      }
+      },
+      "hash": "2c9a537740738306dac25b7bf56e6e4aa144449d7bc96984c11fd5d607701de9"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Daily()",
@@ -2937,7 +3279,8 @@
         "path": "src/Acme.Web/Routes/Handlers.cs",
         "start": 151,
         "end": 191
-      }
+      },
+      "hash": "173632d7766c6ca2e206782f163cf2eeae643c6189957a3d051e8bae6ce43076"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Echo(string)",
@@ -2945,7 +3288,8 @@
         "path": "src/Acme.Web/Routes/Handlers.cs",
         "start": 63,
         "end": 110
-      }
+      },
+      "hash": "c91c4b94955d59bf1d0a6d37535953b8f9a58142dd24b3d44bce6d967d04a8e8"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Find(int)",
@@ -2953,7 +3297,8 @@
         "path": "src/Acme.Web/Routes/Handlers.cs",
         "start": 197,
         "end": 246
-      }
+      },
+      "hash": "5ab937d22af39a204366818b4997fa5146dc1c0b0ffe4083898cfab64ed4d220"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Handlers.Sync()",
@@ -2961,7 +3306,8 @@
         "path": "src/Acme.Web/Routes/Handlers.cs",
         "start": 116,
         "end": 145
-      }
+      },
+      "hash": "a1ff5e59bdca451eb408d360356b831932ffd1ff8b98b6e7e40319704a2e72f3"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf",
@@ -2969,7 +3315,8 @@
         "path": "src/Acme.Web/Routes/Handlers.cs",
         "start": 398,
         "end": 448
-      }
+      },
+      "hash": "8f4c11a27cdb85ef26e252b421c659195e50ab332dbcd12d51efb0492abd3782"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Shelf.Stock()",
@@ -2977,7 +3324,8 @@
         "path": "src/Acme.Web/Routes/Handlers.cs",
         "start": 423,
         "end": 446
-      }
+      },
+      "hash": "ea248bfc3a93e8e0af2988f65c6aee5fa4525531a87b6779322e82bc98680ae3"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store",
@@ -2985,7 +3333,8 @@
         "path": "src/Acme.Web/Routes/Handlers.cs",
         "start": 290,
         "end": 396
-      }
+      },
+      "hash": "86499b37b1a54f1ecd1eba4e0db13f140fc933fd297962ab75a90bcbd52a5d17"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store.All()",
@@ -2993,7 +3342,8 @@
         "path": "src/Acme.Web/Routes/Handlers.cs",
         "start": 315,
         "end": 351
-      }
+      },
+      "hash": "df766a4548b2b7d7b3f338acfb85801d04aeaebe678586ecd28b0e63c0275cdb"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/Handlers.cs::Acme.Web.Routes.Store.Remove(int)",
@@ -3001,7 +3351,8 @@
         "path": "src/Acme.Web/Routes/Handlers.cs",
         "start": 357,
         "end": 394
-      }
+      },
+      "hash": "8d0ae8b09e313f26837706a95288bfa90d497e2e29368ba9c8e4b3aa76235f9f"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes",
@@ -3009,7 +3360,8 @@
         "path": "src/Acme.Web/Routes/OrderRoutes.cs",
         "start": 118,
         "end": 662
-      }
+      },
+      "hash": "ec30936f96c0b91430853256c948af5ae3e1a33cb1c7f8895e78e74ccce20647"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder)",
@@ -3017,7 +3369,8 @@
         "path": "src/Acme.Web/Routes/OrderRoutes.cs",
         "start": 156,
         "end": 421
-      }
+      },
+      "hash": "376d3c6c289233179f0cb0e4b6bde45b7dd9ba3b837e47805f885f860c6aa96a"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).DELETE /api/v1/orders/{}",
@@ -3025,7 +3378,8 @@
         "path": "src/Acme.Web/Routes/OrderRoutes.cs",
         "start": 363,
         "end": 391
-      }
+      },
+      "hash": "55c174b6663ea55fef5b3d1de591b84f7967a19973fc77353a9fb942de3774f4"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.MapOrders(RouteGroupBuilder).GET /api/v1/orders",
@@ -3033,7 +3387,8 @@
         "path": "src/Acme.Web/Routes/OrderRoutes.cs",
         "start": 260,
         "end": 277
-      }
+      },
+      "hash": "f15cff538621918df440184419e618cb3cfc8a2c043a06085aa04ff20f7c7ab3"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder)",
@@ -3041,7 +3396,8 @@
         "path": "src/Acme.Web/Routes/OrderRoutes.cs",
         "start": 509,
         "end": 660
-      }
+      },
+      "hash": "814ec2edd0de9c43b3ae5439ed288ade5701c9d955fbad55353652bf494a4060"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Web/Routes/OrderRoutes.cs::Acme.Web.Routes.OrderRoutes.Nest(RouteGroupBuilder).GET /loop/leaf",
@@ -3049,7 +3405,8 @@
         "path": "src/Acme.Web/Routes/OrderRoutes.cs",
         "start": 599,
         "end": 611
-      }
+      },
+      "hash": "7bbbe3aee91b1ca5b719c6de9179406f39e9c74bc42284db067af8ab815975a1"
     }
   ],
   "calls": [
@@ -5020,7 +5377,8 @@
         "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
         "start": 263,
         "end": 277
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.OldController.Old()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy::ApiController#0",
@@ -5031,7 +5389,8 @@
         "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
         "start": 179,
         "end": 192
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.OldController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy::Route#0",
@@ -5042,7 +5401,8 @@
         "path": "src/Acme.Api/ControllerEdges.Legacy.cs",
         "start": 195,
         "end": 210
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Legacy.cs::Acme.Api.Legacy.OldController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Parts.cs::Acme.Api.Edges.PartsController::HttpGet#0",
@@ -5053,7 +5413,8 @@
         "path": "src/Acme.Api/ControllerEdges.Parts.cs",
         "start": 121,
         "end": 136
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.Parts.cs::Acme.Api.Edges.PartsController.Part()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController::HttpGet#0",
@@ -5064,7 +5425,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 1320,
         "end": 1327
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController.All()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::ActionName#0",
@@ -5075,7 +5437,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 412,
         "end": 430
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.FinishAsync()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::ActionName#1",
@@ -5086,7 +5449,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 489,
         "end": 511
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Skipped()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::HttpGet#0",
@@ -5097,7 +5461,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 348,
         "end": 355
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.ListAsync()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::HttpGet#1",
@@ -5108,7 +5473,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 403,
         "end": 410
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.FinishAsync()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::HttpGet#2",
@@ -5119,7 +5485,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 480,
         "end": 487
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Skipped()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::HttpGet#3",
@@ -5130,7 +5497,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 568,
         "end": 585
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Helper()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::HttpGet#4",
@@ -5141,7 +5509,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 630,
         "end": 649
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Internal()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController::NonAction#0",
@@ -5152,7 +5521,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 557,
         "end": 566
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController.Helper()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PagesController::HttpGet#0",
@@ -5163,7 +5533,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 831,
         "end": 838
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PagesController.Index()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.RootController::HttpGet#0",
@@ -5174,7 +5545,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 989,
         "end": 996
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.RootController.Index()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges::ApiController#0",
@@ -5185,7 +5557,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 1198,
         "end": 1211
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges::Route#0",
@@ -5196,7 +5569,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 246,
         "end": 282
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.JobsController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges::Route#1",
@@ -5207,7 +5581,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 918,
         "end": 927
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.RootController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges::Route#2",
@@ -5218,7 +5593,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 1218,
         "end": 1245
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.CrudController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges::Route#3",
@@ -5229,7 +5605,8 @@
         "path": "src/Acme.Api/ControllerEdges.cs",
         "start": 1468,
         "end": 1495
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/ControllerEdges.cs::Acme.Api.Edges.PartsController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpDelete#0",
@@ -5240,7 +5617,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 587,
         "end": 606
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Remove(int?)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpGet#0",
@@ -5251,7 +5629,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 314,
         "end": 321
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.List()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpGet#1",
@@ -5262,7 +5641,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 356,
         "end": 375
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Get(int)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpGet#2",
@@ -5273,7 +5653,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 808,
         "end": 826
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Health()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpGet#3",
@@ -5284,7 +5665,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 863,
         "end": 890
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Status(int?)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpHead#0",
@@ -5295,7 +5677,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 650,
         "end": 658
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Probe()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpOptions#0",
@@ -5306,7 +5689,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 694,
         "end": 705
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Allowed()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpPatch#0",
@@ -5317,7 +5701,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 519,
         "end": 545
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Touch(int)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpPost#0",
@@ -5328,7 +5713,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 415,
         "end": 423
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Create()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::HttpPut#0",
@@ -5339,7 +5725,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 460,
         "end": 475
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Replace(int)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController::Route#0",
@@ -5350,7 +5737,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 1003,
         "end": 1024
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController.Anything()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.PingController::HttpGet#0",
@@ -5361,7 +5749,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 1268,
         "end": 1283
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.PingController.Pong()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.UsersController::HttpGet#0",
@@ -5372,7 +5761,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 1439,
         "end": 1455
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.UsersController.List()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api::ApiController#0",
@@ -5383,7 +5773,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 217,
         "end": 230
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api::Route#0",
@@ -5394,7 +5785,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 233,
         "end": 258
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.OrdersController"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api::Route#1",
@@ -5405,7 +5797,8 @@
         "path": "src/Acme.Api/Controllers.cs",
         "start": 1488,
         "end": 1499
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Controllers.cs::Acme.Api.ApiBase"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Desk.cs::Acme.Api.Booth.Open()::teller.Current#0",
@@ -5603,7 +5996,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 769,
         "end": 781
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IHealthApi.Ping()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi::Delete#0",
@@ -5614,7 +6008,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 396,
         "end": 418
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Delete(string)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi::Get#0",
@@ -5625,7 +6020,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 269,
         "end": 288
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Item(string)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi::Post#0",
@@ -5636,7 +6032,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 339,
         "end": 353
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IInventoryApi.Add(string)"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IOrdersApi::Get#0",
@@ -5647,7 +6044,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 871,
         "end": 885
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IOrdersApi.List()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IReportsApi::Get#0",
@@ -5658,7 +6056,8 @@
         "path": "src/Acme.Api/Remote.cs",
         "start": 578,
         "end": 593
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IReportsApi.All()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.Inventory.AddReports(IServiceCollection)::services.AddRefitClient#0",
@@ -6983,7 +7382,8 @@
         "path": "src/Acme.Core/Orders/Shipping.cs",
         "start": 165,
         "end": 209
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier.Track()"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders::Serializable#0",
@@ -6994,7 +7394,8 @@
         "path": "src/Acme.Core/Orders/Shipping.cs",
         "start": 30,
         "end": 42
-      }
+      },
+      "decorates": "example.com/acme/conformance::src/Acme.Core/Orders/Shipping.cs::Acme.Core.Orders.Carrier"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Core/Store/Repository.cs::Acme.Core.Store.Repository.Flush()::SaveAll#0",

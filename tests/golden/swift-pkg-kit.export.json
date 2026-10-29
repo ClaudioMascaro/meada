@@ -25,7 +25,8 @@
         "path": "Sources/Hidden/Hidden.swift",
         "start": 0,
         "end": 49
-      }
+      },
+      "hash": "9811f502315ae5a9cd16f479bdaba67a3f39bba4c1ab83f4df6fd2f85e65d584"
     },
     {
       "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter",
@@ -33,7 +34,8 @@
         "path": "Sources/Kit/Greeter.swift",
         "start": 0,
         "end": 305
-      }
+      },
+      "hash": "195dc9a8041d26154320edca19dd8f51e8c903aead62833ef95986c44aff9510"
     },
     {
       "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.hello(to:loudly:)",
@@ -41,7 +43,8 @@
         "path": "Sources/Kit/Greeter.swift",
         "start": 121,
         "end": 249
-      }
+      },
+      "hash": "239846553c52f5741640fd6b1aedd986c1a296e029043e9467498f81de2fc653"
     },
     {
       "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.init(name:)",
@@ -49,7 +52,8 @@
         "path": "Sources/Kit/Greeter.swift",
         "start": 57,
         "end": 115
-      }
+      },
+      "hash": "39c34e9f5e1ecc6e1767392c333e89e7a9a32856f75c10969211853c3d2d3686"
     },
     {
       "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::Greeter.secret()",
@@ -57,7 +61,8 @@
         "path": "Sources/Kit/Greeter.swift",
         "start": 255,
         "end": 303
-      }
+      },
+      "hash": "54ae3646b749733179f808f05c4ea8215491a642023bc48c8dba7d0fe7442f7d"
     },
     {
       "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(_:)",
@@ -65,7 +70,8 @@
         "path": "Sources/Kit/Greeter.swift",
         "start": 485,
         "end": 554
-      }
+      },
+      "hash": "c30d2d0c5059edb52ebc85392bb1c0ef1a06d19bfd487b60abff7fd8d5039bbc"
     },
     {
       "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:)",
@@ -73,7 +79,8 @@
         "path": "Sources/Kit/Greeter.swift",
         "start": 307,
         "end": 392
-      }
+      },
+      "hash": "45775c27e83f258fc80613b4f085e18c3c02a9b742f055a6937b76fc721a59cc"
     },
     {
       "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::greet(name:greeting:)",
@@ -81,7 +88,8 @@
         "path": "Sources/Kit/Greeter.swift",
         "start": 394,
         "end": 483
-      }
+      },
+      "hash": "fabf704c3f5cdd2653c0c9e8d0238ef132d502205eb9249aa1be5caa1a4ada44"
     },
     {
       "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::internalGreet(name:)",
@@ -89,7 +97,8 @@
         "path": "Sources/Kit/Greeter.swift",
         "start": 556,
         "end": 611
-      }
+      },
+      "hash": "e38fb6a3e50bea35dc80d755624a76c6848623cb143a5854af518eb4b8a176d1"
     },
     {
       "id": "example.com/swift/kit::Sources/Kit/Greeter.swift::record(level:items:)",
@@ -97,7 +106,8 @@
         "path": "Sources/Kit/Greeter.swift",
         "start": 613,
         "end": 686
-      }
+      },
+      "hash": "acd62e8b9c76cdad4bc98776d0181722ba0d2832fcd0727c6db0fe430bb97146"
     },
     {
       "id": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money",
@@ -105,7 +115,8 @@
         "path": "Sources/KitMoney/Money.swift",
         "start": 0,
         "end": 294
-      }
+      },
+      "hash": "87e7a962c457c2e8ff4cba3438222d9d544dd01c5e8706fa679b3630494ac41a"
     },
     {
       "id": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.init(cents:)",
@@ -113,7 +124,8 @@
         "path": "Sources/KitMoney/Money.swift",
         "start": 53,
         "end": 111
-      }
+      },
+      "hash": "29cf97d5ea7cb224dad3d145e8c8ccea06085348d2f4820a9431c7b033afab7c"
     },
     {
       "id": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.of(cents:)",
@@ -121,7 +133,8 @@
         "path": "Sources/KitMoney/Money.swift",
         "start": 117,
         "end": 195
-      }
+      },
+      "hash": "b99875dd293dc41cba5d6b339841705126b394afcea5b814b873ac27db3f1b1d"
     },
     {
       "id": "example.com/swift/kit::Sources/KitMoney/Money.swift::Money.plus(_:)",
@@ -129,7 +142,8 @@
         "path": "Sources/KitMoney/Money.swift",
         "start": 201,
         "end": 292
-      }
+      },
+      "hash": "105c5731977293b3751d82a7274fc6ca9ead87b0ae982027288c9e39837fb995"
     },
     {
       "id": "example.com/swift/kit::Tests/KitTests/GreeterTests.swift::testGreeter()",
@@ -137,7 +151,8 @@
         "path": "Tests/KitTests/GreeterTests.swift",
         "start": 0,
         "end": 21
-      }
+      },
+      "hash": "d84bddfd7e7225ee6bef82ab1153e50e628376fc06af2ee3538892116ce8b8ae"
     }
   ],
   "calls": [

@@ -17,6 +17,8 @@ El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [rete
 | C# | `.cs`, agrupados en proyectos por los `.csproj` de estilo SDK y resueltos por sus `namespace` |
 | Swift | `.swift` (salvo `Package.swift` y `Package@swift-<versión>.swift`), agrupados en módulos por los targets de `Package.swift` |
 
+Una anotación (Java, Kotlin), un atributo (C#, o un atributo de ruta de Rust) o un decorador (Python) escrito sobre una definición es una llamada del ámbito que la envuelve, en el nivel en que resuelve. El sitio de llamada del export nombra la definición que decora (`decorates`) y `context` la lista aparte, en `annotations:`, no entre los callees.
+
 ### TypeScript y JavaScript
 
 Meada lee funciones, clases y métodos, bindings `const`, `let` y `var` de una función o clase, y `export default`. También lee funciones definidas por asignación en el nivel superior del archivo: `obj.y = function () {}` define `obj.y`, `X.prototype.y = function () {}` define el método `X.y`, `exports.y = ...` y `module.exports.y = ...` definen el export `y`, y `module.exports = function () {}` define el export por defecto. Un `let` o `var` solo es una definición si el archivo nunca vuelve a asignar ese nombre. Las funciones y métodos del objeto literal de un `const` de nivel superior definen `o.m`; los objetos de opciones escritos como argumento conservan sus definiciones inline. Una llamada `obj.y()` o `y()` en el mismo archivo alcanza esas definiciones. `require` y `module.exports` no son imports entre archivos, y `new F()` de una función constructora no alcanza los métodos de `F.prototype`. Un import usa los `paths` y el `baseUrl` del `tsconfig.json` (o `jsconfig.json`) más cercano, en la carpeta del archivo o encima; ambos son relativos a la carpeta de ese config, y `node_modules` se ignora.
@@ -228,7 +230,7 @@ Un proceso es el árbol de llamadas desde un punto de entrada, entre repositorio
 - Go: `func main` en un `package main`.
 - Swift: un tipo marcado `@main` (por su método `main()` cuando declara uno) y el código de nivel superior de un archivo `main.swift`, en un símbolo `main` dueño de las llamadas escritas allí.
 
-`trace` con `process::<identidad del punto de entrada>` lee el árbol. `meada export` incluye cada proceso. `search` con tipo `community` encuentra comunidades por nombre; con tipo `process`, encuentra procesos por la etiqueta de su punto de entrada. `context` muestra la comunidad del símbolo (o `community: none`) y sus procesos, recorriendo llamadas y vínculos hacia los llamadores.
+`trace` con `process::<identidad del punto de entrada>` lee el árbol. `meada export` incluye cada proceso. `search` con tipo `community` encuentra comunidades por nombre; con tipo `process`, encuentra procesos por la etiqueta de su punto de entrada; con tipo `duplicate`, lista los símbolos cuyo texto es idéntico en dos o más lugares del workspace (entre repositorios o dentro de uno), en grupos ordenados por el tamaño del tramo, encontrados por el nombre o la ruta de un miembro. El export trae el `hash` BLAKE3 de cada símbolo; las copias casi iguales (una diferencia de espacio en blanco) no son duplicados. `context` muestra la comunidad del símbolo (o `community: none`) y sus procesos, recorriendo llamadas y vínculos hacia los llamadores.
 
 ## Límites y próximos pasos
 

@@ -57,7 +57,8 @@
         "path": "src/catalog.ts",
         "start": 65,
         "end": 165
-      }
+      },
+      "hash": "4a2f3145d3e730c4a59d63d1a85244262f86dfa63db5646dc050f01e2f86ad3b"
     },
     {
       "id": "example.com/chain/gateway::src/checkout.ts::createOrder",
@@ -65,7 +66,8 @@
         "path": "src/checkout.ts",
         "start": 279,
         "end": 508
-      }
+      },
+      "hash": "fadb1ab707c2078d7649d18570c7add672370ff1f064d9bb94ac569f834122ae"
     },
     {
       "id": "example.com/chain/gateway::src/events.ts::publish",
@@ -73,7 +75,8 @@
         "path": "src/events.ts",
         "start": 129,
         "end": 237
-      }
+      },
+      "hash": "aba91460b15553a687d4ec3765417b83193820185a4e22b3c720769a91961ce4"
     },
     {
       "id": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/image",
@@ -81,7 +84,8 @@
         "path": "src/inventory.ts",
         "start": 787,
         "end": 900
-      }
+      },
+      "hash": "2e0de73981d0f2ae2d1f3277825d92bd68599f83f0508bf3a51370322ce8aab0"
     },
     {
       "id": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price",
@@ -89,7 +93,8 @@
         "path": "src/inventory.ts",
         "start": 1121,
         "end": 1379
-      }
+      },
+      "hash": "92f11ab7b4ee388b2770fbb2c991cbc16b6b7bcf10b01c0f6313ac50d3359ace"
     },
     {
       "id": "example.com/chain/gateway::src/inventory.ts::POST /api/inventory",
@@ -97,7 +102,8 @@
         "path": "src/inventory.ts",
         "start": 602,
         "end": 671
-      }
+      },
+      "hash": "cffe5c616552f09cd03836d8f5f9139655f33b9d0144b68fdad876767b62882f"
     },
     {
       "id": "example.com/chain/gateway::src/inventory.ts::getItem",
@@ -105,7 +111,8 @@
         "path": "src/inventory.ts",
         "start": 183,
         "end": 449
-      }
+      },
+      "hash": "d9a434b2166ca0d05a8da5340fb79b02f65a36d3be4573347ce8df6f78ca5c5b"
     },
     {
       "id": "example.com/chain/gateway::src/orders.ts::cancelOrder",
@@ -113,7 +120,8 @@
         "path": "src/orders.ts",
         "start": 274,
         "end": 392
-      }
+      },
+      "hash": "e880316bf61368dfdcaafb20a5eaff6fa1bde912d917707e8d38eafceb97e659"
     },
     {
       "id": "example.com/chain/gateway::src/orders.ts::listOrders",
@@ -121,7 +129,8 @@
         "path": "src/orders.ts",
         "start": 95,
         "end": 265
-      }
+      },
+      "hash": "959afabeacfcbc411939c9c7b50c4f2a00a343d0156996f01a49316baad72dfe"
     },
     {
       "id": "example.com/chain/gateway::src/ping.ts::GET /api/ping",
@@ -129,7 +138,8 @@
         "path": "src/ping.ts",
         "start": 146,
         "end": 200
-      }
+      },
+      "hash": "0f9ef9ca0a4aca2b8f4fcb6880391839457d1210bf22bc990851b9c0c35ff816"
     },
     {
       "id": "example.com/chain/gateway::src/routes.ts::POST /api/events",
@@ -137,7 +147,8 @@
         "path": "src/routes.ts",
         "start": 287,
         "end": 323
-      }
+      },
+      "hash": "d0b73b5e94b4fb35d14a8add8100bc340b115c907a4c0d4672413131fc0d39f5"
     },
     {
       "id": "example.com/chain/gateway::src/server.ts::GET /api/health",
@@ -145,7 +156,8 @@
         "path": "src/server.ts",
         "start": 196,
         "end": 225
-      }
+      },
+      "hash": "d20a5e68bc19266d19ea40faf79732e57fd758c7bc5c67974a7235a5dc03be85"
     },
     {
       "id": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves",
@@ -153,7 +165,8 @@
         "path": "src/shelves.ts",
         "start": 369,
         "end": 433
-      }
+      },
+      "hash": "65b673a0aeb430b63dfd083979f733d5969e29135371b728f4f865e0a85dff79"
     },
     {
       "id": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}",
@@ -161,7 +174,8 @@
         "path": "src/shelves.ts",
         "start": 200,
         "end": 272
-      }
+      },
+      "hash": "53e0c8f0f5bc0034eb283c9eb51010057d0b184eab2316881ccd4aa8ba314926"
     }
   ],
   "calls": [

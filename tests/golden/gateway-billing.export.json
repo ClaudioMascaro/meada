@@ -21,7 +21,8 @@
         "path": "app/audit/route.ts",
         "start": 7,
         "end": 59
-      }
+      },
+      "hash": "9857ec80ca3cad3d0e865ccc5594cc66c899e0ad7ff9470cd21e162241c57c4f"
     },
     {
       "id": "example.com/acme/billing::app/status/route.ts::GET",
@@ -29,7 +30,8 @@
         "path": "app/status/route.ts",
         "start": 7,
         "end": 59
-      }
+      },
+      "hash": "9857ec80ca3cad3d0e865ccc5594cc66c899e0ad7ff9470cd21e162241c57c4f"
     },
     {
       "id": "example.com/acme/billing::app/v1/invoices/route.ts::GET",
@@ -37,7 +39,8 @@
         "path": "app/v1/invoices/route.ts",
         "start": 7,
         "end": 59
-      }
+      },
+      "hash": "9857ec80ca3cad3d0e865ccc5594cc66c899e0ad7ff9470cd21e162241c57c4f"
     }
   ],
   "calls": [

@@ -21,7 +21,8 @@
         "path": "src/Jobs/Report.cs",
         "start": 110,
         "end": 264
-      }
+      },
+      "hash": "78cef43a4066e2f69e846fb1ea9dabba3f899ff02ffcc83928a0e6ec93be77b7"
     },
     {
       "id": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Line(int)",
@@ -29,7 +30,8 @@
         "path": "src/Jobs/Report.cs",
         "start": 136,
         "end": 207
-      }
+      },
+      "hash": "8f8d3fdf31c3a2e0829e2f48b9e8a742d9dcef676c3029fe8c06e9cf0a5132b5"
     },
     {
       "id": "example.com/dotnet/app::src/Jobs/Report.cs::Example.App.Jobs.Report.Short(int)",
@@ -37,7 +39,8 @@
         "path": "src/Jobs/Report.cs",
         "start": 213,
         "end": 262
-      }
+      },
+      "hash": "aef1a62114657bd985b8958fe669b8e73c9b8cc5a2e9fb61ac891c7e55ec0982"
     },
     {
       "id": "example.com/dotnet/app::src/Shared/Stamp.cs::Example.Shared.Stamp",
@@ -45,7 +48,8 @@
         "path": "src/Shared/Stamp.cs",
         "start": 27,
         "end": 97
-      }
+      },
+      "hash": "c8a5c13003627fd661429ad23797c672676e6d0afac24f1a11fca6b02fabb1b9"
     },
     {
       "id": "example.com/dotnet/app::src/Shared/Stamp.cs::Example.Shared.Stamp.Now()",
@@ -53,7 +57,8 @@
         "path": "src/Shared/Stamp.cs",
         "start": 59,
         "end": 95
-      }
+      },
+      "hash": "b55cc8cc494d102ff045708056be2408a70b5aace82b8330e80833667907b932"
     },
     {
       "id": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout",
@@ -61,7 +66,8 @@
         "path": "src/Web/Checkout.cs",
         "start": 56,
         "end": 242
-      }
+      },
+      "hash": "6d4a2c8c8ccc9f3bda6c0a7dd9247f44549097894db82eff13ad1677894dbe48"
     },
     {
       "id": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Create()",
@@ -69,7 +75,8 @@
         "path": "src/Web/Checkout.cs",
         "start": 202,
         "end": 240
-      }
+      },
+      "hash": "5829aa77a04d0b16cb1c77a792e10eb61ff87b567059becbc8d459b5bca7bbc9"
     },
     {
       "id": "example.com/dotnet/app::src/Web/Checkout.cs::Example.App.Web.Checkout.Pay(int)",
@@ -77,7 +84,8 @@
         "path": "src/Web/Checkout.cs",
         "start": 84,
         "end": 196
-      }
+      },
+      "hash": "aa7e867dfc4ec90b65e845c8c0785c6f21fa96a82baf968599de0f88b1c86462"
     }
   ],
   "calls": [

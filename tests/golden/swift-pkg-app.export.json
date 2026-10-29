@@ -13,7 +13,8 @@
         "path": "Sources/App/main.swift",
         "start": 881,
         "end": 950
-      }
+      },
+      "hash": "e6e9c7bc1b823f1ac12e7e2572932b110269925d0bb0a3d21dcd1d97b89001e5"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::Local.hello(to:)",
@@ -21,7 +22,8 @@
         "path": "Sources/App/main.swift",
         "start": 900,
         "end": 948
-      }
+      },
+      "hash": "d83e539cbff8c09d20f2e019a01b2539fcc0d6563c55bb8d54adb9939684bee5"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::both(m:)",
@@ -29,7 +31,8 @@
         "path": "Sources/App/main.swift",
         "start": 656,
         "end": 702
-      }
+      },
+      "hash": "7ac372eff05bbe396a211b259dce2ca5f469e45f3b8bba35675999b5445aa4a9"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::formal(who:)",
@@ -37,7 +40,8 @@
         "path": "Sources/App/main.swift",
         "start": 133,
         "end": 214
-      }
+      },
+      "hash": "5900c5c5fb826525f6bc980546a43ee6f47b509749e6a182ddbc5ae80ef57987"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::hello(who:)",
@@ -45,7 +49,8 @@
         "path": "Sources/App/main.swift",
         "start": 270,
         "end": 382
-      }
+      },
+      "hash": "48734a386e1ab6e7b89ab2626013ed0f2e07c67b2594a22e9609c43206ab7bb1"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::hidesGreet(greet:)",
@@ -53,7 +58,8 @@
         "path": "Sources/App/main.swift",
         "start": 952,
         "end": 1023
-      }
+      },
+      "hash": "ea9df32476d1c74ef5fabf19e05255b7e09e5e3f59eaff7d92fa210e3b6222ed"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::hidesGreetByClosure()",
@@ -61,7 +67,8 @@
         "path": "Sources/App/main.swift",
         "start": 1130,
         "end": 1205
-      }
+      },
+      "hash": "92b69ab88c698b618da51f07d4f6c05f3d2752aca7e4d4cba7dfa3c33ba37450"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::hidesGreetByLocal()",
@@ -69,7 +76,8 @@
         "path": "Sources/App/main.swift",
         "start": 1025,
         "end": 1128
-      }
+      },
+      "hash": "374316176d049e16fe64cff33b9d4a5edcb3dcf1abb04a0081c1c1831d4632f6"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::hidesGreeterByLocal()",
@@ -77,7 +85,8 @@
         "path": "Sources/App/main.swift",
         "start": 1294,
         "end": 1394
-      }
+      },
+      "hash": "8c6c41f8038daacb2d3244e916764635b366c378d390e32254ff8c0994304429"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::hidesGreeterByParameter(greeter:)",
@@ -85,7 +94,8 @@
         "path": "Sources/App/main.swift",
         "start": 1207,
         "end": 1292
-      }
+      },
+      "hash": "92617003bfe9c6adc176c7dd7b65aec7f876ceb86eb5b6d57abf06f3e6e09f4f"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::hidesTheTypeByParameter(Greeter:)",
@@ -93,7 +103,8 @@
         "path": "Sources/App/main.swift",
         "start": 1396,
         "end": 1481
-      }
+      },
+      "hash": "41f922f84de9cd9115147681405719f93a5c925e8ed0c86fba730beed457a517"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::local()",
@@ -101,7 +112,8 @@
         "path": "Sources/App/main.swift",
         "start": 602,
         "end": 654
-      }
+      },
+      "hash": "4bc88938d6a7d9918002592059a9bec182d8a56aa58a9d7f8c57078807bf99a6"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::loud(text:)",
@@ -109,7 +121,8 @@
         "path": "Sources/App/main.swift",
         "start": 547,
         "end": 600
-      }
+      },
+      "hash": "3696c0fea842bd5da8b053a78a7d662976031be056ccf1cfbdfb9c93789e48e0"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::main",
@@ -117,7 +130,8 @@
         "path": "Sources/App/main.swift",
         "start": 0,
         "end": 1737
-      }
+      },
+      "hash": "1cd4c17db73b9c8c14d9552a0b93bf136e1b23b649a7e147b6981a96f824097a"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::onAResult()",
@@ -125,7 +139,8 @@
         "path": "Sources/App/main.swift",
         "start": 1622,
         "end": 1736
-      }
+      },
+      "hash": "a1b2678ca5a9b5e7b548243e3f4ff1d97d596194a0d8ebd2b86ed2cc5275eead"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::plain(who:)",
@@ -133,7 +148,8 @@
         "path": "Sources/App/main.swift",
         "start": 216,
         "end": 268
-      }
+      },
+      "hash": "73cc5d0cb3abf048d6ae82b665ea703a0dad03abddacabb1b687986194d91784"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::total()",
@@ -141,7 +157,8 @@
         "path": "Sources/App/main.swift",
         "start": 471,
         "end": 545
-      }
+      },
+      "hash": "e90fc21f40503bd6e0294af0287751093b7c68d0354ee4227e26e144b262bccb"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::twoOrigins(flag:)",
@@ -149,7 +166,8 @@
         "path": "Sources/App/main.swift",
         "start": 1483,
         "end": 1620
-      }
+      },
+      "hash": "b2e1fb69cd30604dd753d57c323379cba0b1afdd905afbd916ba3172f747d8b2"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::typed(greeter:)",
@@ -157,7 +175,8 @@
         "path": "Sources/App/main.swift",
         "start": 384,
         "end": 469
-      }
+      },
+      "hash": "ac946088bfd0fa74f33db79a31a386cb58a78241f250240dd2a673b0d9235504"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::variadic()",
@@ -165,7 +184,8 @@
         "path": "Sources/App/main.swift",
         "start": 704,
         "end": 761
-      }
+      },
+      "hash": "342b0ba14aa62d98591b0c232b09e659d0b00b237d6aa0b100bdf97202bec095"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::viaDyn()",
@@ -173,7 +193,8 @@
         "path": "Sources/App/main.swift",
         "start": 763,
         "end": 813
-      }
+      },
+      "hash": "baf06a19ae116c709f0df0b6bf92aafb70660117499fb9b11e67b06dd228bafc"
     },
     {
       "id": "example.com/apps/shop::Sources/App/main.swift::welcome(who:)",
@@ -181,7 +202,8 @@
         "path": "Sources/App/main.swift",
         "start": 71,
         "end": 131
-      }
+      },
+      "hash": "d1edb5bd3b894093912be4a0557cb2dbdf38c6aa3cf7b83f61355356331a4ccf"
     }
   ],
   "calls": [

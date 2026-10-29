@@ -7,7 +7,7 @@ use rusqlite::Connection;
 
 use crate::contract::{self, ContractKind, Hit, KINDS, Level, Link, Role, Search, View};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
-use crate::index::{Export, State, Symbol, schema};
+use crate::index::{CallSite, Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::{Fix, Msg};
 use crate::render::{
@@ -19,13 +19,10 @@ use crate::{Result, decisions, document, drift_view, index, items, render, repo,
 use meada_core::context::{self, shape_lines};
 use meada_core::search;
 
-/// SQLite attaches at most 10 databases to one connection (`SQLITE_MAX_ATTACHED`).
-const MAX_PEERS: usize = 10;
-
 pub struct Engine {
-    /// The index of the repository where Meada runs, with every other repository of the
-    /// workspace attached as `peer<n>`, `n` its position in `workspace.repos`.
-    db: Connection,
+    /// The index of each repository of the workspace, one connection each (SQLite attaches at
+    /// most 10 databases to one), in `workspace.repos` order: the first is where Meada runs.
+    dbs: Vec<Connection>,
     workspace: Workspace,
     root: PathBuf,
     identity: String,
@@ -102,14 +99,12 @@ impl Engine {
     /// Opens every index of `workspace` read-only; `fix` says where an index that cannot be
     /// read is fixed.
     fn read(workspace: Workspace, fix: Fix) -> Result<Self> {
-        fits(&workspace)?;
-        let repos: Vec<(&Path, &str)> = (workspace.repos.iter())
-            .map(|r| (r.index.as_path(), r.identity.as_str()))
-            .collect();
-        let db = index::open_read(&repos, fix)?;
+        let dbs = (workspace.repos.iter())
+            .map(|r| index::open_read(&r.index, &r.identity, fix))
+            .collect::<Result<_>>()?;
         let here = &workspace.repos[0];
         Ok(Self {
-            db,
+            dbs,
             root: here.root.clone(),
             identity: here.identity.clone(),
             workspace,
@@ -120,20 +115,13 @@ impl Engine {
     /// Opens every index of `workspace` where its repository says it lives
     /// (`Repository::index`).
     fn over(workspace: Workspace) -> Result<Self> {
-        fits(&workspace)?;
-        // Opening builds a missing index, or rebuilds one of another schema, before it is
-        // attached.
-        for peer in &workspace.repos[1..] {
-            index::open(&peer.index, &peer.root, &peer.identity, &peer.config.serve)?;
-        }
+        // Opening builds a missing index, or rebuilds one of another schema.
+        let dbs = (workspace.repos.iter())
+            .map(|r| index::open(&r.index, &r.root, &r.identity, &r.config.serve))
+            .collect::<Result<_>>()?;
         let here = &workspace.repos[0];
-        let db = index::open(&here.index, &here.root, &here.identity, &here.config.serve)?;
-        for (n, peer) in workspace.repos.iter().enumerate().skip(1) {
-            let path = peer.index.to_str().ok_or("index path is not UTF-8")?;
-            db.execute(&format!("ATTACH DATABASE ?1 AS peer{n}"), [path])?;
-        }
         Ok(Self {
-            db,
+            dbs,
             root: here.root.clone(),
             identity: here.identity.clone(),
             workspace,
@@ -155,7 +143,7 @@ impl Engine {
             index::refresh(&db, &peer.root, &peer.identity, &peer.config.serve)?;
         }
         let here = &self.workspace.repos[0];
-        index::refresh(&self.db, &self.root, &self.identity, &here.config.serve)
+        index::refresh(&self.dbs[0], &self.root, &self.identity, &here.config.serve)
     }
 
     /// The canonical export of the repository where Meada runs: its whole index, plus the
@@ -183,10 +171,9 @@ impl Engine {
     /// The index content of every repository of the workspace, with the contracts its
     /// `meada.toml` declares, in workspace order.
     fn exports(&self) -> Result<Vec<Export>> {
-        let repos = self.workspace.repos.iter().enumerate();
-        let mut exports = repos
-            .map(|(n, m)| {
-                let mut export = index::export(&self.db, &schema(n), &m.identity)?;
+        let mut exports = (self.dbs.iter().zip(&self.workspace.repos))
+            .map(|(db, m)| {
+                let mut export = index::export(db, &m.identity)?;
                 export.root = m.root.clone();
                 for kind in contract::KINDS {
                     kind.declare(m, &mut export);
@@ -259,6 +246,7 @@ impl Engine {
         let drift = drift_view::counts(repos.len(), &entries);
         let lines = (repos.iter().zip(&exports).zip(drift))
             .map(|((repo, export), drift)| {
+                let prefix = format!("{}::", repo.identity);
                 let mut lines: Vec<String> = (contract::KINDS.iter())
                     .flat_map(|kind| kind.status(repo, export, &links))
                     .collect();
@@ -272,6 +260,11 @@ impl Engine {
                 }));
                 if drift > 0 {
                     lines.push(Msg::Drift(drift).text());
+                }
+                let inferred = (links.iter())
+                    .any(|l| l.level == Level::Inferred && l.consumer.starts_with(&prefix));
+                if drift > 0 || inferred {
+                    lines.push(Msg::ReportHint.text());
                 }
                 lines
             })
@@ -374,7 +367,8 @@ impl Engine {
     /// `ContractKind::own_search`); `community` lists the communities, matched by name, and `process`
     /// the processes, matched by their entry point's label (`search_communities`,
     /// `search_processes`); `drift` lists the fields consumers read that a route lacks (see
-    /// `search_drift`); `ambiguous` and `unresolved` list the open items whose enclosing
+    /// `search_drift`); `duplicate` lists the symbols whose span text is the same in two or more
+    /// places of the workspace, in groups (`search_duplicates`); `ambiguous` and `unresolved` list the open items whose enclosing
     /// symbol or call expression matches, each with the `meada decide` command that resolves
     /// it. The answer is cut at `budget` tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
@@ -400,6 +394,9 @@ impl Engine {
         }
         if kind == Some("process") {
             return self.search_processes(query, budget);
+        }
+        if kind == Some("duplicate") {
+            return self.search_duplicates(query, budget);
         }
         // Whether symbols match, and the prefix of the contracts that do.
         let (symbols, contracts) = match (kind, selected) {
@@ -578,6 +575,64 @@ impl Engine {
             }
         }
         Ok(search::answer(query, hits, budget))
+    }
+
+    /// The symbols whose span text is the same in two or more places of the workspace (across
+    /// repositories and within one), as groups: a header `<n> copies`, then one line per member in
+    /// the symbol format. A group is listed when any member's name or path matches `query`; groups
+    /// go by span length, longest first, then smallest member identity, members by identity.
+    fn search_duplicates(&self, query: &str, budget: Option<usize>) -> Result<String> {
+        self.refresh()?;
+        let exports = self.exports()?;
+        let needle = query.to_lowercase();
+        // Symbols by hash, as (repository position, symbol); lines are built for the groups
+        // that survive, so a query reads only the files of the answer.
+        let mut groups: HashMap<&str, Vec<(usize, &Symbol)>> = HashMap::new();
+        for (n, export) in exports.iter().enumerate() {
+            for symbol in &export.symbols {
+                groups.entry(&symbol.hash).or_default().push((n, symbol));
+            }
+        }
+        // ponytail: no folding of nested groups (a duplicated class lists its methods as groups of
+        // their own) and no minimum span size; add either if one-line copies drown the answer.
+        let mut groups: Vec<_> = groups
+            .into_values()
+            .filter(|g| g.len() > 1)
+            .filter(|g| {
+                g.iter().any(|(_, symbol)| {
+                    let name = label(&symbol.id).to_lowercase();
+                    let last = name.rsplit('.').next().unwrap_or(&name);
+                    let path = symbol.span.path.to_lowercase();
+                    [name.as_str(), last, path.as_str()]
+                        .iter()
+                        .any(|n| rank(n, &needle).is_some())
+                })
+            })
+            .collect();
+        // Overloads share an identity, so the position in the file settles ties.
+        let place = |(_, s): &(usize, &Symbol)| (s.id.clone(), s.span.path.clone(), s.span.start);
+        for group in &mut groups {
+            group.sort_by_key(place);
+        }
+        let length = |g: &Vec<(usize, &Symbol)>| g[0].1.span.end - g[0].1.span.start;
+        groups.sort_by(|a, b| {
+            (length(b).cmp(&length(a))).then_with(|| place(&a[0]).cmp(&place(&b[0])))
+        });
+        if groups.is_empty() {
+            return Ok(format!("no matches for `{query}`\n"));
+        }
+        let mut files: Vec<Files> = (self.workspace.repos.iter())
+            .map(|repo| Files::new(&repo.root))
+            .collect();
+        let mut lines = Vec::new();
+        for group in groups {
+            lines.push(format!("{} copies", group.len()));
+            for (n, symbol) in group {
+                let identity = &self.workspace.repos[n].identity;
+                lines.push(line(identity, &mut files[n], symbol, label(&symbol.id)));
+            }
+        }
+        Ok(render::budgeted(&lines, budget))
     }
 
     /// The open items of `kind` whose enclosing symbol or call expression matches `query`.
@@ -948,7 +1003,8 @@ fn span_text(root: &Path, export: &Export, symbol: &Symbol) -> Option<(usize, Ve
     Some((render::line_of(&src, symbol.span.start), lines))
 }
 
-/// `callers:` and `callees:` of the symbol `id`, inside the repository `identity`.
+/// `callers:`, `callees:` and, when the symbol has calls that decorate a definition, `annotations:`
+/// of the symbol `id`, inside the repository `identity`.
 fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Vec<String> {
     let symbols: HashMap<&str, &Symbol> =
         export.symbols.iter().map(|s| (s.id.as_str(), s)).collect();
@@ -972,32 +1028,55 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
             )
         })
         .collect();
-    let mut callees: Vec<_> = export.calls.iter().filter(|c| c.caller == id).collect();
-    callees.sort_by_key(|c| (c.target.is_none(), &c.id));
-    let mut callees: Vec<String> = callees
-        .iter()
-        .flat_map(|c| {
-            // An ambiguous call lists every candidate, marked, instead of a guess.
-            let targets: Vec<&Symbol> = c
-                .target
-                .iter()
-                .chain(&c.candidates)
-                .filter_map(|t| symbols.get(t.as_str()).copied())
-                .collect();
-            if targets.is_empty() {
-                let callee = callee(&c.id);
-                let location = files.at(&c.span.path, c.span.start);
-                return vec![format!("{identity} {location} (unresolved) {callee}")];
-            }
-            targets
-                .iter()
-                .map(|t| line(identity, files, t, label(&t.id)) + &mark(c))
-                .collect()
-        })
-        .collect();
-    callees.dedup();
+    let mut calls: Vec<_> = export.calls.iter().filter(|c| c.caller == id).collect();
+    calls.sort_by_key(|c| (c.target.is_none(), &c.id));
+    let lines_of = |calls: Vec<&CallSite>, files: &mut Files| -> Vec<String> {
+        let mut lines: Vec<String> = calls
+            .iter()
+            .flat_map(|c| {
+                // An ambiguous call lists every candidate, marked, instead of a guess.
+                let targets: Vec<&Symbol> = c
+                    .target
+                    .iter()
+                    .chain(&c.candidates)
+                    .filter_map(|t| symbols.get(t.as_str()).copied())
+                    .collect();
+                // An annotation says which definition it decorates.
+                let on = c
+                    .decorates
+                    .as_deref()
+                    .map_or(String::new(), |d| format!(" on {}", label(d)));
+                if targets.is_empty() {
+                    let callee = callee(&c.id);
+                    let location = files.at(&c.span.path, c.span.start);
+                    return vec![format!("{identity} {location} (unresolved) {callee}{on}")];
+                }
+                // Overloads of one method show as one set: the first by id stands for them.
+                render::overload_sets(targets, |t| &t.id)
+                    .into_iter()
+                    .map(|set| match set.as_slice() {
+                        [t] => line(identity, files, t, label(&t.id)) + &mark(c) + &on,
+                        [first, ..] => {
+                            let name = render::overload_name(&first.id);
+                            let at = line(identity, files, first, name);
+                            format!("{at} (one of {} overloads){}{on}", set.len(), mark(c))
+                        }
+                        [] => unreachable!(),
+                    })
+                    .collect()
+            })
+            .collect();
+        lines.dedup();
+        lines
+    };
+    let (annotations, callees) = calls.into_iter().partition(|c| c.decorates.is_some());
+    let callees = lines_of(callees, files);
+    let annotations = lines_of(annotations, files);
     let mut lines = section("callers", callers);
     lines.extend(section("callees", callees));
+    if !annotations.is_empty() {
+        lines.extend(section("annotations", annotations));
+    }
     lines
 }
 
@@ -1145,7 +1224,7 @@ fn check_served(listed: &Manifest, manifest: &Path) -> Result<()> {
     let shown = manifest.display().to_string();
     let problems: Vec<String> = (listed.entries.iter())
         .filter_map(|l| match &l.repository {
-            Ok(r) => (index::open_read(&[(&r.index, &r.identity)], Fix::Index(&shown)))
+            Ok(r) => (index::open_read(&r.index, &r.identity, Fix::Index(&shown)))
                 .err()
                 .map(|e| e.to_string()),
             Err(problem) => Some(format!("{}: {problem}", l.repo)),
@@ -1203,7 +1282,7 @@ pub fn served_generation(manifest: &Path) -> Result<(PathBuf, Vec<String>)> {
             repo::trust(&r.root);
             match r.recheck() {
                 Err(problem) => Some(format!("{}: {problem}", l.repo)),
-                Ok(()) => (index::open_read(&[(&r.index, &r.identity)], fix))
+                Ok(()) => (index::open_read(&r.index, &r.identity, fix))
                     .and_then(|_| index::vet(&r.index, &r.identity, fix))
                     .err()
                     .map(|e| e.to_string()),
@@ -1305,7 +1384,14 @@ fn status_lines(
 /// The `kind` words of `search` the engine answers itself: the first two come before the kinds'
 /// filter words, the rest after the kinds' own renderers (`document` sits between the two).
 const WORDS_BEFORE: [&str; 2] = ["symbol", "contract"];
-const WORDS_AFTER: [&str; 5] = ["drift", "community", "process", "ambiguous", "unresolved"];
+const WORDS_AFTER: [&str; 6] = [
+    "drift",
+    "community",
+    "process",
+    "duplicate",
+    "ambiguous",
+    "unresolved",
+];
 
 /// Every `kind` word of `search`, in the order its error names them: the engine's own, the
 /// kinds' filter words in kinds order, `document`, the kinds' own-renderer words, then the rest
@@ -1321,21 +1407,6 @@ pub(crate) fn kind_words() -> impl Iterator<Item = &'static str> {
         .chain(["document"])
         .chain(kinds(true))
         .chain(WORDS_AFTER)
-}
-
-/// Refuses a workspace larger than one connection attaches.
-fn fits(workspace: &Workspace) -> Result<()> {
-    if workspace.repos.len() > MAX_PEERS + 1 {
-        // ponytail: one connection attaches every peer, so a workspace reads at most 10
-        // peers; batched ATTACH (detach one batch of peers, attach the next) lifts it.
-        return Err(Msg::TooManyRepos {
-            found: workspace.repos.len(),
-            max: MAX_PEERS + 1,
-        }
-        .text()
-        .into());
-    }
-    Ok(())
 }
 
 /// `to` as a path from `from`, with `/` separators: `.`, `../api`.
