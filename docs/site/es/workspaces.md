@@ -54,15 +54,8 @@ almacenamiento propios.
 
 ## Ownership por equipo
 
-!!! warning "Planificado: S3"
-    [S3, #294](https://github.com/ClaudioMascaro/meada/issues/294) define ownership y autorización por equipo. Las versiones y el editor anteriores ya están entregados en S2; las reglas siguientes aún no están disponibles.
+El `owner` de una entrada es el nombre exacto de un grupo OIDC: de 1 a 256 caracteres, sin carácter de control ni espacio en blanco en los extremos, comparado exactamente, con mayúsculas y minúsculas. `meada workspace import` lo guarda, `show` lo imprime justo después de `path`, `pull` lo escribe y cambia el id de la versión; una entrada sin él conserva su id. La indexación y los ids de bundle y de generación nunca lo leen, y las entradas `[[repository]]` del propio manifest de bootstrap lo rechazan, citando `source = "store"`.
 
-El `owner` de una entrada ya existe como metadato (#322): una cadena de 1 a 256 caracteres, sin carácter de control ni espacio en blanco en los extremos, comparada exactamente, con mayúsculas y minúsculas. `meada workspace import` lo guarda, `show` lo imprime justo después de `path`, `pull` lo escribe y cambia el id de la versión; una entrada sin él conserva su id. La indexación y los ids de bundle y de generación nunca lo leen, y las entradas `[[repository]]` del propio manifest de bootstrap lo rechazan, citando `source = "store"`. Ninguna regla lo lee todavía para decidir quién puede escribir.
-
-Una entrada podrá tener un `owner`, el nombre exacto de un grupo OIDC. El operador global delegará la primera entrada; el operador de equipo podrá modificar solo entradas de sus grupos que su grant permita leer. El viewer consultará lo que su grant admita. Ownership nunca ampliará el grant.
-
-Asignar, sustituir **o borrar** un owner será `owner_change`, reservado al operador global. Guardar una propuesta creará una versión inmutable; aplicar la versión y publicar la generación seguirán siendo acciones distintas. Aplicar solo cambios de owners no requerirá indexar el código otra vez.
-
-El diagrama distingue el camino entregado (líneas continuas) de la autorización planificada (líneas discontinuas). [S5](named-workspaces.md) añadirá workspaces con nombre sobre la indexación compartida.
+El operador global delega a un equipo su primera entrada; el operador de equipo modifica solo entradas de sus grupos que su grant permita leer, y el viewer consulta lo que su grant admita. Ownership nunca amplía el grant. Asignar, sustituir o borrar un owner es `owner_change`, reservado al operador global. Las reglas, la confianza que implican y un ejemplo están en [Equipos](console.md#equipos). [S5](named-workspaces.md) añadirá workspaces con nombre sobre la indexación compartida.
 
 <!-- meada-graph:workspaces -->

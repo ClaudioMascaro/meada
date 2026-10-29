@@ -18,6 +18,8 @@ modules:
     groups:
       meada-readers: [github.com/claudiomascaro/meada]
       meada-operators: ["*"]
+      # A team: map its group to the identities it owns (docs site, console, Teams).
+      team-billing: [github.com/acme/billing]
 console:
   enabled: true
   operatorGroups: [meada-operators]

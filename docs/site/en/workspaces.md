@@ -51,15 +51,8 @@ console profiles are off by default and own their bootstrap, admission and stora
 
 ## Team ownership
 
-!!! warning "Planned: S3"
-    [S3, #294](https://github.com/ClaudioMascaro/meada/issues/294) defines team ownership and authorization. The versions and editor above are delivered in S2; the rules below are not yet available behavior.
+An entry's `owner` is the exact name of an OIDC group: 1 to 256 characters, no control character, no whitespace at either end, compared exactly, case included. `meada workspace import` stores it, `show` prints it right after `path`, `pull` writes it and it changes the version id; an entry without it keeps its id. Indexing and the bundle and generation ids never read it, and a bootstrap manifest's own `[[repository]]` entries refuse it, naming `source = "store"`.
 
-An entry's `owner` is available as entry metadata (#322): one string of 1 to 256 characters, with no control character and no whitespace at either end, compared exactly, case included. `meada workspace import` stores it, `show` prints it right after `path`, `pull` writes it and it changes the version id; an entry without it keeps its id. Indexing and the bundle and generation ids never read it, and a bootstrap manifest's own `[[repository]]` entries refuse it, naming `source = "store"`. No rule reads it yet to decide who may write.
-
-An entry will be able to have an `owner`, the exact name of an OIDC group. The global operator will delegate the first entry; a team operator will be able to change only entries owned by its groups that its grant lets it read. A viewer will query what its grant admits. Ownership will never widen the grant.
-
-Setting, replacing **or clearing** an owner will be `owner_change`, reserved for the global operator. Saving a proposal will create an immutable version; applying the version and publishing a generation will remain separate actions. Applying only owner changes will not require indexing code again.
-
-The diagram separates the delivered path (solid lines) from planned authorization (dashed lines). [S5](named-workspaces.md) will add named workspaces over shared indexing.
+The global operator delegates a team its first entry; a team operator changes only entries owned by its groups that its grant lets it read, and a viewer queries what its grant admits. Ownership never widens the grant. Setting, replacing or clearing an owner is `owner_change`, reserved for the global operator. The rules, the trust they imply and an example are in [Teams](console.md#teams). [S5](named-workspaces.md) will add named workspaces over shared indexing.
 
 <!-- meada-graph:workspaces -->

@@ -39,6 +39,12 @@ All notable changes to Meada are recorded here. The format follows
   editor read-only, and apply is offered only when the entries it reads authorize it. Every role
   sees each entry's owner on the versions page, where an owner change lists as the changed key
   `repository.owner` like any other. `meada-core` exports `entriesJson` to WebAssembly.
+- The console documentation gains a Teams section in three languages (shared trust, the `owner`
+  key, roles, delegation, the `[oidc.groups]` mapping, static manifests, the CLI twins, owner-only
+  applies, position and the whole-publication abort), and the Compose and Helm console profiles
+  map an example team group. Team ownership as a whole (the `owner` key, the `team_operator` role,
+  the session's `groups`, `grant` and `teams`, the `entries_refused` refusal) is additive under
+  Spec R1's stability rule: a minor change.
 - ADR 0020 and the glossary record the direction of spec S5: a named query context over shared
   indexing and publication.
 - `meada status` ends a repository's lines with a pointer to the new `inference` issue form when the
