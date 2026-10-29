@@ -58,6 +58,14 @@ pub fn entries_text(repositories: &str) -> Result<String, String> {
         .ok_or_else(|| "not repository entries".to_string())
 }
 
+/// The workspace text `src` as the JSON entries of a version document, the form
+/// `authorizeEntries` and `composeEntries` take; throws import's problems when it is not valid.
+#[wasm_bindgen(js_name = entriesJson)]
+pub fn entries_json(src: &str) -> Result<String, String> {
+    let entries = crate::workspace::version_entries("entries", src).map_err(|e| e.join("\n"))?;
+    serde_json::to_string(&entries).map_err(|error| error.to_string())
+}
+
 /// The entries `role` (`operator`, `team_operator` or `viewer`) may not change from `current` to `entries`,
 /// as JSON `[{identity, change, reason}]`, none when it may. Every other argument is JSON:
 /// `groups` an array of names, `grant` `"*"` or an array of identities, the entries a version's

@@ -89,7 +89,7 @@ share. Both take one version from the workspace, and `meada` depends on `meada-c
 it. `meada-core` has no rusqlite, tree-sitter, filesystem, process or network code and no async
 runtime; it builds for `wasm32-unknown-unknown`, its `wasm-bindgen` feature (never the binary's)
 exporting `init`, `validate`, `workspaceVersionId`, `workspaceDiff`, `entriesText`,
-`authorizeEntries`, `composeEntries` and `parseExport`. CI's `core` job builds it
+`entriesJson`, `authorizeEntries`, `composeEntries` and `parseExport`. CI's `core` job builds it
 with wasm-pack and checks both trees.
 
 Every tree-sitter grammar is a crate except Kotlin's: `vendor/tree-sitter-kotlin-ng/` holds
@@ -122,7 +122,10 @@ other Kotlin grammar may enter the dependency tree: they all export `tree_sitter
   one another report the `repository` array key. Formatting is ignored. `entries_text` is the
   pure JSON-repositories-to-TOML conversion shared with `snapshot::versions` and WASM; it prints
   an entry's `owner` right after its `path`, before the block tables, so the text reads back to
-  the same id.
+  the same id. `version_entries` (`entriesJson`) is the opposite way, a text to the entries a
+  version document holds (`entry` builds one), shared with `snapshot::versions`, so the browser
+  authorizes and composes the same entries the server stores. An owner change alone is the
+  changed dotted key `repository.owner`.
 - `meada-core/src/authorize.rs` (ADR 0015): what a subject may change in a workspace version,
   over a version document's JSON `repositories`. `authorize_entries(role, groups, grant,
   current, new)` returns the refused entries (`Refusal`: `identity`, `change` `add`/`edit`/
@@ -205,6 +208,17 @@ Every edit validates through WASM `validate_import`; JSON entries become TOML th
 same `entries_text` as `workspace show`. Saves require a message, accepted saves read the
 immutable first metadata independently of read refresh failures, and older applies are labelled
 as rollback for the next refresh. The shared confirmation dialog sends nothing before acceptance.
+A team operator (#325) edits the entries its grant reads, as `GET .../versions/<id>` returns
+them (`workspace.ts`: `teamEditorModel` composes the text with `composeEntries`, diffs the
+composed version and runs `authorizeEntries`, so a refusal is marked with its reason in the diff
+and the save disabled with no request; `entryRows` shows each entry's owner and the answer to
+changing it alone). `plainEntries` projects the flags a view adds (`may_change`, `refusal`) out
+before any TOML or id, and a partial view's hash is never a saved id: a team save reads the
+server's `result`. Its save and apply confirmations name the teams that authorize them (the
+owners of the entries touched) instead of a CLI command, an apply is offered only when
+`authorizeEntries` over the entries it reads refuses nothing, `ApiError.body` carries a 403
+`entries_refused` (entries and `hidden`) to the dialog, and any other 403 reloads the session
+and turns the editor read-only. Every role sees owners in the versions page and its diffs.
 The frontend container stage copies the one shared validation fixture because TypeScript also
 checks its tests; Rust/default stages gain no frontend input.
 Vitest exercises the built WASM and the public client, view-model and DOM

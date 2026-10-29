@@ -20,7 +20,7 @@ export interface Manifest {
 }
 
 export class ApiError extends Error {
-  constructor(readonly status: number, readonly code: string, message: string) { super(message); }
+  constructor(readonly status: number, readonly code: string, message: string, readonly body: Record<string, unknown> = {}) { super(message); }
 }
 
 async function read<T>(response: Response): Promise<T> {
@@ -31,8 +31,8 @@ async function read<T>(response: Response): Promise<T> {
       return context.source;
     }) as T;
   }
-  const body = await response.json().catch(() => null) as { error?: { code?: string; message?: string } } | null;
-  throw new ApiError(response.status, body?.error?.code ?? 'http', body?.error?.message ?? `HTTP ${response.status}`);
+  const body = await response.json().catch(() => null) as { error?: { code?: string; message?: string } & Record<string, unknown> } | null;
+  throw new ApiError(response.status, body?.error?.code ?? 'http', body?.error?.message ?? `HTTP ${response.status}`, body?.error);
 }
 
 export function loadConfig(): Promise<Config> {

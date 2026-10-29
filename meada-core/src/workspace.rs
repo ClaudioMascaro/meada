@@ -3,10 +3,11 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value as Json;
+use serde_json::{Map, Value as Json};
 use toml::de::{DeTable, DeValue, ValueDeserializer};
 
-use crate::manifest::validate_import;
+use crate::ids::entry_blocks;
+use crate::manifest::{EntryFile, validate_import};
 use crate::qualify;
 
 #[derive(Debug, Serialize, PartialEq, Eq, Default)]
@@ -174,6 +175,30 @@ fn fields(table: &DeTable<'_>, prefix: &str, out: &mut Vec<(String, Vec<Json>, u
             }
         }
     }
+}
+
+/// One entry of a version document: `repo` and `path`, the `owner` when there is one, then the
+/// entry's blocks (`entry_blocks`).
+pub fn entry(e: &EntryFile, blocks: Json) -> Json {
+    let mut entry = Map::new();
+    entry.insert("repo".into(), e.repo.as_str().into());
+    entry.insert("path".into(), e.path.as_str().into());
+    if let Some(owner) = &e.owner {
+        entry.insert("owner".into(), owner.as_str().into());
+    }
+    if let Json::Object(blocks) = blocks {
+        entry.extend(blocks);
+    }
+    Json::Object(entry)
+}
+
+/// The entries of the workspace text `src` as a version document holds them, with import's
+/// validation errors when it is not valid.
+pub fn version_entries(file: &str, src: &str) -> Result<Vec<Json>, Vec<String>> {
+    let entries = validate_import(file, src)?;
+    Ok((entries.iter().zip(entry_blocks(src)))
+        .map(|(e, blocks)| entry(e, blocks))
+        .collect())
 }
 
 /// A document's entries as `[[repository]]` tables, `None` when they are not TOML tables. An
