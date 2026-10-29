@@ -504,11 +504,11 @@ pub fn apply(
         async |valkey, config, _, held| {
             if role != Role::Operator {
                 let current = match current(valkey, config).await? {
-                    Some((current, _)) => {
+                    Some((current_id, _)) => {
                         let store = Store::connect(snapshot)?;
-                        let key = version_key(snapshot, &current);
-                        let stored = stored(&store, &key, &current).await?;
-                        stored
+                        let key = version_key(snapshot, &current_id);
+                        let document = stored(&store, &key, &current_id).await?;
+                        document
                             .ok_or_else(|| Msg::WorkspaceNoVersion(&key).text())?
                             .0
                     }

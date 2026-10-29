@@ -58,7 +58,7 @@ pub fn entries_text(repositories: &str) -> Result<String, String> {
         .ok_or_else(|| "not repository entries".to_string())
 }
 
-/// The entries `role` (`operator`, `team_operator`) may not change from `current` to `entries`,
+/// The entries `role` (`operator`, `team_operator` or `viewer`) may not change from `current` to `entries`,
 /// as JSON `[{identity, change, reason}]`, none when it may. Every other argument is JSON:
 /// `groups` an array of names, `grant` `"*"` or an array of identities, the entries a version's
 /// `repositories`.

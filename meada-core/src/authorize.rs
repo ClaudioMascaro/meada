@@ -77,6 +77,8 @@ pub enum Reason {
     NotYourTeam,
 }
 
+/// One entry the subject may not change. An `outside_grant` refusal names an identity the subject
+/// may not read: the console counts those instead of naming them (ADR 0015, #324).
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Refusal {
     pub identity: String,
@@ -130,7 +132,7 @@ pub fn authorize_entries(
     }
     let teams = teams(groups, grant, current);
     let old: BTreeMap<&str, &Json> = current.iter().map(|e| (repo(e), e)).collect();
-    let kept: BTreeSet<&str> = new.iter().map(repo).collect();
+    let listed: BTreeSet<&str> = new.iter().map(repo).collect();
     let check = |before: Option<&Json>, after: Option<&Json>| {
         let (identity, change) = match (before, after) {
             (None, Some(after)) => (repo(after), Change::Add),
@@ -139,14 +141,14 @@ pub fn authorize_entries(
             (Some(before), None) => (repo(before), Change::Remove),
             (None, None) => return None,
         };
-        let held = before.or(after).and_then(owner);
+        let owned_by = before.or(after).and_then(owner);
         let reason = if !grant.reads(identity) {
             Reason::OutsideGrant
-        } else if held.is_none() {
+        } else if owned_by.is_none() {
             Reason::Ownerless
-        } else if change == Change::Edit && held != after.and_then(owner) {
+        } else if change == Change::Edit && owned_by != after.and_then(owner) {
             Reason::OwnerChange
-        } else if !held.is_some_and(|owner| teams.contains(&owner)) {
+        } else if !owned_by.is_some_and(|owner| teams.contains(&owner)) {
             Reason::NotYourTeam
         } else {
             return None;
@@ -159,7 +161,7 @@ pub fn authorize_entries(
     };
     let changed = (new.iter()).map(|e| check(old.get(repo(e)).copied(), Some(e)));
     let removed = (current.iter())
-        .filter(|e| !kept.contains(repo(e)))
+        .filter(|e| !listed.contains(repo(e)))
         .map(|e| check(Some(e), None));
     changed.chain(removed).flatten().collect()
 }
@@ -169,12 +171,12 @@ pub fn authorize_entries(
 /// the grant kept as it is, then the entries new to the workspace in `submitted` order. Run only
 /// once `authorize_entries`, given the current entries the grant reads, refused nothing.
 pub fn compose_entries(grant: &Grant, current: &[Json], submitted: &[Json]) -> Vec<Json> {
-    let by: BTreeMap<&str, &Json> = submitted.iter().map(|e| (repo(e), e)).collect();
-    let held: BTreeSet<&str> = current.iter().map(repo).collect();
+    let by_repo: BTreeMap<&str, &Json> = submitted.iter().map(|e| (repo(e), e)).collect();
+    let present: BTreeSet<&str> = current.iter().map(repo).collect();
     let kept = current.iter().filter_map(|e| match grant.reads(repo(e)) {
-        true => by.get(repo(e)).copied(),
+        true => by_repo.get(repo(e)).copied(),
         false => Some(e),
     });
-    let added = submitted.iter().filter(|e| !held.contains(repo(e)));
+    let added = submitted.iter().filter(|e| !present.contains(repo(e)));
     kept.chain(added).cloned().collect()
 }
