@@ -20,6 +20,8 @@ use crate::server::Server;
 const WEB: &str = "example.com/chain/web";
 const PUBLIC: &str = "https://meada.example";
 const METADATA: &str = "https://meada.example/.well-known/oauth-protected-resource";
+/// The path of the protected resource metadata, under a server's root.
+const METADATA_PATH: &str = ".well-known/oauth-protected-resource";
 const SERVED: &str = "example.com/chain/web\nexample.com/chain/gateway\nexample.com/chain/catalog\n\
                       example.com/chain/worker\n";
 
@@ -185,11 +187,16 @@ fn ask(url: &str, token: Option<&str>, headers: &[(&str, &[u8])], call: Call) ->
         (response.headers().get("www-authenticate")).map(|v| v.to_str().unwrap().to_string());
     let kind = (response.headers().get("content-type"))
         .map_or(String::new(), |v| v.to_str().unwrap().to_string());
+    let headers = (response.headers().iter())
+        .filter(|(name, _)| *name != "date")
+        .map(|(name, value)| format!("{name}: {}", String::from_utf8_lossy(value.as_bytes())))
+        .collect();
     let body = response.body_mut().read_to_string().unwrap();
     Answer {
         status: response.status().as_u16(),
         challenge,
         kind,
+        headers,
         body,
     }
 }
@@ -223,11 +230,13 @@ fn raw(url: &str, headers: &[&[u8]]) -> (u16, Option<String>) {
     (status, challenge)
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct Answer {
     status: u16,
     challenge: Option<String>,
     kind: String,
+    /// Every header but `date`, in the order sent.
+    headers: Vec<String>,
     body: String,
 }
 
@@ -615,11 +624,14 @@ fn a_grant_scopes_the_workspace_of_a_generation() {
 /// the whole chain: past ten repositories the grant still decides what an answer exposes.
 fn wide_grants(dir: &Path, manifest: &str, issuer: &Issuer, signing: &EncodingKey) {
     append(dir, manifest, &issuer.base);
+    #[cfg(feature = "snapshot")]
     let server = if manifest == MANIFEST {
         start(dir)
     } else {
         crate::serving::serve(dir, manifest)
     };
+    #[cfg(not(feature = "snapshot"))]
+    let server = start(dir);
     let first = crate::wide::identity(0);
     let read = |granted: usize| {
         let all: Vec<String> = (0..granted).map(crate::wide::identity).collect();
@@ -717,6 +729,222 @@ fn grants_web_through_its_groups(server: Server, issuer: &str, signing: &Encodin
     let stderr = server.stderr();
     for group in [MAPPED, UNMAPPED] {
         assert!(!stderr.contains(group), "{group} on stderr: {stderr}");
+    }
+}
+
+/// `append_groups`'s `[oidc]`, with `kind` as its first lines and `table` after it.
+fn append_typed(dir: &Path, issuer: &str, (kind, table): (&str, &str)) {
+    append_groups(dir, MANIFEST, issuer);
+    let file = dir.join(MANIFEST);
+    let src = fs::read_to_string(&file).unwrap();
+    let src = src.replacen("\n[oidc]\n", &format!("\n[oidc]\n{kind}"), 1);
+    fs::write(&file, src + table).unwrap();
+}
+
+/// What `server`, with `append_typed`'s `[oidc]`, answers to the cases of the tests above: the
+/// metadata, the 401s and 403s, the 404 lists, a `*` token's trace, the groups' grant and a token
+/// in Entra ID's overage (`_claim_names`, no `groups`), each answer labelled; then its stderr
+/// after the address, a failed JWKS refresh included, which leaves `issuer` serving `jwks` again.
+fn transcript(
+    server: Server,
+    issuer: &Issuer,
+    jwks: &str,
+    signing: &EncodingKey,
+) -> (Vec<(String, Answer)>, String) {
+    let base = &issuer.base;
+    let token = |path: &str, identities: Option<&[&str]>, edit: &dyn Fn(&mut Value)| {
+        let mut claims = claims(base, path, identities.unwrap_or_default());
+        if identities.is_none() {
+            claims.as_object_mut().unwrap().remove("meada_repositories");
+        }
+        if path.is_empty() {
+            claims["aud"] = PUBLIC.into();
+        }
+        edit(&mut claims);
+        sign(signing, "k1", Algorithm::ES256, &claims)
+    };
+    let groups = |c: &mut Value| c["groups"] = json!([MAPPED, UNMAPPED]);
+    let overage = |c: &mut Value| {
+        c["_claim_names"] = json!({"groups": "src1"});
+        c["_claim_sources"] =
+            json!({"src1": {"endpoint": "https://graph.example/getMemberObjects"}});
+    };
+    let catalog = "example.com/chain/catalog";
+    let nope = "example.com/chain/nope";
+    let all = token(WEB, Some(&["*"]), &|_| {});
+    let mut cases: Vec<(String, String, Option<String>, Call)> = vec![
+        (
+            "metadata".into(),
+            format!("{METADATA_PATH}/{WEB}"),
+            None,
+            None,
+        ),
+        ("root metadata".into(), METADATA_PATH.into(), None, None),
+        ("no token".into(), WEB.into(), None, trace()),
+        ("no token at the root".into(), String::new(), None, None),
+        ("no token, unknown".into(), nope.into(), None, None),
+        (
+            "in the query".into(),
+            format!("{WEB}?access_token={all}"),
+            None,
+            trace(),
+        ),
+    ];
+    for (case, refused) in refused_tokens(base, signing, WEB) {
+        cases.push((case.into(), WEB.into(), Some(refused), trace()));
+    }
+    let scopeless = scopeless(base, signing, WEB);
+    cases.extend([
+        ("scopeless".into(), WEB.into(), Some(scopeless), trace()),
+        ("all".into(), WEB.into(), Some(all.clone()), trace()),
+        (
+            "another repository".into(),
+            WEB.into(),
+            Some(token(WEB, Some(&[catalog]), &|_| {})),
+            trace(),
+        ),
+        (
+            "listed".into(),
+            String::new(),
+            Some(token("", Some(&[WEB, nope]), &|_| {})),
+            None,
+        ),
+        (
+            "all listed".into(),
+            String::new(),
+            Some(token("", Some(&["*"]), &|_| {})),
+            None,
+        ),
+        (
+            "none listed".into(),
+            String::new(),
+            Some(token("", Some(&[]), &|_| {})),
+            None,
+        ),
+        (
+            "unknown".into(),
+            nope.into(),
+            Some(token(nope, Some(&[WEB]), &|_| {})),
+            None,
+        ),
+        (
+            "groups".into(),
+            WEB.into(),
+            Some(token(WEB, None, &groups)),
+            trace(),
+        ),
+        (
+            "groups, another repository".into(),
+            catalog.into(),
+            Some(token(catalog, None, &groups)),
+            trace(),
+        ),
+        (
+            "groups listed".into(),
+            String::new(),
+            Some(token("", None, &groups)),
+            None,
+        ),
+        (
+            "overage".into(),
+            WEB.into(),
+            Some(token(WEB, None, &overage)),
+            trace(),
+        ),
+        (
+            "overage listed".into(),
+            String::new(),
+            Some(token("", None, &overage)),
+            None,
+        ),
+        (
+            "overage with identities listed".into(),
+            String::new(),
+            Some(token("", Some(&[WEB]), &overage)),
+            None,
+        ),
+    ]);
+    let at = |path: &str| format!("{}/{path}", server.url);
+    let mut answers: Vec<(String, Answer)> = (cases.into_iter())
+        .map(|(case, path, token, call)| (case, ask(&at(&path), token.as_deref(), &[], call)))
+        .collect();
+    let origin = [("Origin", &b"https://evil.example"[..])];
+    answers.push(("origin".into(), ask(&at(WEB), Some(&all), &origin, trace())));
+    // Two `Authorization` headers, then a value not in UTF-8.
+    let header = format!("Authorization: Bearer {all}").into_bytes();
+    let mut bytes = header.clone();
+    bytes.push(0xff);
+    for (case, headers) in [
+        ("twice", vec![&header[..], &header]),
+        ("not utf-8", vec![&bytes]),
+    ] {
+        let (status, challenge) = raw(&at(WEB), &headers);
+        let answer = Answer {
+            status,
+            challenge,
+            kind: String::new(),
+            headers: Vec::new(),
+            body: String::new(),
+        };
+        answers.push((case.into(), answer));
+    }
+    // An unknown `kid` while the JWKS fails.
+    issuer.serve(None);
+    let (rotated, _) = key("k2");
+    let unknown = sign(&rotated, "k2", Algorithm::ES256, &claims(base, WEB, &[WEB]));
+    answers.push((
+        "unknown kid".into(),
+        ask(&at(WEB), Some(&unknown), &[], trace()),
+    ));
+    issuer.serve(Some(jwks.into()));
+    (answers, server.stderr())
+}
+
+/// The identity provider's `type` changes no answer (ADR 0016): with no `type`, `generic`,
+/// `okta`, `keycloak`, and `entra` with and without `[oidc.entra] overage = "ignore"`, every case
+/// of `transcript` answers byte for byte as the manifest without the key, stderr included. A
+/// token in overage (`_claim_names`, no `groups`) has no groups.
+#[test]
+fn the_identity_provider_type_changes_no_answer() {
+    let (signing, jwk) = key("k1");
+    let jwks = set(&[&jwk]);
+    let issuer = Issuer::new(jwks.clone());
+    let dir = chain_manifest("oidc_type");
+    assert!(run(&dir, "index").2);
+    let today = fs::read_to_string(dir.join(MANIFEST)).unwrap();
+    let mut runs = Vec::new();
+    for typed in [
+        ("", ""),
+        ("type = \"generic\"\n", ""),
+        ("type = \"okta\"\n", ""),
+        ("type = \"keycloak\"\n", ""),
+        ("type = \"entra\"\n", ""),
+        ("type = \"entra\"\n", "[oidc.entra]\noverage = \"ignore\"\n"),
+    ] {
+        fs::write(dir.join(MANIFEST), &today).unwrap();
+        append_typed(&dir, &issuer.base, typed);
+        runs.push((typed, transcript(start(&dir), &issuer, &jwks, &signing)));
+    }
+    let ((_, (answers, stderr)), typed) = runs.split_first().unwrap();
+    let answer = |case: &str| &answers.iter().find(|(c, _)| c == case).unwrap().1;
+    assert_eq!(traced(answer("all")), golden());
+    assert_eq!(answer("groups").status, 200);
+    assert_eq!(answer("overage").challenge, forbidden(WEB));
+    assert_eq!(
+        (
+            answer("overage listed").status,
+            answer("overage listed").body.as_str()
+        ),
+        (404, "")
+    );
+    assert_eq!(
+        answer("overage with identities listed").body,
+        format!("{WEB}\n")
+    );
+    assert!(stderr.contains("keeping the cached keys"), "{stderr}");
+    for (kind, run) in typed {
+        assert_eq!(&run.0, answers, "{kind:?}");
+        assert_eq!(&run.1, stderr, "{kind:?}");
     }
 }
 

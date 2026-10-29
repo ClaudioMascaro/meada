@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import fleet from './fixtures/fleet.json';
-import { fleetModel, storeModel, repositoriesModel, credentialsModel, checkModel } from '../src/operations';
+import operational from './fixtures/operational.json';
+import { fleetModel, storeModel, repositoriesModel, credentialsModel, checkModel, admissionModel } from '../src/operations';
 import { operationsCopy } from '../src/operations-i18n';
 
 // The API, rather than the browser, decides which validated heartbeats diagnose a stuck fleet.
@@ -23,6 +24,15 @@ test('admission preserves each independent check outcome and the admitted identi
   expect(model.checks).toContainEqual({ name: 'Issuer', outcome: 'Failed' });
   expect(model.checks).toContainEqual({ name: 'Audience', outcome: 'Not checked' });
   expect(model.identities).toBeNull();
+});
+
+test('admission shows the identity provider type beside the issuer', () => {
+  for (const locale of ['en', 'pt-BR'] as const) {
+    const t = operationsCopy[locale];
+    const fields = admissionModel(operational.admission, t);
+    expect(fields.slice(0, 2)).toEqual([[t.issuer, 'https://issuer.example'], [t.providerType, 'entra']]);
+  }
+  expect(operationsCopy['pt-BR'].providerType).toBe('Tipo do provedor de identidade');
 });
 
 test('credentials show cached lifetime and throttle end, or name the missing GitHub App section', () => {

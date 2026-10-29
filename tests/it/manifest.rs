@@ -632,6 +632,59 @@ fn valkey_section_errors_name_the_file_the_line_and_the_key() {
     }
 }
 
+/// The identity provider's `type` and its table (ADR 0016): each error names the file, the line
+/// and the key, and none echoes a value, a token or a URL.
+#[cfg(feature = "oidc")]
+#[test]
+fn oidc_type_errors_name_the_file_the_line_and_the_key() {
+    let dir = mirrors("manifest_oidc_type_errors");
+    let head = "index_dir = \"../indexes\"\n\n[oidc]\nissuer = \"https://id.example\"\npublic_url = \
+                \"https://meada.example\"\nidentities_claim = \"r\"\n";
+    let at = "meada: ops/meada.workspace.toml";
+    let types = "must be one of `generic`, `entra`, `okta` or `keycloak`";
+    let entra = "`oidc.entra`: needs `oidc.type = \"entra\"`";
+    let overage = "`oidc.entra.overage`: must be `ignore`";
+    for (body, expected) in [
+        (
+            "type = \"azure\"\n",
+            format!("{at}:7: `oidc.type`: {types}\n"),
+        ),
+        ("type = 1\n", format!("{at}:7: `oidc.type`: {types}\n")),
+        ("[oidc.entra]\n", format!("{at}:7: {entra}\n")),
+        (
+            "type = \"generic\"\n[oidc.entra]\n",
+            format!("{at}:8: {entra}\n"),
+        ),
+        (
+            "type = \"okta\"\n[oidc.entra]\noverage = \"ignore\"\n",
+            format!("{at}:8: {entra}\n"),
+        ),
+        (
+            "type = \"entra\"\n[oidc.entra]\noverage = \"directory\"\n",
+            format!("{at}:9: {overage}\n"),
+        ),
+        (
+            "type = \"entra\"\n[oidc.entra]\noverage = \"always\"\n",
+            format!("{at}:9: {overage}\n"),
+        ),
+        (
+            "type = \"entra\"\n[oidc.entra]\ntenant = \"https://login.example\"\n",
+            format!("{at}:9: `oidc.entra.tenant` is not a meada.workspace.toml key\n"),
+        ),
+        (
+            "[oidc.github]\nlogin_claim = \"login\"\n",
+            format!("{at}:7: `oidc.github` is not a meada.workspace.toml key\n"),
+        ),
+    ] {
+        write_manifest(&dir, &format!("{head}{body}"));
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {body}");
+            assert_eq!(stderr, expected, "{command}: {body}");
+        }
+    }
+}
+
 /// The `[postgres]` section of a build that has the module (ADR 0016): each key error names the
 /// file, the line and the key.
 #[cfg(feature = "postgres")]

@@ -16,7 +16,9 @@
 //! `aud`, `exp` (required) and `nbf` with `LEEWAY`, and every configured scope. A missing or invalid token is
 //! a 401 naming the metadata. What passes is a `Grant`: the identities the token's
 //! `identities_claim` lists, and those `[oidc.groups]` maps the groups of its `groups_claim` to
-//! (#291; `*` from either for all). Routing checks it (403) and lists it (404), and it bounds the
+//! (#291; `*` from either for all): the identity provider's claims grant, the one grant provider
+//! the grant is the union of (ADR 0016). `type` names the identity provider; none changes what a
+//! token is granted, and `[oidc.entra] overage = "ignore"` leaves a token in overage no groups. Routing checks it (403) and lists it (404), and it bounds the
 //! workspace of every answer behind it (#290): a repository outside it is absent. An identity the
 //! server does not serve grants nothing.
 //!
@@ -87,10 +89,20 @@ const PATH: &AsciiSet = &CONTROLS
     .add(b'|')
     .add(b'}');
 
-/// The `[oidc]` section as written.
+/// The identity provider's `type`s (ADR 0016): `okta` and `keycloak` behave as `generic`, and
+/// only `entra` takes a table of its own.
+const TYPES: [&str; 4] = ["generic", "entra", "okta", "keycloak"];
+
+/// What `[oidc.entra] overage` accepts: `ignore`, a token in overage having no groups.
+const OVERAGES: [&str; 1] = ["ignore"];
+
+/// The `[oidc]` section as written: the identity provider.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct File {
+    /// Any value, so that one of another type is the error naming the accepted ones.
+    #[serde(rename = "type")]
+    kind: Option<toml::Value>,
     issuer: String,
     public_url: String,
     audience: Option<String>,
@@ -100,11 +112,21 @@ pub struct File {
     groups: Option<HashMap<String, Vec<String>>>,
     scopes: Option<Vec<String>>,
     jwks_refresh_seconds: Option<i64>,
+    entra: Option<Entra>,
+}
+
+/// `[oidc.entra]`: the settings only Entra ID needs.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Entra {
+    overage: Option<toml::Value>,
 }
 
 /// The validated section.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Config {
+    /// The identity provider's `type`, one of `TYPES`.
+    pub kind: &'static str,
     /// The issuer, as tokens and its metadata name it.
     pub issuer: String,
     /// The URL clients use, with no trailing slash: `<public_url>/<identity>` is a resource.
@@ -165,7 +187,25 @@ impl File {
         let seconds = self.jwks_refresh_seconds;
         let refresh = crate::modules::at_least(key, seconds, REFRESH_DEFAULT, REFRESH_MIN)?;
         let refresh = Duration::from_secs(refresh);
+        let named = |value: &toml::Value, accepted: &[&'static str]| {
+            (accepted.iter().copied()).find(|&a| value.as_str() == Some(a))
+        };
+        let kind = match &self.kind {
+            None => "generic",
+            Some(value) => {
+                named(value, &TYPES).ok_or(("oidc.type", Msg::OidcOneOf(&TYPES).text()))?
+            }
+        };
+        if let Some(entra) = self.entra {
+            if kind != "entra" {
+                return Err(("oidc.entra", Msg::OidcTypeTable("entra").text()));
+            }
+            if (entra.overage.as_ref()).is_some_and(|o| named(o, &OVERAGES).is_none()) {
+                return Err(("oidc.entra.overage", Msg::OidcOneOf(&OVERAGES).text()));
+            }
+        }
         Ok(Config {
+            kind,
             issuer: self.issuer,
             public_url: self.public_url.trim_end_matches('/').to_string(),
             audience: self.audience,
@@ -193,22 +233,35 @@ impl Grant {
         }
     }
 
-    /// The grant of `claims` under `config`: the identities its claim lists and those its groups
-    /// map to. A claim that is not an array of strings, and a group the table lacks, grant
-    /// nothing.
+    /// The grant of `claims` under `config`: the union of every configured grant provider's
+    /// identities (ADR 0016), `*` from the claims grant for all. The claims grant is the only
+    /// grant provider until the GitHub one (#332).
     fn of(claims: &Map<String, Value>, config: &Config) -> Self {
-        let listed = config.claim.iter().flat_map(|claim| strings(claims, claim));
-        let mapped = (config.groups.iter()).flat_map(|(claim, table)| {
-            (strings(claims, claim).filter_map(|group| table.get(group)))
-                .flatten()
-                .map(String::as_str)
-        });
-        let listed: HashSet<String> = listed.chain(mapped).map(str::to_string).collect();
+        let providers = [claims_grant(claims, config)];
+        let listed: HashSet<String> = (providers.into_iter().flatten())
+            .map(str::to_string)
+            .collect();
         match listed.contains("*") {
             true => Grant::All,
             false => Grant::Only(listed),
         }
     }
+}
+
+/// The identity provider's claims grant: the identities `claims`' `identities_claim` lists and
+/// those `[oidc.groups]` maps the groups of its `groups_claim` to. A claim that is not an array of
+/// strings, and a group the table lacks, grant nothing.
+fn claims_grant<'a>(
+    claims: &'a Map<String, Value>,
+    config: &'a Config,
+) -> impl Iterator<Item = &'a str> + use<'a> {
+    let listed = config.claim.iter().flat_map(|claim| strings(claims, claim));
+    let mapped = (config.groups.iter()).flat_map(|(claim, table)| {
+        (strings(claims, claim).filter_map(|group| table.get(group)))
+            .flatten()
+            .map(String::as_str)
+    });
+    listed.chain(mapped)
 }
 
 /// The strings of `claims`' array `claim`; none when it is no array or holds anything but
@@ -761,7 +814,8 @@ impl Oidc {
         }
     }
 
-    /// The state an operator explains a 401 or a 403 with (ADR 0014): the issuer, its metadata,
+    /// The state an operator explains a 401 or a 403 with (ADR 0014): the identity provider's
+    /// `type` (ADR 0016), the issuer, its metadata,
     /// the JWKS cache (the cached key ids, the last read, a refresh that failed since, with why)
     /// and the groups table, each group's identities those `reads` admits (`*` kept: it names
     /// none).
@@ -783,6 +837,7 @@ impl Oidc {
                 .collect()
         });
         serde_json::json!({
+            "type": self.config.kind,
             "issuer": self.config.issuer,
             "metadata": self.issuer_metadata,
             "jwks_uri": self.jwks_uri,
@@ -1099,6 +1154,7 @@ mod tests {
 
     fn config(audience: Option<&str>, scopes: &[&str]) -> Config {
         Config {
+            kind: "generic",
             issuer: ISSUER.into(),
             public_url: PUBLIC.into(),
             audience: audience.map(str::to_string),

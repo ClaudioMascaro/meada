@@ -15,6 +15,7 @@ proveedor de identidad del operador. Meada no emite tokens, no registra clientes
 
 ```toml
 [oidc]
+type = "generic"                                # por defecto; "entra", "okta" o "keycloak"
 issuer = "https://id.ejemplo.internal/realms/agentes"
 public_url = "https://meada.ejemplo.internal"   # la URL que usan los clientes, detrás del proxy
 audience = "https://meada.ejemplo.internal"     # opcional; por defecto: la URL canónica del endpoint
@@ -27,6 +28,12 @@ jwks_refresh_seconds = 3600                      # por defecto; como mínimo 60
 "equipo-pagos" = ["github.ejemplo.internal/acme/payments-api", "github.ejemplo.internal/acme/ledger"]
 "plataforma" = ["*"]
 ```
+
+`type` dice qué proveedor de identidad emite los tokens: `generic` (el predeterminado), `entra`,
+`okta` o `keycloak`. Ninguno cambia la admisión, el grant ni una respuesta; el tipo aparece en la
+página de admisión de la consola. Solo `entra` tiene una tabla propia, `[oidc.entra]`, con una
+clave, `overage`, que por ahora acepta solo `"ignore"` (el predeterminado): un token en overage,
+sin `groups`, no tiene grupos. `[oidc.entra]` con otro `type` es un error.
 
 ## Preparar el proveedor de identidad
 

@@ -535,6 +535,12 @@ pub enum Msg<'a> {
     /// An `[oidc]` section with neither `identities_claim` nor `groups_claim`.
     #[cfg(feature = "oidc")]
     OidcNoClaim,
+    /// An `[oidc]` key whose value is none of these, never echoing it (`type`, `overage`).
+    #[cfg(feature = "oidc")]
+    OidcOneOf(&'a [&'a str]),
+    /// The table of an identity provider `type` under another `type`: the one it belongs to.
+    #[cfg(feature = "oidc")]
+    OidcTypeTable(&'a str),
     /// A configured scope holding a character no RFC 6749 scope-token carries.
     #[cfg(feature = "oidc")]
     OidcScope {
@@ -2023,6 +2029,24 @@ impl Msg<'_> {
             Msg::OidcNoClaim => pick(
                 "set `identities_claim`, `groups_claim` or both".into(),
                 "defina `identities_claim`, `groups_claim` ou os dois".into(),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcOneOf(accepted) => {
+                let mut quoted: Vec<String> = accepted.iter().map(|a| format!("`{a}`")).collect();
+                let last = quoted.pop().unwrap_or_default();
+                let rest = quoted.join(", ");
+                match rest.is_empty() {
+                    true => pick(format!("must be {last}"), format!("deve ser {last}")),
+                    false => pick(
+                        format!("must be one of {rest} or {last}"),
+                        format!("deve ser um de {rest} ou {last}"),
+                    ),
+                }
+            }
+            #[cfg(feature = "oidc")]
+            Msg::OidcTypeTable(kind) => pick(
+                format!("needs `oidc.type = \"{kind}\"`"),
+                format!("exige `oidc.type = \"{kind}\"`"),
             ),
             #[cfg(feature = "oidc")]
             Msg::OidcScope { scope, bad } => pick(

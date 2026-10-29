@@ -168,6 +168,42 @@ fn workspace_section_errors_follow_lang() {
     }
 }
 
+/// The identity provider's `[oidc]` errors (ADR 0016) under `pt_BR` and `en_US`: a `type` it
+/// does not know, `[oidc.entra]` under another `type`, and an `overage` it does not take.
+#[cfg(feature = "oidc")]
+#[test]
+fn oidc_type_errors_follow_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_oidc_type");
+    let head = "index_dir = \"../indexes\"\n\n[oidc]\nissuer = \"https://id.example\"\npublic_url = \
+                \"https://meada.example\"\nidentities_claim = \"r\"\n";
+    let at = "meada: ops/meada.workspace.toml";
+    for (body, en, pt) in [
+        (
+            "type = \"azure\"\n",
+            "7: `oidc.type`: must be one of `generic`, `entra`, `okta` or `keycloak`",
+            "7: `oidc.type`: deve ser um de `generic`, `entra`, `okta` ou `keycloak`",
+        ),
+        (
+            "type = \"okta\"\n[oidc.entra]\n",
+            "8: `oidc.entra`: needs `oidc.type = \"entra\"`",
+            "8: `oidc.entra`: exige `oidc.type = \"entra\"`",
+        ),
+        (
+            "type = \"entra\"\n[oidc.entra]\noverage = \"directory\"\n",
+            "9: `oidc.entra.overage`: must be `ignore`",
+            "9: `oidc.entra.overage`: deve ser `ignore`",
+        ),
+    ] {
+        fs::write(dir.join(MANIFEST), format!("{head}{body}")).unwrap();
+        for (lang, what) in [("en_US.UTF-8", en), ("pt_BR.UTF-8", pt)] {
+            let refused = (String::new(), format!("{at}:{what}\n"), Some(1));
+            let args = ["index", "--workspace", MANIFEST];
+            assert_eq!(run_lang(&dir, lang, &args), refused, "{lang} {body}");
+        }
+    }
+}
+
 /// An entry's `owner` (ADR 0015) under `pt_BR` and `en_US`: each rule it breaks, and the static
 /// manifest that holds one at all.
 #[test]

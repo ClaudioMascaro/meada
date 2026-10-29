@@ -8,6 +8,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- `[oidc] type` names the identity provider that issues the deployment's tokens (ADR 0016):
+  `generic` (the default), `entra`, `okta` or `keycloak`. None changes the admission, the grant or
+  any answer, and a bootstrap manifest without the key works as before; the console's `GET
+  /api/v1/admission` gains `"type"`, which the admission page shows beside the issuer. Any other
+  value, or one that is not a string, is an error naming the file, the line, the key and the four
+  values.
+- `[oidc.entra]`, the settings only Entra ID needs, allowed under `type = "entra"` alone, with one
+  key: `overage = "ignore"` (the default), a token in overage having no groups, as before. Any
+  other value, and an unknown key, is an error naming the file, the line and the key.
+
 - The data layer (ADR 0016): the `postgres` cargo feature, off by default and enabled by `cloud`,
   and the bootstrap manifest's `[postgres]` section, which needs no other section. It names the
   connection URL only through `url_env` (default `MEADA_POSTGRES_URL`) or `url_file`, plus

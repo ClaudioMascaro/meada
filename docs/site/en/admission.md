@@ -15,6 +15,7 @@ operator's identity provider. Meada issues no token, registers no client and nev
 
 ```toml
 [oidc]
+type = "generic"                                # default; "entra", "okta" or "keycloak"
 issuer = "https://id.example.internal/realms/agents"
 public_url = "https://meada.example.internal"   # the URL clients use, behind the proxy
 audience = "https://meada.example.internal"     # optional; default: the endpoint's canonical URL
@@ -27,6 +28,12 @@ jwks_refresh_seconds = 3600                      # default; at least 60
 "team-payments" = ["github.example.internal/acme/payments-api", "github.example.internal/acme/ledger"]
 "platform" = ["*"]
 ```
+
+`type` says which identity provider issues the tokens: `generic` (the default), `entra`, `okta`
+or `keycloak`. None changes the admission, the grant or an answer; the type shows on the
+console's admission page. Only `entra` takes a table of its own, `[oidc.entra]`, with one key,
+`overage`, which for now accepts only `"ignore"` (the default): a token in overage, with no
+`groups`, has no groups. `[oidc.entra]` under another `type` is an error.
 
 ## Prepare the identity provider
 
