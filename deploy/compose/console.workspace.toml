@@ -39,6 +39,8 @@ ttl_seconds = 300
 # scopes = ["meada:read"]
 # [oidc.groups]
 # "meada-operators" = ["*"]
+# A team: map its group to the identities it owns (docs site, console, Teams).
+# "team-billing" = ["github.com/acme/billing"]
 
 [ui]
 dir = "/usr/share/meada/ui"

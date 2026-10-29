@@ -120,6 +120,45 @@ As operações da console exigem OIDC e ficam desligadas por padrão. Quando hab
 
 </details>
 
+## Times
+
+Vários times podem dividir um workspace: cada um altera as próprias entradas e o operador global responde pelo resto. As regras numeradas abaixo são o contrato inteiro.
+
+1. **Confiança compartilhada.** Ownership por time é delegação, não isolamento. Uma entrada que um time adiciona é buscada pelo job com as credenciais da frota (uma instalação de GitHub App ou as credenciais git do job) e lida por todo grant `*`. Aceite isso antes de delegar.
+2. **A chave `owner`.** Uma entrada de versão do workspace pode ter `owner = "<grupo OIDC>"`: de 1 a 256 caracteres, sem caractere de controle nem espaço em branco nas pontas, comparada exatamente, com maiúsculas e minúsculas. Um grupo que o provedor envia com caractere de controle, ou com mais de 256 caracteres, não pode ser dono de uma entrada.
+
+    ```toml
+    [[repository]]
+    repo = "github.exemplo.internal/acme/billing"
+    path = "/var/lib/meada/mirrors/billing"
+    owner = "team-billing"
+
+    [[repository]]
+    repo = "github.exemplo.internal/acme/api"
+    path = "/var/lib/meada/mirrors/api"
+    ```
+
+    ```sh
+    meada workspace import repositories.toml --message "Assign billing to its team" --workspace /etc/meada/job.workspace.toml
+    ```
+
+3. **Quem altera o quê.** O operador de time pode editar e remover as entradas que seus times possuem e adicionar entradas cujo owner seja um de seus times. O operador global mantém as mudanças de owner (definir, limpar ou substituir), as entradas sem owner, as entradas de outros owners e todas as operações de geração (`pointer` e `fence`).
+4. **Delegação.** Um grupo vira time quando o operador global lhe atribui a primeira entrada. Um time que remove a última entrada deixa de ser time até o operador global lhe atribuir uma entrada de novo.
+5. **Configuração.** Ser dono nunca amplia o que um token lê. Mapeie o grupo de cada time em `[oidc.groups]` para as identidades que ele possui, e para uma identidade antes de o time poder adicioná-la; sem isso, o time não vê as próprias entradas, e uma adição fora do grant é recusada com `outside_grant`.
+
+    ```toml
+    [oidc.groups]
+    "meada-operators" = ["*"]
+    # Um time: mapeie o grupo para as identidades que ele possui.
+    "team-billing" = ["github.exemplo.internal/acme/billing"]
+    ```
+
+6. **Manifests estáticos.** `owner` nas entradas `[[repository]]` do próprio manifest de bootstrap é erro: um manifest estático não tem editor para delegar. Use `[workspace] source = "store"` e importe as entradas.
+7. **CLI.** `meada workspace import` e `apply` agem como operador global: guardam as credenciais do store e do Valkey, que já permitem toda escrita.
+8. **Apply só de owners.** A indexação nunca lê `owner`, então aplicar uma versão que só muda owners não gera nova geração. A visão da frota continua nomeando a versão que produziu primeiro a geração servida; isso não é um refresh travado.
+9. **Posição.** Os próprios saves do operador de time nunca movem uma entrada (a versão salva mantém no lugar as entradas fora do grant). Ele pode aplicar uma versão armazenada cuja única diferença seja a ordem das entradas.
+10. **Um repositório com falha.** Pela regra de aborto da publicação inteira, o repositório com falha de um time (credencial revogada, remoto apagado, falha de parse) impede novas gerações para todos os times até a causa ser reparada. Os nós seguem servindo a última geração completa. Veja [Refresh](refresh.md).
+
 ## Operações pelo CLI
 
 ```sh

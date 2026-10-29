@@ -2268,6 +2268,9 @@ one for the area a change touches.
 - `meada-core/src/manifest.rs`: an entry's `owner` holds at most `OWNER_MAX` (256) characters
   (ADR 0015); a longer name is an error naming its line and key, wherever the entry is read
   (import, a stored version, a pull, the browser).
+- `meada-core/src/authorize.rs`: a refusal's `refused` list (ADR 0015) holds one `Refusal` per
+  changed entry, so it is bounded by the version's entries, which `VERSION_MAX` in `src/snapshot/versions.rs` (4 MiB, S2's
+  document size cap) bounds; it is not truncated.
 - `resolve.rs` (`Resolver::may_declare`, ADR 0019): a base among a pack's known outside members is
   matched by its spelling, so a same-named type of a wildcard-imported outside package that
   declares an overload of the called name may give a wrong `exact`; a Swift entry is compared
