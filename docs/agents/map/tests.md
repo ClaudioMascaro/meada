@@ -210,6 +210,18 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   CLI diagnostics while its fixed audit outcome excludes JWT fixtures pasted into entries;
   malformed heartbeat
   MAX fences ignored by CLI and HTTP recovery, and workspace-pointer fences in fleet diagnostics;
+  in `ui/oidc/team.rs` (with `ui,oidc,refresh-lock`, #324), the team operator: the `session`
+  role and fields (`team_operator` with `groups`, `grant` and `teams`; a viewer for groups that
+  own nothing or only entries outside the grant, with `operations = false`, with a file
+  workspace, with no pointer, a pointer to a missing document and a malformed pointer; the
+  global operator stays one), a team operator's views bounded by its grant with every role
+  seeing `owner`, a save that edits, removes and adds entries (composed with the entries
+  outside the grant kept in place, its subject as author) and its apply and rollback, two teams
+  in one save, each refusal reason as a 403 `entries_refused` with nothing written and the lock
+  free, an apply naming what the grant reads and counting the rest in `hidden`, an apply checked
+  against the version current then, a team that removes its last entry turning viewer, the
+  generation operations refused by role before the body is read, and the `as <owners>` stderr
+  line;
   serialized workspace versions refused before storage even when their uploads fit the cap;
   managed workspace views and nested peers bounded by grants, the
   token check using current workspace identities; no token, claim value or identity on stderr), `resources` (resource `search`, `context`, `trace` start and `status`

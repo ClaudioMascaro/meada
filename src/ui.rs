@@ -9,9 +9,11 @@
 //! With `[oidc]` (feature `oidc`) the console is a resource server as a node is: a bearer token
 //! for `[ui] audience`, checked by the nodes' own module (`Oidc::admit_console`), except for the
 //! static files and `config`, which the browser needs to log in. Every admitted subject is a
-//! viewer unless its verified groups or boolean claim admit it as an operator. A viewer's
-//! token grant bounds every view (`Session::reads`, #290); operators see the whole fleet and
-//! may write when operations are enabled. Each write is authorized before its body is consumed
+//! viewer unless its verified groups or boolean claim admit it as an operator, or one of its
+//! groups owns an entry of the current workspace version its grant reads (a team operator, ADR
+//! 0015). A viewer's or team operator's token grant bounds every view (`Session::reads`, #290);
+//! operators see the whole fleet and may write when operations are enabled; a team operator
+//! saves and applies changes to its teams' entries. Each write is authorized before its body is consumed
 //! and leaves one escaped audit line (`write`).
 //!
 //! The playground (`POST query`) and the exports (`GET repositories/<identity>/export`) answer
@@ -214,6 +216,10 @@ struct Console {
     oidc: Option<Arc<crate::oidc::Oidc>>,
     /// What the playground and the exports answer from.
     holds: Holds,
+    /// The entries of the last current workspace version a role was computed from, by id: a
+    /// version is immutable, so the id is the key (`teams`).
+    #[cfg(all(feature = "oidc", feature = "generation-pointer"))]
+    entries: std::sync::Mutex<Option<(String, Arc<Vec<Value>>)>>,
 }
 
 /// What the console answers the playground and the exports from, read per request, so that what
@@ -233,7 +239,13 @@ enum Holds {
 #[derive(Clone)]
 struct Session {
     subject: Option<String>,
+    /// The global operator (ADR 0014).
     operator: bool,
+    /// The token's groups, sorted (empty behind the proxy).
+    #[cfg_attr(not(any(feature = "oidc", feature = "refresh-lock")), allow(dead_code))]
+    groups: Vec<String>,
+    /// A team operator's teams, sorted (ADR 0015, #324); empty for everyone else.
+    teams: Vec<String>,
     /// The token's grant; none behind the proxy, where every identity is read.
     #[cfg(feature = "oidc")]
     grant: Option<crate::oidc::Grant>,
@@ -253,6 +265,54 @@ impl Session {
         }
         let _ = identity;
         true
+    }
+
+    /// Whether the session is a team operator: a non-operator with a team.
+    fn team(&self) -> bool {
+        !self.operator && !self.teams.is_empty()
+    }
+
+    /// The owner groups a team operator's audit line names: its teams, for a refusal.
+    fn owners(&self) -> Option<&[String]> {
+        self.team().then_some(&self.teams[..])
+    }
+
+    /// What the session reads, as `meada-core` takes it.
+    #[cfg(feature = "refresh-lock")]
+    fn core_grant(&self) -> meada_core::authorize::Grant {
+        #[cfg(feature = "oidc")]
+        if let Some(crate::oidc::Grant::Only(identities)) = &self.grant {
+            return meada_core::authorize::Grant::Only(identities.iter().cloned().collect());
+        }
+        meada_core::authorize::Grant::All
+    }
+
+    /// The `session` answer: the subject and role; with `[oidc]`, `groups` and `grant`, and
+    /// `teams` for a team operator.
+    fn document(&self) -> Value {
+        let role = match (self.operator, self.team()) {
+            (true, _) => "operator",
+            (_, true) => "team_operator",
+            _ => "viewer",
+        };
+        #[allow(unused_mut)]
+        let mut document = json!({"subject": self.subject, "role": role});
+        #[cfg(feature = "oidc")]
+        if let Some(grant) = &self.grant {
+            document["groups"] = json!(self.groups);
+            document["grant"] = match grant {
+                crate::oidc::Grant::All => json!("*"),
+                crate::oidc::Grant::Only(identities) => {
+                    let mut identities: Vec<_> = identities.iter().collect();
+                    identities.sort();
+                    json!(identities)
+                }
+            };
+            if self.team() {
+                document["teams"] = json!(self.teams);
+            }
+        }
+        document
     }
 
     /// Whether the session reads every identity: operator, proxy admission or a `*` grant.
@@ -393,6 +453,8 @@ impl Console {
             #[cfg(feature = "oidc")]
             oidc,
             holds,
+            #[cfg(all(feature = "oidc", feature = "generation-pointer"))]
+            entries: std::sync::Mutex::new(None),
         })
     }
 
@@ -408,7 +470,7 @@ impl Console {
     /// All request authorization runs before the listener consumes any body. An operation's
     /// pre-authentication refusal has no subject and never logs its query or body arguments.
     fn checked(
-        &self,
+        self: &Arc<Self>,
         bound: SocketAddr,
         request: &hyper::http::request::Parts,
     ) -> std::result::Result<Session, Box<Answer>> {
@@ -418,7 +480,7 @@ impl Console {
         let operation = route.and_then(write::operation).filter(|_| write);
         let audit = |subject: Option<&str>, outcome: &str| {
             if let Some(operation) = operation {
-                write::audit(subject, operation, "-", outcome);
+                write::audit(subject, None, operation, "-", outcome);
             }
         };
         let host = headers.get(header::HOST).and_then(|h| h.to_str().ok());
@@ -463,16 +525,28 @@ impl Console {
                 return Err(refused);
             }
         };
-        if operation.is_some()
-            && (!session.operator || session.subject.as_deref().is_none_or(str::is_empty))
-        {
-            let message = Msg::UiOperatorRequired.text();
-            audit(session.subject.as_deref(), &message);
-            return Err(Box::new(error(
-                StatusCode::FORBIDDEN,
-                "forbidden",
-                &message,
-            )));
+        if let Some(operation) = operation {
+            // A team operator saves and applies workspace versions; the generation operations
+            // stay the global operator's (ADR 0015).
+            let team = session.team() && route.is_some_and(|r| r.starts_with("workspace/"));
+            if !(session.operator || team) || session.subject.as_deref().is_none_or(str::is_empty) {
+                let message = match session.team() {
+                    true => Msg::UiGlobalOperatorRequired.text(),
+                    false => Msg::UiOperatorRequired.text(),
+                };
+                write::audit(
+                    session.subject.as_deref(),
+                    session.owners(),
+                    operation,
+                    "-",
+                    &message,
+                );
+                return Err(Box::new(error(
+                    StatusCode::FORBIDDEN,
+                    "forbidden",
+                    &message,
+                )));
+            }
         }
         Ok(session)
     }
@@ -493,7 +567,7 @@ impl Console {
     /// proxy every request is a viewer's; with `[oidc]`, a bearer token for `[ui] audience`,
     /// except for the static files and `config`, which the browser needs to log in.
     fn admit(
-        &self,
+        self: &Arc<Self>,
         headers: &HeaderMap,
         route: Option<&str>,
     ) -> std::result::Result<Session, Box<Answer>> {
@@ -508,11 +582,19 @@ impl Console {
                 self.ui.operator_groups.as_deref(),
                 self.ui.operator_claim.as_deref(),
             ) {
-                Ok(admitted) => Ok(Session {
-                    subject: admitted.subject,
-                    grant: Some(admitted.grant),
-                    operator: admitted.operator,
-                }),
+                Ok(admitted) => {
+                    let teams = match admitted.operator {
+                        true => Vec::new(),
+                        false => self.teams(&admitted.groups, &admitted.grant),
+                    };
+                    Ok(Session {
+                        subject: admitted.subject,
+                        grant: Some(admitted.grant),
+                        operator: admitted.operator,
+                        groups: admitted.groups,
+                        teams,
+                    })
+                }
                 Err((status, challenge)) => {
                     let (code, message) = match status {
                         StatusCode::UNAUTHORIZED => ("unauthorized", Msg::UiUnauthorized.text()),
@@ -532,6 +614,8 @@ impl Console {
         Ok(Session {
             subject: None,
             operator: false,
+            groups: Vec::new(),
+            teams: Vec::new(),
             #[cfg(feature = "oidc")]
             grant: None,
         })
@@ -566,9 +650,7 @@ impl Console {
         }
         let document = match route {
             "config" if read => Some(self.config()),
-            "session" if read => Some(
-                json!({"subject": session.subject, "role": if session.operator { "operator" } else { "viewer" }}),
-            ),
+            "session" if read => Some(session.document()),
             "manifest" if read => Some(self.manifest(session)),
             #[cfg(feature = "oidc")]
             "admission" if read => (self.oidc.as_ref()).map(|o| o.admission(&|i| session.reads(i))),

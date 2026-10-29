@@ -166,7 +166,7 @@ fn workspace(command: WorkspaceCommand) -> ! {
             let operator = meada_core::authorize::Role::Operator;
             let grant = meada_core::authorize::Grant::All;
             versions::apply(&workspace, &version, &author, operator, &[], &grant)
-                .map(|state| format!("{state}\n"))
+                .map(|applied| format!("{}\n", applied.line))
                 .map_err(Into::into)
         }
         // The id on stdout either way; that nothing changed on stderr.

@@ -141,6 +141,36 @@ impl Console {
             .collect())
     }
 
+    /// A non-operator's teams (ADR 0015, #324): its `groups` that own an entry of the current
+    /// workspace version `grant` reads. Only with `[ui] operations`, `[workspace] source =
+    /// "store"` and groups to look for; a missing pointer or a pointer or document that cannot
+    /// be read or fails its checks gives none, so a read failure never grants a write.
+    #[cfg(feature = "oidc")]
+    pub(super) fn teams(
+        self: &Arc<Self>,
+        groups: &[String],
+        grant: &crate::oidc::Grant,
+    ) -> Vec<String> {
+        #[cfg(feature = "generation-pointer")]
+        if self.ui.operations && self.bootstrap.store && !groups.is_empty() {
+            let read = self.bounded("console", |console, service| {
+                read_runtime(console.current_entries(&service), &service)
+            });
+            let grant = match grant {
+                crate::oidc::Grant::All => meada_core::authorize::Grant::All,
+                crate::oidc::Grant::Only(identities) => {
+                    meada_core::authorize::Grant::Only(identities.iter().cloned().collect())
+                }
+            };
+            if let Ok(Some(entries)) = read {
+                let teams = meada_core::authorize::teams(groups, &grant, &entries);
+                return teams.into_iter().map(str::to_string).collect();
+            }
+        }
+        let _ = (groups, grant);
+        Vec::new()
+    }
+
     fn local_repositories(&self, session: &Session) -> Value {
         let rows: Vec<_> = self.bootstrap.entries.iter().filter(|e| session.reads(&e.repo)).map(|entry| {
             match &entry.repository {
@@ -441,6 +471,43 @@ impl Console {
             .into_iter()
             .filter_map(|entry| entry["repo"].as_str().map(str::to_string))
             .collect())
+    }
+
+    /// The entries of the current workspace version, checked; `None` without a pointer. Read
+    /// per request, the document only when the pointer names another id than the last read.
+    #[cfg(feature = "oidc")]
+    async fn current_entries(
+        &self,
+        service: &Reading,
+    ) -> std::result::Result<Option<Arc<Vec<Value>>>, String> {
+        use crate::snapshot::{store::Store, versions};
+        let config = (self.bootstrap.valkey.as_ref()).expect("store workspace needs valkey");
+        service.set("valkey");
+        let valkey = crate::valkey::Valkey::connect(config).await.map_err(vk)?;
+        let Some((id, _)) = versions::current(&valkey, config).await.map_err(vk)? else {
+            return Ok(None);
+        };
+        let cached = {
+            let held = self.entries.lock().unwrap_or_else(|e| e.into_inner());
+            (held.as_ref())
+                .filter(|(held_id, _)| *held_id == id)
+                .map(|(_, entries)| entries.clone())
+        };
+        if cached.is_some() {
+            return Ok(cached);
+        }
+        service.set("store");
+        let snapshot = (self.bootstrap.snapshot.as_ref()).expect("store workspace needs snapshot");
+        let store = Store::connect(snapshot).map_err(store_problem)?;
+        let key = versions::version_key(snapshot, &id);
+        let version = versions::stored(&store, &key, &id)
+            .await
+            .map_err(store_problem)?
+            .ok_or_else(|| store_problem("current workspace version is missing".into()))?
+            .0;
+        let entries = Arc::new(version.repositories);
+        *self.entries.lock().unwrap_or_else(|e| e.into_inner()) = Some((id, entries.clone()));
+        Ok(Some(entries))
     }
 
     async fn workspace_read(

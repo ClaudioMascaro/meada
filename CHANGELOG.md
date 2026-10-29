@@ -21,6 +21,15 @@ All notable changes to Meada are recorded here. The format follows
   place. The browser gets both through WebAssembly. The apply path checks a team operator under
   the refresh lock against the version then current; `meada workspace apply` acts as the global
   operator, so its output and exit codes do not change.
+- The console has a team operator (ADR 0015): with `[oidc]` carrying `groups_claim`, `[ui]
+  operations = true` and `[workspace] source = "store"`, a subject one of whose groups owns an
+  entry of the current workspace version that its grant reads. It sees what a viewer with its
+  grant sees and may save and apply changes to its teams' entries; `pointer` and `fence/recover`
+  stay the global operator's. Any other change is a 403 `entries_refused` naming each entry
+  with its change and reason (an apply counts the entries outside the grant in `hidden`) and
+  writing nothing. `GET /api/v1/session` gains `groups` and `grant` with `[oidc]` and `teams`
+  for a team operator, and its `role` may be `team_operator`. A team operator's write logs
+  `ui: <subject> as <owners> <action> <arguments>: <outcome>`.
 - ADR 0020 and the glossary record the direction of spec S5: a named query context over shared
   indexing and publication.
 - `meada status` ends a repository's lines with a pointer to the new `inference` issue form when the

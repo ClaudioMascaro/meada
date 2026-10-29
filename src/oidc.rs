@@ -263,6 +263,8 @@ pub struct Admitted {
     /// The token's `sub`, when it has one.
     pub subject: Option<String>,
     pub grant: Grant,
+    /// The token's `groups_claim` read as the grant reads it, sorted, without repeats.
+    pub groups: Vec<String>,
     /// The console role derived only from verified groups or a strict boolean claim.
     pub operator: bool,
 }
@@ -691,9 +693,16 @@ impl Oidc {
                                     })
                             })
                         });
+                    let mut groups: Vec<String> = (self.config.groups.iter())
+                        .flat_map(|(claim, _)| strings(&claims, claim))
+                        .map(str::to_string)
+                        .collect();
+                    groups.sort();
+                    groups.dedup();
                     return Ok(Admitted {
                         subject: subject.map(str::to_string),
                         grant: Grant::of(&claims, &self.config),
+                        groups,
                         operator,
                     });
                 }
