@@ -1,6 +1,6 @@
 # Refresh y publicación
 
-La política elegida es publicar el conjunto completo o no publicar nada: cualquier fallo de fetch o indexación debe abortar la publicación y conservar la generación actual. La implementación y verificación de esa garantía están [planeadas en #316](https://github.com/ClaudioMascaro/meada/issues/316). Hoy, el operador puede encadenar el job con `sh -ec` para detenerse ante un fallo; lock y fence ya protegen el puntero. En [S4 planeado](enterprise.md), las exclusiones por elegibilidad serán decisiones exitosas previas al fetch.
+Un refresh publica el conjunto completo o nada ([#316](https://github.com/ClaudioMascaro/meada/issues/316)): un fallo de fetch o indexación detiene el job antes de `meada snapshot publish`, con salida distinta de cero, así que el puntero no se mueve y los nodos siguen sirviendo la última generación completa. Encadene las etapas para que el primer fallo termine el job (`sh -ec`, o `&&` como abajo). El job de compose lo hace, y su `fetch.sh` nombra el repositorio cuyo fetch falló; `meada index --workspace` nombra cada repositorio que falló y termina con `index failed for <n> repositories`. Nunca lleve el índice anterior de un repositorio a una nueva generación como fallback: corrija la causa y ejecute un refresh completo. Lock y fence protegen el puntero. En [S4 planeado](enterprise.md), las exclusiones por elegibilidad serán decisiones exitosas previas al fetch.
 
 <!-- meada-graph:refresh -->
 

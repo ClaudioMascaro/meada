@@ -276,7 +276,8 @@ fn each_unservable_entry_is_refused_and_the_others_are_still_indexed() {
          meada: example.com/chain/bare: `ops/../bare.git` is not the root of a checkout with a working tree\n\
          meada: example.com/chain/ops: `ops/.` is not the root of a checkout with a working tree\n\
          meada: example.com/chain/src: `ops/../chain-web/src` is not the root of a checkout with a working tree\n\
-         meada: example.com/chain/other: the mirror's remote is `example.com/chain/gateway`, not `example.com/chain/other`\n"
+         meada: example.com/chain/other: the mirror's remote is `example.com/chain/gateway`, not `example.com/chain/other`\n\
+         meada: index failed for 10 repositories\n"
     );
     let served = ["example.com/chain/web", "example.com/chain/catalog"];
     assert_nothing_else_written(&dir, &served);
@@ -318,7 +319,8 @@ fn each_unservable_entry_is_refused_and_the_others_are_still_indexed() {
         "meada: example.com/chain/web: its index directory \
          `ops/../chain-web/./x/../example.com/chain/web` would be inside the mirror `ops/../chain-web`\n\
          meada: example.com/chain/catalog: its index directory \
-         `ops/../chain-web/./x/../example.com/chain/catalog` would be inside the mirror `ops/../chain-web`\n"
+         `ops/../chain-web/./x/../example.com/chain/catalog` would be inside the mirror `ops/../chain-web`\n\
+         meada: index failed for 2 repositories\n"
     );
     assert!(!dir.join("chain-web/example.com").exists());
     assert!(!dir.join("chain-web/x").exists());

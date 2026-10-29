@@ -1323,3 +1323,127 @@ fn fence_recovery_uses_the_heartbeat_servers_clock() {
     drop(time);
     assert_eq!(recovered, ("700\n".into(), String::new(), Some(0)));
 }
+
+/// The compose job, `deploy/compose/refresh.sh` and `fetch.sh`, in `dir/ops/` with its paths
+/// moved into `dir` (`/etc/meada/` is `ops/`, `/srv/mirrors` is `mirrors`), each chain mirror
+/// linked under `mirrors/<identity>`.
+fn compose_job(dir: &Path) {
+    let deploy = Path::new(env!("CARGO_MANIFEST_DIR")).join("deploy/compose");
+    for script in ["refresh.sh", "fetch.sh"] {
+        let src = fs::read_to_string(deploy.join(script)).unwrap();
+        let moved = src.replace("/etc/meada/", "ops/");
+        fs::write(
+            dir.join("ops").join(script),
+            moved.replace("/srv/mirrors", "mirrors"),
+        )
+        .unwrap();
+    }
+    let _ = fs::remove_dir_all(dir.join("mirrors"));
+    for (identity, mirror) in crate::manifest::CHAIN {
+        let link = dir.join("mirrors").join(identity);
+        fs::create_dir_all(link.parent().unwrap()).unwrap();
+        std::os::unix::fs::symlink(dir.join(mirror), link).unwrap();
+    }
+}
+
+/// A commit adding `src/later.ts` to the mirror `repo`, not indexed.
+fn commit_later(repo: &Path) {
+    fs::write(repo.join("src/later.ts"), "export const later = 1;\n").unwrap();
+    crate::common::git(repo, &["add", "-A"]);
+    crate::common::git(repo, &["commit", "-q", "-m", "later"]);
+}
+
+/// `meada snapshot lock -- sh ops/refresh.sh` with `PUBLISH=1`, fetching `repositories` with
+/// git allowed no transport but local files, so a fetch from the chain's https remotes fails
+/// without the network.
+fn compose_refresh(dir: &Path, repositories: &str) -> (String, String, Option<i32>) {
+    let bin = Path::new(MEADA).parent().unwrap().display().to_string();
+    let path = format!("{bin}:{}", std::env::var("PATH").unwrap_or_default());
+    let args = ["snapshot", "lock", "--workspace", MANIFEST, "--"];
+    let mut job = meada(dir, &args);
+    job.args(["sh", "ops/refresh.sh"])
+        .env("PATH", path)
+        .env("PUBLISH", "1")
+        .env("REPOSITORIES", repositories)
+        .env("GIT_ALLOW_PROTOCOL", "file")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1");
+    text(&job.output().expect("meada runs"))
+}
+
+/// A refresh that fails at its fetch or its index publishes nothing (#316): the compose job
+/// under `meada snapshot lock` exits 1 naming the stage and the repository, never a credential,
+/// the pointer keeps the last complete generation although another repository moved, and a node
+/// keeps answering it, as `status --generations` says. Repaired, one complete refresh publishes.
+#[test]
+fn a_failed_fetch_or_index_publishes_nothing_and_keeps_the_current_generation() {
+    use crate::common::assert_golden;
+    use crate::generations::meta;
+    use crate::manifest::ReadOnly;
+    use crate::server::{call, text as answer};
+    use crate::serving::serve;
+    use crate::snapshot::block_on;
+    let Some(fleet) = fleet("lock_abort") else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let g1 = locked_publish(dir);
+    let (node, _) = fleet.node("node");
+    assert_eq!(fleet.pull(&node), g1);
+    compose_job(dir);
+    // The gateway moved since: a publish now would be a new generation.
+    let gateway = dir.join("chain-gateway");
+    commit_later(&gateway);
+
+    // The fetch fails: the job stops before `meada index`.
+    let (stdout, stderr, code) = compose_refresh(dir, "https://example.com/chain/web");
+    assert_eq!((code, stdout.as_str()), (Some(1), ""), "{stderr}");
+    let fetch = "refresh: fetch failed for example.com/chain/web; the refresh stops before index \
+                 and publish\n";
+    assert!(stderr.ends_with(fetch), "{stderr}");
+    assert_eq!(current(&fleet), (g1.clone(), "1".to_string()));
+    // A URL carrying a credential is refused before any fetch, without echoing it.
+    let secret = "https://x-access-token:s3cr3t@example.com/chain/web";
+    let (_, stderr, code) = compose_refresh(dir, secret);
+    assert_eq!(code, Some(1), "{stderr}");
+    assert!(stderr.contains("without credentials"), "{stderr}");
+    assert!(!stderr.contains("s3cr3t"), "{stderr}");
+
+    // The fetch passes and the web's index cannot be written: the job stops at `meada index`.
+    fs::write(dir.join("ops/fetch.sh"), ":\n").unwrap();
+    let web = dir.join("chain-web");
+    commit_later(&web);
+    let Some(locked) = ReadOnly::lock(&dir.join("indexes/example.com/chain/web")) else {
+        return;
+    };
+    let (stdout, stderr, code) = compose_refresh(dir, "unused");
+    assert_eq!((code, stdout.as_str()), (Some(1), ""), "{stderr}");
+    assert!(
+        stderr.starts_with("meada: example.com/chain/web: ")
+            && stderr.ends_with("\nmeada: index failed for 1 repository\n"),
+        "{stderr}"
+    );
+    assert_eq!(current(&fleet), (g1.clone(), "1".to_string()));
+
+    // The node still serves the last complete generation, and says so.
+    assert_eq!(fleet.pull(&node), g1);
+    let held = format!("current: {g1}\nheld: {g1}\nstore: reachable (current {g1})\n");
+    assert_eq!(probe(dir, &node), (held, String::new(), Some(0)));
+    let server = serve(dir, &node);
+    block_on(async {
+        let client = server.client("/example.com/chain/web").await;
+        let from = serde_json::json!({"from": "dashboard"});
+        let trace = client.call_tool(call("trace", from)).await.unwrap();
+        assert_golden("chain.trace-down.txt", answer(&trace));
+        assert_eq!(meta(&trace).as_deref(), Some(g1.as_str()));
+        client.cancel().await.unwrap();
+    });
+
+    // Repaired: one complete refresh publishes a new generation.
+    drop(locked);
+    let (g2, stderr, code) = compose_refresh(dir, "unused");
+    assert_eq!(code, Some(0), "{stderr}");
+    let g2 = g2.trim().to_string();
+    assert_ne!(g2, g1);
+    assert_eq!(current(&fleet).0, g2);
+}

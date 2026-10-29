@@ -28,7 +28,7 @@ Configure bucket, prefixo e domínio Valkey iguais no job e nas réplicas. Dê u
 
 S3 é acessado pela API de objetos, não como volume montado. O backend de snapshot entregue usa endpoint S3 compatível, com TLS fora de loopback. Não há backend `file://`.
 
-Consulte [snapshots](snapshots.md) para configurar o store, [gerações](generations.md) para retenção e [refresh](refresh.md) para lock e fence. A garantia de abortar toda publicação quando qualquer fetch ou indexação falha está [planejada em #316](https://github.com/ClaudioMascaro/meada/issues/316); o encadeamento do job e a proteção de fence já estão documentados.
+Consulte [snapshots](snapshots.md) para configurar o store, [gerações](generations.md) para retenção e [refresh](refresh.md) para lock e fence. Qualquer falha de fetch ou indexação aborta toda a publicação e preserva a geração atual ([#316](https://github.com/ClaudioMascaro/meada/issues/316)).
 
 ## Escolher como distribuir os índices
 

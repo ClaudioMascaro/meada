@@ -576,7 +576,8 @@ fn main() -> ExitCode {
         Command::Status {
             workspace: None, ..
         } => engine::status(here).map(|status| print!("{status}")),
-        // Every repository's problem on its own line; the others are refreshed all the same.
+        // Every repository's problem on its own line, then the stage and the count, exit 1;
+        // the others are refreshed all the same.
         Command::Index {
             workspace: Some(manifest),
         } => engine::index_workspace(&manifest).map(|problems| {
@@ -584,6 +585,7 @@ fn main() -> ExitCode {
                 eprintln!("meada: {problem}");
             }
             if !problems.is_empty() {
+                eprintln!("meada: {}", Msg::IndexFailed(problems.len()).text());
                 std::process::exit(1);
             }
         }),
