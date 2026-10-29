@@ -27,7 +27,15 @@ pub fn workspace_version_id(src: &str) -> Option<String> {
     let entries = crate::manifest::validate_import("entries", src).ok()?;
     let blocks = crate::ids::entry_blocks(src);
     let entries: Vec<_> = (entries.iter().zip(&blocks))
-        .map(|(e, blocks)| (e.repo.as_str(), e.path.as_str(), blocks, e.owner.as_deref()))
+        .map(|(e, blocks)| {
+            (
+                e.repo.as_str(),
+                e.path.as_str(),
+                blocks,
+                e.owner.as_deref(),
+                e.added_by.as_deref(),
+            )
+        })
         .collect();
     Some(crate::ids::workspace_version_id(&entries))
 }

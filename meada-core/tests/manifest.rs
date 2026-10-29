@@ -137,3 +137,45 @@ fn an_owner_is_one_string_of_a_group_name_and_each_error_names_its_line_and_key(
     }
     assert_eq!(validate(FILE, OWNED).unwrap()[0].owner, None);
 }
+
+/// Each `added_by` error names the line and the dotted key; a login of 1 to 39 lowercase ASCII
+/// letters, digits, `-` and `_` is accepted as written (#330).
+#[test]
+fn an_added_by_is_one_lowercase_login_and_each_error_names_its_line_and_key() {
+    let long = "a".repeat(40);
+    for (value, error) in [
+        ("1".to_string(), "must be one string, a GitHub login"),
+        ("\"\"".into(), "is empty"),
+        (format!("\"{long}\""), "is longer than 39 characters"),
+        (
+            "\"Ana\"".into(),
+            "holds a character other than lowercase ASCII letters, digits, `-` and `_`",
+        ),
+        (
+            "\"ana.souza\"".into(),
+            "holds a character other than lowercase ASCII letters, digits, `-` and `_`",
+        ),
+        (
+            "\"ana souza\"".into(),
+            "holds a character other than lowercase ASCII letters, digits, `-` and `_`",
+        ),
+    ] {
+        let src = format!("{OWNED}added_by = {value}\n");
+        assert_eq!(
+            problems(&src),
+            [format!("{FILE}:4: `repository.added_by`: {error}")],
+            "{value}"
+        );
+    }
+    for login in [
+        "a".repeat(39),
+        "a".into(),
+        "ana-souza".into(),
+        "a1_b-2".into(),
+        "ana_acme".into(),
+    ] {
+        let entries = validate(FILE, &format!("{OWNED}added_by = \"{login}\"\n")).unwrap();
+        assert_eq!(entries[0].added_by.as_deref(), Some(login.as_str()));
+    }
+    assert_eq!(validate(FILE, OWNED).unwrap()[0].added_by, None);
+}

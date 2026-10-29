@@ -202,6 +202,37 @@ fn owner<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
     }
 }
 
+/// The most characters a GitHub login holds.
+pub const ADDED_BY_MAX: usize = 39;
+
+/// What an `added_by` may not be (#330): empty, over `ADDED_BY_MAX` characters or holding
+/// anything but lowercase ASCII letters, digits, `-` and `_`, so a login has one canonical text.
+fn added_by_problem(login: &str) -> Option<Msg<'static>> {
+    if login.is_empty() {
+        Some(Msg::Empty)
+    } else if login.chars().count() > ADDED_BY_MAX {
+        Some(Msg::AddedByTooLong)
+    } else if !login
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '-' | '_'))
+    {
+        Some(Msg::AddedByChars)
+    } else {
+        None
+    }
+}
+
+/// One string that `added_by_problem` accepts; an array or a number is not a login.
+fn added_by<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    let toml::Value::String(login) = toml::Value::deserialize(d)? else {
+        return Err(D::Error::custom(Msg::AddedByNotString.text()));
+    };
+    match added_by_problem(&login) {
+        Some(problem) => Err(D::Error::custom(problem.text())),
+        None => Ok(Some(login)),
+    }
+}
+
 /// A `[[repository]]`: `serve` and `resource` take the shapes of `meada.toml`'s, `peer` that
 /// of its `[[peer]]` without `path` (the manifest locates every repository).
 #[derive(Deserialize)]
@@ -213,6 +244,10 @@ pub struct EntryFile {
     /// version, not a block; nothing here reads it to decide anything.
     #[serde(default, deserialize_with = "owner")]
     pub owner: Option<String>,
+    /// The GitHub login that added the entry (#330): metadata like `owner`, attribution and no
+    /// grant; nothing reads it to decide anything yet.
+    #[serde(default, deserialize_with = "added_by")]
+    pub added_by: Option<String>,
     #[serde(default, deserialize_with = "declared")]
     pub serve: Serve,
     #[serde(default, rename = "resource")]

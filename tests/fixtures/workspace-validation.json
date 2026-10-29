@@ -223,6 +223,133 @@
     }
   },
   {
+    "name": "added_by not a string",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nadded_by = 1\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.added_by`: must be one string, a GitHub login"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.added_by`: deve ser uma única string, um login do GitHub"
+      ]
+    }
+  },
+  {
+    "name": "added_by an array",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nadded_by = [\"a\", \"b\"]\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.added_by`: must be one string, a GitHub login"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.added_by`: deve ser uma única string, um login do GitHub"
+      ]
+    }
+  },
+  {
+    "name": "added_by empty",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nadded_by = \"\"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.added_by`: is empty"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.added_by`: está vazio"
+      ]
+    }
+  },
+  {
+    "name": "added_by over 39 characters",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nadded_by = \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.added_by`: is longer than 39 characters"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.added_by`: tem mais de 39 caracteres"
+      ]
+    }
+  },
+  {
+    "name": "added_by with an uppercase letter",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nadded_by = \"Ana\"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.added_by`: holds a character other than lowercase ASCII letters, digits, `-` and `_`"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.added_by`: contém um caractere além de letras ASCII minúsculas, dígitos, `-` e `_`"
+      ]
+    }
+  },
+  {
+    "name": "added_by with a dot",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nadded_by = \"ana.souza\"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.added_by`: holds a character other than lowercase ASCII letters, digits, `-` and `_`"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.added_by`: contém um caractere além de letras ASCII minúsculas, dígitos, `-` e `_`"
+      ]
+    }
+  },
+  {
+    "name": "added_by with a space",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nadded_by = \"ana souza\"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.added_by`: holds a character other than lowercase ASCII letters, digits, `-` and `_`"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.added_by`: contém um caractere além de letras ASCII minúsculas, dígitos, `-` e `_`"
+      ]
+    }
+  },
+  {
+    "name": "added_by of 39 characters",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nadded_by = \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n",
+    "errors": {
+      "en": [],
+      "pt-BR": []
+    }
+  },
+  {
+    "name": "added_by of 1 character",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nadded_by = \"a\"\n",
+    "errors": {
+      "en": [],
+      "pt-BR": []
+    }
+  },
+  {
+    "name": "added_by with digits, hyphen and underscore",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nadded_by = \"ana-souza_2\"\n",
+    "errors": {
+      "en": [],
+      "pt-BR": []
+    }
+  },
+  {
+    "name": "added_by with an Enterprise Managed Users shortcode suffix",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nadded_by = \"ana_acme\"\n",
+    "errors": {
+      "en": [],
+      "pt-BR": []
+    }
+  },
+  {
     "name": "authorize: an addition outside the grant",
     "role": "team_operator",
     "groups": [

@@ -15,7 +15,7 @@ export function editorModel(text: string, current: string, locale: Language) {
   };
 }
 
-export interface Entry { repo: string; path: string; owner?: string; [key: string]: unknown }
+export interface Entry { repo: string; path: string; owner?: string; added_by?: string; [key: string]: unknown }
 export type Reason = 'outside_grant' | 'ownerless' | 'owner_change' | 'not_your_team';
 export interface Refusal { identity: string; change: 'add' | 'edit' | 'remove'; reason: Reason }
 /** What the session's token says it is: the teams' groups and what it reads. */

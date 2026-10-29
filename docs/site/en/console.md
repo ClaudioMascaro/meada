@@ -160,6 +160,8 @@ Several teams can share one workspace: each changes its own entries and the glob
     meada workspace import repositories.toml --message "Assign billing to its team" --workspace /etc/meada/job.workspace.toml
     ```
 
+    An entry may also carry `added_by = "<GitHub login>"`, the login that added it: 1 to 39 characters of lowercase ASCII letters, digits, `-` and `_` (an Enterprise Managed Users login such as `ana_acme` fits), compared exactly, so `Ana` is refused. It follows `owner` in `meada workspace show`, is part of the version id, and nothing reads it to decide anything yet. In a bootstrap manifest's own `[[repository]]` entries it is an error, as `owner` is.
+
 3. **Who changes what.** The team operator may edit and remove the entries its teams own and add entries owned by its teams. The global operator keeps owner changes (set, clear or replace), entries with no owner, other owners' entries and every generation operation (`pointer` and `fence`).
 4. **Delegation.** A group becomes a team when the global operator assigns it its first entry. A team that removes its last entry stops being one until the global operator assigns it an entry again.
 5. **Configuration.** Ownership never widens what a token reads. Map each team's group in `[oidc.groups]` to the identities it owns, and to an identity before the team can add it; without that, the team cannot see its entries, and an addition outside the grant is refused `outside_grant`.

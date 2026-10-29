@@ -107,25 +107,29 @@ other Kotlin grammar may enter the dependency tree: they all export `tree_sitter
   empty, at most `OWNER_MAX` characters, no control character, no whitespace at either end;
   compared exactly), so the browser's validation, every import, every pull and every read of a
   stored version check it alike; `authorize` reads it to decide a write (#323).
+  `EntryFile::added_by` is the optional GitHub login that added the entry (#330), checked there
+  too (`added_by_problem`: one string, 1 to 39 characters of lowercase ASCII letters, digits,
+  `-` and `_`; compared exactly); attribution and no grant, read by nothing yet.
   `validate_import(file, src)`
   validates entries while ignoring other top-level keys, with CLI import's file prefix on
   identity errors; CLI, HTTP and WASM import validation share it, preserving empty workspaces and ignored
   bootstrap sections.
 - `meada-core/src/ids.rs`: `bundle_id`, `generation_id` (ADR 0012), `workspace_version_id`
   (ADR 0014: the canonical JSON of the entries, `{"blocks","path","repo"}` in manifest order, with
-  `"owner"` between `blocks` and `path` only when the entry has one, so an ownerless entry keeps
-  its text and its version id), `is_id`, `fence`, `entry_blocks` (every key of an entry but
-  `repo`, `path` and `owner`; the owner is no block, so no bundle id reads it).
+  `"owner"` between `blocks` and `path` and, keys being sorted, `"added_by"` (#330) before
+  `blocks`, each only when the entry has one, so an entry without them keeps its text and its
+  version id), `is_id`, `fence`, `entry_blocks` (every key of an entry but `repo`, `path`,
+  `owner` and `added_by`; neither is a block, so no bundle id reads them).
 - `meada-core/src/workspace.rs`: `diff(file, before, after)` validates through `validate_import`
   and lists added/removed/changed identities and changed dotted keys in manifest order. Array
   tables retain each field's row position and absence; common entries reordered relative to
   one another report the `repository` array key. Formatting is ignored. `entries_text` is the
   pure JSON-repositories-to-TOML conversion shared with `snapshot::versions` and WASM; it prints
-  an entry's `owner` right after its `path`, before the block tables, so the text reads back to
+  an entry's `owner` and `added_by` right after its `path`, before the block tables, so the text reads back to
   the same id. `version_entries` (`entriesJson`) is the opposite way, a text to the entries a
   version document holds, so the browser authorizes and composes the same entries the server
   stores: `entry`, which builds one, is the function `snapshot::versions` stores them with. An owner change alone is the
-  changed dotted key `repository.owner`.
+  changed dotted key `repository.owner`, likewise `repository.added_by`.
 - `meada-core/src/authorize.rs` (ADR 0015): what a subject may change in a workspace version,
   over a version document's JSON `repositories`. `authorize_entries(role, groups, grant,
   current, new)` returns the refused entries (`Refusal`: `identity`, `change` `add`/`edit`/
@@ -859,8 +863,8 @@ one for the area a change touches.
   `path` as written, its `owner` when it has one, plus its blocks as `entry_blocks` gives
   them), stored with the size and hash metadata every object carries and never rewritten. The
   id is `meada_core::ids::workspace_version_id` of the entries alone, owners included.
-  `meada index`, `status`, `export` and `snapshot publish` ignore the owner of a pulled version,
-  and a generation document's entry blocks holding an `owner` are refused (`snapshot/pull.rs`). The current version is
+  `meada index`, `status`, `export` and `snapshot publish` ignore the owner and the `added_by` of a pulled version,
+  and a generation document's entry blocks holding an `owner` or an `added_by` are refused (`snapshot/pull.rs`). The current version is
   `{<key_prefix>}:workspace`, a hash `{id, fence}` under the pointer's hash tag (`pointer_key`,
   read by `current`, moved by `meada workspace apply`, #302). `import` (`meada workspace import
   <file> --message <text> [--author <name>] --workspace <bootstrap manifest>`) reads the file's
@@ -1000,7 +1004,8 @@ one for the area a change touches.
   (`Msg::WorkspaceStoreBeside`); `Manifest::store` records it, with no entries from `read`. An
   `owner` in the bootstrap manifest's own `[[repository]]` entries (`source = "file"`) is an
   error naming the file, the line, `repository.owner` and `source = "store"`
-  (`Msg::WorkspaceOwnerStatic`); `meada workspace import` reads the same entries with it allowed.
+  (`Msg::WorkspaceOwnerStatic`), and an `added_by` likewise (`Msg::WorkspaceAddedByStatic`);
+  `meada workspace import` reads the same entries with them allowed.
   `Manifest::read_listed`, which `index`, `status`, `export` without `--generations` and
   `snapshot publish` call, reads the entries of the version `meada workspace pull` left under
   `<index_dir>/workspace/` (`versions::pulled`, from disk, once per read, `Manifest::version`

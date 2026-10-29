@@ -160,6 +160,8 @@ Varios equipos pueden compartir un workspace: cada uno modifica sus propias entr
     meada workspace import repositories.toml --message "Assign billing to its team" --workspace /etc/meada/job.workspace.toml
     ```
 
+    Una entrada también puede llevar `added_by = "<login de GitHub>"`, el login de quien la añadió: de 1 a 39 caracteres entre letras ASCII minúsculas, dígitos, `-` y `_` (un login de Enterprise Managed Users como `ana_acme` sirve), comparado exactamente, así que `Ana` se rechaza. Va después del `owner` en `meada workspace show`, entra en el id de la versión, y nada lo lee todavía para decidir algo. En las entradas `[[repository]]` del propio manifest de bootstrap es un error, como el `owner`.
+
 3. **Quién cambia qué.** El operador de equipo puede editar y eliminar las entradas que sus equipos poseen y añadir entradas cuyo owner sea uno de sus equipos. El operador global conserva los cambios de owner (asignar, borrar o sustituir), las entradas sin owner, las entradas de otros owners y todas las operaciones de generación (`pointer` y `fence`).
 4. **Delegación.** Un grupo se vuelve equipo cuando el operador global le asigna su primera entrada. Un equipo que elimina su última entrada deja de serlo hasta que el operador global le asigne una de nuevo.
 5. **Configuración.** Ser dueño nunca amplía lo que lee un token. Mapea el grupo de cada equipo en `[oidc.groups]` a las identidades que posee, y a una identidad antes de que el equipo pueda añadirla; sin eso, el equipo no ve sus entradas, y una adición fuera del grant se rechaza con `outside_grant`.

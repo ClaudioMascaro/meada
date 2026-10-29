@@ -1083,6 +1083,45 @@ fn apply_moves_the_workspace_pointer_for_versions_that_set_change_and_clear_owne
     }
 }
 
+/// `apply` of a version that sets `added_by`, one that changes and clears it, and the first
+/// again, moves the pointer as for any version (#330): `added_by` is entry metadata and no team
+/// rule applies to the CLI.
+#[test]
+fn apply_moves_the_workspace_pointer_for_versions_that_set_change_and_clear_added_by() {
+    let Some(fleet) = fleet("ws_apply_added_by") else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let text = fs::read_to_string(dir.join(MANIFEST)).unwrap();
+    let owners = [Some("team-a"), None, None, None];
+    let set = [Some("ana"), Some("bia"), None, None];
+    let changed = [Some("ana-souza"), None, Some("caio_acme"), None];
+    let mut ids = Vec::new();
+    for (name, logins) in [("set", set), ("changed", changed)] {
+        let file = format!("ops/{name}.toml");
+        let version =
+            crate::generations::added(&crate::generations::owned(&text, &owners), &logins);
+        fs::write(dir.join(&file), version).unwrap();
+        ids.push(crate::generations::import(dir, &file, name, "alice").0);
+    }
+    let (plain, _) = crate::generations::import(dir, MANIFEST, "plain", "alice");
+    let mut last = 0u64;
+    for id in [&ids[0], &ids[1], &plain, &ids[0]] {
+        let (stdout, stderr, code) = apply(dir, id);
+        assert_eq!((code, stderr.as_str()), (Some(0), ""), "{id}");
+        let (shown, fence) = stdout.trim().split_once(' ').unwrap();
+        let fence: u64 = fence.parse().unwrap();
+        assert_eq!(shown, id.as_str());
+        assert!(fence > last, "{fence} {last}");
+        assert_eq!(
+            workspace_hash(&fleet),
+            [Some(id.clone()), Some(fence.to_string())]
+        );
+        assert!(released(&fleet));
+        last = fence;
+    }
+}
+
 /// `apply` is refused, leaving the pointer as it was: for a version the store does not hold,
 /// naming its key; while a job holds the lock, naming the holder; and with
 /// `{<prefix>}:fence` lowered, by the fence. `fence recover` counts the workspace pointer's
