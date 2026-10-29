@@ -30,6 +30,15 @@ All notable changes to Meada are recorded here. The format follows
   writing nothing. `GET /api/v1/session` gains `groups` and `grant` with `[oidc]` and `teams`
   for a team operator, and its `role` may be `team_operator`. A team operator's write logs
   `ui: <subject> as <owners> <action> <arguments>: <outcome>`.
+- The console's workspace editor serves a team operator (ADR 0015): it holds only the entries its
+  grant reads, each with its owner and whether it may change it and why not, marks every change
+  the API would refuse in the diff as it types (computed by `authorize_entries` and
+  `compose_entries` in WebAssembly, in pt-BR and English) and disables the save while one stands.
+  Its save and apply confirmations name the teams that authorize them instead of a CLI command,
+  a 403 `entries_refused` shows the server's entries and the hidden count, a lost role turns the
+  editor read-only, and apply is offered only when the entries it reads authorize it. Every role
+  sees each entry's owner on the versions page, where an owner change lists as the changed key
+  `repository.owner` like any other. `meada-core` exports `entriesJson` to WebAssembly.
 - ADR 0020 and the glossary record the direction of spec S5: a named query context over shared
   indexing and publication.
 - `meada status` ends a repository's lines with a pointer to the new `inference` issue form when the

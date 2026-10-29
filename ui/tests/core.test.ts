@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, expect, test } from 'vitest';
 import fixtures from '../../tests/fixtures/workspace-validation.json';
 import {
-  initSync, init, validate, workspaceVersionId, workspaceDiff, entriesText, authorizeEntries, composeEntries,
+  initSync, init, validate, workspaceVersionId, workspaceDiff, entriesText, entriesJson, authorizeEntries, composeEntries,
 } from '../wasm/meada_core';
 
 // One table, three kinds of rows: text validation, authorization and a team operator's save (#323).
@@ -57,4 +57,10 @@ test('stored entries use the CLI TOML conversion and retain their version id', (
   expect(validate('entries', text)).toEqual([]);
   expect(JSON.parse(workspaceDiff(text, text))).toEqual({ added: [], removed: [], changed: [] });
   expect(workspaceVersionId(text)).toMatch(/^[0-9a-f]{16}$/);
+});
+
+test('a text reads back as the entries a version document holds, and an invalid one throws import\'s problems', () => {
+  const entries = [{ repo: 'a.com/x', path: 'x', owner: 'team-a', serve: { prefix: '/x' } }, { repo: 'a.com/y', path: 'y' }];
+  expect(JSON.parse(entriesJson(entriesText(json(entries))))).toEqual(entries);
+  expect(() => entriesJson('[[repository]]\npath="x"\n')).toThrow('entries:1: `repository.repo` is missing');
 });

@@ -1,11 +1,18 @@
 import { expect, test } from 'vitest';
 import { pointerActions, recoverAction } from '../src/actions';
+import type { Session } from '../src/api';
 import config from './fixtures/config.json';
 
 test('viewers and operators with operations off have no generation actions', () => {
   const row = { id: 'aaaaaaaaaaaaaaaa', retained: true, current: false, kept: true };
   expect(pointerActions(row, { role: 'viewer', subject: 'viewer' }, { ...config, operations: true }, 'ops.toml')).toEqual([]);
   expect(pointerActions(row, { role: 'operator', subject: 'operator' }, { ...config, operations: false }, 'ops.toml')).toEqual([]);
+});
+
+test('a team operator has no generation actions, as a viewer', () => {
+  const row = { id: 'aaaaaaaaaaaaaaaa', retained: true, current: false, kept: true };
+  const session: Session = { role: 'team_operator', subject: 'tina', groups: ['team-a'], grant: '*', teams: ['team-a'] };
+  expect(pointerActions(row, session, { ...config, operations: true }, 'ops.toml')).toEqual([]);
 });
 
 test('fence recovery preserves every u64 digit and validates the optional floor before confirmation', () => {

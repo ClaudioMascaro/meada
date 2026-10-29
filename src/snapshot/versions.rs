@@ -18,6 +18,7 @@
 //! time. `index`, `status`, `export` and `snapshot publish` read the version `current` names
 //! from there (`pulled`, through `Manifest::read_listed`), checked again, and never connect.
 
+#[cfg(feature = "refresh-lock")]
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
@@ -26,10 +27,10 @@ use std::path::{Path, PathBuf};
 use meada_core::authorize::{self, Grant, Refusal, Role, authorize_entries, compose_entries};
 use meada_core::ids::workspace_version_id;
 use meada_core::manifest::{EntryFile, validate, validate_import};
-use meada_core::workspace::entries_text;
+use meada_core::workspace::{entries_text, entry};
 use redis::cmd;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value as Json};
+use serde_json::Value as Json;
 
 use super::generations::{now, rfc3339};
 use super::store::Store;
@@ -314,21 +315,6 @@ fn touched_owners(current: &[Json], new: &[Json]) -> Vec<String> {
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect()
-}
-
-/// One entry of a version document: `repo` and `path`, the `owner` when there is one, then the
-/// entry's blocks.
-fn entry(e: &EntryFile, blocks: Json) -> Json {
-    let mut entry = Map::new();
-    entry.insert("repo".into(), e.repo.as_str().into());
-    entry.insert("path".into(), e.path.as_str().into());
-    if let Some(owner) = &e.owner {
-        entry.insert("owner".into(), owner.as_str().into());
-    }
-    if let Json::Object(blocks) = blocks {
-        entry.extend(blocks);
-    }
-    Json::Object(entry)
 }
 
 /// The version id of `entries`, their blocks being `blocks` (`entry_blocks`), and the entries as

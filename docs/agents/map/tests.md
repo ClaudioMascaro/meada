@@ -467,7 +467,9 @@ managed workspace read. CLI import is also checked with `generation-pointer` alo
 
 `meada-core/tests/workspace.rs` exercises the public diff seam: entry/key order, unchanged
 versions, nested keys, reordered entries and absent fields moving between array-table rows, and
-`entries_text` printing an entry's `owner` after its `path`. `meada-core/tests/ids.rs` and
+`entries_text` printing an entry's `owner` after its `path`, an owner set, cleared or replaced
+alone being the changed key `repository.owner`, and `version_entries` reading a text as a
+document's entries (#325). `meada-core/tests/ids.rs` and
 `meada-core/tests/manifest.rs` hold the `owner` cases (canonical text, version id, each rule and
 the names accepted); the shared validation table below carries the `owner` rows in both languages.
 `tests/fixtures/workspace-validation.json` is the single pt-BR/English validation table used
@@ -487,6 +489,18 @@ rows and `role` on inline entries; `ui/tests/core.test.ts` drives `authorizeEntr
 for owner changes and ownerless entries with its refusals unchanged.
 `ui/tests/workspace.test.ts` checks local editor validation/diff and captured commands;
 `ui/tests/WorkspacePage.test.tsx` covers the labelled versions/editor/diff DOM and HTTP boundary.
+The team operator's editor (#325): `ui/tests/workspace.test.ts` holds the model seam with the real
+WASM (annotated entries never reaching a text, an id or a diff key; each entry's state; each
+refusal reason computed locally and cleared by undoing it, with no request; the diff of the
+composed version with entries outside the grant in place; the apply offer and its teams), and
+`ui/tests/TeamWorkspace.test.tsx` the DOM in both languages: the held entries with owner and
+state, each refusal marked in text with the save disabled, a save of an edit, a removal and an
+addition naming its teams with nothing sent before confirmation, a 403 `entries_refused` with
+its `hidden` count, a viewer refusal turning the editor read-only, apply and rollback offered
+by authorization, owners and an owner change for a viewer, no save or apply for a viewer or with
+operations off, and the global operator's unchanged editor and CLI command.
+`ui/tests/actions.test.ts` and `ui/tests/action-pages.test.tsx` keep the fleet and store pages
+action-free for a team operator.
 
 Review regressions for #293 cover manifest-wide grant filtering (including groups-only
 identities in validation errors), issuer query preservation at `Auth.login`, exact recovery
