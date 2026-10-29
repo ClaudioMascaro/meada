@@ -253,7 +253,7 @@ pub enum Msg<'a> {
         schema: &'a str,
         version: i32,
     },
-    #[cfg(feature = "postgres")]
+    #[cfg(any(feature = "postgres", feature = "ui"))]
     PostgresUnreachable(&'a str),
     /// `meada postgres migrate` with a manifest that has no `[postgres]`.
     #[cfg(feature = "postgres")]
@@ -717,6 +717,18 @@ pub enum Msg<'a> {
     /// A fixed body error that never echoes untrusted JSON.
     #[cfg(feature = "ui")]
     UiWriteBody,
+    /// A CLI twin of a console write whose audit record cannot be written (#328).
+    #[cfg(any(feature = "ui", feature = "generation-pointer"))]
+    AuditCli(&'a str),
+    /// The console's 503 `audit_unavailable`: no write without its record (#328).
+    #[cfg(feature = "ui")]
+    AuditUnavailable,
+    /// An audit row that fails its checks, naming the table and never its values.
+    #[cfg(feature = "ui")]
+    AuditBadRecord(&'a str),
+    /// `GET audit` with a query other than `before=<id>` and `limit=<1 to 100>`.
+    #[cfg(feature = "ui")]
+    UiAuditQuery,
     About,
     Index,
     Status,
@@ -1342,7 +1354,7 @@ impl Msg<'_> {
                 format!("postgres: reachable, schema {schema} version {version}"),
                 format!("postgres: alcançável, schema {schema} versão {version}"),
             ),
-            #[cfg(feature = "postgres")]
+            #[cfg(any(feature = "postgres", feature = "ui"))]
             Msg::PostgresUnreachable(reason) => pick(
                 format!("postgres: unreachable ({reason})"),
                 format!("postgres: inalcançável ({reason})"),
@@ -2393,6 +2405,34 @@ impl Msg<'_> {
             Msg::UiWriteBody => pick(
                 "not a valid console operation body".into(),
                 "body inválido para uma operação da console".into(),
+            ),
+            #[cfg(any(feature = "ui", feature = "generation-pointer"))]
+            Msg::AuditCli(reason) => pick(
+                format!(
+                    "the audit record cannot be written to Postgres, so nothing was changed: \
+                     {reason}"
+                ),
+                format!(
+                    "o registro de auditoria não pode ser gravado no Postgres, então nada foi \
+                     alterado: {reason}"
+                ),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::AuditUnavailable => pick(
+                "the audit in Postgres is unavailable: no write is made without its record".into(),
+                "a auditoria no Postgres está indisponível: nenhuma escrita é feita sem o seu \
+                 registro"
+                    .into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiAuditQuery => pick(
+                "the audit takes `before=<id>` and `limit=<1 to 100>`, nothing else".into(),
+                "a auditoria aceita `before=<id>` e `limit=<1 a 100>`, nada mais".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::AuditBadRecord(table) => pick(
+                format!("{table}: a record fails its checks and is left out"),
+                format!("{table}: um registro falha nas verificações e fica de fora"),
             ),
             Msg::About => pick(
                 "LLM-free code graph for agents and people".into(),

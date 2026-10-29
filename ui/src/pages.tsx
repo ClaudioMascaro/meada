@@ -16,7 +16,13 @@ export const routes = [
   { path: '/repositories', label: 'repositories' },
   { path: '/credentials', label: 'credentials' },
   { path: '/admission', label: 'admission' },
+  { path: '/audit', label: 'audit' },
 ] as const;
+
+/** The pages `session` is offered: the audit is the global operator's alone. */
+export function offered(session?: Session) {
+  return routes.filter(route => route.path !== '/audit' || session?.role === 'operator');
+}
 
 export function Shell({ path, locale, onLanguage, session, t, children, onNavigate }: {
   path: string; locale: Language; onLanguage: (language: Language) => void;
@@ -39,7 +45,7 @@ export function Shell({ path, locale, onLanguage, session, t, children, onNaviga
     </header>
     <aside className="sidebar">
       <nav aria-label={t.navigation}>
-        {routes.map(route => <a key={route.path} href={route.path} onClick={event => follow(event, route.path)} aria-current={path === route.path ? 'page' : undefined}>
+        {offered(session).map(route => <a key={route.path} href={route.path} onClick={event => follow(event, route.path)} aria-current={path === route.path ? 'page' : undefined}>
           {t[route.label]}
         </a>)}
       </nav>

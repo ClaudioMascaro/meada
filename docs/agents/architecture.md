@@ -194,6 +194,11 @@ page and a current-generation load reads again. `graph-i18n.ts` holds this area'
 `operations.ts` projects their checked DTOs, with bilingual copy in `operations-i18n.ts`.
 Missing modules name their sections, errors remain local to the page, and the pasted token
 exists only in the uncontrolled field and its request body, cleared on completion.
+`AuditPage.tsx` (#328) reads `GET audit` a page at a time, newest first, following `next` (older
+records) and back to the newest; `audit.ts` projects each record's time, via, subject, login,
+role, owners, action, arguments, outcome and message into text, with copy in `audit-i18n.ts`.
+`pages.tsx`'s `offered` lists the page for the global operator alone, and `App.tsx` answers its
+path with the not-found page for anyone else.
 The API reader preserves large JSON integers as decimal strings instead of rounding fences.
 `actions.ts` offers generation operations only to an operator while operations are enabled;
 `ActionControls.tsx` displays their CLI commands and the optional fence floor without rounding
@@ -356,7 +361,10 @@ one for the area a change touches.
   nothing outside it (ADR 0002, invariant 3). `MIGRATIONS` lists the migrations in order; a
   ticket appends the next number when it integrates, never editing one before it. Migration 1
   creates the version table, `<schema>.schema_version` (one row, `version`), the schema itself
-  created in its transaction when absent. `migrate` (`meada postgres migrate --workspace
+  created in its transaction when absent; migration 2 the audit's table, `<schema>.audit`
+  (`audit.rs`). `connected` is `connect` keeping the password for scrubbing a later statement's
+  error, and `probe` is the console's start check (a version refusal refuses the start, Postgres
+  unreachable does not). `migrate` (`meada postgres migrate --workspace
   <bootstrap manifest>`, reading `Manifest::postgres`, no mirror) is the only command that
   creates or alters a table: it takes `pg_advisory_lock` on `lock_key(schema)` (the first eight
   bytes of BLAKE3 of `meada postgres migrate <schema>`, so two runs serialize; the wait runs
@@ -507,6 +515,44 @@ one for the area a change touches.
   the 422 response but logs only the fixed outcome `workspace entries failed validation`, so
   invalid identities cannot copy editor contents into stderr. No route releases locks or
   triggers refresh.
+  The audit (#328, ADR 0016, `audit.rs`): with `[postgres]` every write route and every CLI twin
+  of one leaves a record in `<schema>.audit`: `id` (an identity column), `time` (Postgres's
+  `now()`, answered RFC 3339, UTC, microseconds), `via` (`console` or `cli`), `subject`, `login`
+  (null until a grant provider reads one), `role` (`viewer`, `operator`, `team_operator`; the
+  CLI acts as the operator), `owners` (a team operator's, as its stderr line names them, else
+  null), `action` (`audit::ACTIONS`: `workspace.save`, `workspace.import`, `workspace.apply`,
+  `pointer.set`, `pointer.retain`, `pointer.drop`, `fence.recover`, and `pointer` for a pointer
+  request refused before its body), `arguments` (`{"version", "message"}` for a save or an import,
+  the id of the entries as submitted; `{"version"}` for an apply; `{"generation"}` for the
+  pointer actions; `{"at_least"}` for a recovery with a floor, its decimal digits; `{}` for a
+  refusal before the body), `outcome` (`pending`, `accepted`, `refused`, `failed`) and `message`
+  (the new state, or the refusal's or failure's message as the stderr line has it). The order is
+  fail closed: a write that passed its role and its body's checks (400, 413 and 422 are never
+  recorded, nor the `Host`, `Origin` and admission refusals) inserts its record as `pending`
+  (`Audit::pending`, `Console::pending` in `ui/write.rs`) before it touches Valkey or the store;
+  an insert that fails answers 503 `audit_unavailable` (`Msg::AuditUnavailable`), its stderr
+  line carrying that message after one `ui: postgres: unreachable (<reason>)` line, and writes
+  nothing; on the CLI (`audit::cli`, which `main.rs` wraps around each twin) it exits 1 with
+  `Msg::AuditCli` naming Postgres and the reason. The helpers that print a write's stderr line
+  then finish its record (`Audit::finish`) with that line's outcome text and owners: `accepted`,
+  `refused` for a held or lost lock, an operation's own refusal (`snapshot::generations::OpError
+  ::Refused`: a generation not retained, the current one dropped, the kept set full, a fence it
+  may not lower or raise, a version not stored, `ApplyError::Conflict`, `SaveError::Refused`),
+  `entries_refused` or a role lost under the lock, and `failed` for anything else (Valkey, the
+  store, the manifest). A failed update leaves the record `pending`. A role refusal in
+  `Console::checked` is inserted directly as `refused` with the route's action (`write::recorded`)
+  and `{}`, before any body is read; a refusal that finds Postgres unreachable is answered as
+  before and leaves only its stderr line. Each call opens its own connection through
+  `postgres::connected`, so a schema version this binary does not know counts as unreachable;
+  `pool_size` is still unread. The stderr lines are unchanged, with and without `[postgres]`.
+  `GET audit?before=<id>&limit=<n>` (`Console::audit_page`, only with `[postgres]`, a 404
+  without) is the global operator's alone (anyone else gets the 403 `Msg::UiOperatorRequired`):
+  records with an id below `before`, newest first, at most `limit` (1 to 100, 50 by default), as
+  `{"records": [...], "next": <id or null>}`, `next` the `before` of the following page; any other
+  query, a repeated key or a value out of range is a 400 (`Msg::UiAuditQuery`), Postgres
+  unreachable a 503 `audit_unavailable`. Every row is hostile: one whose columns fail their
+  checks (`audit::record`) is left out with one stderr line naming the table
+  (`Msg::AuditBadRecord`), never a value. Records are never deleted by Meada.
   Operational reads live in `ui/read.rs`: `GET fleet` reads the checked pointer/retained/kept
   state (`generations::inspect`), live heartbeats (`heartbeat::read`), holder and remaining
   lock TTL, and fence counter from Valkey; workspace ids come from generation documents and

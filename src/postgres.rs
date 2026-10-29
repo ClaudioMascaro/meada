@@ -59,6 +59,20 @@ const MIGRATIONS: &[&str] = &[
     // 1: the version the schema holds, one row that `migrate` alone writes.
     "CREATE TABLE {schema}.schema_version (version integer NOT NULL);
      INSERT INTO {schema}.schema_version VALUES (0);",
+    // 2: the audit (`crate::audit`), one row per write, never deleted by Meada.
+    "CREATE TABLE {schema}.audit (
+       id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+       \"time\" timestamptz NOT NULL DEFAULT now(),
+       via text NOT NULL,
+       subject text,
+       login text,
+       role text NOT NULL,
+       owners jsonb,
+       action text NOT NULL,
+       arguments jsonb NOT NULL,
+       outcome text NOT NULL,
+       message text
+     );",
 ];
 
 /// The `[postgres]` section as written.
@@ -233,7 +247,7 @@ impl Config {
     }
 
     /// The schema, quoted for a statement (`schema_ok` leaves nothing to escape).
-    fn quoted(&self) -> String {
+    pub(crate) fn quoted(&self) -> String {
         format!("\"{}\"", self.schema)
     }
 }
@@ -388,13 +402,13 @@ async fn handshake(config: &Config) -> Result<Opened, String> {
 }
 
 /// An open connection and the password it was opened with, which no error may carry.
-struct Opened {
-    client: tokio_postgres::Client,
+pub(crate) struct Opened {
+    pub(crate) client: tokio_postgres::Client,
     secret: Option<String>,
 }
 
 impl Opened {
-    fn scrub(&self, e: tokio_postgres::Error) -> String {
+    pub(crate) fn scrub(&self, e: tokio_postgres::Error) -> String {
         scrub(&reason(&e), self.secret.as_deref())
     }
 }
@@ -475,10 +489,31 @@ fn check(schema: &str, stored: i32, known: i32) -> Result<(), String> {
 /// unreachable or the version refusal; a CLI command or the console refuses on it, a node
 /// writes it once on stderr and treats Postgres as unreachable.
 pub async fn connect(config: &Config) -> Result<(tokio_postgres::Client, i32), String> {
+    let opened = connected(config).await?;
+    Ok((opened.client, known()))
+}
+
+/// `connect`, keeping the password so a later statement's error can be scrubbed of it.
+pub(crate) async fn connected(config: &Config) -> Result<Opened, String> {
     let opened = open(config).await?;
     let version = stored(&opened, config).await?;
     check(&config.schema, version, known())?;
-    Ok((opened.client, version))
+    Ok(opened)
+}
+
+/// The console's start check: the version refusal when Postgres answers with a version this
+/// binary does not know; Postgres unreachable passes (the console starts anyway).
+pub fn probe(config: &Config) -> Result<(), String> {
+    let run = async {
+        let Ok(opened) = open(config).await else {
+            return Ok(());
+        };
+        match stored(&opened, config).await {
+            Ok(version) => check(&config.schema, version, known()),
+            Err(_) => Ok(()),
+        }
+    };
+    crate::modules::block_on(run).unwrap_or(Ok(()))
 }
 
 /// The advisory lock key of `schema`'s migrations: the first eight bytes of a BLAKE3 hash, so

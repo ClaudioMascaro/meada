@@ -9,7 +9,7 @@ use std::path::Path;
 
 use redis::cmd;
 
-use super::generations::{self, KEPT_MAX, pointer};
+use super::generations::{self, KEPT_MAX, OpError, pointer};
 use super::lock::{self, Held};
 use super::store::Store;
 use super::{fence, is_id, pull};
@@ -50,14 +50,15 @@ pub(super) fn sections(manifest: &Path) -> crate::Result<Sections> {
 
 /// Runs `op` under the refresh lock of the workspace of `sections`, its holder saying `holds`,
 /// with `[generations]`'s `keep`; the lock and the holder are released whatever `op` returned.
+/// A refusal (the lock held, or one of `op`'s own) stays an `OpError::Refused` in the error.
 pub(super) fn locked<T>(
     sections: &Sections,
     holds: &str,
-    op: impl AsyncFnOnce(&Valkey, &valkey::Config, u64, &Held) -> Result<T, String>,
+    op: impl AsyncFnOnce(&Valkey, &valkey::Config, u64, &Held) -> Result<T, OpError>,
 ) -> crate::Result<T> {
     let config = &sections.valkey;
     let run = async {
-        let valkey = Valkey::connect(config).await?;
+        let valkey = Valkey::connect(config).await.map_err(OpError::Failed)?;
         let held =
             lock::acquire(&valkey, config, sections.lock.ttl, holds, lock::LAST_FENCE).await?;
         let done = op(&valkey, config, sections.keep, &held).await;
@@ -98,7 +99,8 @@ pub fn pointer_set(manifest: &Path, id: &str, author: &str) -> crate::Result<Str
                     .is_some()
             });
             if !listed {
-                return Err(Msg::PointerNotRetained { id, key: &retained }.text());
+                let refused = Msg::PointerNotRetained { id, key: &retained };
+                return Err(OpError::Refused(refused.text()));
             }
             generations::point(valkey, config, keep, id, Some(&held.token), held.fence).await?;
             Ok(format!("{id} {}", held.fence))
@@ -170,12 +172,14 @@ pub fn pointer_retain(manifest: &Path, id: &str, author: &str) -> crate::Result<
             let wrote = valkey.query::<i64>(&script).await;
             match wrote.map_err(|e| format!("{retained}, {kept}: {e}"))? {
                 1 => Ok(id.to_string()),
-                -1 => Err(Msg::KeptFull {
-                    key: &kept,
-                    max: KEPT_MAX,
-                }
-                .text()),
-                _ => Err(Msg::LockNotHeld(&lock).text()),
+                -1 => Err(OpError::Refused(
+                    Msg::KeptFull {
+                        key: &kept,
+                        max: KEPT_MAX,
+                    }
+                    .text(),
+                )),
+                _ => Err(OpError::Refused(Msg::LockNotHeld(&lock).text())),
             }
         },
     )
@@ -224,9 +228,13 @@ pub fn pointer_drop(manifest: &Path, id: &str, author: &str) -> crate::Result<St
             let wrote = valkey.query::<i64>(&script).await;
             match wrote.map_err(|e| format!("{current}, {retained}, {kept}: {e}"))? {
                 1 => Ok(id.to_string()),
-                -1 => Err(Msg::DropCurrent { id, key: &current }.text()),
-                -2 => Err(Msg::DropNotRetained { id, key: &retained }.text()),
-                _ => Err(Msg::LockNotHeld(&lock).text()),
+                -1 => Err(OpError::Refused(
+                    Msg::DropCurrent { id, key: &current }.text(),
+                )),
+                -2 => Err(OpError::Refused(
+                    Msg::DropNotRetained { id, key: &retained }.text(),
+                )),
+                _ => Err(OpError::Refused(Msg::LockNotHeld(&lock).text())),
             }
         },
     )
@@ -277,15 +285,17 @@ pub fn fence_recover(
     let max = lock::LAST_FENCE - 1;
     let usable = |value: u64| match value <= max {
         true => Ok(()),
-        false => Err(Msg::FenceLimit {
-            key: &fence_key,
-            max,
-        }
-        .text()),
+        false => Err(OpError::Refused(
+            Msg::FenceLimit {
+                key: &fence_key,
+                max,
+            }
+            .text(),
+        )),
     };
     usable(floor)?;
     let run = async {
-        let valkey = Valkey::connect(config).await?;
+        let valkey = Valkey::connect(config).await.map_err(OpError::Failed)?;
         usable(recorded(&valkey, config, &mut Vec::new()).await?)?;
         let holds = format!("fence recover {}", author.escape_debug());
         let held = lock::acquire(&valkey, config, sections.lock.ttl, &holds, max).await?;
@@ -299,16 +309,18 @@ pub fn fence_recover(
             raise.arg(&held.token).arg(highest).arg(max);
             let left: Option<String> =
                 (valkey.query(&raise).await).map_err(|e| format!("{fence_key}: {e}"))?;
-            let left = left.ok_or_else(|| Msg::LockNotHeld(&lock).text())?;
+            let left = left.ok_or_else(|| OpError::Refused(Msg::LockNotHeld(&lock).text()))?;
             if left.is_empty() {
-                return Err(Msg::FenceLimit {
-                    key: &fence_key,
-                    max,
-                }
-                .text());
+                return Err(OpError::Refused(
+                    Msg::FenceLimit {
+                        key: &fence_key,
+                        max,
+                    }
+                    .text(),
+                ));
             }
             let left = fence(&left).ok_or_else(|| Msg::LockBadFence(&fence_key).text())?;
-            Ok((left, skipped))
+            Ok::<_, OpError>((left, skipped))
         }
         .await;
         lock::release(&valkey, config, &held.token).await;

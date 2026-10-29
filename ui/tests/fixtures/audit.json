@@ -1,0 +1,7 @@
+{
+  "records": [
+    {"id": 12, "time": "2026-10-29T12:00:01.123456Z", "via": "console", "subject": "ana", "login": null, "role": "team_operator", "owners": ["team-billing", "team-search"], "action": "workspace.save", "arguments": {"version": "0123456789abcdef", "message": "move billing"}, "outcome": "refused", "message": "1 entry is outside your teams (e.test/team/joint; hidden 1)"},
+    {"id": 11, "time": "2026-10-29T11:59:00.000001Z", "via": "cli", "subject": "cli:ops@build-1", "login": "octo-ops", "role": "operator", "owners": null, "action": "fence.recover", "arguments": {}, "outcome": "pending", "message": null}
+  ],
+  "next": 11
+}

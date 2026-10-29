@@ -514,6 +514,34 @@ version leaving the other applies, and a long version list read two versions at 
 `ui/tests/actions.test.ts` and `ui/tests/action-pages.test.tsx` keep the fleet and store pages
 action-free for a team operator.
 
+### The audit (#328)
+
+`tests/it/ui/oidc/audit.rs` runs the team fixture's console with `[postgres]` (a schema of each
+test's own, its URL in `ops/pg-url` through `postgres::Relay`, a loopback relay the test closes;
+`postgres::audited` migrates it and reads the records back). The global operator's `pointer`
+`retain`, `set` and `drop`, `fence/recover`, `workspace/versions` and `workspace/apply` leave one
+`accepted` record each and `GET audit` lists them newest first with Postgres's time, paged by
+`next` with every record once; a write while `meada snapshot lock` holds the lock ends
+`refused`; a hostile row is left out with one line naming the table; a team operator and a
+viewer get the role refusal and bad queries a 400; the stderr lines are S2's. A team operator's
+accepted save and apply record `team_operator` and the touched owners, its refused save its teams
+and the message with the named identity and the hidden count; a viewer's apply and a team
+operator's `pointer` and `fence/recover` with a body that never completes are refused and
+recorded with the route's action and `{}`. With the relay closed every write is a 503
+`audit_unavailable` with Valkey and the store unchanged, reads, `session` and a fresh start still
+answer, a viewer's write keeps its refusal and line and leaves no record; a schema version the
+binary does not know refuses the start naming both. No record, line or body carries a token part
+or the Postgres URL. `tests/it/refresh_lock.rs`
+(`every_cli_twin_is_audited_and_none_writes_without_its_record`) holds the CLI twins: one record
+each with `via = "cli"`, the author, the operator's role and the outcome, an exit 1 naming
+Postgres and nothing written with the relay closed, and an exit 1 naming both versions on an
+unknown schema version; their behavior without `[postgres]` stays covered, output and exit
+code, by the existing `refresh_lock` and `generations` cases. `tests/it/cli.rs`
+(`the_audit_refusal_follows_lang`) checks the CLI refusal in pt-BR and English, and
+`tests/it/postgres.rs` migration 2's columns. `ui/tests/audit.test.tsx` holds the page's view
+model from `fixtures/audit.json`, `offered`, the labelled and keyboard-reachable table paging
+through `next` in both languages, the 503's message and the copy keys.
+
 Review regressions for #293 cover manifest-wide grant filtering (including groups-only
 identities in validation errors), issuer query preservation at `Auth.login`, exact recovery
 ceilings through CLI and HTTP, and live-heartbeat selection with a controlled RESP `TIME`

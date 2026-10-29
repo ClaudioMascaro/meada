@@ -9,6 +9,7 @@ import { PlaygroundPage } from './PlaygroundPage';
 import { GraphPage } from './GraphPage';
 import { WorkspacePage } from './WorkspacePage';
 import { OperationalPage } from './OperationalPage';
+import { AuditPage } from './AuditPage';
 
 export function App({ api, config, initialLanguage }: { api: Api; config: Config; initialLanguage: Language }) {
   const [locale, setLocale] = useState(initialLanguage);
@@ -83,6 +84,7 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
       : path === '/workspace' ? session ? <WorkspacePage api={api} locale={locale} session={session} config={config} onSession={setSession} /> : <p role="status">{t.loading}</p>
       : path === '/playground' ? <PlaygroundPage api={api} locale={locale} />
       : path === '/graph' ? <GraphPage api={api} locale={locale} />
+      : path === '/audit' ? session ? session.role === 'operator' ? <AuditPage api={api} locale={locale} /> : <h1>{t.notFound}</h1> : <p role="status">{t.loading}</p>
       : operational ? session ? <OperationalPage key={operational} kind={operational} api={api} locale={locale} config={config} session={session} /> : <p role="status">{t.loading}</p>
       : <h1>{t.notFound}</h1>}
   </Shell>;
