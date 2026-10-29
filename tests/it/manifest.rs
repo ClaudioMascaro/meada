@@ -359,6 +359,27 @@ fn manifest_errors_name_the_file_the_line_and_the_key() {
              path = \"../chain-web\"\n\n[repository.serve]\nprefix = \"edge\"\n",
             "meada: ops/meada.workspace.toml:8: `repository.serve.prefix`: `edge` must start with `/`\n",
         ),
+        // An owner belongs to a workspace version (ADR 0015): a static manifest names the key
+        // of the first entry that holds one, and `source = "store"`.
+        (
+            "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
+             path = \"../chain-web\"\n\n[[repository]]\nrepo = \"example.com/chain/gateway\"\n\
+             path = \"../chain-gateway\"\nowner = \"team-gateway\"\n",
+            "meada: ops/meada.workspace.toml:10: `repository.owner`: an owner belongs to the \
+             entries of a workspace version, which a static manifest has none of: use [workspace] \
+             source = \"store\" and `meada workspace import`\n",
+        ),
+        (
+            "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
+             path = \"../chain-web\"\nowner = \" team\"\n",
+            "meada: ops/meada.workspace.toml:6: `repository.owner`: has whitespace at either end\n",
+        ),
+        (
+            "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
+             path = \"../chain-web\"\nowner = [\"a\", \"b\"]\n",
+            "meada: ops/meada.workspace.toml:6: `repository.owner`: must be one string, the name \
+             of one group\n",
+        ),
     ] {
         write_manifest(&dir, toml);
         for command in ["index", "status"] {

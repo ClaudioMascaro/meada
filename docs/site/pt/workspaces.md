@@ -53,6 +53,8 @@ são desligados por padrão e mantêm bootstrap, admissão e armazenamento próp
 !!! warning "Planejado: S3"
     [S3, #294](https://github.com/ClaudioMascaro/meada/issues/294) define ownership e autorização por equipe. As versões e o editor acima já estão entregues em S2; as regras abaixo ainda não são comportamento disponível.
 
+O `owner` de uma entrada já existe como metadado (#322): uma string de 1 a 256 caracteres, sem caractere de controle nem espaço em branco nas pontas, comparada exatamente, com maiúsculas e minúsculas. `meada workspace import` o grava, `show` o imprime logo depois de `path`, `pull` o escreve e ele muda o id da versão; uma entrada sem ele mantém o id. A indexação e os ids de bundle e de geração nunca o leem, e as entradas `[[repository]]` do próprio manifest de bootstrap o recusam, citando `source = "store"`. Nenhuma regra o lê ainda para decidir quem pode escrever.
+
 Uma entrada poderá ter um `owner`, o nome exato de um grupo OIDC. O operador global delegará a primeira entrada; o operador de equipe poderá alterar apenas entradas dos seus grupos que seu grant permita ler. O viewer consultará o que seu grant admitir. Ownership nunca ampliará o grant.
 
 Definir, substituir **ou limpar** um owner será `owner_change`, reservado ao operador global. Salvar uma proposta gerará uma versão imutável; aplicar a versão e publicar a geração continuarão sendo ações distintas. Uma aplicação somente de owners não exigirá reindexar o código.

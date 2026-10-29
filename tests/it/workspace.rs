@@ -209,6 +209,12 @@ fn invalid_config_errors_name_file_line_and_key() {
             "[[peer]]\nrepo = \"example.com/acme/api\"\nbranch = \"main\"\n",
             "<repo>/meada.toml:3: `peer.branch` is not a meada.toml key",
         ),
+        // A repository's own file replaces an entry's blocks, never its owner (ADR 0015).
+        (
+            "config_owner",
+            "owner = \"team-web\"\n",
+            "<repo>/meada.toml:1: `owner` is not a meada.toml key",
+        ),
         (
             "config_missing",
             "[[peer]]\npath = \"../api\"\n",

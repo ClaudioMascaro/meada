@@ -102,18 +102,27 @@ other Kotlin grammar may enter the dependency tree: they all export `tree_sitter
   `Resource`, `Role`, `declared`, `gateway_path`); `parse` and `error_at`, the errors naming
   the file, the line and the dotted key (`line_of`); `identity_problem` and `entry_problems`
   (an identity listed twice); `validate`, a workspace text's entries or its problems as the CLI
-  prints them (a text holding only `[[repository]]` entries). `validate_import(file, src)`
+  prints them (a text holding only `[[repository]]` entries). `EntryFile::owner` is an entry's
+  optional `owner` (ADR 0015), checked where the entry is read (`owner_problem`: one string, not
+  empty, at most `OWNER_MAX` characters, no control character, no whitespace at either end;
+  compared exactly), so the browser's validation, every import, every pull and every read of a
+  stored version check it alike; nothing reads it to decide a write yet (#323 and #324 will).
+  `validate_import(file, src)`
   validates entries while ignoring other top-level keys, with CLI import's file prefix on
   identity errors; CLI, HTTP and WASM import validation share it, preserving empty workspaces and ignored
   bootstrap sections.
 - `meada-core/src/ids.rs`: `bundle_id`, `generation_id` (ADR 0012), `workspace_version_id`
-  (ADR 0014: the canonical JSON of the entries, `{"blocks","path","repo"}` in manifest order),
-  `is_id`, `fence`, `entry_blocks`.
+  (ADR 0014: the canonical JSON of the entries, `{"blocks","path","repo"}` in manifest order, with
+  `"owner"` between `blocks` and `path` only when the entry has one, so an ownerless entry keeps
+  its text and its version id), `is_id`, `fence`, `entry_blocks` (every key of an entry but
+  `repo`, `path` and `owner`; the owner is no block, so no bundle id reads it).
 - `meada-core/src/workspace.rs`: `diff(file, before, after)` validates through `validate_import`
   and lists added/removed/changed identities and changed dotted keys in manifest order. Array
   tables retain each field's row position and absence; common entries reordered relative to
   one another report the `repository` array key. Formatting is ignored. `entries_text` is the
-  pure JSON-repositories-to-TOML conversion shared with `snapshot::versions` and WASM.
+  pure JSON-repositories-to-TOML conversion shared with `snapshot::versions` and WASM; it prints
+  an entry's `owner` right after its `path`, before the block tables, so the text reads back to
+  the same id.
 - `meada-core/src/msg.rs`: the messages of those checks and the language flag the binary's
   `msg.rs` reads too; `meada-core/src/http.rs`: `normalize_path` and `PARAM`, which the HTTP
   kind re-exports. `qualify` and `parent` (dotted names) live in its `lib.rs`.
@@ -617,9 +626,11 @@ one for the area a change touches.
   versions: the `[[repository]]` entries of a workspace as immutable documents in the store, at
   `workspaces/<version id>.json` under `[snapshot] prefix` (`Version`: `id`, `author`, `time`
   in RFC 3339 UTC, `message`, and `repositories` in manifest order, each entry its `repo` and
-  `path` as written plus its blocks as `entry_blocks` gives them), stored with the size and
-  hash metadata every object carries and never rewritten. The id is
-  `meada_core::ids::workspace_version_id` of the entries alone. The current version is
+  `path` as written, its `owner` when it has one, plus its blocks as `entry_blocks` gives
+  them), stored with the size and hash metadata every object carries and never rewritten. The
+  id is `meada_core::ids::workspace_version_id` of the entries alone, owners included.
+  `meada index`, `status`, `export` and `snapshot publish` ignore the owner of a pulled version,
+  and a generation document's entry blocks holding an `owner` are refused (`snapshot/pull.rs`). The current version is
   `{<key_prefix>}:workspace`, a hash `{id, fence}` under the pointer's hash tag (`pointer_key`,
   read by `current`, moved by `meada workspace apply`, #302). `import` (`meada workspace import
   <file> --message <text> [--author <name>] --workspace <bootstrap manifest>`) reads the file's
@@ -748,7 +759,10 @@ one for the area a change touches.
   `snapshot/versions.rs`). `source = "store"` without `generation-pointer` is an error naming
   the feature (`Msg::WorkspaceStoreNeedsFeature`), without `[snapshot]` or `[generations]` one
   naming them (`modules::needs`), and beside a `[[repository]]` one naming both
-  (`Msg::WorkspaceStoreBeside`); `Manifest::store` records it, with no entries from `read`.
+  (`Msg::WorkspaceStoreBeside`); `Manifest::store` records it, with no entries from `read`. An
+  `owner` in the bootstrap manifest's own `[[repository]]` entries (`source = "file"`) is an
+  error naming the file, the line, `repository.owner` and `source = "store"`
+  (`Msg::WorkspaceOwnerStatic`); `meada workspace import` reads the same entries with it allowed.
   `Manifest::read_listed`, which `index`, `status`, `export` without `--generations` and
   `snapshot publish` call, reads the entries of the version `meada workspace pull` left under
   `<index_dir>/workspace/` (`versions::pulled`, from disk, once per read, `Manifest::version`
@@ -2107,9 +2121,11 @@ one for the area a change touches.
   binary's (both crates are default members): `ids.rs`, the bundle and generation ids against
   their canonical texts (the cases the `snapshot` module held), `is_id`, `fence`,
   `entry_blocks`, and the workspace version id (its canonical text, the same for the same
-  entries however written, changed by a swap, a path or a block); `manifest.rs`, `validate`
-  (the entries in order, text errors with file, line and dotted key, every unservable identity
-  named); `export.rs`, every `*.export.json` golden read with `export::parse` and written
+  entries however written, changed by a swap, a path, a block or an owner, an entry without one
+  keeping its ownerless text, two owners differing in case giving two ids); `manifest.rs`,
+  `validate` (the entries in order, text errors with file, line and dotted key, every
+  unservable identity named, each `owner` error and the names it accepts); `workspace.rs`,
+  `diff` and `entries_text` (the owner printed after the path); `export.rs`, every `*.export.json` golden read with `export::parse` and written
   again byte for byte, and `parse` refusing a missing field or one of the wrong type, naming it.
   The binary's manifest errors stay in `tests/it/manifest.rs`.
 - The integration tests are one binary, `tests/it/main.rs`, so `cargo test` links it once: a
@@ -2188,6 +2204,9 @@ one for the area a change touches.
 
 ## Known ceilings
 
+- `meada-core/src/manifest.rs`: an entry's `owner` holds at most `OWNER_MAX` (256) characters
+  (ADR 0015); a longer name is an error naming its line and key, wherever the entry is read
+  (import, a stored version, a pull, the browser).
 - `resolve.rs` (`Resolver::may_declare`, ADR 0019): a base among a pack's known outside members is
   matched by its spelling, so a same-named type of a wildcard-imported outside package that
   declares an overload of the called name may give a wrong `exact`; a Swift entry is compared

@@ -99,3 +99,41 @@ fn a_manifest_s_entries_are_validated_alone() {
         ["local/x: a local identity: server mode serves repositories by their remote"]
     );
 }
+
+const OWNED: &str = "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n";
+
+/// Each `owner` error names the line and the dotted key; the accepted names are compared as
+/// they are written. (The pt-BR texts are the CLI's `cli` cases: the language is process-wide.)
+#[test]
+fn an_owner_is_one_string_of_a_group_name_and_each_error_names_its_line_and_key() {
+    let long = "g".repeat(257);
+    for (value, error) in [
+        ("1".to_string(), "must be one string, the name of one group"),
+        (
+            "[\"a\", \"b\"]".into(),
+            "must be one string, the name of one group",
+        ),
+        ("\"\"".into(), "is empty"),
+        (format!("\"{long}\""), "is longer than 256 characters"),
+        ("\"te\\u0007am\"".into(), "holds a control character"),
+        ("\" team\"".into(), "has whitespace at either end"),
+        ("\"team \"".into(), "has whitespace at either end"),
+    ] {
+        let src = format!("{OWNED}owner = {value}\n");
+        assert_eq!(
+            problems(&src),
+            [format!("{FILE}:4: `repository.owner`: {error}")],
+            "{value}"
+        );
+    }
+    for owner in [
+        "g".repeat(256),
+        "g".to_string(),
+        "Equipe de Cobrança, São Paulo".to_string(),
+        "a b,c".to_string(),
+    ] {
+        let entries = validate(FILE, &format!("{OWNED}owner = \"{owner}\"\n")).unwrap();
+        assert_eq!(entries[0].owner.as_deref(), Some(owner.as_str()));
+    }
+    assert_eq!(validate(FILE, OWNED).unwrap()[0].owner, None);
+}

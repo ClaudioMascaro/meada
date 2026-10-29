@@ -8,6 +8,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- An entry of a workspace version may name the team that answers for its repository with
+  `owner = "<OIDC group>"` (ADR 0015): one string of 1 to 256 characters, no control character, no
+  whitespace at either end, compared exactly. It is imported, stored, shown (right after `path`)
+  and pulled like the entry's other keys, and changes the version id; an entry without it keeps
+  its id, and generation and bundle ids never read it. `meada index` ignores it. In a bootstrap
+  manifest's own `[[repository]]` entries it is an error naming `source = "store"`.
+- ADR 0020 and the glossary record the direction of spec S5: a named query context over shared
+  indexing and publication.
 - `meada status` ends a repository's lines with a pointer to the new `inference` issue form when the
   repository holds a shape drift or an `inferred` link, so a wrong conclusion can be reported.
   The MCP tools never print it.
