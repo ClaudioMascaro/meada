@@ -19,8 +19,8 @@ All notable changes to Meada are recorded here. The format follows
   and `oidc`), the job's role check at every refresh: for each identity of the workspace on
   `[oidc.github] host` it lists `GET /repos/{owner}/{repo}/collaborators?affiliation=all&per_page=100`,
   every page, through the installation ADR 0013's selection picks, and replaces the permissions
-  set in Postgres in one transaction (its rows, every collaborator listed with its `role_name`,
-  and its exclusions), refused when a set with a higher `MEADA_REFRESH_FENCE` exists. With
+  set in Postgres in one transaction (what GitHub showed of each repository, its rows, every
+  collaborator listed with its `role_name`, and its exclusions with their reason), refused when a set with a higher `MEADA_REFRESH_FENCE` exists. With
   `source = "store"`, every addition whose `added_by` holds no accepted role is left out:
   written to `<index_dir>/workspace/excluded`, and `meada index`, `status`, `export` and
   `snapshot publish` treat it as absent from the workspace, refusing to run, naming the role

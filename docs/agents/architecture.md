@@ -761,9 +761,13 @@ one for the area a change touches.
   and no rows; an identity on the host that is not `<host>/<owner>/<repo>` likewise); one
   transaction under `LOCK TABLE permission_sets IN EXCLUSIVE MODE`, which serializes writers and
   lets readers see the old set or the new one, checking the fence again, inserting the set, its
-  rows (`unnest` of three arrays) and its exclusions and deleting every older set; then, under
-  `<index_dir>/workspace/excluded.lock`, the file written by rename (`versions::write_excluded`)
-  only while the set still exists, else `Msg::RolesReplaced`. Postgres and the file are never
+  repositories' coverage (`Shown`: `listed`, `not_found`, `uncovered`, plus `not_a_repository`),
+  its rows (`unnest` of three arrays) and its exclusions with their reason (`no_role`,
+  `role_not_accepted`) and deleting every older set, all under
+  `<index_dir>/workspace/excluded.lock` (`versions::lock_excluded`; the file is removed again
+  once the fence passes, a refused run leaving it as it is), held until the file is written by rename (`versions::write_excluded`) only while
+  the set still exists, else `Msg::RolesReplaced`: on one machine a file is always that of the
+  last run to commit. Postgres and the file are never
   written atomically together: a run that fails anywhere after the removal leaves no file, so no
   reader admits a previous check's exclusions for the same version, and the local recovery is
   to run the role check again. `collaborators` lists one repository with its token: the URL is
@@ -2739,7 +2743,9 @@ qualification budget does (ADR 0017).
   metadata document at most `METADATA_MAX` (64 KiB) and a JWKS at most `JWKS_MAX` (256 KiB);
   past any of them the request fails (at start, the start is refused; on a refresh, the cached
   keys stay). An identity whose path starts with `.well-known/oauth-protected-resource` is
-  unreachable with `[oidc]`, since that path serves the metadata. The `scope` claim is read as a
+  unreachable with `[oidc]`, since that path serves the metadata. A role name of
+  `[oidc.github] roles`, and a `role_name` the role check stores, holds at most `ROLE_MAX` (100)
+  characters; a longer `role_name` from GitHub is a skipped row. The `scope` claim is read as a
   space-separated string; `scp` and arrays are not read. With `audience` unset, the root's 404
   takes a token whose `aud` is `public_url` itself. The caps are inclusive: a body of exactly
   the cap is read. The `oidc` build carries `rsa`, whose RUSTSEC-2023-0071 (Marvin timing) hits

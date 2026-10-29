@@ -1030,14 +1030,7 @@ fn checked_entries(
     #[cfg(feature = "generation-pointer")]
     if read.store {
         let dir = read.index_dir.join(crate::snapshot::versions::DIR);
-        let not_pulled = || {
-            let (manifest, dir) = (manifest.display().to_string(), dir.display().to_string());
-            Msg::WorkspaceNotPulled {
-                manifest: &manifest,
-                dir: &dir,
-            }
-            .text()
-        };
+        let not_pulled = || crate::snapshot::versions::not_pulled(manifest, &dir);
         let (id, entries, _) = crate::snapshot::versions::pulled(&dir)?.ok_or_else(not_pulled)?;
         let entries = entries.into_iter().map(|e| (e.repo, e.added_by));
         return Ok((Some(id), entries.collect()));
@@ -1138,13 +1131,15 @@ struct Check<'a> {
 
 /// The role check, in this order. Postgres is reached and the fence checked before anything
 /// changes. The exclusions file is removed, so no reader admits the previous check's exclusions
-/// once this one has started, whatever it ends in. Every identity is listed. One transaction,
-/// under a lock on the sets that serializes writers, checks the fence again, inserts the set, its
-/// rows and its exclusions and deletes every older set. Then, under `excluded.lock`, the file is
-/// written by rename only while the set is still the newest. Postgres and the file are never
-/// written atomically together: a run that fails after its commit leaves the set and no file,
-/// and the readers refuse until a run succeeds (the local recovery is to run `meada github-app
-/// roles` again). The line it prints on success.
+/// once this one has started, whatever it ends in. Every identity is listed. Then, holding
+/// `excluded.lock` from here to the end, one transaction, under a lock on the sets that serializes
+/// writers, checks the fence again (a refused run leaves the file as it is), removes the file
+/// again (another run on this machine may have written it meanwhile), inserts the set, its
+/// repositories' coverage, its rows and its exclusions and deletes every older set; the file is written by rename only while the set is
+/// still the newest. Postgres and the file are never written atomically together: a run that
+/// fails after its commit leaves the set and no file, so the readers refuse until a run succeeds
+/// (the local recovery is to run `meada github-app roles` again), and a file on disk is always
+/// that of the last run on this machine to commit. The line it prints on success.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 async fn check(check: Check<'_>) -> Result<String, String> {
     use std::collections::BTreeMap;
@@ -1175,47 +1170,45 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     let _ = &dir;
     #[cfg(feature = "generation-pointer")]
     if let Some(dir) = &dir {
-        let file = dir.join(crate::snapshot::versions::EXCLUDED);
-        match std::fs::remove_file(&file) {
-            Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
-                return Err(format!("{}: {e}", file.display()));
-            }
-            _ => {}
-        }
+        crate::snapshot::versions::remove_excluded(dir)?;
     }
 
     // Every identity on the host, listed; rows keyed by identity and login, the first kept.
     let mut run = Run::open(valkey).await?;
     let mut rows: BTreeMap<(String, String), String> = BTreeMap::new();
-    let mut repositories = 0;
+    // Per identity on the host, what GitHub showed of it: the App and repository coverage.
+    let mut coverage: Vec<(&str, &str)> = Vec::new();
     let prefix = format!("{}/", github.host);
-    let mut every = async || {
+    let mut list_all = async || {
         for (identity, _) in &entries {
             let Some(rest) = identity.strip_prefix(&prefix) else {
                 continue;
             };
             let Some((owner, repo)) = repository(rest).filter(|_| !rest.ends_with(".git")) else {
                 run.notes.push(Msg::RolesNotRepository(identity).text());
+                coverage.push((identity, "not_a_repository"));
                 continue;
             };
-            let listed = listed(&mut run, apps, &github.host, identity, &owner, &repo).await;
-            let Some(listed) = listed? else {
+            let shown = listed(&mut run, apps, &github.host, identity, &owner, &repo).await?;
+            let Shown::Listed(found) = shown else {
+                coverage.push((identity, shown.coverage()));
                 continue;
             };
-            repositories += 1;
-            for (login, role) in listed {
+            coverage.push((identity, "listed"));
+            for (login, role) in found {
                 rows.entry((identity.clone(), login)).or_insert(role);
             }
         }
         Ok::<_, String>(())
     };
-    let listing = every().await;
+    let listing = list_all().await;
     notes.append(&mut run.notes);
     listing?;
 
     // The additions whose `added_by` holds no accepted role on their repository, with
     // `source = "store"` only (a file's entries have no `added_by`).
-    let mut excluded = BTreeMap::new();
+    let repositories = coverage.iter().filter(|(_, c)| *c == "listed").count();
+    let mut excluded: BTreeMap<&str, (&str, &str)> = BTreeMap::new();
     for (identity, added_by) in &entries {
         let Some(login) = added_by.as_ref().filter(|_| identity.starts_with(&prefix)) else {
             continue;
@@ -1226,21 +1219,37 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         }
         let listed = role.is_some();
         notes.push(Msg::RolesExcluded { identity, listed }.text());
-        excluded.insert(identity.clone(), login.clone());
+        let reason = if listed {
+            "role_not_accepted"
+        } else {
+            "no_role"
+        };
+        excluded.insert(identity, (login, reason));
     }
 
+    // Held to the end: this machine's runs commit and publish their file one at a time.
+    #[cfg(feature = "generation-pointer")]
+    let _local = match &dir {
+        Some(dir) => Some(crate::snapshot::versions::lock_excluded(dir)?),
+        None => None,
+    };
     let tx = client.transaction().await.map_err(&scrub)?;
     let lock = format!("LOCK TABLE {q}.permission_sets IN EXCLUSIVE MODE");
     tx.batch_execute(&lock).await.map_err(&scrub)?;
     let max = format!("SELECT max(fence) FROM {q}.permission_sets");
     held_fence(tx.query_one(&max, &[]).await.map_err(&scrub)?.get(0))?;
+    // Past the fence, under the local lock: a file another run here wrote meanwhile goes.
+    #[cfg(feature = "generation-pointer")]
+    if let Some(dir) = &dir {
+        crate::snapshot::versions::remove_excluded(dir)?;
+    }
     let insert = format!(
         "INSERT INTO {q}.permission_sets (fence, version, started, repositories) \
          VALUES ($1, $2, $3::text::timestamptz, $4) RETURNING id"
     );
-    let (fence, listed) = (fence as i64, repositories as i32);
+    let (fence, count) = (fence as i64, repositories as i32);
     let params: [&(dyn tokio_postgres::types::ToSql + Sync); 4] =
-        [&fence, &version, &started, &listed];
+        [&fence, &version, &started, &count];
     let id: String = tx.query_one(&insert, &params).await.map_err(&scrub)?.get(0);
     let (mut identities, mut logins, mut roles) = (Vec::new(), Vec::new(), Vec::new());
     for ((identity, login), role) in &rows {
@@ -1255,14 +1264,21 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     let params: [&(dyn tokio_postgres::types::ToSql + Sync); 4] =
         [&id, &identities, &logins, &roles];
     tx.execute(&insert, &params).await.map_err(&scrub)?;
-    let (identities, logins): (Vec<&str>, Vec<&str>) = (excluded.iter())
-        .map(|(i, l)| (i.as_str(), l.as_str()))
-        .unzip();
+    let (identities, shown): (Vec<&str>, Vec<&str>) = coverage.iter().copied().unzip();
     let insert = format!(
-        "INSERT INTO {q}.permission_exclusions (set_id, identity, added_by) \
-         SELECT $1, i, a FROM unnest($2::text[], $3::text[]) AS t (i, a)"
+        "INSERT INTO {q}.permission_repositories (set_id, identity, coverage) \
+         SELECT $1, i, c FROM unnest($2::text[], $3::text[]) AS t (i, c)"
     );
-    let params: [&(dyn tokio_postgres::types::ToSql + Sync); 3] = [&id, &identities, &logins];
+    let params: [&(dyn tokio_postgres::types::ToSql + Sync); 3] = [&id, &identities, &shown];
+    tx.execute(&insert, &params).await.map_err(&scrub)?;
+    let identities: Vec<&str> = excluded.keys().copied().collect();
+    let (logins, reasons): (Vec<&str>, Vec<&str>) = excluded.values().copied().unzip();
+    let insert = format!(
+        "INSERT INTO {q}.permission_exclusions (set_id, identity, added_by, reason) \
+         SELECT $1, i, a, r FROM unnest($2::text[], $3::text[], $4::text[]) AS t (i, a, r)"
+    );
+    let params: [&(dyn tokio_postgres::types::ToSql + Sync); 4] =
+        [&id, &identities, &logins, &reasons];
     tx.execute(&insert, &params).await.map_err(&scrub)?;
     let older = format!("DELETE FROM {q}.permission_sets WHERE id <> $1");
     tx.execute(&older, &[&id]).await.map_err(&scrub)?;
@@ -1270,16 +1286,6 @@ async fn check(check: Check<'_>) -> Result<String, String> {
 
     #[cfg(feature = "generation-pointer")]
     if let (Some(dir), Some(version)) = (&dir, &version) {
-        let at = |path: &Path| {
-            let shown = path.display().to_string();
-            move |e: std::io::Error| format!("{shown}: {e}")
-        };
-        let path = dir.join(format!("{}.lock", crate::snapshot::versions::EXCLUDED));
-        let lock = (std::fs::File::options().read(true).write(true).create(true))
-            .truncate(false)
-            .open(&path)
-            .map_err(at(&path))?;
-        lock.lock().map_err(at(&path))?;
         let newest = format!("SELECT EXISTS (SELECT 1 FROM {q}.permission_sets WHERE id = $1)");
         let newest: bool = client
             .query_one(&newest, &[&id])
@@ -1289,7 +1295,7 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         if !newest {
             return Err(Msg::RolesReplaced.text());
         }
-        let identities: std::collections::BTreeSet<String> = excluded.keys().cloned().collect();
+        let identities = excluded.keys().map(|i| i.to_string()).collect();
         crate::snapshot::versions::write_excluded(dir, version, &identities)?;
     }
     Ok(Msg::RolesSet {
@@ -1301,10 +1307,32 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     .text())
 }
 
+/// What GitHub showed of one repository.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+enum Shown {
+    Listed(Vec<Row>),
+    /// A 404.
+    NotFound,
+    /// No installation covers the owner.
+    Uncovered,
+}
+
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+impl Shown {
+    /// The coverage the set records for it.
+    fn coverage(&self) -> &'static str {
+        match self {
+            Shown::Listed(_) => "listed",
+            Shown::NotFound => "not_found",
+            Shown::Uncovered => "uncovered",
+        }
+    }
+}
+
 /// The collaborators of `identity` (`owner/repo` on `host`) and their roles, through the
 /// installations covering the owner in `Run::rotation`'s order: a 403 or 429 marks the
-/// installation throttled and passes to the next. `None`, with a stderr line, when no
-/// installation covers the owner or GitHub answers 404. Every other failure, every installation
+/// installation throttled and passes to the next. `Shown::Uncovered` or `Shown::NotFound`, with a
+/// stderr line, when no installation covers the owner or GitHub answers 404. Every other failure, every installation
 /// throttled included, is the line that fails the run.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 async fn listed(
@@ -1314,7 +1342,7 @@ async fn listed(
     identity: &str,
     owner: &str,
     repo: &str,
-) -> Result<Option<Vec<Row>>, String> {
+) -> Result<Shown, String> {
     let failed = |why: &str| Msg::RolesFailed { identity, why }.text();
     let (open, throttled) = run
         .rotation(apps, host, owner)
@@ -1322,7 +1350,7 @@ async fn listed(
         .map_err(|e| failed(&e))?;
     if open.is_empty() {
         run.notes.push(Msg::RolesUncovered(identity).text());
-        return Ok(None);
+        return Ok(Shown::Uncovered);
     }
     if throttled {
         return Err(failed(&Msg::RolesThrottled(None).text()));
@@ -1338,11 +1366,11 @@ async fn listed(
                 for _ in 0..skipped {
                     run.notes.push(Msg::RolesSkipped(identity).text());
                 }
-                return Ok(Some(rows));
+                return Ok(Shown::Listed(rows));
             }
             Ok(None) => {
                 run.notes.push(Msg::RolesNotFound(identity).text());
-                return Ok(None);
+                return Ok(Shown::NotFound);
             }
             Err(Failure::Throttled(status, wait)) => {
                 let key = run.installation_key(host, at.id, "throttled");

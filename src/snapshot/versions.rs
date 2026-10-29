@@ -849,6 +849,38 @@ pub fn excluded(dir: &Path, version: &str) -> Result<BTreeSet<String>, String> {
         .collect()
 }
 
+/// The refusal of a reader of `manifest` with no version pulled into `dir`, naming the pull.
+pub(crate) fn not_pulled(manifest: &Path, dir: &Path) -> String {
+    let (manifest, dir) = (manifest.display().to_string(), dir.display().to_string());
+    Msg::WorkspaceNotPulled {
+        manifest: &manifest,
+        dir: &dir,
+    }
+    .text()
+}
+
+/// Removes the exclusions file of `dir`, if there is one.
+pub fn remove_excluded(dir: &Path) -> Result<(), String> {
+    let file = dir.join(EXCLUDED);
+    match fs::remove_file(&file) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(pull::io_at(&file)(e)),
+        _ => Ok(()),
+    }
+}
+
+/// `<dir>/excluded.lock`, taken (waiting for another run's): what a role check holds from before
+/// its commit until it has written the file.
+pub fn lock_excluded(dir: &Path) -> Result<File, String> {
+    let path = dir.join(format!("{EXCLUDED}.lock"));
+    let at = pull::io_at(&path);
+    let lock = (File::options().read(true).write(true).create(true))
+        .truncate(false)
+        .open(&path)
+        .map_err(&at)?;
+    lock.lock().map_err(&at)?;
+    Ok(lock)
+}
+
 /// Writes the exclusions file of `dir` by rename: `version`, then `identities` in order.
 pub fn write_excluded(
     dir: &Path,
@@ -879,13 +911,5 @@ pub fn show_pulled(manifest: &Path) -> crate::Result<String> {
         true => eligible(&dir)?,
         false => pulled(&dir)?,
     };
-    let not_pulled = || {
-        let (manifest, dir) = (manifest.display().to_string(), dir.display().to_string());
-        Msg::WorkspaceNotPulled {
-            manifest: &manifest,
-            dir: &dir,
-        }
-        .text()
-    };
-    Ok(found.ok_or_else(not_pulled)?.2)
+    Ok(found.ok_or_else(|| not_pulled(manifest, &dir))?.2)
 }

@@ -19,7 +19,7 @@ type = "generic"                                # por defecto; "entra", "okta" o
 issuer = "https://id.ejemplo.internal/realms/agentes"
 public_url = "https://meada.ejemplo.internal"   # la URL que usan los clientes, detrás del proxy
 audience = "https://meada.ejemplo.internal"     # opcional; por defecto: la URL canónica del endpoint
-identities_claim = "meada_repositories"          # opcional con groups_claim
+identities_claim = "meada_repositories"          # opcional con groups_claim o [oidc.github]
 groups_claim = "groups"                          # opcional, junto con [oidc.groups]
 scopes = ["meada:read"]                          # opcional, anunciado y exigido
 jwks_refresh_seconds = 3600                      # por defecto; como mínimo 60
@@ -33,7 +33,10 @@ jwks_refresh_seconds = 3600                      # por defecto; como mínimo 60
 `okta` o `keycloak`. Ninguno cambia la admisión, el grant ni una respuesta; el tipo aparece en la
 página de admisión de la consola. Solo `entra` tiene una tabla propia, `[oidc.entra]`, con una
 clave, `overage`, que por ahora acepta solo `"ignore"` (el predeterminado): un token en overage,
-sin `groups`, no tiene grupos. `[oidc.entra]` con otro `type` es un error.
+sin `groups`, no tiene grupos. `[oidc.entra]` con otro `type` es un error. `[oidc.github]`, el
+proveedor de grant de GitHub, tiene su propia sección en
+[Credenciales de GitHub App](github-app.md#verificacion-de-roles); con él ninguna de las dos
+claims es obligatoria, y por ahora no añade nada al grant.
 
 ## Preparar el proveedor de identidad
 

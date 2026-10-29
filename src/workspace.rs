@@ -415,19 +415,12 @@ impl Manifest {
         #[cfg(feature = "generation-pointer")]
         if store && pulled {
             let dir = index_dir.join(crate::snapshot::versions::DIR);
-            let not_pulled = || {
-                let (manifest, dir) = (file.display().to_string(), dir.display().to_string());
-                Msg::WorkspaceNotPulled {
-                    manifest: &manifest,
-                    dir: &dir,
-                }
-                .text()
-            };
             // Under `[oidc.github]` without the additions the role check left out (#331).
             let read = match github {
                 true => crate::snapshot::versions::eligible(&dir)?,
                 false => crate::snapshot::versions::pulled(&dir)?,
             };
+            let not_pulled = || crate::snapshot::versions::not_pulled(file, &dir);
             let (id, repositories, text) = read.ok_or_else(not_pulled)?;
             parsed.repositories = repositories;
             entries_src = text;

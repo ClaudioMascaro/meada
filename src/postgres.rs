@@ -126,8 +126,10 @@ const MIGRATIONS: &[&str] = &[
        )
      );",
     // 5: the permissions set (#331), one kept: `meada github-app roles` replaces it in one
-    // transaction, its rows every collaborator GitHub listed and its exclusions the additions
-    // left out; times from Postgres's clock.
+    // transaction, its repositories what GitHub showed of each identity on the host (`listed`,
+    // `not_found`, `uncovered`, `not_a_repository`), its rows every collaborator GitHub listed,
+    // and its exclusions the additions left out (`no_role`, `role_not_accepted`); times from
+    // Postgres's clock.
     "CREATE TABLE {schema}.permission_sets (
        id text PRIMARY KEY DEFAULT replace(gen_random_uuid()::text, '-', ''),
        fence bigint NOT NULL,
@@ -144,10 +146,17 @@ const MIGRATIONS: &[&str] = &[
        PRIMARY KEY (set_id, identity, login)
      );
      CREATE INDEX ON {schema}.permission_rows (set_id, login);
+     CREATE TABLE {schema}.permission_repositories (
+       set_id text NOT NULL REFERENCES {schema}.permission_sets (id) ON DELETE CASCADE,
+       identity text NOT NULL,
+       coverage text NOT NULL,
+       PRIMARY KEY (set_id, identity)
+     );
      CREATE TABLE {schema}.permission_exclusions (
        set_id text NOT NULL REFERENCES {schema}.permission_sets (id) ON DELETE CASCADE,
        identity text NOT NULL,
        added_by text NOT NULL,
+       reason text NOT NULL,
        PRIMARY KEY (set_id, identity)
      );",
 ];

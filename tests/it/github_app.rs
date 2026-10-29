@@ -66,6 +66,8 @@ struct State {
     listing_throttled: HashMap<u64, (u16, Option<u64>)>,
     /// The status every listing answers, when set (a 5xx).
     listing_status: Option<u16>,
+    /// Every listing answers a body of this many bytes, when set.
+    listing_bytes: Option<usize>,
     /// The `Link` header every listing page answers instead of the fake's own `next`.
     link: Option<String>,
     /// Every listing request: the installation whose token it carried, and its path and query.
@@ -273,6 +275,9 @@ fn collaborators(
     }
     if let Some(status) = state.listing_status {
         return (status, String::new(), String::new());
+    }
+    if let Some(bytes) = state.listing_bytes {
+        return (200, String::new(), format!("[{}]", " ".repeat(bytes - 2)));
     }
     let mut names: Vec<&String> = state.collaborators.keys().collect();
     names.sort();

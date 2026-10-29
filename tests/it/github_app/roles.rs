@@ -764,6 +764,7 @@ fn the_role_check_refuses_a_schema_version_it_does_not_know() {
 
 /// A `Link` header the role check refuses fails the run before any further request: another
 /// origin, a user in it, another repository, a page listed already. The token goes nowhere else.
+/// An answer past the size cap fails the run too.
 #[test]
 fn a_hostile_pagination_link_fails_the_run_and_is_never_followed() {
     let Some(case) = Case::new("roles_links", &[1]) else {
@@ -813,6 +814,21 @@ fn a_hostile_pagination_link_fails_the_run_and_is_never_followed() {
     foreign.set_nonblocking(true).unwrap();
     let accepted = foreign.accept().map(drop).map_err(|e| e.kind());
     assert_eq!(accepted, Err(std::io::ErrorKind::WouldBlock));
+    // An answer past the size cap of the module's REST answers (4 MiB) fails the run alike; one
+    // at the cap is read.
+    case.api.with(|s| {
+        s.link = None;
+        s.listing_bytes = Some((4 << 20) + 1);
+    });
+    let (stdout, stderr, code) = case.roles(BOOTSTRAP, None);
+    assert_eq!((stdout.as_str(), code), ("", Some(1)));
+    let failed = format!("meada: {WEB}: the role check failed: ");
+    assert!(
+        stderr.starts_with(&failed) && stderr.ends_with("; nothing was written\n"),
+        "{stderr}"
+    );
+    case.api.with(|s| s.listing_bytes = Some(4 << 20));
+    case.checked(BOOTSTRAP, None, "4 repositories, 0 rows, 0 exclusions");
 }
 
 /// The job's refresh under `meada snapshot lock` (pull, the role check, the fetch list

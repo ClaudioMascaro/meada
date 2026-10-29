@@ -102,7 +102,8 @@ const OVERAGES: [&str; 1] = ["ignore"];
 /// `[oidc.github] roles` by default: GitHub's five built-in repository roles, as `role_name`
 /// spells them.
 const ROLES: [&str; 5] = ["read", "triage", "write", "maintain", "admin"];
-/// The longest role name `[oidc.github] roles` takes, in characters.
+// ponytail: the longest role name `[oidc.github] roles` takes, in characters, and the longest
+// `role_name` from GitHub the role check stores; a longer one is refused (a skipped row).
 const ROLE_MAX: usize = 100;
 /// The shortest `[oidc.github] max_age_seconds`.
 const MAX_AGE_MIN: i64 = 60;

@@ -191,6 +191,21 @@ check and the CLI twins that write connect to it; nodes only read it; `meada ind
 connects (ADR 0016).
 _Avoid_: database, persistence layer, state store
 
+**Permissions set**:
+What the job's role check (`meada github-app roles`) writes to the data layer at every refresh,
+one kept and replaced in one transaction: each GitHub repository of the workspace's coverage
+(listed, not found, uncovered), every collaborator GitHub listed with its role, and the additions
+left out, under the refresh lock's fence so a stalled job cannot replace a newer one (ADR 0016,
+#331).
+_Avoid_: permissions table, role cache, ACL
+
+**Exclusions file**:
+`<index_dir>/workspace/excluded`, which the role check writes beside the pulled version: its
+version id, then the additions whose `added_by` holds no accepted role. Every reader of the
+pulled version treats them as absent from the workspace and refuses without a file of the pulled
+version (#331).
+_Avoid_: blocklist, deny list, skip list
+
 **Audit record**:
 One row of the data layer's audit: who (the subject, its role and a team operator's owners), what
 (the action and its arguments), when (Postgres's clock) and the outcome (`pending`, `accepted`,
