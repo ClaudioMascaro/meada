@@ -181,6 +181,18 @@ github-app roles`, which also needs `postgres`.)
   (Amended 2026-10-22; #319: with `[oidc.github]`, ADR 0016 puts `meada github-app roles`
   between `meada workspace pull` and the fetch, and the publish treats the additions it excluded
   as absent from the workspace; a refresh that stops on `roles` publishes nothing.)
+  (Amended 2026-10-28; #316: a refresh publishes the whole workspace or nothing. A failed
+  `roles`, fetch or index stage stops the job before `meada snapshot publish`, exiting nonzero
+  with a bounded failure that names the stage and the repository and never a URL or a
+  credential: the pointer does not move, nodes keep serving the last complete generation, and
+  objects already stored stay valid while the job's local work is left as it is. No fallback
+  omits a repository or carries its previous bundle into a new generation; recovery is to repair
+  the cause and run a complete refresh. An eligibility exclusion ADR 0016 decides before the
+  fetch is a successful policy decision, not a failure, and a permissions set committed before a
+  later graph failure keeps its own freshness and revocation: a graph failure never restores
+  revoked access. Named workspaces share this rule and add no publication or stale-bundle policy
+  of their own. The compose job's `fetch.sh` names the identity whose fetch failed, and `meada
+  index --workspace` ends a failure with the stage and how many repositories failed.)
 - An id names inputs, not bytes: two pods publishing the same commits build tar files that
   differ (mtimes, SQLite pages) under the same bundle id. So each bundle is uploaded with its
   size and BLAKE3 hash as object metadata, and the generation document records the stored

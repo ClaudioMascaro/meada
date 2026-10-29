@@ -30,6 +30,9 @@ pub enum Msg<'a> {
     OtherVersion,
     Indexed(i64),
     OtherVersionWorkspace,
+    /// The last line of a failed `meada index --workspace`: the stage and how many of its
+    /// repositories, each named on its own line before it, failed (#316).
+    IndexFailed(usize),
     /// `meada_core::msg::Msg::ListedTwice`.
     ListedTwice,
     NoMirror(&'a str),
@@ -837,6 +840,14 @@ impl Msg<'_> {
             Msg::OtherVersionWorkspace => pick(
                 "indexed by another version; rebuilt by meada index --workspace".into(),
                 "indexado por outra versão; reconstruído por meada index --workspace".into(),
+            ),
+            Msg::IndexFailed(1) => pick(
+                "index failed for 1 repository".into(),
+                "a indexação falhou em 1 repositório".into(),
+            ),
+            Msg::IndexFailed(n) => pick(
+                format!("index failed for {n} repositories"),
+                format!("a indexação falhou em {n} repositórios"),
             ),
             Msg::ListedTwice => Core::ListedTwice.text(),
             Msg::NoMirror(path) => pick(

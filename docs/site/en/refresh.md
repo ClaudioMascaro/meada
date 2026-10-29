@@ -1,6 +1,6 @@
 # Refresh and publication
 
-The selected policy is to publish the whole set or publish nothing: any fetch or indexing failure must abort publication and preserve the current generation. Implementation and verification of that guarantee are [planned in #316](https://github.com/ClaudioMascaro/meada/issues/316). Today, operators can chain the job with `sh -ec` to stop on failure; lock and fencing already protect pointer updates. In [planned S4](enterprise.md), eligibility exclusions will be successful decisions before fetch.
+A refresh publishes the whole set or nothing ([#316](https://github.com/ClaudioMascaro/meada/issues/316)): a failed fetch or index stops the job before `meada snapshot publish`, with a nonzero exit, so the pointer does not move and nodes keep serving the last complete generation. Chain the stages so the first failure ends the job (`sh -ec`, or `&&` as below). The compose job does, and its `fetch.sh` names the repository whose fetch failed; `meada index --workspace` names each repository that failed and ends with `index failed for <n> repositories`. Never carry a repository's previous index into a new generation as a fallback: repair the cause and run a complete refresh. Lock and fencing protect pointer updates. In [planned S4](enterprise.md), eligibility exclusions will be successful decisions before fetch.
 
 <!-- meada-graph:refresh -->
 

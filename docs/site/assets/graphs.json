@@ -8,9 +8,9 @@
         "es": "Un refresh, una publicación"
       },
       "summary": {
-        "pt": "Lock e fence estão entregues. O abort de todo o conjunto em falha de fetch/indexação é a política planejada em #316.",
-        "en": "Lock and fencing are delivered. Whole-set abort on fetch/indexing failure is the policy planned in #316.",
-        "es": "Lock y fence están entregados. El abort del conjunto ante fallos de fetch/indexación es la política planeada en #316."
+        "pt": "Lock e fence protegem o ponteiro, e uma falha de fetch ou indexação aborta toda a publicação (#316).",
+        "en": "Lock and fencing protect the pointer, and a fetch or indexing failure aborts the whole publication (#316).",
+        "es": "Lock y fence protegen el puntero, y un fallo de fetch o indexación aborta toda la publicación (#316)."
       },
       "start": "lock",
       "nodes": [
@@ -116,9 +116,9 @@
           },
           "kind": "process",
           "detail": {
-            "pt": "meada index lê os checkouts locais e produz índices sem LLM ou conexão de rede. A política de impedir toda publicação após falha em qualquer repositório está planejada em #316.",
-            "en": "meada index reads local checkouts and produces indexes without an LLM or network connection. Preventing all publication after a failure in any repository is planned in #316.",
-            "es": "meada index lee checkouts locales y produce índices sin LLM ni conexión de red. Impedir toda publicación tras un fallo en cualquier repositorio está planeado en #316."
+            "pt": "meada index lê os checkouts locais e produz índices sem LLM ou conexão de rede. Se um repositório falha, ele nomeia cada um, termina com a etapa e a contagem e sai com código 1, e o job para antes de publicar.",
+            "en": "meada index reads local checkouts and produces indexes without an LLM or network connection. When a repository fails, it names each one, ends with the stage and the count and exits 1, and the job stops before publishing.",
+            "es": "meada index lee checkouts locales y produce índices sin LLM ni conexión de red. Si un repositorio falla, nombra cada uno, termina con la etapa y el recuento y sale con código 1, y el job se detiene antes de publicar."
           },
           "reference": {
             "pt": "#refresh-e-publicacao",
@@ -144,9 +144,9 @@
           },
           "kind": "process",
           "detail": {
-            "pt": "Com refresh_lock, publish confere o token e usa o fence na atualização do ponteiro. Essa proteção entregue evita que um job antigo substitua uma geração mais nova; não substitui a garantia de abort de #316.",
-            "en": "With refresh_lock, publish checks the token and uses the fence when updating the pointer. This delivered protection prevents an old job replacing a newer generation; it does not replace #316’s abort guarantee.",
-            "es": "Con refresh_lock, publish comprueba el token y usa el fence al actualizar el puntero. Esta protección entregada impide que un job antiguo sustituya una generación más nueva; no sustituye la garantía de abort de #316."
+            "pt": "Com refresh_lock, publish confere o token e usa o fence na atualização do ponteiro, então um job antigo não substitui uma geração mais nova. Só um refresh cujas etapas passaram chega aqui: nenhum repositório fica de fora nem leva um bundle anterior.",
+            "en": "With refresh_lock, publish checks the token and uses the fence when updating the pointer, so an old job cannot replace a newer generation. Only a refresh whose stages all passed reaches it: no repository is left out or carries a previous bundle.",
+            "es": "Con refresh_lock, publish comprueba el token y usa el fence al actualizar el puntero, así que un job antiguo no sustituye una generación más nueva. Solo llega aquí un refresh cuyas etapas pasaron: ningún repositorio queda fuera ni lleva un bundle anterior."
           },
           "reference": {
             "pt": "#publicacao-e-recuperacao-do-fence",
@@ -198,11 +198,11 @@
             "x": 900,
             "y": 230
           },
-          "kind": "planned",
+          "kind": "guardrail",
           "detail": {
-            "pt": "A política escolhida é abortar toda a publicação se qualquer fetch ou indexação falhar, mantendo a geração atual. A entrega e verificação dessa garantia pertencem ao ticket aberto #316; hoje, o operador encadeia comandos com sh -ec para parar em uma falha.",
-            "en": "The selected policy is to abort the whole publication if any fetch or indexing step fails, preserving the current generation. Delivery and verification of this guarantee belong to open #316; today the operator chains commands with sh -ec to stop on failure.",
-            "es": "La política elegida es abortar toda la publicación si falla cualquier fetch o indexación y conservar la generación actual. La entrega y verificación de esa garantía pertenecen al ticket abierto #316; hoy el operador encadena comandos con sh -ec para detenerse ante un fallo."
+            "pt": "Uma falha de fetch ou indexação para o job com código diferente de zero, nomeando a etapa e o repositório sem ecoar credenciais. O ponteiro não se move e os nós continuam servindo a última geração completa; a recuperação é corrigir a causa e rodar um refresh completo.",
+            "en": "A fetch or indexing failure stops the job with a nonzero exit, naming the stage and the repository without echoing credentials. The pointer does not move and nodes keep serving the last complete generation; recovery is to repair the cause and run a complete refresh.",
+            "es": "Un fallo de fetch o indexación detiene el job con salida distinta de cero, nombrando la etapa y el repositorio sin mostrar credenciales. El puntero no se mueve y los nodos siguen sirviendo la última generación completa; la recuperación es corregir la causa y ejecutar un refresh completo."
           },
           "reference": {
             "pt": "#publicacao-e-recuperacao-do-fence",
@@ -259,7 +259,7 @@
           "target": "retain",
           "sourceHandle": "right",
           "targetHandle": "top",
-          "kind": "planned",
+          "kind": "failure",
           "label": {
             "pt": "falha",
             "en": "failure",
@@ -272,7 +272,7 @@
           "target": "retain",
           "sourceHandle": "right",
           "targetHandle": "left",
-          "kind": "planned",
+          "kind": "failure",
           "label": {
             "pt": "falha",
             "en": "failure",
