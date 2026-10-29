@@ -8,6 +8,25 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The data layer (ADR 0016): the `postgres` cargo feature, off by default and enabled by `cloud`,
+  and the bootstrap manifest's `[postgres]` section, which needs no other section. It names the
+  connection URL only through `url_env` (default `MEADA_POSTGRES_URL`) or `url_file`, plus
+  `ca_file`, `schema` (default `meada`), `pool_size`, `connect_timeout_seconds` and
+  `statement_timeout_seconds`. The URL is `postgres://` or `postgresql://` with a TCP host and no
+  query parameter (`sslmode` included); an error names the key, never the URL. A host outside
+  loopback always connects over TLS with its name verified, against `ca_file` alone when set,
+  else the system roots; a loopback host connects in plain TCP unless `ca_file` is set. Every
+  table lives in the schema `[postgres]` names. `[postgres]` in a build without the feature is
+  the error naming it. Postgres 15 and later.
+- `meada postgres migrate --workspace <bootstrap manifest>` creates the schema when absent and
+  applies each migration up to the binary's version, each in its own transaction, under an
+  advisory lock keyed by the schema, so two runs serialize; it prints the version reached and
+  never lowers one. It ships migration 1, the schema's version. Every later connection refuses a
+  version the binary does not know: a lower one (an absent schema included) names `meada
+  postgres migrate`, a higher one names both versions.
+- `meada status --workspace` with `[postgres]` prints `postgres: reachable, schema <name>
+  version <n>` or `postgres: unreachable (<reason>)`, a version refusal included, without
+  changing its exit code.
 - An entry of a workspace version may name the team that answers for its repository with
   `owner = "<OIDC group>"` (ADR 0015): one string of 1 to 256 characters, no control character, no
   whitespace at either end, compared exactly. It is imported, stored, shown (right after `path`)

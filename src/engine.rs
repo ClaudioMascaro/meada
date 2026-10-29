@@ -1140,6 +1140,12 @@ fn status_listed(listed: &Manifest, manifest: &Path) -> String {
         .unwrap_or_default();
     #[cfg(not(feature = "valkey"))]
     let valkey = String::new();
+    #[cfg(feature = "postgres")]
+    let postgres = (listed.postgres.as_ref())
+        .map(|config| crate::postgres::status_line(config) + "\n")
+        .unwrap_or_default();
+    #[cfg(not(feature = "postgres"))]
+    let postgres = String::new();
     let ignored: String = (listed.entries.iter())
         .flat_map(|l| l.ignored.iter().map(|block| (block, &l.repo)))
         .map(|(block, repo)| Msg::IgnoredBlock { block, repo }.text() + "\n")
@@ -1174,7 +1180,7 @@ fn status_listed(listed: &Manifest, manifest: &Path) -> String {
         let line = format!("{repo} ({path}) {state}");
         (repo, line)
     });
-    status_lines(heads, report, &missing) + &ignored + &valkey
+    status_lines(heads, report, &missing) + &ignored + &valkey + &postgres
 }
 
 /// `meada index --workspace` (ADR 0011): refreshes every repository the manifest at `manifest`

@@ -200,6 +200,9 @@ pub struct Manifest {
     /// The `[ui]` section, when the build has the module (ADR 0014).
     #[cfg(feature = "ui")]
     pub ui: Option<crate::ui::Config>,
+    /// The `[postgres]` section, when the build has the module (ADR 0016).
+    #[cfg(feature = "postgres")]
+    pub postgres: Option<crate::postgres::Config>,
     /// `[workspace] source = "store"` (ADR 0014): the repositories come from the current
     /// workspace version: `entries` is empty, or with `read_listed` the pulled version's.
     #[cfg(feature = "generation-pointer")]
@@ -247,6 +250,8 @@ struct ManifestFile {
     oidc: Option<crate::oidc::File>,
     #[cfg(feature = "ui")]
     ui: Option<crate::ui::File>,
+    #[cfg(feature = "postgres")]
+    postgres: Option<crate::postgres::File>,
     #[cfg(feature = "github-app")]
     #[serde(default, rename = "github_app")]
     github_apps: Vec<crate::github_app::File>,
@@ -329,6 +334,8 @@ impl Manifest {
         let oidc = modules::validated(file, &src, parsed.oidc, |o| o.validate())?;
         #[cfg(feature = "ui")]
         let ui = crate::ui::validated(file, &src, base, parsed.ui)?;
+        #[cfg(feature = "postgres")]
+        let postgres = modules::validated(file, &src, parsed.postgres, |p| p.validate(base))?;
         // The `[[github_app]]` blocks are checked, `[valkey]` among their needs; only
         // `github_apps` keeps them.
         #[cfg(feature = "github-app")]
@@ -447,6 +454,8 @@ impl Manifest {
             oidc,
             #[cfg(feature = "ui")]
             ui,
+            #[cfg(feature = "postgres")]
+            postgres,
             #[cfg(feature = "generation-pointer")]
             store,
             #[cfg(feature = "generation-pointer")]
@@ -480,6 +489,17 @@ impl Manifest {
         let has_valkey = valkey.is_some();
         let apps = crate::github_app::validated(file, &src, base, parsed.github_apps, has_valkey)?;
         Ok((valkey, apps))
+    }
+
+    /// The `[postgres]` section of the manifest at `file`, checked as `read` checks it, without
+    /// reading any mirror: what `meada postgres migrate` needs.
+    #[cfg(feature = "postgres")]
+    pub(crate) fn postgres(file: &Path) -> Result<Option<crate::postgres::Config>> {
+        let src = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
+        modules::check(file, &src)?;
+        let parsed: ManifestFile = config::parse(file, &src, "meada.workspace.toml")?;
+        let base = file.parent().unwrap_or(Path::new(""));
+        modules::validated(file, &src, parsed.postgres, |p| p.validate(base))
     }
 
     /// The workspace of a pulled generation (`meada snapshot pull`, ADR 0012), which `dir`
@@ -550,6 +570,8 @@ impl Manifest {
             oidc: None,
             #[cfg(feature = "ui")]
             ui: None,
+            #[cfg(feature = "postgres")]
+            postgres: None,
             #[cfg(feature = "generation-pointer")]
             store: false,
             #[cfg(feature = "generation-pointer")]
