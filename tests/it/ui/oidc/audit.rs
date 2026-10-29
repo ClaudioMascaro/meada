@@ -227,10 +227,14 @@ fn every_operator_write_leaves_one_record_read_newest_first() {
         );
     }
 
-    // A row that fails its checks is left out, one stderr line naming the table and no value.
+    // A row that fails its checks (a role, then a login outside its pattern) is left out, one
+    // stderr line naming the table and no value.
     audit.admin.run(&format!(
-        "INSERT INTO \"{}\".audit (via, subject, role, action, arguments, outcome, message) \
-         VALUES ('console', 'mallory-328', 'admin', 'pointer.set', '{{}}', 'accepted', 'x')",
+        "INSERT INTO \"{0}\".audit (via, subject, role, action, arguments, outcome, message) \
+         VALUES ('console', 'mallory-328', 'admin', 'pointer.set', '{{}}', 'accepted', 'x');
+         INSERT INTO \"{0}\".audit (via, subject, login, role, action, arguments, outcome, \
+         message) VALUES ('console', 'mallory-332', 'Mallory.332', 'operator', 'pointer.set', \
+         '{{}}', 'accepted', 'x')",
         audit.schema
     ));
     let page = ask(&console, "/api/v1/audit", &root).json();
@@ -254,10 +258,11 @@ fn every_operator_write_leaves_one_record_read_newest_first() {
             line("workspace save", &saved, &saved),
             line("workspace apply", &saved, &applied),
             line("pointer set", &g2, holder),
+            skipped.clone(),
             skipped,
         ]
     );
-    assert!(!lines.concat().contains("mallory-328"));
+    assert!(!lines.concat().to_lowercase().contains("mallory"));
     let all = format!(
         "{}{}",
         lines.join("\n"),

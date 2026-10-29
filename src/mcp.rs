@@ -656,6 +656,10 @@ fn run(
     routes: impl FnOnce(&StreamableHttpServerConfig) -> Routes,
 ) -> crate::Result<()> {
     serve_http(address, move |_, config| {
+        #[cfg(feature = "oidc")]
+        if let Some(oidc) = &gate.oidc {
+            oidc.listening();
+        }
         let routes = Arc::new(routes(config));
         move |request| {
             let (routes, gate) = (routes.clone(), gate.clone());

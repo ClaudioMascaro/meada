@@ -62,3 +62,27 @@ test.each([200, 400])('the named token-check form clears the pasted token after 
   expect(location.href).not.toContain(pasted);
   expect(fetch).toHaveBeenCalledTimes(2);
 });
+
+test.each(['en', 'pt-BR'] as const)('the admission page shows the permissions set and the token check its sources in %s', async locale => {
+  const t = operationsCopy[locale];
+  history.replaceState(null, '', '/admission');
+  const github = {
+    host: 'github.com', login_claim: 'github_login', roles: ['write'], max_age_seconds: 5400, grant: 'expired',
+    set: { id: 'cd'.repeat(16), finished: '2026-10-29T12:00:00.000000Z', age_seconds: 6000, repositories: 2, rows: 4, exclusions: 0 },
+  };
+  const checks = { signature: true, issuer: true, audience: true, lifetime: true, scopes: true };
+  const fetch = vi.fn()
+    .mockResolvedValueOnce(Response.json({ ...fixtures.admission, github }))
+    .mockResolvedValueOnce(Response.json({ checks, identities: ['e.test/a', 'e.test/b'], sources: { claims: ['e.test/b'], github: ['e.test/a'] } }));
+  vi.stubGlobal('fetch', fetch);
+  const api = new Api(new Auth(config));
+  await act(() => root.render(<OperationalPage kind="admission" api={api} locale={locale} config={config} session={{ ...session, role: 'viewer' }} />));
+  const form = await waitFor(() => getByRole(host, 'form', { name: t.checkToken }));
+  for (const shown of [t.permissionsSet, 'cd'.repeat(16), `${t.setAge}6000 s`, t.github_expired, `${t.setRows}4`]) {
+    expect(host.textContent).toContain(shown);
+  }
+  const input = getByRole(host, 'textbox', { name: t.token }) as HTMLTextAreaElement;
+  await act(() => { fireEvent.input(input, { target: { value: 'a.b.c' } }); fireEvent.submit(form); });
+  await waitFor(() => expect(host.textContent).toContain(`${t.fromGithub}: e.test/a`));
+  expect(host.textContent).toContain(`${t.fromClaims}: e.test/b`);
+});

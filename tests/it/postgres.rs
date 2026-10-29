@@ -500,19 +500,29 @@ fn status_names_whether_postgres_is_reachable_and_its_exit_code_ignores_it() {
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
 }
 
-/// A loopback relay to the test's Postgres that the test closes: a Postgres stopped.
-#[cfg(any(feature = "refresh-lock", feature = "directory"))]
+/// A loopback relay to the test's Postgres that the test closes: a Postgres stopped, and
+/// opened again on the same port: the same Postgres back.
+#[cfg(any(
+    feature = "refresh-lock",
+    feature = "directory",
+    feature = "github-app"
+))]
 pub(crate) struct Relay {
     /// The test's URL with the relay's address.
     pub(crate) url: String,
     open: std::sync::Arc<std::sync::atomic::AtomicBool>,
     port: u16,
+    to: String,
 }
 
-#[cfg(any(feature = "refresh-lock", feature = "directory"))]
+#[cfg(any(
+    feature = "refresh-lock",
+    feature = "directory",
+    feature = "github-app"
+))]
 impl Relay {
     pub(crate) fn new(url: &str) -> Self {
-        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::atomic::AtomicBool;
         let config = tokio_postgres::Config::from_str(url).unwrap();
         let to = match (&config.get_hosts()[0], config.get_ports().first()) {
             (tokio_postgres::config::Host::Tcp(host), port) => {
@@ -523,7 +533,27 @@ impl Relay {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
         let open = std::sync::Arc::new(AtomicBool::new(true));
-        let flag = open.clone();
+        Self::serve(listener, to.clone(), open.clone());
+        let (scheme, rest) = url.split_once("://").unwrap();
+        let (user, rest) = rest.rsplit_once('@').map_or(("", rest), |(u, r)| (u, r));
+        let path = rest.split_once('/').map_or("", |(_, p)| p);
+        let at = if user.is_empty() { "" } else { "@" };
+        let url = format!("{scheme}://{user}{at}127.0.0.1:{port}/{path}");
+        Self {
+            url,
+            open,
+            port,
+            to,
+        }
+    }
+
+    /// Forwards each connection `listener` accepts to `to` until `flag` is cleared.
+    fn serve(
+        listener: TcpListener,
+        to: String,
+        flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) {
+        use std::sync::atomic::Ordering;
         std::thread::spawn(move || {
             for client in listener.incoming().flatten() {
                 // Closed: the listener goes with this thread, so connections are refused.
@@ -544,12 +574,14 @@ impl Relay {
                 }
             }
         });
-        let (scheme, rest) = url.split_once("://").unwrap();
-        let (user, rest) = rest.rsplit_once('@').map_or(("", rest), |(u, r)| (u, r));
-        let path = rest.split_once('/').map_or("", |(_, p)| p);
-        let at = if user.is_empty() { "" } else { "@" };
-        let url = format!("{scheme}://{user}{at}127.0.0.1:{port}/{path}");
-        Self { url, open, port }
+    }
+
+    /// Opens the relay again, on its port, after `close`.
+    #[cfg(feature = "github-app")]
+    pub(crate) fn open(&self) {
+        self.open.store(true, std::sync::atomic::Ordering::SeqCst);
+        let listener = TcpListener::bind(("127.0.0.1", self.port)).unwrap();
+        Self::serve(listener, self.to.clone(), self.open.clone());
     }
 
     /// Stops the relay: every connection after it is refused.

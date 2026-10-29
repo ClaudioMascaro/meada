@@ -1094,6 +1094,8 @@ mod audit;
 mod deprovision;
 #[cfg(feature = "directory")]
 mod directory;
+#[cfg(all(feature = "refresh-lock", feature = "postgres", feature = "github-app"))]
+mod github;
 #[cfg(feature = "refresh-lock")]
 mod team;
 #[cfg(feature = "refresh-lock")]

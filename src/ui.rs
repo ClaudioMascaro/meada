@@ -264,6 +264,11 @@ struct Session {
     /// The token's grant; none behind the proxy, where every identity is read.
     #[cfg(feature = "oidc")]
     grant: Option<crate::oidc::Grant>,
+    /// The token's GitHub login, when `[oidc.github] login_claim` holds a valid one (#332).
+    login: Option<String>,
+    /// With `[oidc.github]`, its host and the GitHub grant's state at admission.
+    #[cfg(feature = "oidc")]
+    github: Option<(String, &'static str)>,
 }
 
 impl Session {
@@ -311,8 +316,9 @@ impl Session {
         }
     }
 
-    /// The `session` answer: the subject and role; with `[oidc]`, `groups` and `grant`, and
-    /// `teams` for a team operator.
+    /// The `session` answer: the subject and role; with `[oidc]`, `groups` and `grant` (the
+    /// union of the grant providers'), and `teams` for a team operator; with `[oidc.github]`,
+    /// `login` when the token has a valid one, `github_host` and `github_grant` (#332).
     fn document(&self) -> Value {
         #[allow(unused_mut)]
         let mut document = json!({"subject": self.subject, "role": self.role()});
@@ -329,6 +335,13 @@ impl Session {
             };
             if self.is_team_operator() {
                 document["teams"] = json!(self.teams);
+            }
+            if let Some((host, state)) = &self.github {
+                if let Some(login) = &self.login {
+                    document["login"] = json!(login);
+                }
+                document["github_host"] = json!(host);
+                document["github_grant"] = json!(state);
             }
         }
         document
@@ -356,6 +369,10 @@ pub fn listen(listen: &str, manifest: &Path) -> Result<()> {
     let address = crate::mcp::address(listen)?;
     let console = Arc::new(Console::start(manifest)?);
     crate::mcp::serve_http(address, move |bound, _| {
+        #[cfg(feature = "oidc")]
+        if let Some(oidc) = &console.oidc {
+            oidc.listening();
+        }
         move |request: Request<Incoming>| {
             let console = console.clone();
             async move {
@@ -783,12 +800,15 @@ impl Console {
                         true => Vec::new(),
                         false => self.teams(&admitted.groups, &admitted.grant),
                     };
+                    let github = oidc.github().map(|(host, state)| (host.to_string(), state));
                     Ok(Session {
                         subject: admitted.subject,
                         grant: Some(admitted.grant),
                         operator: admitted.operator,
                         groups: admitted.groups,
                         teams,
+                        login: admitted.login,
+                        github,
                     })
                 }
                 Err((status, challenge)) => {
@@ -814,6 +834,9 @@ impl Console {
             teams: Vec::new(),
             #[cfg(feature = "oidc")]
             grant: None,
+            login: None,
+            #[cfg(feature = "oidc")]
+            github: None,
         })
     }
 
@@ -968,7 +991,9 @@ impl Console {
     }
 
     /// The token check: each check of the pasted token as a node makes it, against the cached
-    /// keys only, and the identities its grant admits among those served that `session` reads.
+    /// keys only, and the identities its grant admits among those served that `session` reads;
+    /// with `[oidc.github]`, `sources`: those identities by side, the claims grant's (`*` as
+    /// such) and the GitHub grant's from the cache, each sorted, so the check sends no request.
     /// The token lives only for this request.
     #[cfg(feature = "oidc")]
     fn check(self: &Arc<Self>, oidc: &crate::oidc::Oidc, body: &Body, session: &Session) -> Answer {
@@ -999,11 +1024,12 @@ impl Console {
         };
         let served: Vec<&str> = identities.iter().map(String::as_str).collect();
         let checked = oidc.check(&pasted.token, &served);
-        let identities = checked.grant.map(|grant| {
+        let admitted = |reads: &dyn Fn(&str) -> bool| {
             (served.iter())
-                .filter(|i| grant.reads(i) && session.reads(i))
+                .filter(|i| reads(i) && session.reads(i))
                 .collect::<Vec<_>>()
-        });
+        };
+        let identities = (checked.grant).map(|grant| admitted(&|i| grant.reads(i)));
         let checks = json!({
             "signature": checked.signature,
             "issuer": checked.issuer,
@@ -1011,10 +1037,25 @@ impl Console {
             "lifetime": checked.lifetime,
             "scopes": checked.scopes,
         });
-        json_answer(
-            StatusCode::OK,
-            &json!({"checks": checks, "identities": identities}),
-        )
+        let mut answer = json!({"checks": checks, "identities": identities});
+        if oidc.github().is_some() {
+            let sorted = |reads: &dyn Fn(&str) -> bool| {
+                let mut identities = admitted(reads);
+                identities.sort();
+                identities
+            };
+            answer["sources"] = match checked.sources {
+                None => Value::Null,
+                Some((claims, github)) => json!({
+                    "claims": match claims {
+                        crate::oidc::Grant::All => json!("*"),
+                        claims => json!(sorted(&|i| claims.reads(i))),
+                    },
+                    "github": sorted(&|i| github.iter().any(|g| g == i)),
+                }),
+            };
+        }
+        json_answer(StatusCode::OK, &answer)
     }
 
     /// The playground: `{"repository", "generation", "tool", "arguments"}`, the tool `search`,

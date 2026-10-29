@@ -118,3 +118,20 @@ imprime la versión descargada sin las exclusiones, para el script de fetch. El 
 bajo `meada snapshot lock`, queda: `workspace pull`, `github-app roles`, el fetch de lo que
 `show --pulled` lista, `index --workspace` y `snapshot publish`; un refresh que se detiene en la
 verificación no publica nada.
+
+### El grant en la admisión
+
+Los nodos y la consola con `[oidc.github]` leen cada minuto el conjunto de permisos más nuevo, y
+cargan las filas cuyo rol está en `roles` solo cuando el conjunto cambia; la admisión nunca espera
+a Postgres. El login de un token es el valor de `login_claim` cuando es una cadena de 1 a 39
+letras ASCII, dígitos, `-` y `_`, comparado en minúsculas; cualquier otro valor no da grant de
+GitHub. Use una claim que el administrador del proveedor de identidad mapea desde un atributo
+verificado, nunca una que el usuario edita. El grant de GitHub es lo que ese login lee en el
+conjunto mientras su edad (el reloj de Postgres menos `finished`, más el tiempo monotónico del
+proceso desde la lectura) es como mucho `max_age_seconds`; después, con el job detenido o Postgres
+inalcanzable, queda vacío y el grant de las claims sigue valiendo. Nunca vale `*`, y un token de
+máquina con `*` no depende de Postgres. La sesión de la consola muestra `login`, `github_host` y
+`github_grant` (`current`, `expired` o `unread`), la verificación de token separa las identidades
+en `sources` (`claims` y `github`) y la página de admisión muestra el conjunto cargado. Un nodo
+que encuentra una versión de schema que no conoce lo dice una vez en stderr y trata a Postgres
+como inalcanzable.

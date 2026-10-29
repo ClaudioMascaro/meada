@@ -15,6 +15,18 @@ test('configuration and session display the running version, operations and subj
   expect(sessionModel({ subject: null, role: 'viewer' }, copy.en)[0]?.value).toBe('Admitted by the reverse proxy');
 });
 
+test('a session under the GitHub grant provider shows its login and whether the GitHub grant is current', () => {
+  for (const locale of ['en', 'pt-BR'] as const) {
+    const t = copy[locale];
+    const github: Session = { subject: 'ana', role: 'viewer', grant: [], login: 'ana-souza', github_host: 'github.com', github_grant: 'expired' };
+    expect(sessionModel(github, t).slice(2)).toEqual([
+      { label: t.githubLogin, value: 'ana-souza' }, { label: t.githubHost, value: 'github.com' }, { label: t.githubGrant, value: t.github_expired },
+    ]);
+    const { login: _, ...loginless } = github;
+    expect(sessionModel({ ...loginless, github_grant: 'unread' }, t).slice(2).map(field => field.value)).toEqual([t.noLogin, 'github.com', t.github_unread]);
+  }
+});
+
 test('manifest keeps secret references by name, errors with position and key, and names disabled sections', () => {
   const model = manifestModel(manifest, copy.en);
   expect(model.loaded).toContain('MEADA_VALKEY_URL');

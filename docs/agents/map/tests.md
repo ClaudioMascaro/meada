@@ -645,6 +645,46 @@ deactivated-account page. `tests/it/postgres.rs` holds migration 4's columns, an
 role check without `[oidc.github]`, without a `[[github_app]]` block for its host and without
 `MEADA_REFRESH_FENCE` under `[refresh_lock]`, and a reader without the exclusions file).
 
+### The GitHub grant at admission (#332)
+
+`tests/it/oidc/github.rs` runs `meada mcp --listen` over the chain with `[oidc]` (one audience)
+and `[oidc.github]`, its permissions set seeded by `meada github-app roles` against
+`github_app`'s fake (`oidc::github::Github`: the fake with the owners `chain` and `team`, the
+local Valkey and Postgres in a schema and key prefix of each test's own; skipped without them,
+failed with `MEADA_TEST_SERVICES_REQUIRED=1`). `MEADA_PERMISSIONS_POLL_MS`, a debug-build knob
+as `MEADA_DRAIN_MS` is, shortens the 60-second poll to 200 ms and lowers the 60-second floor of
+`max_age_seconds` to one second. The union: a login holding `write` and a custom role of
+`roles` (`Custom Reviewer`) and a claims grant read all three in the root's 404, a trace keeps
+the gateway's link, a role outside `roles` (`triage`) is a 403, the login in another case than
+GitHub's; no login claim, an empty, 40-character, numeric, `ana.souza` or array value reads the
+claims grant only; a machine token's `*` reads everything; a replacing set without a role
+revokes it. The age, through
+`postgres::Relay` (closed, then opened again on its port): the GitHub grant holds past the
+relay's close until the set is `max_age_seconds` old on Postgres's clock, then only the claims
+grant answers, every stderr line one failed poll and their count bounded by the polls; a new set
+after the relay opens restores it. A node never reaching Postgres starts and serves, its GitHub
+grant empty and `*` whole; over a schema one version newer than `MEADA_POSTGRES_VERSION_MAX` it
+names both versions on exactly one stderr line. Hostile rows (written by the test): a set whose
+`finished` is ahead of Postgres's clock grants nothing and is named by its table, and once valid
+a `*` row and an off-host row are skipped with one line each naming `permission_rows`. No
+stderr line carries a token part, a login or the Postgres URL. `src/oidc/permissions.rs`'s unit
+tests hold the exact expiry (`max_age_seconds` grants, a millisecond past it does not), an age
+that never moves back when Postgres's clock does, the login's shape and the row identity check.
+
+`tests/it/ui/oidc/github.rs` runs the team fixture's console with `[oidc.github]` and
+`[postgres]`: the session is `unread` with the login lowercased before any set, then `current`
+with the GitHub identity in `grant`, a group owning an entry only GitHub grants making a
+`team_operator` with that team, every bounded route (`workspace`, its versions, `repositories`,
+`manifest`, `store`, `credentials`) naming no identity outside the union; the token check's
+`sources` (`claims` and `github`, sorted, `*` for a machine token) with no request to the
+loopback issuer or the fake GitHub; `admission`'s `github` with the set's id, `finished`, age,
+`max_age_seconds` and the counts the job wrote; an audited write's record carrying the login;
+then `expired`, a viewer with an empty grant. `tests/it/ui/oidc/audit.rs` also leaves out a record whose stored login fails the login
+pattern. `ui/tests/models.test.ts`,
+`ui/tests/operations.test.ts` and `ui/tests/operations.test.tsx` hold the session view's login
+and state, the admission page's set rows (and `unread` with no set) and the token check's
+sources, in both languages.
+
 ## Java declarative clients (#90)
 
 `conformance-java` gains `example.declarative` (Feign with and without `url`, a Retrofit

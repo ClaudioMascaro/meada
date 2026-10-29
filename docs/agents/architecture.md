@@ -387,7 +387,7 @@ one for the area a change touches.
   absent schema or table) and `check` refuses one the binary does not know, lower naming `meada
   postgres migrate`, higher naming both versions. A CLI command or the console refuses on it
   (exit 1, or no start); a node writes it once on stderr and treats Postgres as unreachable,
-  keeping its readiness (the callers come with S4 tickets 2, 5, 6 and 8). In debug builds
+  keeping its readiness (the permissions cache tells that refusal apart through `versioned`). In debug builds
   `MEADA_POSTGRES_VERSION_MAX` caps the version the binary knows (`known`), a test knob as
   `MEADA_DRAIN_MS` is, ignored by release builds. `status --workspace` prints `postgres:
   reachable, schema <name> version <n>` or `postgres: unreachable (<reason>)` within
@@ -499,8 +499,8 @@ one for the area a change touches.
   that `role_ok` takes, 1 to `ROLE_MAX` characters with no control character, `ROLES`, GitHub's
   five built-in roles, by default; `max_age_seconds` required, at least `MAX_AGE_MIN`), in a
   build without `postgres` the error naming the feature, without `[postgres]` the error naming
-  both (`workspace::Manifest::read`); beside it neither claim is needed, and until #332 it adds
-  nothing to a grant; `issuer` `https` or loopback `http`
+  both (`workspace::Manifest::read`, which also hands it its `[postgres]`, `Github::postgres`);
+  beside it neither claim is needed; `issuer` `https` or loopback `http`
   with no user, query or fragment, `public_url` the same with no path (`modules::reachable`),
   `identities_claim` and `audience` not empty, `groups_claim` (not empty) and its `[oidc.groups]`
   table together, at least one of the two claims or `[oidc.github]`, scopes RFC 6749 scope-tokens,
@@ -520,20 +520,46 @@ one for the area a change touches.
   carry one, the key's own `alg`, its type and curve), the JWKS fetched again
   when none does (`refetch`, at most once per `KID_REFRESH_EVERY`), `exp` and `nbf` with
   `LEEWAY`, `iss`, `aud` against the configured audience or the path's and its identity's
-  resources, then the scopes (403 when one is missing). The grant (`Grant::of`, once per
-  request, on nodes and in the console) is the union of every configured grant provider's
-  identities, of which the identity provider's claims grant (`claims_grant`) is the only one until
-  #332: the union of `identities_claim` and what `[oidc.groups]` maps the groups of
-  `groups_claim` to, a claim counting only as an array of strings, `*` from either for all;
-  routing checks it and it bounds the workspace of each answer (`mcp.rs`). No token, error text
+  resources, then the scopes (403 when one is missing). The grant (`Oidc::granted`, once per
+  request, on nodes and in the console; `Granted::union`) is the union of every configured grant
+  provider's identities: the identity provider's claims grant (`Grant::of`, `claims_grant`: the
+  union of `identities_claim` and what `[oidc.groups]` maps the groups of `groups_claim` to, a
+  claim counting only as an array of strings, `*` from either for all) and, with
+  `[oidc.github]`, the GitHub grant (#332), never `*`: the identities the token's login holds an
+  accepted role on in the permissions cache. The login is `login_claim`'s value when it is a
+  string of 1 to 39 ASCII letters, digits, `-` and `_`, lowercased (`permissions::login`); any
+  other value gives no GitHub grant. The permissions cache (`oidc/permissions.rs`, feature
+  `postgres`, `Permissions`) is empty until the listener printed its address (`Oidc::listening`,
+  called by `mcp::run` and `ui::listen`), then a thread reads, every `PERMISSIONS_POLL` (60 s),
+  in one `REPEATABLE READ READ ONLY` transaction through `postgres::versioned`, the newest set's
+  id, `finished` and age on Postgres's clock (`clock_timestamp() - finished`) and, only when the
+  id changed, its counts and its rows whose `role` is in `roles`, keyed by login. The age rule:
+  the age at the last successful read plus the process's monotonic time since, a read of the
+  same set never lowering it (`Set::seen`), so neither clock moving back extends a set; at most
+  `max_age_seconds` the GitHub grant is honored (`current`), past it empty (`expired`), and
+  before a set is loaded empty (`unread`). A read is bounded by `postgres::Config::bound` (the
+  connect timeout plus one statement timeout per statement), so a Postgres that stops answering
+  without closing the connection cannot stall the poll. A failed read is one `Msg::PermissionsUnreadable`
+  line per poll and keeps the set aging; a schema version this binary does not know is one
+  `Msg::PermissionsVersion` line, once, and counts as unreachable, readiness unchanged. Every row
+  is hostile: a set whose id, `finished` (ahead of Postgres's clock included) or counts fail
+  their checks, and a row whose identity is not on `host` or not a safe identity, whose login or
+  role fails its pattern, is skipped with one `Msg::PermissionsBadRow` line naming its table.
+  In debug builds `MEADA_PERMISSIONS_POLL_MS` shortens the poll and lowers the floor of
+  `max_age_seconds` to 1 (`max_age_min`), a test knob as `MEADA_DRAIN_MS` is. Routing checks
+  the grant and it bounds the workspace of each answer and each 404 list (`mcp.rs`). No token, error text
   of `jsonwebtoken` or claim value is ever printed. With feature `ui`, the console reaches the
   same checks through `admit_console` (one audience, `[ui] audience`; a `Bearer` challenge with
   no `resource_metadata`), `check` (a pasted token's outcome per check, signature, issuer,
   audience as a node checks it, lifetime and scopes, and its grant when every check passes,
-  against the cached keys only, so it never fetches) and `admission` (the identity provider's
+  against the cached keys only, so it never fetches; with `[oidc.github]` its two sides,
+  `Checked::sources`, from the cache) and `admission` (the identity provider's
   `type`, always present, the issuer's metadata as read at start, the cached key ids, the last
-  read and a refresh that failed since, with its reason and never the answer's body, and the
-  groups table bounded by the caller's grant).
+  read and a refresh that failed since, with its reason and never the answer's body, the
+  groups table bounded by the caller's grant, and with `[oidc.github]` `github`: the host,
+  `login_claim`, `roles`, `max_age_seconds`, the grant's state and the loaded set's id,
+  `finished`, `age_seconds` and the counts the job wrote, `repositories`, `rows` and
+  `exclusions`, or `null` before one is loaded).
 - `ui.rs` (feature `ui`, no crate of its own; `cloud` enables it): the management console's
   process (ADR 0014), `meada ui --listen <addr> --workspace <bootstrap manifest>`,
   on the node's listener (`mcp::serve_http`, `mcp::address`, the same drain); never a node's
@@ -578,7 +604,11 @@ one for the area a change touches.
   "message"}}`, an unknown path a 404 in that shape, as the admission routes are without
   `[oidc]`); `config` adds, with `[oidc]`, the issuer, `client_id`, the scopes and the audience
   the browser's authorization code flow with PKCE needs; `session` is the subject and role (`viewer`, `team_operator`, `operator`) and, with `[oidc]`, `groups`
-  (sorted), `grant` (`"*"` or sorted identities) and, for a team operator, `teams`;
+  (sorted), `grant` (`"*"` or sorted identities, the union of the grant providers', which every
+  bounded view, the team operator role and its teams, and `authorize_entries` and
+  `compose_entries` read through `Session::reads` and `core_grant`) and, for a team operator,
+  `teams`; with `[oidc.github]` (#332) `login` when the token has a valid one, `github_host` and
+  `github_grant` (the cache's state, `Oidc::github`, whatever the token's login);
   `manifest` answers the file as loaded at start (a TOML table as JSON: secrets' variable and
   file names only), the module table with what this build has, and the errors of the file as it
   now stands on disk, read again per request, for a session that does not read everything
@@ -586,7 +616,9 @@ one for the area a change touches.
   (group wildcards remain visible), and with only the file and line of an error whose text
   could name one, including an identity known only through groups; `admission/check` reads `{"token": ...}` (`CHECK_MAX`) and answers each check's outcome and the identities, of the
   file's entries or the checked current workspace version's entries for `source = "store"`,
-  that both the token's grant and the session's admit; the token lives
+  that both the token's grant and the session's admit, and with `[oidc.github]` `sources`
+  (`{"claims": "*" | [...], "github": [...]}`, each side of those identities, sorted; `null` when
+  a check fails); the token lives
   only for that request, and a body that does not parse is a fixed 400, never serde's text.
   `ui/write.rs` owns four POST routes, all disabled unless `operations` is true and the
   admitted operator has a nonempty subject. Host, Origin, admission and role are checked before
@@ -624,7 +656,8 @@ one for the area a change touches.
   The audit (#328, ADR 0016, `audit.rs`): with `[postgres]` every write route and every CLI twin
   of one leaves a record in `<schema>.audit`: `id` (an identity column), `time` (Postgres's
   `now()`, answered RFC 3339, UTC, microseconds), `via` (`console` or `cli`), `subject`, `login`
-  (null until a grant provider reads one), `role` (`viewer`, `operator`, `team_operator`; the
+  (the session's GitHub login under `[oidc.github]`, #332, else null; a stored one that fails the
+  login pattern leaves the row out), `role` (`viewer`, `operator`, `team_operator`; the
   CLI acts as the operator), `owners` (a team operator's, as its stderr line names them, else
   null), `action` (`audit::ACTIONS`: `workspace.save`, `workspace.import`, `workspace.apply`,
   `pointer.set`, `pointer.retain`, `pointer.drop`, `fence.recover`, and `pointer` for a pointer
@@ -2739,6 +2772,10 @@ qualification budget does (ADR 0017).
   `CA_MAX` (1 MiB); past either the connection fails, naming the file.
 - `postgres.rs`: `url_file` holds at most `URL_MAX` (4096 bytes) and `ca_file` at most `CA_MAX`
   (1 MiB); past either the connection fails, naming the file.
+- `oidc/permissions.rs`: a process holds every accepted-role row of the newest permissions set in
+  memory (logins times repositories under an organization base role), loaded whole when the set
+  changes; a revocation on GitHub reaches it at the next successful refresh plus at most
+  `PERMISSIONS_POLL` (60 seconds), and without one at most `max_age_seconds` after the last.
 - `oidc.rs`: each metadata and JWKS request takes at most `FETCH_TIMEOUT` (10 seconds), a
   metadata document at most `METADATA_MAX` (64 KiB) and a JWKS at most `JWKS_MAX` (256 KiB);
   past any of them the request fails (at start, the start is refused; on a refresh, the cached

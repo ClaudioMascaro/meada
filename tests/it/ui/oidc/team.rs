@@ -59,7 +59,7 @@ fn team_oidc(issuer: &str) -> String {
 pub(super) struct Team {
     pub(super) fleet: Fleet,
     encoding: EncodingKey,
-    issuer: Issuer,
+    pub(super) issuer: Issuer,
     pub(super) console: Server,
     /// The version applied before the console started.
     pub(super) v1: String,

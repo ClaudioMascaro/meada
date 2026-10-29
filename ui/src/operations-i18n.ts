@@ -28,6 +28,10 @@ const en = {
   token: 'Token to check', tokenHint: 'The token is sent in this request body and cleared when the check finishes.',
   checkToken: 'Check token', checking: 'Checking…', check: 'Check', outcome: 'Outcome', noGrant: 'No admitted grant.',
   directory: 'Directory', directoryUsers: 'Directory users', directoryGroups: 'Directory groups', directoryLastWrite: 'Last SCIM write (UTC)', directoryUnavailable: 'Unavailable: the directory could not be read.',
+  githubHost: 'GitHub host', loginClaim: 'Login claim', githubRoles: 'Accepted roles', maxAge: 'Maximum permissions set age',
+  githubGrant: 'GitHub grant', github_current: 'Current', github_expired: 'Expired: the permissions set is older than allowed', github_unread: 'Not read yet',
+  permissionsSet: 'Permissions set', setFinished: 'Set finished (UTC)', setAge: 'Set age', setRepositories: 'Repositories listed',
+  setRows: 'Role rows', setExclusions: 'Exclusions', fromClaims: 'From the claims', fromGithub: 'From GitHub', everyIdentity: 'Every identity (*)',
 };
 export type OperationsCopy = { [K in keyof typeof en]: string };
 export const operationsCopy: Record<Language, OperationsCopy> = {
@@ -60,5 +64,9 @@ export const operationsCopy: Record<Language, OperationsCopy> = {
     token: 'Token para verificar', tokenHint: 'O token segue no body desta requisição e é apagado quando a verificação termina.',
     checkToken: 'Verificar token', checking: 'Verificando…', check: 'Verificação', outcome: 'Resultado', noGrant: 'Nenhum grant admitido.',
     directory: 'Diretório', directoryUsers: 'Usuários do diretório', directoryGroups: 'Grupos do diretório', directoryLastWrite: 'Última escrita SCIM (UTC)', directoryUnavailable: 'Indisponível: não foi possível ler o diretório.',
+    githubHost: 'Host do GitHub', loginClaim: 'Claim de login', githubRoles: 'Papéis aceitos', maxAge: 'Idade máxima do conjunto de permissões',
+    githubGrant: 'Grant do GitHub', github_current: 'Atual', github_expired: 'Expirado: o conjunto de permissões é mais antigo que o permitido', github_unread: 'Ainda não lido',
+    permissionsSet: 'Conjunto de permissões', setFinished: 'Conjunto concluído (UTC)', setAge: 'Idade do conjunto', setRepositories: 'Repositórios listados',
+    setRows: 'Linhas de papéis', setExclusions: 'Exclusões', fromClaims: 'Das claims', fromGithub: 'Do GitHub', everyIdentity: 'Todas as identidades (*)',
   },
 };

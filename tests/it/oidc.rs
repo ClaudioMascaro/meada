@@ -17,6 +17,9 @@ use serde_json::{Value, json};
 use crate::manifest::{MANIFEST, chain_manifest, run, run_args};
 use crate::server::Server;
 
+#[cfg(all(feature = "postgres", feature = "github-app"))]
+pub(crate) mod github;
+
 const WEB: &str = "example.com/chain/web";
 const PUBLIC: &str = "https://meada.example";
 const METADATA: &str = "https://meada.example/.well-known/oauth-protected-resource";

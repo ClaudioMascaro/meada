@@ -35,7 +35,8 @@ do console. Só `entra` tem uma tabela própria, `[oidc.entra]`, com uma chave, 
 enquanto aceita só `"ignore"` (o padrão): um token em overage, sem `groups`, não tem grupos.
 `[oidc.entra]` com outro `type` é um erro. `[oidc.github]`, o provedor de grant do GitHub, tem
 a sua própria seção em [Credenciais de GitHub App](github-app.md#checagem-de-papeis); com ele,
-nenhuma das duas claims é obrigatória, e por enquanto ele não acrescenta nada ao grant.
+nenhuma das duas claims é obrigatória, e o grant de um token passa a ser a união do grant das
+claims com o que o seu login do GitHub lê.
 
 ## Preparar o provedor de identidade
 

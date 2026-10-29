@@ -16,6 +16,11 @@ export function sessionModel(session: Session, t: Copy): Field[] {
   return [
     { label: t.subject, value: session.subject ?? t.anonymous },
     { label: t.role, value: t[session.role] },
+    ...session.github_grant ? [
+      { label: t.githubLogin, value: session.login ?? t.noLogin },
+      { label: t.githubHost, value: session.github_host ?? '' },
+      { label: t.githubGrant, value: t[`github_${session.github_grant}`] },
+    ] : [],
   ];
 }
 

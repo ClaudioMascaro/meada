@@ -65,3 +65,34 @@ test('store exposes bundle size, hash and current/retained/kept marks, leaving o
   expect(model.generations[1]?.loaded).toBe(false);
   expect(model.generations[1]?.bundles).toEqual([]);
 });
+
+const github = {
+  host: 'github.com', login_claim: 'github_login', roles: ['write', 'Custom Reviewer'], max_age_seconds: 5400, grant: 'current' as const,
+  set: { id: 'ab'.repeat(16), finished: '2026-10-29T12:00:00.000000Z', age_seconds: 75, repositories: 3, rows: 12, exclusions: 1 },
+};
+
+test('admission shows the GitHub grant provider and the newest permissions set, or none read yet', () => {
+  for (const locale of ['en', 'pt-BR'] as const) {
+    const t = operationsCopy[locale];
+    const fields = admissionModel({ ...operational.admission, github }, t);
+    expect(fields.slice(-11)).toEqual([
+      [t.githubHost, 'github.com'], [t.loginClaim, 'github_login'], [t.githubRoles, 'write, Custom Reviewer'],
+      [t.maxAge, '5400 s'], [t.githubGrant, t.github_current], [t.permissionsSet, 'ab'.repeat(16)],
+      [t.setFinished, '2026-10-29T12:00:00.000000Z'], [t.setAge, '75 s'], [t.setRepositories, '3'], [t.setRows, '12'], [t.setExclusions, '1'],
+    ]);
+    const unread = admissionModel({ ...operational.admission, github: { ...github, grant: 'unread', set: null } }, t);
+    expect(unread.slice(-2)).toEqual([[t.githubGrant, t.github_unread], [t.permissionsSet, t.none]]);
+  }
+  expect(admissionModel(operational.admission, operationsCopy.en).some(([label]) => label === operationsCopy.en.githubHost)).toBe(false);
+});
+
+test('the token check splits the admitted identities into the claims side and the GitHub side', () => {
+  const checks = { signature: true, issuer: true, audience: true, lifetime: true, scopes: true };
+  const t = operationsCopy.en;
+  const model = checkModel({ checks, identities: ['a/b', 'a/c'], sources: { claims: ['a/c'], github: ['a/b'] } }, t);
+  expect(model.sources).toEqual({ claims: 'a/c', github: 'a/b' });
+  const machine = checkModel({ checks, identities: ['a/b'], sources: { claims: '*', github: [] } }, t);
+  expect(machine.sources).toEqual({ claims: t.everyIdentity, github: t.none });
+  expect(checkModel({ checks, identities: ['a/b'] }, t).sources).toBeUndefined();
+  expect(checkModel({ checks, identities: null, sources: null }, t).sources).toBeNull();
+});

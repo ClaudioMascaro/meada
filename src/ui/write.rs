@@ -65,6 +65,7 @@ pub(super) fn actor<'a>(session: &'a Session, owners: Option<&'a [String]>) -> A
     Actor {
         via: "console",
         subject: session.subject.as_deref(),
+        login: session.login.as_deref(),
         role: session.role(),
         owners,
     }
