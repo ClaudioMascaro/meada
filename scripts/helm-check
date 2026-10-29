@@ -157,3 +157,49 @@ for profile in [generations, console_profile]:
         spec = deployment["spec"]["template"]["spec"]
         names = [container["name"] for container in spec["initContainers"] + spec["containers"]]
         assert len(names) == len(set(names)), "Kubernetes requires unique names across init containers and containers"
+
+identity = render("-f", str(CHART / "values-console.yaml"), "-f", str(CHART / "values-identity.yaml"))
+migrate = next(item for item in identity if item["kind"] == "Job")
+assert migrate["metadata"]["annotations"]["helm.sh/hook"] == "pre-install,pre-upgrade"
+assert "migrate-url" in str(migrate["spec"]["template"]["spec"]["containers"][0]["env"])
+migrate_config = next(item for item in identity if item["kind"] == "ConfigMap" and item["metadata"]["name"].endswith("-migrate"))
+migrate_toml = tomllib.loads(migrate_config["data"]["postgres.workspace.toml"])
+assert list(migrate_toml) == ["postgres"] and migrate_toml["postgres"]["url_env"] == "MEADA_POSTGRES_MIGRATE_URL"
+for deployment in [item for item in identity if item["kind"] == "Deployment"]:
+    spec = deployment["spec"]["template"]["spec"]
+    assert spec["initContainers"][0]["name"] == "wait-postgres", "pods hold back until the schema is migrated"
+refresh_job = resource(identity, "CronJob")["spec"]["jobTemplate"]["spec"]["template"]["spec"]
+assert refresh_job["initContainers"][0]["name"] == "wait-postgres"
+steps = refresh_job["containers"][0]["args"][-1].split(" && ")
+assert [step.split()[:3] for step in steps] == [["meada", "workspace", "pull"], ["meada", "github-app", "roles"],
+    ["meada", "workspace", "show"], ["/bin/sh", "/etc/meada/fetch.sh", "/data/pulled.toml"],
+    ["meada", "index", "--workspace"], ["meada", "snapshot", "publish"]]
+assert "--pulled" in steps[2]
+identity_nodes = manifest(identity)
+node_config = tomllib.loads(identity_nodes)
+assert node_config["postgres"]["url_env"] == "MEADA_POSTGRES_URL" and node_config["oidc"]["github"]["login_claim"] == "github_login"
+assert "github_app" not in node_config, "only the refresh job carries the App section"
+job_config = tomllib.loads(resource(identity, "ConfigMap")["data"]["job.workspace.toml"])
+assert job_config["github_app"][0]["private_key_env"] == "MEADA_GITHUB_APP_KEY"
+node_env = str(pod(identity)["containers"][0]["env"])
+assert "read-url" in node_env and "write-url" not in node_env
+assert "MEADA_GITHUB_APP_KEY" not in node_env and "MEADA_SCIM_TOKEN" not in node_env
+console_env = str(next(item for item in identity if item["kind"] == "Deployment" and
+    item["metadata"]["labels"].get("app.kubernetes.io/component") == "console")["spec"]["template"]["spec"]["containers"][0]["env"])
+assert "write-url" in console_env and "MEADA_SCIM_TOKEN" in console_env
+bundled = render("-f", str(CHART / "values-console.yaml"), "-f", str(CHART / "values-identity.yaml"), "--set", "postgres.enabled=true")
+assert next(item for item in bundled if item["kind"] == "StatefulSet")["spec"]["template"]["spec"]["containers"][0]["image"].startswith("postgres:15")
+assert next(item for item in bundled if item["kind"] == "Job")["metadata"]["annotations"]["helm.sh/hook"] == "post-install,post-upgrade"
+for profile in [default, generations, console_profile]:
+    assert not any(item["kind"] in ("StatefulSet", "Job") for item in profile), "Postgres and its migrate step are opt-in"
+    assert "postgres" not in yaml.dump(profile).lower(), "disabled by default, nothing of Postgres renders"
+for arguments, problem in [
+    (["-f", str(CHART / "values-console.yaml"), "--set", "modules.oidc.github.enabled=true"], "modules.oidc.github requires"),
+    (["-f", str(CHART / "values-console.yaml"), "--set", "modules.directory.enabled=true"], "modules.directory requires"),
+    (["-f", str(CHART / "values-console.yaml"), "--set", "postgres.enabled=true"], "postgres.enabled requires"),
+    (["-f", str(CHART / "values-console.yaml"), "--set", "modules.oidc.type=azure"], "modules.oidc.type"),
+    (["-f", str(CHART / "values-console.yaml"), "--set", "modules.oidc.entra.overage=directory"], "overage=directory requires"),
+]:
+    failed = subprocess.run(["helm", "template", "check", str(CHART), *arguments], capture_output=True, text=True)
+    assert failed.returncode and problem in failed.stderr, (arguments, failed.stderr)
+print("helm-check: Postgres, migrate step, role check refresh and identity sections passed")

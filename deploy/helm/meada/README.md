@@ -129,3 +129,31 @@ Para inspeção local, faça port-forward do Service `meada-meada-console` e env
 configurado. `scripts/helm-check` valida o perfil OIDC, seus seletores e a rota independente.
 O smoke implantado usa viewer admitido por loopback; login OIDC completo é coberto pelos testes
 HTTP/Rust e não é simulado com um IdP no cluster.
+
+## Postgres e identidade empresarial, opcional
+
+`values-identity.yaml` (sobre `values-console.yaml`) liga a camada de dados e a identidade empresarial
+(ADR 0016): `modules.postgres`, `modules.githubApp`, `modules.oidc.github`, `modules.directory` e,
+comentado, `modules.oidc.type: entra` com `entra.overage: directory`. Tudo vem desligado por padrão
+e nada de Postgres é renderizado. As URLs (que levam senhas), a chave do App e o token SCIM vêm só
+de Secrets: `meada-postgres` (chaves `migrate-url`, `write-url`, `read-url`), `meada-github-app`
+(`private-key`) e `meada-scim` (`token`, pelo menos 32 caracteres); nenhum valor guarda segredo.
+
+```sh
+helm upgrade --install meada deploy/helm/meada -f deploy/helm/meada/values-console.yaml \
+  -f deploy/helm/meada/values-identity.yaml -f meus-valores.yaml
+```
+
+Com `modules.postgres.enabled`, um Job de hook roda `meada postgres migrate` com o papel
+`migrate-url`, em `pre-install,pre-upgrade`, antes de o chart criar os Deployments e o CronJob; cada
+pod ainda espera num init container (`wait-postgres`) até o schema estar migrado. Os nós leem
+`read-url`; a console e o refresh, `write-url`. Com `modules.oidc.github.enabled`, o CronJob usa o
+bootstrap `job.workspace.toml` (o único com `[[github_app]]`) e roda `meada workspace pull`,
+`meada github-app roles`, `meada workspace show --pulled`, o seu `workspace.fetch` (que recebe esse
+arquivo em `$1`), `index` e `publish`.
+
+`postgres.enabled=true` renderiza um Postgres de exemplo, para avaliação (uma réplica; Secrets
+`meada-postgres-server` e `meada-postgres-tls`, com um certificado que nomeie o Service). Como o
+banco não existe antes do release, o hook de migração passa a `post-install,post-upgrade` e os
+pods esperam o schema. Em produção, use o seu próprio Postgres 15 ou mais novo, com TLS e os três
+papéis, e a mesma `tls.caSecret` valida o certificado (`ca_file`).

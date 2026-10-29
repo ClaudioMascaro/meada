@@ -2853,6 +2853,12 @@ qualification budget does (ADR 0017).
   takes a token whose `aud` is `public_url` itself. The caps are inclusive: a body of exactly
   the cap is read. The `oidc` build carries `rsa`, whose RUSTSEC-2023-0071 (Marvin timing) hits
   private-key operations; Meada only verifies with public keys, so it does not apply.
+- `meada-core/src/manifest.rs`: a GitHub login (an entry's `added_by`, and a token's `login_claim`
+  value, which `oidc/permissions.rs` reads through `added_by_problem`) holds at most `ADDED_BY_MAX`
+  (39) characters; a longer one is an error in an entry and no GitHub grant in a token.
+- `audit.rs`: the audit grows without bound, one `<schema>.audit` row per write and refusal, until
+  the operator prunes it in SQL; Meada never deletes a record, and a page of `GET /api/v1/audit`
+  answers at most 100.
 - `github_app.rs`: each REST request takes at most `REQUEST_TIMEOUT` (10 seconds) and reads at
   most `ANSWER_MAX` (4 MiB); an App's installations are listed over at most `PAGES_MAX` pages of
   100 (10,000 installations), the rest unseen; the role check lists one repository's

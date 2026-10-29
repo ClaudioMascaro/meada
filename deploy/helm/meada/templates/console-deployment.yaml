@@ -28,6 +28,7 @@ spec:
       imagePullSecrets: {{ toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
+        {{- include "meada.waitPostgres" (dict "root" . "key" "write-url") | nindent 8 }}
         - name: pull-initial
           image: {{ include "meada.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -52,6 +53,14 @@ spec:
               exec:
                 command: ["sleep", {{ .Values.preStop.sleepSeconds | quote }}]
           env: {{ include "meada.env" . | nindent 12 }}
+            {{- include "meada.postgresEnv" (dict "root" . "key" "write-url") | nindent 12 }}
+            {{- if .Values.modules.directory.enabled }}
+            - name: MEADA_SCIM_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.modules.directory.tokenSecret }}
+                  key: token
+            {{- end }}
           volumeMounts: {{ include "meada.mounts" . | nindent 12 }}
           resources: {{ toYaml .Values.console.resources | nindent 12 }}
         - name: pull

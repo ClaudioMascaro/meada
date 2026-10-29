@@ -83,6 +83,7 @@ plugins:
             Console: Console
             Versões e owners: Versions and owners
             Identidade empresarial: Enterprise identity
+            Receitas de identidade: Identity recipes
             Workspaces nomeados: Named workspaces
             Projeto: Project
             Sobre o Meada: About Meada
@@ -114,6 +115,7 @@ plugins:
             Console: Consola
             Versões e owners: Versiones y owners
             Identidade empresarial: Identidad empresarial
+            Receitas de identidade: Recetas de identidad
             Workspaces nomeados: Workspaces con nombre
             Projeto: Proyecto
             Sobre o Meada: Sobre Meada
@@ -160,6 +162,7 @@ nav:
       - Console: console.md
       - Versões e owners: workspaces.md
       - Identidade empresarial: enterprise.md
+      - Receitas de identidade: identity-providers.md
       - Workspaces nomeados: named-workspaces.md
   - Roadmap: roadmap.md
   - Projeto:

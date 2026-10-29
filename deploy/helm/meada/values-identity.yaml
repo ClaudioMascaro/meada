@@ -1,0 +1,32 @@
+# Identity automation (ADR 0016) on top of values-console.yaml:
+#   helm upgrade --install meada deploy/helm/meada -f deploy/helm/meada/values-console.yaml \
+#     -f deploy/helm/meada/values-identity.yaml -f my-values.yaml
+# Create the Secrets first; no URL, password, key or token lives in these values:
+#   meada-postgres      migrate-url, write-url, read-url   (postgres:// URLs, no query parameter)
+#   meada-github-app    private-key                        (the App's PEM)
+#   meada-scim          token                              (at least 32 characters)
+# Without the example Postgres below, run your own Postgres 15 or later with TLS and the three
+# roles; the migrate step then runs before the other pods are created.
+modules:
+  postgres:
+    enabled: true
+  githubApp:
+    enabled: true
+    appId: 123456
+  oidc:
+    # type: entra                # then entra.overage: directory needs the directory below
+    github:
+      enabled: true
+      loginClaim: github_login
+      maxAgeSeconds: 5400
+    # entra:
+    #   overage: directory
+  directory:
+    enabled: true
+    userClaim: oid
+    userAttribute: externalId
+    groupAttribute: externalId
+# An example Postgres for evaluation, with Secrets meada-postgres-server and meada-postgres-tls
+# (see values.yaml). Off by default.
+# postgres:
+#   enabled: true

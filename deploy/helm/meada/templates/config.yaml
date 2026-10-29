@@ -9,12 +9,29 @@ data:
   fetch.sh: |
     {{- .Values.workspace.fetch | nindent 4 }}
   meada.workspace.toml: |
-    index_dir = "/data/indexes"
-    {{- if eq .Values.workspace.source "store" }}
+    {{- include "meada.nodeBootstrap" . | nindent 4 }}
+  {{- if .Values.modules.githubApp.enabled }}
+  job.workspace.toml: |
+    {{- include "meada.nodeBootstrap" . | nindent 4 }}
+    {{- with .Values.modules.githubApp }}
 
-    [workspace]
-    source = "store"
-    {{- else }}
-    {{- .Values.workspace.repositories | nindent 4 }}
+    [[github_app]]
+    host = {{ .host | toJson }}
+    api = {{ .api | toJson }}
+    app_id = {{ .appId }}
+    private_key_env = "MEADA_GITHUB_APP_KEY"
     {{- end }}
-    {{- include "meada.modules" (dict "Values" .Values "localDir" "/data/generations") | nindent 4 }}
+  {{- end }}
+  {{- if .Values.modules.postgres.enabled }}
+  postgres.workspace.toml: |
+    index_dir = "/data/indexes"
+    {{- with .Values.modules.postgres }}
+
+    [postgres]
+    url_env = "MEADA_POSTGRES_URL"
+    schema = {{ .schema | toJson }}
+    {{- if or $.Values.tls.caSecret $.Values.tls.caConfigMap }}
+    ca_file = "/etc/meada-ca/ca.crt"
+    {{- end }}
+    {{- end }}
+  {{- end }}

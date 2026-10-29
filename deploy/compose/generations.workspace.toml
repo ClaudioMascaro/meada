@@ -27,3 +27,17 @@ keep = 3
 
 [refresh_lock]
 ttl_seconds = 300
+
+# Identity automation (ADR 0016), with compose.postgres.yaml. A node reads Postgres with the read
+# role; [oidc.github] needs [oidc] and [postgres]. Match the console's [oidc] and [oidc.github].
+# [postgres]
+# url_env = "MEADA_POSTGRES_READ_URL"
+# ca_file = "/etc/meada/ca/ca.pem"
+#
+# [oidc]
+# issuer = "https://id.example.internal/realms/agents"
+# public_url = "https://localhost:8443"
+#
+# [oidc.github]
+# login_claim = "github_login"
+# max_age_seconds = 5400

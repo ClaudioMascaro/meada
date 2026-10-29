@@ -26,6 +26,10 @@ spec:
           {{- with .Values.imagePullSecrets }}
           imagePullSecrets: {{ toYaml . | nindent 12 }}
           {{- end }}
+          {{- if .Values.modules.postgres.enabled }}
+          initContainers:
+            {{- include "meada.waitPostgres" (dict "root" . "key" "write-url") | nindent 12 }}
+          {{- end }}
           containers:
             - name: refresh
               image: {{ include "meada.image" . }}
@@ -35,17 +39,25 @@ spec:
                 - snapshot
                 - lock
                 - --workspace
-                - /etc/meada/meada.workspace.toml
+                - {{ include "meada.jobWorkspace" . }}
                 - --
                 - sh
                 - -ec
-                - {{ if eq .Values.workspace.source "store" }}meada workspace pull --workspace /etc/meada/meada.workspace.toml && {{ end }}/bin/sh /etc/meada/fetch.sh && meada index --workspace /etc/meada/meada.workspace.toml && meada snapshot publish --workspace /etc/meada/meada.workspace.toml
+                - {{ include "meada.refresh" . }}
               {{- else }}
               command: ["/bin/sh", "-ec"]
               args:
-                - {{ if eq .Values.workspace.source "store" }}meada workspace pull --workspace /etc/meada/meada.workspace.toml && {{ end }}/bin/sh /etc/meada/fetch.sh && meada index --workspace /etc/meada/meada.workspace.toml && meada snapshot publish --workspace /etc/meada/meada.workspace.toml
+                - {{ include "meada.refresh" . }}
               {{- end }}
               env: {{ include "meada.env" . | nindent 16 }}
+                {{- include "meada.postgresEnv" (dict "root" . "key" "write-url") | nindent 16 }}
+                {{- if .Values.modules.githubApp.enabled }}
+                - name: MEADA_GITHUB_APP_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.modules.githubApp.privateKeySecret }}
+                      key: private-key
+                {{- end }}
               {{- if .Values.workspace.gitCredentialsSecret }}
               envFrom:
                 - secretRef:

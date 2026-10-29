@@ -127,3 +127,32 @@ For local inspection, port-forward Service `meada-meada-console` and send the co
 Host. `scripts/helm-check` validates the OIDC profile, selectors and independent route.
 The deployed smoke uses a loopback-admitted viewer; complete OIDC login is covered by HTTP/Rust
 tests and is not simulated with an IdP inside the cluster.
+
+## Postgres and enterprise identity, optional
+
+`values-identity.yaml` (on top of `values-console.yaml`) turns on the data layer and enterprise
+identity (ADR 0016): `modules.postgres`, `modules.githubApp`, `modules.oidc.github`,
+`modules.directory` and, commented, `modules.oidc.type: entra` with `entra.overage: directory`.
+Everything is off by default and nothing of Postgres renders. The URLs (which carry passwords), the
+App's key and the SCIM token come only from Secrets: `meada-postgres` (keys `migrate-url`,
+`write-url`, `read-url`), `meada-github-app` (`private-key`) and `meada-scim` (`token`, at least 32
+characters); no value holds a secret.
+
+```sh
+helm upgrade --install meada deploy/helm/meada -f deploy/helm/meada/values-console.yaml \
+  -f deploy/helm/meada/values-identity.yaml -f my-values.yaml
+```
+
+With `modules.postgres.enabled`, a hook Job runs `meada postgres migrate` with the `migrate-url`
+role, as `pre-install,pre-upgrade`, before the chart creates the Deployments and the CronJob; each
+pod also waits in an init container (`wait-postgres`) until the schema is migrated. Nodes read
+`read-url`; the console and the refresh, `write-url`. With `modules.oidc.github.enabled`, the
+CronJob uses the `job.workspace.toml` bootstrap (the only one with `[[github_app]]`) and runs
+`meada workspace pull`, `meada github-app roles`, `meada workspace show --pulled`, your
+`workspace.fetch` (which receives that file as `$1`), `index` and `publish`.
+
+`postgres.enabled=true` renders an example Postgres for evaluation (one replica; Secrets
+`meada-postgres-server` and `meada-postgres-tls`, with a certificate naming the Service). Since the
+database does not exist before the release, the migrate hook becomes `post-install,post-upgrade`
+and the pods wait for the schema. In production use your own Postgres 15 or later, with TLS and the
+three roles; the same `tls.caSecret` verifies its certificate (`ca_file`).

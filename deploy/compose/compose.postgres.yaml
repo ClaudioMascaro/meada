@@ -1,0 +1,81 @@
+# Opt in with compose.yaml, compose.console.yaml and this file, and both --profile generations and
+# --profile console: docker compose -f compose.yaml -f compose.console.yaml -f compose.postgres.yaml
+# (ADR 0016). It adds a Postgres service with TLS and the three recommended roles, and a one-shot
+# `meada postgres migrate` step that finishes before the services that connect (the job, the
+# console and the nodes) start. Nothing connects until you uncomment [postgres] and the sections
+# that need it in the bootstrap manifests; without this file no Postgres starts.
+services:
+  postgres:
+    image: postgres:15-alpine
+    profiles: [generations]
+    user: "70:70"
+    command: [postgres, -c, ssl=on, -c, ssl_cert_file=/tls/cert.pem, -c, ssl_key_file=/tls/key.pem]
+    environment:
+      POSTGRES_DB: meada
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_MIGRATE_PASSWORD: ${POSTGRES_MIGRATE_PASSWORD:?Set POSTGRES_MIGRATE_PASSWORD in .env}
+      POSTGRES_WRITE_PASSWORD: ${POSTGRES_WRITE_PASSWORD:?Set POSTGRES_WRITE_PASSWORD in .env}
+      POSTGRES_READ_PASSWORD: ${POSTGRES_READ_PASSWORD:?Set POSTGRES_READ_PASSWORD in .env}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    depends_on:
+      certificates:
+        condition: service_completed_successfully
+    volumes:
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro
+      - postgres-tls:/tls:ro
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h localhost -U postgres -d meada']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    mem_limit: 512m
+
+  postgres-migrate:
+    image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}-cloud
+    profiles: [generations]
+    command: [postgres, migrate, --workspace, /etc/meada/meada.workspace.toml]
+    environment:
+      MEADA_POSTGRES_MIGRATE_URL: postgres://meada_migrate:${POSTGRES_MIGRATE_PASSWORD:?Set POSTGRES_MIGRATE_PASSWORD in .env}@postgres:5432/meada
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./postgres.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - ca:/etc/meada/ca:ro
+    restart: "no"
+    read_only: true
+    mem_limit: 128m
+
+  # The job: [postgres], [oidc] and [oidc.github] in job.workspace.toml make its refresh run
+  # `meada github-app roles` and fetch from `meada workspace show --pulled`.
+  generation-indexer:
+    environment:
+      MEADA_POSTGRES_URL: postgres://meada_write:${POSTGRES_WRITE_PASSWORD:?Set POSTGRES_WRITE_PASSWORD in .env}@postgres:5432/meada
+    depends_on:
+      postgres-migrate:
+        condition: service_completed_successfully
+
+  console:
+    environment:
+      MEADA_POSTGRES_URL: postgres://meada_write:${POSTGRES_WRITE_PASSWORD:?Set POSTGRES_WRITE_PASSWORD in .env}@postgres:5432/meada
+      # With [directory]: set MEADA_SCIM_TOKEN in .env (at least 32 characters).
+      MEADA_SCIM_TOKEN: ${MEADA_SCIM_TOKEN:-}
+    depends_on:
+      postgres-migrate:
+        condition: service_completed_successfully
+
+  generation-one:
+    environment:
+      MEADA_POSTGRES_READ_URL: postgres://meada_read:${POSTGRES_READ_PASSWORD:?Set POSTGRES_READ_PASSWORD in .env}@postgres:5432/meada
+    depends_on:
+      postgres-migrate:
+        condition: service_completed_successfully
+
+  generation-two:
+    environment:
+      MEADA_POSTGRES_READ_URL: postgres://meada_read:${POSTGRES_READ_PASSWORD:?Set POSTGRES_READ_PASSWORD in .env}@postgres:5432/meada
+    depends_on:
+      postgres-migrate:
+        condition: service_completed_successfully

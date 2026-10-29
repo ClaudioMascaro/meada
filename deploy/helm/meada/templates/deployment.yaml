@@ -27,6 +27,7 @@ spec:
       imagePullSecrets: {{ toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
+        {{- include "meada.waitPostgres" (dict "root" . "key" "read-url") | nindent 8 }}
         {{- if .Values.modules.snapshot.enabled }}
         - name: pull-initial
           image: {{ include "meada.image" . }}
@@ -80,6 +81,7 @@ spec:
                 command: ["sleep", {{ .Values.preStop.sleepSeconds | quote }}]
           volumeMounts: {{ include "meada.mounts" . | nindent 12 }}
           env: {{ include "meada.env" . | nindent 12 }}
+            {{- include "meada.postgresEnv" (dict "root" . "key" "read-url") | nindent 12 }}
           resources: {{ toYaml .Values.resources | nindent 12 }}
         {{- if .Values.modules.snapshot.enabled }}
         - name: pull

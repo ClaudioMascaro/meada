@@ -8,6 +8,30 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Identity automation for enterprise deployments (ADR 0016, spec #319), in the entries below: the
+  `postgres` and `directory` features and the `[postgres]`, `[directory]`, `[oidc] type`,
+  `[oidc.entra]` and `[oidc.github]` sections; `meada postgres migrate`, `meada github-app roles`
+  and `meada workspace show --pulled`; an entry's `added_by` and the `unattributed` and
+  `added_by_change` reasons of `entries_refused`; the session's `login`, `github_host` and
+  `github_grant`, the token check's `sources`; the audit and `GET /api/v1/audit`; the SCIM endpoint
+  under `/scim/v2/`, the `deprovisioned` refusal, the owner picker, `owner_missing` and `excluded`.
+  Under Spec R1's stability rule every one of them is additive: a minor change. Without the new
+  sections every process behaves as before, and the default build, the CLI help, the MCP surface
+  and every export and trace golden are unchanged.
+- The identity automation documentation, in three languages: an enterprise identity guide (the
+  data layer, the audit, the provider type, the GitHub grant, additions under the provider, the
+  directory, Entra overage and Known ceilings), recipes for Entra ID, Okta and Keycloak, the
+  roadmap and diagrams with S4 delivered, and the architecture map's Known ceilings gaining the
+  login length and the audit's growth. S5 (#339), named workspaces and authoring through the UI or
+  MCP, stays planned.
+- The Compose example gains `compose.postgres.yaml` (a Postgres 15 with TLS and the three
+  recommended roles, and a one-shot `meada postgres migrate` step that finishes before the job,
+  the console and the nodes), a `fetch-pulled.sh` for the job's refresh under `[oidc.github]`, and
+  commented `[postgres]`, `[oidc.github]`, `[directory]` and `[oidc.entra]` examples in the
+  bootstraps. The Helm chart gains `modules.postgres`, `modules.githubApp`, `modules.oidc.github`,
+  `modules.oidc.type` and `entra`, `modules.directory`, a migrate hook Job with pods that wait for
+  the schema, an example Postgres (`postgres.enabled`) and `values-identity.yaml`; the default
+  values render nothing of Postgres.
 - `[oidc.github]`, the GitHub grant provider's table (ADR 0016): `host` (default `github.com`, a
   lowercase host name), `login_claim` (required), `roles` (a non-empty array of distinct role
   names of 1 to 100 characters with no control character, compared exactly with GitHub's

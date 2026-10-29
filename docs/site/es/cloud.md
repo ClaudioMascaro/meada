@@ -14,3 +14,4 @@ Elige los módulos según tu operación. Cada uno es opt-in: requiere la feature
 - [Autenticación y grants](admission.md)
 - [Credenciales de GitHub App](github-app.md)
 - [Consola de administración](console.md)
+- [Identidad empresarial: Postgres, auditoría, grant de GitHub y directorio](enterprise.md)
