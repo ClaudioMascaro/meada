@@ -190,13 +190,46 @@ fn oidc_type_errors_follow_lang() {
             "8: `oidc.entra`: exige `oidc.type = \"entra\"`",
         ),
         (
-            "type = \"entra\"\n[oidc.entra]\noverage = \"directory\"\n",
-            "9: `oidc.entra.overage`: must be `ignore`",
-            "9: `oidc.entra.overage`: deve ser `ignore`",
+            "type = \"entra\"\n[oidc.entra]\noverage = \"always\"\n",
+            "9: `oidc.entra.overage`: must be one of `ignore` or `directory`",
+            "9: `oidc.entra.overage`: deve ser um de `ignore` ou `directory`",
         ),
     ] {
         fs::write(dir.join(MANIFEST), format!("{head}{body}")).unwrap();
         for (lang, what) in [("en_US.UTF-8", en), ("pt_BR.UTF-8", pt)] {
+            let refused = (String::new(), format!("{at}:{what}\n"), Some(1));
+            let args = ["index", "--workspace", MANIFEST];
+            assert_eq!(run_lang(&dir, lang, &args), refused, "{lang} {body}");
+        }
+    }
+}
+
+/// `overage = "directory"` (#336) under `pt_BR` and `en_US`: without `groups_claim` and without
+/// `[directory]`.
+#[cfg(all(feature = "oidc", feature = "directory"))]
+#[test]
+fn oidc_overage_directory_errors_follow_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_oidc_overage");
+    let head = "index_dir = \"../indexes\"\n\n[oidc]\nissuer = \"https://id.example\"\npublic_url = \
+                \"https://meada.example\"\nidentities_claim = \"r\"\ntype = \"entra\"\n";
+    let groups = "groups_claim = \"groups\"\n[oidc.groups]\n\"g\" = [\"a\"]\n";
+    let overage = "[oidc.entra]\noverage = \"directory\"\n";
+    for (body, en, pt) in [
+        (
+            overage.to_string(),
+            "9: `oidc.entra.overage`: `oidc.groups_claim` is missing",
+            "9: `oidc.entra.overage`: falta `oidc.groups_claim`",
+        ),
+        (
+            format!("{groups}{overage}"),
+            "12: `oidc.entra.overage`: [oidc.entra] needs [directory]",
+            "12: `oidc.entra.overage`: [oidc.entra] exige [directory]",
+        ),
+    ] {
+        fs::write(dir.join(MANIFEST), format!("{head}{body}")).unwrap();
+        for (lang, what) in [("en_US.UTF-8", en), ("pt_BR.UTF-8", pt)] {
+            let at = "meada: ops/meada.workspace.toml";
             let refused = (String::new(), format!("{at}:{what}\n"), Some(1));
             let args = ["index", "--workspace", MANIFEST];
             assert_eq!(run_lang(&dir, lang, &args), refused, "{lang} {body}");

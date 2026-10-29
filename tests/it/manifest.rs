@@ -659,7 +659,7 @@ fn oidc_type_errors_name_the_file_the_line_and_the_key() {
     let at = "meada: ops/meada.workspace.toml";
     let types = "must be one of `generic`, `entra`, `okta` or `keycloak`";
     let entra = "`oidc.entra`: needs `oidc.type = \"entra\"`";
-    let overage = "`oidc.entra.overage`: must be `ignore`";
+    let overage = "`oidc.entra.overage`: must be one of `ignore` or `directory`";
     for (body, expected) in [
         (
             "type = \"azure\"\n",
@@ -676,10 +676,6 @@ fn oidc_type_errors_name_the_file_the_line_and_the_key() {
             format!("{at}:8: {entra}\n"),
         ),
         (
-            "type = \"entra\"\n[oidc.entra]\noverage = \"directory\"\n",
-            format!("{at}:9: {overage}\n"),
-        ),
-        (
             "type = \"entra\"\n[oidc.entra]\noverage = \"always\"\n",
             format!("{at}:9: {overage}\n"),
         ),
@@ -690,6 +686,46 @@ fn oidc_type_errors_name_the_file_the_line_and_the_key() {
         (
             "[oidc.github]\nlogin_claim = \"login\"\nmax_age_seconds = 60\norg = \"acme\"\n",
             format!("{at}:10: `oidc.github.org` is not a meada.workspace.toml key\n"),
+        ),
+    ] {
+        write_manifest(&dir, &format!("{head}{body}"));
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {body}");
+            assert_eq!(stderr, expected, "{command}: {body}");
+        }
+    }
+}
+
+/// `overage = "directory"` (#336) needs `[oidc] groups_claim` and `[directory]`: each missing one
+/// is the error naming the file, the line and the key or section (a build without the
+/// `directory` feature names the feature instead), and under a `type` other than `entra` the
+/// error of `[oidc.entra]` stands.
+#[cfg(feature = "oidc")]
+#[test]
+fn oidc_overage_directory_names_what_it_needs() {
+    let dir = mirrors("manifest_oidc_overage");
+    let head = "index_dir = \"../indexes\"\n\n[oidc]\nissuer = \"https://id.example\"\npublic_url = \
+                \"https://meada.example\"\nidentities_claim = \"r\"\n";
+    let at = "meada: ops/meada.workspace.toml";
+    let feature =
+        "`oidc.entra.overage`: [oidc.entra] needs a Meada built with the directory feature";
+    let claim = "`oidc.entra.overage`: `oidc.groups_claim` is missing";
+    let section = "`oidc.entra.overage`: [oidc.entra] needs [directory]";
+    let groups = "groups_claim = \"groups\"\n[oidc.groups]\n\"g\" = [\"a\"]\n";
+    let directory = cfg!(feature = "directory");
+    for (body, expected) in [
+        (
+            "type = \"entra\"\n[oidc.entra]\noverage = \"directory\"\n".to_string(),
+            format!("{at}:9: {}\n", if directory { claim } else { feature }),
+        ),
+        (
+            format!("type = \"entra\"\n{groups}[oidc.entra]\noverage = \"directory\"\n"),
+            format!("{at}:12: {}\n", if directory { section } else { feature }),
+        ),
+        (
+            "type = \"okta\"\n[oidc.entra]\noverage = \"directory\"\n".to_string(),
+            format!("{at}:8: `oidc.entra`: needs `oidc.type = \"entra\"`\n"),
         ),
     ] {
         write_manifest(&dir, &format!("{head}{body}"));

@@ -586,9 +586,13 @@ pub enum Msg<'a> {
     /// A schema version this binary does not know, found by a poll: written once.
     #[cfg(all(feature = "oidc", feature = "postgres"))]
     PermissionsVersion(&'a str),
-    /// A permissions row or set that fails its checks, naming the table and never its values.
+    /// A permissions or directory row or set that fails its checks, naming the table and never
+    /// its values.
     #[cfg(all(feature = "oidc", feature = "postgres"))]
     PermissionsBadRow(&'a str),
+    /// A lookup of an overage token's groups that failed (#336): why, never the URL or a claim.
+    #[cfg(all(feature = "oidc", feature = "directory"))]
+    OverageUnreadable(&'a str),
     #[cfg(feature = "snapshot")]
     SnapshotRetainedSkipped {
         id: &'a str,
@@ -2256,6 +2260,14 @@ impl Msg<'_> {
             Msg::PermissionsBadRow(table) => pick(
                 format!("{table}: a row fails its checks and is skipped"),
                 format!("{table}: uma linha falha nas verificações e é ignorada"),
+            ),
+            #[cfg(all(feature = "oidc", feature = "directory"))]
+            Msg::OverageUnreadable(why) => pick(
+                format!("meada: the directory cannot be read for a token in overage ({why}); it has no groups"),
+                format!(
+                    "meada: o diretório não pode ser lido para um token em overage ({why}); ele \
+                     fica sem grupos"
+                ),
             ),
             #[cfg(feature = "snapshot")]
             Msg::GenerationsHelp => pick(

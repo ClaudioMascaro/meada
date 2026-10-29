@@ -20,6 +20,9 @@ use crate::server::Server;
 #[cfg(all(feature = "postgres", feature = "github-app"))]
 pub(crate) mod github;
 
+#[cfg(all(feature = "ui", feature = "directory"))]
+mod overage;
+
 const WEB: &str = "example.com/chain/web";
 const PUBLIC: &str = "https://meada.example";
 const METADATA: &str = "https://meada.example/.well-known/oauth-protected-resource";

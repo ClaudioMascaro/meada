@@ -76,7 +76,8 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `meada::with_reversed_walk`), `items` (open items and their `search` goldens, fixtures
   `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`;
   with `oidc`, the identity provider's errors: an unknown `type`, `[oidc.entra]` under `okta` and
-  an `overage` other than `ignore`; without `directory`, `[directory]` naming the feature; with
+  an `overage` other than `ignore` and `directory`; with `oidc` and `directory`,
+  `overage = "directory"` without `groups_claim` and without `[directory]` (#336); without `directory`, `[directory]` naming the feature; with
   `directory` and `oidc`, `[directory]` without `[postgres]` and `[oidc]`, with both token keys
   and with `user_attribute = "email"`; without `postgres`, `[postgres]` naming the feature and no `meada postgres`; with it, a
   `[postgres]` key error, the URL refusals (an unset variable, a query, a Unix socket) and,
@@ -161,7 +162,19 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   too), the 401s, 403s and 404 lists, the groups' grant, a token in overage with no groups and a
   key added after the start, with the same status, headers and body and the same stderr, which
   holds no token part, group or claim value, as the manifest without the key, and an oversized
-  JWKS refusing the start alike), `github_app` (`github-app credential` and `throttled` against a GitHub API served
+  JWKS refusing the start alike; in `oidc/overage.rs` (with `ui,directory`; the debug knob
+  `MEADA_OVERAGE_TTL_MS` shortens the answers' lifetime to three seconds, and a loopback relay
+  the test closes stands for Postgres stopped), Entra overage through the directory on nodes,
+  the directory fed through the console's SCIM endpoint: a token with `_claim_names` and no
+  `groups` reading the identities `[oidc.groups]` maps its directory groups to, with the claims
+  grant beside them and nothing under `overage = "ignore"`, an inactive, an unknown and a
+  groupless user reading nothing, a token with `groups` or a `_claim_names` that is no object or
+  maps to a non-string never looked up (no line with Postgres closed), an answer, of no groups
+  too, kept for the TTL and no longer, a cached subject keeping its groups with Postgres stopped
+  until expiry and an uncached one having none, each failed lookup one stderr line, readiness
+  unchanged and a schema version newer than the node knows named, group values failing the owner
+  name rule skipped with a line naming `directory_groups`, `userName` matched ignoring case and
+  `externalId` exactly, and no token, object id, group or URL on stderr), `github_app` (`github-app credential` and `throttled` against a GitHub API served
   on loopback that verifies each App's JWT against the fixture keys of
   `tests/fixtures/github-app/`: a minted token cached and reused, two Apps taken in turn, a
   throttled installation skipped until its retry time, a mint answered 429 passing to the next
@@ -242,7 +255,14 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   outside the grant, the repositories outside it the 404 of one not served, a 401 without a
   token; `admission`'s `type`, `generic` with no key and `entra` when set, every read route,
   `session` and `admission/check` answering the same tokens alike under both, a token in overage
-  with no groups; the admission routes
+  with no groups; in `ui/oidc/overage.rs` (with `directory,refresh-lock`), a token in overage
+  granted through directory groups, made `operator` through `operator_groups` and `team_operator`
+  through a group owning an entry it reads, its `session` listing the groups, and none of it under
+  `overage = "ignore"`; a token with `groups` or an odd `_claim_names` never looked up; an
+  inactive or deleted user refused with 403 `deprovisioned` before its cached answer is used, on
+  `session` and a write, and a viewer once reprovisioned in no group and the answer expired; the
+  token check of a pasted overage token listing the identities its directory groups grant,
+  none under `ignore`, with no request on the issuer; the admission routes
   absent without `[oidc]`; manifest peers and error text bounded even for an unlisted peer;
   operator groups and strict boolean claims, all five configuration errors, whole operator
   views despite restricted grants, and header-only refused writes proving bodies stay unread;

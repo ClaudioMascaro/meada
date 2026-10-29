@@ -18,7 +18,8 @@
 //! `identities_claim` lists, and those `[oidc.groups]` maps the groups of its `groups_claim` to
 //! (#291; `*` from either for all): the identity provider's claims grant, the one grant provider
 //! a grant provider of the union (ADR 0016). `type` names the identity provider; none changes what
-//! a token is granted, and `[oidc.entra] overage = "ignore"` leaves a token in overage no groups.
+//! a token is granted, and `[oidc.entra] overage = "ignore"` leaves a token in overage no groups,
+//! while `"directory"` gives it those the directory holds for its user (#336, `overage`).
 //! `[oidc.github]` adds the GitHub grant provider (#332, `permissions`): the identities the
 //! token's `login_claim` login holds an accepted role on in the newest permissions set `meada
 //! github-app roles` wrote (#331), while that set is at most `max_age_seconds` old, never `*`.
@@ -97,8 +98,9 @@ const PATH: &AsciiSet = &CONTROLS
 /// only `entra` takes a table of its own.
 const TYPES: [&str; 4] = ["generic", "entra", "okta", "keycloak"];
 
-/// What `[oidc.entra] overage` accepts: `ignore`, a token in overage having no groups.
-const OVERAGES: [&str; 1] = ["ignore"];
+/// What `[oidc.entra] overage` accepts: `ignore`, a token in overage having no groups, and
+/// `directory`, its groups from the directory the identity provider pushes (#336).
+const OVERAGES: [&str; 2] = ["ignore", "directory"];
 
 /// `[oidc.github] roles` by default: GitHub's five built-in repository roles, as `role_name`
 /// spells them.
@@ -121,6 +123,17 @@ fn max_age_min() -> i64 {
 
 #[cfg(feature = "postgres")]
 mod permissions;
+
+#[cfg(feature = "directory")]
+mod overage;
+
+/// `[oidc.entra] overage = "directory"` (#336): where the directory is read. `Manifest::read`
+/// sets it from `[directory]` and `[postgres]`, and refuses the key without them.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Overage {
+    #[cfg(feature = "directory")]
+    pub lookup: Option<(crate::directory::Config, crate::postgres::Config)>,
+}
 
 /// The `[oidc]` section as written: the identity provider.
 #[derive(Deserialize)]
@@ -249,6 +262,9 @@ pub struct Config {
     pub refresh: Duration,
     /// `[oidc.github]`, the GitHub grant provider.
     pub github: Option<Github>,
+    /// `[oidc.entra] overage = "directory"`, a token in overage getting its groups from the
+    /// directory.
+    pub overage: Option<Overage>,
 }
 
 impl File {
@@ -306,12 +322,29 @@ impl File {
                 one_of(value, &TYPES).ok_or(("oidc.type", Msg::OidcOneOf(&TYPES).text()))?
             }
         };
+        let mut overage = None;
         if let Some(entra) = self.entra {
             if kind != "entra" {
                 return Err(("oidc.entra", Msg::OidcTypeTable("entra").text()));
             }
-            if (entra.overage.as_ref()).is_some_and(|o| one_of(o, &OVERAGES).is_none()) {
-                return Err(("oidc.entra.overage", Msg::OidcOneOf(&OVERAGES).text()));
+            if let Some(value) = &entra.overage {
+                let key = "oidc.entra.overage";
+                let chosen =
+                    one_of(value, &OVERAGES).ok_or((key, Msg::OidcOneOf(&OVERAGES).text()))?;
+                if chosen == "directory" {
+                    // The directory is in the data layer, which only `directory` builds have.
+                    if !cfg!(feature = "directory") {
+                        let (section, feature) = ("oidc.entra", "directory");
+                        return Err((key, Msg::NeedsFeature { section, feature }.text()));
+                    }
+                    if groups.is_none() {
+                        return Err((key, Msg::KeyMissing("oidc.groups_claim").text()));
+                    }
+                    overage = Some(Overage {
+                        #[cfg(feature = "directory")]
+                        lookup: None,
+                    });
+                }
             }
         }
         Ok(Config {
@@ -324,6 +357,7 @@ impl File {
             scopes,
             refresh,
             github,
+            overage,
         })
     }
 }
@@ -344,9 +378,12 @@ impl Grant {
         }
     }
 
-    /// The identity provider's claims grant of `claims` under `config`, `*` for all.
-    fn of(claims: &Map<String, Value>, config: &Config) -> Self {
-        let listed: HashSet<String> = claims_grant(claims, config).map(str::to_string).collect();
+    /// The identity provider's claims grant of `claims` under `config`, its `groups` being those
+    /// the grant reads (the claim's, or the directory's for a token in overage), `*` for all.
+    fn of(claims: &Map<String, Value>, config: &Config, groups: &[String]) -> Self {
+        let listed: HashSet<String> = (claims_grant(claims, config, groups))
+            .map(str::to_string)
+            .collect();
         match listed.contains("*") {
             true => Grant::All,
             false => Grant::Only(listed),
@@ -368,6 +405,10 @@ impl Grant {
 /// token's login and the GitHub grant (empty without a valid login or a current set).
 struct Granted {
     claims: Grant,
+    /// The groups the claims grant read: the token's `groups_claim`, or the directory's for a
+    /// token in overage (#336).
+    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    groups: Vec<String>,
     #[cfg_attr(not(feature = "ui"), allow(dead_code))]
     login: Option<String>,
     github: Option<Vec<String>>,
@@ -381,15 +422,16 @@ impl Granted {
 }
 
 /// The identity provider's claims grant: the identities `claims`' `identities_claim` lists and
-/// those `[oidc.groups]` maps the groups of its `groups_claim` to. A claim that is not an array of
-/// strings, and a group the table lacks, grant nothing.
+/// those `[oidc.groups]` maps `groups` to. A claim that is not an array of strings, and a group
+/// the table lacks, grant nothing.
 fn claims_grant<'a>(
     claims: &'a Map<String, Value>,
     config: &'a Config,
+    groups: &'a [String],
 ) -> impl Iterator<Item = &'a str> + use<'a> {
     let listed = config.claim.iter().flat_map(|claim| strings(claims, claim));
-    let mapped = (config.groups.iter()).flat_map(|(claim, table)| {
-        (strings(claims, claim).filter_map(|group| table.get(group)))
+    let mapped = (config.groups.iter()).flat_map(|(_, table)| {
+        (groups.iter().filter_map(|group| table.get(group)))
             .flatten()
             .map(String::as_str)
     });
@@ -435,6 +477,9 @@ pub struct Oidc {
     /// The permissions cache of `[oidc.github]` (#332).
     #[cfg(feature = "postgres")]
     permissions: Option<Arc<permissions::Permissions>>,
+    /// The overage lookup and its cache, with `[oidc.entra] overage = "directory"` (#336).
+    #[cfg(feature = "directory")]
+    overage: Option<overage::Overage>,
 }
 
 /// When the cached JWKS was read (seconds since the epoch), and the last refresh that failed
@@ -676,11 +721,17 @@ impl Oidc {
         let permissions = (config.github.clone())
             .and_then(|github| Some((github.postgres.clone()?, github)))
             .map(|(postgres, github)| permissions::Permissions::new(github, postgres));
+        #[cfg(feature = "directory")]
+        let overage = (config.overage.as_ref())
+            .and_then(|overage| overage.lookup.as_ref())
+            .map(|(directory, postgres)| overage::Overage::new(directory, postgres.clone()));
         let oidc = Self::new(config, agent, jwks_uri, keys);
         let oidc = Arc::new(Self {
             issuer_metadata,
             #[cfg(feature = "postgres")]
             permissions,
+            #[cfg(feature = "directory")]
+            overage,
             ..oidc
         });
         let (module, every) = (Arc::downgrade(&oidc), oidc.config.refresh);
@@ -702,6 +753,8 @@ impl Oidc {
             }),
             #[cfg(feature = "postgres")]
             permissions: None,
+            #[cfg(feature = "directory")]
+            overage: None,
         }
     }
 
@@ -717,22 +770,52 @@ impl Oidc {
     /// The grant of `claims`, its sides and its login: with `[oidc.github]`, the GitHub grant of
     /// a valid `login_claim` login, read from the cache (never from Postgres).
     fn granted(&self, claims: &Map<String, Value>) -> Granted {
-        let claims_grant = Grant::of(claims, &self.config);
+        let groups = self.groups(claims);
+        let claims_grant = Grant::of(claims, &self.config, &groups);
         #[cfg(feature = "postgres")]
         if let (Some(github), Some(cache)) = (&self.config.github, &self.permissions) {
             let login = permissions::login(claims.get(&github.login_claim));
             let read = login.as_deref().map(|l| cache.grant(l)).unwrap_or_default();
             return Granted {
                 claims: claims_grant,
+                groups,
                 login,
                 github: Some(read),
             };
         }
         Granted {
             claims: claims_grant,
+            groups,
             login: None,
             github: None,
         }
+    }
+
+    /// The groups of `claims` as every check reads them: its `groups_claim` array (none when it
+    /// is no array of strings), or, for a token in overage under `overage = "directory"`, those
+    /// the directory holds for its user (#336).
+    fn groups(&self, claims: &Map<String, Value>) -> Vec<String> {
+        let Some((claim, _)) = &self.config.groups else {
+            return Vec::new();
+        };
+        #[cfg(feature = "directory")]
+        if let Some(overage) = &self.overage
+            && overage::in_overage(claims, claim)
+        {
+            return overage.groups(claims);
+        }
+        strings(claims, claim).map(str::to_string).collect()
+    }
+
+    /// Whether `claims` is a token in overage whose groups the directory gives (#336).
+    #[cfg(feature = "ui")]
+    fn overage(&self, claims: &Map<String, Value>) -> bool {
+        #[cfg(feature = "directory")]
+        if let (Some(_), Some((claim, _))) = (&self.overage, &self.config.groups) {
+            return overage::in_overage(claims, claim);
+        }
+        let _ = claims;
+        false
     }
 
     /// With `[oidc.github]`, its host and the GitHub grant's state (`current`, `expired` or
@@ -928,27 +1011,29 @@ impl Oidc {
             Ok(Some(token)) => match self.verified(token, &[audience.to_string()]) {
                 Ok(claims) => {
                     let subject = claims.get("sub").and_then(Value::as_str);
+                    // The groups the directory gives a token in overage replace its missing
+                    // claim here as everywhere (#336).
+                    let granted = self.granted(&claims);
+                    let in_operators = |group: &str| {
+                        operator_groups.is_some_and(|ops| ops.iter().any(|op| op == group))
+                    };
+                    let by_groups = match self.overage(&claims) {
+                        true => granted.groups.iter().any(|group| in_operators(group)),
+                        // A token with its own claim keeps the lenient reading it always had: a
+                        // string among other elements still matches an operator group.
+                        false => self.config.groups.as_ref().is_some_and(|(claim, _)| {
+                            let groups = claims.get(claim).and_then(Value::as_array);
+                            groups.is_some_and(|groups| {
+                                groups.iter().filter_map(Value::as_str).any(in_operators)
+                            })
+                        }),
+                    };
                     let operator = operator_claim
                         .is_some_and(|name| claims.get(name) == Some(&Value::Bool(true)))
-                        || operator_groups.is_some_and(|operators| {
-                            self.config.groups.as_ref().is_some_and(|(claim, _)| {
-                                claims
-                                    .get(claim)
-                                    .and_then(Value::as_array)
-                                    .is_some_and(|groups| {
-                                        groups.iter().filter_map(Value::as_str).any(|group| {
-                                            operators.iter().any(|operator| operator == group)
-                                        })
-                                    })
-                            })
-                        });
-                    let mut groups: Vec<String> = (self.config.groups.iter())
-                        .flat_map(|(claim, _)| strings(&claims, claim))
-                        .map(str::to_string)
-                        .collect();
+                        || by_groups;
+                    let mut groups = granted.groups.clone();
                     groups.sort();
                     groups.dedup();
-                    let granted = self.granted(&claims);
                     return Ok(Admitted {
                         subject: subject.map(str::to_string),
                         grant: granted.union(),
@@ -1206,6 +1291,42 @@ mod tests {
     }
 
     #[test]
+    fn overage_through_the_directory_needs_the_groups_claim_and_the_feature() {
+        let table = |kind: &str, groups: bool, overage: &str| {
+            let groups = match groups {
+                true => "groups_claim = \"groups\"\n[groups]\n\"g\" = [\"a\"]\n",
+                false => "",
+            };
+            bare(&format!(
+                "identities_claim = \"c\"\ntype = \"{kind}\"\n{groups}[entra]\n{overage}\n"
+            ))
+        };
+        let directory = "overage = \"directory\"";
+        let ignored = table("entra", false, "overage = \"ignore\"").unwrap();
+        assert_eq!(ignored.overage, None);
+        assert_eq!(table("entra", true, "").unwrap().overage, None);
+        let key = "oidc.entra.overage";
+        if cfg!(feature = "directory") {
+            assert!(table("entra", true, directory).unwrap().overage.is_some());
+            let missing = Msg::KeyMissing("oidc.groups_claim").text();
+            assert_eq!(table("entra", false, directory), Err((key, missing)));
+        } else {
+            // Without the module the key names the feature, with or without the claim.
+            for groups in [true, false] {
+                let refused = table("entra", groups, directory).unwrap_err();
+                let (section, feature) = ("oidc.entra", "directory");
+                let named = Msg::NeedsFeature { section, feature }.text();
+                assert_eq!(refused, (key, named));
+            }
+        }
+        // Under another `type` the error of `[oidc.entra]` stands.
+        let other = table("okta", true, directory).unwrap_err();
+        assert_eq!(other, ("oidc.entra", Msg::OidcTypeTable("entra").text()));
+        let always = table("entra", true, "overage = \"always\"").unwrap_err();
+        assert_eq!(always.0, key);
+    }
+
+    #[test]
     fn the_claims_and_the_groups_table_are_checked_together() {
         let groups = "[groups]\n\"team-a\" = [\"a\"]\n";
         let config = bare(&format!("groups_claim = \"groups\"\n{groups}")).unwrap();
@@ -1241,7 +1362,9 @@ mod tests {
             groups: Some(("groups".into(), table)),
             ..config(None, &[])
         };
-        match Grant::of(claims.as_object().unwrap(), &config) {
+        let claims = claims.as_object().unwrap();
+        let groups: Vec<String> = strings(claims, "groups").map(str::to_string).collect();
+        match Grant::of(claims, &config, &groups) {
             Grant::All => None,
             Grant::Only(identities) => {
                 let mut identities: Vec<String> = identities.into_iter().collect();
@@ -1435,6 +1558,7 @@ mod tests {
             scopes: scopes.iter().map(|s| s.to_string()).collect(),
             refresh: Duration::from_secs(3600),
             github: None,
+            overage: None,
         }
     }
 

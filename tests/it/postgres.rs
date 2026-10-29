@@ -504,7 +504,7 @@ fn status_names_whether_postgres_is_reachable_and_its_exit_code_ignores_it() {
 /// opened again on the same port: the same Postgres back.
 #[cfg(any(
     feature = "refresh-lock",
-    feature = "directory",
+    all(feature = "directory", feature = "ui"),
     feature = "github-app"
 ))]
 pub(crate) struct Relay {
@@ -512,12 +512,13 @@ pub(crate) struct Relay {
     pub(crate) url: String,
     open: std::sync::Arc<std::sync::atomic::AtomicBool>,
     port: u16,
+    #[cfg_attr(not(feature = "github-app"), allow(dead_code))]
     to: String,
 }
 
 #[cfg(any(
     feature = "refresh-lock",
-    feature = "directory",
+    all(feature = "directory", feature = "ui"),
     feature = "github-app"
 ))]
 impl Relay {
@@ -602,7 +603,7 @@ impl Relay {
 
 /// The audit (#328) of a test's manifests in `dir`: `[postgres]` (`section`, to append to each)
 /// reading its URL, the relay's, from `ops/pg-url`, in a schema of `case`'s own, migrated.
-#[cfg(any(feature = "refresh-lock", feature = "directory"))]
+#[cfg(any(feature = "refresh-lock", all(feature = "directory", feature = "ui")))]
 pub(crate) struct Audited {
     pub(crate) admin: Admin,
     pub(crate) schema: String,
@@ -612,7 +613,7 @@ pub(crate) struct Audited {
     pub(crate) url: String,
 }
 
-#[cfg(any(feature = "refresh-lock", feature = "directory"))]
+#[cfg(any(feature = "refresh-lock", all(feature = "directory", feature = "ui")))]
 pub(crate) fn audited(dir: &Path, case: &str) -> Option<Audited> {
     let url = service()?;
     let schema = schema(case);
@@ -635,7 +636,7 @@ pub(crate) fn audited(dir: &Path, case: &str) -> Option<Audited> {
     })
 }
 
-#[cfg(any(feature = "refresh-lock", feature = "directory"))]
+#[cfg(any(feature = "refresh-lock", all(feature = "directory", feature = "ui")))]
 impl Audited {
     /// Every record, oldest first, as Postgres's `row_to_json` writes it.
     #[cfg(feature = "refresh-lock")]
@@ -660,7 +661,7 @@ impl Audited {
     }
 }
 
-#[cfg(any(feature = "refresh-lock", feature = "directory"))]
+#[cfg(any(feature = "refresh-lock", all(feature = "directory", feature = "ui")))]
 impl Drop for Audited {
     fn drop(&mut self) {
         let drop = format!("DROP SCHEMA IF EXISTS \"{}\" CASCADE", self.schema);

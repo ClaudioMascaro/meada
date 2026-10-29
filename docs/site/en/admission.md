@@ -32,8 +32,18 @@ jwks_refresh_seconds = 3600                      # default; at least 60
 `type` says which identity provider issues the tokens: `generic` (the default), `entra`, `okta`
 or `keycloak`. None changes the admission, the grant or an answer; the type shows on the
 console's admission page. Only `entra` takes a table of its own, `[oidc.entra]`, with one key,
-`overage`, which for now accepts only `"ignore"` (the default): a token in overage, with no
-`groups`, has no groups. `[oidc.entra]` under another `type` is an error. `[oidc.github]`, the
+`overage`: `"ignore"` (the default), where a token in overage (no `groups` claim, and a
+`_claim_names` object mapping `groups_claim` to a source) has no groups, or `"directory"`, where
+its groups come from the [directory](console.md#directory-scim) the identity provider pushes: the
+`group_attribute` values of the groups whose members include the active user whose
+`user_attribute` equals the token's `user_claim`. They replace the missing claim everywhere
+`groups_claim` is read, on nodes and in the console (grant, operators, teams, `session`, token
+check). It needs `[directory]` and `groups_claim`, each error naming the key. A node or the console
+looks the token up once at admission and keeps the answer for five minutes per `user_claim` value
+(a membership change reaches it that late); with Postgres unreachable and nothing kept, the token
+has no groups, with one stderr line, and Meada never calls the source's endpoint. The console
+refuses a deactivated or deleted user before any kept answer is used; nodes do not check
+deprovisioning. `[oidc.entra]` under another `type` is an error. `[oidc.github]`, the
 GitHub grant provider, has its own section in [GitHub App credentials](github-app.md#role-check);
 with it neither claim is required, and a token's grant becomes the union of its claims grant and
 what its GitHub login reads.

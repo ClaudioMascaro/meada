@@ -429,7 +429,8 @@ one for the area a change touches.
   start (`Console::start`): unset, unreadable or shorter than `TOKEN_MIN` (32) characters refuses
   the start naming the key (`Msg::DirectoryTokenShort`), never the value; rotating it means a
   restart. Nodes parse the section and never read the token; `user_claim` is read by the console's
-  deprovisioning (`ui/directory.rs`) and waits for Entra overage (S4 ticket 10).
+  deprovisioning (`ui/directory.rs`) and, for nodes and the console alike, Entra overage
+  (`oidc/overage.rs`, #336).
   `directory/scim.rs` (with `ui`) is the endpoint the console serves under `/scim/v2/` with
   `[ui]` and `[directory]` (`Console::scim`, routed before the console's admission). Admission
   in order: S2's `Host` check (the plain 403); a 403 for any request carrying `Origin`; the
@@ -492,7 +493,10 @@ one for the area a change touches.
   deployment), and `File::validate` its `Config` (`type` one of `TYPES`, `generic` by default,
   `entra`, `okta` or `keycloak`, any other value or a value that is not a string the error naming
   the four and never the value; `[oidc.entra]` only under `type = "entra"`, its one key `overage`
-  one of `OVERAGES`, only `ignore` until #336, a token in overage having no groups; `okta` and
+  one of `OVERAGES`: `ignore`, a token in overage having no groups, or `directory` (#336), which
+  needs `groups_claim` (`Msg::KeyMissing`), a build with `directory` (`Msg::NeedsFeature`) and
+  `[directory]` (`Manifest::read`, which hands it `[directory]` and `[postgres]`,
+  `Config::overage`, `Msg::NeedsSections`), each error at `oidc.entra.overage`; `okta` and
   `keycloak` take no table and, as `entra`, change no answer; `[oidc.github]` the GitHub grant
   provider, `GithubFile::validate` its `Github` (`host` a lowercase host name, `github.com` by
   default; `login_claim` required and not empty; `roles` a non-empty array of distinct names
@@ -528,7 +532,9 @@ one for the area a change touches.
   `[oidc.github]`, the GitHub grant (#332), never `*`: the identities the token's login holds an
   accepted role on in the permissions cache. The login is `login_claim`'s value when it is a
   string of 1 to 39 ASCII letters, digits, `-` and `_`, lowercased (`permissions::login`); any
-  other value gives no GitHub grant. The permissions cache (`oidc/permissions.rs`, feature
+  other value gives no GitHub grant. Under `[oidc.entra] overage = "directory"` the groups the
+  claims grant maps are `Oidc::groups`: the `groups_claim` array, or, for a token in overage, the
+  directory's (see Entra overage below). The permissions cache (`oidc/permissions.rs`, feature
   `postgres`, `Permissions`) is empty until the listener printed its address (`Oidc::listening`,
   called by `mcp::run` and `ui::listen`), then a thread reads, every `PERMISSIONS_POLL` (60 s),
   in one `REPEATABLE READ READ ONLY` transaction through `postgres::versioned`, the newest set's
@@ -550,7 +556,8 @@ one for the area a change touches.
   the grant and it bounds the workspace of each answer and each 404 list (`mcp.rs`). No token, error text
   of `jsonwebtoken` or claim value is ever printed. With feature `ui`, the console reaches the
   same checks through `admit_console` (one audience, `[ui] audience`; a `Bearer` challenge with
-  no `resource_metadata`), `check` (a pasted token's outcome per check, signature, issuer,
+  no `resource_metadata`; its `groups`, the session's, and the `operator_groups` match read the
+  same effective groups, `Granted::groups`), `check` (a pasted token's outcome per check, signature, issuer,
   audience as a node checks it, lifetime and scopes, and its grant when every check passes,
   against the cached keys only, so it never fetches; with `[oidc.github]` its two sides,
   `Checked::sources`, from the cache) and `admission` (the identity provider's
@@ -2776,6 +2783,35 @@ qualification budget does (ADR 0017).
   memory (logins times repositories under an organization base role), loaded whole when the set
   changes; a revocation on GitHub reaches it at the next successful refresh plus at most
   `PERMISSIONS_POLL` (60 seconds), and without one at most `max_age_seconds` after the last.
+- `oidc/overage.rs`: an overage answer is kept `OVERAGE_TTL` (5 minutes), so a membership change
+  reaches an overage subject that late; the cache has no cap on live entries, since only a token
+  that passed every check adds one, and holds at most the subjects seen in the last two TTLs
+  (an expired entry is dropped when found and swept once per TTL); a failed lookup is not cached,
+  so with Postgres blackholed every uncached overage request waits up to the connect and
+  statement timeouts and writes one stderr line; a console whose directory cannot be read admits
+  reads (the deprovisioning rule of #335), so within the TTL a user deactivated meanwhile keeps
+  its cached overage groups for reads, while writes are refused (503 `audit_unavailable`).
+- `oidc/overage.rs` (feature `directory`, #336): Entra overage through the directory. A token is
+  in overage (`in_overage`) when it has no claim named `groups_claim` and its `_claim_names` is an
+  object whose value for `groups_claim` is a string; anything else, `groups` present with any
+  value included, is a token without groups and is never looked up. The groups of such a token
+  are the `group_attribute` values (`displayName` or `externalId`) of the groups whose members
+  include the active `directory_users` row whose `user_attribute` equals the token's
+  `user_claim` value (`externalId` exactly, `userName` through `lower()`), one statement after
+  the version check (`postgres::versioned`), bounded by `Config::bound`; an inactive or absent
+  user has none, and a value failing `owner_problem` is skipped with one `Msg::PermissionsBadRow`
+  line naming `directory_groups`. `Overage::groups` looks up at admission, on nodes (`Oidc::admit`,
+  inside `block_in_place`) and in the console (`admit_console`, the token check's `check`), and
+  keeps the answer in memory by `user_claim` value for `OVERAGE_TTL` (5 minutes; in debug builds
+  `MEADA_OVERAGE_TTL_MS` shortens it, a test knob as `MEADA_DRAIN_MS` is): an answer of no groups
+  is kept like any other, a failed lookup is not (one `Msg::OverageUnreadable` line, the token
+  having no groups, whether Postgres is unreachable or its schema version unknown), and an entry
+  is dropped when found expired and by a sweep of all the expired ones that a store triggers once
+  per TTL (`Cache::put`). Only a token that passed every check reaches the lookup. It is the
+  only lookup on a node's request path. The console's `directory_refusal` runs after
+  `admit_console` and before any role is computed from the groups, so an inactive or deleted
+  provisioned user is refused (`deprovisioned`) before cached overage authority is used; nodes do
+  not check deprovisioning.
 - `oidc.rs`: each metadata and JWKS request takes at most `FETCH_TIMEOUT` (10 seconds), a
   metadata document at most `METADATA_MAX` (64 KiB) and a JWKS at most `JWKS_MAX` (256 KiB);
   past any of them the request fails (at start, the start is refused; on a refresh, the cached

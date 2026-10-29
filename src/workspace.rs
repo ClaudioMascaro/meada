@@ -374,6 +374,24 @@ impl Manifest {
             let missing: Vec<&str> = (missing.iter()).filter(|m| m.1).map(|m| m.0).collect();
             modules::needs(file, &src, "directory", &missing)?;
         }
+        // `[oidc.entra] overage = "directory"` (#336) reads the directory `[directory]` names, in
+        // the data layer `[postgres]` names; `[directory]` already needed both.
+        #[cfg(all(feature = "oidc", feature = "directory"))]
+        if let Some(overage) = oidc.as_mut().and_then(|o| o.overage.as_mut()) {
+            match (&directory, &postgres) {
+                (Some(directory), Some(postgres)) => {
+                    overage.lookup = Some((directory.clone(), postgres.clone()));
+                }
+                _ => {
+                    let needed = Msg::NeedsSections {
+                        section: "oidc.entra",
+                        needed: &["directory"],
+                    };
+                    let key = "oidc.entra.overage";
+                    return Err(config::error_at(file, &src, key, &needed.text()));
+                }
+            }
+        }
         // The `[[github_app]]` blocks are checked, `[valkey]` among their needs; only
         // `github_apps` keeps them.
         #[cfg(feature = "github-app")]

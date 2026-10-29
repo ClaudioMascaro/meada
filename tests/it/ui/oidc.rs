@@ -1096,6 +1096,8 @@ mod deprovision;
 mod directory;
 #[cfg(all(feature = "refresh-lock", feature = "postgres", feature = "github-app"))]
 mod github;
+#[cfg(all(feature = "directory", feature = "refresh-lock"))]
+mod overage;
 #[cfg(feature = "refresh-lock")]
 mod team;
 #[cfg(feature = "refresh-lock")]

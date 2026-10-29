@@ -64,6 +64,19 @@ All notable changes to Meada are recorded here. The format follows
   /api/v1/admission` gains `"type"`, which the admission page shows beside the issuer. Any other
   value, or one that is not a string, is an error naming the file, the line, the key and the four
   values.
+- `[oidc.entra] overage = "directory"` (ADR 0016): a Microsoft Entra ID token in more groups than
+  it can carry (`_claim_names` mapping `groups_claim` to a source, no `groups`) gets its groups
+  from the directory the identity provider pushes through the console's SCIM endpoint: the
+  `group_attribute` values of the groups whose members include the active user whose
+  `user_attribute` equals the token's `user_claim`. They replace the missing claim everywhere
+  `groups_claim` is read: a node's grant through `[oidc.groups]`, and the console's grant,
+  `[ui] operator_groups`, the team operator's teams, the session's `groups` and the token check.
+  It needs `[directory]` and `groups_claim`, each error naming the file, the line and the key.
+  Nodes and the console look a token up once at admission and keep the answer five minutes, per
+  `user_claim` value; a failed lookup is not kept, and with Postgres unreachable the token has no
+  groups, as before, with one stderr line. Meada never calls the source's endpoint. The console
+  still refuses a deactivated or deleted provisioned user as `deprovisioned` before any cached
+  answer is used. `overage = "ignore"` keeps today's behavior.
 - `[oidc.entra]`, the settings only Entra ID needs, allowed under `type = "entra"` alone, with one
   key: `overage = "ignore"` (the default), a token in overage having no groups, as before. Any
   other value, and an unknown key, is an error naming the file, the line and the key.

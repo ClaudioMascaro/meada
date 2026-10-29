@@ -175,7 +175,7 @@ pub const OWNER_MAX: usize = 256;
 
 /// What an `owner` may not be (ADR 0015): empty, over `OWNER_MAX` characters, holding a control
 /// character (Unicode category Cc) or with whitespace at either end.
-fn owner_problem(name: &str) -> Option<Msg<'static>> {
+pub fn owner_problem(name: &str) -> Option<Msg<'static>> {
     let padded = name.chars().next().is_some_and(char::is_whitespace)
         || name.chars().next_back().is_some_and(char::is_whitespace);
     if name.is_empty() {

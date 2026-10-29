@@ -6,9 +6,9 @@
 //! (`user_attribute`, `userName` or `externalId`) and the group attribute that names a group
 //! (`group_attribute`, `displayName` by default, or `externalId`). It needs `[postgres]` and
 //! `[oidc]`. Only the console reads the token, once at start: rotating it means restarting the
-//! console. Nodes read the section only for overage (#336), never the token. The console reads
-//! the directory (`read`, #335) at its admission, for the owner picker, `owner_missing` and the
-//! admission counts; overage is S4 ticket 10.
+//! console. Nodes read the section only for overage (#336, `oidc::overage`), never the token.
+//! The console reads the directory (`read`, #335) at its admission, for the owner picker,
+//! `owner_missing` and the admission counts, and for overage as the nodes do.
 
 use std::path::Path;
 
@@ -50,16 +50,16 @@ pub struct File {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Config {
     token: Secret,
-    /// The token claim naming a user: the console's deprovisioning (#335) and the overage (S4
-    /// ticket 10) read it.
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    /// The token claim naming a user: the console's deprovisioning (#335) and the overage lookup
+    /// (#336) read it.
+    #[cfg_attr(not(any(feature = "ui", feature = "oidc")), allow(dead_code))]
     pub user_claim: String,
     /// `userName` or `externalId`: what `user_claim` matches, and what a revocation marker is
     /// cleared by.
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    #[cfg_attr(not(any(feature = "ui", feature = "oidc")), allow(dead_code))]
     pub user_attribute: &'static str,
     /// `displayName` or `externalId`: what names a group, unique among them.
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    #[cfg_attr(not(any(feature = "ui", feature = "oidc")), allow(dead_code))]
     pub group_attribute: &'static str,
 }
 
