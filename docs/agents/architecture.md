@@ -369,8 +369,13 @@ one for the area a change touches.
   creates the version table, `<schema>.schema_version` (one row, `version`), the schema itself
   created in its transaction when absent; migration 2 the audit's table, `<schema>.audit`
   (`audit.rs`); migration 3 the directory's tables (`directory/scim.rs`); migration 4 its state row,
-  `<schema>.directory_state` (`groups_provisioned`, `last_write`; #335). `connected` is `connect` keeping the password for scrubbing a later statement's
-  error, and `probe` is the console's start check (a version refusal refuses the start, Postgres
+  `<schema>.directory_state` (`groups_provisioned`, `last_write`; #335); migration 5 the
+  permissions set (#331): `<schema>.permission_sets` (`id`, 32 lowercase hex characters from
+  `gen_random_uuid`, `fence`, `version`, `started`, `finished` from Postgres's clock,
+  `repositories`), `<schema>.permission_rows` (`identity`, `login` lowercase, `role` as GitHub
+  spells it) and `<schema>.permission_exclusions` (`identity`, `added_by`), both cascading from
+  their set. `connected` is `connect` keeping the password for scrubbing a later statement's
+  error (`Opened::scrubber` a copy of it for a transaction, which borrows the client), and `probe` is the console's start check (a version refusal refuses the start, Postgres
   unreachable does not). `migrate` (`meada postgres migrate --workspace
   <bootstrap manifest>`, reading `Manifest::postgres`, no mirror) is the only command that
   creates or alters a table: it takes `pg_advisory_lock` on `lock_key(schema)` (the first eight
@@ -488,11 +493,17 @@ one for the area a change touches.
   `entra`, `okta` or `keycloak`, any other value or a value that is not a string the error naming
   the four and never the value; `[oidc.entra]` only under `type = "entra"`, its one key `overage`
   one of `OVERAGES`, only `ignore` until #336, a token in overage having no groups; `okta` and
-  `keycloak` take no table and, as `entra`, change no answer; `[oidc.github]` an unknown key until
-  #331; `issuer` `https` or loopback `http`
+  `keycloak` take no table and, as `entra`, change no answer; `[oidc.github]` the GitHub grant
+  provider, `GithubFile::validate` its `Github` (`host` a lowercase host name, `github.com` by
+  default; `login_claim` required and not empty; `roles` a non-empty array of distinct names
+  that `role_ok` takes, 1 to `ROLE_MAX` characters with no control character, `ROLES`, GitHub's
+  five built-in roles, by default; `max_age_seconds` required, at least `MAX_AGE_MIN`), in a
+  build without `postgres` the error naming the feature, without `[postgres]` the error naming
+  both (`workspace::Manifest::read`); beside it neither claim is needed, and until #332 it adds
+  nothing to a grant; `issuer` `https` or loopback `http`
   with no user, query or fragment, `public_url` the same with no path (`modules::reachable`),
   `identities_claim` and `audience` not empty, `groups_claim` (not empty) and its `[oidc.groups]`
-  table together, at least one of the two claims, scopes RFC 6749 scope-tokens,
+  table together, at least one of the two claims or `[oidc.github]`, scopes RFC 6749 scope-tokens,
   `jwks_refresh_seconds` at least 60). `Oidc::start`,
   called by `mcp::Gate::new` before the listener binds, finds the metadata at the URLs the MCP
   specification tries in order (`metadata_urls`: RFC 8414 and OpenID discovery with the path
@@ -731,8 +742,43 @@ one for the area a change touches.
   `installation:<id>:` `token` (`<expiry> <token>`), `mint`, `throttled`;
   `owner:<owner>:next` (the counter, the only key with no TTL); `repo:<owner>/<repo>:last`. A
   token must be visible ASCII before it is cached or answered, so the API cannot inject a
-  protocol line. Errors carry an HTTP status or a URL, never a body, and the JWT is scrubbed
-  from ureq's (`valkey::scrub`).
+  protocol line. Errors carry an HTTP status or a URL, never a body, and the bearer (the JWT, or
+  an installation token) is scrubbed from ureq's (`valkey::scrub`).
+  The role check (#331, features `github-app`, `postgres` and `oidc`): `roles` (`meada
+  github-app roles --workspace <bootstrap manifest>`) needs `[oidc.github]` (`Msg::RolesNoGithub`)
+  and a `[[github_app]]` block for its `host` (`Msg::RolesNoApp`, at the table's line), reads
+  the workspace as `index --workspace` does but whole (`checked_entries`: with `source = "store"`
+  the pulled version through `versions::pulled`, never `eligible`, its id the set's `version`),
+  and takes its fence from `MEADA_REFRESH_FENCE` under `[refresh_lock]` (`run_fence`, a positive
+  decimal within `bigint`, else `Msg::RolesFenceEnv`), 0 without. `check` then runs in this
+  order: `postgres::connected` (the schema version refusal), the newest set's fence read with
+  Postgres's `now()` as `started` and a higher one refused (`Msg::RolesFenceBelow`); the
+  exclusions file removed; every identity on the host listed (`listed`: the owner's
+  installations in `Run::rotation`'s order, the round robin `get` shares; a 403 or 429 marks the
+  installation and passes to the next, every one throttled, a 5xx, a timeout, an answer past
+  `ANSWER_MAX` or a page that is not a JSON array fails the run with `Msg::RolesFailed` naming the
+  identity and why; a 404 (`Failure::Missing`) and an owner no installation covers are a warning
+  and no rows; an identity on the host that is not `<host>/<owner>/<repo>` likewise); one
+  transaction under `LOCK TABLE permission_sets IN EXCLUSIVE MODE`, which serializes writers and
+  lets readers see the old set or the new one, checking the fence again, inserting the set, its
+  rows (`unnest` of three arrays) and its exclusions and deleting every older set; then, under
+  `<index_dir>/workspace/excluded.lock`, the file written by rename (`versions::write_excluded`)
+  only while the set still exists, else `Msg::RolesReplaced`. Postgres and the file are never
+  written atomically together: a run that fails anywhere after the removal leaves no file, so no
+  reader admits a previous check's exclusions for the same version, and the local recovery is
+  to run the role check again. `collaborators` lists one repository with its token: the URL is
+  always `Listing::url` (`affiliation=all`, `PER_PAGE`, the page), and `Listing::next` reads the
+  `Link` header's `rel="next"` as hostile, never echoed: on the REST base's origin with no user,
+  at `/repos/<owner>/<repo>/collaborators` or GitHub's `/repositories/<id>/collaborators` (one
+  id for every page), naming a `page` not requested yet (`Msg::RolesLinkForeign`,
+  `Msg::RolesLinkCycle`), at most `COLLABORATOR_PAGES_MAX` (`Msg::RolesPages`); only the page
+  number is followed, so the token reaches no other URL. `collaborator` keeps a row whose login
+  `meada_core::manifest::added_by_problem` takes once lowercased and whose `role_name`
+  `oidc::role_ok` takes, else one line naming the identity (`Msg::RolesSkipped`); rows are keyed
+  by identity and login, the first kept. An entry with `added_by` on the host whose login holds
+  no role in `roles` among its repository's rows is excluded (`Msg::RolesExcluded`, the reason
+  and never the login). The line on stdout is `Msg::RolesSet`: the set's id, the repositories
+  listed, the rows and the exclusions.
 - `snapshot.rs`, `snapshot/store.rs`, `snapshot/pull.rs` (feature `snapshot`; the only places
   `object_store`, `reqwest` as a client of Meada's own and `tar` are used): the snapshot store. `File` is the
   `[snapshot]` section and `File::validate` its `Config` (an `https` endpoint, or `http` on
@@ -883,7 +929,9 @@ one for the area a change touches.
   `path` as written, its `owner` when it has one, plus its blocks as `entry_blocks` gives
   them), stored with the size and hash metadata every object carries and never rewritten. The
   id is `meada_core::ids::workspace_version_id` of the entries alone, owners included.
-  `meada index`, `status`, `export` and `snapshot publish` ignore the owner and the `added_by` of a pulled version,
+  `meada index`, `status`, `export` and `snapshot publish` ignore the owner and the `added_by` of a pulled version
+  (the role check reads the `added_by`, and under `[oidc.github]` they leave out what its
+  exclusions file names),
   and a generation document's entry blocks holding an `owner` or an `added_by` are refused (`snapshot/pull.rs`). The current version is
   `{<key_prefix>}:workspace`, a hash `{id, fence}` under the pointer's hash tag (`pointer_key`,
   read by `current`, moved by `meada workspace apply`, #302). `import` (`meada workspace import
@@ -1031,7 +1079,20 @@ one for the area a change touches.
   `<index_dir>/workspace/` (`versions::pulled`, from disk, once per read, `Manifest::version`
   its id), its paths relative to the bootstrap manifest's directory, and goes on as for a
   file's entries (the checks that need a mirror run in `mirror`); without one it refuses naming
-  `meada workspace pull` (`Msg::WorkspaceNotPulled`). `mcp --listen` without `--generations`
+  `meada workspace pull` (`Msg::WorkspaceNotPulled`). Under `[oidc.github]` (#331) it reads
+  `versions::eligible` instead: the pulled version without the identities the exclusions file
+  `<index_dir>/workspace/excluded` names (`versions::excluded`: hostile input, at most
+  `VERSION_MAX`, its first line a version id equal to the pulled one, then one identity per
+  line, no space or control character and no `identity_problem`), refused naming `meada
+  github-app roles` when the file is missing (`Msg::ExcludedMissing`), names another version
+  (`Msg::ExcludedOther`) or holds a malformed line (`Msg::ExcludedBad`, the file and the line);
+  an excluded identity is absent as an entry the workspace does not list (a peer naming it misses
+  it). `Manifest::excludes` says whether a manifest's readers do so (`[oidc.github]` with
+  `source = "store"`). `meada workspace show --pulled` (`versions::show_pulled`) prints what
+  they read, in the `[[repository]]` shape, for the fetch script; without `[oidc.github]` the
+  pulled version whole, and with a version argument it is a usage error (clap's
+  `conflicts_with`). `[oidc.github]` without `[postgres]` is refused here, at the table's line,
+  naming both. `mcp --listen` without `--generations`
   refuses such a manifest naming `--generations` (`Msg::WorkspaceStoreRefused`): a managed
   workspace's nodes serve generations, which take their repositories from the generation.
   `Manifest::index_dir` is the directory every index lives under.
@@ -2377,6 +2438,12 @@ one for the area a change touches.
   identity, and the optional Ingress leaves admission and header forwarding to the controller.
 - `scripts/helm-check` checks public renders with Helm and parses the resulting TOML. The
   Helm workflow runs it without a cluster; a local kind smoke checks MCP search after install.
+- The job's refresh under `[oidc.github]` (#331), under `meada snapshot lock`: `meada workspace
+  pull`, `meada github-app roles`, the fetch of the mirrors `meada workspace show --pulled`
+  lists, `meada index --workspace` and `meada snapshot publish`; one that stops on the role
+  check's exit publishes nothing, and its exclusion of an addition is a decision before the
+  fetch, not a failed fetch (#316). The compose and Helm profiles gain the step, Postgres and
+  `migrate` with the documentation and profiles slice of #319.
 
 ## Tests (`tests/`)
 
@@ -2679,7 +2746,11 @@ qualification budget does (ADR 0017).
   private-key operations; Meada only verifies with public keys, so it does not apply.
 - `github_app.rs`: each REST request takes at most `REQUEST_TIMEOUT` (10 seconds) and reads at
   most `ANSWER_MAX` (4 MiB); an App's installations are listed over at most `PAGES_MAX` pages of
-  100 (10,000 installations), the rest unseen; a `private_key_file` holds at most `KEY_MAX` (16
+  100 (10,000 installations), the rest unseen; the role check lists one repository's
+  collaborators over at most `COLLABORATOR_PAGES_MAX` pages of 100 (100,000 collaborators), past
+  which the run fails, writing nothing. It costs one listing per repository on the host,
+  `ceil(collaborators / 100)` requests each, against the installation's REST budget (#319's
+  Known ceilings), and it holds every row of the set in memory once, as Postgres receives it; a `private_key_file` holds at most `KEY_MAX` (16
   KiB) and git's request at most `INPUT_MAX` (64 KiB). The time margins are fixed, not
   configured: `TOKEN_MARGIN` and `REFRESH_EVERY` (10 minutes each), the JWT's `JWT_LIFE` (9
   minutes) and `JWT_BACKDATE` (60 s), `INSTALLATIONS_TTL` (the listed installations stay usable

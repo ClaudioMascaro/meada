@@ -8,6 +8,32 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- `[oidc.github]`, the GitHub grant provider's table (ADR 0016): `host` (default `github.com`, a
+  lowercase host name), `login_claim` (required), `roles` (a non-empty array of distinct role
+  names of 1 to 100 characters with no control character, compared exactly with GitHub's
+  `role_name`; default `["read", "triage", "write", "maintain", "admin"]`) and `max_age_seconds`
+  (required, at least 60). It needs `[postgres]` and a build with `postgres`, each error naming
+  them; beside it `[oidc]` needs neither `identities_claim` nor `groups_claim`. Until the grant
+  at admission lands, such a deployment grants nothing through GitHub, failing closed.
+- `meada github-app roles --workspace <bootstrap manifest>` (features `github-app`, `postgres`
+  and `oidc`), the job's role check at every refresh: for each identity of the workspace on
+  `[oidc.github] host` it lists `GET /repos/{owner}/{repo}/collaborators?affiliation=all&per_page=100`,
+  every page, through the installation ADR 0013's selection picks, and replaces the permissions
+  set in Postgres in one transaction (its rows, every collaborator listed with its `role_name`,
+  and its exclusions), refused when a set with a higher `MEADA_REFRESH_FENCE` exists. With
+  `source = "store"`, every addition whose `added_by` holds no accepted role is left out:
+  written to `<index_dir>/workspace/excluded`, and `meada index`, `status`, `export` and
+  `snapshot publish` treat it as absent from the workspace, refusing to run, naming the role
+  check, when the file is missing or names another version. A 403 or 429 passes to the next
+  installation; every one throttled, a 5xx, a timeout, an answer past the size cap or a
+  `Link` header that leaves the repository's listing fails the run, which writes nothing. A
+  404 or an owner no installation covers gives a warning and no rows. No App permission beyond
+  Metadata (read) is needed. The job's refresh becomes `workspace pull`, `github-app roles`,
+  the fetch of what `show --pulled` lists, `index` and `snapshot publish`.
+- `meada workspace show --pulled --workspace <bootstrap manifest>` prints the version `meada
+  workspace pull` left on disk in the `[[repository]]` shape, without the entries the role
+  check excluded, for the fetch script; with a version argument it is a usage error.
+
 - `added_by`, an optional key of a workspace version's `[[repository]]` entries beside `repo`,
   `path` and `owner` (ADR 0016): the GitHub login that added the entry, 1 to 39 characters of
   lowercase ASCII letters, digits, `-` and `_`. It is imported, stored, shown (`meada workspace

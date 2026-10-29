@@ -17,14 +17,19 @@
 //! `<id> <fence>`, swapped by rename and never to a lower fence; `pull.lock` keeps one pull at a
 //! time. `index`, `status`, `export` and `snapshot publish` read the version `current` names
 //! from there (`pulled`, through `Manifest::read_listed`), checked again, and never connect.
+//! Under `[oidc.github]` they read it without the additions `meada github-app roles` excluded
+//! (`eligible`), which it writes to `excluded` (`EXCLUDED`) beside `current` (#331).
 
 #[cfg(feature = "refresh-lock")]
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
+#[cfg(all(feature = "ui", feature = "refresh-lock"))]
+use meada_core::authorize::compose_entries;
 #[cfg(feature = "refresh-lock")]
-use meada_core::authorize::{self, Grant, Refusal, Role, authorize_entries, compose_entries};
+use meada_core::authorize::{self, Grant, Refusal, Role, authorize_entries};
 use meada_core::ids::{VersionEntry, workspace_version_id};
 use meada_core::manifest::{EntryFile, validate, validate_import};
 use meada_core::workspace::{entries_text, entry};
@@ -759,6 +764,16 @@ pub fn pull(manifest: &Path) -> crate::Result<Pulled> {
 /// checked as a pull checks it: its id, its entries and their text in the `[[repository]]`
 /// shape; `None` without a current file. No connection is opened.
 pub fn pulled(dir: &Path) -> Result<Option<(String, Vec<EntryFile>, String)>, String> {
+    let Some((id, _, text, shown)) = pulled_version(dir)? else {
+        return Ok(None);
+    };
+    let entries = validate(&shown, &text).map_err(|_| Msg::WorkspaceNotVersion(&shown).text())?;
+    Ok(Some((id, entries, text)))
+}
+
+/// The pulled version as `pulled` reads it: its id, its document, its entries' text and the path
+/// it was read from.
+fn pulled_version(dir: &Path) -> Result<Option<(String, Version, String, String)>, String> {
     let file = dir.join(CURRENT);
     let current = pull::pointer_file(&file, |shown| Msg::WorkspaceCurrentBad(shown).text())?;
     let Some((id, _)) = current else {
@@ -767,7 +782,110 @@ pub fn pulled(dir: &Path) -> Result<Option<(String, Vec<EntryFile>, String)>, St
     let path = dir.join(format!("{id}.json"));
     let shown = path.display().to_string();
     let bytes = crate::config::read_bounded(&path, VERSION_MAX)?;
-    let (_, text) = checked(&shown, &id, &bytes)?;
-    let entries = validate(&shown, &text).map_err(|_| Msg::WorkspaceNotVersion(&shown).text())?;
+    let (version, text) = checked(&shown, &id, &bytes)?;
+    Ok(Some((id, version, text, shown)))
+}
+
+/// `pulled` without the entries the exclusions file of `dir` names (`excluded`): what every
+/// reader of the pulled version reads under `[oidc.github]` with `source = "store"` (#331), an
+/// excluded identity being absent from the workspace. `meada github-app roles` alone reads the
+/// version whole.
+pub fn eligible(dir: &Path) -> Result<Option<(String, Vec<EntryFile>, String)>, String> {
+    let Some((id, version, _, shown)) = pulled_version(dir)? else {
+        return Ok(None);
+    };
+    let excluded = excluded(dir, &id)?;
+    let kept: Vec<Json> = (version.repositories.into_iter())
+        .filter(|e| {
+            !e["repo"]
+                .as_str()
+                .is_some_and(|repo| excluded.contains(repo))
+        })
+        .collect();
+    let not = || Msg::WorkspaceNotVersion(&shown).text();
+    let text = entries_text(&kept).ok_or_else(not)?;
+    let entries = validate(&shown, &text).map_err(|_| not())?;
     Ok(Some((id, entries, text)))
+}
+
+/// The exclusions file in `DIR` (#331): the version id `meada github-app roles` checked on its
+/// first line, then the identities it left out, sorted, one per line.
+pub const EXCLUDED: &str = "excluded";
+
+/// The identities the exclusions file of `dir` leaves out of the pulled version `version`. The
+/// file is hostile: refused, naming `meada github-app roles`, when it is missing or names another
+/// version id, and naming its line when one is not a version id or an identity.
+pub fn excluded(dir: &Path, version: &str) -> Result<BTreeSet<String>, String> {
+    let file = dir.join(EXCLUDED);
+    let shown = file.display().to_string();
+    if fs::symlink_metadata(&file).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound) {
+        return Err(Msg::ExcludedMissing(&shown).text());
+    }
+    let bytes = crate::config::read_bounded(&file, VERSION_MAX)?;
+    let bad = |line| Msg::ExcludedBad { file: &shown, line }.text();
+    let text = String::from_utf8(bytes).map_err(|_| bad(1))?;
+    let mut lines = text.lines();
+    let named = lines.next().filter(|id| is_id(id)).ok_or_else(|| bad(1))?;
+    if named != version {
+        let (file, pulled) = (shown.as_str(), version);
+        return Err(Msg::ExcludedOther {
+            file,
+            named,
+            pulled,
+        }
+        .text());
+    }
+    let identity = |line: &str| {
+        !line.is_empty()
+            && !line.chars().any(|c| c.is_control() || c.is_whitespace())
+            && meada_core::manifest::identity_problem(line).is_none()
+    };
+    (lines.enumerate())
+        .map(|(n, line)| {
+            identity(line)
+                .then(|| line.to_string())
+                .ok_or_else(|| bad(n + 2))
+        })
+        .collect()
+}
+
+/// Writes the exclusions file of `dir` by rename: `version`, then `identities` in order.
+pub fn write_excluded(
+    dir: &Path,
+    version: &str,
+    identities: &BTreeSet<String>,
+) -> Result<(), String> {
+    let text: String = std::iter::once(version)
+        .chain(identities.iter().map(String::as_str))
+        .map(|line| format!("{line}\n"))
+        .collect();
+    let (file, new) = (dir.join(EXCLUDED), dir.join(format!("{EXCLUDED}.new")));
+    let written = (fs::write(&new, text).map_err(pull::io_at(&new)))
+        .and_then(|()| fs::rename(&new, &file).map_err(pull::io_at(&file)));
+    if written.is_err() {
+        let _ = fs::remove_file(&new);
+    }
+    written
+}
+
+/// `meada workspace show --pulled --workspace <manifest>`: the version `meada workspace pull` left
+/// on disk, in the `[[repository]]` shape, for the fetch script; under `[oidc.github]` with
+/// `source = "store"` without the entries the role check excluded, refused as the readers refuse.
+/// No connection is opened.
+pub fn show_pulled(manifest: &Path) -> crate::Result<String> {
+    let read = Manifest::read(manifest)?;
+    let dir = read.index_dir.join(DIR);
+    let found = match read.excludes() {
+        true => eligible(&dir)?,
+        false => pulled(&dir)?,
+    };
+    let not_pulled = || {
+        let (manifest, dir) = (manifest.display().to_string(), dir.display().to_string());
+        Msg::WorkspaceNotPulled {
+            manifest: &manifest,
+            dir: &dir,
+        }
+        .text()
+    };
+    Ok(found.ok_or_else(not_pulled)?.2)
 }

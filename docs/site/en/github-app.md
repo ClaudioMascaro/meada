@@ -81,3 +81,38 @@ to the next installation. With git 2.54 or later, `http.maxRetries` makes git it
 
 On GitHub.com and GitHub Enterprise Cloud, `api` lies outside the operator's boundary; that is
 accepted because the job's fetches already go to that host (ADR 0013).
+
+## Role check
+
+With `[oidc.github]` (features `github-app`, `postgres` and `oidc`), the job asks GitHub at every
+refresh who holds which role on each repository of the workspace on the provider's `host`, with
+the same installations, throttle marks and token cache as the helper. The App needs no
+permission beyond Metadata (read).
+
+```toml
+[oidc.github]
+host = "github.com"                     # the default; a lowercase host name
+login_claim = "github_login"            # the claim holding the subject's GitHub login
+roles = ["read", "triage", "write", "maintain", "admin"]   # the default; custom roles too
+max_age_seconds = 5400                  # required, at least 60
+```
+
+`[oidc.github]` needs `[postgres]` and a Meada built with `postgres`; beside it, `[oidc]` needs
+neither `identities_claim` nor `groups_claim`. `meada github-app roles --workspace <manifest>`
+lists `GET /repos/{owner}/{repo}/collaborators?affiliation=all&per_page=100`, every page, and
+writes to Postgres, in one transaction, a permissions set that replaces the previous one: each
+collaborator listed with its `role_name`. Under `[refresh_lock]` the set carries the job's
+`MEADA_REFRESH_FENCE`, and a set with a higher fence already written refuses the run. A 403 or
+429 passes to the next installation; with every one throttled, on a 5xx, a timeout or a `Link`
+header that leaves the repository's listing, nothing is written and the exit is 1. A 404, or an
+owner no installation covers, gives a warning and no rows.
+
+With `source = "store"`, every addition whose `added_by` holds no role in `roles` is left out:
+the command writes `<index_dir>/workspace/excluded` (the version id, then the excluded
+identities, one per line), and `meada index`, `status`, `export` and `snapshot publish` treat it
+as absent from the workspace. Without that file, or with one of another version, they refuse,
+naming `meada github-app roles`; a check that failed leaves no file. `meada workspace show
+--pulled` prints the pulled version without the exclusions, for the fetch script. The job's
+refresh, under `meada snapshot lock`, becomes: `workspace pull`, `github-app roles`, the fetch of
+what `show --pulled` lists, `index --workspace` and `snapshot publish`; a refresh that stops at
+the check publishes nothing.

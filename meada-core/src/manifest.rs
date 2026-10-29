@@ -207,7 +207,7 @@ pub const ADDED_BY_MAX: usize = 39;
 
 /// What an `added_by` may not be (#330): empty, over `ADDED_BY_MAX` characters or holding
 /// anything but lowercase ASCII letters, digits, `-` and `_`, so a login has one canonical text.
-fn added_by_problem(login: &str) -> Option<Msg<'static>> {
+pub fn added_by_problem(login: &str) -> Option<Msg<'static>> {
     if login.is_empty() {
         Some(Msg::Empty)
     } else if login.chars().count() > ADDED_BY_MAX {

@@ -15,6 +15,11 @@
 //! listing) throttled; `meada github-app throttled` marks the installation that last answered
 //! for a repository after the job's fetch failed so. Every Valkey key lives under the
 //! `[valkey]` `key_prefix`. No private key, JWT or token reaches stderr or an error.
+//!
+//! The role check (`roles`, #331, with `postgres` and `oidc`) is the module's second REST use:
+//! each repository's collaborators on `[oidc.github] host`, through the same installations and
+//! throttle marks, into one fenced permissions set in Postgres, and with `source = "store"` the
+//! exclusions file the readers of the pulled version honor (`snapshot::versions::eligible`).
 
 use std::collections::HashMap;
 use std::io::Read;
@@ -266,8 +271,13 @@ fn printable(token: &str) -> bool {
 
 /// How a REST call failed.
 enum Failure {
-    /// 403 or 429, with the seconds the answer says to wait, if it says.
-    Throttled(Option<u64>),
+    /// 403 or 429, with the status and the seconds the answer says to wait, if it says.
+    Throttled(
+        #[cfg_attr(not(all(feature = "postgres", feature = "oidc")), allow(dead_code))] u16,
+        Option<u64>,
+    ),
+    /// 404.
+    Missing(String),
     Other(String),
 }
 
@@ -284,9 +294,15 @@ fn wait(headers: &HeaderMap, now: u64) -> Option<u64> {
     }
 }
 
-/// `GET url` (or `POST`, with no body) with the App's `jwt`: at most `ANSWER_MAX` bytes of a
-/// success answer. No error carries the JWT.
-fn call(agent: &ureq::Agent, post: bool, url: &str, jwt: &str) -> Result<Vec<u8>, Failure> {
+/// `GET url` (or `POST`, with no body) with the bearer `jwt` (the App's JWT, or an installation
+/// token): at most `ANSWER_MAX` bytes of a success answer, and its `Link` header. No error
+/// carries the bearer.
+fn call(
+    agent: &ureq::Agent,
+    post: bool,
+    url: &str,
+    jwt: &str,
+) -> Result<(Vec<u8>, Option<String>), Failure> {
     fn headers<B>(request: ureq::RequestBuilder<B>, jwt: &str) -> ureq::RequestBuilder<B> {
         (request.header("Authorization", format!("Bearer {jwt}")))
             .header("Accept", "application/vnd.github+json")
@@ -301,14 +317,21 @@ fn call(agent: &ureq::Agent, post: bool, url: &str, jwt: &str) -> Result<Vec<u8>
     let mut response = sent.map_err(other)?;
     let status = response.status().as_u16();
     if matches!(status, 403 | 429) {
-        return Err(Failure::Throttled(wait(response.headers(), now())));
+        return Err(Failure::Throttled(status, wait(response.headers(), now())));
     }
     if !response.status().is_success() {
-        return Err(Failure::Other(Msg::GithubAppStatus { url, status }.text()));
+        let why = Msg::GithubAppStatus { url, status }.text();
+        return Err(match status {
+            404 => Failure::Missing(why),
+            _ => Failure::Other(why),
+        });
     }
+    let link = (response.headers().get("link"))
+        .and_then(|link| link.to_str().ok())
+        .map(str::to_string);
     // ureq refuses a body that fills its limit, so `max` bytes take a limit one past it.
     let body = response.body_mut().with_config().limit(ANSWER_MAX + 1);
-    body.read_to_vec().map_err(other)
+    Ok((body.read_to_vec().map_err(other)?, link))
 }
 
 /// The JWT of `app`, signed now with its key: RS256, `iat` `JWT_BACKDATE` ago, `exp`
@@ -360,7 +383,7 @@ fn list(agent: &ureq::Agent, app: &Config, jwt: &str) -> Result<Vec<(String, u64
             "{}/app/installations?per_page={PER_PAGE}&page={page}",
             app.api
         );
-        let body = call(agent, false, &url, jwt)?;
+        let (body, _) = call(agent, false, &url, jwt)?;
         let found: Vec<Installation> = (serde_json::from_slice(&body))
             .map_err(|_| Failure::Other(Msg::GithubAppAnswer(&url).text()))?;
         let full = found.len() == PER_PAGE;
@@ -382,7 +405,7 @@ fn mint(agent: &ureq::Agent, app: &Config, id: u64, jwt: &str) -> Result<(String
     }
     let url = format!("{}/app/installations/{id}/access_tokens", app.api);
     let not = || Failure::Other(Msg::GithubAppAnswer(&url).text());
-    let body = call(agent, true, &url, jwt)?;
+    let (body, _) = call(agent, true, &url, jwt)?;
     let minted: Minted = serde_json::from_slice(&body).map_err(|_| not())?;
     let expires = unix(&minted.expires_at).ok_or_else(not)?;
     match printable(&minted.token) {
@@ -523,14 +546,14 @@ impl<'a> Run<'a> {
         let jwt = self.jwt(app)?;
         let found = match list(&self.agent, app, &jwt) {
             Ok(found) => found,
-            Err(Failure::Throttled(wait)) => {
+            Err(Failure::Throttled(_, wait)) => {
                 let secs = self.mark(throttled, wait).await?;
                 let what = format!("GitHub App {} of {}", app.app_id, app.host);
                 self.notes
                     .push(Msg::GithubAppMarked { what: &what, secs }.text());
                 return Ok(());
             }
-            Err(Failure::Other(why)) => return Err(why),
+            Err(Failure::Other(why) | Failure::Missing(why)) => return Err(why),
         };
         let mut replace = cmd("EVAL");
         replace.arg(REPLACE).arg(1).arg(held).arg(INSTALLATIONS_TTL);
@@ -569,6 +592,39 @@ impl<'a> Run<'a> {
         }
         found.sort_by_key(|c| (c.app.app_id, c.id));
         Ok(found)
+    }
+
+    /// The installations covering `owner` in the order to try them: those not throttled (all
+    /// of them when every one is, with `true`), from the one the owner's round-robin counter
+    /// names. Empty when none covers the owner.
+    async fn rotation<'c>(
+        &mut self,
+        apps: &[&'c Config],
+        host: &str,
+        owner: &str,
+    ) -> Result<(Vec<Candidate<'c>>, bool), String> {
+        let all = self.candidates(apps, owner, true).await?;
+        let mut open = Vec::new();
+        for at in &all {
+            if !self
+                .exists(&self.installation_key(host, at.id, "throttled"))
+                .await?
+            {
+                open.push(*at);
+            }
+        }
+        let throttled = !all.is_empty() && open.is_empty();
+        if throttled {
+            open = all;
+        }
+        if open.is_empty() {
+            return Ok((open, false));
+        }
+        let next = self.key(host, &format!("owner:{owner}:next"));
+        let n: i64 = self.valkey.query(cmd("INCR").arg(&next)).await?;
+        let first = (n - 1).rem_euclid(open.len() as i64) as usize;
+        open.rotate_left(first);
+        Ok((open, throttled))
     }
 
     /// The token of `at` with at least `TOKEN_MARGIN` left and its expiry: from Valkey, or
@@ -618,14 +674,14 @@ impl<'a> Run<'a> {
         let jwt = self.jwt(at.app)?;
         let (token, expires) = match mint(&self.agent, at.app, at.id, &jwt) {
             Ok(minted) => minted,
-            Err(Failure::Throttled(wait)) => {
+            Err(Failure::Throttled(_, wait)) => {
                 let secs = self.mark(throttled, wait).await?;
                 let what = format!("installation {}", at.id);
                 self.notes
                     .push(Msg::GithubAppMarked { what: &what, secs }.text());
                 return Ok(None);
             }
-            Err(Failure::Other(why)) => return Err(why),
+            Err(Failure::Other(why) | Failure::Missing(why)) => return Err(why),
         };
         let ttl = expires.saturating_sub(now()).saturating_sub(TOKEN_MARGIN);
         if ttl > 0 {
@@ -713,29 +769,15 @@ async fn get(
     owner: &str,
     repo: &str,
 ) -> Result<Option<String>, String> {
-    let all = run.candidates(apps, owner, true).await?;
-    if all.is_empty() {
+    let (open, throttled) = run.rotation(apps, host, owner).await?;
+    if open.is_empty() {
         return Ok(None);
     }
-    let mut open = Vec::new();
-    for at in &all {
-        if !run
-            .exists(&run.installation_key(host, at.id, "throttled"))
-            .await?
-        {
-            open.push(*at);
-        }
-    }
     let covered = format!("{host}/{owner}");
-    if open.is_empty() {
+    if throttled {
         run.notes.push(Msg::GithubAppAllThrottled(&covered).text());
-        open = all;
     }
-    let next = run.key(host, &format!("owner:{owner}:next"));
-    let n: i64 = run.valkey.query(cmd("INCR").arg(&next)).await?;
-    let len = open.len() as i64;
-    for k in 0..len {
-        let at = open[(n - 1 + k).rem_euclid(len) as usize];
+    for at in open {
         let Some((token, expires)) = run.token(at).await? else {
             continue;
         };
@@ -816,6 +858,504 @@ pub fn throttled(manifest: &Path, url: &str, retry_after: Option<u64>) -> crate:
     };
     reply.notes.push(crate::modules::block_on(run)??);
     Ok(reply)
+}
+
+// The role check (#331, ADR 0016): `meada github-app roles`, the job's second REST use.
+
+// ponytail: the most pages of one repository's collaborators the role check lists, `PER_PAGE`
+// each (100,000 collaborators); past it the run fails, writing nothing.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+const COLLABORATOR_PAGES_MAX: u32 = 1000;
+
+/// One repository's collaborators listing: the REST base, the owner and the repository, and
+/// what its pages have named so far.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+struct Listing<'a> {
+    api: &'a str,
+    owner: &'a str,
+    repo: &'a str,
+    /// The pages requested so far.
+    seen: std::collections::HashSet<u32>,
+    /// The repository id a `/repositories/<id>/collaborators` link named first.
+    pinned: Option<String>,
+}
+
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+impl<'a> Listing<'a> {
+    fn new(api: &'a str, owner: &'a str, repo: &'a str) -> Self {
+        Self {
+            api,
+            owner,
+            repo,
+            seen: std::collections::HashSet::new(),
+            pinned: None,
+        }
+    }
+
+    /// The URL of page `page`, always built here: `affiliation=all`, `PER_PAGE` a page.
+    fn url(&self, page: u32) -> String {
+        let (api, owner, repo) = (self.api, self.owner, self.repo);
+        format!(
+            "{api}/repos/{owner}/{repo}/collaborators?affiliation=all&per_page={PER_PAGE}&page={page}"
+        )
+    }
+
+    /// The page `link`'s `rel="next"` names, `None` on the last page. The link is hostile and
+    /// never echoed: it must be on the REST base's origin with no user, at this repository's
+    /// collaborators (`/repos/<owner>/<repo>` or the `/repositories/<id>` GitHub links with,
+    /// one id for every page), and name a `page` not requested yet, at most
+    /// `COLLABORATOR_PAGES_MAX` of them. Only the page number is followed.
+    fn next(&mut self, link: Option<&str>) -> Result<Option<u32>, String> {
+        let next = link
+            .into_iter()
+            .flat_map(|l| l.split(','))
+            .find_map(|part| {
+                let (url, params) = part.trim().strip_prefix('<')?.split_once('>')?;
+                (params.split(';'))
+                    .any(|p| p.trim() == "rel=\"next\"")
+                    .then_some(url)
+            });
+        let Some(next) = next else {
+            return Ok(None);
+        };
+        let foreign = || Msg::RolesLinkForeign.text();
+        let (next, base): (Uri, Uri) = (
+            next.parse().map_err(|_| foreign())?,
+            self.api.parse().map_err(|_| foreign())?,
+        );
+        let origin = |u: &Uri| {
+            (
+                u.scheme_str().map(str::to_ascii_lowercase),
+                u.authority().map(|a| a.as_str().to_ascii_lowercase()),
+            )
+        };
+        if origin(&next) != origin(&base)
+            || next.authority().is_some_and(|a| a.as_str().contains('@'))
+        {
+            return Err(foreign());
+        }
+        let path = (next.path().strip_prefix(base.path().trim_end_matches('/')))
+            .and_then(|p| p.strip_suffix("/collaborators"))
+            .ok_or_else(foreign)?;
+        let ours = format!("/repos/{}/{}", self.owner, self.repo);
+        match path.strip_prefix("/repositories/") {
+            Some(id) if !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()) => {
+                if self.pinned.get_or_insert_with(|| id.to_string()) != id {
+                    return Err(foreign());
+                }
+            }
+            _ if path.eq_ignore_ascii_case(&ours) => {}
+            _ => return Err(foreign()),
+        }
+        let page = (next.query().unwrap_or("").split('&'))
+            .find_map(|pair| pair.strip_prefix("page="))
+            .and_then(|page| page.parse::<u32>().ok())
+            .filter(|page| *page > 0)
+            .ok_or_else(foreign)?;
+        if self.seen.contains(&page) {
+            return Err(Msg::RolesLinkCycle.text());
+        }
+        Ok(Some(page))
+    }
+
+    /// Marks `page` requested, refused past `COLLABORATOR_PAGES_MAX`.
+    fn take(&mut self, page: u32) -> Result<(), String> {
+        if self.seen.len() as u32 >= COLLABORATOR_PAGES_MAX {
+            return Err(Msg::RolesPages(COLLABORATOR_PAGES_MAX).text());
+        }
+        self.seen.insert(page);
+        Ok(())
+    }
+}
+
+/// A collaborator's login and role, as the permissions set holds them.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+type Row = (String, String);
+
+/// An entry of the workspace as the role check reads it: its identity and its `added_by`.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+type Entry = (String, Option<String>);
+
+/// A collaborator as `role_name`'s row: the login, lowercase, and the role as GitHub spells it;
+/// `None` for one whose login is not a GitHub login (1 to 39 ASCII letters, digits, `-` and `_`,
+/// compared ignoring case) or whose role is not a name `[oidc.github] roles` could hold.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+fn collaborator(value: &serde_json::Value) -> Option<Row> {
+    let login = value.get("login")?.as_str()?.to_ascii_lowercase();
+    let role = value.get("role_name")?.as_str()?;
+    let role_ok = crate::oidc::role_ok(role);
+    let login_ok = meada_core::manifest::added_by_problem(&login).is_none();
+    (login_ok && role_ok).then(|| (login, role.to_string()))
+}
+
+/// Every collaborator of `listing` GitHub lists for `token`, every page, with how many it listed
+/// that `collaborator` refused; `None` on a 404. A page that is not a JSON array, or a `Link`
+/// that `Listing::next` refuses, fails the listing.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+fn collaborators(
+    agent: &ureq::Agent,
+    mut listing: Listing<'_>,
+    token: &str,
+) -> Result<Option<(Vec<Row>, usize)>, Failure> {
+    let (mut rows, mut skipped, mut page) = (Vec::new(), 0, 1);
+    loop {
+        listing.take(page).map_err(Failure::Other)?;
+        let url = listing.url(page);
+        let (body, link) = match call(agent, false, &url, token) {
+            Err(Failure::Missing(_)) => return Ok(None),
+            answered => answered?,
+        };
+        let found: Vec<serde_json::Value> = (serde_json::from_slice(&body))
+            .map_err(|_| Failure::Other(Msg::GithubAppAnswer(&url).text()))?;
+        for value in &found {
+            match collaborator(value) {
+                Some(row) => rows.push(row),
+                None => skipped += 1,
+            }
+        }
+        match listing.next(link.as_deref()).map_err(Failure::Other)? {
+            Some(next) => page = next,
+            None => return Ok(Some((rows, skipped))),
+        }
+    }
+}
+
+/// What `roles` reads of the workspace: the pulled version's id with `source = "store"` and each
+/// entry's identity and `added_by`, whole: the exclusions are this command's to write.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+fn checked_entries(
+    manifest: &Path,
+    read: &crate::workspace::Manifest,
+) -> crate::Result<(Option<String>, Vec<Entry>)> {
+    #[cfg(feature = "generation-pointer")]
+    if read.store {
+        let dir = read.index_dir.join(crate::snapshot::versions::DIR);
+        let not_pulled = || {
+            let (manifest, dir) = (manifest.display().to_string(), dir.display().to_string());
+            Msg::WorkspaceNotPulled {
+                manifest: &manifest,
+                dir: &dir,
+            }
+            .text()
+        };
+        let (id, entries, _) = crate::snapshot::versions::pulled(&dir)?.ok_or_else(not_pulled)?;
+        let entries = entries.into_iter().map(|e| (e.repo, e.added_by));
+        return Ok((Some(id), entries.collect()));
+    }
+    let _ = manifest;
+    Ok((
+        None,
+        read.entries
+            .iter()
+            .map(|l| (l.repo.clone(), None))
+            .collect(),
+    ))
+}
+
+/// The fence of this run: `MEADA_REFRESH_FENCE` under `[refresh_lock]` (a positive decimal that
+/// Postgres's `bigint` holds), else 0.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+fn run_fence(read: &crate::workspace::Manifest) -> Result<u64, String> {
+    #[cfg(feature = "refresh-lock")]
+    if read.refresh_lock.is_some() {
+        let fence = std::env::var(crate::snapshot::lock::FENCE_ENV).ok();
+        let fence = fence.and_then(|f| meada_core::ids::fence(&f));
+        let fence = fence.filter(|f| *f > 0 && i64::try_from(*f).is_ok());
+        return fence.ok_or_else(|| Msg::RolesFenceEnv.text());
+    }
+    let _ = read;
+    Ok(0)
+}
+
+/// `meada github-app roles --workspace <manifest>` (#331): every identity of the workspace on
+/// `[oidc.github] host`, its collaborators listed through the installation ADR 0013's selection
+/// picks, into one permissions set in Postgres, replacing the one before, and with
+/// `source = "store"` the exclusions file of the pulled version. A listing that fails fails the
+/// run and nothing is written; see `check` for the order of the writes.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+pub fn roles(manifest: &Path) -> crate::Result<Reply> {
+    let shown = manifest.display().to_string();
+    let read = crate::workspace::Manifest::read(manifest)?;
+    let github = (read.oidc.as_ref())
+        .and_then(|o| o.github.clone())
+        .ok_or_else(|| Msg::RolesNoGithub(&shown).text())?;
+    let (valkey, all) = crate::workspace::Manifest::github_apps(manifest)?;
+    let apps: Vec<&Config> = all.iter().filter(|a| a.host == github.host).collect();
+    let (Some(valkey), false) = (valkey, apps.is_empty()) else {
+        let src = std::fs::read_to_string(manifest).map_err(|e| format!("{shown}: {e}"))?;
+        let why = Msg::RolesNoApp(&github.host).text();
+        return Err(crate::config::error_at(manifest, &src, "oidc.github", &why));
+    };
+    // `Manifest::read` refuses `[oidc.github]` without `[postgres]`.
+    let postgres = read
+        .postgres
+        .clone()
+        .ok_or_else(|| Msg::RolesNoGithub(&shown).text())?;
+    let fence = run_fence(&read)?;
+    let (version, entries) = checked_entries(manifest, &read)?;
+    #[cfg(feature = "generation-pointer")]
+    let dir = (read.store).then(|| read.index_dir.join(crate::snapshot::versions::DIR));
+    #[cfg(not(feature = "generation-pointer"))]
+    let dir: Option<std::path::PathBuf> = None;
+    let mut notes = Vec::new();
+    let checked = check(Check {
+        postgres: &postgres,
+        valkey: &valkey,
+        apps: &apps,
+        github: &github,
+        fence,
+        version,
+        entries,
+        dir,
+        notes: &mut notes,
+    });
+    match crate::modules::block_on(checked)? {
+        Ok(line) => Ok(Reply {
+            stdout: format!("{line}\n"),
+            notes,
+        }),
+        Err(why) => {
+            notes.push(why);
+            Err(notes.join("\n").into())
+        }
+    }
+}
+
+/// What one role check reads and where it writes its stderr lines.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+struct Check<'a> {
+    postgres: &'a crate::postgres::Config,
+    valkey: &'a valkey::Config,
+    apps: &'a [&'a Config],
+    github: &'a crate::oidc::Github,
+    fence: u64,
+    version: Option<String>,
+    entries: Vec<Entry>,
+    /// `<index_dir>/workspace/` with `source = "store"`: where the exclusions file lives.
+    dir: Option<std::path::PathBuf>,
+    notes: &'a mut Vec<String>,
+}
+
+/// The role check, in this order. Postgres is reached and the fence checked before anything
+/// changes. The exclusions file is removed, so no reader admits the previous check's exclusions
+/// once this one has started, whatever it ends in. Every identity is listed. One transaction,
+/// under a lock on the sets that serializes writers, checks the fence again, inserts the set, its
+/// rows and its exclusions and deletes every older set. Then, under `excluded.lock`, the file is
+/// written by rename only while the set is still the newest. Postgres and the file are never
+/// written atomically together: a run that fails after its commit leaves the set and no file,
+/// and the readers refuse until a run succeeds (the local recovery is to run `meada github-app
+/// roles` again). The line it prints on success.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+async fn check(check: Check<'_>) -> Result<String, String> {
+    use std::collections::BTreeMap;
+    let Check {
+        postgres,
+        valkey,
+        apps,
+        github,
+        fence,
+        version,
+        entries,
+        dir,
+        notes,
+    } = check;
+    let opened = crate::postgres::connected(postgres).await?;
+    let scrub = opened.scrubber();
+    let mut client = opened.client;
+    let q = postgres.quoted();
+    let held_fence = |held: Option<i64>| match held {
+        Some(held) if held > fence as i64 => Err(Msg::RolesFenceBelow { fence, held }.text()),
+        _ => Ok(()),
+    };
+    let first = format!("SELECT (SELECT max(fence) FROM {q}.permission_sets), now()::text");
+    let row = client.query_one(&first, &[]).await.map_err(&scrub)?;
+    held_fence(row.get(0))?;
+    let started: String = row.get(1);
+    #[cfg(not(feature = "generation-pointer"))]
+    let _ = &dir;
+    #[cfg(feature = "generation-pointer")]
+    if let Some(dir) = &dir {
+        let file = dir.join(crate::snapshot::versions::EXCLUDED);
+        match std::fs::remove_file(&file) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+                return Err(format!("{}: {e}", file.display()));
+            }
+            _ => {}
+        }
+    }
+
+    // Every identity on the host, listed; rows keyed by identity and login, the first kept.
+    let mut run = Run::open(valkey).await?;
+    let mut rows: BTreeMap<(String, String), String> = BTreeMap::new();
+    let mut repositories = 0;
+    let prefix = format!("{}/", github.host);
+    let mut every = async || {
+        for (identity, _) in &entries {
+            let Some(rest) = identity.strip_prefix(&prefix) else {
+                continue;
+            };
+            let Some((owner, repo)) = repository(rest).filter(|_| !rest.ends_with(".git")) else {
+                run.notes.push(Msg::RolesNotRepository(identity).text());
+                continue;
+            };
+            let listed = listed(&mut run, apps, &github.host, identity, &owner, &repo).await;
+            let Some(listed) = listed? else {
+                continue;
+            };
+            repositories += 1;
+            for (login, role) in listed {
+                rows.entry((identity.clone(), login)).or_insert(role);
+            }
+        }
+        Ok::<_, String>(())
+    };
+    let listing = every().await;
+    notes.append(&mut run.notes);
+    listing?;
+
+    // The additions whose `added_by` holds no accepted role on their repository, with
+    // `source = "store"` only (a file's entries have no `added_by`).
+    let mut excluded = BTreeMap::new();
+    for (identity, added_by) in &entries {
+        let Some(login) = added_by.as_ref().filter(|_| identity.starts_with(&prefix)) else {
+            continue;
+        };
+        let role = rows.get(&(identity.clone(), login.clone()));
+        if role.is_some_and(|role| github.roles.contains(role)) {
+            continue;
+        }
+        let listed = role.is_some();
+        notes.push(Msg::RolesExcluded { identity, listed }.text());
+        excluded.insert(identity.clone(), login.clone());
+    }
+
+    let tx = client.transaction().await.map_err(&scrub)?;
+    let lock = format!("LOCK TABLE {q}.permission_sets IN EXCLUSIVE MODE");
+    tx.batch_execute(&lock).await.map_err(&scrub)?;
+    let max = format!("SELECT max(fence) FROM {q}.permission_sets");
+    held_fence(tx.query_one(&max, &[]).await.map_err(&scrub)?.get(0))?;
+    let insert = format!(
+        "INSERT INTO {q}.permission_sets (fence, version, started, repositories) \
+         VALUES ($1, $2, $3::text::timestamptz, $4) RETURNING id"
+    );
+    let (fence, listed) = (fence as i64, repositories as i32);
+    let params: [&(dyn tokio_postgres::types::ToSql + Sync); 4] =
+        [&fence, &version, &started, &listed];
+    let id: String = tx.query_one(&insert, &params).await.map_err(&scrub)?.get(0);
+    let (mut identities, mut logins, mut roles) = (Vec::new(), Vec::new(), Vec::new());
+    for ((identity, login), role) in &rows {
+        identities.push(identity.as_str());
+        logins.push(login.as_str());
+        roles.push(role.as_str());
+    }
+    let insert = format!(
+        "INSERT INTO {q}.permission_rows (set_id, identity, login, role) \
+         SELECT $1, i, l, r FROM unnest($2::text[], $3::text[], $4::text[]) AS t (i, l, r)"
+    );
+    let params: [&(dyn tokio_postgres::types::ToSql + Sync); 4] =
+        [&id, &identities, &logins, &roles];
+    tx.execute(&insert, &params).await.map_err(&scrub)?;
+    let (identities, logins): (Vec<&str>, Vec<&str>) = (excluded.iter())
+        .map(|(i, l)| (i.as_str(), l.as_str()))
+        .unzip();
+    let insert = format!(
+        "INSERT INTO {q}.permission_exclusions (set_id, identity, added_by) \
+         SELECT $1, i, a FROM unnest($2::text[], $3::text[]) AS t (i, a)"
+    );
+    let params: [&(dyn tokio_postgres::types::ToSql + Sync); 3] = [&id, &identities, &logins];
+    tx.execute(&insert, &params).await.map_err(&scrub)?;
+    let older = format!("DELETE FROM {q}.permission_sets WHERE id <> $1");
+    tx.execute(&older, &[&id]).await.map_err(&scrub)?;
+    tx.commit().await.map_err(&scrub)?;
+
+    #[cfg(feature = "generation-pointer")]
+    if let (Some(dir), Some(version)) = (&dir, &version) {
+        let at = |path: &Path| {
+            let shown = path.display().to_string();
+            move |e: std::io::Error| format!("{shown}: {e}")
+        };
+        let path = dir.join(format!("{}.lock", crate::snapshot::versions::EXCLUDED));
+        let lock = (std::fs::File::options().read(true).write(true).create(true))
+            .truncate(false)
+            .open(&path)
+            .map_err(at(&path))?;
+        lock.lock().map_err(at(&path))?;
+        let newest = format!("SELECT EXISTS (SELECT 1 FROM {q}.permission_sets WHERE id = $1)");
+        let newest: bool = client
+            .query_one(&newest, &[&id])
+            .await
+            .map_err(&scrub)?
+            .get(0);
+        if !newest {
+            return Err(Msg::RolesReplaced.text());
+        }
+        let identities: std::collections::BTreeSet<String> = excluded.keys().cloned().collect();
+        crate::snapshot::versions::write_excluded(dir, version, &identities)?;
+    }
+    Ok(Msg::RolesSet {
+        id: &id,
+        repositories,
+        rows: rows.len(),
+        exclusions: excluded.len(),
+    }
+    .text())
+}
+
+/// The collaborators of `identity` (`owner/repo` on `host`) and their roles, through the
+/// installations covering the owner in `Run::rotation`'s order: a 403 or 429 marks the
+/// installation throttled and passes to the next. `None`, with a stderr line, when no
+/// installation covers the owner or GitHub answers 404. Every other failure, every installation
+/// throttled included, is the line that fails the run.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+async fn listed(
+    run: &mut Run<'_>,
+    apps: &[&Config],
+    host: &str,
+    identity: &str,
+    owner: &str,
+    repo: &str,
+) -> Result<Option<Vec<Row>>, String> {
+    let failed = |why: &str| Msg::RolesFailed { identity, why }.text();
+    let (open, throttled) = run
+        .rotation(apps, host, owner)
+        .await
+        .map_err(|e| failed(&e))?;
+    if open.is_empty() {
+        run.notes.push(Msg::RolesUncovered(identity).text());
+        return Ok(None);
+    }
+    if throttled {
+        return Err(failed(&Msg::RolesThrottled(None).text()));
+    }
+    let mut last = None;
+    for at in open {
+        let Some((token, _)) = run.token(at).await.map_err(|e| failed(&e))? else {
+            continue;
+        };
+        let listing = Listing::new(&at.app.api, owner, repo);
+        match collaborators(&run.agent, listing, &token) {
+            Ok(Some((rows, skipped))) => {
+                for _ in 0..skipped {
+                    run.notes.push(Msg::RolesSkipped(identity).text());
+                }
+                return Ok(Some(rows));
+            }
+            Ok(None) => {
+                run.notes.push(Msg::RolesNotFound(identity).text());
+                return Ok(None);
+            }
+            Err(Failure::Throttled(status, wait)) => {
+                let key = run.installation_key(host, at.id, "throttled");
+                let secs = run.mark(&key, wait).await.map_err(|e| failed(&e))?;
+                let what = format!("installation {}", at.id);
+                run.notes
+                    .push(Msg::GithubAppMarked { what: &what, secs }.text());
+                last = Some(status);
+            }
+            Err(Failure::Other(why) | Failure::Missing(why)) => return Err(failed(&why)),
+        }
+    }
+    Err(failed(&Msg::RolesThrottled(last).text()))
 }
 
 /// Cached installations and their expiry/throttle state. This reads Valkey only, never a key
@@ -1023,6 +1563,91 @@ mod tests {
                 !why.contains("s3cret") && !why.contains("x-access"),
                 "{why}"
             );
+        }
+    }
+
+    #[cfg(all(feature = "postgres", feature = "oidc"))]
+    #[test]
+    fn a_next_page_is_this_repository_s_listing_on_the_rest_base_and_never_seen() {
+        let api = "https://ghe.example/api/v3";
+        let link = |url: &str| format!("<{url}>; rel=\"next\", <{api}/x?page=9>; rel=\"last\"");
+        let mut listing = Listing::new(api, "acme", "web");
+        listing.take(1).unwrap();
+        assert_eq!(listing.next(None), Ok(None));
+        let last = format!("<{api}/x?page=9>; rel=\"last\"");
+        assert_eq!(listing.next(Some(&last)), Ok(None));
+        let ours =
+            format!("{api}/repos/Acme/Web/collaborators?affiliation=all&per_page=100&page=2");
+        assert_eq!(listing.next(Some(&link(&ours))), Ok(Some(2)));
+        let pinned = format!("{api}/repositories/42/collaborators?page=3");
+        assert_eq!(listing.next(Some(&link(&pinned))), Ok(Some(3)));
+        let foreign = Msg::RolesLinkForeign.text();
+        for bad in [
+            "https://elsewhere.example/api/v3/repos/acme/web/collaborators?page=2".to_string(),
+            "http://ghe.example/api/v3/repos/acme/web/collaborators?page=2".into(),
+            "https://u:p@ghe.example/api/v3/repos/acme/web/collaborators?page=2".into(),
+            "https://ghe.example:8443/api/v3/repos/acme/web/collaborators?page=2".into(),
+            "https://ghe.example/repos/acme/web/collaborators?page=2".into(),
+            format!("{api}/repos/acme/api/collaborators?page=2"),
+            format!("{api}/repos/acme/web/collaborators/x?page=2"),
+            format!("{api}/repos/acme/web/teams?page=2"),
+            format!("{api}/repositories/43/collaborators?page=2"),
+            format!("{api}/repositories/4x/collaborators?page=2"),
+            format!("{api}/repos/acme/web/collaborators?per_page=100"),
+            format!("{api}/repos/acme/web/collaborators?page=0"),
+            format!("{api}/repos/acme/web/collaborators?page=-1"),
+            "not a url".into(),
+        ] {
+            assert_eq!(
+                listing.next(Some(&link(&bad))),
+                Err(foreign.clone()),
+                "{bad}"
+            );
+        }
+        // A page requested already is a cycle.
+        assert_eq!(
+            listing.next(Some(&link(&format!(
+                "{api}/repos/acme/web/collaborators?page=1"
+            )))),
+            Err(Msg::RolesLinkCycle.text())
+        );
+        // Past `COLLABORATOR_PAGES_MAX` pages the listing fails.
+        for page in 2..=COLLABORATOR_PAGES_MAX {
+            listing.take(page).unwrap();
+        }
+        let past = Msg::RolesPages(COLLABORATOR_PAGES_MAX).text();
+        assert_eq!(listing.take(COLLABORATOR_PAGES_MAX + 1), Err(past));
+    }
+
+    #[cfg(all(feature = "postgres", feature = "oidc"))]
+    #[test]
+    fn a_collaborator_needs_a_github_login_and_a_role_name() {
+        let row = |v: serde_json::Value| collaborator(&v);
+        let pair = |l: &str, r: &str| Some((l.to_string(), r.to_string()));
+        assert_eq!(
+            row(serde_json::json!({"login": "Ana_Souza-1", "role_name": "write"})),
+            pair("ana_souza-1", "write")
+        );
+        assert_eq!(
+            row(serde_json::json!({"login": "a", "role_name": "Custom Role"})),
+            pair("a", "Custom Role")
+        );
+        let long = "x".repeat(40);
+        let role = "r".repeat(101);
+        for bad in [
+            serde_json::json!({"login": "a"}),
+            serde_json::json!({"role_name": "read"}),
+            serde_json::json!({"login": "", "role_name": "read"}),
+            serde_json::json!({"login": long, "role_name": "read"}),
+            serde_json::json!({"login": "a.b", "role_name": "read"}),
+            serde_json::json!({"login": "ä", "role_name": "read"}),
+            serde_json::json!({"login": 7, "role_name": "read"}),
+            serde_json::json!({"login": "a", "role_name": ""}),
+            serde_json::json!({"login": "a", "role_name": role}),
+            serde_json::json!({"login": "a", "role_name": "re\nad"}),
+            serde_json::json!("a"),
+        ] {
+            assert_eq!(row(bad.clone()), None, "{bad}");
         }
     }
 

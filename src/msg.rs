@@ -380,7 +380,8 @@ pub enum Msg<'a> {
     #[cfg(any(
         feature = "generation-pointer",
         feature = "github-app",
-        feature = "directory"
+        feature = "directory",
+        all(feature = "oidc", feature = "postgres")
     ))]
     NeedsSections {
         section: &'a str,
@@ -652,6 +653,88 @@ pub enum Msg<'a> {
     GithubAppNotAnswered(&'a str),
     #[cfg(feature = "github-app")]
     GithubAppRepositoryUrl,
+    /// `meada github-app roles` (#331).
+    #[cfg(feature = "github-app")]
+    GithubAppRoles,
+    /// A `[oidc.github] host` that is not a lowercase host name.
+    #[cfg(feature = "oidc")]
+    OidcGithubHost,
+    /// `[oidc.github] roles` that is not a non-empty array of distinct names of 1 to this many
+    /// characters with no control character.
+    #[cfg(feature = "oidc")]
+    OidcGithubRoles(usize),
+    /// `[oidc.github]` without a `[[github_app]]` block for its host, for the role check.
+    #[cfg(feature = "github-app")]
+    RolesNoApp(&'a str),
+    /// A manifest without `[oidc.github]` given to the role check.
+    #[cfg(feature = "github-app")]
+    RolesNoGithub(&'a str),
+    /// `[refresh_lock]` without a positive `MEADA_REFRESH_FENCE` for the role check.
+    #[cfg(feature = "github-app")]
+    RolesFenceEnv,
+    /// A permissions set with a higher fence than this run's.
+    #[cfg(feature = "github-app")]
+    RolesFenceBelow {
+        fence: u64,
+        held: i64,
+    },
+    /// The run's set was replaced before the exclusions file was written.
+    #[cfg(feature = "github-app")]
+    RolesReplaced,
+    /// An identity on the host that is not `<host>/<owner>/<repo>`.
+    #[cfg(feature = "github-app")]
+    RolesNotRepository(&'a str),
+    #[cfg(feature = "github-app")]
+    RolesUncovered(&'a str),
+    #[cfg(feature = "github-app")]
+    RolesNotFound(&'a str),
+    /// A collaborator listed without a valid login or role, never echoing either.
+    #[cfg(feature = "github-app")]
+    RolesSkipped(&'a str),
+    /// A listing that fails the run: the identity and why (a status, a timeout, a bad page).
+    #[cfg(feature = "github-app")]
+    RolesFailed {
+        identity: &'a str,
+        why: &'a str,
+    },
+    /// Every installation covering an owner throttled, with the last status answered, if any.
+    #[cfg(feature = "github-app")]
+    RolesThrottled(Option<u16>),
+    /// A `Link` header's next page off the repository's collaborators listing, never echoed.
+    #[cfg(feature = "github-app")]
+    RolesLinkForeign,
+    #[cfg(feature = "github-app")]
+    RolesLinkCycle,
+    #[cfg(feature = "github-app")]
+    RolesPages(u32),
+    /// An addition left out, with the reason and never the login.
+    #[cfg(feature = "github-app")]
+    RolesExcluded {
+        identity: &'a str,
+        listed: bool,
+    },
+    /// The role check's line on success.
+    #[cfg(feature = "github-app")]
+    RolesSet {
+        id: &'a str,
+        repositories: usize,
+        rows: usize,
+        exclusions: usize,
+    },
+    /// The exclusions file a reader of the pulled version needs (#331).
+    #[cfg(feature = "generation-pointer")]
+    ExcludedMissing(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    ExcludedOther {
+        file: &'a str,
+        named: &'a str,
+        pulled: &'a str,
+    },
+    #[cfg(feature = "generation-pointer")]
+    ExcludedBad {
+        file: &'a str,
+        line: usize,
+    },
     /// `meada ui` (feature `ui`, ADR 0014).
     #[cfg(feature = "ui")]
     Ui,
@@ -882,6 +965,8 @@ pub enum Msg<'a> {
     WorkspaceImportAuthor,
     #[cfg(feature = "generation-pointer")]
     WorkspaceShowVersion,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceShowPulled,
     #[cfg(feature = "generation-pointer")]
     WorkspaceBootstrapHelp,
     /// A bootstrap manifest given to `meada workspace` without `[generations]`.
@@ -1712,7 +1797,8 @@ impl Msg<'_> {
             #[cfg(any(
                 feature = "generation-pointer",
                 feature = "github-app",
-                feature = "directory"
+                feature = "directory",
+                                       all(feature = "oidc", feature = "postgres")
             ))]
             Msg::NeedsSections { section, needed } => {
                 let needed: Vec<String> = needed.iter().map(|s| format!("[{s}]")).collect();
@@ -2288,6 +2374,194 @@ impl Msg<'_> {
             Msg::GithubAppRepositoryUrl => pick(
                 "the repository URL is not https://<host>/<owner>/<repo>".into(),
                 "a URL do repositório não é https://<host>/<owner>/<repo>".into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppRoles => pick(
+                "List each GitHub repository's collaborators with their roles into the \
+                 permissions set in Postgres, and write the exclusions file of the pulled version."
+                    .into(),
+                "Lista os colaboradores de cada repositório do GitHub com seus papéis no conjunto \
+                 de permissões no Postgres, e grava o arquivo de exclusões da versão baixada."
+                    .into(),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcGithubHost => pick(
+                "must be a lowercase host name".into(),
+                "deve ser um nome de host em minúsculas".into(),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcGithubRoles(max) => pick(
+                format!(
+                    "must be a non-empty array of distinct role names of 1 to {max} characters \
+                     with no control character"
+                ),
+                format!(
+                    "deve ser um array não vazio de nomes de papel distintos, de 1 a {max} \
+                     caracteres e sem caractere de controle"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesNoApp(host) => pick(
+                format!("meada github-app roles needs a [[github_app]] block for host {host}"),
+                format!("meada github-app roles exige um bloco [[github_app]] para o host {host}"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesNoGithub(manifest) => pick(
+                format!("{manifest}: meada github-app roles needs [oidc.github]"),
+                format!("{manifest}: meada github-app roles exige [oidc.github]"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesFenceEnv => pick(
+                "[refresh_lock] needs MEADA_REFRESH_FENCE: run meada github-app roles under meada \
+                 snapshot lock"
+                    .into(),
+                "[refresh_lock] exige MEADA_REFRESH_FENCE: rode o meada github-app roles sob meada \
+                 snapshot lock"
+                    .into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesFenceBelow { fence, held } => pick(
+                format!(
+                    "the newest permissions set has fence {held}, above this run's {fence}: a \
+                     newer refresh wrote it; nothing was written"
+                ),
+                format!(
+                    "o conjunto de permissões mais novo tem fence {held}, acima do {fence} desta \
+                     execução: um refresh mais novo o gravou; nada foi gravado"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesReplaced => pick(
+                "a newer permissions set replaced this run's before the exclusions file was \
+                 written; run meada github-app roles again"
+                    .into(),
+                "um conjunto de permissões mais novo substituiu o desta execução antes de o \
+                 arquivo de exclusões ser gravado; rode o meada github-app roles de novo"
+                    .into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesNotRepository(identity) => pick(
+                format!("{identity}: not <host>/<owner>/<repo> on GitHub; it gets no rows"),
+                format!("{identity}: não é <host>/<owner>/<repo> no GitHub; não recebe linhas"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesUncovered(identity) => pick(
+                format!("{identity}: no GitHub App installation covers its owner; it gets no rows"),
+                format!(
+                    "{identity}: nenhuma instalação de GitHub App cobre o dono; não recebe linhas"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesNotFound(identity) => pick(
+                format!("{identity}: GitHub answers 404 for its collaborators; it gets no rows"),
+                format!(
+                    "{identity}: o GitHub responde 404 para os colaboradores; não recebe linhas"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesSkipped(identity) => pick(
+                format!("{identity}: a collaborator GitHub listed has no valid login or role; skipped"),
+                format!(
+                    "{identity}: um colaborador que o GitHub listou não tem login ou papel \
+                     válido; ignorado"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesFailed { identity, why } => pick(
+                format!("{identity}: the role check failed: {why}; nothing was written"),
+                format!("{identity}: a checagem de papéis falhou: {why}; nada foi gravado"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesThrottled(None) => pick(
+                "every installation covering its owner is throttled".into(),
+                "toda instalação que cobre o dono está limitada".into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesThrottled(Some(status)) => pick(
+                format!("every installation covering its owner is throttled (http status {status})"),
+                format!("toda instalação que cobre o dono está limitada (status http {status})"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesLinkForeign => pick(
+                "a Link header's next page is not this repository's collaborators listing".into(),
+                "a próxima página de um cabeçalho Link não é a listagem de colaboradores deste \
+                 repositório"
+                    .into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesLinkCycle => pick(
+                "a Link header's next page was listed already".into(),
+                "a próxima página de um cabeçalho Link já foi listada".into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesPages(max) => pick(
+                format!("more than {max} pages of collaborators"),
+                format!("mais de {max} páginas de colaboradores"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesExcluded {
+                identity,
+                listed: false,
+            } => pick(
+                format!("{identity}: excluded: GitHub lists no role for its added_by"),
+                format!("{identity}: excluído: o GitHub não lista papel para o seu added_by"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesExcluded {
+                identity,
+                listed: true,
+            } => pick(
+                format!("{identity}: excluded: its added_by holds no role in [oidc.github] roles"),
+                format!(
+                    "{identity}: excluído: o seu added_by não tem papel em [oidc.github] roles"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesSet {
+                id,
+                repositories,
+                rows,
+                exclusions,
+            } => pick(
+                format!(
+                    "permissions set {id}: {repositories} repositories, {rows} rows, \
+                     {exclusions} exclusions"
+                ),
+                format!(
+                    "conjunto de permissões {id}: {repositories} repositórios, {rows} linhas, \
+                     {exclusions} exclusões"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::ExcludedMissing(file) => pick(
+                format!("{file} is missing: run `meada github-app roles` after `meada workspace pull`"),
+                format!(
+                    "{file} não existe: rode `meada github-app roles` depois de `meada workspace \
+                     pull`"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::ExcludedOther {
+                file,
+                named,
+                pulled,
+            } => pick(
+                format!(
+                    "{file} names version {named}, not the pulled version {pulled}: run `meada \
+                     github-app roles`"
+                ),
+                format!(
+                    "{file} nomeia a versão {named}, não a versão baixada {pulled}: rode `meada \
+                     github-app roles`"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::ExcludedBad { file, line } => pick(
+                format!("{file}:{line}: not a version id or an identity: run `meada github-app roles`"),
+                format!(
+                    "{file}:{line}: não é um id de versão nem uma identidade: rode `meada \
+                     github-app roles`"
+                ),
             ),
             #[cfg(feature = "ui")]
             Msg::Ui => pick(
@@ -2890,6 +3164,15 @@ impl Msg<'_> {
             Msg::WorkspaceShowVersion => pick(
                 "The workspace version id (the current one by default)".into(),
                 "O id da versão do workspace (a atual por padrão)".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceShowPulled => pick(
+                "Print the version meada workspace pull left on disk, without the entries the \
+                 role check excluded"
+                    .into(),
+                "Imprime a versão que o meada workspace pull deixou no disco, sem as entradas \
+                 que a checagem de papéis excluiu"
+                    .into(),
             ),
             #[cfg(feature = "generation-pointer")]
             Msg::WorkspaceBootstrapHelp => pick(

@@ -688,8 +688,8 @@ fn oidc_type_errors_name_the_file_the_line_and_the_key() {
             format!("{at}:9: `oidc.entra.tenant` is not a meada.workspace.toml key\n"),
         ),
         (
-            "[oidc.github]\nlogin_claim = \"login\"\n",
-            format!("{at}:7: `oidc.github` is not a meada.workspace.toml key\n"),
+            "[oidc.github]\nlogin_claim = \"login\"\nmax_age_seconds = 60\norg = \"acme\"\n",
+            format!("{at}:10: `oidc.github.org` is not a meada.workspace.toml key\n"),
         ),
     ] {
         write_manifest(&dir, &format!("{head}{body}"));
@@ -698,6 +698,102 @@ fn oidc_type_errors_name_the_file_the_line_and_the_key() {
             assert!(!ok && stdout.is_empty(), "{command}: {body}");
             assert_eq!(stderr, expected, "{command}: {body}");
         }
+    }
+}
+
+/// The GitHub grant provider's `[oidc.github]` (#331): each key error, the table without
+/// `[postgres]` and, in a build without `postgres`, the table at all, name the file, the line
+/// and the key or the sections, never a value; alone, without `identities_claim` or
+/// `groups_claim`, it is accepted. `meada github-app roles` needs a `[[github_app]]` block for
+/// its host.
+#[cfg(feature = "oidc")]
+#[test]
+fn oidc_github_errors_name_the_file_the_line_and_the_key() {
+    let dir = mirrors("manifest_oidc_github_errors");
+    let oidc = "index_dir = \"../indexes\"\n\n[oidc]\nissuer = \"https://id.example\"\npublic_url = \
+                \"https://meada.example\"\n";
+    let at = "meada: ops/meada.workspace.toml";
+    let table = "[oidc.github]\nlogin_claim = \"github_login\"\nmax_age_seconds = 5400\n";
+    let refused = |toml: &str, expected: &str| {
+        write_manifest(&dir, toml);
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {toml}");
+            assert_eq!(stderr, expected, "{command}: {toml}");
+        }
+    };
+    if !cfg!(feature = "postgres") {
+        let feature = "[oidc.github] needs a Meada built with the postgres feature";
+        refused(
+            &format!("{oidc}{table}"),
+            &format!("{at}:6: `oidc.github`: {feature}\n"),
+        );
+        return;
+    }
+    let postgres = "\n[postgres]\nschema = \"m\"\n";
+    refused(
+        &format!("{oidc}{table}"),
+        &format!("{at}:6: `oidc.github`: [oidc.github] needs [postgres]\n"),
+    );
+    let roles = "must be a non-empty array of distinct role names of 1 to 100 characters with no \
+                 control character";
+    for (body, expected) in [
+        (
+            "[oidc.github]\nmax_age_seconds = 60\n",
+            format!("{at}:6: `oidc.github`: `oidc.github.login_claim` is missing\n"),
+        ),
+        (
+            "[oidc.github]\nlogin_claim = \"l\"\n",
+            format!("{at}:6: `oidc.github`: `oidc.github.max_age_seconds` is missing\n"),
+        ),
+        (
+            "[oidc.github]\nlogin_claim = \"\"\nmax_age_seconds = 60\n",
+            format!("{at}:7: `oidc.github.login_claim`: must not be empty\n"),
+        ),
+        (
+            "[oidc.github]\nlogin_claim = \"l\"\nmax_age_seconds = 59\n",
+            format!("{at}:8: `oidc.github.max_age_seconds`: must be at least 60\n"),
+        ),
+        (
+            "[oidc.github]\nhost = \"GitHub.com\"\nlogin_claim = \"l\"\nmax_age_seconds = 60\n",
+            format!("{at}:7: `oidc.github.host`: must be a lowercase host name\n"),
+        ),
+        (
+            "[oidc.github]\nlogin_claim = \"l\"\nroles = [\"read\", \"read\"]\nmax_age_seconds = 60\n",
+            format!("{at}:8: `oidc.github.roles`: {roles}\n"),
+        ),
+        (
+            "[oidc.github]\nlogin_claim = \"l\"\nroles = []\nmax_age_seconds = 60\n",
+            format!("{at}:8: `oidc.github.roles`: {roles}\n"),
+        ),
+        (
+            "[oidc.github]\nlogin_claim = \"l\"\nmax_age_seconds = 60\nlogin = \"x\"\n",
+            format!("{at}:9: `oidc.github.login` is not a meada.workspace.toml key\n"),
+        ),
+    ] {
+        refused(&format!("{oidc}{body}{postgres}"), &expected);
+    }
+    // Alone: no `identities_claim` or `groups_claim` is needed beside it.
+    write_manifest(&dir, &format!("{oidc}{table}{postgres}"));
+    let (_, stderr, ok) = run(&dir, "index");
+    assert!(ok, "{stderr}");
+    // The role check lists collaborators through the installations of its host.
+    #[cfg(feature = "github-app")]
+    for apps in [
+        "",
+        "\n[valkey]\nurl = \"redis://127.0.0.1:9\"\n\n[[github_app]]\nhost = \"ghe.example\"\n\
+         api = \"https://ghe.example/api/v3\"\napp_id = 1\nprivate_key_env = \"K\"\n",
+    ] {
+        write_manifest(&dir, &format!("{oidc}{table}{postgres}{apps}"));
+        let args = ["github-app", "roles", "--workspace", MANIFEST];
+        let (stdout, stderr, code) = run_args(&dir, &args);
+        assert_eq!((stdout.as_str(), code), ("", Some(1)), "{apps}");
+        let needed = "meada github-app roles needs a [[github_app]] block for host github.com";
+        assert_eq!(
+            stderr,
+            format!("{at}:6: `oidc.github`: {needed}\n"),
+            "{apps}"
+        );
     }
 }
 

@@ -20,6 +20,9 @@ use crate::common;
 use crate::manifest::{MANIFEST, chain_manifest, run};
 use crate::server::{Server, get as http_get};
 
+#[cfg(all(feature = "postgres", feature = "oidc", feature = "generation-pointer"))]
+mod roles;
+
 const HOST: &str = "github.test";
 /// What the fake answers as every token's expiry, and its Unix time.
 const EXPIRES_AT: &str = "2099-01-01T00:00:00Z";
@@ -56,12 +59,28 @@ struct State {
     /// Every JWT received.
     jwts: Vec<String>,
     requests: usize,
+    /// Per `<owner>/<repo>`: its collaborators, login and `role_name`, in the order listed; a
+    /// repository not here answers 404.
+    collaborators: HashMap<String, Vec<(String, String)>>,
+    /// Installations whose listings answer this status (403 or 429), with this `retry-after`.
+    listing_throttled: HashMap<u64, (u16, Option<u64>)>,
+    /// The status every listing answers, when set (a 5xx).
+    listing_status: Option<u16>,
+    /// The `Link` header every listing page answers instead of the fake's own `next`.
+    link: Option<String>,
+    /// Every listing request: the installation whose token it carried, and its path and query.
+    listings: Vec<(u64, String)>,
+    /// The next listing request waits while `holding` is set, which it sets itself.
+    hold_next: bool,
+    holding: bool,
 }
 
 /// A GitHub API on loopback: `GET /app/installations` and `POST
 /// /app/installations/{id}/access_tokens`, each refused with 401 unless its JWT is RS256, signed
 /// by the key of the App its `iss` names, issued at least 50 s ago and expiring within 10
-/// minutes.
+/// minutes; and `GET /repos/{owner}/{repo}/collaborators` with a token it minted, 100 a page with
+/// a `Link` to the next page on `/repositories/<n>/` as GitHub's are. Each connection is answered
+/// on a thread of its own, so a held listing holds only itself.
 struct Api {
     base: String,
     state: Arc<Mutex<State>>,
@@ -79,30 +98,44 @@ impl Api {
                 (n, DecodingKey::from_rsa_pem(&pem).unwrap())
             })
             .collect();
+        let at = base.clone();
+        let keys = Arc::new(keys);
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let Ok(mut stream) = stream else { continue };
-                let mut reader = BufReader::new(stream.try_clone().unwrap());
-                let mut line = String::new();
-                let _ = reader.read_line(&mut line);
-                let mut jwt = None;
-                let mut header = String::new();
-                while reader.read_line(&mut header).is_ok_and(|n| n > 2) {
-                    if let Some((name, value)) = header.trim_end().split_once(": ")
-                        && name.eq_ignore_ascii_case("authorization")
-                    {
-                        jwt = value.strip_prefix("Bearer ").map(str::to_string);
+                let (held, keys, at) = (held.clone(), keys.clone(), at.clone());
+                std::thread::spawn(move || {
+                    let mut reader = BufReader::new(stream.try_clone().unwrap());
+                    let mut line = String::new();
+                    let _ = reader.read_line(&mut line);
+                    let mut jwt = None;
+                    let mut header = String::new();
+                    while reader.read_line(&mut header).is_ok_and(|n| n > 2) {
+                        if let Some((name, value)) = header.trim_end().split_once(": ")
+                            && name.eq_ignore_ascii_case("authorization")
+                        {
+                            jwt = value.strip_prefix("Bearer ").map(str::to_string);
+                        }
+                        header.clear();
                     }
-                    header.clear();
-                }
-                let mut parts = line.split(' ');
-                let (method, path) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
-                let (status, extra, body) = answer(&held, &keys, method, path, jwt);
-                let _ = write!(
-                    stream,
-                    "HTTP/1.1 {status} X\r\n{extra}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                    body.len()
-                );
+                    let mut parts = line.split(' ');
+                    let (method, path) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
+                    if path.contains("/collaborators") {
+                        let hold = std::mem::take(&mut held.lock().unwrap().hold_next);
+                        if hold {
+                            held.lock().unwrap().holding = true;
+                            while held.lock().unwrap().holding {
+                                std::thread::sleep(std::time::Duration::from_millis(20));
+                            }
+                        }
+                    }
+                    let (status, extra, body) = answer(&held, &keys, &at, method, path, jwt);
+                    let _ = write!(
+                        stream,
+                        "HTTP/1.1 {status} X\r\n{extra}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len()
+                    );
+                });
             }
         });
         Self { base, state }
@@ -156,10 +189,12 @@ fn made_token() -> String {
     )
 }
 
-/// The fake's answer to `method path` with `jwt`: status, extra header lines and body.
+/// The fake's answer to `method path` with `jwt` (a JWT, or a token for a listing), the fake
+/// served at `base`: status, extra header lines and body.
 fn answer(
     state: &Mutex<State>,
     keys: &HashMap<u64, DecodingKey>,
+    base: &str,
     method: &str,
     path: &str,
     jwt: Option<String>,
@@ -169,6 +204,11 @@ fn answer(
     let Some(jwt) = jwt else {
         return (401, String::new(), String::new());
     };
+    if let Some(listing) =
+        (path.strip_prefix("/repos/")).and_then(|rest| rest.split_once("/collaborators?"))
+    {
+        return collaborators(&mut state, base, method, path, listing, &jwt);
+    }
     state.jwts.push(jwt.clone());
     let now = jsonwebtoken::get_current_timestamp();
     let app = keys.iter().find_map(|(app, key)| {
@@ -209,6 +249,55 @@ fn answer(
         }
         _ => (404, String::new(), String::new()),
     }
+}
+
+/// The fake's answer to a collaborators listing: `listing` the `<owner>/<repo>` and the query.
+fn collaborators(
+    state: &mut State,
+    base: &str,
+    method: &str,
+    path: &str,
+    (repo, query): (&str, &str),
+    token: &str,
+) -> (u16, String, String) {
+    let Some(&(id, _)) = state.minted.iter().find(|(_, t)| t == token) else {
+        return (401, String::new(), String::new());
+    };
+    state.listings.push((id, path.to_string()));
+    if method != "GET" {
+        return (404, String::new(), String::new());
+    }
+    if let Some(&(status, after)) = state.listing_throttled.get(&id) {
+        let after = after.map_or(String::new(), |a| format!("Retry-After: {a}\r\n"));
+        return (status, after, String::new());
+    }
+    if let Some(status) = state.listing_status {
+        return (status, String::new(), String::new());
+    }
+    let mut names: Vec<&String> = state.collaborators.keys().collect();
+    names.sort();
+    let Some(n) = names.iter().position(|name| name.as_str() == repo) else {
+        return (404, String::new(), String::new());
+    };
+    let page: usize = (query.split('&'))
+        .find_map(|pair| pair.strip_prefix("page="))
+        .and_then(|page| page.parse().ok())
+        .unwrap_or(1);
+    let all = &state.collaborators[repo];
+    let rows: Vec<Value> = (all.iter().skip((page - 1) * 100).take(100))
+        .map(|(login, role)| json!({"login": login, "type": "User", "role_name": role}))
+        .collect();
+    let link = match &state.link {
+        Some(link) => format!("Link: {link}\r\n"),
+        None if page * 100 < all.len() => format!(
+            "Link: <{base}/repositories/{}/collaborators?affiliation=all&per_page=100&page={}>; \
+             rel=\"next\"\r\n",
+            n + 1,
+            page + 1
+        ),
+        None => String::new(),
+    };
+    (200, link, json!(rows).to_string())
 }
 
 /// `<case>/meada.workspace.toml` with `[valkey]` at `valkey` (the case's own key prefix) and
