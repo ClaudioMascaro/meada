@@ -51,10 +51,10 @@ fn decode<T: serde::de::DeserializeOwned>(
 }
 
 /// A write's pending record and the audit it goes to; `None` before it was inserted.
-type Record<'a> = Option<(&'a Audit, Pending)>;
+type PendingRecord<'a> = Option<(&'a Audit, Pending)>;
 
 /// Finishes `record` as `outcome` with the stderr line's `message` and `owners`.
-fn finish(record: Record, outcome: Outcome, message: &str, owners: Option<&[String]>) {
+fn finish(record: PendingRecord, outcome: Outcome, message: &str, owners: Option<&[String]>) {
     if let Some((audit, pending)) = record {
         audit.finish(pending, outcome, message, owners);
     }
@@ -71,7 +71,7 @@ pub(super) fn actor<'a>(session: &'a Session, owners: Option<&'a [String]>) -> A
 }
 
 fn refused(
-    record: Record,
+    record: PendingRecord,
     session: &Session,
     action: &str,
     arguments: &str,
@@ -79,7 +79,7 @@ fn refused(
     code: &str,
     message: &str,
 ) -> Answer {
-    failed(
+    unsuccessful(
         record,
         Outcome::Refused,
         session,
@@ -93,8 +93,8 @@ fn refused(
 
 /// `refused` recording `outcome`.
 #[allow(clippy::too_many_arguments)]
-fn failed(
-    record: Record,
+fn unsuccessful(
+    record: PendingRecord,
     outcome: Outcome,
     session: &Session,
     action: &str,
@@ -118,7 +118,7 @@ fn failed(
 /// touched, for its audit line. An operational refusal is a 409 with the CLI message.
 #[cfg(feature = "refresh-lock")]
 fn result(
-    record: Record,
+    record: PendingRecord,
     session: &Session,
     action: &str,
     arguments: &str,
@@ -138,7 +138,7 @@ fn result(
             finish(record, Outcome::Accepted, &result, owners);
             json_answer(StatusCode::OK, &json!({"result": result}))
         }
-        Err((message, outcome)) => failed(
+        Err((message, outcome)) => unsuccessful(
             record,
             outcome,
             session,
@@ -155,10 +155,7 @@ fn result(
 /// own refusal or a failure.
 #[cfg(feature = "refresh-lock")]
 fn outcome(e: Box<dyn std::error::Error>) -> (String, Outcome) {
-    let outcome = match crate::snapshot::generations::OpError::refused(&*e) {
-        true => Outcome::Refused,
-        false => Outcome::Failed,
-    };
+    let outcome = Outcome::of(crate::snapshot::generations::OpError::refused(&*e));
     (e.to_string(), outcome)
 }
 
@@ -174,7 +171,7 @@ fn acting(session: &Session) -> (Role, Grant) {
 /// A refusal whose audit outcome is not its message.
 #[cfg(feature = "refresh-lock")]
 fn refused_with_outcome(
-    record: Record,
+    record: PendingRecord,
     session: &Session,
     action: &str,
     outcome: &str,
@@ -195,7 +192,7 @@ fn refused_with_outcome(
 
 /// A team operator that lost its role between admission and the lock gets a viewer's refusal.
 #[cfg(feature = "refresh-lock")]
-fn role_lost(record: Record, session: &Session, action: &str, arguments: &str) -> Answer {
+fn role_lost(record: PendingRecord, session: &Session, action: &str, arguments: &str) -> Answer {
     let message = Msg::UiOperatorRequired.text();
     refused(
         record,
@@ -214,7 +211,7 @@ fn role_lost(record: Record, session: &Session, action: &str, arguments: &str) -
 /// Nothing was written. The audit outcome is the message, the named identities and the count.
 #[cfg(feature = "refresh-lock")]
 fn entries_refused(
-    record: Record,
+    record: PendingRecord,
     session: &Session,
     action: &str,
     arguments: &str,
@@ -254,7 +251,7 @@ impl Console {
         (line_action, line_arguments): (&str, &str),
         action: &str,
         arguments: Value,
-    ) -> std::result::Result<Record<'_>, Box<Answer>> {
+    ) -> std::result::Result<PendingRecord<'_>, Box<Answer>> {
         let actor = actor(session, session.owners());
         match self.audit.pending(&actor, action, &arguments) {
             Ok(pending) => Ok(Some((&self.audit, pending))),
@@ -528,10 +525,7 @@ impl Console {
                 }
                 Err(ApplyError::RoleLost) => role_lost(record, session, action, version),
                 Err(e @ (ApplyError::Conflict(_) | ApplyError::Failed(_))) => {
-                    let outcome = match e.refused() {
-                        true => Outcome::Refused,
-                        false => Outcome::Failed,
-                    };
+                    let outcome = Outcome::of(e.refused());
                     let done = Err((e.to_string(), outcome));
                     result(record, session, action, version, done, &[])
                 }
@@ -543,9 +537,6 @@ impl Console {
             feature: "refresh-lock",
         }
         .text();
-        let actor = actor(session, session.owners());
-        let empty = json!({});
-        (self.audit).refused(&actor, recorded(route), &empty, &message);
         refused(
             None,
             session,

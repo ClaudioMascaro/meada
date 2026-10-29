@@ -34,9 +34,10 @@ test('the view model shows every field of a record, absent ones as none', () => 
   expect(auditRoute(11)).toBe('audit?before=11');
 });
 
-test('only the global operator is offered the audit page', () => {
-  const paths = (role?: 'viewer' | 'team_operator' | 'operator') => offered(role && { subject: 's', role }).map(route => route.path);
+test('only the global operator is offered the audit page, and only when the console has one', () => {
+  const paths = (role?: 'viewer' | 'team_operator' | 'operator', audit = true) => offered(role && { subject: 's', role }, audit).map(route => route.path);
   expect(paths('operator')).toContain('/audit');
+  expect(paths('operator', false)).not.toContain('/audit');
   for (const role of ['viewer', 'team_operator', undefined] as const) expect(paths(role)).not.toContain('/audit');
 });
 
@@ -48,7 +49,7 @@ test.each(['en', 'pt-BR'] as const)('the page pages with next, labelled and keyb
   vi.stubGlobal('fetch', fetch);
   const session = { subject: 'root', role: 'operator' } as const;
   await act(() => root.render(
-    <Shell path="/audit" locale={locale} onLanguage={() => {}} session={session} t={copy[locale]}>
+    <Shell path="/audit" locale={locale} onLanguage={() => {}} session={session} t={copy[locale]} audit>
       <AuditPage api={new Api(new Auth(config))} locale={locale} />
     </Shell>,
   ));

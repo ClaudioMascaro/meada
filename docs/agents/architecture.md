@@ -197,8 +197,9 @@ exists only in the uncontrolled field and its request body, cleared on completio
 `AuditPage.tsx` (#328) reads `GET audit` a page at a time, newest first, following `next` (older
 records) and back to the newest; `audit.ts` projects each record's time, via, subject, login,
 role, owners, action, arguments, outcome and message into text, with copy in `audit-i18n.ts`.
-`pages.tsx`'s `offered` lists the page for the global operator alone, and `App.tsx` answers its
-path with the not-found page for anyone else.
+`pages.tsx`'s `offered` lists the page for the global operator alone when `config` says
+`"audit": true` (the console has `[postgres]`), and `App.tsx` answers its path with the
+not-found page otherwise.
 The API reader preserves large JSON integers as decimal strings instead of rounding fences.
 `actions.ts` offers generation operations only to an operator while operations are enabled;
 `ActionControls.tsx` displays their CLI commands and the optional fence floor without rounding
@@ -545,9 +546,9 @@ one for the area a change touches.
   before and leaves only its stderr line. Each call opens its own connection through
   `postgres::connected`, so a schema version this binary does not know counts as unreachable;
   `pool_size` is still unread. The stderr lines are unchanged, with and without `[postgres]`.
-  `GET audit?before=<id>&limit=<n>` (`Console::audit_page`, only with `[postgres]`, a 404
-  without) is the global operator's alone (anyone else gets the 403 `Msg::UiOperatorRequired`):
-  records with an id below `before`, newest first, at most `limit` (1 to 100, 50 by default), as
+  `GET audit?before=<id>&limit=<n>` (`Console::audit_page`, only with `[postgres]`, when `config`
+  adds `"audit": true`; a 404 without) is the global operator's alone (anyone else gets the 403 `Msg::UiOperatorRequired`):
+  records with an id below `before`, newest first, at most `limit` (1 to `AUDIT_LIMIT_MAX`, 100; `AUDIT_LIMIT`, 50, by default), as
   `{"records": [...], "next": <id or null>}`, `next` the `before` of the following page; any other
   query, a repeated key or a value out of range is a 400 (`Msg::UiAuditQuery`), Postgres
   unreachable a 503 `audit_unavailable`. Every row is hostile: one whose columns fail their

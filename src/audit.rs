@@ -8,8 +8,10 @@
 //! It fails closed: a write that passed its authorization inserts its record as `pending`
 //! (`Audit::pending`) before it touches Valkey or the store and refuses itself when the insert
 //! fails; once done it sets the outcome (`Audit::finish`), and a failed update leaves the record
-//! `pending`. A refusal found before the write is inserted as `refused` (`Audit::refused`), and
-//! one that finds Postgres unreachable leaves no record. Records are never deleted by Meada.
+//! `pending`. A role refusal found before the body is read is inserted as `refused`
+//! (`Audit::refused`), and one that finds Postgres unreachable leaves no record. A body that fails
+//! its checks (400, 413, 422) is never recorded, nor are the `Host`, `Origin` and admission
+//! refusals. Records are never deleted by Meada.
 //! Without `[postgres]` (or the `postgres` feature) every call does nothing. Each call opens its
 //! own connection through `postgres::connected`, so a schema version this binary does not know
 //! counts as unreachable. No record holds a token, a raw body or the Postgres URL.
@@ -46,6 +48,14 @@ pub enum Outcome {
 }
 
 impl Outcome {
+    /// `Refused` when `refused`, else `Failed`: a write that did not succeed.
+    pub fn of(refused: bool) -> Self {
+        match refused {
+            true => Outcome::Refused,
+            false => Outcome::Failed,
+        }
+    }
+
     #[cfg_attr(not(feature = "postgres"), allow(dead_code))]
     fn name(self) -> &'static str {
         match self {
@@ -321,6 +331,8 @@ pub fn cli<T, E: std::fmt::Display + Into<Box<dyn std::error::Error>>>(
     accepted: impl FnOnce(&T) -> String,
     refused: impl FnOnce(&E) -> bool,
 ) -> crate::Result<T> {
+    // A manifest that does not read is refused by `op`, which reads it whole (`Manifest::read`,
+    // `[postgres]` included), before it writes anything.
     let audit = Audit::of(manifest).unwrap_or_default();
     let (Some(arguments), true) = (arguments, audit.on()) else {
         return op().map_err(Into::into);
@@ -337,10 +349,7 @@ pub fn cli<T, E: std::fmt::Display + Into<Box<dyn std::error::Error>>>(
     match &done {
         Ok(value) => audit.finish(pending, Outcome::Accepted, &accepted(value), None),
         Err(e) => {
-            let outcome = match refused(e) {
-                true => Outcome::Refused,
-                false => Outcome::Failed,
-            };
+            let outcome = Outcome::of(refused(e));
             audit.finish(pending, outcome, &e.to_string(), None);
         }
     }

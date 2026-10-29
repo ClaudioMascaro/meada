@@ -4,6 +4,8 @@ export interface Config {
   version: string;
   public_url: string;
   operations: boolean;
+  /** With `[postgres]`: the audit page has its route. */
+  audit?: boolean;
   issuer?: string;
   client_id?: string;
   scopes?: string[];

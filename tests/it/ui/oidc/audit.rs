@@ -140,6 +140,8 @@ fn every_operator_write_leaves_one_record_read_newest_first() {
     nix::sys::signal::kill(pid, nix::sys::signal::Signal::SIGTERM).unwrap();
     child.wait();
 
+    // `config` tells the front end the page has its route.
+    assert_eq!(ask(&console, "/api/v1/config", &root).json()["audit"], true);
     let page = ask(&console, "/api/v1/audit", &root);
     assert_eq!(page.status, 200, "{}", page.body);
     let page = page.json();

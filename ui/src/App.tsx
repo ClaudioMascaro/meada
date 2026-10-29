@@ -69,7 +69,7 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
   }
 
   const failed = error instanceof ApiError ? error.code === 'session_expired' ? t.sessionExpired : error.message : t.loadError;
-  return <Shell path={path} locale={locale} onLanguage={setLocale} session={session} t={t} onNavigate={navigate}>
+  return <Shell path={path} locale={locale} onLanguage={setLocale} session={session} t={t} onNavigate={navigate} audit={config.audit === true}>
     {signedOut ? <>
       <h1>{t.session}</h1><button type="button" onClick={() => { void login(); }}>{t.signIn}</button>
       {error != null && <p className="error" role="alert">{t.loginError}</p>}
@@ -84,7 +84,7 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
       : path === '/workspace' ? session ? <WorkspacePage api={api} locale={locale} session={session} config={config} onSession={setSession} /> : <p role="status">{t.loading}</p>
       : path === '/playground' ? <PlaygroundPage api={api} locale={locale} />
       : path === '/graph' ? <GraphPage api={api} locale={locale} />
-      : path === '/audit' ? session ? session.role === 'operator' ? <AuditPage api={api} locale={locale} /> : <h1>{t.notFound}</h1> : <p role="status">{t.loading}</p>
+      : path === '/audit' ? session ? config.audit === true && session.role === 'operator' ? <AuditPage api={api} locale={locale} /> : <h1>{t.notFound}</h1> : <p role="status">{t.loading}</p>
       : operational ? session ? <OperationalPage key={operational} kind={operational} api={api} locale={locale} config={config} session={session} /> : <p role="status">{t.loading}</p>
       : <h1>{t.notFound}</h1>}
   </Shell>;

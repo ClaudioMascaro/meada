@@ -72,6 +72,10 @@ const QUERY: &str = "/api/v1/query";
 /// short arguments, with room to spare.
 const QUERY_MAX: usize = 16 << 10;
 
+/// The most records `GET audit` answers at once, and how many without `limit` (#328).
+const AUDIT_LIMIT_MAX: i64 = 100;
+const AUDIT_LIMIT: i64 = 50;
+
 /// The fixed bodies of the 403s.
 const HOST_REFUSED: &str = "Forbidden: Host header is not allowed\n";
 const ORIGIN_REFUSED: &str = "Forbidden: Origin header is not allowed\n";
@@ -710,6 +714,10 @@ impl Console {
             "operations": self.ui.operations,
             "public_url": self.ui.public_url,
         });
+        // With `[postgres]`, the audit page has its route (#328).
+        if self.audit.on() {
+            config["audit"] = true.into();
+        }
         #[cfg(feature = "oidc")]
         if let Some(oidc) = &self.oidc {
             let (issuer, scopes) = oidc.login();
@@ -901,7 +909,9 @@ impl Console {
                     before.is_some()
                 }
                 Some(("limit", n)) if limit.is_none() => {
-                    limit = number(n).filter(|n| (1..=100).contains(n)).map(Some);
+                    limit = number(n)
+                        .filter(|n| (1..=AUDIT_LIMIT_MAX).contains(n))
+                        .map(Some);
                     limit.is_some()
                 }
                 _ => false,
@@ -914,7 +924,7 @@ impl Console {
                 );
             }
         }
-        let limit = limit.flatten().unwrap_or(50);
+        let limit = limit.flatten().unwrap_or(AUDIT_LIMIT);
         match self.audit.page(before.flatten(), limit) {
             Ok(page) => {
                 for _ in 0..page.skipped {

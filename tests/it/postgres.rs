@@ -310,8 +310,9 @@ fn two_migrations_serialize_on_the_advisory_lock() {
     let schema = schema("lock");
     let admin = Admin::new(&url);
     admin.run(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"));
-    // A one-second statement bound: the wait on the lock outlasts it.
-    let lines = format!("schema = \"{schema}\"\nstatement_timeout_seconds = 1\n");
+    // A three-second statement bound, which the wait on the lock outlasts; shorter, a loaded
+    // machine's migration DDL may outlast it too.
+    let lines = format!("schema = \"{schema}\"\nstatement_timeout_seconds = 3\n");
     let dir = manifest("postgres_lock", &lines);
     let spawn = || {
         Command::new(env!("CARGO_BIN_EXE_meada"))
@@ -329,7 +330,7 @@ fn two_migrations_serialize_on_the_advisory_lock() {
     admin.run(&format!("SELECT pg_advisory_lock({key})"));
     let mut waiting = spawn();
     let start = Instant::now();
-    while start.elapsed() < Duration::from_millis(1500) {
+    while start.elapsed() < Duration::from_millis(4000) {
         assert!(
             waiting.try_wait().unwrap().is_none(),
             "migrate ran without the lock"
