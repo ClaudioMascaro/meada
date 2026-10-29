@@ -33,6 +33,22 @@ All notable changes to Meada are recorded here. The format follows
   never lowers one. It ships migration 1, the schema's version. Every later connection refuses a
   version the binary does not know: a lower one (an absent schema included) names `meada
   postgres migrate`, a higher one names both versions.
+- The directory (ADR 0016): the `directory` cargo feature, implying `postgres` and enabled by
+  `cloud`, and the bootstrap manifest's `[directory]` section, which needs `[postgres]` and
+  `[oidc]`: `token_env` (default `MEADA_SCIM_TOKEN`) or `token_file`, `user_claim`,
+  `user_attribute` (`userName` or `externalId`) and `group_attribute` (`displayName`, the
+  default, or `externalId`). Only the console reads the token, at start: shorter than 32
+  characters, unset or unreadable, it refuses to start naming the key, never the value.
+  `[directory]` in a build without the feature is the error naming it.
+- The SCIM 2.0 endpoint: with `[ui]` and `[directory]` the console serves `/scim/v2/`, where
+  Entra ID's and Okta's provisioning create, read, filter, page, replace, patch and delete users
+  and groups, stored in the data layer (migration 3) as the provider sent them, never with
+  `password`. It admits only its own bearer token (no console token, and no request carrying
+  `Origin`), bounds a body at 1 MiB and a resource at 64 KiB, answers RFC 7644's errors with
+  their `scimType` and no echoed value, a 503 with Postgres unreachable, and the
+  `/ServiceProviderConfig`, `/ResourceTypes` and `/Schemas` documents. A deleted user leaves
+  every group and a revocation marker until it is provisioned again, active. Each write leaves
+  one stderr line, `scim: <method> <resource> <id>: <status>`. Nothing reads the directory yet.
 - The audit (ADR 0016): with `[postgres]`, every console write (`workspace.save`,
   `workspace.apply`, `pointer.set`, `pointer.retain`, `pointer.drop`, `fence.recover`) and every
   CLI twin of one (`meada workspace import` and `apply`, `meada snapshot pointer set`, `retain`

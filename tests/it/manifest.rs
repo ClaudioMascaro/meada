@@ -443,6 +443,14 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
             "meada: ops/meada.workspace.toml:3: [postgres] needs a Meada built with the postgres feature\n",
         ));
     }
+    // Nor does `directory`.
+    if !cfg!(feature = "directory") {
+        cases.push((
+            "index_dir = \"../indexes\"\n\n[directory]\nuser_claim = \"oid\"\n",
+            "meada: ops/meada.workspace.toml:3: [directory] needs a Meada built with the directory \
+             feature\n",
+        ));
+    }
     // `ui` needs no `valkey` either.
     if !cfg!(feature = "ui") {
         cases.push((
@@ -741,6 +749,63 @@ fn postgres_section_errors_name_the_file_the_line_and_the_key() {
         let (stdout, stderr, code) = run_args(&dir, &migrate);
         assert!(code == Some(1) && stdout.is_empty(), "migrate: {body}");
         assert_eq!(stderr, expected, "migrate: {body}");
+    }
+}
+
+/// The `[directory]` section (#334): without `[postgres]`, without `[oidc]`, with both token
+/// keys, with an unknown key and with a `user_attribute` it does not accept, each error names the
+/// file, the line and the sections or the key, and never a value.
+#[cfg(all(feature = "directory", feature = "oidc"))]
+#[test]
+fn directory_section_errors_name_the_file_the_line_and_the_keys() {
+    let dir = mirrors("manifest_directory_errors");
+    let at = "meada: ops/meada.workspace.toml";
+    let head = "index_dir = \"../indexes\"\n";
+    let postgres = "\n[postgres]\nschema = \"m\"\n";
+    let oidc = "\n[oidc]\nissuer = \"https://id.example.com\"\npublic_url = \"https://m.example\"\n\
+                identities_claim = \"r\"\n";
+    let directory = "\n[directory]\nuser_claim = \"oid\"\nuser_attribute = \"userName\"\n";
+    let full = format!("{head}{postgres}{oidc}{directory}");
+    for (toml, expected) in [
+        (
+            format!("{head}{oidc}{directory}"),
+            format!("{at}:8: [directory] needs [postgres]\n"),
+        ),
+        (
+            format!("{head}{postgres}{directory}"),
+            format!("{at}:6: [directory] needs [oidc]\n"),
+        ),
+        (
+            format!("{head}{directory}"),
+            format!("{at}:3: [directory] needs [postgres] and [oidc]\n"),
+        ),
+        (
+            format!("{full}token_env = \"SCIM\"\ntoken_file = \"scim-token\"\n"),
+            format!(
+                "{at}:15: `directory.token_file`: is set together with token_env: use one of the \
+                 two\n"
+            ),
+        ),
+        (
+            format!("{full}token = \"scim-secret-334\"\n"),
+            format!("{at}:14: `directory.token` is not a meada.workspace.toml key\n"),
+        ),
+        (
+            full.replace("\"userName\"", "\"email\""),
+            format!(
+                "{at}:13: `directory.user_attribute`: must be one of `userName` or `externalId`\n"
+            ),
+        ),
+        (
+            full.replace("user_claim = \"oid\"\n", ""),
+            format!("{at}:11: `directory`: `directory.user_claim` is missing\n"),
+        ),
+    ] {
+        write_manifest(&dir, &toml);
+        let (stdout, stderr, ok) = run(&dir, "status");
+        assert!(!ok && stdout.is_empty(), "{toml}");
+        assert_eq!(stderr, expected, "{toml}");
+        assert!(!stderr.contains("scim-secret-334"), "{stderr}");
     }
 }
 

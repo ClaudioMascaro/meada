@@ -269,10 +269,10 @@ fn migrate_creates_the_schema_once_and_a_second_run_changes_nothing() {
     };
     let before = outside();
     let (stdout, stderr, code) = migrate(&dir, &url, None);
-    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("2\n", "", 0));
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("3\n", "", 0));
     assert_eq!(outside(), before);
     let first = admin.snapshot(&schema);
-    // Migration 2: the audit's table (#328).
+    // Migration 2: the audit's table (#328); 3: the directory's (#334).
     let columns = [
         "audit.action text",
         "audit.arguments jsonb",
@@ -285,19 +285,37 @@ fn migrate_creates_the_schema_once_and_a_second_run_changes_nothing() {
         "audit.subject text",
         "audit.time timestamp with time zone",
         "audit.via text",
+        "directory_groups.created timestamp with time zone",
+        "directory_groups.display_name text",
+        "directory_groups.external_id text",
+        "directory_groups.id text",
+        "directory_groups.last_modified timestamp with time zone",
+        "directory_groups.resource jsonb",
+        "directory_members.group_id text",
+        "directory_members.user_id text",
+        "directory_revoked.external_id text",
+        "directory_revoked.revoked timestamp with time zone",
+        "directory_revoked.user_name text",
+        "directory_users.active boolean",
+        "directory_users.created timestamp with time zone",
+        "directory_users.external_id text",
+        "directory_users.id text",
+        "directory_users.last_modified timestamp with time zone",
+        "directory_users.resource jsonb",
+        "directory_users.user_name text",
         "schema_version.version integer",
     ];
     assert_eq!(first[..columns.len()], columns);
-    assert!(first[columns.len()].starts_with("2 "), "{first:?}");
+    assert!(first[columns.len()].starts_with("3 "), "{first:?}");
     let (stdout, stderr, code) = migrate(&dir, &url, None);
-    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("2\n", "", 0));
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("3\n", "", 0));
     assert_eq!(admin.snapshot(&schema), first);
     // A schema the operator created beforehand, empty, is kept and migrated.
     admin.run(&format!(
         "DROP SCHEMA \"{schema}\" CASCADE; CREATE SCHEMA \"{schema}\""
     ));
     let (stdout, _, code) = migrate(&dir, &url, None);
-    assert_eq!((stdout.as_str(), code), ("2\n", 0));
+    assert_eq!((stdout.as_str(), code), ("3\n", 0));
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
 }
 
@@ -348,7 +366,7 @@ fn two_migrations_serialize_on_the_advisory_lock() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert_eq!(out.stdout, b"2\n");
+    assert_eq!(out.stdout, b"3\n");
 
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
     // The default statement bound: two migrations' DDL on a loaded machine may outlast a second.
@@ -368,7 +386,7 @@ fn two_migrations_serialize_on_the_advisory_lock() {
             "{}",
             String::from_utf8_lossy(&out.stderr)
         );
-        assert_eq!(out.stdout, b"2\n");
+        assert_eq!(out.stdout, b"3\n");
     }
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
 }
@@ -389,13 +407,13 @@ fn a_version_this_binary_does_not_know_is_refused() {
     assert_eq!(
         status_line(&dir, &url, None),
         format!(
-            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 2: \
+            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 3: \
              run meada postgres migrate)"
         )
     );
-    assert_eq!(migrate(&dir, &url, None).0, "2\n");
+    assert_eq!(migrate(&dir, &url, None).0, "3\n");
     let higher =
-        format!("the schema {schema} is at version 2, above this Meada's 0: upgrade Meada");
+        format!("the schema {schema} is at version 3, above this Meada's 0: upgrade Meada");
     assert_eq!(
         status_line(&dir, &url, Some("0")),
         format!("postgres: unreachable ({higher})")
@@ -442,11 +460,11 @@ fn status_names_whether_postgres_is_reachable_and_its_exit_code_ignores_it() {
     let admin = Admin::new(&url);
     admin.run(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"));
     with(&format!("schema = \"{schema}\"\n"));
-    assert_eq!(migrate(&dir, &url, None).0, "2\n");
+    assert_eq!(migrate(&dir, &url, None).0, "3\n");
     let env = [("MEADA_POSTGRES_URL", url.as_str())];
     let (status, stderr, code) = meada(&dir, EN, &env, &STATUS);
     assert!(code == 0 && stderr.is_empty(), "{stderr}");
-    let line = format!("\npostgres: reachable, schema {schema} version 2\n");
+    let line = format!("\npostgres: reachable, schema {schema} version 3\n");
     assert!(status.ends_with(&line), "{status}");
     // A `ca_file` on loopback is never ignored: the plain test server refuses the TLS it asks.
     let roots = "/etc/ssl/certs/ca-certificates.crt";
@@ -462,7 +480,7 @@ fn status_names_whether_postgres_is_reachable_and_its_exit_code_ignores_it() {
 }
 
 /// A loopback relay to the test's Postgres that the test closes: a Postgres stopped.
-#[cfg(feature = "refresh-lock")]
+#[cfg(any(feature = "refresh-lock", feature = "directory"))]
 pub(crate) struct Relay {
     /// The test's URL with the relay's address.
     pub(crate) url: String,
@@ -470,7 +488,7 @@ pub(crate) struct Relay {
     port: u16,
 }
 
-#[cfg(feature = "refresh-lock")]
+#[cfg(any(feature = "refresh-lock", feature = "directory"))]
 impl Relay {
     pub(crate) fn new(url: &str) -> Self {
         use std::sync::atomic::{AtomicBool, Ordering};
@@ -531,7 +549,7 @@ impl Relay {
 
 /// The audit (#328) of a test's manifests in `dir`: `[postgres]` (`section`, to append to each)
 /// reading its URL, the relay's, from `ops/pg-url`, in a schema of `case`'s own, migrated.
-#[cfg(feature = "refresh-lock")]
+#[cfg(any(feature = "refresh-lock", feature = "directory"))]
 pub(crate) struct Audited {
     pub(crate) admin: Admin,
     pub(crate) schema: String,
@@ -541,7 +559,7 @@ pub(crate) struct Audited {
     pub(crate) url: String,
 }
 
-#[cfg(feature = "refresh-lock")]
+#[cfg(any(feature = "refresh-lock", feature = "directory"))]
 pub(crate) fn audited(dir: &Path, case: &str) -> Option<Audited> {
     let url = service()?;
     let schema = schema(case);
@@ -554,7 +572,7 @@ pub(crate) fn audited(dir: &Path, case: &str) -> Option<Audited> {
     fs::write(dir.join("ops/postgres.toml"), toml).unwrap();
     let migrate = ["postgres", "migrate", "--workspace", "ops/postgres.toml"];
     let (stdout, stderr, code) = meada(dir, EN, &[], &migrate);
-    assert_eq!((stdout.as_str(), code), ("2\n", 0), "{stderr}");
+    assert_eq!((stdout.as_str(), code), ("3\n", 0), "{stderr}");
     Some(Audited {
         admin,
         schema,
@@ -564,9 +582,10 @@ pub(crate) fn audited(dir: &Path, case: &str) -> Option<Audited> {
     })
 }
 
-#[cfg(feature = "refresh-lock")]
+#[cfg(any(feature = "refresh-lock", feature = "directory"))]
 impl Audited {
     /// Every record, oldest first, as Postgres's `row_to_json` writes it.
+    #[cfg(feature = "refresh-lock")]
     pub(crate) fn records(&self) -> Vec<serde_json::Value> {
         let sql = format!(
             "SELECT row_to_json(a)::text FROM \"{}\".audit a ORDER BY id",
@@ -588,7 +607,7 @@ impl Audited {
     }
 }
 
-#[cfg(feature = "refresh-lock")]
+#[cfg(any(feature = "refresh-lock", feature = "directory"))]
 impl Drop for Audited {
     fn drop(&mut self) {
         let drop = format!("DROP SCHEMA IF EXISTS \"{}\" CASCADE", self.schema);

@@ -19,7 +19,7 @@ pub struct Module {
     pub built: bool,
 }
 
-pub const MODULES: [Module; 8] = [
+pub const MODULES: [Module; 9] = [
     Module {
         section: "valkey",
         feature: "valkey",
@@ -60,6 +60,11 @@ pub const MODULES: [Module; 8] = [
         feature: "postgres",
         built: cfg!(feature = "postgres"),
     },
+    Module {
+        section: "directory",
+        feature: "directory",
+        built: cfg!(feature = "directory"),
+    },
 ];
 
 /// The first section of `src`, the content of `file`, whose feature this build lacks. A file
@@ -78,7 +83,11 @@ pub fn check(file: &Path, src: &str) -> Result<()> {
 
 /// The error for `section` of `src`, the content of `file`, when the sections it needs that
 /// `missing` names are not there: `[section] needs [missing...]`, at the section's line.
-#[cfg(any(feature = "generation-pointer", feature = "github-app"))]
+#[cfg(any(
+    feature = "generation-pointer",
+    feature = "github-app",
+    feature = "directory"
+))]
 pub fn needs(file: &Path, src: &str, section: &str, missing: &[&str]) -> Result<()> {
     if missing.is_empty() {
         return Ok(());

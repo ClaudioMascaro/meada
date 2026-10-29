@@ -154,6 +154,9 @@ postgres = [
     "dep:rustls",
     "dep:rustls-platform-verifier",
 ]
+# The directory (`[directory]`, ADR 0016): a SCIM 2.0 endpoint on the console's listener, its
+# users and groups in the data layer. No crate beyond `postgres`'s.
+directory = ["postgres"]
 # The management console (`[ui]`, `meada ui`, ADR 0014): the node's hyper listener and
 # serde_json. No crate of its own.
 ui = []
@@ -166,6 +169,7 @@ cloud = [
     "github-app",
     "ui",
     "postgres",
+    "directory",
 ]
 
 # `cargo test` runs the example's own tests too.

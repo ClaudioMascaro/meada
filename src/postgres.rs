@@ -73,6 +73,41 @@ const MIGRATIONS: &[&str] = &[
        outcome text NOT NULL,
        message text
      );",
+    // 3: the directory (`crate::directory`, #334): users and groups as the identity provider
+    // sent them, Meada's ids 32 lowercase hex characters, the memberships, and the revocation
+    // markers a deleted user leaves until it is provisioned again, active.
+    "CREATE TABLE {schema}.directory_users (
+       id text PRIMARY KEY DEFAULT replace(gen_random_uuid()::text, '-', ''),
+       user_name text NOT NULL,
+       external_id text,
+       active boolean NOT NULL,
+       resource jsonb NOT NULL,
+       created timestamptz NOT NULL DEFAULT now(),
+       last_modified timestamptz NOT NULL DEFAULT now()
+     );
+     CREATE UNIQUE INDEX ON {schema}.directory_users (lower(user_name));
+     CREATE UNIQUE INDEX ON {schema}.directory_users (external_id);
+     CREATE TABLE {schema}.directory_groups (
+       id text PRIMARY KEY DEFAULT replace(gen_random_uuid()::text, '-', ''),
+       display_name text NOT NULL,
+       external_id text,
+       resource jsonb NOT NULL,
+       created timestamptz NOT NULL DEFAULT now(),
+       last_modified timestamptz NOT NULL DEFAULT now()
+     );
+     CREATE INDEX ON {schema}.directory_groups (display_name);
+     CREATE INDEX ON {schema}.directory_groups (external_id);
+     CREATE TABLE {schema}.directory_members (
+       group_id text NOT NULL REFERENCES {schema}.directory_groups (id) ON DELETE CASCADE,
+       user_id text NOT NULL REFERENCES {schema}.directory_users (id) ON DELETE CASCADE,
+       PRIMARY KEY (group_id, user_id)
+     );
+     CREATE INDEX ON {schema}.directory_members (user_id);
+     CREATE TABLE {schema}.directory_revoked (
+       user_name text NOT NULL,
+       external_id text,
+       revoked timestamptz NOT NULL DEFAULT now()
+     );",
 ];
 
 /// The `[postgres]` section as written.
@@ -757,7 +792,9 @@ mod tests {
             let sql = migration.replace("{schema}", "\"s\"");
             let words: Vec<&str> = sql.split_whitespace().collect();
             for pair in words.windows(2) {
-                if ["TABLE", "INTO", "UPDATE", "FROM", "ON"].contains(&pair[0]) {
+                let keyword = ["TABLE", "INTO", "UPDATE", "FROM", "ON", "REFERENCES"];
+                // `ON DELETE` is a foreign key's action, not a table.
+                if keyword.contains(&pair[0]) && pair[1] != "DELETE" {
                     assert!(pair[1].starts_with("\"s\"."), "{sql}");
                 }
             }

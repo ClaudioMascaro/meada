@@ -203,6 +203,10 @@ pub struct Manifest {
     /// The `[postgres]` section, when the build has the module (ADR 0016).
     #[cfg(feature = "postgres")]
     pub postgres: Option<crate::postgres::Config>,
+    /// The `[directory]` section, when the build has the module (ADR 0016); `read` checks that
+    /// `[postgres]` and `[oidc]` are there too.
+    #[cfg(feature = "directory")]
+    pub directory: Option<crate::directory::Config>,
     /// `[workspace] source = "store"` (ADR 0014): the repositories come from the current
     /// workspace version: `entries` is empty, or with `read_listed` the pulled version's.
     #[cfg(feature = "generation-pointer")]
@@ -252,6 +256,8 @@ struct ManifestFile {
     ui: Option<crate::ui::File>,
     #[cfg(feature = "postgres")]
     postgres: Option<crate::postgres::File>,
+    #[cfg(feature = "directory")]
+    directory: Option<crate::directory::File>,
     #[cfg(feature = "github-app")]
     #[serde(default, rename = "github_app")]
     github_apps: Vec<crate::github_app::File>,
@@ -336,6 +342,19 @@ impl Manifest {
         let ui = crate::ui::validated(file, &src, base, parsed.ui)?;
         #[cfg(feature = "postgres")]
         let postgres = modules::validated(file, &src, parsed.postgres, |p| p.validate(base))?;
+        #[cfg(feature = "directory")]
+        let directory = modules::validated(file, &src, parsed.directory, |d| d.validate(base))?;
+        #[cfg(feature = "directory")]
+        if directory.is_some() {
+            // Without the `oidc` feature an `[oidc]` section was already the error naming it.
+            #[cfg(feature = "oidc")]
+            let no_oidc = oidc.is_none();
+            #[cfg(not(feature = "oidc"))]
+            let no_oidc = true;
+            let missing = [("postgres", postgres.is_none()), ("oidc", no_oidc)];
+            let missing: Vec<&str> = (missing.iter()).filter(|m| m.1).map(|m| m.0).collect();
+            modules::needs(file, &src, "directory", &missing)?;
+        }
         // The `[[github_app]]` blocks are checked, `[valkey]` among their needs; only
         // `github_apps` keeps them.
         #[cfg(feature = "github-app")]
@@ -456,6 +475,8 @@ impl Manifest {
             ui,
             #[cfg(feature = "postgres")]
             postgres,
+            #[cfg(feature = "directory")]
+            directory,
             #[cfg(feature = "generation-pointer")]
             store,
             #[cfg(feature = "generation-pointer")]
@@ -572,6 +593,8 @@ impl Manifest {
             ui: None,
             #[cfg(feature = "postgres")]
             postgres: None,
+            #[cfg(feature = "directory")]
+            directory: None,
             #[cfg(feature = "generation-pointer")]
             store: false,
             #[cfg(feature = "generation-pointer")]

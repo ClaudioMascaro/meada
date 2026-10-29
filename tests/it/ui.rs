@@ -211,7 +211,8 @@ fn serves_config_session_and_manifest() {
             "oidc",
             "github_app",
             "ui",
-            "postgres"
+            "postgres",
+            "directory"
         ]
     );
     for module in modules {
@@ -224,6 +225,7 @@ fn serves_config_session_and_manifest() {
             "github-app" => cfg!(feature = "github-app"),
             "ui" => true,
             "postgres" => cfg!(feature = "postgres"),
+            "directory" => cfg!(feature = "directory"),
             other => panic!("{other}"),
         };
         assert_eq!(module["built"], json!(built), "{module}");
