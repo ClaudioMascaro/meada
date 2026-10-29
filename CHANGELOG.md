@@ -56,7 +56,23 @@ All notable changes to Meada are recorded here. The format follows
   their `scimType` and no echoed value, a 503 with Postgres unreachable, and the
   `/ServiceProviderConfig`, `/ResourceTypes` and `/Schemas` documents. A deleted user leaves
   every group and a revocation marker until it is provisioned again, active. Each write leaves
-  one stderr line, `scim: <method> <resource> <id>: <status>`. Nothing reads the directory yet.
+  one stderr line, `scim: <method> <resource> <id>: <status>`.
+- Deprovisioning in the console (ADR 0016): with `[directory]`, the token's `user_claim` is looked
+  up in the directory by `user_attribute` (`userName` ignoring case, `externalId` exact). A user
+  found inactive, or deleted and not provisioned active since, gets a 403 `deprovisioned` on every
+  route but `GET /api/v1/config`, whatever its role, and the console shows a deactivated-account
+  page. A user never provisioned is admitted. With the directory unreadable, reads are admitted
+  and a write is a 503 `audit_unavailable` before any audit insert, with one stderr line that
+  names the directory and never the claim. Migration 4 adds the directory's state row (the schema
+  version is now 4); a directory that had already lost its last group before the upgrade starts
+  with no group ever provisioned, so nothing is flagged until a group is provisioned again.
+- The owner picker: `GET /api/v1/directory/groups?prefix=<text>`, for the global operator alone,
+  lists at most 100 group names starting with the prefix (compared exactly, sorted), and the
+  workspace editor offers them while the caret is inside an `owner = "..."` string.
+- `owner_missing`: `GET /api/v1/workspace` and `workspace/versions/<id>` add `"owner_missing":
+  true` to an entry whose owner names no directory group, once a group was ever provisioned; the
+  versions page and the editor say so in text. `GET /api/v1/admission` gains the directory's
+  users and groups counts and the last SCIM write, which the admission page shows.
 - The audit (ADR 0016): with `[postgres]`, every console write (`workspace.save`,
   `workspace.apply`, `pointer.set`, `pointer.retain`, `pointer.drop`, `fence.recover`) and every
   CLI twin of one (`meada workspace import` and `apply`, `meada snapshot pointer set`, `retain`

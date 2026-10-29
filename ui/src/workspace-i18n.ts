@@ -23,6 +23,8 @@ export const workspaceCopy = {
     apiRefused: 'O servidor recusou estas entradas', hiddenRefused: 'Entradas fora do seu acesso também recusadas',
     roleLost: 'Seu papel mudou: você não pode mais editar o workspace. O editor ficou somente leitura.',
     authorizedBy: 'Autorizado pelos times', noTeams: 'nenhum time (nada dos seus times muda)',
+    ownerMissing: 'o time responsável não é um grupo do diretório', ownerMissingIntro: 'Estas entradas da versão atual têm um time responsável que não é um grupo do diretório do provedor de identidade:',
+    ownerSuggestions: 'Sugestões de time do diretório', ownerSuggestionsHint: 'Grupos do diretório; o texto do time continua livre.',
     added: 'Adicionadas', removed: 'Removidas', changed: 'Alteradas', entry: 'Entrada', key: 'Chaves alteradas',
   },
   en: {
@@ -49,6 +51,8 @@ export const workspaceCopy = {
     apiRefused: 'The server refused these entries', hiddenRefused: 'Entries outside your access also refused',
     roleLost: 'Your role changed: you can no longer edit the workspace. The editor is read-only.',
     authorizedBy: 'Authorized by the teams', noTeams: 'no team (nothing in your teams changes)',
+    ownerMissing: 'the owner names no group of the directory', ownerMissingIntro: 'These entries of the current version name an owner that is no group of the identity provider’s directory:',
+    ownerSuggestions: 'Owner suggestions from the directory', ownerSuggestionsHint: 'Groups of the directory; the owner text stays free.',
     added: 'Added', removed: 'Removed', changed: 'Changed', entry: 'Entry', key: 'Changed keys',
   },
 };

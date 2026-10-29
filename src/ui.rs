@@ -39,6 +39,8 @@ use crate::modules::{self, Problem, Shape};
 use crate::msg::Msg;
 use crate::workspace::Manifest;
 
+#[cfg(feature = "directory")]
+mod directory;
 mod read;
 mod write;
 
@@ -229,6 +231,10 @@ struct Console {
     /// The SCIM endpoint under `/scim/v2/`, with `[directory]` (#334).
     #[cfg(feature = "directory")]
     scim: Option<crate::directory::scim::Scim>,
+    /// What the console reads of the directory, with `[directory]` (#335): deprovisioning at
+    /// admission, the owner picker, `owner_missing` and the admission counts.
+    #[cfg(feature = "directory")]
+    directory: Option<crate::directory::read::Directory>,
 }
 
 /// What the console answers the playground and the exports from, read per request, so that what
@@ -467,6 +473,14 @@ impl Console {
             },
             _ => None,
         };
+        #[cfg(feature = "directory")]
+        let directory = match (&read.directory, &read.postgres) {
+            (Some(directory), Some(postgres)) => Some(crate::directory::read::Directory::new(
+                directory,
+                postgres.clone(),
+            )),
+            _ => None,
+        };
         #[cfg(feature = "postgres")]
         let audit = crate::audit::Audit::new(read.postgres.clone());
         #[cfg(not(feature = "postgres"))]
@@ -517,6 +531,8 @@ impl Console {
             audit,
             #[cfg(feature = "directory")]
             scim,
+            #[cfg(feature = "directory")]
+            directory,
         })
     }
 
@@ -678,17 +694,10 @@ impl Console {
                 &message,
             )));
         }
-        let session = match self.admit(headers, route) {
+        let session = match self.admit(headers, route, operation.is_some()) {
             Ok(session) => session,
-            Err(refused) => {
-                #[cfg(feature = "oidc")]
-                {
-                    let message = match refused.status() {
-                        StatusCode::UNAUTHORIZED => Msg::UiUnauthorized.text(),
-                        _ => Msg::UiScope.text(),
-                    };
-                    audit(None, &message);
-                }
+            Err((refused, message)) => {
+                audit(None, &message);
                 return Err(refused);
             }
         };
@@ -737,14 +746,18 @@ impl Console {
         }
     }
 
-    /// Admission of a request to the API route `route` (`None`: a static file). Behind the
-    /// proxy every request is a viewer's; with `[oidc]`, a bearer token for `[ui] audience`,
-    /// except for the static files and `config`, which the browser needs to log in.
+    /// Admission of a request to the API route `route` (`None`: a static file), `write` when it
+    /// is one of the audited operations. Behind the proxy every request is a viewer's; with
+    /// `[oidc]`, a bearer token for `[ui] audience`, except for the static files and `config`,
+    /// which the browser needs to log in. With `[directory]`, the token's `user_claim` is then
+    /// looked up (`deprovisioned`) before any role is computed. A refusal comes with the line
+    /// the pre-authentication audit prints.
     fn admit(
         self: &Arc<Self>,
         headers: &HeaderMap,
         route: Option<&str>,
-    ) -> std::result::Result<Session, Box<Answer>> {
+        write: bool,
+    ) -> std::result::Result<Session, (Box<Answer>, String)> {
         let open = matches!(route, None | Some("config"));
         #[cfg(feature = "oidc")]
         if let Some(oidc) = &self.oidc
@@ -755,8 +768,13 @@ impl Console {
                 &self.ui.audience,
                 self.ui.operator_groups.as_deref(),
                 self.ui.operator_claim.as_deref(),
+                self.user_claim(),
             ) {
                 Ok(admitted) => {
+                    #[cfg(feature = "directory")]
+                    if let Some(refused) = self.directory_refusal(admitted.user.as_deref(), write) {
+                        return Err(refused);
+                    }
                     // A team operator reads what a viewer reads: only `session` and the writes
                     // need the role, so only they read the current version.
                     let role_route =
@@ -784,11 +802,11 @@ impl Console {
                             .headers_mut()
                             .insert(header::WWW_AUTHENTICATE, challenge);
                     }
-                    Err(Box::new(answer))
+                    Err((Box::new(answer), message))
                 }
             };
         }
-        let _ = (headers, open);
+        let _ = (headers, open, write);
         Ok(Session {
             subject: None,
             operator: false,
@@ -797,6 +815,15 @@ impl Console {
             #[cfg(feature = "oidc")]
             grant: None,
         })
+    }
+
+    /// The token claim naming a user, with `[directory]`.
+    #[cfg(feature = "oidc")]
+    fn user_claim(&self) -> Option<&str> {
+        #[cfg(feature = "directory")]
+        return self.directory.as_ref().map(|d| d.user_claim());
+        #[cfg(not(feature = "directory"))]
+        None
     }
 
     /// Whether `host`, a request's `Host`, is `public_url`'s host and port, or the bound address
@@ -826,6 +853,10 @@ impl Console {
         if read && route == "audit" && self.audit.on() {
             return self.audit_page(request.uri().query(), session);
         }
+        #[cfg(feature = "directory")]
+        if read && route == "directory/groups" && self.directory.is_some() {
+            return self.directory_groups(request.uri().query(), session);
+        }
         if read && let Some(answer) = self.operational(route, session) {
             return answer;
         }
@@ -834,7 +865,13 @@ impl Console {
             "session" if read => Some(session.document()),
             "manifest" if read => Some(self.manifest(session)),
             #[cfg(feature = "oidc")]
-            "admission" if read => (self.oidc.as_ref()).map(|o| o.admission(&|i| session.reads(i))),
+            "admission" if read => (self.oidc.as_ref()).map(|o| {
+                #[allow(unused_mut)]
+                let mut document = o.admission(&|i| session.reads(i));
+                #[cfg(feature = "directory")]
+                self.with_directory_counts(&mut document);
+                document
+            }),
             #[cfg(feature = "oidc")]
             "admission/check" if *method == Method::POST => match &self.oidc {
                 Some(oidc) => return self.check(oidc, request.body(), session),

@@ -716,7 +716,10 @@ impl Db {
         Ok(pairs.collect())
     }
 
+    /// Records the write's time in the directory's state (#335) and commits.
     async fn commit(&self) -> Done<()> {
+        let state = "UPDATE {s}.directory_state SET last_write = now()";
+        self.execute(state, &[]).await?;
         self.execute("COMMIT", &[]).await.map(|_| ())
     }
 }
@@ -1157,6 +1160,8 @@ impl Scim {
                             .await?
                     }
                 };
+                let provisioned = "UPDATE {s}.directory_state SET groups_provisioned = true";
+                db.execute(provisioned, &[]).await?;
                 let group = rows
                     .first()
                     .and_then(|row| row.try_get::<_, String>(0).ok());

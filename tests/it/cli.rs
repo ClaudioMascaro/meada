@@ -974,26 +974,26 @@ fn postgres_refusals_follow_lang() {
     assert_eq!(
         line(en, "9"),
         format!(
-            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 3: \
+            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 4: \
              run meada postgres migrate)"
         )
     );
     assert_eq!(
         line(pt, "9"),
         format!(
-            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da 3 deste Meada: \
+            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da 4 deste Meada: \
              rode meada postgres migrate)"
         )
     );
-    assert_eq!(meada(&dir, en, &at("9"), &MIGRATE).0, "3\n");
+    assert_eq!(meada(&dir, en, &at("9"), &MIGRATE).0, "4\n");
     for (lang, expected) in [
         (
             en,
-            format!("the schema {schema} is at version 3, above this Meada's 0: upgrade Meada"),
+            format!("the schema {schema} is at version 4, above this Meada's 0: upgrade Meada"),
         ),
         (
             pt,
-            format!("o schema {schema} está na versão 3, acima da 0 deste Meada: atualize o Meada"),
+            format!("o schema {schema} está na versão 4, acima da 0 deste Meada: atualize o Meada"),
         ),
     ] {
         let (_, stderr, code) = meada(&dir, lang, &at("0"), &MIGRATE);

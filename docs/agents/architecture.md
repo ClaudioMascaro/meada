@@ -368,7 +368,8 @@ one for the area a change touches.
   ticket appends the next number when it integrates, never editing one before it. Migration 1
   creates the version table, `<schema>.schema_version` (one row, `version`), the schema itself
   created in its transaction when absent; migration 2 the audit's table, `<schema>.audit`
-  (`audit.rs`); migration 3 the directory's tables (`directory/scim.rs`). `connected` is `connect` keeping the password for scrubbing a later statement's
+  (`audit.rs`); migration 3 the directory's tables (`directory/scim.rs`); migration 4 its state row,
+  `<schema>.directory_state` (`groups_provisioned`, `last_write`; #335). `connected` is `connect` keeping the password for scrubbing a later statement's
   error, and `probe` is the console's start check (a version refusal refuses the start, Postgres
   unreachable does not). `migrate` (`meada postgres migrate --workspace
   <bootstrap manifest>`, reading `Manifest::postgres`, no mirror) is the only command that
@@ -394,6 +395,23 @@ one for the area a change touches.
   which owns the schema; one that writes (the console, the role check, the CLI twins); one that
   reads (nodes). `pool_size` is read by the callers that pool connections; `migrate` and
   `status` open one.
+- `directory/read.rs` (feature `ui` on top of `directory`; #335): the console's readers of the
+  directory, one statement per call on `postgres::connected`, never cached. `deprovisioned`
+  (the token's `user_claim` value against `user_attribute`: `userName` ignoring case,
+  `externalId` exact; an inactive user or a revocation marker) answers the admission;
+  `groups(prefix)` is the owner picker (`starts_with`, exact, byte order, at most `PICKER_MAX`
+  100); `named` is which of the given owners name a group, `None` while `groups_provisioned` is
+  false; `counts` is the admission view's users, groups and last write. `ui/directory.rs` is the
+  console's side: `directory_refusal` (a deprovisioned user is a 403 `deprovisioned` on every
+  route but `config`, before the role is computed and for a team operator too; an unreadable
+  directory admits a read, and refuses a write as 503 `audit_unavailable` before any audit
+  insert, with one `directory: unreadable (<reason>)` line that names no claim), the route
+  `GET /api/v1/directory/groups?prefix=` (the global operator alone; a prefix over `OWNER_MAX`
+  is a 400), `flag_missing_owners` (`owner_missing: true` on the entries of `workspace` and
+  `workspace/versions/<id>` whose owner names no group; nothing flagged before a group was ever
+  provisioned, ownerless entries never flagged, no flags and one stderr line when the read
+  fails) and `with_directory_counts` (`GET /api/v1/admission` gains `directory`: `users`,
+  `groups`, `last_write`; `null` when unreadable, absent without `[directory]`).
 - `directory.rs`, `directory/scim.rs` (feature `directory`, implying `postgres`, enabled by
   `cloud`, no crate beyond `postgres`'s; ADR 0016's `directory` row of ADR 0012's module table;
   #334): the directory, users and groups the identity provider pushes in over SCIM 2.0.
@@ -405,8 +423,8 @@ one for the area a change touches.
   names its key, never a value. `Config::token` reads the token, only in the console and only at
   start (`Console::start`): unset, unreadable or shorter than `TOKEN_MIN` (32) characters refuses
   the start naming the key (`Msg::DirectoryTokenShort`), never the value; rotating it means a
-  restart. Nodes parse the section and never read the token; `user_claim` waits for the
-  directory's readers (S4 tickets 9 and 10: deprovisioning in the console, Entra overage).
+  restart. Nodes parse the section and never read the token; `user_claim` is read by the console's
+  deprovisioning (`ui/directory.rs`) and waits for Entra overage (S4 ticket 10).
   `directory/scim.rs` (with `ui`) is the endpoint the console serves under `/scim/v2/` with
   `[ui]` and `[directory]` (`Console::scim`, routed before the console's admission). Admission
   in order: S2's `Host` check (the plain 403); a 403 for any request carrying `Origin`; the
@@ -447,8 +465,10 @@ one for the area a change touches.
   with another write. A deleted user leaves every group and a revocation marker (its `userName`
   and `externalId` in `directory_revoked`), separate from the deleted resource, which a write
   naming `active` true for a user whose `user_attribute` matches it (a `userName` ignoring case)
-  clears (active by default is not enough);
-  nothing reads the markers yet. Errors are RFC 7644's, with `scimType` (`invalidFilter`,
+  clears (active by default is not enough); the console's admission reads the markers
+  (`directory/read.rs`). Every committed write also stamps `directory_state.last_write`, and the
+  first group stored sets `groups_provisioned` for good (a deleted group does not unset it).
+  Errors are RFC 7644's, with `scimType` (`invalidFilter`,
   `invalidPath`, `invalidValue`, `noTarget`, `uniqueness`, `invalidSyntax`) for a 400 or 409, an
   unknown id a 404, and a fixed detail that echoes no value; a value Postgres cannot store
   (SQLSTATE class 22, as a NUL) is a 400 `invalidValue`. Postgres unreachable, or a schema
@@ -2447,6 +2467,9 @@ one for the area a change touches.
 
 ## Known ceilings
 
+- `directory/read.rs`: the owner picker lists at most `PICKER_MAX` (100) group names and says
+  nothing when it cut the list; the global operator narrows it by typing more of the prefix
+  (#335).
 - `meada-core/src/manifest.rs`: an entry's `owner` holds at most `OWNER_MAX` (256) characters
   (ADR 0015); a longer name is an error naming its line and key, wherever the entry is read
   (import, a stored version, a pull, the browser).

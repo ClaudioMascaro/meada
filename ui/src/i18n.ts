@@ -56,6 +56,8 @@ const en = {
   loginError: 'Sign-in failed. Start again from the console.',
   configError: 'The identity provider configuration is unavailable. Check the issuer and its public client.',
   sessionExpired: 'Your session expired. Signing in again…',
+  deprovisionedTitle: 'Account deactivated',
+  deprovisioned: 'The identity provider deactivated this account, so the console refuses every request. Ask your administrator to activate it again.',
   notFound: 'This page does not exist.',
 } as const;
 
@@ -114,6 +116,8 @@ export const copy: Record<Language, Copy> = {
     loginError: 'A entrada falhou. Recomece pela console.',
     configError: 'A configuração do provedor de identidade está indisponível. Verifique o issuer e seu cliente público.',
     sessionExpired: 'Sua sessão expirou. Entrando novamente…',
+    deprovisionedTitle: 'Conta desativada',
+    deprovisioned: 'O provedor de identidade desativou esta conta, e a console recusa todas as requisições. Peça ao administrador para ativá-la novamente.',
     notFound: 'Esta página não existe.',
   },
 };

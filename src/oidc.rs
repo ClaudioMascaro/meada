@@ -321,6 +321,9 @@ pub struct Admitted {
     pub groups: Vec<String>,
     /// The console role derived only from verified groups or a strict boolean claim.
     pub operator: bool,
+    /// The token's `[directory] user_claim`, when it is a string: what the directory is asked
+    /// about (#335). Never printed.
+    pub user: Option<String>,
 }
 
 /// Each check of a pasted token (ADR 0014): `None` where it could not be made, since the
@@ -720,7 +723,8 @@ impl Oidc {
     /// The console's admission (ADR 0014): `headers`' bearer token checked as `verified` checks
     /// it, its audience `audience`. Otherwise the status and `WWW-Authenticate` refusing it: 401
     /// for a missing or invalid token (`error="invalid_token"` when one was sent), 403 for a
-    /// missing scope; no `resource_metadata`, since the console serves none.
+    /// missing scope; no `resource_metadata`, since the console serves none. `user_claim` names
+    /// the claim `Admitted::user` reads.
     #[cfg(feature = "ui")]
     pub fn admit_console(
         &self,
@@ -728,6 +732,7 @@ impl Oidc {
         audience: &str,
         operator_groups: Option<&[String]>,
         operator_claim: Option<&str>,
+        user_claim: Option<&str>,
     ) -> Result<Admitted, (StatusCode, String)> {
         let refused = match bearer(headers) {
             Ok(Some(token)) => match self.verified(token, &[audience.to_string()]) {
@@ -758,6 +763,10 @@ impl Oidc {
                         grant: Grant::of(&claims, &self.config),
                         groups,
                         operator,
+                        user: user_claim
+                            .and_then(|name| claims.get(name))
+                            .and_then(Value::as_str)
+                            .map(str::to_string),
                     });
                 }
                 Err(refusal) => refusal,

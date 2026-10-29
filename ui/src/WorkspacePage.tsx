@@ -3,7 +3,7 @@ import { ApiError } from './api';
 import type { Api, Config, Session } from './api';
 import { loadCore } from './core';
 import type { Language } from './i18n';
-import { applyAction, authority, editorModel, entryRows, plainEntries, saveAction, teamApplyAction, teamEditorModel, teamSaveAction, versionText } from './workspace';
+import { applyAction, authority, editorModel, entryRows, ownerAt, ownerMissing, plainEntries, saveAction, teamApplyAction, teamEditorModel, teamSaveAction, tomlEscaped, versionText } from './workspace';
 import type { ApplyAction, CurrentWorkspace, Entry, EntryRow, Refusal, SaveAction, VersionSummary, WorkspaceDiff, WorkspaceVersion, WorkspaceVersions } from './workspace';
 import { word, workspaceCopy } from './workspace-i18n';
 import type { WorkspaceCopy } from './workspace-i18n';
@@ -43,6 +43,10 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
   const [saved, setSaved] = useState<WorkspaceVersion>();
   const [savedId, setSavedId] = useState<string>();
   const [metadataError, setMetadataError] = useState('');
+  const [caret, setCaret] = useState(0);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const entriesBox = useRef<HTMLTextAreaElement>(null);
+  const restore = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
@@ -109,6 +113,21 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
     setDraft(previous => previous ?? initial);
   }, [workspace, ready, locale]);
 
+  // The owner picker is the global operator's alone: no other role asks the directory anything.
+  const typing = global && allowed && draft !== undefined ? ownerAt(draft, caret) : undefined;
+  const wanted = typing?.prefix;
+  useEffect(() => {
+    if (wanted === undefined) { setSuggestions([]); return; }
+    let active = true;
+    // ponytail: one request per keystroke inside an owner string; debounce if the route shows load.
+    void api.request<{ groups: string[] }>(`directory/groups?prefix=${encodeURIComponent(wanted)}`)
+      .then(found => { if (active) setSuggestions(found.groups); }).catch(() => { if (active) setSuggestions([]); });
+    return () => { active = false; };
+  }, [api, wanted]);
+  useEffect(() => {
+    if (restore.current !== undefined) { entriesBox.current?.setSelectionRange(restore.current, restore.current); restore.current = undefined; }
+  });
+
   useEffect(() => {
     if (!savedId) return;
     let active = true;
@@ -126,6 +145,15 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
   const editor = teamEditor ?? (drafted ? editorModel(draft, currentText, locale) : undefined);
   const refused = teamEditor?.refusals ?? [];
   const marks = new Map(refused.map(refusal => [refusal.identity, refusal]));
+  const unnamed = workspace?.version ? ownerMissing(workspace.version.repositories) : new Set<string>();
+
+  function pick(name: string) {
+    if (!typing || draft === undefined) return;
+    const written = tomlEscaped(name);
+    setDraft(draft.slice(0, typing.start) + written + draft.slice(caret));
+    setCaret(typing.start + written.length); restore.current = typing.start + written.length;
+    entriesBox.current?.focus();
+  }
 
   async function reloadRole(message: string) {
     try {
@@ -198,9 +226,14 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
         open(teamEditor ? teamSaveAction(draft, message, teamEditor.owners) : saveAction(draft, message, file ?? ''));
       }}>
         <h2>{t.editor}</h2><p>{t.editorIntro}</p>
-        {team && <><p>{t.teamHint}</p><EntriesTable entries={entryRows(held, team)} t={t} label={t.entryState} state /></>}
+        {team && <><p>{t.teamHint}</p><EntriesTable entries={entryRows(held, team)} t={t} label={t.entryState} state missing={unnamed} /></>}
+        {!team && unnamed.size > 0 && <div role="status" className="notice"><p>{t.ownerMissingIntro}</p>
+          <ul>{held.filter(entry => unnamed.has(entry.repo)).map(entry => <li key={entry.repo}><code>{entry.repo}</code> · <code>{entry.owner}</code> · {t.ownerMissing}</li>)}</ul></div>}
         <label className="workspace-label" htmlFor="workspace-edit-entries">{t.editEntries}</label>
-        <textarea id="workspace-edit-entries" className="workspace-text" value={draft} spellCheck={false} onChange={event => setDraft(event.target.value)} />
+        <textarea id="workspace-edit-entries" ref={entriesBox} className="workspace-text" value={draft} spellCheck={false}
+          onChange={event => { setDraft(event.target.value); setCaret(event.target.selectionStart); }} onSelect={event => setCaret(event.currentTarget.selectionStart)} />
+        {typing && suggestions.length > 0 && <div role="group" aria-label={t.ownerSuggestions} className="workspace-suggestions"><p>{t.ownerSuggestionsHint}</p>
+          <ul>{suggestions.map(name => <li key={name}><button type="button" className="secondary" onClick={() => pick(name)}>{name}</button></li>)}</ul></div>}
         <div role="region" aria-label={t.validation} tabIndex={0}>{editor.errors.length ? <ul role="alert" className="error">{editor.errors.map((problem, index) => <li key={index}><code>{problem}</code></li>)}</ul> : <p className="notice">{t.valid}</p>}</div>
         {refused.length > 0 && <p role="status" className="error">{t.refusedSummary}</p>}
         {editor.diff && <DiffView diff={editor.diff} t={t} label={t.editorDiff} marks={marks} />}
@@ -215,7 +248,7 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
         <div className="workspace-selectors">{([['from', t.from, from, setFrom], ['to', t.to, to, setTo]] as const).map(([name, label, value, change]) => <label key={name} htmlFor={`workspace-${name}`}>{label}
           <select id={`workspace-${name}`} value={value} onChange={event => change(event.target.value)}>{listing.versions.map(version => <option key={version.id} value={version.id}>{version.id} · {version.message}</option>)}</select></label>)}</div>
         {diff ? <DiffView diff={diff} t={t} /> : <p role="status">{t.loading}</p>}
-        {after && after.repositories.length > 0 && <EntriesTable entries={plainEntries(after.repositories)} t={t} label={t.owners} />}
+        {after && after.repositories.length > 0 && <EntriesTable entries={plainEntries(after.repositories)} t={t} label={t.owners} missing={ownerMissing(after.repositories)} />}
         <label className="workspace-label" htmlFor="workspace-version-entries">{t.entries}</label>
         <textarea id="workspace-version-entries" className="workspace-text" readOnly value={after && ready === locale ? text(after) : ''} spellCheck={false} />
       </section>}
@@ -231,10 +264,10 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
   </>;
 }
 
-function EntriesTable({ entries, t, label, state }: { entries: (Entry | EntryRow)[]; t: WorkspaceCopy; label: string; state?: boolean }) {
+function EntriesTable({ entries, t, label, state, missing }: { entries: (Entry | EntryRow)[]; t: WorkspaceCopy; label: string; state?: boolean; missing?: Set<string> }) {
   return <div role="region" aria-label={label} tabIndex={0} className="table-scroll"><h3>{label}</h3>
     <table><thead><tr><th>{t.entry}</th><th>{t.owner}</th>{state && <th>{t.state}</th>}</tr></thead><tbody>
-      {entries.map(entry => <tr key={entry.repo}><td><code>{entry.repo}</code></td><td>{entry.owner ? <code>{entry.owner}</code> : t.noOwner}</td>
+      {entries.map(entry => <tr key={entry.repo}><td><code>{entry.repo}</code></td><td>{entry.owner ? <code>{entry.owner}</code> : t.noOwner}{missing?.has(entry.repo) && <strong className="workspace-missing"> · {t.ownerMissing}</strong>}</td>
         {state && <td>{'may_change' in entry && entry.may_change ? t.mayChange : `${t.readOnly}: ${word(t, 'reason', 'refusal' in entry ? String(entry.refusal) : '')}`}</td>}</tr>)}
     </tbody></table></div>;
 }

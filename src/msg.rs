@@ -739,6 +739,19 @@ pub enum Msg<'a> {
     /// `GET audit` with a query other than `before=<id>` and `limit=<1 to 100>`.
     #[cfg(feature = "ui")]
     UiAuditQuery,
+    /// A subject the identity provider deactivated (#335): the 403 `deprovisioned`.
+    #[cfg(all(feature = "ui", feature = "directory"))]
+    UiDeprovisioned,
+    /// The directory could not be read: the stderr line, naming the directory and never a claim.
+    #[cfg(all(feature = "ui", feature = "directory"))]
+    DirectoryUnreadable(&'a str),
+    /// The 503 of a route that answers from the directory alone.
+    #[cfg(all(feature = "ui", feature = "directory"))]
+    DirectoryUnavailable,
+    /// `GET directory/groups` with a query other than one `prefix` of at most `OWNER_MAX`
+    /// characters.
+    #[cfg(all(feature = "ui", feature = "directory"))]
+    UiDirectoryQuery(usize),
     About,
     Index,
     Status,
@@ -2449,6 +2462,26 @@ impl Msg<'_> {
                 "a auditoria no Postgres está indisponível: nenhuma escrita é feita sem o seu \
                  registro"
                     .into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "directory"))]
+            Msg::UiDeprovisioned => pick(
+                "the identity provider deactivated this account".into(),
+                "o provedor de identidade desativou esta conta".into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "directory"))]
+            Msg::DirectoryUnreadable(reason) => pick(
+                format!("directory: unreadable ({reason})"),
+                format!("directory: ilegível ({reason})"),
+            ),
+            #[cfg(all(feature = "ui", feature = "directory"))]
+            Msg::DirectoryUnavailable => pick(
+                "the directory in Postgres is unavailable".into(),
+                "o diretório no Postgres está indisponível".into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "directory"))]
+            Msg::UiDirectoryQuery(max) => pick(
+                format!("the owner picker takes one `prefix=<text>` of at most {max} characters"),
+                format!("o seletor de owner aceita um `prefix=<texto>` de até {max} caracteres"),
             ),
             #[cfg(feature = "ui")]
             Msg::UiAuditQuery => pick(
