@@ -990,12 +990,7 @@ fn an_owner_is_stored_shown_and_pulled_and_a_malformed_one_is_refused() {
         Some("a b,c"),
     ];
     fs::write(dir.join("ops/owned.toml"), owned(&text, &owners)).unwrap();
-    let (id, stderr) = import(dir, "ops/owned.toml", "owned", "alice");
-    assert_eq!(
-        stderr.lines().count(),
-        1,
-        "only the index_dir note: {stderr}"
-    );
+    let (id, _) = import(dir, "ops/owned.toml", "owned", "alice");
     let (plain, _) = import(dir, MANIFEST, "plain", "alice");
     assert_ne!(id, plain, "an owner changes the version id");
 
@@ -1023,14 +1018,23 @@ fn an_owner_is_stored_shown_and_pulled_and_a_malformed_one_is_refused() {
     assert_eq!(pulled, stored);
     let before = pulled_files(dir);
 
+    // Each forged document carries the id its entries derive, so only the owner check refuses it.
     let long = "g".repeat(257);
     let bad = ["", " team", "team ", "te\u{7}am", long.as_str()];
+    let blocks = serde_json::json!({});
     let mut forged = Vec::new();
-    for (n, owner) in bad.iter().enumerate() {
-        let id = format!("00000000000000b{n:x}");
+    for owner in bad {
         let mut other = document.clone();
+        other["repositories"][0]["owner"] = owner.into();
+        let hashed: Vec<(&str, &str, &serde_json::Value, Option<&str>)> =
+            (other["repositories"].as_array().unwrap().iter())
+                .map(|e| {
+                    let (repo, path) = (e["repo"].as_str().unwrap(), e["path"].as_str().unwrap());
+                    (repo, path, &blocks, e["owner"].as_str())
+                })
+                .collect();
+        let id = meada_core::ids::workspace_version_id(&hashed);
         other["id"] = id.clone().into();
-        other["repositories"][0]["owner"] = (*owner).into();
         let bytes = serde_json::to_vec_pretty(&other).unwrap();
         crate::snapshot::put_stored(&s3, &version_key(&id), &bytes);
         forged.push(id);

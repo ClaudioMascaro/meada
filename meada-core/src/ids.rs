@@ -66,7 +66,7 @@ pub fn workspace_version_id(entries: &[(&str, &str, &Json, Option<&str>)]) -> St
 }
 
 /// Each `[[repository]]` of the manifest text `src`, in order, as its blocks were written
-/// (every key but `repo`, `path` and `owner`), as JSON with every table's keys sorted: TOML's spellings
+/// (every key but `repo`, `path`, `owner`), as JSON with every table's keys sorted: TOML's spellings
 /// of one value give one text.
 pub fn entry_blocks(src: &str) -> Vec<Json> {
     let Ok(table) = toml::from_str::<toml::Table>(src) else {
