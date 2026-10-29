@@ -28,7 +28,7 @@ All notable changes to Meada are recorded here. The format follows
   `github_host` and `github_grant` (`current`, `expired` or `unread`); `grant` is the union.
   `POST /api/v1/admission/check` gains `sources`: `{"claims": "*" | [identities], "github":
   [identities]}`, each sorted, from the console's cache. `GET /api/v1/admission` gains `github`:
-  the provider, the grant's state and the newest set's id, `finished`, age, `max_age_seconds`,
+  the grant provider's settings, the grant's state and the newest set's id, `finished`, age, `max_age_seconds`,
   repositories, rows and exclusions. The admission and session pages show them, and audit
   records carry the subject's login.
 - `meada github-app roles --workspace <bootstrap manifest>` (features `github-app`, `postgres`

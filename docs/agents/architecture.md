@@ -537,7 +537,9 @@ one for the area a change touches.
   the age at the last successful read plus the process's monotonic time since, a read of the
   same set never lowering it (`Set::seen`), so neither clock moving back extends a set; at most
   `max_age_seconds` the GitHub grant is honored (`current`), past it empty (`expired`), and
-  before a set is loaded empty (`unread`). A failed read is one `Msg::PermissionsUnreadable`
+  before a set is loaded empty (`unread`). A read is bounded by `postgres::Config::bound` (the
+  connect timeout plus one statement timeout per statement), so a Postgres that stops answering
+  without closing the connection cannot stall the poll. A failed read is one `Msg::PermissionsUnreadable`
   line per poll and keeps the set aging; a schema version this binary does not know is one
   `Msg::PermissionsVersion` line, once, and counts as unreachable, readiness unchanged. Every row
   is hostile: a set whose id, `finished` (ahead of Postgres's clock included) or counts fail

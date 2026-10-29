@@ -116,7 +116,7 @@ export interface Admission {
   groups: Record<string, string[]> | null; scopes: string[];
   /** With `[directory]`: its counts and the last SCIM write; null when it could not be read. */
   directory?: { users: number; groups: number; last_write: string | null } | null;
-  /** With `[oidc.github]`: the provider, the grant's state and the newest permissions set as loaded, its counts the job's. */
+  /** With `[oidc.github]`: the grant provider's settings, the grant's state and the newest permissions set as loaded, its counts the job's. */
   github?: {
     host: string; login_claim: string; roles: string[]; max_age_seconds: number; grant: GithubGrant;
     set: { id: string; finished: string; age_seconds: number; repositories: number; rows: number; exclusions: number } | null;

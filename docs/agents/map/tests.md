@@ -657,7 +657,8 @@ as `MEADA_DRAIN_MS` is, shortens the 60-second poll to 200 ms and lowers the 60-
 `roles` (`Custom Reviewer`) and a claims grant read all three in the root's 404, a trace keeps
 the gateway's link, a role outside `roles` (`triage`) is a 403, the login in another case than
 GitHub's; no login claim, an empty, 40-character, numeric, `ana.souza` or array value reads the
-claims grant only; a machine token's `*` reads everything. The age, through
+claims grant only; a machine token's `*` reads everything; a replacing set without a role
+revokes it. The age, through
 `postgres::Relay` (closed, then opened again on its port): the GitHub grant holds past the
 relay's close until the set is `max_age_seconds` old on Postgres's clock, then only the claims
 grant answers, every stderr line one failed poll and their count bounded by the polls; a new set
@@ -678,7 +679,8 @@ with the GitHub identity in `grant`, a group owning an entry only GitHub grants 
 `sources` (`claims` and `github`, sorted, `*` for a machine token) with no request to the
 loopback issuer or the fake GitHub; `admission`'s `github` with the set's id, `finished`, age,
 `max_age_seconds` and the counts the job wrote; an audited write's record carrying the login;
-then `expired`, a viewer with an empty grant. `ui/tests/models.test.ts`,
+then `expired`, a viewer with an empty grant. `tests/it/ui/oidc/audit.rs` also leaves out a record whose stored login fails the login
+pattern. `ui/tests/models.test.ts`,
 `ui/tests/operations.test.ts` and `ui/tests/operations.test.tsx` hold the session view's login
 and state, the admission page's set rows (and `unread` with no set) and the token check's
 sources, in both languages.

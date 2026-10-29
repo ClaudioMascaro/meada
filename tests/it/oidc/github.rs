@@ -208,7 +208,8 @@ fn lines(identities: &[&str]) -> String {
 /// than GitHub's): the root's 404 lists them, a trace from `WEB` keeps the gateway's link, and the
 /// catalog, where its role (`triage`) is outside `roles`, is a 403. A token without the login
 /// claim, with an empty, 40-character, non-string or `ana.souza` value, reads its claims grant
-/// only; a machine token with `*` reads everything. stderr names no token, login or URL.
+/// only; a machine token with `*` reads everything; a new set without the gateway's role revokes
+/// it. stderr names no token, login or URL.
 #[test]
 fn a_token_reads_the_union_of_its_claims_and_its_login_s_roles() {
     let Some(github) = Github::new("gh_union") else {
@@ -283,6 +284,15 @@ fn a_token_reads_the_union_of_its_claims_and_its_login_s_roles() {
     assert_eq!(listed(&server, &bia), "");
     let machine = token(&signing, &issuer.base, &["*"], None);
     assert_eq!(listed(&server, &machine), SERVED);
+    // A set replacing this one revokes what it no longer lists.
+    github.list("chain/gateway", &[]);
+    github.seed(&dir, MANIFEST, &github.url);
+    until(
+        &server,
+        &sent[0],
+        &lines(&[WEB, WORKER]),
+        Duration::from_secs(5),
+    );
     sent.extend([bia, machine]);
     github.clean(&server.stderr(), &sent);
 }

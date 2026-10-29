@@ -22,8 +22,12 @@ use tokio_postgres::IsolationLevel;
 use super::{Github, role_ok};
 use crate::msg::Msg;
 
-/// How often the newest set is read; `MEADA_PERMISSIONS_POLL_MS` shortens it in debug builds.
+// ponytail: how often the newest set is read, so a revocation on GitHub reaches a process at most
+// this long after the refresh that recorded it; `MEADA_PERMISSIONS_POLL_MS` shortens it in debug
+// builds.
 const PERMISSIONS_POLL: Duration = Duration::from_secs(60);
+/// The statements of one read: the version, the newest set, its counts and its rows.
+const STATEMENTS: u32 = 4;
 
 /// How often a process reads the newest permissions set. In debug builds
 /// `MEADA_PERMISSIONS_POLL_MS` shortens it (a knob for tests and not documented, as
@@ -88,10 +92,11 @@ impl Set {
     }
 }
 
-/// What a read found: no set, the set already loaded at its age, or another one, loaded.
+/// What a read found: no set, the set already loaded at its age and the instant it was taken,
+/// or another one, loaded.
 enum Read {
     None,
-    Same(Duration),
+    Same(Duration, Instant),
     New(Set),
 }
 
@@ -151,8 +156,8 @@ impl Permissions {
         }
     }
 
-    /// The admission view's `github` (#332): the provider's settings, the grant's state and the
-    /// newest set as loaded (null before one is), its counts as the job wrote them.
+    /// The admission view's `github` (#332): the grant provider's settings, the grant's state and
+    /// the newest set as loaded (null before one is), its counts as the job wrote them.
     #[cfg_attr(not(feature = "ui"), allow(dead_code))]
     pub(super) fn admission(&self) -> Value {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
@@ -183,14 +188,20 @@ impl Permissions {
             let state = self.state.read().unwrap_or_else(|e| e.into_inner());
             state.set.as_ref().map(|set| set.id.clone())
         };
-        let read = crate::modules::block_on(self.read(known.as_deref()))
-            .unwrap_or_else(|e| Err(Some((e.to_string(), false))));
+        // The poll thread is the only reader: a Postgres that stops answering must not stop it.
+        let bound = self.postgres.bound(STATEMENTS);
+        let read = crate::modules::within(
+            bound,
+            async { Ok(self.read(known.as_deref()).await) },
+            Msg::PostgresTimeout,
+        );
+        let read = read.unwrap_or_else(|why| Err(Some((why, false))));
         let mut state = self.state.write().unwrap_or_else(|e| e.into_inner());
         match read {
             Ok(Read::None) => state.set = None,
-            Ok(Read::Same(age)) => {
+            Ok(Read::Same(age, at)) => {
                 if let Some(set) = &mut state.set {
-                    set.seen(age, Instant::now());
+                    set.seen(age, at);
                 }
             }
             Ok(Read::New(set)) => state.set = Some(set),
@@ -220,6 +231,8 @@ impl Permissions {
             .start()
             .await
             .map_err(failed)?;
+        // Taken before the age is: the time the rest of the read takes counts in the age.
+        let at = Instant::now();
         let newest = format!(
             "SELECT id, to_char(finished AT TIME ZONE 'UTC', \
              'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'), \
@@ -245,7 +258,7 @@ impl Permissions {
             return Err(None);
         };
         if known == Some(id.as_str()) {
-            return Ok(Read::Same(age));
+            return Ok(Read::Same(age, at));
         }
         let counts = format!(
             "SELECT (SELECT count(*) FROM {q}.permission_rows WHERE set_id = $1), \
@@ -274,7 +287,7 @@ impl Permissions {
             id,
             finished,
             age,
-            read: Instant::now(),
+            read: at,
             repositories: repositories.into(),
             rows: counted.get(0),
             exclusions: counted.get(1),

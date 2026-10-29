@@ -587,6 +587,16 @@ pub async fn connect(config: &Config) -> Result<(tokio_postgres::Client, i32), S
     Ok((opened.client, known()))
 }
 
+impl Config {
+    /// How long a connection and `statements` statements on it may take, all told: what a
+    /// caller with no one waiting on it bounds itself by, since a peer that stops answering
+    /// without closing the connection would hold it forever.
+    #[cfg(feature = "oidc")]
+    pub(crate) fn bound(&self, statements: u32) -> Duration {
+        self.connect_timeout + self.statement_timeout * statements
+    }
+}
+
 /// `connect`, keeping the password so a later statement's error can be scrubbed of it.
 pub(crate) async fn connected(config: &Config) -> Result<Opened, String> {
     versioned(config).await.map_err(|(why, _)| why)

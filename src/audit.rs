@@ -1,8 +1,8 @@
 //! The audit (ADR 0016, #328): with `[postgres]`, every console write and every CLI twin of one
 //! leaves a record in `<schema>.audit`: `id` (a sequence), `time` (Postgres's clock, RFC 3339,
 //! UTC, microseconds), `via` (`console` or `cli`), `subject`, `login` (the session's GitHub login
-//! under `[oidc.github]`, #332, else null), `role`, `owners` (a team operator's owner groups, as its stderr line names them),
-//! `action` (`ACTIONS`), `arguments` (the operation body's names, `{}` for a refusal before the
+//! under `[oidc.github]`, #332, else null), `role`, `owners` (a team operator's owner groups, as
+//! its stderr line names them), `action` (`ACTIONS`), `arguments` (the operation body's names, `{}` for a refusal before the
 //! body is read), `outcome` (`pending`, `accepted`, `refused` or `failed`) and `message`.
 //!
 //! It fails closed: a write that passed its authorization inserts its record as `pending`
