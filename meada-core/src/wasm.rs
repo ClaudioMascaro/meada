@@ -74,15 +74,18 @@ pub fn entries_json(src: &str) -> Result<String, String> {
     serde_json::to_string(&entries).map_err(|error| error.to_string())
 }
 
-/// The entries `role` (`operator`, `team_operator` or `viewer`) may not change from `current` to `entries`,
-/// as JSON `[{identity, change, reason}]`, none when it may. Every other argument is JSON:
-/// `groups` an array of names, `grant` `"*"` or an array of identities, the entries a version's
-/// `repositories`.
+/// The entries `role` (`operator`, `team_operator` or `viewer`) may not change from `current` to
+/// `entries`, as JSON `[{identity, change, reason}]`, none when it may. `login` and `github_host`
+/// are the subject's GitHub login and the GitHub grant provider's host, `undefined` (or `null`)
+/// without it. Every other argument is JSON: `groups` an array of names, `grant` `"*"` or an
+/// array of identities, the entries a version's `repositories`.
 #[wasm_bindgen(js_name = authorizeEntries)]
 pub fn authorize_entries(
     role: &str,
     groups: &str,
     grant: &str,
+    login: Option<String>,
+    github_host: Option<String>,
     current: &str,
     entries: &str,
 ) -> Result<String, String> {
@@ -91,18 +94,28 @@ pub fn authorize_entries(
         serde_json::from_value(role).map_err(|e| e.to_string())?,
         &from_json::<Vec<String>>(groups)?,
         &from_json(grant)?,
+        login.as_deref(),
+        github_host.as_deref(),
         &from_json::<Vec<_>>(current)?,
         &from_json::<Vec<_>>(entries)?,
     );
     serde_json::to_string(&refused).map_err(|e| e.to_string())
 }
 
-/// The entries a team operator's save stores (`compose_entries`), as JSON; the arguments as
-/// `authorizeEntries` takes them.
+/// The entries a team operator's save stores (`compose_entries`), its additions attributed, as
+/// JSON; the arguments as `authorizeEntries` takes them.
 #[wasm_bindgen(js_name = composeEntries)]
-pub fn compose_entries(grant: &str, current: &str, submitted: &str) -> Result<String, String> {
+pub fn compose_entries(
+    grant: &str,
+    login: Option<String>,
+    github_host: Option<String>,
+    current: &str,
+    submitted: &str,
+) -> Result<String, String> {
     let composed = crate::authorize::compose_entries(
         &from_json(grant)?,
+        login.as_deref(),
+        github_host.as_deref(),
         &from_json::<Vec<_>>(current)?,
         &from_json::<Vec<_>>(submitted)?,
     );

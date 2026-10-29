@@ -307,6 +307,16 @@ impl Session {
         meada_core::authorize::Grant::All
     }
 
+    /// `[oidc.github] host`, under the GitHub grant provider.
+    #[cfg(feature = "refresh-lock")]
+    fn github_host(&self) -> Option<&str> {
+        #[cfg(feature = "oidc")]
+        if let Some((host, _)) = &self.github {
+            return Some(host);
+        }
+        None
+    }
+
     /// The session's role: `operator`, `team_operator` or `viewer`.
     fn role(&self) -> &'static str {
         match (self.operator, self.is_team_operator()) {

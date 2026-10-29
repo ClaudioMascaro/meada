@@ -1,7 +1,9 @@
 //! Authorization and a team operator's save at the public core seam, driven by the shared table
 //! Vitest also reads through the WebAssembly bundle.
 
-use meada_core::authorize::{Grant, Refusal, Role, authorize_entries, compose_entries, role};
+use meada_core::authorize::{
+    Change, Grant, Reason, Refusal, Role, authorize_entries, compose_entries, role,
+};
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
 
@@ -12,6 +14,9 @@ struct Case {
     #[serde(default)]
     groups: Vec<String>,
     grant: Option<Grant>,
+    /// The subject's login and the GitHub grant provider's host; both none without it (#333).
+    login: Option<String>,
+    github_host: Option<String>,
     #[serde(default)]
     current: Vec<Json>,
     #[serde(default)]
@@ -35,19 +40,30 @@ fn every_authorization_case_gives_the_refusals_the_table_lists() {
         else {
             continue;
         };
-        let answer = authorize_entries(role, &case.groups, grant, &case.current, &case.new);
+        let (login, host) = (case.login.as_deref(), case.github_host.as_deref());
+        let answer = authorize_entries(
+            role,
+            &case.groups,
+            grant,
+            login,
+            host,
+            &case.current,
+            &case.new,
+        );
         assert_eq!(&answer, refused, "{}", case.name);
         let operator = authorize_entries(
             Role::Operator,
             &case.groups,
             grant,
+            login,
+            host,
             &case.current,
             &case.new,
         );
         assert!(operator.is_empty(), "{}: {operator:?}", case.name);
         seen += 1;
     }
-    assert!(seen >= 20, "{seen} authorization cases");
+    assert!(seen >= 30, "{seen} authorization cases");
 }
 
 #[test]
@@ -57,11 +73,12 @@ fn every_composition_case_stores_the_entries_the_table_lists() {
         let (Some(grant), Some(composed)) = (&case.grant, &case.composed) else {
             continue;
         };
-        let answer = compose_entries(grant, &case.current, &case.new);
+        let (login, host) = (case.login.as_deref(), case.github_host.as_deref());
+        let answer = compose_entries(grant, login, host, &case.current, &case.new);
         assert_eq!(&answer, composed, "{}", case.name);
         seen += 1;
     }
-    assert!(seen >= 2, "{seen} composition cases");
+    assert!(seen >= 5, "{seen} composition cases");
 }
 
 /// The role apply recomputes under the lock: a group owning an entry the grant reads.
@@ -84,7 +101,8 @@ fn the_role_follows_the_entries_the_grant_reads() {
     assert!(serde_json::from_value::<Grant>(json!("a.com/a")).is_err());
 }
 
-/// An entry whose only difference is `added_by` is edited, so S3's rules apply to it (#330).
+/// An entry whose only difference is `added_by` is edited (#330): without the GitHub grant
+/// provider ADR 0015's rules apply to it, under it the change is refused `added_by_change` (#333).
 #[test]
 fn an_added_by_change_alone_is_an_edit() {
     let entry = |added_by: Option<&str>| match added_by {
@@ -95,19 +113,25 @@ fn an_added_by_change_alone_is_an_edit() {
     };
     let groups = ["team-a".to_string()];
     let team = Role::TeamOperator;
+    let all = Grant::All;
     for (before, after) in [
         (None, Some("ana")),
         (Some("ana"), None),
         (Some("ana"), Some("bia")),
     ] {
         let (current, new) = ([entry(before)], [entry(after)]);
-        assert!(authorize_entries(team, &groups, &Grant::All, &current, &new).is_empty());
+        assert!(authorize_entries(team, &groups, &all, None, None, &current, &new).is_empty());
         let outside = Grant::Only(["a.com/b".to_string()].into());
-        let refused = authorize_entries(team, &groups, &outside, &current, &new);
+        let refused = authorize_entries(team, &groups, &outside, None, None, &current, &new);
         assert_eq!(refused.len(), 1);
-        assert_eq!(refused[0].change, meada_core::authorize::Change::Edit);
+        assert_eq!(refused[0].change, Change::Edit);
         let other = ["team-b".to_string()];
-        let refused = authorize_entries(team, &other, &Grant::All, &current, &new);
-        assert_eq!(refused[0].change, meada_core::authorize::Change::Edit);
+        let refused = authorize_entries(team, &other, &all, None, None, &current, &new);
+        assert_eq!(refused[0].change, Change::Edit);
+        for (login, host) in [(Some("ana"), Some("a.com")), (None, Some("g.com"))] {
+            let refused = authorize_entries(team, &groups, &all, login, host, &current, &new);
+            assert_eq!(refused.len(), 1);
+            assert_eq!(refused[0].reason, Reason::AddedByChange);
+        }
     }
 }

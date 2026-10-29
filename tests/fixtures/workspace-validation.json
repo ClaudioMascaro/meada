@@ -1936,5 +1936,1230 @@
         "owner": "team-b"
       }
     ]
+  },
+  {
+    "name": "authorize under the GitHub grant provider: an addition on the host outside the grant, attributed, is accepted",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "g.com/a",
+      "g.com/b",
+      "g.com/c",
+      "g.com/o"
+    ],
+    "login": "ana",
+    "github_host": "g.com",
+    "current": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/new",
+        "path": "new",
+        "owner": "team-a",
+        "added_by": "ana"
+      }
+    ],
+    "refused": []
+  },
+  {
+    "name": "authorize under the GitHub grant provider: the same addition by a subject without a login is unattributed",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "g.com/a",
+      "g.com/b",
+      "g.com/c",
+      "g.com/o"
+    ],
+    "login": null,
+    "github_host": "g.com",
+    "current": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/new",
+        "path": "new",
+        "owner": "team-a"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "g.com/new",
+        "change": "add",
+        "reason": "unattributed"
+      }
+    ]
+  },
+  {
+    "name": "authorize under the GitHub grant provider: an addition on the host without added_by is unattributed, inside the grant too",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "g.com/a",
+      "g.com/b",
+      "g.com/c",
+      "g.com/o",
+      "g.com/in"
+    ],
+    "login": "ana",
+    "github_host": "g.com",
+    "current": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/new",
+        "path": "new",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/in",
+        "path": "in",
+        "owner": "team-a"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "g.com/new",
+        "change": "add",
+        "reason": "unattributed"
+      },
+      {
+        "identity": "g.com/in",
+        "change": "add",
+        "reason": "unattributed"
+      }
+    ]
+  },
+  {
+    "name": "authorize under the GitHub grant provider: an addition off the host outside the grant is outside_grant",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "g.com/a",
+      "g.com/b",
+      "g.com/c",
+      "g.com/o"
+    ],
+    "login": "ana",
+    "github_host": "g.com",
+    "current": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/z",
+        "path": "z",
+        "owner": "team-a",
+        "added_by": "ana"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "a.com/z",
+        "change": "add",
+        "reason": "outside_grant"
+      }
+    ]
+  },
+  {
+    "name": "authorize under the GitHub grant provider: an addition off the host inside the grant needs no added_by",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "g.com/a",
+      "g.com/b",
+      "g.com/c",
+      "g.com/o",
+      "a.com/in"
+    ],
+    "login": "ana",
+    "github_host": "g.com",
+    "current": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/in",
+        "path": "in",
+        "owner": "team-a"
+      }
+    ],
+    "refused": []
+  },
+  {
+    "name": "authorize under the GitHub grant provider: an edit changing, clearing or setting added_by is added_by_change",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "g.com/a",
+      "g.com/b",
+      "g.com/c",
+      "g.com/o"
+    ],
+    "login": "ana",
+    "github_host": "g.com",
+    "current": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "bia"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a",
+        "added_by": "ana"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "g.com/a",
+        "change": "edit",
+        "reason": "added_by_change"
+      },
+      {
+        "identity": "g.com/c",
+        "change": "edit",
+        "reason": "added_by_change"
+      },
+      {
+        "identity": "a.com/a",
+        "change": "edit",
+        "reason": "added_by_change"
+      }
+    ]
+  },
+  {
+    "name": "authorize under the GitHub grant provider: an edit keeping added_by and a removal of an attributed entry are accepted",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "g.com/a",
+      "g.com/b",
+      "g.com/c",
+      "g.com/o"
+    ],
+    "login": "ana",
+    "github_host": "g.com",
+    "current": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "g.com/a",
+        "path": "moved",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      }
+    ],
+    "refused": []
+  },
+  {
+    "name": "authorize under the GitHub grant provider: precedence, the first failing rule is the reason",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "g.com/a",
+      "g.com/b",
+      "g.com/c",
+      "g.com/o"
+    ],
+    "login": "ana",
+    "github_host": "g.com",
+    "current": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-b",
+        "added_by": "bia"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b",
+        "added_by": "bia"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o",
+        "added_by": "ana"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/n",
+        "path": "n"
+      },
+      {
+        "repo": "g.com/m",
+        "path": "m",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/t",
+        "path": "t",
+        "owner": "team-b",
+        "added_by": "ana"
+      },
+      {
+        "repo": "a.com/z",
+        "path": "z"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "g.com/a",
+        "change": "edit",
+        "reason": "owner_change"
+      },
+      {
+        "identity": "g.com/b",
+        "change": "edit",
+        "reason": "added_by_change"
+      },
+      {
+        "identity": "g.com/o",
+        "change": "edit",
+        "reason": "ownerless"
+      },
+      {
+        "identity": "a.com/s",
+        "change": "edit",
+        "reason": "outside_grant"
+      },
+      {
+        "identity": "g.com/n",
+        "change": "add",
+        "reason": "unattributed"
+      },
+      {
+        "identity": "g.com/m",
+        "change": "add",
+        "reason": "ownerless"
+      },
+      {
+        "identity": "g.com/t",
+        "change": "add",
+        "reason": "not_your_team"
+      },
+      {
+        "identity": "a.com/z",
+        "change": "add",
+        "reason": "outside_grant"
+      }
+    ]
+  },
+  {
+    "name": "authorize under the GitHub grant provider: the global operator is refused nothing",
+    "role": "operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "g.com/a",
+      "g.com/b",
+      "g.com/c",
+      "g.com/o"
+    ],
+    "login": "ana",
+    "github_host": "g.com",
+    "current": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-b",
+        "added_by": "bia"
+      },
+      {
+        "repo": "g.com/new",
+        "path": "new"
+      },
+      {
+        "repo": "a.com/z",
+        "path": "z"
+      }
+    ],
+    "refused": []
+  },
+  {
+    "name": "authorize under the GitHub grant provider: without the GitHub grant provider an addition on the host outside the grant is ADR 0015's outside_grant",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "g.com/a",
+      "g.com/b",
+      "g.com/c",
+      "g.com/o"
+    ],
+    "login": null,
+    "github_host": null,
+    "current": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/new",
+        "path": "new",
+        "owner": "team-a",
+        "added_by": "ana"
+      }
+    ],
+    "refused": [
+      {
+        "identity": "g.com/new",
+        "change": "add",
+        "reason": "outside_grant"
+      }
+    ]
+  },
+  {
+    "name": "authorize under the GitHub grant provider: without the GitHub grant provider an added_by change alone is ADR 0015's edit",
+    "role": "team_operator",
+    "groups": [
+      "team-a"
+    ],
+    "grant": [
+      "a.com/a",
+      "g.com/a",
+      "g.com/b",
+      "g.com/c",
+      "g.com/o"
+    ],
+    "login": null,
+    "github_host": null,
+    "current": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a",
+        "added_by": "caio"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      }
+    ],
+    "new": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "bia"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/c",
+        "path": "c",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/o",
+        "path": "o"
+      },
+      {
+        "repo": "a.com/a",
+        "path": "aa",
+        "owner": "team-a"
+      }
+    ],
+    "refused": []
+  },
+  {
+    "name": "compose under the GitHub grant provider: a forged added_by on an addition on the host is the login, cleared off the host, and an edit keeps its submitted form",
+    "grant": [
+      "g.com/a",
+      "g.com/b",
+      "g.com/new",
+      "g.com/plain",
+      "a.com/new"
+    ],
+    "login": "ana",
+    "github_host": "g.com",
+    "current": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      }
+    ],
+    "new": [
+      {
+        "repo": "g.com/a",
+        "path": "a2",
+        "owner": "team-a",
+        "added_by": "bia"
+      },
+      {
+        "repo": "g.com/new",
+        "path": "new",
+        "owner": "team-a",
+        "added_by": "mallory"
+      },
+      {
+        "repo": "a.com/new",
+        "path": "an",
+        "owner": "team-a",
+        "added_by": "mallory"
+      },
+      {
+        "repo": "g.com/plain",
+        "path": "p",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      }
+    ],
+    "composed": [
+      {
+        "repo": "g.com/a",
+        "path": "a2",
+        "owner": "team-a",
+        "added_by": "bia"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/new",
+        "path": "new",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "a.com/new",
+        "path": "an",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/plain",
+        "path": "p",
+        "owner": "team-a",
+        "added_by": "ana"
+      }
+    ]
+  },
+  {
+    "name": "compose under the GitHub grant provider: with no login an addition's added_by is left absent",
+    "grant": [
+      "g.com/a",
+      "g.com/b",
+      "g.com/new",
+      "g.com/plain",
+      "a.com/new"
+    ],
+    "login": null,
+    "github_host": "g.com",
+    "current": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      }
+    ],
+    "new": [
+      {
+        "repo": "g.com/a",
+        "path": "a2",
+        "owner": "team-a",
+        "added_by": "bia"
+      },
+      {
+        "repo": "g.com/new",
+        "path": "new",
+        "owner": "team-a",
+        "added_by": "mallory"
+      },
+      {
+        "repo": "a.com/new",
+        "path": "an",
+        "owner": "team-a",
+        "added_by": "mallory"
+      },
+      {
+        "repo": "g.com/plain",
+        "path": "p",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      }
+    ],
+    "composed": [
+      {
+        "repo": "g.com/a",
+        "path": "a2",
+        "owner": "team-a",
+        "added_by": "bia"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/new",
+        "path": "new",
+        "owner": "team-a"
+      },
+      {
+        "repo": "a.com/new",
+        "path": "an",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/plain",
+        "path": "p",
+        "owner": "team-a"
+      }
+    ]
+  },
+  {
+    "name": "compose under the GitHub grant provider: without the GitHub grant provider additions keep their submitted text",
+    "grant": [
+      "g.com/a",
+      "g.com/b",
+      "g.com/new",
+      "g.com/plain",
+      "a.com/new"
+    ],
+    "login": null,
+    "github_host": null,
+    "current": [
+      {
+        "repo": "g.com/a",
+        "path": "a",
+        "owner": "team-a",
+        "added_by": "ana"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      }
+    ],
+    "new": [
+      {
+        "repo": "g.com/a",
+        "path": "a2",
+        "owner": "team-a",
+        "added_by": "bia"
+      },
+      {
+        "repo": "g.com/new",
+        "path": "new",
+        "owner": "team-a",
+        "added_by": "mallory"
+      },
+      {
+        "repo": "a.com/new",
+        "path": "an",
+        "owner": "team-a",
+        "added_by": "mallory"
+      },
+      {
+        "repo": "g.com/plain",
+        "path": "p",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      }
+    ],
+    "composed": [
+      {
+        "repo": "g.com/a",
+        "path": "a2",
+        "owner": "team-a",
+        "added_by": "bia"
+      },
+      {
+        "repo": "a.com/s",
+        "path": "s",
+        "owner": "team-a"
+      },
+      {
+        "repo": "g.com/b",
+        "path": "b",
+        "owner": "team-b"
+      },
+      {
+        "repo": "g.com/new",
+        "path": "new",
+        "owner": "team-a",
+        "added_by": "mallory"
+      },
+      {
+        "repo": "a.com/new",
+        "path": "an",
+        "owner": "team-a",
+        "added_by": "mallory"
+      },
+      {
+        "repo": "g.com/plain",
+        "path": "p",
+        "owner": "team-a"
+      }
+    ]
   }
 ]

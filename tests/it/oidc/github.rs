@@ -75,10 +75,18 @@ impl Github {
     /// `[valkey]` and the `[[github_app]]` block for `host` the role check lists through.
     pub(crate) fn job(&self, host: &str) -> String {
         format!(
-            "\n[valkey]\nurl = \"{}\"\nkey_prefix = \"{}\"\n\n[[github_app]]\nhost = \"{host}\"\n\
-             api = \"{}\"\napp_id = 1\nprivate_key_file = \"{}\"\n",
+            "\n[valkey]\nurl = \"{}\"\nkey_prefix = \"{}\"\n{}",
             self.valkey,
             prefix(&self.case),
+            self.app(host)
+        )
+    }
+
+    /// The `[[github_app]]` block for `host` alone, for a manifest with a `[valkey]` of its own.
+    pub(crate) fn app(&self, host: &str) -> String {
+        format!(
+            "\n[[github_app]]\nhost = \"{host}\"\napi = \"{}\"\napp_id = 1\n\
+             private_key_file = \"{}\"\n",
             self.api.base,
             fixture("app1.pem").display()
         )

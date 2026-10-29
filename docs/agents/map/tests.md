@@ -535,7 +535,8 @@ alone being the changed key `repository.owner`, and `version_entries` reading a 
 document's entries (#325). `meada-core/tests/ids.rs` and
 `meada-core/tests/manifest.rs` hold the `owner` and `added_by` cases (canonical text, version id,
 each rule and the names accepted; an `added_by` printed after the owner, its change alone the
-changed key `repository.added_by`, and `authorize_entries` treating it as an edit, #330); the
+changed key `repository.added_by`, and `authorize_entries` treating it as an edit, #330, which
+under the GitHub grant provider is `added_by_change`, #333); the
 shared validation table below carries the `owner` and `added_by` rows in both languages.
 `tests/fixtures/workspace-validation.json` is the single pt-BR/English validation table used
 by the real WASM in `ui/tests/core.test.ts` and the binary `workspace import` in
@@ -546,7 +547,19 @@ precedence, an owner set on an ownerless entry, cleared and replaced, several te
 change, a group that owns nothing yet, an owned entry outside the grant, moved entries, the
 refused list's order and a viewer passed in; every row is also refused nothing for the global
 operator. Its composition rows (`grant`, `current`, `new` in, `composed` out) cover an edit, a
-removal and additions around entries outside the grant, and a reordering submission.
+removal and additions around entries outside the grant, and a reordering submission. Under the
+GitHub grant provider (#333) rows also carry `login` and `github_host` (none on S3's rows, which
+answer as before): an addition on the host outside the grant with `added_by` accepted, the same
+by a subject without a login and one without `added_by` (inside the grant too) `unattributed`,
+an addition off the host outside the grant `outside_grant` and inside it needing no `added_by`,
+an edit changing, clearing or setting `added_by` `added_by_change`, a kept `added_by` and the
+removal of an attributed entry accepted, the full precedence (`outside_grant`, `unattributed`,
+`ownerless`, `owner_change`, `added_by_change`, `not_your_team`) in one change, the global
+operator refused nothing, and without the GitHub grant provider the same addition `outside_grant` and an
+`added_by` change alone ADR 0015's edit; composition rows with a login and a host: a forged `added_by`
+on an addition on the host replaced by the login, cleared off the host, left absent with no
+login, an edited entry kept as submitted, and additions kept as submitted without the
+GitHub grant provider.
 `meada-core/tests/authorize.rs` drives `authorize_entries` and `compose_entries` through those
 rows and `role` on inline entries; `ui/tests/core.test.ts` drives `authorizeEntries` and
 `composeEntries` through the same rows, and the binary's import test reads only the text rows.
@@ -565,6 +578,16 @@ its `hidden` count, a viewer refusal turning the editor read-only, apply and rol
 by authorization, owners and an owner change for a viewer, no save or apply for a viewer or with
 operations off, the global operator's unchanged editor and CLI command, one unreadable stored
 version leaving the other applies, and a long version list read two versions at a time.
+`ui/tests/GithubWorkspace.test.tsx` (#333) renders the views under the GitHub grant provider:
+`unattributed` (a session without a login adding on the host) and `added_by_change` (an
+`added_by` changed or set) marked in text in both languages with the save disabled and no
+request while typing; an addition on the host outside the grant with a forged `added_by`
+accepted with a login and sent as typed, the same off the host `outside_grant`; a server
+`outside_grant` for an identity already present listed with its change and reason; each entry's
+`added_by` in the team editor's table; and the `excluded` mark, with its reason in text, in the
+team editor's table, the global operator's labelled status and the versions page (only for the
+version that carries it), never in the editor's text or a save. `ui/tests/workspace.test.ts`
+keeps `excluded` out of a text, an id and a payload.
 `ui/tests/actions.test.ts` and `ui/tests/action-pages.test.tsx` keep the fleet and store pages
 action-free for a team operator.
 
@@ -699,7 +722,24 @@ with the GitHub identity in `grant`, a group owning an entry only GitHub grants 
 `sources` (`claims` and `github`, sorted, `*` for a machine token) with no request to the
 loopback issuer or the fake GitHub; `admission`'s `github` with the set's id, `finished`, age,
 `max_age_seconds` and the counts the job wrote; an audited write's record carrying the login;
-then `expired`, a viewer with an empty grant. `tests/it/ui/oidc/audit.rs` also leaves out a record whose stored login fails the login
+then `expired`, a viewer with an empty grant.
+
+`tests/it/ui/oidc/additions.rs` (#333) runs the same console with `[oidc.github]` and
+`[postgres]` (every write audited) and the role check over the store's version: a team
+operator's addition on the host outside its grant stored with `added_by` set from its login over
+a forged `mallory`, the entries outside the grant kept; without a login `unattributed`; an
+`added_by` set on its entry `added_by_change`; an identity the workspace holds outside its grant
+`outside_grant`, named as submitted, with a login and without one; each refusal writing nothing
+and recorded `refused`, the accepted save `accepted`, with the login when there is one; the
+global operator setting, replacing and clearing `added_by` and its own additions kept as written;
+a team operator's apply of a version whose addition on the host inside its grant lacks
+`added_by` refused `unattributed` with the pointer unmoved, and applied once the addition has
+one; after `meada workspace pull` and `meada github-app roles` exclude an addition, `workspace`
+and `workspace/versions/<id>` of that version marking it `excluded: true` for the global operator
+and for a viewer the GitHub grant lets read it, another version holding the same entry and every
+other entry unmarked, and a team operator that does not read it never seeing it. No stderr line
+carries a token, a login or the forged value. `tests/it/ui/oidc/team.rs` checks that without
+`[oidc.github]` no workspace body carries `excluded`. `tests/it/ui/oidc/audit.rs` also leaves out a record whose stored login fails the login
 pattern. `ui/tests/models.test.ts`,
 `ui/tests/operations.test.ts` and `ui/tests/operations.test.tsx` hold the session view's login
 and state, the admission page's set rows (and `unread` with no set) and the token check's

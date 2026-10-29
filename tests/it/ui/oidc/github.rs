@@ -18,11 +18,11 @@ use crate::snapshot::KEY_ID;
 use crate::ui::{Reply, send_body};
 
 /// The team identities' git host, `[oidc.github] host` here.
-const HOST: &str = "e.test";
+pub(super) const HOST: &str = "e.test";
 const MAX_AGE: u64 = 8;
 
 /// The console of `ops/console.toml`, polling every `POLL_MS`.
-fn console(dir: &std::path::Path) -> Server {
+pub(super) fn console(dir: &std::path::Path) -> Server {
     Server::start_command(
         dir,
         "ui",
@@ -34,13 +34,13 @@ fn console(dir: &std::path::Path) -> Server {
     )
 }
 
-fn get(console: &Server, route: &str, token: &str) -> Value {
+pub(super) fn get(console: &Server, route: &str, token: &str) -> Value {
     let reply = ask(console, &format!("/api/v1/{route}"), token);
     assert_eq!(reply.status, 200, "{route}: {}", reply.body);
     reply.json()
 }
 
-fn post(console: &Server, route: &str, token: &str, body: Value) -> Reply {
+pub(super) fn post(console: &Server, route: &str, token: &str, body: Value) -> Reply {
     let headers = [("Authorization", bearer(token)), ("Origin", PUBLIC.into())];
     let headers: Vec<(&str, &str)> = headers.iter().map(|(n, v)| (*n, v.as_str())).collect();
     send_body(

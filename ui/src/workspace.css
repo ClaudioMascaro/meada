@@ -23,5 +23,5 @@
 .workspace-versions-table td:first-child code, .workspace-versions-table time { white-space: nowrap; }
 .workspace-diff h4 { font-size: .85rem; font-weight: 600; margin: 1rem 0 .5rem; }
 .workspace-refused { font-weight: 700; }
-.workspace-missing { font-weight: 700; }
+.workspace-missing, .workspace-excluded { font-weight: 700; }
 .workspace-suggestions ul { display: flex; flex-wrap: wrap; gap: .5rem; padding: 0; list-style: none; }

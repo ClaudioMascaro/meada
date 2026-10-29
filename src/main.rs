@@ -197,15 +197,14 @@ fn workspace(command: WorkspaceCommand) -> ! {
         WorkspaceCommand::Apply { version, workspace } => {
             let author = versions::cli_author();
             // The CLI holds the store's and Valkey's credentials: the global operator (ADR 0015).
-            let operator = meada_core::authorize::Role::Operator;
-            let grant = meada_core::authorize::Grant::All;
+            let operator = versions::Acting::operator();
             let id = meada_core::ids::is_id(&version).then(|| version.clone());
             meada::audit::cli(
                 &workspace,
                 &author,
                 "workspace.apply",
                 id.map(|id| serde_json::json!({"version": id})),
-                || versions::apply(&workspace, &version, &author, operator, &[], &grant),
+                || versions::apply(&workspace, &version, &author, &operator),
                 |applied| applied.line.clone(),
                 |e| e.refused(),
             )

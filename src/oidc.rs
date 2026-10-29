@@ -829,6 +829,17 @@ impl Oidc {
         None
     }
 
+    /// With `[oidc.github]`, the newest permissions set's workspace version and the identities it
+    /// excluded from it (#333), for the console's `excluded` flag.
+    #[cfg(feature = "ui")]
+    pub fn excluded(&self) -> Option<(String, std::collections::BTreeSet<String>)> {
+        #[cfg(feature = "postgres")]
+        if let Some(cache) = &self.permissions {
+            return cache.excluded();
+        }
+        None
+    }
+
     /// Whether the request to `path` (percent-decoded, without its leading and trailing
     /// slashes) goes on to routing, and with what grant; `identity` is the repository `path`
     /// names (`path` without its pin, if it has one). Otherwise the answer: the protected

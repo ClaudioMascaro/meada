@@ -7,7 +7,7 @@ use super::*;
 use crate::audit::{Actor, Audit, Outcome, Pending};
 
 #[cfg(feature = "refresh-lock")]
-use crate::snapshot::versions::ApplyError;
+use crate::snapshot::versions::{Acting, ApplyError};
 #[cfg(feature = "refresh-lock")]
 use meada_core::authorize::{Grant, Refusal, Role};
 
@@ -160,12 +160,28 @@ fn outcome(e: Box<dyn std::error::Error>) -> (String, Outcome) {
     (e.to_string(), outcome)
 }
 
-/// The role and grant a write is authorized as: the global operator's reads everything.
+/// The grant a write is authorized with: the global operator's reads everything.
 #[cfg(feature = "refresh-lock")]
-fn acting(session: &Session) -> (Role, Grant) {
+fn grant(session: &Session) -> Grant {
     match session.operator {
-        true => (Role::Operator, Grant::All),
-        false => (Role::TeamOperator, session.core_grant()),
+        true => Grant::All,
+        false => session.core_grant(),
+    }
+}
+
+/// Who a write acts as: the global operator, or a team operator with its groups, `grant` and,
+/// under the GitHub grant provider, its login and the GitHub grant provider's host (#333).
+#[cfg(feature = "refresh-lock")]
+fn acting<'a>(session: &'a Session, grant: &'a Grant) -> Acting<'a> {
+    Acting {
+        role: match session.operator {
+            true => Role::Operator,
+            false => Role::TeamOperator,
+        },
+        groups: &session.groups,
+        grant,
+        login: session.login.as_deref(),
+        github_host: session.github_host(),
     }
 }
 
@@ -434,15 +450,13 @@ impl Console {
                 Ok(record) => record,
                 Err(answer) => return *answer,
             };
-            let (role, grant) = acting(session);
+            let grant = grant(session);
             return match crate::snapshot::versions::save(
                 &self.file,
                 &save.entries,
                 &save.message,
                 author,
-                role,
-                &session.groups,
-                &grant,
+                &acting(session, &grant),
             ) {
                 Ok((saved, owners)) => result(
                     record,
@@ -503,14 +517,12 @@ impl Console {
                     Err(answer) => return *answer,
                 };
             let author = session.subject.as_deref().expect("write subject admitted");
-            let (role, grant) = acting(session);
+            let grant = grant(session);
             let done = crate::snapshot::versions::apply(
                 &self.file,
                 version,
                 author,
-                role,
-                &session.groups,
-                &grant,
+                &acting(session, &grant),
             );
             return match done {
                 Ok(applied) => result(

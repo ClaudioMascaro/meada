@@ -24,19 +24,27 @@ test.each(validations)('WebAssembly and CLI share validation: $name', row => {
   }
 });
 
+// A row's login and GitHub host (#333): both absent or null without the GitHub grant provider.
 test.each(authorizations)('WebAssembly and CLI share authorization: $name', row => {
   const groups = json(row.groups), grant = json(row.grant), current = json(row.current), entries = json(row.new);
-  expect(JSON.parse(authorizeEntries(row.role, groups, grant, current, entries))).toEqual(row.refused);
-  expect(JSON.parse(authorizeEntries('operator', groups, grant, current, entries))).toEqual([]);
+  const login = row.login ?? undefined, host = row.github_host ?? undefined;
+  expect(JSON.parse(authorizeEntries(row.role, groups, grant, login, host, current, entries))).toEqual(row.refused);
+  expect(JSON.parse(authorizeEntries('operator', groups, grant, login, host, current, entries))).toEqual([]);
 });
 
 test.each(compositions)('WebAssembly and CLI share a team operator\'s save: $name', row => {
-  expect(JSON.parse(composeEntries(json(row.grant), json(row.current), json(row.new)))).toEqual(row.composed);
+  const login = row.login ?? undefined, host = row.github_host ?? undefined;
+  expect(JSON.parse(composeEntries(json(row.grant), login, host, json(row.current), json(row.new)))).toEqual(row.composed);
+});
+
+test('the shared table holds the GitHub grant provider\'s cases', () => {
+  expect(authorizations.filter(row => row.github_host).length).toBeGreaterThanOrEqual(9);
+  expect(compositions.filter(row => row.github_host).length).toBeGreaterThanOrEqual(2);
 });
 
 test('WebAssembly refuses arguments that are not the shared formats', () => {
-  expect(() => authorizeEntries('owner', '[]', '"*"', '[]', '[]')).toThrow();
-  expect(() => composeEntries('"a.com/x"', '[]', '[]')).toThrow();
+  expect(() => authorizeEntries('owner', '[]', '"*"', undefined, undefined, '[]', '[]')).toThrow();
+  expect(() => composeEntries('"a.com/x"', undefined, undefined, '[]', '[]')).toThrow();
 });
 
 test('WebAssembly uses the workspace entries to name a version', () => {

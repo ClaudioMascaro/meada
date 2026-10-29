@@ -118,11 +118,19 @@ impl Team {
     }
 
     /// A token for exactly `claims`, signed by the team's key.
+    #[cfg_attr(
+        not(any(feature = "directory", feature = "github-app")),
+        allow(dead_code)
+    )]
     pub(super) fn sign(&self, claims: &Value) -> String {
         sign(&self.encoding, "team", Algorithm::ES256, claims)
     }
 
     /// The claims `token` mints for `subject`: the base of `sign`.
+    #[cfg_attr(
+        not(any(feature = "directory", feature = "github-app")),
+        allow(dead_code)
+    )]
     pub(super) fn claims(&self, subject: &str) -> Value {
         let mut claims = claims(&self.issuer.base, &[]);
         claims["sub"] = json!(subject);
@@ -320,6 +328,14 @@ fn a_team_operator_sees_its_grant_and_every_role_sees_the_owners() {
             !body.contains(VAULT) && !body.contains(SEARCH),
             "{route}: {body}"
         );
+    }
+    // Without `[oidc.github]` no entry carries the role check's mark (#333).
+    for route in [
+        "workspace".to_string(),
+        format!("workspace/versions/{}", team.v1),
+    ] {
+        let body = ask(&team.console, &format!("/api/v1/{route}"), &operator).body;
+        assert!(!body.contains("excluded"), "{route}: {body}");
     }
     let viewer_sees = owners(&of(&viewer));
     assert_eq!(

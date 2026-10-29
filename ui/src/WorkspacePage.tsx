@@ -3,7 +3,7 @@ import { ApiError } from './api';
 import type { Api, Config, Session } from './api';
 import { loadCore } from './core';
 import type { Language } from './i18n';
-import { applyAction, authority, editorModel, entryRows, ownerAt, ownerMissing, plainEntries, saveAction, teamApplyAction, teamEditorModel, teamSaveAction, tomlEscaped, versionText } from './workspace';
+import { applyAction, authority, editorModel, entryRows, excludedEntries, ownerAt, ownerMissing, plainEntries, saveAction, teamApplyAction, teamEditorModel, teamSaveAction, tomlEscaped, versionText } from './workspace';
 import type { ApplyAction, CurrentWorkspace, Entry, EntryRow, Refusal, SaveAction, VersionSummary, WorkspaceDiff, WorkspaceVersion, WorkspaceVersions } from './workspace';
 import { word, workspaceCopy } from './workspace-i18n';
 import type { WorkspaceCopy } from './workspace-i18n';
@@ -146,6 +146,7 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
   const refused = teamEditor?.refusals ?? [];
   const marks = new Map(refused.map(refusal => [refusal.identity, refusal]));
   const unnamed = workspace?.version ? ownerMissing(workspace.version.repositories) : new Set<string>();
+  const left = workspace?.version ? excludedEntries(workspace.version.repositories) : new Set<string>();
 
   function pick(name: string) {
     if (!typing || draft === undefined) return;
@@ -226,9 +227,11 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
         open(teamEditor ? teamSaveAction(draft, message, teamEditor.owners) : saveAction(draft, message, file ?? ''));
       }}>
         <h2>{t.editor}</h2><p>{t.editorIntro}</p>
-        {team && <><p>{t.teamHint}</p><EntriesTable entries={entryRows(held, team)} t={t} label={t.entryState} state missing={unnamed} /></>}
+        {team && <><p>{t.teamHint}</p><EntriesTable entries={entryRows(held, team)} t={t} label={t.entryState} state missing={unnamed} excluded={left} /></>}
         {!team && unnamed.size > 0 && <div role="status" className="notice"><p>{t.ownerMissingIntro}</p>
           <ul>{held.filter(entry => unnamed.has(entry.repo)).map(entry => <li key={entry.repo}><code>{entry.repo}</code> · <code>{entry.owner}</code> · {t.ownerMissing}</li>)}</ul></div>}
+        {!team && left.size > 0 && <div role="status" aria-label={t.excluded} className="notice"><p>{t.excludedIntro}</p>
+          <ul>{held.filter(entry => left.has(entry.repo)).map(entry => <li key={entry.repo}><code>{entry.repo}</code>{entry.added_by && <> · <code>{entry.added_by}</code></>} · {t.excluded}</li>)}</ul></div>}
         <label className="workspace-label" htmlFor="workspace-edit-entries">{t.editEntries}</label>
         <textarea id="workspace-edit-entries" ref={entriesBox} className="workspace-text" value={draft} spellCheck={false}
           onChange={event => { setDraft(event.target.value); setCaret(event.target.selectionStart); }} onSelect={event => setCaret(event.currentTarget.selectionStart)} />
@@ -248,7 +251,7 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
         <div className="workspace-selectors">{([['from', t.from, from, setFrom], ['to', t.to, to, setTo]] as const).map(([name, label, value, change]) => <label key={name} htmlFor={`workspace-${name}`}>{label}
           <select id={`workspace-${name}`} value={value} onChange={event => change(event.target.value)}>{listing.versions.map(version => <option key={version.id} value={version.id}>{version.id} · {version.message}</option>)}</select></label>)}</div>
         {diff ? <DiffView diff={diff} t={t} /> : <p role="status">{t.loading}</p>}
-        {after && after.repositories.length > 0 && <EntriesTable entries={plainEntries(after.repositories)} t={t} label={t.owners} missing={ownerMissing(after.repositories)} />}
+        {after && after.repositories.length > 0 && <EntriesTable entries={plainEntries(after.repositories)} t={t} label={t.owners} missing={ownerMissing(after.repositories)} excluded={excludedEntries(after.repositories)} />}
         <label className="workspace-label" htmlFor="workspace-version-entries">{t.entries}</label>
         <textarea id="workspace-version-entries" className="workspace-text" readOnly value={after && ready === locale ? text(after) : ''} spellCheck={false} />
       </section>}
@@ -264,10 +267,14 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
   </>;
 }
 
-function EntriesTable({ entries, t, label, state, missing }: { entries: (Entry | EntryRow)[]; t: WorkspaceCopy; label: string; state?: boolean; missing?: Set<string> }) {
+function EntriesTable({ entries, t, label, state, missing, excluded }: { entries: (Entry | EntryRow)[]; t: WorkspaceCopy; label: string; state?: boolean; missing?: Set<string>; excluded?: Set<string> }) {
+  // Who added each entry, once any has `added_by` (under the GitHub grant provider, #333).
+  const adders = entries.some(entry => entry.added_by !== undefined);
   return <div role="region" aria-label={label} tabIndex={0} className="table-scroll"><h3>{label}</h3>
-    <table><thead><tr><th>{t.entry}</th><th>{t.owner}</th>{state && <th>{t.state}</th>}</tr></thead><tbody>
-      {entries.map(entry => <tr key={entry.repo}><td><code>{entry.repo}</code></td><td>{entry.owner ? <code>{entry.owner}</code> : t.noOwner}{missing?.has(entry.repo) && <strong className="workspace-missing"> · {t.ownerMissing}</strong>}</td>
+    <table><thead><tr><th>{t.entry}</th><th>{t.owner}</th>{adders && <th>{t.addedBy}</th>}{state && <th>{t.state}</th>}</tr></thead><tbody>
+      {entries.map(entry => <tr key={entry.repo}><td><code>{entry.repo}</code>{excluded?.has(entry.repo) && <strong className="workspace-excluded"> · {t.excluded}</strong>}</td>
+        <td>{entry.owner ? <code>{entry.owner}</code> : t.noOwner}{missing?.has(entry.repo) && <strong className="workspace-missing"> · {t.ownerMissing}</strong>}</td>
+        {adders && <td>{entry.added_by ? <code>{entry.added_by}</code> : t.noAddedBy}</td>}
         {state && <td>{'may_change' in entry && entry.may_change ? t.mayChange : `${t.readOnly}: ${word(t, 'reason', 'refusal' in entry ? String(entry.refusal) : '')}`}</td>}</tr>)}
     </tbody></table></div>;
 }

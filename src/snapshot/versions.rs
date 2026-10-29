@@ -26,10 +26,10 @@ use std::collections::BTreeSet;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
-#[cfg(all(feature = "ui", feature = "refresh-lock"))]
-use meada_core::authorize::compose_entries;
 #[cfg(feature = "refresh-lock")]
 use meada_core::authorize::{self, Grant, Refusal, Role, authorize_entries};
+#[cfg(all(feature = "ui", feature = "refresh-lock"))]
+use meada_core::authorize::{Change, Reason, compose_entries};
 use meada_core::ids::{VersionEntry, workspace_version_id};
 use meada_core::manifest::{EntryFile, validate, validate_import};
 use meada_core::workspace::{entries_text, entry};
@@ -224,28 +224,74 @@ pub(crate) enum SaveError {
     RoleLost,
 }
 
+/// Who a write acts as: its role, its groups and grant, and under the GitHub grant provider
+/// (ADR 0016) its login and the GitHub grant provider's host, both none without it.
+#[cfg(feature = "refresh-lock")]
+pub struct Acting<'a> {
+    pub role: Role,
+    pub groups: &'a [String],
+    pub grant: &'a Grant,
+    pub login: Option<&'a str>,
+    pub github_host: Option<&'a str>,
+}
+
+#[cfg(feature = "refresh-lock")]
+impl Acting<'_> {
+    /// The global operator, as the CLI acts.
+    pub fn operator() -> Acting<'static> {
+        Acting {
+            role: Role::Operator,
+            groups: &[],
+            grant: &Grant::All,
+            login: None,
+            github_host: None,
+        }
+    }
+
+    /// `authorize_entries` of the change from `current` to `new`.
+    fn refused(&self, current: &[Json], new: &[Json]) -> Vec<Refusal> {
+        let Acting {
+            role,
+            groups,
+            grant,
+            login,
+            github_host,
+        } = *self;
+        authorize_entries(role, groups, grant, login, github_host, current, new)
+    }
+}
+
 /// The console's save is CLI import's text preparation and storage under the refresh lock.
 /// CLI import deliberately remains available with generation-pointer alone and takes no lock.
-/// Anyone but the global operator (`role`, its `groups` and `grant`) is authorized under the
-/// lock against the version then current, which two writes cannot move at once: its role
-/// recomputed, `authorize_entries` over the current entries its grant reads, then the version
-/// stored is `compose_entries`' (ADR 0015). Returns what was stored with the owner groups of the
-/// entries the change touches, for a team operator's audit line.
+/// Anyone but the global operator (`acting`) is authorized under the lock against the version
+/// then current, which two writes cannot move at once: its role recomputed, the submitted
+/// entries composed over the current entries its grant reads (`compose_entries`, which under the
+/// GitHub grant provider attributes its additions, so a forged `added_by` decides nothing),
+/// `authorize_entries` over that change, an addition of an identity the version holds outside
+/// the grant refused `outside_grant` (`collisions`), then the version stored is
+/// `compose_entries`' over the whole current version (ADR 0015, #333). The global operator's
+/// text is stored as written, `added_by` included. Returns what was stored with the owner groups
+/// of the entries the change touches, for a team operator's audit line.
 #[cfg(all(feature = "ui", feature = "refresh-lock"))]
 pub(crate) fn save(
     manifest: &Path,
     src: &str,
     message: &str,
     author: &str,
-    role: Role,
-    groups: &[String],
-    grant: &Grant,
+    acting: &Acting,
 ) -> Result<(Imported, Vec<String>), SaveError> {
     let version = prepared("entries", src, message, author).map_err(SaveError::Invalid)?;
     let sections =
         super::operation::sections(manifest).map_err(|e| SaveError::Failed(e.to_string()))?;
     let snapshot = sections.snapshot.clone();
     let holds = format!("workspace save {}", author.escape_debug());
+    let Acting {
+        role,
+        groups,
+        grant,
+        login,
+        github_host,
+    } = *acting;
     super::operation::locked(&sections, &holds, async move |valkey, config, _, held| {
         super::lock::holds(valkey, config, &held.token).await?;
         let store = Store::connect(&snapshot)?;
@@ -261,11 +307,13 @@ pub(crate) fn save(
                 .filter(|e| grant.reads(authorize::repo(e)))
                 .cloned()
                 .collect();
-            let refused = authorize_entries(role, groups, grant, &read, &version.repositories);
+            let submitted = &version.repositories;
+            let seen = compose_entries(grant, login, github_host, &read, submitted);
+            let refused = collisions(grant, &current, &seen, acting.refused(&read, &seen));
             if !refused.is_empty() {
                 return Ok(Err(SaveError::Unauthorized(refused)));
             }
-            let composed = compose_entries(grant, &current, &version.repositories);
+            let composed = compose_entries(grant, login, github_host, &current, submitted);
             owners = touched_owners(&current, &composed);
             let text = entries_text(&composed).ok_or_else(|| Msg::UiEntriesInvalid.text())?;
             version = match prepared("entries", &text, message, author) {
@@ -281,6 +329,40 @@ pub(crate) fn save(
         true => SaveError::Refused(e.to_string()),
         false => SaveError::Failed(e.to_string()),
     })?
+}
+
+/// `refused`, the refusals of a team operator's save over the entries its grant reads, with each
+/// entry of `seen` whose identity `current` holds outside the grant refused `outside_grant` as an
+/// addition, whatever else it failed (#333): the browser sees such an identity as new, so only
+/// the save can refuse it, named as the subject submitted it. In `seen` order, then the removals.
+#[cfg(all(feature = "ui", feature = "refresh-lock"))]
+fn collisions(
+    grant: &Grant,
+    current: &[Json],
+    seen: &[Json],
+    refused: Vec<Refusal>,
+) -> Vec<Refusal> {
+    let hidden: BTreeSet<&str> = (current.iter().map(authorize::repo))
+        .filter(|repo| !grant.reads(repo))
+        .collect();
+    let (changed, removed): (Vec<_>, Vec<_>) =
+        (refused.into_iter()).partition(|r| r.change != Change::Remove);
+    let mut changed: BTreeMap<String, Refusal> = (changed.into_iter())
+        .map(|r| (r.identity.clone(), r))
+        .collect();
+    let added = seen.iter().filter_map(|e| {
+        let repo = authorize::repo(e);
+        let found = changed.remove(repo);
+        match hidden.contains(repo) {
+            true => Some(Refusal {
+                identity: repo.to_string(),
+                change: Change::Add,
+                reason: Reason::OutsideGrant,
+            }),
+            false => found,
+        }
+    });
+    added.chain(removed).collect()
 }
 
 /// The id of the version the entries `src` would be stored as, or the problems of the checks
@@ -571,19 +653,24 @@ pub struct Applied {
 /// `meada workspace apply <version> --workspace <manifest>` (feature `refresh-lock`): once the
 /// store holds the version `id`'s document, checked, moves `{<key_prefix>}:workspace` to `id`
 /// with the operation's fence under the refresh lock (`APPLY`); `<id> <fence>`. The id is
-/// checked before anything is read. Anyone but the global operator (`role`, its `groups` and
-/// `grant`) is authorized under the lock, before the pointer moves, against the version then
-/// current: its role recomputed from it, then `authorize_entries` over its whole entries. The
-/// CLI passes the global operator.
+/// checked before anything is read. Anyone but the global operator (`acting`) is authorized
+/// under the lock, before the pointer moves, against the version then current: its role
+/// recomputed from it, then `authorize_entries` over its whole entries, so under the GitHub grant
+/// provider an addition on its host without `added_by` is `unattributed`. The CLI passes the
+/// global operator.
 #[cfg(feature = "refresh-lock")]
 pub fn apply(
     manifest: &Path,
     id: &str,
     author: &str,
-    role: Role,
-    groups: &[String],
-    grant: &Grant,
+    acting: &Acting,
 ) -> Result<Applied, ApplyError> {
+    let Acting {
+        role,
+        groups,
+        grant,
+        ..
+    } = *acting;
     fn failed(e: Box<dyn std::error::Error>) -> ApplyError {
         match OpError::refused(&*e) {
             true => ApplyError::Conflict(e.to_string()),
@@ -619,7 +706,7 @@ pub fn apply(
                 if authorize::role(role, groups, grant, &current) == Role::Viewer {
                     return Ok(Err(ApplyError::RoleLost));
                 }
-                let refused = authorize_entries(role, groups, grant, &current, &entries);
+                let refused = acting.refused(&current, &entries);
                 if !refused.is_empty() {
                     return Ok(Err(ApplyError::Refused(refused)));
                 }
@@ -912,4 +999,82 @@ pub fn show_pulled(manifest: &Path) -> crate::Result<String> {
         false => pulled(&dir)?,
     };
     Ok(found.ok_or_else(|| not_pulled(manifest, &dir))?.2)
+}
+
+#[cfg(all(test, feature = "ui", feature = "refresh-lock"))]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// An identity the version holds outside the grant is `outside_grant` whatever the core
+    /// found, an attribution missing included, in the submitted order and before the removals.
+    #[test]
+    fn a_collision_with_a_hidden_identity_is_outside_grant_first() {
+        let entry = |repo: &str, owner: &str| json!({"repo": repo, "path": "p", "owner": owner});
+        let grant = Grant::Only(["g.com/a".into(), "g.com/b".into(), "g.com/r".into()].into());
+        let current = [
+            entry("g.com/a", "team-a"),
+            entry("g.com/hidden", "team-a"),
+            entry("g.com/r", "team-b"),
+        ];
+        let read: Vec<Json> = (current.iter())
+            .filter(|e| grant.reads(authorize::repo(e)))
+            .cloned()
+            .collect();
+        let seen = [
+            entry("g.com/b", "team-b"),
+            entry("g.com/hidden", "team-a"),
+            entry("g.com/a", "team-a"),
+            entry("g.com/new", "team-a"),
+        ];
+        let groups = ["team-a".to_string()];
+        let acting = Acting {
+            role: Role::TeamOperator,
+            groups: &groups,
+            grant: &grant,
+            login: None,
+            github_host: Some("g.com"),
+        };
+        let refused = acting.refused(&read, &seen);
+        let reasons = |refused: &[Refusal]| -> Vec<(String, Reason)> {
+            (refused.iter())
+                .map(|r| (r.identity.clone(), r.reason))
+                .collect()
+        };
+        let unattributed = |repo: &str| (repo.to_string(), Reason::Unattributed);
+        assert_eq!(
+            reasons(&refused),
+            [
+                unattributed("g.com/b"),
+                unattributed("g.com/hidden"),
+                unattributed("g.com/new"),
+                ("g.com/r".into(), Reason::NotYourTeam),
+            ]
+        );
+        let refused = collisions(&grant, &current, &seen, refused);
+        assert_eq!(
+            reasons(&refused),
+            [
+                unattributed("g.com/b"),
+                ("g.com/hidden".into(), Reason::OutsideGrant),
+                unattributed("g.com/new"),
+                ("g.com/r".into(), Reason::NotYourTeam),
+            ]
+        );
+        assert_eq!(refused[1].change, Change::Add);
+        // Without a refusal of its own, a collision is still refused.
+        let acting = Acting {
+            login: Some("ana"),
+            ..acting
+        };
+        let mut attributed = seen.clone();
+        attributed[1]["added_by"] = "ana".into();
+        let refused = acting.refused(&read, &attributed[1..2]);
+        assert!(refused.iter().all(|r| r.identity != "g.com/hidden"));
+        let refused = collisions(&grant, &current, &attributed[1..2], refused);
+        assert_eq!(
+            reasons(&refused)[0],
+            ("g.com/hidden".into(), Reason::OutsideGrant)
+        );
+    }
 }

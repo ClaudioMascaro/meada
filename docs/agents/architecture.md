@@ -131,19 +131,30 @@ other Kotlin grammar may enter the dependency tree: they all export `tree_sitter
   stores: `entry`, which builds one, is the function `snapshot::versions` stores them with. An owner change alone is the
   changed dotted key `repository.owner`, likewise `repository.added_by`.
 - `meada-core/src/authorize.rs` (ADR 0015): what a subject may change in a workspace version,
-  over a version document's JSON `repositories`. `authorize_entries(role, groups, grant,
-  current, new)` returns the refused entries (`Refusal`: `identity`, `change` `add`/`edit`/
-  `remove`, `reason`), the new entries' order then the removed ones in the current order; the
-  global operator (`Role::Operator`) gets none. For anyone else, entries pair by `repo`, one is
-  changed when anything but its position differs, and each changed entry gets the first rule it
-  fails: `outside_grant`, `ownerless` (the current entry has no owner, or the addition has
-  none), `owner_change` (an edit's owner differs, cleared included), `not_your_team` (the owner
-  is none of its teams: its groups owning an entry of `current` the `Grant` reads). `role` is
-  admission's rule (#324): the global operator stays one, anyone else is a team operator while
-  it has a team, else a viewer. `compose_entries(grant, current, submitted)` is the version a
-  team operator's save stores: the current entries in place, those the grant reads replaced or
-  dropped, those outside it kept, additions appended in submitted order. The binary's apply and
-  the browser (`authorizeEntries`, `composeEntries` in `wasm.rs`) call the same functions.
+  over a version document's JSON `repositories`. `authorize_entries(role, groups, grant, login,
+  github_host, current, new)` returns the refused entries (`Refusal`: `identity`, `change`
+  `add`/`edit`/`remove`, `reason`), the new entries' order then the removed ones in the current
+  order; the global operator (`Role::Operator`) gets none. `login` and `github_host` are the
+  subject's GitHub login and the GitHub grant provider's host (ADR 0016, #333), both none
+  without `[oidc.github]`, where every answer is ADR 0015's. For anyone else, entries pair by `repo`,
+  one is changed when anything but its position differs, and each changed entry gets the first
+  rule it fails: `outside_grant` (under the GitHub grant provider, never for an addition on its host,
+  `on_host`: the identity's first segment), `unattributed` (under the GitHub grant provider, an addition on
+  its host without `added_by`, or by a subject without a login), `ownerless` (the current entry
+  has no owner, or the addition has none), `owner_change` (an edit's owner differs, cleared
+  included), `added_by_change` (under the GitHub grant provider, an edit's `added_by` differs: changed,
+  cleared or set), `not_your_team` (the owner is none of its teams: its groups owning an entry
+  of `current` the `Grant` reads). `role` is admission's rule (#324): the global operator stays
+  one, anyone else is a team operator while it has a team, else a viewer.
+  `compose_entries(grant, login, github_host, current, submitted)` is the version a team
+  operator's save stores: the current entries in place, those the grant reads replaced by their
+  submitted form or dropped, those outside it kept, additions appended in submitted order; under
+  the GitHub grant provider each addition is attributed (`added_by` the login on its host whatever the text
+  held, absent without a valid login; absent off it). The attribution step comes before
+  authorization: the server and the browser both authorize the change from the entries the
+  grant reads to `compose_entries` over them, so a forged `added_by` decides no reason. The
+  binary's save and apply and the browser (`authorizeEntries`, `composeEntries` in `wasm.rs`,
+  `login` and `github_host` as `string | undefined`) call the same functions.
 - `meada-core/src/msg.rs`: the messages of those checks and the language flag the binary's
   `msg.rs` reads too; `meada-core/src/http.rs`: `normalize_path` and `PARAM`, which the HTTP
   kind re-exports. `qualify` and `parent` (dotted names) live in its `lib.rs`.
@@ -222,7 +233,12 @@ A team operator (#325) edits the entries its grant reads, as `GET .../versions/<
 them (`workspace.ts`: `teamEditorModel` composes the text with `composeEntries`, diffs the
 composed version and runs `authorizeEntries`, so a refusal is marked with its reason in the diff
 and the save disabled with no request; `entryRows` shows each entry's owner and the answer to
-changing it alone). `plainEntries` projects the flags a view adds (`may_change`, `refusal`) out
+changing it alone). Under the GitHub grant provider (#333) `authority` carries the session's
+`login` and `github_host` into both functions, so `unattributed` and `added_by_change` are
+marked as ADR 0015's reasons are; the entries tables show each entry's `added_by` once one has it, and
+the editor and the versions page mark the entries a version's `excluded` names (the global
+operator's editor lists them in a labelled status), in text. `plainEntries` projects the flags
+a view adds (`may_change`, `refusal`, `owner_missing`, `excluded`) out
 before any TOML or id, and a partial view's hash is never a saved id: a team save reads the
 server's `result`. Its save and apply confirmations name the teams that authorize them (the
 owners of the entries touched) instead of a CLI command, an apply is offered only when
@@ -415,7 +431,11 @@ one for the area a change touches.
   is a 400), `flag_missing_owners` (`owner_missing: true` on the entries of `workspace` and
   `workspace/versions/<id>` whose owner names no group; nothing flagged before a group was ever
   provisioned, ownerless entries never flagged, no flags and one stderr line when the read
-  fails) and `with_directory_counts` (`GET /api/v1/admission` gains `directory`: `users`,
+  fails), `flag_excluded` (`ui/read.rs`, #333: `excluded: true` on the entries of `workspace`
+  and `workspace/versions/<id>` whose identity the newest permissions set excluded, only for the
+  version that set checked and only after the grant bounded the entries; the field is present
+  only when true, so without `[oidc.github]` every body is as before) and `with_directory_counts`
+  (`GET /api/v1/admission` gains `directory`: `users`,
   `groups`, `last_write`; `null` when unreadable, absent without `[directory]`).
 - `directory.rs`, `directory/scim.rs` (feature `directory`, implying `postgres`, enabled by
   `cloud`, no crate beyond `postgres`'s; ADR 0016's `directory` row of ADR 0012's module table;
@@ -539,7 +559,10 @@ one for the area a change touches.
   called by `mcp::run` and `ui::listen`), then a thread reads, every `PERMISSIONS_POLL` (60 s),
   in one `REPEATABLE READ READ ONLY` transaction through `postgres::versioned`, the newest set's
   id, `finished` and age on Postgres's clock (`clock_timestamp() - finished`) and, only when the
-  id changed, its counts and its rows whose `role` is in `roles`, keyed by login. The age rule:
+  id changed, its counts, its rows whose `role` is in `roles`, keyed by login, its `version`
+  and its exclusions' identities (`Permissions::excluded`, read by the console whatever the
+  set's age, #333; a `version` that is no version id marks nothing, with one
+  `Msg::PermissionsBadRow` line, and the set still grants). The age rule:
   the age at the last successful read plus the process's monotonic time since, a read of the
   same set never lowering it (`Set::seen`), so neither clock moving back extends a set; at most
   `max_age_seconds` the GitHub grant is honored (`current`), past it empty (`expired`), and
@@ -641,10 +664,16 @@ one for the area a change touches.
   with the admitted subject as author. Success is 200 `{result: "<CLI line>"}`; operational
   refusals are 409 with the CLI message; entry validation is 422 with CLI line/key diagnostics;
   malformed JSON, extra keys or malformed ids/fences are safe fixed 400s; caps are 413s. A team
-  operator's save runs `versions::save` as `Role::TeamOperator`: after validation (422), under
-  the refresh lock and against the version then current, its role recomputed, `authorize_entries`
-  over the current entries its grant reads, and `compose_entries` over the whole current version
-  makes the stored one (author its subject); its apply is `versions::apply`'s authorized path.
+  operator's save runs `versions::save` as `Role::TeamOperator` (`versions::Acting`, with the
+  session's login and `[oidc.github] host` under the GitHub grant provider): after validation
+  (422), under the refresh lock and against the version then current, its role recomputed, the
+  submission composed over the current entries its grant reads (the attribution step,
+  `compose_entries`), `authorize_entries` over that change, every addition of an identity the
+  whole current version holds outside the grant refused `outside_grant` whatever else it failed
+  (`versions::collisions`, #333: the one refusal the editor cannot predict, which tells the
+  subject the identity exists, named as it submitted it), and `compose_entries` over the whole
+  current version makes the stored one (author its subject). The global operator's text is
+  stored as written, `added_by` included. Its apply is `versions::apply`'s authorized path.
   A refused change is a 403 `{"error": {"code": "entries_refused", "message":
   <Msg::WorkspaceRefused>, "refused": [{"identity", "change", "reason"}], "hidden": <n>}}` with
   nothing written and the lock released: a save names every refused entry (it refuses only what
@@ -1004,10 +1033,11 @@ one for the area a change touches.
   (`Msg::BadVersionArg`), needs `[refresh_lock]` (`operation::sections`), reads and checks the
   version's document in the store (missing, `Msg::WorkspaceNoVersion` naming its key), then runs
   under `operation::locked` (holder `workspace apply <author>`), for a subject other than the
-  global operator (its `Role`, groups and `Grant`), the authorization against the version then
-  current: its role recomputed (`authorize::role`; none current, or no team left, is
-  `ApplyError::RoleLost`), then `authorize_entries` over the whole current entries and the
-  applied ones (`ApplyError::Refused` with the refusals; `Msg::WorkspaceRefused` counts them).
+  global operator (`Acting`: its `Role`, groups, `Grant`, login and GitHub host), the
+  authorization against the version then current: its role recomputed (`authorize::role`; none
+  current, or no team left, is `ApplyError::RoleLost`), then `authorize_entries` over the whole
+  current entries and the applied ones, so an addition on the GitHub host without `added_by` is
+  `unattributed` (`ApplyError::Refused` with the refusals; `Msg::WorkspaceRefused` counts them).
   Either releases the lock and moves nothing; two applies serialize on the lock, so a version is
   checked against the one it replaces. The CLI passes the global operator, which reads nothing
   more; the console passes the session's role (#324). `apply` returns `Applied`: the line and

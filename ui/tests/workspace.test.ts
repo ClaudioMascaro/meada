@@ -56,6 +56,15 @@ test('view annotations never enter a text, an id or the diff keys', () => {
   expect(owned.diff?.changed).toEqual([{ repo: 'a.com/z', keys: ['repository.owner'] }]);
 });
 
+test('the role check\'s mark is response metadata: never in a text, an id or a payload (#333)', () => {
+  const marked = [{ ...x, added_by: 'ana-souza', excluded: true }, y];
+  const plain = [{ ...x, added_by: 'ana-souza' }, y];
+  expect(plainEntries(marked)).toEqual(plain);
+  expect(versionText(marked)).toBe(text(plain));
+  expect(workspaceVersionId(versionText(marked))).toBe(workspaceVersionId(text(plain)));
+  expect(saveAction(versionText(marked), 'm', 'ops.toml').body.entries).not.toContain('excluded');
+});
+
 test('each entry is shown with the refusal of changing it alone', () => {
   expect(entryRows([x, y, z], who).map(({ repo, may_change, refusal }) => ({ repo, may_change, refusal }))).toEqual([
     { repo: 'a.com/x', may_change: true }, { repo: 'a.com/y', may_change: false, refusal: 'not_your_team' },

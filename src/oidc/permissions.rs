@@ -3,7 +3,8 @@
 //! reads, every `poll_every()` (`PERMISSIONS_POLL`, 60 seconds), the newest set's id, its
 //! `finished` and its age on Postgres's clock, and loads its rows whose `role` is in `roles` only
 //! when the id changed, in one read-only transaction that sees one set. Admission never waits on
-//! Postgres: before the first read the GitHub grant is empty.
+//! Postgres: before the first read the GitHub grant is empty. The console also reads the set's
+//! exclusions with the version it checked, for the workspace views' `excluded` flag (#333).
 //!
 //! The age is Postgres's current time minus `finished` at the last successful read, plus the
 //! process's monotonic time since; a later read of the same set never lowers it, so a clock moved
@@ -12,7 +13,7 @@
 //! does not know is written once and counts as unreachable. Every row is hostile: a set or a row
 //! that fails its checks is skipped with one line naming its table, never a value.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, RwLock, Weak};
 use std::time::{Duration, Instant};
 
@@ -26,8 +27,9 @@ use crate::msg::Msg;
 // this long after the refresh that recorded it; `MEADA_PERMISSIONS_POLL_MS` shortens it in debug
 // builds.
 const PERMISSIONS_POLL: Duration = Duration::from_secs(60);
-/// The statements of one read: the version, the newest set, its counts and its rows.
-const STATEMENTS: u32 = 4;
+/// The statements of one read: the version, the newest set, its counts, its rows and its
+/// exclusions.
+const STATEMENTS: u32 = 5;
 
 /// How often a process reads the newest permissions set. In debug builds
 /// `MEADA_PERMISSIONS_POLL_MS` shortens it (a knob for tests and not documented, as
@@ -77,6 +79,10 @@ struct Set {
     exclusions: i64,
     /// The identities each login reads through an accepted role.
     logins: HashMap<String, Vec<String>>,
+    /// The workspace version the set was checked against, and the identities of its additions
+    /// the set left out (`excluded`).
+    version: Option<String>,
+    excluded: BTreeSet<String>,
 }
 
 impl Set {
@@ -154,6 +160,16 @@ impl Permissions {
             Some(set) if set.age(now) <= self.github.max_age => "current",
             Some(_) => "expired",
         }
+    }
+
+    /// The newest set's workspace version and the identities it excluded from that version
+    /// (#333), whatever the set's age: what the last role check left out. `None` before a set is
+    /// loaded or when it names no version.
+    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    pub(super) fn excluded(&self) -> Option<(String, BTreeSet<String>)> {
+        let state = self.state.read().unwrap_or_else(|e| e.into_inner());
+        let set = state.set.as_ref()?;
+        Some((set.version.clone()?, set.excluded.clone()))
     }
 
     /// The admission view's `github` (#332): the grant provider's settings, the grant's state and
@@ -236,7 +252,7 @@ impl Permissions {
         let newest = format!(
             "SELECT id, to_char(finished AT TIME ZONE 'UTC', \
              'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'), \
-             extract(epoch FROM clock_timestamp() - finished)::float8, repositories \
+             extract(epoch FROM clock_timestamp() - finished)::float8, repositories, version \
              FROM {q}.permission_sets ORDER BY fence DESC, finished DESC LIMIT 1"
         );
         let Some(row) = tx.query_opt(&newest, &[]).await.map_err(failed)? else {
@@ -260,6 +276,16 @@ impl Permissions {
         if known == Some(id.as_str()) {
             return Ok(Read::Same(age, at));
         }
+        // The version it checked only names what the console marks `excluded`: one that is no
+        // version id marks nothing, and the set still grants.
+        let version = match row.try_get::<_, Option<String>>(4) {
+            Ok(None) => None,
+            Ok(Some(version)) if meada_core::ids::is_id(&version) => Some(version),
+            _ => {
+                eprintln!("{}", Msg::PermissionsBadRow(&sets).text());
+                None
+            }
+        };
         let counts = format!(
             "SELECT (SELECT count(*) FROM {q}.permission_rows WHERE set_id = $1), \
              (SELECT count(*) FROM {q}.permission_exclusions WHERE set_id = $1)"
@@ -283,6 +309,18 @@ impl Permissions {
                 _ => eprintln!("{}", Msg::PermissionsBadRow(&table).text()),
             }
         }
+        let exclusions =
+            format!("SELECT identity FROM {q}.permission_exclusions WHERE set_id = $1");
+        let table = format!("{q}.permission_exclusions");
+        let mut excluded = BTreeSet::new();
+        for row in tx.query(&exclusions, &[&id]).await.map_err(failed)? {
+            match row.try_get::<_, String>(0).ok() {
+                Some(identity) if self.identity_ok(&identity) => {
+                    excluded.insert(identity);
+                }
+                _ => eprintln!("{}", Msg::PermissionsBadRow(&table).text()),
+            }
+        }
         Ok(Read::New(Set {
             id,
             finished,
@@ -292,6 +330,8 @@ impl Permissions {
             rows: counted.get(0),
             exclusions: counted.get(1),
             logins,
+            version,
+            excluded,
         }))
     }
 
@@ -370,6 +410,8 @@ mod tests {
             rows: 1,
             exclusions: 0,
             logins: HashMap::from([("ana".into(), vec!["github.com/acme/api".into()])]),
+            version: None,
+            excluded: BTreeSet::new(),
         }
     }
 

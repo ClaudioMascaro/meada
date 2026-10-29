@@ -31,6 +31,25 @@ All notable changes to Meada are recorded here. The format follows
   the grant provider's settings, the grant's state and the newest set's id, `finished`, age, `max_age_seconds`,
   repositories, rows and exclusions. The admission and session pages show them, and audit
   records carry the subject's login.
+- Additions under the GitHub grant provider (ADR 0015, ADR 0016): a team operator may add, for
+  its team, an entry of a repository on `[oidc.github] host` that its grant does not read yet.
+  The console's save sets the addition's `added_by` to the saver's login whatever the submitted
+  text says (and clears it on additions off the host), and the role check fetches the entry only
+  while that login holds an accepted role. Two refusal reasons join `entries_refused`, in
+  precedence order `outside_grant`, `unattributed` (an addition on the host without `added_by`,
+  or by a subject without a login), `ownerless`, `owner_change`, `added_by_change` (an edit
+  changing, clearing or setting `added_by`) and `not_your_team`. A save that adds an identity
+  the workspace already holds outside the grant is refused `outside_grant`, naming it as
+  submitted. The global operator's saves and the CLI keep `added_by` as written.
+  `authorize_entries` and `compose_entries` of `meada-core`, and their WebAssembly exports, take
+  the subject's login and the GitHub grant provider's host (none without the GitHub grant provider, answering as before),
+  and the editor marks the new reasons as it marks the others, in pt-BR and English, and shows
+  each entry's `added_by`.
+- `excluded`: with `[oidc.github]`, `GET /api/v1/workspace` and `GET
+  /api/v1/workspace/versions/<id>` mark `excluded: true` on each entry of the version the newest
+  permissions set checked whose addition it left out, for those who see the entry; the field is
+  absent otherwise. The versions page and the editor mark those entries with the reason that the
+  adder holds no accepted role.
 - `meada github-app roles --workspace <bootstrap manifest>` (features `github-app`, `postgres`
   and `oidc`), the job's role check at every refresh: for each identity of the workspace on
   `[oidc.github] host` it lists `GET /repos/{owner}/{repo}/collaborators?affiliation=all&per_page=100`,

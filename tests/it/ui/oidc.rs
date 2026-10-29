@@ -1088,6 +1088,8 @@ fn refused_writes_are_authorized_and_audited_before_any_body_is_consumed() {
     }
 }
 
+#[cfg(all(feature = "refresh-lock", feature = "postgres", feature = "github-app"))]
+mod additions;
 #[cfg(all(feature = "refresh-lock", feature = "postgres"))]
 mod audit;
 #[cfg(all(feature = "directory", feature = "refresh-lock"))]
