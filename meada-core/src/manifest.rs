@@ -203,7 +203,7 @@ fn owner<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
 }
 
 /// The most characters a GitHub login holds.
-const ADDED_BY_MAX: usize = 39;
+pub const ADDED_BY_MAX: usize = 39;
 
 /// What an `added_by` may not be (#330): empty, over `ADDED_BY_MAX` characters or holding
 /// anything but lowercase ASCII letters, digits, `-` and `_`, so a login has one canonical text.
@@ -244,8 +244,8 @@ pub struct EntryFile {
     /// version, not a block; nothing here reads it to decide anything.
     #[serde(default, deserialize_with = "owner")]
     pub owner: Option<String>,
-    /// The GitHub login that added the entry (#330): metadata like `owner`, verified attribution
-    /// and no grant; nothing reads it to decide anything yet.
+    /// The GitHub login that added the entry (#330): metadata like `owner`, attribution and no
+    /// grant; nothing reads it to decide anything yet.
     #[serde(default, deserialize_with = "added_by")]
     pub added_by: Option<String>,
     #[serde(default, deserialize_with = "declared")]

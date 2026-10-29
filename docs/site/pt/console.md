@@ -160,6 +160,8 @@ Vários times podem dividir um workspace: cada um altera as próprias entradas e
     meada workspace import repositories.toml --message "Assign billing to its team" --workspace /etc/meada/job.workspace.toml
     ```
 
+    Uma entrada também pode ter `added_by = "<login do GitHub>"`, o login de quem a adicionou: de 1 a 39 caracteres entre letras ASCII minúsculas, dígitos, `-` e `_` (um login de Enterprise Managed Users como `ana_acme` serve), comparado exatamente, então `Ana` é recusado. Ele vem depois do `owner` em `meada workspace show`, entra no id da versão, e nada o lê ainda para decidir algo. Nas entradas `[[repository]]` do próprio manifest de bootstrap é erro, como o `owner`.
+
 3. **Quem altera o quê.** O operador de time pode editar e remover as entradas que seus times possuem e adicionar entradas cujo owner seja um de seus times. O operador global mantém as mudanças de owner (definir, limpar ou substituir), as entradas sem owner, as entradas de outros owners e todas as operações de geração (`pointer` e `fence`).
 4. **Delegação.** Um grupo vira time quando o operador global lhe atribui a primeira entrada. Um time que remove a última entrada deixa de ser time até o operador global lhe atribuir uma entrada de novo.
 5. **Configuração.** Ser dono nunca amplia o que um token lê. Mapeie o grupo de cada time em `[oidc.groups]` para as identidades que ele possui, e para uma identidade antes de o time poder adicioná-la; sem isso, o time não vê as próprias entradas, e uma adição fora do grant é recusada com `outside_grant`.

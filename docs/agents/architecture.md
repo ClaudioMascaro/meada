@@ -109,7 +109,7 @@ other Kotlin grammar may enter the dependency tree: they all export `tree_sitter
   stored version check it alike; `authorize` reads it to decide a write (#323).
   `EntryFile::added_by` is the optional GitHub login that added the entry (#330), checked there
   too (`added_by_problem`: one string, 1 to 39 characters of lowercase ASCII letters, digits,
-  `-` and `_`; compared exactly); verified attribution and no grant, read by nothing yet.
+  `-` and `_`; compared exactly); attribution and no grant, read by nothing yet.
   `validate_import(file, src)`
   validates entries while ignoring other top-level keys, with CLI import's file prefix on
   identity errors; CLI, HTTP and WASM import validation share it, preserving empty workspaces and ignored

@@ -3,7 +3,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::manifest::OWNER_MAX;
+use crate::manifest::{ADDED_BY_MAX, OWNER_MAX};
 
 static PT: AtomicBool = AtomicBool::new(false);
 
@@ -96,8 +96,8 @@ impl Msg<'_> {
                 "deve ser uma única string, um login do GitHub".into(),
             ),
             Msg::AddedByTooLong => pick(
-                "is longer than 39 characters".into(),
-                "tem mais de 39 caracteres".into(),
+                format!("is longer than {ADDED_BY_MAX} characters"),
+                format!("tem mais de {ADDED_BY_MAX} caracteres"),
             ),
             Msg::AddedByChars => pick(
                 "holds a character other than lowercase ASCII letters, digits, `-` and `_`".into(),
