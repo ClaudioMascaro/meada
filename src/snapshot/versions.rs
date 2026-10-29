@@ -4,9 +4,9 @@
 //!
 //! A version is stored at `workspaces/<version id>.json` under the store's prefix, with its size
 //! and BLAKE3 hash as metadata, and never rewritten: `id`, `author`, `time` (RFC 3339, UTC),
-//! `message` and `repositories`, in manifest order, each entry its `repo` and `path` as written
-//! and its blocks as `entry_blocks` gives them. The id is `meada_core`'s workspace version id of
-//! the entries alone. The current version is `{<key_prefix>}:workspace`, a hash `{id, fence}`
+//! `message` and `repositories`, in manifest order, each entry its `repo` and `path` as written,
+//! its `owner` when it has one (ADR 0015) and its blocks as `entry_blocks` gives them. The id is
+//! `meada_core`'s workspace version id of the entries alone. The current version is `{<key_prefix>}:workspace`, a hash `{id, fence}`
 //! under the pointer's hash tag, which `meada workspace apply` moves. Everything read back from
 //! the store or Valkey is hostile: each name, id and fence is checked against its pattern, and a
 //! document is bounded in size, its entries validated again and its id derived from them again
@@ -52,7 +52,8 @@ pub struct Version {
     /// RFC 3339, UTC, to the second.
     pub time: String,
     pub message: String,
-    /// In manifest order: each entry's `repo` and `path` as written, and its blocks.
+    /// In manifest order: each entry's `repo` and `path` as written, its `owner` if any, and its
+    /// blocks.
     pub repositories: Vec<Json>,
 }
 
@@ -229,11 +230,15 @@ pub(crate) fn save(
     .map_err(|e| SaveError::Refused(e.to_string()))
 }
 
-/// One entry of a version document: `repo` and `path`, then the entry's blocks.
-fn entry(repo: &str, path: &str, blocks: Json) -> Json {
+/// One entry of a version document: `repo` and `path`, the `owner` when there is one, then the
+/// entry's blocks.
+fn entry(e: &EntryFile, blocks: Json) -> Json {
     let mut entry = Map::new();
-    entry.insert("repo".into(), repo.into());
-    entry.insert("path".into(), path.into());
+    entry.insert("repo".into(), e.repo.as_str().into());
+    entry.insert("path".into(), e.path.as_str().into());
+    if let Some(owner) = &e.owner {
+        entry.insert("owner".into(), owner.as_str().into());
+    }
     if let Json::Object(blocks) = blocks {
         entry.extend(blocks);
     }
@@ -243,12 +248,12 @@ fn entry(repo: &str, path: &str, blocks: Json) -> Json {
 /// The version id of `entries`, their blocks being `blocks` (`entry_blocks`), and the entries as
 /// a version document holds them.
 fn versioned(entries: &[EntryFile], blocks: Vec<Json>) -> (String, Vec<Json>) {
-    let ids: Vec<(&str, &str, &Json)> = (entries.iter().zip(&blocks))
-        .map(|(e, blocks)| (e.repo.as_str(), e.path.as_str(), blocks))
+    let ids: Vec<(&str, &str, &Json, Option<&str>)> = (entries.iter().zip(&blocks))
+        .map(|(e, blocks)| (e.repo.as_str(), e.path.as_str(), blocks, e.owner.as_deref()))
         .collect();
     let id = workspace_version_id(&ids);
     let repositories = (entries.iter().zip(blocks))
-        .map(|(e, blocks)| entry(&e.repo, &e.path, blocks))
+        .map(|(e, blocks)| entry(e, blocks))
         .collect();
     (id, repositories)
 }

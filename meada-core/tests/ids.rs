@@ -95,13 +95,13 @@ fn another_bundle_id_or_identity_changes_the_generation_id() {
 }
 
 #[test]
-fn entry_blocks_leave_out_repo_and_path_and_sort_their_keys() {
+fn entry_blocks_leave_out_repo_path_and_owner_and_sort_their_keys() {
     let a = "index_dir = \"i\"\n[[repository]]\nrepo = \"example.com/acme/web\"\npath = \"../web\"\n\
              [repository.serve]\ndomains = [\"web.example.com\"]\ndocuments = [\"openapi.yaml\"]\n\
              [[repository]]\nrepo = \"example.com/acme/api\"\npath = \"api\"\n";
     let b = "index_dir = \"j\"\n[[repository]]\npath = \"/srv/web\"\n\
              serve = { documents = ['openapi.yaml'], domains = ['web.example.com'] }\n\
-             repo = \"example.com/acme/web\"\n\
+             repo = \"example.com/acme/web\"\nowner = \"team-web\"\n\
              [[repository]]\nrepo = \"example.com/acme/api\"\npath = \"/srv/api\"\n";
     let (a, b) = (entry_blocks(a), entry_blocks(b));
     assert_eq!(a, b);
@@ -147,8 +147,8 @@ fn api() -> Value {
 fn the_workspace_version_id_hashes_the_canonical_text_of_the_entries_alone() {
     let (web, api) = (web(), api());
     let entries = [
-        ("example.com/acme/web", "../web", &web),
-        ("example.com/acme/api", "/srv/api", &api),
+        ("example.com/acme/web", "../web", &web, None),
+        ("example.com/acme/api", "/srv/api", &api, None),
     ];
     let id = workspace_version_id(&entries);
     let text = "[{\"blocks\":{\"serve\":{\"documents\":[\"openapi.yaml\"]}},\"path\":\"../web\",\
@@ -168,7 +168,7 @@ fn the_same_entries_written_another_way_give_the_same_workspace_version_id() {
                 ("example.com/acme/web", "../web"),
                 ("example.com/acme/api", "api"),
             ])
-            .map(|(blocks, (repo, path))| (repo, path, blocks))
+            .map(|(blocks, (repo, path))| (repo, path, blocks, None))
             .collect();
         workspace_version_id(&entries)
     };
@@ -185,23 +185,50 @@ fn the_same_entries_written_another_way_give_the_same_workspace_version_id() {
 fn swapping_two_entries_or_changing_a_block_changes_the_workspace_version_id() {
     let (web, api) = (web(), api());
     let id = workspace_version_id(&[
-        ("example.com/acme/web", "web", &web),
-        ("example.com/acme/api", "api", &api),
+        ("example.com/acme/web", "web", &web, None),
+        ("example.com/acme/api", "api", &api, None),
     ]);
     let swapped = workspace_version_id(&[
-        ("example.com/acme/api", "api", &api),
-        ("example.com/acme/web", "web", &web),
+        ("example.com/acme/api", "api", &api, None),
+        ("example.com/acme/web", "web", &web, None),
     ]);
     assert_ne!(id, swapped);
     let other = json!({"serve": {"documents": ["openapi.json"]}});
     let changed = workspace_version_id(&[
-        ("example.com/acme/web", "web", &other),
-        ("example.com/acme/api", "api", &api),
+        ("example.com/acme/web", "web", &other, None),
+        ("example.com/acme/api", "api", &api, None),
     ]);
     assert_ne!(id, changed);
     let moved = workspace_version_id(&[
-        ("example.com/acme/web", "../web", &web),
-        ("example.com/acme/api", "api", &api),
+        ("example.com/acme/web", "../web", &web, None),
+        ("example.com/acme/api", "api", &api, None),
     ]);
     assert_ne!(id, moved);
+}
+
+/// An entry without an owner has the canonical text it had before owners; an owner joins it
+/// between `blocks` and `path`, and is compared exactly.
+#[test]
+fn an_owner_joins_the_canonical_text_and_changes_the_workspace_version_id() {
+    let (web, api) = (web(), api());
+    let of = |owner: Option<&str>| {
+        workspace_version_id(&[
+            ("example.com/acme/web", "../web", &web, owner),
+            ("example.com/acme/api", "/srv/api", &api, None),
+        ])
+    };
+    let ownerless = "[{\"blocks\":{\"serve\":{\"documents\":[\"openapi.yaml\"]}},\"path\":\"../web\",\
+                     \"repo\":\"example.com/acme/web\"},{\"blocks\":{\"peer\":[{\"repo\":\
+                     \"example.com/acme/web\"}]},\"path\":\"/srv/api\",\"repo\":\"example.com/acme/api\"}]";
+    assert_eq!(of(None), short(ownerless));
+    let owned = ownerless.replacen(
+        "},\"path\":\"../web\"",
+        "},\"owner\":\"team-web\",\"path\":\"../web\"",
+        1,
+    );
+    assert_eq!(of(Some("team-web")), short(&owned));
+    let (a, b) = (of(Some("Team-Web")), of(Some("team-web")));
+    assert_ne!(a, b);
+    assert_ne!(of(None), b);
+    assert_ne!(of(None), of(Some("")));
 }

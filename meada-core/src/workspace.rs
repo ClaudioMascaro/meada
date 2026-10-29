@@ -176,9 +176,40 @@ fn fields(table: &DeTable<'_>, prefix: &str, out: &mut Vec<(String, Vec<Json>, u
     }
 }
 
-/// A document's entries as `[[repository]]` tables, `None` when they are not TOML tables.
+/// A document's entries as `[[repository]]` tables, `None` when they are not TOML tables. An
+/// entry's `owner` follows its `path`, before its block tables: a key after a block's header
+/// would belong to the block.
 pub fn entries_text(repositories: &[Json]) -> Option<String> {
-    let entries = toml::Value::try_from(repositories).ok()?;
-    let table = toml::Table::from_iter([("repository".to_string(), entries)]);
-    toml::to_string(&table).ok()
+    if repositories.is_empty() {
+        let entries = toml::Value::try_from(repositories).ok()?;
+        return toml::to_string(&toml::Table::from_iter([(
+            "repository".to_string(),
+            entries,
+        )]))
+        .ok();
+    }
+    let entries: Vec<String> = (repositories.iter())
+        .map(|entry| {
+            let toml::Value::Table(mut table) = toml::Value::try_from(entry).ok()? else {
+                return None;
+            };
+            let key = |name: &str, value: Option<toml::Value>| {
+                let line = toml::Table::from_iter(value.map(|v| (name.to_string(), v)));
+                toml::to_string(&line).ok()
+            };
+            let (path, owner) = (table.remove("path"), table.remove("owner"));
+            let rest = toml::Table::from_iter([(
+                "repository".to_string(),
+                toml::Value::Array(vec![toml::Value::Table(table)]),
+            )]);
+            let rest = toml::to_string(&rest).ok()?;
+            let (header, rest) = rest.split_once('\n')?;
+            Some(format!(
+                "{header}\n{}{}{rest}",
+                key("path", path)?,
+                key("owner", owner)?
+            ))
+        })
+        .collect::<Option<_>>()?;
+    Some(entries.join("\n"))
 }

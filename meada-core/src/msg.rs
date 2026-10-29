@@ -3,6 +3,8 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use crate::manifest::OWNER_MAX;
+
 static PT: AtomicBool = AtomicBool::new(false);
 
 /// Picks the language from the value of `LANG`; `None` is English.
@@ -25,6 +27,10 @@ pub enum Msg<'a> {
     NotLowercase(&'a str),
     NoLeadingSlash(&'a str),
     Empty,
+    OwnerNotString,
+    OwnerTooLong,
+    OwnerControl,
+    OwnerPadded,
 }
 
 impl Msg<'_> {
@@ -66,6 +72,22 @@ impl Msg<'_> {
                 format!("`{value}` deve começar com `/`"),
             ),
             Msg::Empty => pick("is empty".into(), "está vazio".into()),
+            Msg::OwnerNotString => pick(
+                "must be one string, the name of one group".into(),
+                "deve ser uma única string, o nome de um grupo".into(),
+            ),
+            Msg::OwnerTooLong => pick(
+                format!("is longer than {OWNER_MAX} characters"),
+                format!("tem mais de {OWNER_MAX} caracteres"),
+            ),
+            Msg::OwnerControl => pick(
+                "holds a control character".into(),
+                "contém um caractere de controle".into(),
+            ),
+            Msg::OwnerPadded => pick(
+                "has whitespace at either end".into(),
+                "tem espaço em branco numa das pontas".into(),
+            ),
         }
     }
 }

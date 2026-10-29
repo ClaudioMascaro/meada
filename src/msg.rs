@@ -741,6 +741,8 @@ pub enum Msg<'a> {
     /// `[[repository]]` entries beside `[workspace] source = "store"`.
     #[cfg(feature = "generation-pointer")]
     WorkspaceStoreBeside,
+    /// `owner` in the `[[repository]]` entries of a bootstrap manifest (`source = "file"`).
+    WorkspaceOwnerStatic,
     /// `meada mcp --listen` without `--generations`, given a `source = "store"` manifest.
     #[cfg(feature = "generation-pointer")]
     WorkspaceStoreRefused(&'a str),
@@ -2454,6 +2456,14 @@ impl Msg<'_> {
             Msg::WorkspaceStoreNeedsFeature => pick(
                 "\"store\" needs a Meada built with the generation-pointer feature".into(),
                 "\"store\" exige um Meada compilado com a feature generation-pointer".into(),
+            ),
+            Msg::WorkspaceOwnerStatic => pick(
+                "an owner belongs to the entries of a workspace version, which a static manifest \
+                 has none of: use [workspace] source = \"store\" and `meada workspace import`"
+                    .into(),
+                "um dono pertence às entradas de uma versão do workspace, que um manifest \
+                 estático não tem: use [workspace] source = \"store\" e `meada workspace import`"
+                    .into(),
             ),
             #[cfg(feature = "generation-pointer")]
             Msg::WorkspaceStoreBeside => pick(

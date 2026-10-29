@@ -127,6 +127,11 @@ remaining points. This ADR records the decisions; the spec fixes the details the
   version and one console switcher per workspace, and a route that names the workspace. It splits
   the link universe the teams share and multiplies the operator's state, for a separation that
   shared trust does not need. ADR 0014's one workspace per deployment stands.
+  (Amended 2026-10-23; #322: ADR 0020 records the direction of spec S5 (#339), a named query
+  context over shared indexing and publication, which neither splits the link universe's
+  indexes nor multiplies the operator's publication. The rejection stands for isolated
+  workspaces; spec S5 owns the runtime and the final contracts, and the ownership of entries
+  here is unchanged.)
 - **A federation of workspaces**, where each repository has one owning workspace and the others
   read it from that workspace's generation. Cross-workspace links would need generations of
   several workspaces at once on every node, a pin that names several generations and a fence per

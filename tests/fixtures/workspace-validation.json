@@ -103,5 +103,123 @@
         "entries: a.com/../x: não é uma identidade de repositório: um segmento está vazio ou é `.` ou `..`"
       ]
     }
+  },
+  {
+    "name": "owner not a string",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = 1\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.owner`: must be one string, the name of one group"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.owner`: deve ser uma única string, o nome de um grupo"
+      ]
+    }
+  },
+  {
+    "name": "owner an array",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = [\"a\", \"b\"]\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.owner`: must be one string, the name of one group"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.owner`: deve ser uma única string, o nome de um grupo"
+      ]
+    }
+  },
+  {
+    "name": "owner empty",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \"\"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.owner`: is empty"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.owner`: está vazio"
+      ]
+    }
+  },
+  {
+    "name": "owner over 256 characters",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \"ggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg\"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.owner`: is longer than 256 characters"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.owner`: tem mais de 256 caracteres"
+      ]
+    }
+  },
+  {
+    "name": "owner with a control character",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \"te\\u0007am\"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.owner`: holds a control character"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.owner`: contém um caractere de controle"
+      ]
+    }
+  },
+  {
+    "name": "owner with a leading space",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \" team\"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.owner`: has whitespace at either end"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.owner`: tem espaço em branco numa das pontas"
+      ]
+    }
+  },
+  {
+    "name": "owner with a trailing space",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \"team \"\n",
+    "errors": {
+      "en": [
+        "entries:4: `repository.owner`: has whitespace at either end"
+      ],
+      "pt-BR": [
+        "entries:4: `repository.owner`: tem espaço em branco numa das pontas"
+      ]
+    }
+  },
+  {
+    "name": "owner of 256 characters",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \"gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg\"\n",
+    "errors": {
+      "en": [],
+      "pt-BR": []
+    }
+  },
+  {
+    "name": "owner of 1 character",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \"g\"\n",
+    "errors": {
+      "en": [],
+      "pt-BR": []
+    }
+  },
+  {
+    "name": "owner with inner spaces, commas and non-ASCII letters",
+    "file": "entries",
+    "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\nowner = \"Equipe de Cobrança, São Paulo\"\n",
+    "errors": {
+      "en": [],
+      "pt-BR": []
+    }
   }
 ]

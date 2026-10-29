@@ -168,6 +168,40 @@ fn not_empty<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
     }
 }
 
+/// The most characters an entry's `owner` may hold.
+// ponytail: an owner names one OIDC group, so 256 characters is ample; a longer name is refused
+// where it is read (ADR 0015).
+pub const OWNER_MAX: usize = 256;
+
+/// What an `owner` may not be (ADR 0015): empty, over `OWNER_MAX` characters, holding a control
+/// character (Unicode category Cc) or with whitespace at either end.
+fn owner_problem(name: &str) -> Option<Msg<'static>> {
+    let padded = name.chars().next().is_some_and(char::is_whitespace)
+        || name.chars().next_back().is_some_and(char::is_whitespace);
+    if name.is_empty() {
+        Some(Msg::Empty)
+    } else if name.chars().count() > OWNER_MAX {
+        Some(Msg::OwnerTooLong)
+    } else if name.chars().any(char::is_control) {
+        Some(Msg::OwnerControl)
+    } else if padded {
+        Some(Msg::OwnerPadded)
+    } else {
+        None
+    }
+}
+
+/// One string that `owner_problem` accepts; an array or a number is not an owner.
+fn owner<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    let toml::Value::String(name) = toml::Value::deserialize(d)? else {
+        return Err(D::Error::custom(Msg::OwnerNotString.text()));
+    };
+    match owner_problem(&name) {
+        Some(problem) => Err(D::Error::custom(problem.text())),
+        None => Ok(Some(name)),
+    }
+}
+
 /// A `[[repository]]`: `serve` and `resource` take the shapes of `meada.toml`'s, `peer` that
 /// of its `[[peer]]` without `path` (the manifest locates every repository).
 #[derive(Deserialize)]
@@ -175,6 +209,10 @@ fn not_empty<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
 pub struct EntryFile {
     pub repo: String,
     pub path: String,
+    /// The OIDC group that answers for the repository (ADR 0015): entry metadata of a workspace
+    /// version, not a block; nothing here reads it to decide anything.
+    #[serde(default, deserialize_with = "owner")]
+    pub owner: Option<String>,
     #[serde(default, deserialize_with = "declared")]
     pub serve: Serve,
     #[serde(default, rename = "resource")]

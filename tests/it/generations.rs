@@ -847,8 +847,8 @@ fn import_stores_a_version_once_and_answers_its_id() {
         .map(|(repo, path)| (*repo, format!("../{path}")))
         .collect();
     let blocks = serde_json::json!({});
-    let hashed: Vec<(&str, &str, &serde_json::Value)> = (entries.iter())
-        .map(|(repo, path)| (*repo, path.as_str(), &blocks))
+    let hashed: Vec<(&str, &str, &serde_json::Value, Option<&str>)> = (entries.iter())
+        .map(|(repo, path)| (*repo, path.as_str(), &blocks, None))
         .collect();
     assert_eq!(id, meada_core::ids::workspace_version_id(&hashed));
     let s3 = bucket(&fleet.endpoint, &fleet.bucket);
@@ -928,6 +928,22 @@ fn import_validates_before_any_connection() {
          [[repository]] entries\n\
          meada: ops/invalid.toml:9: `repository.branch` is not a meada.workspace.toml key\n"
     );
+    // An `owner` that breaks a rule is refused alike, in both languages.
+    let padded = "[[repository]]\nrepo = \"example.com/chain/web\"\npath = \"w\"\nowner = \" t\"\n";
+    fs::write(dir.join("ops/invalid.toml"), padded).unwrap();
+    for (lang, what) in [
+        ("en_US.UTF-8", "has whitespace at either end"),
+        ("pt_BR.UTF-8", "tem espaço em branco numa das pontas"),
+    ] {
+        let args = ["workspace", "import", "ops/invalid.toml", "--message", "m"]
+            .into_iter()
+            .chain(["--workspace", MANIFEST])
+            .collect::<Vec<_>>();
+        let (stdout, stderr, code) = meada_in(&dir, lang, &args);
+        assert_eq!((stdout.as_str(), code), ("", Some(1)), "{lang}");
+        let expected = format!("meada: ops/invalid.toml:4: `repository.owner`: {what}\n");
+        assert_eq!(stderr, expected, "{lang}");
+    }
     let local = "[[repository]]\nrepo = \"local/web\"\npath = \"w\"\n";
     fs::write(dir.join("ops/invalid.toml"), local).unwrap();
     let (stdout, stderr, code) = workspace(&dir, &args);
@@ -937,6 +953,110 @@ fn import_validates_before_any_connection() {
         "meada: ops/invalid.toml: local/web: a local identity: server mode serves repositories \
          by their remote\n"
     );
+}
+
+/// `text`'s `[[repository]]` entries with `owners[n]`, when it is `Some`, as the `owner` right
+/// after the `path` of its n-th entry.
+pub(crate) fn owned(text: &str, owners: &[Option<&str>]) -> String {
+    let mut owners = owners.iter();
+    (text.lines())
+        .map(
+            |line| match line.starts_with("path = ").then(|| owners.next()) {
+                Some(Some(Some(owner))) => format!("{line}\nowner = \"{owner}\"\n"),
+                _ => format!("{line}\n"),
+            },
+        )
+        .collect()
+}
+
+/// An entry's `owner` is imported, stored, shown and pulled like its other keys: the document
+/// holds it, `show` prints it right after `path` and importing that output gives the same id,
+/// and `pull` writes the document as stored. A stored document whose owner breaks a rule (empty,
+/// padded, with a control character, over 256 characters) is listed as malformed, refused by
+/// `show` and by `pull`, which leaves the index directory's workspace state as it was.
+#[test]
+fn an_owner_is_stored_shown_and_pulled_and_a_malformed_one_is_refused() {
+    let Some(fleet) = Fleet::new("workspace_owner", 3) else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let key = workspace_pointer(fleet.case);
+    let mut valkey = admin(&fleet.valkey);
+    let text = fs::read_to_string(dir.join(MANIFEST)).unwrap();
+    let owners = [
+        Some("team-web"),
+        None,
+        Some("Equipe de Cobrança, SP"),
+        Some("a b,c"),
+    ];
+    fs::write(dir.join("ops/owned.toml"), owned(&text, &owners)).unwrap();
+    let (id, stderr) = import(dir, "ops/owned.toml", "owned", "alice");
+    assert_eq!(
+        stderr.lines().count(),
+        1,
+        "only the index_dir note: {stderr}"
+    );
+    let (plain, _) = import(dir, MANIFEST, "plain", "alice");
+    assert_ne!(id, plain, "an owner changes the version id");
+
+    let s3 = bucket(&fleet.endpoint, &fleet.bucket);
+    let stored = crate::snapshot::get(&s3, &version_key(&id));
+    let document: serde_json::Value = serde_json::from_slice(&stored).unwrap();
+    let entries = document["repositories"].as_array().unwrap();
+    let stored_owners: Vec<Option<&str>> = entries.iter().map(|e| e["owner"].as_str()).collect();
+    assert_eq!(stored_owners, owners);
+
+    let (shown, stderr, code) = workspace(dir, &["show", &id]);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    let after_path = "path = \"../chain-web\"\nowner = \"team-web\"\nrepo =";
+    assert!(shown.contains(after_path), "{shown}");
+    assert_eq!(shown.matches("owner = ").count(), 3, "{shown}");
+    fs::write(dir.join("ops/shown.toml"), &shown).unwrap();
+    let (again, _) = import(dir, "ops/shown.toml", "again", "bob");
+    assert_eq!(again, id);
+
+    send(&mut valkey, &["HSET", &key, "id", &id, "fence", "1"]);
+    let (stdout, stderr, code) = workspace(dir, &["pull"]);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    assert_eq!(stdout, format!("{id}\n"));
+    let pulled = fs::read(dir.join(format!("indexes/workspace/{id}.json"))).unwrap();
+    assert_eq!(pulled, stored);
+    let before = pulled_files(dir);
+
+    let long = "g".repeat(257);
+    let bad = ["", " team", "team ", "te\u{7}am", long.as_str()];
+    let mut forged = Vec::new();
+    for (n, owner) in bad.iter().enumerate() {
+        let id = format!("00000000000000b{n:x}");
+        let mut other = document.clone();
+        other["id"] = id.clone().into();
+        other["repositories"][0]["owner"] = (*owner).into();
+        let bytes = serde_json::to_vec_pretty(&other).unwrap();
+        crate::snapshot::put_stored(&s3, &version_key(&id), &bytes);
+        forged.push(id);
+    }
+    let not_version = |id: &str| {
+        let key = version_key(id);
+        format!("{key}: malformed: not the workspace version document of its id")
+    };
+    let (listed, stderr, code) = workspace(dir, &["list"]);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    for id in &forged {
+        assert!(
+            listed.contains(&format!("! {}\n", not_version(id))),
+            "{listed}"
+        );
+    }
+    for id in &forged {
+        let (stdout, stderr, code) = workspace(dir, &["show", id]);
+        assert_eq!((stdout.as_str(), code), ("", Some(1)), "{id}");
+        assert_eq!(stderr, format!("meada: {}\n", not_version(id)));
+        send(&mut valkey, &["HSET", &key, "id", id, "fence", "5"]);
+        let (stdout, stderr, code) = workspace(dir, &["pull"]);
+        assert_eq!((stdout.as_str(), code), ("", Some(1)), "{id}");
+        assert_eq!(stderr, format!("meada: {}\n", not_version(id)));
+        assert_eq!(pulled_files(dir), before, "{id}");
+    }
 }
 
 /// `list` shows the versions newest first, with no version current until
@@ -1737,19 +1857,29 @@ fn workspace_pull_refuses_hostile_input_and_changes_nothing() {
     }
 }
 
-/// The chain's entries as a workspace version pulled into `dir` (`<index_dir>/workspace/`), as
-/// `meada workspace pull` leaves it at fence 1.
+/// The chain's entries, three of them owned, as a workspace version pulled into `dir`
+/// (`<index_dir>/workspace/`), as `meada workspace pull` leaves it at fence 1.
 fn write_pulled(dir: &Path) {
     let blocks = serde_json::json!({});
     let entries: Vec<(&str, String)> = (crate::manifest::CHAIN.iter())
         .map(|(repo, path)| (*repo, format!("../{path}")))
         .collect();
-    let hashed: Vec<(&str, &str, &serde_json::Value)> = (entries.iter())
-        .map(|(repo, path)| (*repo, path.as_str(), &blocks))
+    // The owners the version holds: the pulled version is read with them and ignores them.
+    let owners = [
+        Some("team-web"),
+        None,
+        Some("team-catalog"),
+        Some("team-worker"),
+    ];
+    let hashed: Vec<(&str, &str, &serde_json::Value, Option<&str>)> = (entries.iter().zip(owners))
+        .map(|((repo, path), owner)| (*repo, path.as_str(), &blocks, owner))
         .collect();
     let id = meada_core::ids::workspace_version_id(&hashed);
-    let repositories: Vec<serde_json::Value> = (entries.iter())
-        .map(|(repo, path)| serde_json::json!({"repo": repo, "path": path}))
+    let repositories: Vec<serde_json::Value> = (entries.iter().zip(owners))
+        .map(|((repo, path), owner)| match owner {
+            Some(owner) => serde_json::json!({"repo": repo, "path": path, "owner": owner}),
+            None => serde_json::json!({"repo": repo, "path": path}),
+        })
         .collect();
     let document = serde_json::json!({
         "id": id, "author": "alice", "time": "2026-10-22T00:00:00Z", "message": "chain",
@@ -1808,7 +1938,16 @@ fn the_job_s_commands_read_the_pulled_version_and_publish_records_it() {
     let key = workspace_pointer(fleet.case);
     let mut valkey = admin(&fleet.valkey);
     store_bootstrap(dir, "../store-indexes");
-    let (v1, _) = import(dir, MANIFEST, "chain", "alice");
+    // The version holds owners; the job's commands give what the same entries give without.
+    let text = fs::read_to_string(dir.join(MANIFEST)).unwrap();
+    let owners = [
+        Some("team-web"),
+        Some("team-gateway"),
+        None,
+        Some("team-worker"),
+    ];
+    fs::write(dir.join("ops/owned.toml"), owned(&text, &owners)).unwrap();
+    let (v1, _) = import(dir, "ops/owned.toml", "chain", "alice");
     send(&mut valkey, &["HSET", &key, "id", &v1, "fence", "1"]);
     let (stdout, stderr, code) = on_bootstrap(dir, &["workspace", "pull"]);
     assert_eq!(
@@ -1878,6 +2017,18 @@ fn the_job_s_commands_read_the_pulled_version_and_publish_records_it() {
     let (g, stderr, code) = on_bootstrap(dir, &["snapshot", "publish"]);
     assert_eq!((g.trim(), code), (g1.as_str(), Some(0)), "{stderr}");
     assert_eq!(document(&g1), first);
+    // The same entries with owners changed, cleared and set: no new generation, the stored
+    // document unchanged and still naming the version that first produced it.
+    let other = [None, Some("team-b"), Some("team-c"), Some("team-web")];
+    fs::write(dir.join("ops/reowned.toml"), owned(&text, &other)).unwrap();
+    let (v3, _) = import(dir, "ops/reowned.toml", "reowned", "carol");
+    assert_ne!(v3, v1);
+    send(&mut valkey, &["HSET", &key, "id", &v3, "fence", "3"]);
+    assert_eq!(on_bootstrap(dir, &["workspace", "pull"]).2, Some(0));
+    let (g, stderr, code) = on_bootstrap(dir, &["snapshot", "publish"]);
+    assert_eq!((g.trim(), code), (g1.as_str(), Some(0)), "{stderr}");
+    assert_eq!(document(&g1), first);
+    assert_eq!(field(&document(&g1)), Some(v1.clone().into()));
     // A file's new generation records no version.
     next_commit(dir, "chain-web", "file_only");
     let g2 = fleet.publish();
