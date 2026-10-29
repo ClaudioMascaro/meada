@@ -268,13 +268,13 @@ impl Session {
     }
 
     /// Whether the session is a team operator: a non-operator with a team.
-    fn team(&self) -> bool {
+    fn is_team_operator(&self) -> bool {
         !self.operator && !self.teams.is_empty()
     }
 
     /// The owner groups a team operator's audit line names: its teams, for a refusal.
     fn owners(&self) -> Option<&[String]> {
-        self.team().then_some(&self.teams[..])
+        self.is_team_operator().then_some(&self.teams[..])
     }
 
     /// What the session reads, as `meada-core` takes it.
@@ -290,7 +290,7 @@ impl Session {
     /// The `session` answer: the subject and role; with `[oidc]`, `groups` and `grant`, and
     /// `teams` for a team operator.
     fn document(&self) -> Value {
-        let role = match (self.operator, self.team()) {
+        let role = match (self.operator, self.is_team_operator()) {
             (true, _) => "operator",
             (_, true) => "team_operator",
             _ => "viewer",
@@ -308,7 +308,7 @@ impl Session {
                     json!(identities)
                 }
             };
-            if self.team() {
+            if self.is_team_operator() {
                 document["teams"] = json!(self.teams);
             }
         }
@@ -528,10 +528,11 @@ impl Console {
         if let Some(operation) = operation {
             // A team operator saves and applies workspace versions; the generation operations
             // stay the global operator's (ADR 0015).
-            let team = session.team() && route.is_some_and(|r| r.starts_with("workspace/"));
+            let team =
+                session.is_team_operator() && route.is_some_and(|r| r.starts_with("workspace/"));
             let anonymous = session.subject.as_deref().is_none_or(str::is_empty);
             if !(session.operator || team) || anonymous {
-                let message = match session.team() && !anonymous {
+                let message = match session.is_team_operator() && !anonymous {
                     true => Msg::UiGlobalOperatorRequired.text(),
                     false => Msg::UiOperatorRequired.text(),
                 };
@@ -584,7 +585,11 @@ impl Console {
                 self.ui.operator_claim.as_deref(),
             ) {
                 Ok(admitted) => {
-                    let teams = match admitted.operator {
+                    // A team operator reads what a viewer reads: only `session` and the writes
+                    // need the role, so only they read the current version.
+                    let role_route =
+                        route == Some("session") || route.and_then(write::operation).is_some();
+                    let teams = match admitted.operator || !role_route {
                         true => Vec::new(),
                         false => self.teams(&admitted.groups, &admitted.grant),
                     };

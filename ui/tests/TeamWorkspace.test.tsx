@@ -209,3 +209,21 @@ test('one stored version failing to read leaves the other applies offered', asyn
   expect(getByRole(host, 'alert').textContent).toBe('version unavailable');
   expect(queryByRole(host, 'button', { name: new RegExp(foreign.id) })).toBeNull();
 });
+
+test('a team operator reads a long version list two versions at a time', async () => {
+  const many = Array.from({ length: 12 }, (_, n) => version(`${n}`.padStart(16, 'a'), `Version ${n}`, [x, q, y, z]));
+  let open = 0, most = 0;
+  const fetch = vi.fn(async (url: string) => {
+    if (url === '/api/v1/workspace') return Response.json({ current: { id: current.id, fence: '7' }, version: current });
+    if (url === '/api/v1/workspace/versions') return Response.json({ current: { id: current.id, fence: '7' }, versions: [current, ...many], malformed: [] });
+    const found = many.find(row => url === `/api/v1/workspace/versions/${row.id}`);
+    if (!found) throw new Error(`unexpected GET ${url}`);
+    most = Math.max(most, ++open);
+    await new Promise(resolve => setTimeout(resolve, 5));
+    open -= 1;
+    return Response.json(found);
+  });
+  await render(team, 'en', fetch);
+  await waitFor(() => expect(fetch.mock.calls.filter(([url]) => String(url).startsWith('/api/v1/workspace/versions/'))).toHaveLength(many.length));
+  expect(most).toBe(2);
+});

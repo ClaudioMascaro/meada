@@ -390,7 +390,8 @@ one for the area a change touches.
   "store"` and a token carrying groups, a non-operator is a team operator (ADR 0015, #324) when
   one of its groups owns an entry of the current workspace version whose identity its grant
   reads: `Console::teams` (`ui/read.rs`) reads the pointer `{<key_prefix>}:workspace` and its
-  document per request, through the readers' permits and two-second deadline, and keeps the
+  document on each `session` and write request (the reads need no role, since a team operator
+  reads what a viewer reads), through the readers' permits and two-second deadline, and keeps the
   last document by id (a version is immutable); `meada_core::authorize::teams` gives the
   groups, sorted, as `Session::teams`. No pointer, or a pointer or document that cannot be read
   or fails its checks, makes a viewer, so a read failure never grants a write. The global operator

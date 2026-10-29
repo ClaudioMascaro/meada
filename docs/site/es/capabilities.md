@@ -2,7 +2,7 @@
 
 Meada 0.1 indexa TypeScript, JavaScript, Python, Rust, Go, Java, Kotlin, C# y Swift. Encuentra llamadas en el código y conecta repositorios mediante HTTP, paquetes y canales de mensajes. Cada vínculo indica su nivel de certeza.
 
-El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [retención](generations.md) y [workspace gestionado](workspaces.md) mediante módulos opcionales. La consola tiene editor, diff, playground y grafo. [Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/) y [Helm](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/) ofrecen ejemplos de despliegue.
+El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [retención](generations.md) y [workspace gestionado](workspaces.md) mediante módulos opcionales. La consola tiene editor, diff, playground y grafo, y un workspace puede delegar sus entradas a [equipos](console.md#equipos). [Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/) y [Helm](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/) ofrecen ejemplos de despliegue.
 
 ## Lenguajes y resolución
 

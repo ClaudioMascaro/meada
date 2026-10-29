@@ -248,7 +248,7 @@ pub(crate) fn save(
                 return Ok(Err(SaveError::RoleLost));
             }
             let read: Vec<Json> = (current.iter())
-                .filter(|e| grant.reads(e["repo"].as_str().unwrap_or_default()))
+                .filter(|e| grant.reads(authorize::repo(e)))
                 .cloned()
                 .collect();
             let refused = authorize_entries(role, groups, grant, &read, &version.repositories);
@@ -297,12 +297,7 @@ async fn current_entries(
 fn touched_owners(current: &[Json], new: &[Json]) -> Vec<String> {
     let keyed = |entries: &[Json]| -> BTreeMap<String, Json> {
         (entries.iter())
-            .map(|e| {
-                (
-                    e["repo"].as_str().unwrap_or_default().to_string(),
-                    e.clone(),
-                )
-            })
+            .map(|e| (authorize::repo(e).to_string(), e.clone()))
             .collect()
     };
     let (old, new) = (keyed(current), keyed(new));
