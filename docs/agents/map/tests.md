@@ -461,6 +461,18 @@ the names accepted); the shared validation table below carries the `owner` rows 
 `tests/fixtures/workspace-validation.json` is the single pt-BR/English validation table used
 by the real WASM in `ui/tests/core.test.ts` and the binary `workspace import` in
 `tests/it/generations/imports.rs` with generation-pointer and real configured store services.
+Its authorization rows (#323: `role`, `groups`, `grant`, `current`, `new` in, `refused` out)
+cover each reason for `add`, `edit` and `remove` (`owner_change` is only an edit), their
+precedence, an owner set on an ownerless entry, cleared and replaced, several teams in one
+change, a group that owns nothing yet, an owned entry outside the grant, moved entries, the
+refused list's order and a viewer passed in; every row is also refused nothing for the global
+operator. Its composition rows (`grant`, `current`, `new` in, `composed` out) cover an edit, a
+removal and additions around entries outside the grant, and a reordering submission.
+`meada-core/tests/authorize.rs` drives `authorize_entries` and `compose_entries` through those
+rows and `role` on inline entries; `ui/tests/core.test.ts` drives `authorizeEntries` and
+`composeEntries` through the same rows, and the binary's import test reads only the text rows.
+`tests/it/refresh_lock.rs` keeps `meada workspace apply` (the global operator) moving the pointer
+for owner changes and ownerless entries with its refusals unchanged.
 `ui/tests/workspace.test.ts` checks local editor validation/diff and captured commands;
 `ui/tests/WorkspacePage.test.tsx` covers the labelled versions/editor/diff DOM and HTTP boundary.
 

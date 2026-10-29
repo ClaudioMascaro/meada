@@ -248,8 +248,20 @@ impl Console {
                 }
             };
             let author = session.subject.as_deref().expect("write subject admitted");
-            let done = crate::snapshot::versions::apply(&self.file, &apply.version, author)
-                .map_err(|e| e.to_string());
+            // Only the global operator reaches a write until #324 passes a team operator.
+            let (operator, grant) = (
+                meada_core::authorize::Role::Operator,
+                meada_core::authorize::Grant::All,
+            );
+            let done = crate::snapshot::versions::apply(
+                &self.file,
+                &apply.version,
+                author,
+                operator,
+                &[],
+                &grant,
+            )
+            .map_err(|e| e.to_string());
             return result(session, action, &apply.version, done);
         }
         let _ = body;

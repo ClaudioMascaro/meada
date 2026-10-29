@@ -284,8 +284,14 @@ fn workspace_import_and_wasm_share_every_validation_fixture() {
         text: String,
         errors: std::collections::BTreeMap<String, Vec<String>>,
     }
-    let cases: Vec<Case> =
+    // The authorization and composition rows (#323) hold entries, not text: `meada-core`'s
+    // seam reads them.
+    let rows: Vec<serde_json::Value> =
         serde_json::from_str(include_str!("../../fixtures/workspace-validation.json")).unwrap();
+    let cases: Vec<Case> = (rows.into_iter())
+        .filter(|row| row.get("text").is_some())
+        .map(|row| serde_json::from_value(row).unwrap())
+        .collect();
     let Some(fleet) = Fleet::new("workspace_validation_table", 3) else {
         return;
     };
