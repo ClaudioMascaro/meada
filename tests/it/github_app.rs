@@ -29,7 +29,7 @@ const EXPIRES_AT: &str = "2099-01-01T00:00:00Z";
 const EXPIRES: u64 = 4_070_908_800;
 
 /// The local Valkey, or `None` with the reason printed.
-fn service() -> Option<String> {
+pub(crate) fn service() -> Option<String> {
     let url = std::env::var("MEADA_TEST_VALKEY_URL").ok();
     if url.is_none() {
         let required = std::env::var("MEADA_TEST_SERVICES_REQUIRED").is_ok_and(|v| v == "1");
@@ -39,7 +39,7 @@ fn service() -> Option<String> {
     url
 }
 
-fn fixture(name: &str) -> PathBuf {
+pub(crate) fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/github-app")
         .join(name)
@@ -47,7 +47,7 @@ fn fixture(name: &str) -> PathBuf {
 
 /// What the fake API holds and saw.
 #[derive(Default)]
-struct State {
+pub(crate) struct State {
     /// Per App id: its installations, as id and account login.
     apps: HashMap<u64, Vec<(u64, String)>>,
     /// Installations whose mint answers 429 with this `retry-after`.
@@ -58,10 +58,10 @@ struct State {
     minted: Vec<(u64, String)>,
     /// Every JWT received.
     jwts: Vec<String>,
-    requests: usize,
+    pub(crate) requests: usize,
     /// Per `<owner>/<repo>`: its collaborators, login and `role_name`, in the order listed; a
     /// repository not here answers 404.
-    collaborators: HashMap<String, Vec<(String, String)>>,
+    pub(crate) collaborators: HashMap<String, Vec<(String, String)>>,
     /// Installations whose listings answer this status (403 or 429), with this `retry-after`.
     listing_throttled: HashMap<u64, (u16, Option<u64>)>,
     /// The status every listing answers, when set (a 5xx).
@@ -83,13 +83,13 @@ struct State {
 /// minutes; and `GET /repos/{owner}/{repo}/collaborators` with a token it minted, 100 a page with
 /// a `Link` to the next page on `/repositories/<n>/` as GitHub's are. Each connection is answered
 /// on a thread of its own, so a held listing holds only itself.
-struct Api {
-    base: String,
+pub(crate) struct Api {
+    pub(crate) base: String,
     state: Arc<Mutex<State>>,
 }
 
 impl Api {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let base = format!("http://{}", listener.local_addr().unwrap());
         let state = Arc::new(Mutex::new(State::default()));
@@ -143,12 +143,12 @@ impl Api {
         Self { base, state }
     }
 
-    fn install(&self, app: u64, id: u64, login: &str) {
+    pub(crate) fn install(&self, app: u64, id: u64, login: &str) {
         let mut state = self.state.lock().unwrap();
         state.apps.entry(app).or_default().push((id, login.into()));
     }
 
-    fn with<T>(&self, read: impl FnOnce(&mut State) -> T) -> T {
+    pub(crate) fn with<T>(&self, read: impl FnOnce(&mut State) -> T) -> T {
         read(&mut self.state.lock().unwrap())
     }
 
@@ -160,7 +160,7 @@ impl Api {
     }
 
     /// Asserts `stderr` holds no part of a private key, a JWT or a token.
-    fn clean(&self, stderr: &str) {
+    pub(crate) fn clean(&self, stderr: &str) {
         let state = self.state.lock().unwrap();
         for jwt in &state.jwts {
             for part in jwt.split('.').skip(1) {
@@ -331,7 +331,7 @@ fn block(api: &str, app: u64) -> String {
     )
 }
 
-fn prefix(case: &str) -> String {
+pub(crate) fn prefix(case: &str) -> String {
     format!("meada:test-{}-{case}", std::process::id())
 }
 

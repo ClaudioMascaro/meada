@@ -500,7 +500,7 @@ impl Opened {
 
     /// `scrub` holding its own copy of the password, for the errors of a transaction, which
     /// borrows the client.
-    #[cfg(all(feature = "github-app", feature = "oidc"))]
+    #[cfg(feature = "oidc")]
     pub(crate) fn scrubber(&self) -> impl Fn(tokio_postgres::Error) -> String + use<> {
         let secret = self.secret.clone();
         move |e| scrub(&reason(&e), secret.as_deref())
@@ -589,9 +589,15 @@ pub async fn connect(config: &Config) -> Result<(tokio_postgres::Client, i32), S
 
 /// `connect`, keeping the password so a later statement's error can be scrubbed of it.
 pub(crate) async fn connected(config: &Config) -> Result<Opened, String> {
-    let opened = open(config).await?;
-    let version = stored(&opened, config).await?;
-    check(&config.schema, version, known())?;
+    versioned(config).await.map_err(|(why, _)| why)
+}
+
+/// `connected` telling the version refusal apart: its error is why, and whether it is a schema
+/// version this binary does not know (a node writes that one once, #332).
+pub(crate) async fn versioned(config: &Config) -> Result<Opened, (String, bool)> {
+    let opened = open(config).await.map_err(|why| (why, false))?;
+    let version = stored(&opened, config).await.map_err(|why| (why, false))?;
+    check(&config.schema, version, known()).map_err(|why| (why, true))?;
     Ok(opened)
 }
 
@@ -608,6 +614,24 @@ pub fn probe(config: &Config) -> Result<(), String> {
         }
     };
     crate::modules::block_on(run).unwrap_or(Ok(()))
+}
+
+/// Whether `text` is a time as Meada's statements answer one (`to_char` of a `timestamptz` at
+/// UTC): `YYYY-MM-DDTHH:MM:SS.ffffffZ`.
+#[cfg_attr(
+    not(any(feature = "ui", feature = "oidc", feature = "generation-pointer")),
+    allow(dead_code)
+)]
+pub(crate) fn is_time(text: &str) -> bool {
+    let shape = "dddd-dd-ddTdd:dd:dd.ddddddZ";
+    text.len() == shape.len()
+        && (text.bytes().zip(shape.bytes())).all(|(b, s)| {
+            if s == b'd' {
+                b.is_ascii_digit()
+            } else {
+                b == s
+            }
+        })
 }
 
 /// The advisory lock key of `schema`'s migrations: the first eight bytes of a BLAKE3 hash, so

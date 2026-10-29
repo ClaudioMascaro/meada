@@ -184,6 +184,7 @@ function AdmissionView({ data, api, t, locale }: { data: Admission; api: Api; t:
     {checked && <>
       <Table label={t.checkToken} t={t} headers={[t.check, t.outcome]} rows={checked.checks.map(row => [row.name, row.outcome])} />
       <p>{t.identities}: {checked.identities === null ? t.noGrant : checked.identities.join(', ') || t.none}</p>
+      {checked.sources && <><p>{t.fromClaims}: {checked.sources.claims}</p><p>{t.fromGithub}: {checked.sources.github}</p></>}
     </>}
   </>;
 }

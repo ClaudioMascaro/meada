@@ -580,6 +580,15 @@ pub enum Msg<'a> {
     },
     #[cfg(feature = "oidc")]
     OidcRefreshFailed(&'a str),
+    /// A poll of the newest permissions set that failed (#332): why, never the URL.
+    #[cfg(all(feature = "oidc", feature = "postgres"))]
+    PermissionsUnreadable(&'a str),
+    /// A schema version this binary does not know, found by a poll: written once.
+    #[cfg(all(feature = "oidc", feature = "postgres"))]
+    PermissionsVersion(&'a str),
+    /// A permissions row or set that fails its checks, naming the table and never its values.
+    #[cfg(all(feature = "oidc", feature = "postgres"))]
+    PermissionsBadRow(&'a str),
     #[cfg(feature = "snapshot")]
     SnapshotRetainedSkipped {
         id: &'a str,
@@ -2226,6 +2235,27 @@ impl Msg<'_> {
             Msg::OidcRefreshFailed(why) => pick(
                 format!("meada: {why}; keeping the cached keys"),
                 format!("meada: {why}; as chaves em cache continuam"),
+            ),
+            #[cfg(all(feature = "oidc", feature = "postgres"))]
+            Msg::PermissionsUnreadable(why) => pick(
+                format!("meada: the permissions set cannot be read ({why}); the GitHub grant ages"),
+                format!(
+                    "meada: o conjunto de permissões não pode ser lido ({why}); o grant do \
+                     GitHub envelhece"
+                ),
+            ),
+            #[cfg(all(feature = "oidc", feature = "postgres"))]
+            Msg::PermissionsVersion(why) => pick(
+                format!("meada: {why}; Postgres counts as unreachable and the GitHub grant ages"),
+                format!(
+                    "meada: {why}; o Postgres conta como inalcançável e o grant do GitHub \
+                     envelhece"
+                ),
+            ),
+            #[cfg(all(feature = "oidc", feature = "postgres"))]
+            Msg::PermissionsBadRow(table) => pick(
+                format!("{table}: a row fails its checks and is skipped"),
+                format!("{table}: uma linha falha nas verificações e é ignorada"),
             ),
             #[cfg(feature = "snapshot")]
             Msg::GenerationsHelp => pick(

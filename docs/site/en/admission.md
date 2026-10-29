@@ -35,7 +35,8 @@ console's admission page. Only `entra` takes a table of its own, `[oidc.entra]`,
 `overage`, which for now accepts only `"ignore"` (the default): a token in overage, with no
 `groups`, has no groups. `[oidc.entra]` under another `type` is an error. `[oidc.github]`, the
 GitHub grant provider, has its own section in [GitHub App credentials](github-app.md#role-check);
-with it neither claim is required, and for now it adds nothing to the grant.
+with it neither claim is required, and a token's grant becomes the union of its claims grant and
+what its GitHub login reads.
 
 ## Prepare the identity provider
 

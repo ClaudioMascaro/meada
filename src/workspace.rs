@@ -345,12 +345,17 @@ impl Manifest {
         // `[oidc.github]` keeps its permissions set in the data layer (ADR 0016); without the
         // `postgres` feature its own check already named it.
         #[cfg(all(feature = "oidc", feature = "postgres"))]
-        if oidc.as_ref().is_some_and(|o| o.github.is_some()) && postgres.is_none() {
-            let needed = Msg::NeedsSections {
-                section: "oidc.github",
-                needed: &["postgres"],
-            };
-            return Err(config::error_at(file, &src, "oidc.github", &needed.text()));
+        let mut oidc = oidc;
+        #[cfg(all(feature = "oidc", feature = "postgres"))]
+        if let Some(github) = oidc.as_mut().and_then(|o| o.github.as_mut()) {
+            if postgres.is_none() {
+                let needed = Msg::NeedsSections {
+                    section: "oidc.github",
+                    needed: &["postgres"],
+                };
+                return Err(config::error_at(file, &src, "oidc.github", &needed.text()));
+            }
+            github.postgres = postgres.clone();
         }
         #[cfg(feature = "oidc")]
         let github = oidc.as_ref().is_some_and(|o| o.github.is_some());

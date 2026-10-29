@@ -36,7 +36,8 @@ clave, `overage`, que por ahora acepta solo `"ignore"` (el predeterminado): un t
 sin `groups`, no tiene grupos. `[oidc.entra]` con otro `type` es un error. `[oidc.github]`, el
 proveedor de grant de GitHub, tiene su propia sección en
 [Credenciales de GitHub App](github-app.md#verificacion-de-roles); con él ninguna de las dos
-claims es obligatoria, y por ahora no añade nada al grant.
+claims es obligatoria, y el grant de un token pasa a ser la unión del grant de las claims con lo
+que lee su login de GitHub.
 
 ## Preparar el proveedor de identidad
 

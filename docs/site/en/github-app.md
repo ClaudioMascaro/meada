@@ -116,3 +116,19 @@ naming `meada github-app roles`; a check that failed leaves no file. `meada work
 refresh, under `meada snapshot lock`, becomes: `workspace pull`, `github-app roles`, the fetch of
 what `show --pulled` lists, `index --workspace` and `snapshot publish`; a refresh that stops at
 the check publishes nothing.
+
+### The grant at admission
+
+Nodes and the console with `[oidc.github]` read the newest permissions set every minute, and load
+the rows whose role is in `roles` only when the set changes; admission never waits on Postgres. A
+token's login is `login_claim`'s value when it is a string of 1 to 39 ASCII letters, digits, `-`
+and `_`, compared in lowercase; any other value gives no GitHub grant. Use a claim the identity
+provider's administrator maps from a verified attribute, never one the user edits. The GitHub
+grant is what that login reads in the set while its age (Postgres's clock minus `finished`, plus
+the process's monotonic time since the read) is at most `max_age_seconds`; past it, with the job
+stopped or Postgres unreachable, it is empty and the claims grant keeps working. It never holds
+`*`, and a machine token with `*` never depends on Postgres. The console's session shows `login`,
+`github_host` and `github_grant` (`current`, `expired` or `unread`), the token check splits the
+identities into `sources` (`claims` and `github`) and the admission page shows the loaded set. A
+node finding a schema version it does not know says so once on stderr and treats Postgres as
+unreachable.

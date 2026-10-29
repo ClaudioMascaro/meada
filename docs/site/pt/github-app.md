@@ -116,3 +116,20 @@ github-app roles`; uma checagem que falhou não deixa arquivo. `meada workspace 
 imprime a versão baixada sem as exclusões, para o script de fetch. O refresh do job, sob `meada
 snapshot lock`, fica: `workspace pull`, `github-app roles`, o fetch do que `show --pulled` lista,
 `index --workspace` e `snapshot publish`; um refresh que para na checagem não publica nada.
+
+### O grant na admissão
+
+Nós e a console com `[oidc.github]` leem, a cada minuto, o conjunto de permissões mais novo, e
+carregam as linhas cujo papel está em `roles` só quando o conjunto muda; a admissão nunca espera
+pelo Postgres. O login de um token é o valor de `login_claim` quando é uma string de 1 a 39
+letras ASCII, dígitos, `-` e `_`, comparado em minúsculas; qualquer outro valor não dá grant do
+GitHub. Use uma claim que o administrador do provedor de identidade mapeia de um atributo
+verificado, nunca uma que o usuário edita. O grant do GitHub é o que esse login lê no conjunto
+enquanto a idade dele (o relógio do Postgres menos `finished`, mais o tempo monotônico do
+processo desde a leitura) é no máximo `max_age_seconds`; depois disso, com o job parado ou o
+Postgres inalcançável, ele fica vazio e o grant das claims continua valendo. Ele nunca vale `*`,
+e um token de máquina com `*` não depende do Postgres. A sessão da console mostra `login`,
+`github_host` e `github_grant` (`current`, `expired` ou `unread`), a verificação de token separa
+as identidades em `sources` (`claims` e `github`) e a página de admissão mostra o conjunto
+carregado. Um nó que acha uma versão de schema que não conhece diz isso uma vez no stderr e trata
+o Postgres como inalcançável.

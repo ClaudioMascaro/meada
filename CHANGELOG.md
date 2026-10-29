@@ -13,8 +13,24 @@ All notable changes to Meada are recorded here. The format follows
   names of 1 to 100 characters with no control character, compared exactly with GitHub's
   `role_name`; default `["read", "triage", "write", "maintain", "admin"]`) and `max_age_seconds`
   (required, at least 60). It needs `[postgres]` and a build with `postgres`, each error naming
-  them; beside it `[oidc]` needs neither `identities_claim` nor `groups_claim`. Until the grant
-  at admission lands, such a deployment grants nothing through GitHub, failing closed.
+  them; beside it `[oidc]` needs neither `identities_claim` nor `groups_claim`.
+- The GitHub grant at admission (ADR 0016): nodes and the console with `[oidc.github]` keep the
+  newest permissions set in memory, read every 60 seconds without admission ever waiting on
+  Postgres, and a token reads the union of its claims grant and what its `login_claim` login (1
+  to 39 ASCII letters, digits, `-` and `_`, compared in lowercase) holds an accepted role on,
+  everywhere the grant is read: a node's admission, routing, answers and 404 lists, and every
+  bounded view of the console, the team operator role, the entry authorization and the token
+  check. The GitHub part grants for at most `max_age_seconds` past the set's `finished` on
+  Postgres's clock, then nothing, the claims grant unaffected; a machine token's `*` never
+  depends on Postgres. A node starts and serves without Postgres, and names a schema version it
+  does not know once on stderr. Every row read is checked as hostile input.
+- `GET /api/v1/session` gains, with `[oidc.github]`, `login` (when the token has a valid one),
+  `github_host` and `github_grant` (`current`, `expired` or `unread`); `grant` is the union.
+  `POST /api/v1/admission/check` gains `sources`: `{"claims": "*" | [identities], "github":
+  [identities]}`, each sorted, from the console's cache. `GET /api/v1/admission` gains `github`:
+  the provider, the grant's state and the newest set's id, `finished`, age, `max_age_seconds`,
+  repositories, rows and exclusions. The admission and session pages show them, and audit
+  records carry the subject's login.
 - `meada github-app roles --workspace <bootstrap manifest>` (features `github-app`, `postgres`
   and `oidc`), the job's role check at every refresh: for each identity of the workspace on
   `[oidc.github] host` it lists `GET /repos/{owner}/{repo}/collaborators?affiliation=all&per_page=100`,

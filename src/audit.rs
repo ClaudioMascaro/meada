@@ -1,7 +1,7 @@
 //! The audit (ADR 0016, #328): with `[postgres]`, every console write and every CLI twin of one
 //! leaves a record in `<schema>.audit`: `id` (a sequence), `time` (Postgres's clock, RFC 3339,
-//! UTC, microseconds), `via` (`console` or `cli`), `subject`, `login` (absent until a provider
-//! reads one), `role`, `owners` (a team operator's owner groups, as its stderr line names them),
+//! UTC, microseconds), `via` (`console` or `cli`), `subject`, `login` (the session's GitHub login
+//! under `[oidc.github]`, #332, else null), `role`, `owners` (a team operator's owner groups, as its stderr line names them),
 //! `action` (`ACTIONS`), `arguments` (the operation body's names, `{}` for a refusal before the
 //! body is read), `outcome` (`pending`, `accepted`, `refused` or `failed`) and `message`.
 //!
@@ -71,6 +71,8 @@ impl Outcome {
 pub struct Actor<'a> {
     pub via: &'static str,
     pub subject: Option<&'a str>,
+    /// The subject's GitHub login, when its session has one (#332).
+    pub login: Option<&'a str>,
     pub role: &'static str,
     pub owners: Option<&'a [String]>,
 }
@@ -219,9 +221,9 @@ fn insert(
     let run = async {
         let opened = crate::postgres::connected(config).await?;
         let sql = format!(
-            "INSERT INTO {}.audit (via, subject, role, owners, action, arguments, outcome, \
-             message) VALUES ($1, $2, $3, $4::text::jsonb, $5, $6::text::jsonb, $7, $8) \
-             RETURNING id",
+            "INSERT INTO {}.audit (via, subject, login, role, owners, action, arguments, \
+             outcome, message) VALUES ($1, $2, $3, $4, $5::text::jsonb, $6, $7::text::jsonb, \
+             $8, $9) RETURNING id",
             config.quoted()
         );
         let row = (opened.client)
@@ -230,6 +232,7 @@ fn insert(
                 &[
                     &actor.via,
                     &actor.subject,
+                    &actor.login,
                     &actor.role,
                     &owners,
                     &action,
@@ -280,9 +283,12 @@ fn record(row: &tokio_postgres::Row) -> Option<Value> {
     let text = |i: usize| row.try_get::<_, Option<String>>(i).ok();
     let one_of = |i: usize, allowed: &[&str]| text(i)?.filter(|v| allowed.contains(&v.as_str()));
     let id = row.try_get::<_, i64>(0).ok().filter(|id| *id > 0)?;
-    let time = text(1)?.filter(|t| is_time(t))?;
+    let time = text(1)?.filter(|t| crate::postgres::is_time(t))?;
     let via = one_of(2, &["console", "cli"])?;
     let (subject, login) = (text(3)?, text(4)?);
+    if (login.as_deref()).is_some_and(|l| meada_core::manifest::added_by_problem(l).is_some()) {
+        return None;
+    }
     let role = one_of(5, &["viewer", "operator", "team_operator"])?;
     let owners = match text(6)? {
         None => Value::Null,
@@ -300,20 +306,6 @@ fn record(row: &tokio_postgres::Row) -> Option<Value> {
         "owners": owners, "action": action, "arguments": arguments, "outcome": outcome,
         "message": text(10)?,
     }))
-}
-
-/// Whether `text` is a record's time: `YYYY-MM-DDTHH:MM:SS.ffffffZ`.
-#[cfg(feature = "postgres")]
-fn is_time(text: &str) -> bool {
-    let shape = "dddd-dd-ddTdd:dd:dd.ddddddZ";
-    text.len() == shape.len()
-        && (text.bytes().zip(shape.bytes())).all(|(b, s)| {
-            if s == b'd' {
-                b.is_ascii_digit()
-            } else {
-                b == s
-            }
-        })
 }
 
 /// A CLI twin of a console write under the audit of `manifest`: the record of `action` with
@@ -340,6 +332,7 @@ pub fn cli<T, E: std::fmt::Display + Into<Box<dyn std::error::Error>>>(
     let actor = Actor {
         via: "cli",
         subject: Some(subject),
+        login: None,
         role: "operator",
         owners: None,
     };

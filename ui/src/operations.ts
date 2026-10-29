@@ -1,4 +1,5 @@
 import type { OperationsCopy } from './operations-i18n';
+import type { GithubGrant } from './api';
 
 /** A large integer remains decimal text at the HTTP boundary. */
 export type Integer = number | string;
@@ -115,24 +116,44 @@ export interface Admission {
   groups: Record<string, string[]> | null; scopes: string[];
   /** With `[directory]`: its counts and the last SCIM write; null when it could not be read. */
   directory?: { users: number; groups: number; last_write: string | null } | null;
+  /** With `[oidc.github]`: the provider, the grant's state and the newest permissions set as loaded, its counts the job's. */
+  github?: {
+    host: string; login_claim: string; roles: string[]; max_age_seconds: number; grant: GithubGrant;
+    set: { id: string; finished: string; age_seconds: number; repositories: number; rows: number; exclusions: number } | null;
+  };
 }
 function directoryRows(directory: Admission['directory'], t: OperationsCopy): [string, string][] {
   if (directory === undefined) return [];
   if (directory === null) return [[t.directory, t.directoryUnavailable]];
   return [[t.directoryUsers, String(directory.users)], [t.directoryGroups, String(directory.groups)], [t.directoryLastWrite, directory.last_write ?? t.none]];
 }
-/** The admission page's fields: the identity provider's type beside the issuer, then the JWKS cache and the claims. */
+function githubRows(github: Admission['github'], t: OperationsCopy): [string, string][] {
+  if (github === undefined) return [];
+  const set = github.set;
+  return [
+    [t.githubHost, github.host], [t.loginClaim, github.login_claim], [t.githubRoles, github.roles.join(', ')],
+    [t.maxAge, `${github.max_age_seconds} ${t.seconds}`], [t.githubGrant, t[`github_${github.grant}`]],
+    ...set === null ? [[t.permissionsSet, t.none] as [string, string]] : [
+      [t.permissionsSet, set.id], [t.setFinished, set.finished], [t.setAge, `${set.age_seconds} ${t.seconds}`],
+      [t.setRepositories, String(set.repositories)], [t.setRows, String(set.rows)], [t.setExclusions, String(set.exclusions)],
+    ] as [string, string][],
+  ];
+}
+/** The admission page's fields: the identity provider's type beside the issuer, then the JWKS cache and the claims, the directory and the GitHub grant provider. */
 export function admissionModel(data: Admission, t: OperationsCopy): [string, string][] {
   return [
     [t.issuer, data.issuer], [t.providerType, data.type], [t.jwks, data.jwks_uri],
     [t.keyIds, data.keys.map(key => key ?? t.unknown).join(', ') || t.none], [t.refreshed, data.refreshed],
     [t.identitiesClaim, data.identities_claim], [t.groupsClaim, data.groups_claim ?? t.none], [t.scopes, data.scopes.join(', ') || t.none],
     ...directoryRows(data.directory, t),
+    ...githubRows(data.github, t),
   ];
 }
 export interface CheckResult {
   checks: Record<'signature' | 'issuer' | 'audience' | 'lifetime' | 'scopes', boolean | null>;
   identities: string[] | null;
+  /** With `[oidc.github]`: the admitted identities by side, each sorted; null when a check failed. */
+  sources?: { claims: '*' | string[]; github: string[] } | null;
 }
 export function checkModel(data: CheckResult, t: OperationsCopy) {
   return {
@@ -140,5 +161,9 @@ export function checkModel(data: CheckResult, t: OperationsCopy) {
       name: t[key], outcome: data.checks[key] === null ? t.notChecked : data.checks[key] ? t.passed : t.failed,
     })),
     identities: data.identities,
+    sources: data.sources && {
+      claims: data.sources.claims === '*' ? t.everyIdentity : data.sources.claims.join(', ') || t.none,
+      github: data.sources.github.join(', ') || t.none,
+    },
   };
 }

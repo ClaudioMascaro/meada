@@ -17,10 +17,11 @@
 //! a 401 naming the metadata. What passes is a `Grant`: the identities the token's
 //! `identities_claim` lists, and those `[oidc.groups]` maps the groups of its `groups_claim` to
 //! (#291; `*` from either for all): the identity provider's claims grant, the one grant provider
-//! the grant is the union of (ADR 0016). `type` names the identity provider; none changes what a
-//! token is granted, and `[oidc.entra] overage = "ignore"` leaves a token in overage no groups.
-//! `[oidc.github]` configures the GitHub grant provider, whose permissions set `meada github-app
-//! roles` writes (#331); until its grant at admission (#332) it adds nothing to a grant.
+//! a grant provider of the union (ADR 0016). `type` names the identity provider; none changes what
+//! a token is granted, and `[oidc.entra] overage = "ignore"` leaves a token in overage no groups.
+//! `[oidc.github]` adds the GitHub grant provider (#332, `permissions`): the identities the
+//! token's `login_claim` login holds an accepted role on in the newest permissions set `meada
+//! github-app roles` wrote (#331), while that set is at most `max_age_seconds` old, never `*`.
 //! Routing checks it (403) and lists it (404), and it bounds the workspace of every answer behind
 //! it (#290): a repository outside it is absent. An identity the
 //! server does not serve grants nothing.
@@ -108,6 +109,19 @@ const ROLE_MAX: usize = 100;
 /// The shortest `[oidc.github] max_age_seconds`.
 const MAX_AGE_MIN: i64 = 60;
 
+/// The shortest `[oidc.github] max_age_seconds` this process takes: `MAX_AGE_MIN`, or 1 in a debug
+/// build with `MEADA_PERMISSIONS_POLL_MS` set, so a test crosses the age in seconds.
+fn max_age_min() -> i64 {
+    #[cfg(all(debug_assertions, feature = "postgres"))]
+    if permissions::poll_knob().is_some() {
+        return 1;
+    }
+    MAX_AGE_MIN
+}
+
+#[cfg(feature = "postgres")]
+mod permissions;
+
 /// The `[oidc]` section as written: the identity provider.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -145,9 +159,8 @@ struct GithubFile {
     max_age_seconds: Option<i64>,
 }
 
-/// The validated `[oidc.github]`: what `meada github-app roles` checks against (#331); the grant
-/// at admission, which reads `login_claim` and `max_age`, is #332's.
-#[allow(dead_code)]
+/// The validated `[oidc.github]`: what `meada github-app roles` checks against (#331) and the
+/// grant at admission reads (#332).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Github {
     /// The git host whose identities it grants, a lowercase host name.
@@ -158,6 +171,10 @@ pub struct Github {
     pub roles: Vec<String>,
     /// How old the newest permissions set may be and still grant.
     pub max_age: Duration,
+    /// The manifest's `[postgres]`, where the set is read: `Manifest::read` sets it, and
+    /// refuses `[oidc.github]` without it.
+    #[cfg(feature = "postgres")]
+    pub postgres: Option<crate::postgres::Config>,
 }
 
 /// Whether `role` is a role name `[oidc.github] roles` takes: 1 to `ROLE_MAX` characters with no
@@ -198,12 +215,15 @@ impl GithubFile {
         let Some(max_age) = self.max_age_seconds else {
             return Err(("oidc.github", Msg::KeyMissing(key).text()));
         };
-        let max_age = crate::modules::at_least(key, Some(max_age), MAX_AGE_MIN, MAX_AGE_MIN)?;
+        let floor = max_age_min();
+        let max_age = crate::modules::at_least(key, Some(max_age), floor, floor)?;
         Ok(Github {
             host,
             login_claim,
             roles,
             max_age: Duration::from_secs(max_age),
+            #[cfg(feature = "postgres")]
+            postgres: None,
         })
     }
 }
@@ -324,18 +344,39 @@ impl Grant {
         }
     }
 
-    /// The grant of `claims` under `config`: the union of every configured grant provider's
-    /// identities (ADR 0016), `*` from the claims grant for all. The claims grant is the only
-    /// grant provider until the GitHub one (#332).
+    /// The identity provider's claims grant of `claims` under `config`, `*` for all.
     fn of(claims: &Map<String, Value>, config: &Config) -> Self {
-        let providers = [claims_grant(claims, config)];
-        let listed: HashSet<String> = (providers.into_iter().flatten())
-            .map(str::to_string)
-            .collect();
+        let listed: HashSet<String> = claims_grant(claims, config).map(str::to_string).collect();
         match listed.contains("*") {
             true => Grant::All,
             false => Grant::Only(listed),
         }
+    }
+
+    /// The union with `more` (ADR 0016): `*` stays all.
+    fn with(&self, more: &[String]) -> Self {
+        match self {
+            Grant::All => Grant::All,
+            Grant::Only(identities) => {
+                Grant::Only(identities.iter().chain(more).cloned().collect())
+            }
+        }
+    }
+}
+
+/// What a token's grant is made of (ADR 0016): the claims grant and, with `[oidc.github]`, the
+/// token's login and the GitHub grant (empty without a valid login or a current set).
+struct Granted {
+    claims: Grant,
+    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    login: Option<String>,
+    github: Option<Vec<String>>,
+}
+
+impl Granted {
+    /// The grant every check reads: the union of both providers.
+    fn union(&self) -> Grant {
+        self.claims.with(self.github.as_deref().unwrap_or_default())
     }
 }
 
@@ -391,6 +432,9 @@ pub struct Oidc {
     kid_fetched: Mutex<Option<Instant>>,
     /// When the JWKS was last read, and the refresh that failed since.
     fetched: Mutex<Fetched>,
+    /// The permissions cache of `[oidc.github]` (#332).
+    #[cfg(feature = "postgres")]
+    permissions: Option<Arc<permissions::Permissions>>,
 }
 
 /// When the cached JWKS was read (seconds since the epoch), and the last refresh that failed
@@ -413,7 +457,10 @@ pub struct Admitted {
     pub operator: bool,
     /// The token's `[directory] user_claim`, when it is a string: what the directory is asked
     /// about (#335). Never printed.
+    #[cfg_attr(not(feature = "directory"), allow(dead_code))]
     pub user: Option<String>,
+    /// With `[oidc.github]`, the token's login when `login_claim` holds a valid one (#332).
+    pub login: Option<String>,
 }
 
 /// Each check of a pasted token (ADR 0014): `None` where it could not be made, since the
@@ -427,6 +474,9 @@ pub struct Checked {
     pub scopes: Option<bool>,
     /// What the token may read when every check passes.
     pub grant: Option<Grant>,
+    /// With `[oidc.github]` and every check passed, the grant's two sides: the claims grant
+    /// and the GitHub grant, from the cache (#332).
+    pub sources: Option<(Grant, Vec<String>)>,
 }
 
 /// `GET url`, at most `max` bytes of a success answer; a redirect is no success.
@@ -616,14 +666,21 @@ fn reply(status: StatusCode, kind: &str, body: String) -> Reply {
 
 impl Oidc {
     /// The module of `config`: the issuer's metadata and its JWKS read, then a thread that
-    /// fetches the JWKS again every `config.refresh` while the module lives.
+    /// fetches the JWKS again every `config.refresh` while the module lives. With
+    /// `[oidc.github]`, the permissions cache over its `[postgres]`, empty until `listening`.
     pub fn start(config: Config) -> crate::Result<Arc<Self>> {
         let agent = agent(FETCH_TIMEOUT);
         let (jwks_uri, issuer_metadata) = discover(&agent, &config.issuer)?;
         let keys = jwks(&agent, &jwks_uri)?;
+        #[cfg(feature = "postgres")]
+        let permissions = (config.github.clone())
+            .and_then(|github| Some((github.postgres.clone()?, github)))
+            .map(|(postgres, github)| permissions::Permissions::new(github, postgres));
         let oidc = Self::new(config, agent, jwks_uri, keys);
         let oidc = Arc::new(Self {
             issuer_metadata,
+            #[cfg(feature = "postgres")]
+            permissions,
             ..oidc
         });
         let (module, every) = (Arc::downgrade(&oidc), oidc.config.refresh);
@@ -643,7 +700,50 @@ impl Oidc {
                 at: crate::modules::now(),
                 failed: None,
             }),
+            #[cfg(feature = "postgres")]
+            permissions: None,
         }
+    }
+
+    /// Starts reading the permissions set (`[oidc.github]`, #332), which admission never waits
+    /// on: a listener calls it once, after its address is the first line on stderr.
+    pub fn listening(&self) {
+        #[cfg(feature = "postgres")]
+        if let Some(cache) = &self.permissions {
+            cache.poll();
+        }
+    }
+
+    /// The grant of `claims`, its sides and its login: with `[oidc.github]`, the GitHub grant of
+    /// a valid `login_claim` login, read from the cache (never from Postgres).
+    fn granted(&self, claims: &Map<String, Value>) -> Granted {
+        let claims_grant = Grant::of(claims, &self.config);
+        #[cfg(feature = "postgres")]
+        if let (Some(github), Some(cache)) = (&self.config.github, &self.permissions) {
+            let login = permissions::login(claims.get(&github.login_claim));
+            let read = login.as_deref().map(|l| cache.grant(l)).unwrap_or_default();
+            return Granted {
+                claims: claims_grant,
+                login,
+                github: Some(read),
+            };
+        }
+        Granted {
+            claims: claims_grant,
+            login: None,
+            github: None,
+        }
+    }
+
+    /// With `[oidc.github]`, its host and the GitHub grant's state (`current`, `expired` or
+    /// `unread`), whatever a token's login (#332).
+    #[cfg(feature = "ui")]
+    pub fn github(&self) -> Option<(&str, &'static str)> {
+        #[cfg(feature = "postgres")]
+        if let Some(cache) = &self.permissions {
+            return Some((cache.host(), cache.state()));
+        }
+        None
     }
 
     /// Whether the request to `path` (percent-decoded, without its leading and trailing
@@ -753,10 +853,10 @@ impl Oidc {
         reply(StatusCode::OK, "application/json", document.to_string())
     }
 
-    /// The grant of `token` if it passes (`verified`).
+    /// The grant of `token` if it passes (`verified`): the union of its providers' grants.
     fn verify(&self, token: &str, audiences: &[String]) -> Result<Grant, Refusal> {
         let claims = self.verified(token, audiences)?;
-        Ok(Grant::of(&claims, &self.config))
+        Ok(self.granted(&claims).union())
     }
 
     /// The claims of `token` if it passes: an algorithm of `ALGORITHMS`, signed by a cached key
@@ -848,15 +948,17 @@ impl Oidc {
                         .collect();
                     groups.sort();
                     groups.dedup();
+                    let granted = self.granted(&claims);
                     return Ok(Admitted {
                         subject: subject.map(str::to_string),
-                        grant: Grant::of(&claims, &self.config),
+                        grant: granted.union(),
                         groups,
                         operator,
                         user: user_claim
                             .and_then(|name| claims.get(name))
                             .and_then(Value::as_str)
                             .map(str::to_string),
+                        login: granted.login,
                     });
                 }
                 Err(refusal) => refusal,
@@ -885,6 +987,7 @@ impl Oidc {
             lifetime: None,
             scopes: None,
             grant: None,
+            sources: None,
         };
         let Some(header) = signing(token) else {
             return failed;
@@ -904,20 +1007,23 @@ impl Oidc {
         let lifetime = self.signed(token, &header, true).is_some();
         let scopes = self.scoped(&claims);
         let passes = issuer && audience && lifetime && scopes;
+        let granted = passes.then(|| self.granted(&claims));
         Checked {
             signature: true,
             issuer: Some(issuer),
             audience: Some(audience),
             lifetime: Some(lifetime),
             scopes: Some(scopes),
-            grant: passes.then(|| Grant::of(&claims, &self.config)),
+            grant: granted.as_ref().map(Granted::union),
+            sources: granted.and_then(|g| g.github.map(|github| (g.claims, github))),
         }
     }
 
     /// The state an operator explains a 401 or a 403 with (ADR 0014): the identity provider's
     /// `type` (ADR 0016), the issuer, its metadata, the JWKS cache (the cached key ids, the last
     /// read, a refresh that failed since, with why) and the groups table, each group's identities
-    /// those `reads` admits (`*` kept: it names none).
+    /// those `reads` admits (`*` kept: it names none); with `[oidc.github]`, `github`: the
+    /// provider, the grant's state and the newest set as loaded, its counts the job's (#332).
     #[cfg(feature = "ui")]
     pub fn admission(&self, reads: &dyn Fn(&str) -> bool) -> Value {
         let kids: Vec<Option<String>> = (self.keys().iter())
@@ -935,7 +1041,8 @@ impl Oidc {
                 })
                 .collect()
         });
-        serde_json::json!({
+        #[allow(unused_mut)]
+        let mut document = serde_json::json!({
             "type": self.config.kind,
             "issuer": self.config.issuer,
             "metadata": self.issuer_metadata,
@@ -947,7 +1054,12 @@ impl Oidc {
             "groups_claim": self.config.groups.as_ref().map(|(claim, _)| claim),
             "groups": groups,
             "scopes": self.config.scopes,
-        })
+        });
+        #[cfg(feature = "postgres")]
+        if let Some(cache) = &self.permissions {
+            document["github"] = cache.admission();
+        }
+        document
     }
 
     /// The issuer and the scopes the console's browser logs in with (ADR 0014).
