@@ -419,8 +419,9 @@ one for the area a change touches.
   no `resource_metadata`), `check` (a pasted token's outcome per check, signature, issuer,
   audience as a node checks it, lifetime and scopes, and its grant when every check passes,
   against the cached keys only, so it never fetches) and `admission` (the identity provider's
-  `type`, always present, the issuer's metadata as read at start, the cached key ids, the last read and a refresh that failed since, with its
-  reason and never the answer's body, and the groups table bounded by the caller's grant).
+  `type`, always present, the issuer's metadata as read at start, the cached key ids, the last
+  read and a refresh that failed since, with its reason and never the answer's body, and the
+  groups table bounded by the caller's grant).
 - `ui.rs` (feature `ui`, no crate of its own; `cloud` enables it): the management console's
   process (ADR 0014), `meada ui --listen <addr> --workspace <bootstrap manifest>`,
   on the node's listener (`mcp::serve_http`, `mcp::address`, the same drain); never a node's

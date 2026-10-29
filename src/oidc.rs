@@ -18,8 +18,9 @@
 //! `identities_claim` lists, and those `[oidc.groups]` maps the groups of its `groups_claim` to
 //! (#291; `*` from either for all): the identity provider's claims grant, the one grant provider
 //! the grant is the union of (ADR 0016). `type` names the identity provider; none changes what a
-//! token is granted, and `[oidc.entra] overage = "ignore"` leaves a token in overage no groups. Routing checks it (403) and lists it (404), and it bounds the
-//! workspace of every answer behind it (#290): a repository outside it is absent. An identity the
+//! token is granted, and `[oidc.entra] overage = "ignore"` leaves a token in overage no groups.
+//! Routing checks it (403) and lists it (404), and it bounds the workspace of every answer behind
+//! it (#290): a repository outside it is absent. An identity the
 //! server does not serve grants nothing.
 //!
 //! Meada never forwards a token, and no error or stderr line holds one or any of its parts (a
@@ -187,20 +188,20 @@ impl File {
         let seconds = self.jwks_refresh_seconds;
         let refresh = crate::modules::at_least(key, seconds, REFRESH_DEFAULT, REFRESH_MIN)?;
         let refresh = Duration::from_secs(refresh);
-        let named = |value: &toml::Value, accepted: &[&'static str]| {
+        let one_of = |value: &toml::Value, accepted: &[&'static str]| {
             (accepted.iter().copied()).find(|&a| value.as_str() == Some(a))
         };
         let kind = match &self.kind {
             None => "generic",
             Some(value) => {
-                named(value, &TYPES).ok_or(("oidc.type", Msg::OidcOneOf(&TYPES).text()))?
+                one_of(value, &TYPES).ok_or(("oidc.type", Msg::OidcOneOf(&TYPES).text()))?
             }
         };
         if let Some(entra) = self.entra {
             if kind != "entra" {
                 return Err(("oidc.entra", Msg::OidcTypeTable("entra").text()));
             }
-            if (entra.overage.as_ref()).is_some_and(|o| named(o, &OVERAGES).is_none()) {
+            if (entra.overage.as_ref()).is_some_and(|o| one_of(o, &OVERAGES).is_none()) {
                 return Err(("oidc.entra.overage", Msg::OidcOneOf(&OVERAGES).text()));
             }
         }
@@ -815,10 +816,9 @@ impl Oidc {
     }
 
     /// The state an operator explains a 401 or a 403 with (ADR 0014): the identity provider's
-    /// `type` (ADR 0016), the issuer, its metadata,
-    /// the JWKS cache (the cached key ids, the last read, a refresh that failed since, with why)
-    /// and the groups table, each group's identities those `reads` admits (`*` kept: it names
-    /// none).
+    /// `type` (ADR 0016), the issuer, its metadata, the JWKS cache (the cached key ids, the last
+    /// read, a refresh that failed since, with why) and the groups table, each group's identities
+    /// those `reads` admits (`*` kept: it names none).
     #[cfg(feature = "ui")]
     pub fn admission(&self, reads: &dyn Fn(&str) -> bool) -> Value {
         let kids: Vec<Option<String>> = (self.keys().iter())

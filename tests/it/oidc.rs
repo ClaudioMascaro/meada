@@ -741,16 +741,19 @@ fn append_typed(dir: &Path, issuer: &str, (kind, table): (&str, &str)) {
     fs::write(&file, src + table).unwrap();
 }
 
-/// What `server`, with `append_typed`'s `[oidc]`, answers to the cases of the tests above: the
-/// metadata, the 401s and 403s, the 404 lists, a `*` token's trace, the groups' grant and a token
-/// in Entra ID's overage (`_claim_names`, no `groups`), each answer labelled; then its stderr
-/// after the address, a failed JWKS refresh included, which leaves `issuer` serving `jwks` again.
+/// What a server in `dir`, with `append_typed`'s `[oidc]`, answers to the cases of the tests
+/// above: the metadata, the 401s and 403s, the 404 lists, a `*` token's trace, the groups' grant,
+/// a token in Entra ID's overage (`_claim_names`, no `groups`) and, on a second server, a key the
+/// JWKS gains after the start, each answer labelled; then the first server's stderr after the
+/// address, a failed JWKS refresh included, which holds no part of a token sent, no group and no
+/// claim value. `issuer` serves `jwk` alone again when it returns.
 fn transcript(
-    server: Server,
+    dir: &Path,
     issuer: &Issuer,
-    jwks: &str,
+    jwk: &Jwk,
     signing: &EncodingKey,
 ) -> (Vec<(String, Answer)>, String) {
+    let server = start(dir);
     let base = &issuer.base;
     let token = |path: &str, identities: Option<&[&str]>, edit: &dyn Fn(&mut Value)| {
         let mut claims = claims(base, path, identities.unwrap_or_default());
@@ -780,6 +783,18 @@ fn transcript(
             None,
         ),
         ("root metadata".into(), METADATA_PATH.into(), None, None),
+        (
+            "pinned metadata".into(),
+            format!("{METADATA_PATH}/{WEB}@0123456789abcdef"),
+            None,
+            None,
+        ),
+        (
+            "encoded CR LF".into(),
+            "x%0D%0AX-Evil:%201".into(),
+            None,
+            None,
+        ),
         ("no token".into(), WEB.into(), None, trace()),
         ("no token at the root".into(), String::new(), None, None),
         ("no token, unknown".into(), nope.into(), None, None),
@@ -865,6 +880,7 @@ fn transcript(
         ),
     ]);
     let at = |path: &str| format!("{}/{path}", server.url);
+    let mut sent: Vec<String> = cases.iter().filter_map(|c| c.2.clone()).collect();
     let mut answers: Vec<(String, Answer)> = (cases.into_iter())
         .map(|(case, path, token, call)| (case, ask(&at(&path), token.as_deref(), &[], call)))
         .collect();
@@ -896,19 +912,42 @@ fn transcript(
         "unknown kid".into(),
         ask(&at(WEB), Some(&unknown), &[], trace()),
     ));
-    issuer.serve(Some(jwks.into()));
-    (answers, server.stderr())
+    sent.push(unknown);
+    issuer.serve(Some(set(&[jwk])));
+    let stderr = server.stderr();
+    for token in &sent {
+        for part in token.split('.').filter(|p| p.len() >= 8) {
+            assert!(!stderr.contains(part), "a token part on stderr: {stderr}");
+        }
+    }
+    for claim in [MAPPED, UNMAPPED, "graph.example", "src1"] {
+        assert!(!stderr.contains(claim), "{claim} on stderr: {stderr}");
+    }
+
+    // A key the JWKS gains after the start, on a server that has not fetched it again yet.
+    let server = start(dir);
+    let (added, added_jwk) = key("k2");
+    issuer.serve(Some(set(&[jwk, &added_jwk])));
+    let token = sign(&added, "k2", Algorithm::ES256, &claims(base, WEB, &["*"]));
+    let at = format!("{}/{WEB}", server.url);
+    answers.push(("rotated".into(), ask(&at, Some(&token), &[], trace())));
+    issuer.serve(Some(set(&[jwk])));
+    (answers, stderr)
 }
 
 /// The identity provider's `type` changes no answer (ADR 0016): with no `type`, `generic`,
 /// `okta`, `keycloak`, and `entra` with and without `[oidc.entra] overage = "ignore"`, every case
-/// of `transcript` answers byte for byte as the manifest without the key, stderr included. A
-/// token in overage (`_claim_names`, no `groups`) has no groups.
+/// of `transcript` answers byte for byte as the manifest without the key, stderr included, and a
+/// JWKS past its cap refuses the start with the same stderr. A token in overage (`_claim_names`,
+/// no `groups`) has no groups.
 #[test]
 fn the_identity_provider_type_changes_no_answer() {
     let (signing, jwk) = key("k1");
-    let jwks = set(&[&jwk]);
-    let issuer = Issuer::new(jwks.clone());
+    let issuer = Issuer::new(set(&[&jwk]));
+    let oversized = Issuer::new(format!(
+        "{{\"keys\": [], \"pad\": \"{}\"}}",
+        " ".repeat(256 << 10)
+    ));
     let dir = chain_manifest("oidc_type");
     assert!(run(&dir, "index").2);
     let today = fs::read_to_string(dir.join(MANIFEST)).unwrap();
@@ -921,11 +960,18 @@ fn the_identity_provider_type_changes_no_answer() {
         ("type = \"entra\"\n", ""),
         ("type = \"entra\"\n", "[oidc.entra]\noverage = \"ignore\"\n"),
     ] {
+        // A JWKS past its cap refuses the start with the same stderr.
+        fs::write(dir.join(MANIFEST), &today).unwrap();
+        append_typed(&dir, &oversized.base, typed);
+        let args = ["mcp", "--listen", "127.0.0.1:0", "--workspace", MANIFEST];
+        let refused = run_args(&dir, &args);
         fs::write(dir.join(MANIFEST), &today).unwrap();
         append_typed(&dir, &issuer.base, typed);
-        runs.push((typed, transcript(start(&dir), &issuer, &jwks, &signing)));
+        runs.push((typed, (transcript(&dir, &issuer, &jwk, &signing), refused)));
     }
-    let ((_, (answers, stderr)), typed) = runs.split_first().unwrap();
+    let ((_, ((answers, stderr), refused)), typed) = runs.split_first().unwrap();
+    assert_ne!(refused.2, Some(0));
+    assert!(refused.1.contains("JWKS"), "{}", refused.1);
     let answer = |case: &str| &answers.iter().find(|(c, _)| c == case).unwrap().1;
     assert_eq!(traced(answer("all")), golden());
     assert_eq!(answer("groups").status, 200);
@@ -941,10 +987,12 @@ fn the_identity_provider_type_changes_no_answer() {
         answer("overage with identities listed").body,
         format!("{WEB}\n")
     );
+    assert_eq!(traced(answer("rotated")), golden());
     assert!(stderr.contains("keeping the cached keys"), "{stderr}");
-    for (kind, run) in typed {
-        assert_eq!(&run.0, answers, "{kind:?}");
-        assert_eq!(&run.1, stderr, "{kind:?}");
+    for (kind, ((run, run_stderr), run_refused)) in typed {
+        assert_eq!(run, answers, "{kind:?}");
+        assert_eq!(run_stderr, stderr, "{kind:?}");
+        assert_eq!(run_refused, refused, "{kind:?}");
     }
 }
 

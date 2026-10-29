@@ -9,8 +9,8 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
 `--range` forms) prints added, removed and moved entries per section instead of the raw JSON.
 
 - `ui/tests/operations.test.ts` projects operational API fixtures into fleet diagnostics,
-  retention/bundle metadata, repository provenance, cached credential lifetime and token-check
-  outcomes. `operations.test.tsx` exercises the five pages through their DOM and HTTP client,
+  retention/bundle metadata, repository provenance, cached credential lifetime, token-check
+  outcomes and the admission page's fields, the identity provider's type beside the issuer. `operations.test.tsx` exercises the five pages through their DOM and HTTP client,
   including bilingual accessible controls and the pasted token's lifetime.
 - `ui/tests/actions.test.ts` checks the operator/operations gates, eligible generation actions,
   shell-quoted commands and exact u64 recovery floors. `action-pages.test.tsx` exercises those
@@ -155,9 +155,11 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   against an issuer and a JWKS served on loopback: a token admits what its claim lists and leaks
   nowhere, a rotated key, an oversized JWKS refusing the start, a pinned path admitted as its
   identity; the identity provider's `type` (no key, `generic`, `okta`, `keycloak`, and `entra`
-  with and without `[oidc.entra] overage = "ignore"`) answering every case, the metadata, the
-  401s, 403s and 404 lists, the groups' grant and a token in overage with no groups, with the
-  same status, headers and body and the same stderr as the manifest without the key), `github_app` (`github-app credential` and `throttled` against a GitHub API served
+  with and without `[oidc.entra] overage = "ignore"`) answering every case, the metadata (of a pin
+  too), the 401s, 403s and 404 lists, the groups' grant, a token in overage with no groups and a
+  key added after the start, with the same status, headers and body and the same stderr, which
+  holds no token part, group or claim value, as the manifest without the key, and an oversized
+  JWKS refusing the start alike), `github_app` (`github-app credential` and `throttled` against a GitHub API served
   on loopback that verifies each App's JWT against the fixture keys of
   `tests/fixtures/github-app/`: a minted token cached and reused, two Apps taken in turn, a
   throttled installation skipped until its retry time, a mint answered 429 passing to the next

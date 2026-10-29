@@ -17,7 +17,6 @@ All notable changes to Meada are recorded here. The format follows
 - `[oidc.entra]`, the settings only Entra ID needs, allowed under `type = "entra"` alone, with one
   key: `overage = "ignore"` (the default), a token in overage having no groups, as before. Any
   other value, and an unknown key, is an error naming the file, the line and the key.
-
 - The data layer (ADR 0016): the `postgres` cargo feature, off by default and enabled by `cloud`,
   and the bootstrap manifest's `[postgres]` section, which needs no other section. It names the
   connection URL only through `url_env` (default `MEADA_POSTGRES_URL`) or `url_file`, plus
