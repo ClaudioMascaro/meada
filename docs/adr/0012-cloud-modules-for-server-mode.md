@@ -183,8 +183,7 @@ github-app roles`, which also needs `postgres`.)
   as absent from the workspace; a refresh that stops on `roles` publishes nothing.)
   (Amended 2026-10-28; #316: a refresh publishes the whole workspace or nothing. A failed
   `roles`, fetch or index stage stops the job before `meada snapshot publish`, exiting nonzero
-  with a bounded failure that names the stage and the repository and never a URL or a
-  credential: the pointer does not move, nodes keep serving the last complete generation, and
+  with a bounded failure that names the stage and the repository and never a credential: the pointer does not move, nodes keep serving the last complete generation, and
   objects already stored stay valid while the job's local work is left as it is. No fallback
   omits a repository or carries its previous bundle into a new generation; recovery is to repair
   the cause and run a complete refresh. An eligibility exclusion ADR 0016 decides before the

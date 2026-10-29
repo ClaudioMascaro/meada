@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 # A failed fetch stops the refresh before `meada index` (#316): the job publishes nothing and
-# the nodes keep the current generation. The failure names the identity, never the URL.
+# the nodes keep the current generation. Its line names the identity; no URL carries a credential.
 for remote in ${REPOSITORIES:?Set REPOSITORIES}; do
   case "$remote" in
     https://*|http://*) identity=${remote#*://}; identity=${identity%.git} ;;

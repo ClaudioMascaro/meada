@@ -1346,6 +1346,13 @@ fn compose_job(dir: &Path) {
     }
 }
 
+/// A commit adding `src/later.ts` to the mirror `repo`, not indexed.
+fn commit_later(repo: &Path) {
+    fs::write(repo.join("src/later.ts"), "export const later = 1;\n").unwrap();
+    crate::common::git(repo, &["add", "-A"]);
+    crate::common::git(repo, &["commit", "-q", "-m", "later"]);
+}
+
 /// `meada snapshot lock -- sh ops/refresh.sh` with `PUBLISH=1`, fetching `repositories` with
 /// git allowed no transport but local files, so a fetch from the chain's https remotes fails
 /// without the network.
@@ -1370,7 +1377,7 @@ fn compose_refresh(dir: &Path, repositories: &str) -> (String, String, Option<i3
 /// keeps answering it, as `status --generations` says. Repaired, one complete refresh publishes.
 #[test]
 fn a_failed_fetch_or_index_publishes_nothing_and_keeps_the_current_generation() {
-    use crate::common::{assert_golden, git};
+    use crate::common::assert_golden;
     use crate::generations::meta;
     use crate::manifest::ReadOnly;
     use crate::server::{call, text as answer};
@@ -1386,9 +1393,7 @@ fn a_failed_fetch_or_index_publishes_nothing_and_keeps_the_current_generation() 
     compose_job(dir);
     // The gateway moved since: a publish now would be a new generation.
     let gateway = dir.join("chain-gateway");
-    fs::write(gateway.join("src/later.ts"), "export const later = 1;\n").unwrap();
-    git(&gateway, &["add", "-A"]);
-    git(&gateway, &["commit", "-q", "-m", "later"]);
+    commit_later(&gateway);
 
     // The fetch fails: the job stops before `meada index`.
     let (stdout, stderr, code) = compose_refresh(dir, "https://example.com/chain/web");
@@ -1407,9 +1412,7 @@ fn a_failed_fetch_or_index_publishes_nothing_and_keeps_the_current_generation() 
     // The fetch passes and the web's index cannot be written: the job stops at `meada index`.
     fs::write(dir.join("ops/fetch.sh"), ":\n").unwrap();
     let web = dir.join("chain-web");
-    fs::write(web.join("src/later.ts"), "export const later = 1;\n").unwrap();
-    git(&web, &["add", "-A"]);
-    git(&web, &["commit", "-q", "-m", "later"]);
+    commit_later(&web);
     let Some(locked) = ReadOnly::lock(&dir.join("indexes/example.com/chain/web")) else {
         return;
     };

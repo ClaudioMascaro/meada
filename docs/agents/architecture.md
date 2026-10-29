@@ -198,11 +198,12 @@ console's public assets, config and PKCE callback reach its listener before OIDC
 its proxy preserves Host, Origin and Authorization. MCP keeps its separate admission rules.
 
 Managed writers pull the workspace before the external fetch, index and publish, inside one
-refresh lock. A failed stage ends the job before publish, so the pointer stays (#316, ADR 0012):
-the compose `fetch.sh` names the identity whose fetch failed, never its URL, and
-`meada index --workspace` ends a failure with the stage and the count. Seeding and applying the first version are explicit operator actions. The fetch
-list/script and mirror provisioning still belong to the operator: applying a new identity or
-path does not clone it. `scripts/compose-check` and `scripts/helm-check` check the rendered
+refresh lock. A failed stage ends the job before publish, so the pointer stays (#316, ADR
+0012): the compose `fetch.sh` refuses URLs carrying credentials and names the identity whose
+fetch failed, and `meada index --workspace` ends a failure with the stage and the count.
+Seeding and applying the first version are explicit operator actions. The fetch list/script and
+mirror provisioning still belong to the operator: applying a new identity or path does not
+clone it. `scripts/compose-check` and `scripts/helm-check` check the rendered
 configuration, module dependencies, storage, selectors and refresh order.
 
 ## Modules (`src/`)
