@@ -264,6 +264,12 @@ pub enum Msg<'a> {
     PostgresMigrate,
     #[cfg(feature = "postgres")]
     PostgresWorkspaceHelp,
+    /// `[directory]` naming both `token_env` and `token_file`.
+    #[cfg(feature = "directory")]
+    DirectoryBoth,
+    /// A SCIM token shorter than the least it may be, never echoing it.
+    #[cfg(feature = "directory")]
+    DirectoryTokenShort(usize),
     #[cfg(feature = "snapshot")]
     SnapshotEndpointInvalid,
     #[cfg(feature = "snapshot")]
@@ -371,7 +377,11 @@ pub enum Msg<'a> {
     SnapshotStoreReachable(&'a str),
     #[cfg(feature = "snapshot")]
     SnapshotStoreUnreachable(&'a str),
-    #[cfg(any(feature = "generation-pointer", feature = "github-app"))]
+    #[cfg(any(
+        feature = "generation-pointer",
+        feature = "github-app",
+        feature = "directory"
+    ))]
     NeedsSections {
         section: &'a str,
         needed: &'a [&'a str],
@@ -530,13 +540,13 @@ pub enum Msg<'a> {
     /// fragment.
     #[cfg(feature = "oidc")]
     OidcJwksUrl,
-    #[cfg(feature = "oidc")]
+    #[cfg(any(feature = "oidc", feature = "directory"))]
     OidcEmpty,
     /// An `[oidc]` section with neither `identities_claim` nor `groups_claim`.
     #[cfg(feature = "oidc")]
     OidcNoClaim,
     /// An `[oidc]` key whose value is none of these, never echoing it (`type`, `overage`).
-    #[cfg(feature = "oidc")]
+    #[cfg(any(feature = "oidc", feature = "directory"))]
     OidcOneOf(&'a [&'a str]),
     /// The table of an identity provider `type` under another `type`: the one it belongs to.
     #[cfg(feature = "oidc")]
@@ -1379,6 +1389,16 @@ impl Msg<'_> {
                 "The bootstrap manifest, with its [postgres] section".into(),
                 "O manifesto de bootstrap, com a seção [postgres]".into(),
             ),
+            #[cfg(feature = "directory")]
+            Msg::DirectoryBoth => pick(
+                "is set together with token_env: use one of the two".into(),
+                "está junto de token_env: use um dos dois".into(),
+            ),
+            #[cfg(feature = "directory")]
+            Msg::DirectoryTokenShort(min) => pick(
+                format!("holds a token shorter than {min} characters"),
+                format!("traz um token com menos de {min} caracteres"),
+            ),
             #[cfg(feature = "snapshot")]
             Msg::SnapshotEndpointInvalid => pick(
                 "is not an http:// or https:// URL with a host and nothing after it".into(),
@@ -1674,7 +1694,11 @@ impl Msg<'_> {
                 format!("store: unreachable ({reason})"),
                 format!("store: inalcançável ({reason})"),
             ),
-            #[cfg(any(feature = "generation-pointer", feature = "github-app"))]
+            #[cfg(any(
+                feature = "generation-pointer",
+                feature = "github-app",
+                feature = "directory"
+            ))]
             Msg::NeedsSections { section, needed } => {
                 let needed: Vec<String> = needed.iter().map(|s| format!("[{s}]")).collect();
                 pick(
@@ -2035,14 +2059,14 @@ impl Msg<'_> {
                  em loopback)"
                     .into(),
             ),
-            #[cfg(feature = "oidc")]
+            #[cfg(any(feature = "oidc", feature = "directory"))]
             Msg::OidcEmpty => pick("must not be empty".into(), "não pode ser vazio".into()),
             #[cfg(feature = "oidc")]
             Msg::OidcNoClaim => pick(
                 "set `identities_claim`, `groups_claim` or both".into(),
                 "defina `identities_claim`, `groups_claim` ou os dois".into(),
             ),
-            #[cfg(feature = "oidc")]
+            #[cfg(any(feature = "oidc", feature = "directory"))]
             Msg::OidcOneOf(accepted) => {
                 let mut quoted: Vec<String> = accepted.iter().map(|a| format!("`{a}`")).collect();
                 let last = quoted.pop().unwrap_or_default();

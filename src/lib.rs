@@ -11,6 +11,8 @@ pub mod decide;
 mod decider;
 mod decisions;
 mod declared;
+#[cfg(feature = "directory")]
+mod directory;
 mod document;
 mod dotnet;
 mod drift_view;

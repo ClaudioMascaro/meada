@@ -308,7 +308,8 @@ one for the area a change touches.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `modules.rs`, `valkey.rs`: the cloud modules (ADR 0012). `modules.rs` is the section table,
   in every build: each module section of `meada.workspace.toml` (`[valkey]`, `[snapshot]`,
-  `[generations]`, `[refresh_lock]`, `[oidc]`, `[[github_app]]`, `[ui]`, `[postgres]`) with the cargo feature that
+  `[generations]`, `[refresh_lock]`, `[oidc]`, `[[github_app]]`, `[ui]`, `[postgres]`,
+  `[directory]`) with the cargo feature that
   owns it and whether this build has it. `Manifest::read` checks it before the typed parse, so a
   section whose feature is missing is an error naming the file, the line, the section and the
   feature, and a section the table lacks stays an unknown key. A module ticket adds its row and
@@ -363,7 +364,7 @@ one for the area a change touches.
   ticket appends the next number when it integrates, never editing one before it. Migration 1
   creates the version table, `<schema>.schema_version` (one row, `version`), the schema itself
   created in its transaction when absent; migration 2 the audit's table, `<schema>.audit`
-  (`audit.rs`). `connected` is `connect` keeping the password for scrubbing a later statement's
+  (`audit.rs`); migration 3 the directory's tables (`directory/scim.rs`). `connected` is `connect` keeping the password for scrubbing a later statement's
   error, and `probe` is the console's start check (a version refusal refuses the start, Postgres
   unreachable does not). `migrate` (`meada postgres migrate --workspace
   <bootstrap manifest>`, reading `Manifest::postgres`, no mirror) is the only command that
@@ -389,6 +390,69 @@ one for the area a change touches.
   which owns the schema; one that writes (the console, the role check, the CLI twins); one that
   reads (nodes). `pool_size` is read by the callers that pool connections; `migrate` and
   `status` open one.
+- `directory.rs`, `directory/scim.rs` (feature `directory`, implying `postgres`, enabled by
+  `cloud`, no crate beyond `postgres`'s; ADR 0016's `directory` row of ADR 0012's module table;
+  #334): the directory, users and groups the identity provider pushes in over SCIM 2.0.
+  `directory.rs` is the `[directory]` section, which needs `[postgres]` and `[oidc]`
+  (`modules::needs`); `File::validate` gives its `Config`: `token_env` (default
+  `MEADA_SCIM_TOKEN`) or `token_file`, at most one (`Msg::DirectoryBoth`); `user_claim`,
+  required and non-empty; `user_attribute`, required, `userName` or `externalId`;
+  `group_attribute`, `displayName` by default or `externalId` (`Msg::OidcOneOf`). Every problem
+  names its key, never a value. `Config::token` reads the token, only in the console and only at
+  start (`Console::start`): unset, unreadable or shorter than `TOKEN_MIN` (32) characters refuses
+  the start naming the key (`Msg::DirectoryTokenShort`), never the value; rotating it means a
+  restart. Nodes parse the section and never read the token; `user_claim` waits for the
+  directory's readers (S4 tickets 9 and 10: deprovisioning in the console, Entra overage).
+  `directory/scim.rs` (with `ui`) is the endpoint the console serves under `/scim/v2/` with
+  `[ui]` and `[directory]` (`Console::scim`, routed before the console's admission). Admission
+  in order: S2's `Host` check (the plain 403); a 403 for any request carrying `Origin`; the
+  `Authorization: Bearer <token>` (`Scim::admits`, comparing BLAKE3 hashes, which is constant
+  time and keeps no token in memory), else a 401 with `WWW-Authenticate: Bearer`. OIDC admission
+  never applies there, and the SCIM token is no console token under `/api/v1/` (a 401 there).
+  The body of a `POST`, `PUT` or `PATCH` is read only after admission, at most `SCIM_BODY_MAX`
+  (1 MiB, else a 413 without `scimType`), and must be `application/scim+json` or
+  `application/json` (else a 415). Operations (`Scim::answer`): `/Users` and `/Groups` take
+  `POST` (201, `Location`), `GET` with `filter` (`userName eq "<v>"`, compared ignoring case, or
+  `externalId eq`; `displayName eq` or `externalId eq` for groups; attribute names and `eq`
+  ignoring case), `startIndex` (1 by default) and `count` (`PAGE_MAX`, 100, by default and at
+  most), ordered by creation, and `GET`, `PUT`, `PATCH` and `DELETE` (204) of `/<kind>/<id>`. A
+  user `PATCH` answers 200 with the user, a group `PATCH` 204; `excludedAttributes=members`
+  leaves a group's members out. `PATCH` (`operations`, `apply`) takes `add`, `replace` and
+  `remove` (ignoring case) with or without a path; a path (`path`) is an optional schema URN
+  (the core schemas' dropped), an attribute, an optional `[<sub> eq <value>]` filter and an
+  optional `.<sub>`, names compared ignoring case; a `remove` of `members` with a value list
+  removes those values, an `add` through a filter that matches nothing adds the value it
+  describes, a `replace` through one is `noTarget`. Every operation applies to the resource in
+  memory and the result is stored as one write, so a later failure writes nothing.
+  `/ServiceProviderConfig`, `/ResourceTypes` and `/Schemas` are fixed documents (`patch`,
+  `filter` with `maxResults` 100; no `bulk`, `sort`, `etag` or `changePassword`; the bearer
+  token scheme). Storage: migration 3's `directory_users`, `directory_groups`,
+  `directory_members` and `directory_revoked`; a resource is the JSON the provider sent
+  (`candidate`) without `id`, `meta` and `password` (dropped wherever they appear, so the
+  provider can change none of them), a group without `members` (rows of `directory_members`,
+  each naming a stored user, else a 400 `invalidValue`; a deleted user's rows go with it), at
+  most `SCIM_RESOURCE_MAX` (64 KiB, else a 413) after every change; `userName` is required, `active`
+  is a boolean or `"True"`/`"False"`, true when absent, and an inactive user is returned like
+  any other. Ids are Postgres's (`gen_random_uuid` without dashes: 32 lowercase hex characters),
+  checked wherever read (`is_id`, `Stored::of`): a path id that fails is a 404, a row that fails
+  is skipped. Each answer carries `meta` (`resourceType`, `created` and `lastModified` from
+  Postgres's clock, `location` from `[ui] public_url`). Every write is one transaction holding
+  one advisory lock of the schema (`Scim::begin`), so the uniqueness checks (`store`: a
+  `userName` ignoring case or an `externalId` another user holds, a `group_attribute` another
+  group holds, exactly; a 409 `uniqueness`), the members check and the write cannot interleave
+  with another write. A deleted user leaves every group and a revocation marker (its `userName`
+  and `externalId` in `directory_revoked`), separate from the deleted resource, which a write
+  leaving an active user whose `user_attribute` matches it (a `userName` ignoring case) clears;
+  nothing reads the markers yet. Errors are RFC 7644's, with `scimType` (`invalidFilter`,
+  `invalidPath`, `invalidValue`, `noTarget`, `uniqueness`, `invalidSyntax`) for a 400 or 409, an
+  unknown id a 404, and a fixed detail that echoes no value. Postgres unreachable, or a schema
+  version this binary does not know (`postgres::connected`), is a 503 in the same schema after
+  one `ui: postgres: unreachable (<reason>)` line; the console's other routes are unaffected.
+  Each `POST`, `PUT`, `PATCH` or `DELETE` under the prefix leaves one stderr line `scim:
+  <method> <resource> <id>: <status>`, `<resource>` `Users`, `Groups` or `-`, `<id>` the stored
+  resource the write named or `-` (a failed `POST`, an unknown id, a refusal before routing):
+  no payload, attribute value, group name or token reaches stderr. The console's `manifest`
+  route shows `[directory]` as written, the token's variable or file name and never its value.
 - `oidc.rs` (feature `oidc`; with `github_app.rs` the only places `jsonwebtoken` is used, with
   RustCrypto as its backend, never aws-lc-rs): server mode as an OAuth 2.1 resource server. `File`
   is the `[oidc]` section, the identity provider (ADR 0016: the one token issuer of the
@@ -434,7 +498,9 @@ one for the area a change touches.
 - `ui.rs` (feature `ui`, no crate of its own; `cloud` enables it): the management console's
   process (ADR 0014), `meada ui --listen <addr> --workspace <bootstrap manifest>`,
   on the node's listener (`mcp::serve_http`, `mcp::address`, the same drain); never a node's
-  route, never an MCP server. `File` is `[ui]` and `validated` lists every problem of it at
+  route, never an MCP server. With `[directory]` (feature `directory`) a request under
+  `/scim/v2/` goes to the directory's endpoint (`Console::scim`, `directory/scim.rs`) with its
+  own admission, before the console's. `File` is `[ui]` and `validated` lists every problem of it at
   once (`dir` and `public_url` required, `public_url` `https` or loopback `http` with nothing
   past the host through `modules::reachable`; `audience` defaults to `public_url`; `client_id`,
   `operations` defaults to false and requires `[oidc]` plus one operator key when true;
@@ -2604,6 +2670,15 @@ qualification budget does (ADR 0017).
   timed-out workers retain their slots until I/O completes, so overload starts no additional
   work. `index.rs` reads optional `index.commit.json` up to
   `PROVENANCE_MAX` (4 KiB); anything larger has no trusted indexed commit.
+- `directory/scim.rs`: a request's body is read up to `SCIM_BODY_MAX` (1 MiB), and a stored
+  resource (the JSON the provider sent, a group without its members) holds at most
+  `SCIM_RESOURCE_MAX` (64 KiB) after every change; past either the answer is a 413. A list
+  answers at most `PAGE_MAX` (100) resources, `count` above it is lowered to it. Each request opens
+  its own Postgres connection (`pool_size` is still unread), and every write holds one advisory
+  lock of the schema, so the directory's writes run one at a time: per-resource locks when a
+  provider's throughput needs them. A group's answer lists every member.
+- `directory.rs`: `token_file` holds at most `TOKEN_MAX` (4096 bytes); past it the console
+  refuses to start, naming the file.
 - `ui/write.rs`: `POINTER_MAX`, `FENCE_MAX` and `APPLY_MAX` bound their respective POST bodies
   to 1 KiB; `SAVE_MAX` bounds a version save's JSON body to 4 MiB. Over-cap authorized uploads
   get 413 before any operation; unauthorized uploads are never consumed.

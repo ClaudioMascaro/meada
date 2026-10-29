@@ -58,7 +58,7 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `freshness` moves a `mod`, declares the orphan, adds a module, drops the `[[bin]]`, edits a
   `pub use`, moves an item between files and renames a package, and
   exports it with the walk reversed), `xlang` (a TypeScript and a Python repository linked both ways, over HTTP
-  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files; and a TypeScript and a Java one, `xlang-java-web` and `xlang-java-api`, the Java bases from Spring `@Value` fields and a constructor parameter (a placeholder, a literal URL, a placeholder with a default a peer serves and one no peer serves) and `System.getenv`, and a Kafka topic produced in TypeScript and consumed by a `@KafkaListener` whose topic the configuration names: exports, `trace` down (also from the producer, `xlang-java.trace-channel-down.txt`), up and from uncommitted changes, `freshness` editing, adding and deleting `.java` and configuration files, and a configuration edited alone), `index` (export, schema rebuild, writes only in `.meada/`), `self_index` (a copy of this repository's tracked files, indexed in about 6 s in debug: no call from `src/` reaches `tests/fixtures/`, and `Resolver.call` has an `exact` caller), `hostile` (per pack, repositories of pathological files sized past the limits of Known ceilings: deep nesting, long chains, wide files and manifests, values traced through chains and lattices of constants, wrappers, parameters and return values; each indexed on a thread with a small stack within a time budget, so a recursion with no limit aborts the run and a loop with none fails it; `--nocapture` names each case as it starts; and one test over the table `chained`, a row for each pack of `PACKS`, which indexes a chain of 80 locals each holding a call on the one before, from a receiver typed outside the repository and from a type of it, side by side within the budget: a pack that reads a result twice per link misses it, as Java's and C#'s did before `result_of` read exact targets alone), `query` (search/context), `workspace` (peers, status, config errors, an `owner` key in a `meada.toml` as an unknown key), `manifest` (server mode's workspace manifest: `index`, `status` and `export --repo` with `--workspace`, the refused entries, manifest errors, entry blocks configuring mirrors with no `meada.toml` and ignored under one, decisions replayed, reads that write nothing and see the index until `meada index` refreshes it, nothing written into a mirror, refreshed equals cold, `[workspace]`'s unknown key and source, `source = "file"` as before, `source = "store"` naming `generation-pointer` without it and its sections or `[[repository]]` with it; `[postgres]` naming the `postgres` feature without it, and with it each key error (an unknown key, `url_env` with `url_file`, a `schema` with an uppercase letter, a leading digit or 64 characters, `pool_size = 0`, a zero timeout) naming the file, the line and the key in `index`, `status` and `postgres migrate`; an `owner` in a static manifest's entry naming the file, the line, the key and `source = "store"`, and each `owner` rule it breaks; with `oidc`, `type = "azure"`, `type = 1`, `[oidc.entra]` with no `type` and under `generic` and `okta`, `overage = "directory"` and `"always"`, an unknown key in `[oidc.entra]` and `[oidc.github]` each naming the file, the line and the key, never the value; with `snapshot`, a bad `[snapshot] node_name` naming the file, the line and the key), `gateway`
+  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files; and a TypeScript and a Java one, `xlang-java-web` and `xlang-java-api`, the Java bases from Spring `@Value` fields and a constructor parameter (a placeholder, a literal URL, a placeholder with a default a peer serves and one no peer serves) and `System.getenv`, and a Kafka topic produced in TypeScript and consumed by a `@KafkaListener` whose topic the configuration names: exports, `trace` down (also from the producer, `xlang-java.trace-channel-down.txt`), up and from uncommitted changes, `freshness` editing, adding and deleting `.java` and configuration files, and a configuration edited alone), `index` (export, schema rebuild, writes only in `.meada/`), `self_index` (a copy of this repository's tracked files, indexed in about 6 s in debug: no call from `src/` reaches `tests/fixtures/`, and `Resolver.call` has an `exact` caller), `hostile` (per pack, repositories of pathological files sized past the limits of Known ceilings: deep nesting, long chains, wide files and manifests, values traced through chains and lattices of constants, wrappers, parameters and return values; each indexed on a thread with a small stack within a time budget, so a recursion with no limit aborts the run and a loop with none fails it; `--nocapture` names each case as it starts; and one test over the table `chained`, a row for each pack of `PACKS`, which indexes a chain of 80 locals each holding a call on the one before, from a receiver typed outside the repository and from a type of it, side by side within the budget: a pack that reads a result twice per link misses it, as Java's and C#'s did before `result_of` read exact targets alone), `query` (search/context), `workspace` (peers, status, config errors, an `owner` key in a `meada.toml` as an unknown key), `manifest` (server mode's workspace manifest: `index`, `status` and `export --repo` with `--workspace`, the refused entries, manifest errors, entry blocks configuring mirrors with no `meada.toml` and ignored under one, decisions replayed, reads that write nothing and see the index until `meada index` refreshes it, nothing written into a mirror, refreshed equals cold, `[workspace]`'s unknown key and source, `source = "file"` as before, `source = "store"` naming `generation-pointer` without it and its sections or `[[repository]]` with it; `[postgres]` naming the `postgres` feature without it, and with it each key error (an unknown key, `url_env` with `url_file`, a `schema` with an uppercase letter, a leading digit or 64 characters, `pool_size = 0`, a zero timeout) naming the file, the line and the key in `index`, `status` and `postgres migrate`; an `owner` in a static manifest's entry naming the file, the line, the key and `source = "store"`, and each `owner` rule it breaks; with `oidc`, `type = "azure"`, `type = 1`, `[oidc.entra]` with no `type` and under `generic` and `okta`, `overage = "directory"` and `"always"`, an unknown key in `[oidc.entra]` and `[oidc.github]` each naming the file, the line and the key, never the value; without `directory`, `[directory]` naming the feature, and with `directory` and `oidc`, `[directory]` without `[postgres]`, without `[oidc]` and without both, with both token keys, with an unknown key, with `user_attribute = "email"` and without `user_claim`, each naming the file, the line and the sections or the key, never a value; with `snapshot`, a bad `[snapshot] node_name` naming the file, the line and the key), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export
   carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a channel handler's process, a cycle, an
@@ -76,7 +76,9 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `meada::with_reversed_walk`), `items` (open items and their `search` goldens, fixtures
   `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`;
   with `oidc`, the identity provider's errors: an unknown `type`, `[oidc.entra]` under `okta` and
-  an `overage` other than `ignore`; without `postgres`, `[postgres]` naming the feature and no `meada postgres`; with it, a
+  an `overage` other than `ignore`; without `directory`, `[directory]` naming the feature; with
+  `directory` and `oidc`, `[directory]` without `[postgres]` and `[oidc]`, with both token keys
+  and with `user_attribute = "email"`; without `postgres`, `[postgres]` naming the feature and no `meada postgres`; with it, a
   `[postgres]` key error, the URL refusals (an unset variable, a query, a Unix socket) and,
   against the local Postgres, both version refusals; with
   `refresh-lock`, the operations' refusals: a malformed id, no `[refresh_lock]`, a generation
@@ -547,6 +549,41 @@ identities in validation errors), issuer query preservation at `Auth.login`, exa
 ceilings through CLI and HTTP, and live-heartbeat selection with a controlled RESP `TIME`
 response while all other commands reach the real Valkey fixture. The ceiling tests preserve
 one final locked publish and compare English and Brazilian Portuguese refusals.
+
+### The directory (#334)
+
+`tests/it/ui/oidc/directory.rs` runs a console with `[oidc]` (the `oidc` module's loopback
+issuer), `[postgres]` and `[directory]`. Against the local Postgres (a schema of each test's
+own through `postgres::audited` and its relay; skipped without `MEADA_TEST_POSTGRES_URL`,
+failed with `MEADA_TEST_SERVICES_REQUIRED=1`): an Entra ID sequence (the `userName` lookup,
+`POST` with its id, `Location` and `meta`, a `PATCH` of attributes through a filtered path, a
+sub-attribute and the enterprise extension, `PATCH active` with `"False"`, the user shown
+inactive, a group with members added and removed by path and by value list answered 204,
+`excludedAttributes=members` on a list and a read, the user's `DELETE` leaving the group and a
+revocation marker, the group's `DELETE`), then the relay closed: a 503 in RFC 7644's schema and
+`config` still answering; each write's one `scim:` line, exactly, and no token, attribute value
+or Postgres URL on stderr. An Okta sequence (the lookup with `startIndex` and `count`, `POST`
+with a `password` that neither the answer nor the stored row holds, `PUT` of the whole user,
+`PATCH active=false` without a path, a group with no members, `PUT` replacing its members, a
+rename by a path-less `PATCH`, `DELETE`) and paging over 150 users in creation order, with
+`count` capped at 100. The refusals: 409 `uniqueness` for a `userName` differing in case on
+`POST`, `PUT` and `PATCH`, a repeated `externalId` and a repeated group name; 400
+`invalidValue` for a member naming no user or no id; `invalidFilter`, `invalidPath` and
+`invalidSyntax` for an unsupported filter, path and operation; 404 for an unknown or malformed
+id; a two-operation `PATCH` whose second fails (`noTarget`) writing nothing; `id` and `meta`
+unchanged by `PATCH` and `PUT`; 413 without `scimType` for a body over 1 MiB and a resource
+over 64 KiB on `POST` and after a `PATCH`; eight concurrent `POST`s of one `userName` storing
+one; no error body or stderr line echoing a value. The revocation marker: none after a
+deactivation; one after deleting an inactive and an active user, which `filter` does not show;
+none for an unknown id; kept by an inactive reprovisioning, cleared by an active one (by
+`PATCH`, `userName` differing in case, and by a `POST` without `active`). Without a service (a
+`[postgres]` naming a closed port): no token, a console token, a wrong token, the token one
+character short and a `Basic` scheme each a 401 with `WWW-Authenticate: Bearer`; `Origin` a 403
+with and without the token; a foreign `Host` a 403; the SCIM token under `/api/v1/session` a
+401; another media type a 415; the three discovery documents' fixed content; a 405; a 503 for a
+resource with `config` answering; the `manifest` route naming `token_env` and not the token; the
+console refusing to start with a 31-character token and with none, naming the key and its line
+in English under `en_US` and `pt_BR`. `tests/it/postgres.rs` holds migration 3's columns.
 
 ## Java declarative clients (#90)
 

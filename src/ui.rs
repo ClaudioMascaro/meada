@@ -226,6 +226,9 @@ struct Console {
     entries: std::sync::Mutex<Option<(String, Arc<Vec<Value>>)>>,
     /// The audit of every write, with `[postgres]` (#328).
     audit: crate::audit::Audit,
+    /// The SCIM endpoint under `/scim/v2/`, with `[directory]` (#334).
+    #[cfg(feature = "directory")]
+    scim: Option<crate::directory::scim::Scim>,
 }
 
 /// What the console answers the playground and the exports from, read per request, so that what
@@ -351,6 +354,13 @@ pub fn listen(listen: &str, manifest: &Path) -> Result<()> {
             let console = console.clone();
             async move {
                 let (parts, body) = request.into_parts();
+                #[cfg(feature = "directory")]
+                if let Some(scim) = &console.scim
+                    && crate::directory::scim::routed(parts.uri.path())
+                {
+                    let answer = console.scim(scim, bound, &parts, body).await;
+                    return console.secure(answer);
+                }
                 let admitted = tokio::task::block_in_place(|| console.checked(bound, &parts));
                 let answer = match admitted {
                     Err(refused) => *refused,
@@ -439,6 +449,24 @@ impl Console {
         {
             problems.push(at("postgres", version));
         }
+        // The directory (#334): the SCIM token read now, once; a missing, unreadable or short one
+        // refuses the start, naming its key.
+        #[cfg(feature = "directory")]
+        let scim = match (&read.directory, &read.postgres) {
+            (Some(directory), Some(postgres)) => match directory.token() {
+                Ok(token) => Some(crate::directory::scim::Scim::new(
+                    directory,
+                    &token,
+                    postgres.clone(),
+                    &ui.public_url,
+                )),
+                Err((key, problem)) => {
+                    problems.push(at(key, problem));
+                    None
+                }
+            },
+            _ => None,
+        };
         #[cfg(feature = "postgres")]
         let audit = crate::audit::Audit::new(read.postgres.clone());
         #[cfg(not(feature = "postgres"))]
@@ -478,7 +506,114 @@ impl Console {
             #[cfg(all(feature = "oidc", feature = "generation-pointer"))]
             entries: std::sync::Mutex::new(None),
             audit,
+            #[cfg(feature = "directory")]
+            scim,
         })
+    }
+
+    /// A request under `/scim/v2/` (#334), in order: the `Host` check, a 403 for any request
+    /// carrying `Origin`, the SCIM token (else a 401 with `WWW-Authenticate: Bearer`), the body
+    /// bounded at `SCIM_BODY_MAX` (else a 413) and of a JSON media type (else a 415); then the
+    /// directory answers. OIDC admission never applies here. Each write leaves one line,
+    /// `scim: <method> <resource> <id>: <status>`, `<id>` `-` when no stored resource is named.
+    #[cfg(feature = "directory")]
+    async fn scim(
+        &self,
+        scim: &crate::directory::scim::Scim,
+        bound: SocketAddr,
+        parts: &hyper::http::request::Parts,
+        body: Incoming,
+    ) -> Answer {
+        use crate::directory::scim::{self, Reply};
+        let method = &parts.method;
+        let write = matches!(
+            *method,
+            Method::POST | Method::PUT | Method::PATCH | Method::DELETE
+        );
+        let headers = &parts.headers;
+        let host = headers.get(header::HOST).and_then(|h| h.to_str().ok());
+        let reply = if !host.is_some_and(|host| self.hosts(host, bound)) {
+            None
+        } else if headers.contains_key(header::ORIGIN) {
+            Some(Reply::error(
+                StatusCode::FORBIDDEN,
+                None,
+                scim::ORIGIN_REFUSED,
+            ))
+        } else if !scim.admits(
+            headers
+                .get(header::AUTHORIZATION)
+                .and_then(|h| h.to_str().ok()),
+        ) {
+            Some(Reply::error(
+                StatusCode::UNAUTHORIZED,
+                None,
+                scim::UNAUTHORIZED,
+            ))
+        } else {
+            let json = (headers
+                .get(header::CONTENT_TYPE)
+                .and_then(|c| c.to_str().ok()))
+            .and_then(|c| c.split(';').next())
+            .is_some_and(|c| {
+                let c = c.trim();
+                c.eq_ignore_ascii_case("application/scim+json")
+                    || c.eq_ignore_ascii_case("application/json")
+            });
+            let body = match matches!(*method, Method::POST | Method::PUT | Method::PATCH) {
+                false => Ok(Bytes::new()),
+                true => match Limited::new(body, scim::SCIM_BODY_MAX).collect().await {
+                    Ok(collected) => Ok(collected.to_bytes()),
+                    Err(e) if e.is::<http_body_util::LengthLimitError>() => Err(Reply::error(
+                        StatusCode::PAYLOAD_TOO_LARGE,
+                        None,
+                        scim::TOO_LARGE,
+                    )),
+                    Err(_) => Err(Reply::error(
+                        StatusCode::BAD_REQUEST,
+                        Some("invalidSyntax"),
+                        scim::UNREADABLE,
+                    )),
+                },
+            };
+            Some(match body {
+                Err(refused) => refused,
+                Ok(body) if !body.is_empty() && !json => {
+                    Reply::error(StatusCode::UNSUPPORTED_MEDIA_TYPE, None, scim::MEDIA_TYPE)
+                }
+                Ok(body) => {
+                    let (path, query) = (parts.uri.path(), parts.uri.query());
+                    scim.answer(method, path, query, &body).await
+                }
+            })
+        };
+        let path = parts.uri.path();
+        let status = reply.as_ref().map_or(StatusCode::FORBIDDEN, |r| r.status);
+        if write {
+            let named = reply.as_ref().and_then(|r| r.named.as_deref());
+            let (resource, id) = (scim::resource(path), named.unwrap_or("-"));
+            eprintln!("scim: {method} {resource} {id}: {}", status.as_u16());
+        }
+        let Some(reply) = reply else {
+            return plain(StatusCode::FORBIDDEN, HOST_REFUSED);
+        };
+        let mut answer = Response::builder()
+            .status(reply.status)
+            .header(header::CACHE_CONTROL, "no-store");
+        if let Some(location) = &reply.location {
+            answer = answer.header(header::LOCATION, location);
+        }
+        if reply.status == StatusCode::UNAUTHORIZED {
+            answer = answer.header(header::WWW_AUTHENTICATE, "Bearer");
+        }
+        let body = match &reply.body {
+            Some(document) => {
+                answer = answer.header(header::CONTENT_TYPE, "application/scim+json");
+                Full::from(document.to_string())
+            }
+            None => Full::default(),
+        };
+        answer.body(body.boxed()).expect("a valid response")
     }
 
     /// The security headers of every answer, including a refusal before admission.

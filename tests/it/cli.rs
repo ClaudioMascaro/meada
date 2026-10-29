@@ -763,6 +763,79 @@ fn the_postgres_section_without_its_feature_follows_lang() {
     assert!(stderr.contains("unrecognized subcommand"), "{stderr}");
 }
 
+/// `[directory]` in a build without its feature, under `pt_BR` and `en_US` (#334).
+#[cfg(not(feature = "directory"))]
+#[test]
+fn the_directory_section_without_its_feature_follows_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_directory_feature");
+    let toml = "index_dir = \"../indexes\"\n\n[directory]\nuser_claim = \"oid\"\n";
+    fs::write(dir.join(MANIFEST), toml).unwrap();
+    for (lang, expected) in [
+        (
+            "en_US.UTF-8",
+            "meada: ops/meada.workspace.toml:3: [directory] needs a Meada built with the \
+             directory feature\n",
+        ),
+        (
+            "pt_BR.UTF-8",
+            "meada: ops/meada.workspace.toml:3: [directory] exige um Meada compilado com a \
+             feature directory\n",
+        ),
+    ] {
+        let refused = (String::new(), expected.to_string(), Some(1));
+        let args = ["status", "--workspace", MANIFEST];
+        assert_eq!(run_lang(&dir, lang, &args), refused, "{lang}");
+    }
+}
+
+/// With `directory` (#334), under `pt_BR` and `en_US`: `[directory]` without the sections it
+/// needs, with both token keys and with a `user_attribute` it does not accept.
+#[cfg(all(feature = "directory", feature = "oidc"))]
+#[test]
+fn directory_refusals_follow_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_directory");
+    let head = "index_dir = \"../indexes\"\n";
+    let postgres = "\n[postgres]\nschema = \"m\"\n";
+    let oidc = "\n[oidc]\nissuer = \"https://id.example.com\"\npublic_url = \"https://m.example\"\n\
+                identities_claim = \"r\"\n";
+    let directory = "\n[directory]\nuser_claim = \"oid\"\nuser_attribute = \"userName\"\n";
+    let full = format!("{head}{postgres}{oidc}{directory}");
+    let at = "meada: ops/meada.workspace.toml";
+    for (toml, en, pt) in [
+        (
+            format!("{head}{directory}"),
+            format!("{at}:3: [directory] needs [postgres] and [oidc]\n"),
+            format!("{at}:3: [directory] exige [postgres] e [oidc]\n"),
+        ),
+        (
+            format!("{full}token_env = \"SCIM\"\ntoken_file = \"scim-token\"\n"),
+            format!(
+                "{at}:15: `directory.token_file`: is set together with token_env: use one of the \
+                 two\n"
+            ),
+            format!("{at}:15: `directory.token_file`: está junto de token_env: use um dos dois\n"),
+        ),
+        (
+            full.replace("\"userName\"", "\"email\""),
+            format!(
+                "{at}:13: `directory.user_attribute`: must be one of `userName` or `externalId`\n"
+            ),
+            format!(
+                "{at}:13: `directory.user_attribute`: deve ser um de `userName` ou `externalId`\n"
+            ),
+        ),
+    ] {
+        fs::write(dir.join(MANIFEST), &toml).unwrap();
+        let args = ["status", "--workspace", MANIFEST];
+        for (lang, expected) in [("en_US.UTF-8", en), ("pt_BR.UTF-8", pt)] {
+            let refused = (String::new(), expected, Some(1));
+            assert_eq!(run_lang(&dir, lang, &args), refused, "{lang}: {toml}");
+        }
+    }
+}
+
 /// With `postgres`, under `pt_BR` and `en_US`: a `[postgres]` key error, the URL refusals and,
 /// against the local Postgres, both version refusals.
 #[cfg(feature = "postgres")]
@@ -856,26 +929,26 @@ fn postgres_refusals_follow_lang() {
     assert_eq!(
         line(en, "9"),
         format!(
-            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 2: \
+            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 3: \
              run meada postgres migrate)"
         )
     );
     assert_eq!(
         line(pt, "9"),
         format!(
-            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da 2 deste Meada: \
+            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da 3 deste Meada: \
              rode meada postgres migrate)"
         )
     );
-    assert_eq!(meada(&dir, en, &at("9"), &MIGRATE).0, "2\n");
+    assert_eq!(meada(&dir, en, &at("9"), &MIGRATE).0, "3\n");
     for (lang, expected) in [
         (
             en,
-            format!("the schema {schema} is at version 2, above this Meada's 0: upgrade Meada"),
+            format!("the schema {schema} is at version 3, above this Meada's 0: upgrade Meada"),
         ),
         (
             pt,
-            format!("o schema {schema} está na versão 2, acima da 0 deste Meada: atualize o Meada"),
+            format!("o schema {schema} está na versão 3, acima da 0 deste Meada: atualize o Meada"),
         ),
     ] {
         let (_, stderr, code) = meada(&dir, lang, &at("0"), &MIGRATE);
