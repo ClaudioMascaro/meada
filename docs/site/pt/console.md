@@ -120,6 +120,10 @@ As operações da console exigem OIDC e ficam desligadas por padrão. Quando hab
 
 </details>
 
+## Auditoria
+
+Com `[postgres]` no bootstrap (e o schema em dia com `meada postgres migrate`), cada escrita da console e cada comando do CLI que a espelha (`meada workspace import` e `apply`, `meada snapshot pointer set`, `retain` e `drop`, `meada snapshot fence recover`) deixa um registro no Postgres: quem (sujeito, papel e, para um operador de time, os owners), o quê (ação e argumentos), quando (o relógio do Postgres) e o resultado (`pending`, `accepted`, `refused` ou `failed`). O registro é gravado antes de a escrita tocar o Valkey ou o store: se ele não puder ser gravado, a escrita é recusada e nada muda (a console responde 503 `audit_unavailable`, o CLI sai com 1 nomeando o Postgres). Recusas de papel e recusas sob a trava também são registradas; bodies inválidos (400, 413, 422) não. A console sobe com o Postgres fora do ar (as leituras continuam) e se recusa a subir com uma versão de schema que não conhece. O operador global lê os registros, do mais recente ao mais antigo, na página **Registro de auditoria** ou em `GET /api/v1/audit?before=<id>&limit=<1 a 100>`. A linha de auditoria em stderr não muda, com ou sem `[postgres]`, e a Meada nunca apaga um registro.
+
 ## Times
 
 Vários times podem dividir um workspace: cada um altera as próprias entradas e o operador global responde pelo resto. As regras numeradas abaixo são o contrato inteiro.

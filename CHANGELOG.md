@@ -33,6 +33,19 @@ All notable changes to Meada are recorded here. The format follows
   never lowers one. It ships migration 1, the schema's version. Every later connection refuses a
   version the binary does not know: a lower one (an absent schema included) names `meada
   postgres migrate`, a higher one names both versions.
+- The audit (ADR 0016): with `[postgres]`, every console write (`workspace.save`,
+  `workspace.apply`, `pointer.set`, `pointer.retain`, `pointer.drop`, `fence.recover`) and every
+  CLI twin of one (`meada workspace import` and `apply`, `meada snapshot pointer set`, `retain`
+  and `drop`, `meada snapshot fence recover`) leaves a record in `<schema>.audit` (migration 2):
+  who (subject, role, a team operator's owners), what (action and arguments), when (Postgres's
+  clock) and the outcome. The record is written as `pending` before the write touches Valkey or
+  the store, so a write whose record cannot be written is refused and changes nothing: the
+  console answers 503 `audit_unavailable`, the CLI exits 1 naming Postgres. Role refusals and
+  refusals under the lock are recorded too. The console starts with Postgres unreachable (reads
+  are served) and refuses to start on a schema version it does not know, as each CLI twin exits
+  1. The global operator reads the records, newest first, through `GET
+  /api/v1/audit?before=<id>&limit=<n>` and the console's new audit page. Without `[postgres]`
+  every write behaves as before, and the stderr lines are unchanged in both cases.
 - `meada status --workspace` with `[postgres]` prints `postgres: reachable, schema <name>
   version <n>` or `postgres: unreachable (<reason>)`, a version refusal included, without
   changing its exit code.

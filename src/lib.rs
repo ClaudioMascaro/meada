@@ -1,6 +1,8 @@
 //! Meada: an LLM-free code graph. The query engine (`engine`) is the seam the CLI, the MCP
 //! server and the tests share.
 
+#[cfg(any(feature = "ui", feature = "generation-pointer"))]
+pub mod audit;
 mod channel;
 mod community;
 mod config;

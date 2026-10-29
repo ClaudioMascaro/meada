@@ -191,6 +191,14 @@ check and the CLI twins that write connect to it; nodes only read it; `meada ind
 connects (ADR 0016).
 _Avoid_: database, persistence layer, state store
 
+**Audit record**:
+One row of the data layer's audit: who (the subject, its role and a team operator's owners), what
+(the action and its arguments), when (Postgres's clock) and the outcome (`pending`, `accepted`,
+`refused`, `failed`) of a console write or a CLI twin of one. It is written as `pending` before
+the write touches Valkey or the store, so no write happens without it; the console's stderr line
+is not one (ADR 0016, #328).
+_Avoid_: audit log entry, audit event, audit line
+
 **Directory**:
 The users and groups the identity provider pushes into the data layer through the console's
 SCIM 2.0 endpoint (`[directory]`). It feeds the owner picker, flags an owner that names no group,

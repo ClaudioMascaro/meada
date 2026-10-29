@@ -72,6 +72,10 @@ const QUERY: &str = "/api/v1/query";
 /// short arguments, with room to spare.
 const QUERY_MAX: usize = 16 << 10;
 
+/// The most records `GET audit` answers at once, and how many without `limit` (#328).
+const AUDIT_LIMIT_MAX: i64 = 100;
+const AUDIT_LIMIT: i64 = 50;
+
 /// The fixed bodies of the 403s.
 const HOST_REFUSED: &str = "Forbidden: Host header is not allowed\n";
 const ORIGIN_REFUSED: &str = "Forbidden: Origin header is not allowed\n";
@@ -220,6 +224,8 @@ struct Console {
     /// version is immutable, so the id is the key (`teams`).
     #[cfg(all(feature = "oidc", feature = "generation-pointer"))]
     entries: std::sync::Mutex<Option<(String, Arc<Vec<Value>>)>>,
+    /// The audit of every write, with `[postgres]` (#328).
+    audit: crate::audit::Audit,
 }
 
 /// What the console answers the playground and the exports from, read per request, so that what
@@ -287,16 +293,20 @@ impl Session {
         meada_core::authorize::Grant::All
     }
 
-    /// The `session` answer: the subject and role; with `[oidc]`, `groups` and `grant`, and
-    /// `teams` for a team operator.
-    fn document(&self) -> Value {
-        let role = match (self.operator, self.is_team_operator()) {
+    /// The session's role: `operator`, `team_operator` or `viewer`.
+    fn role(&self) -> &'static str {
+        match (self.operator, self.is_team_operator()) {
             (true, _) => "operator",
             (_, true) => "team_operator",
             _ => "viewer",
-        };
+        }
+    }
+
+    /// The `session` answer: the subject and role; with `[oidc]`, `groups` and `grant`, and
+    /// `teams` for a team operator.
+    fn document(&self) -> Value {
         #[allow(unused_mut)]
-        let mut document = json!({"subject": self.subject, "role": role});
+        let mut document = json!({"subject": self.subject, "role": self.role()});
         #[cfg(feature = "oidc")]
         if let Some(grant) = &self.grant {
             document["groups"] = json!(self.groups);
@@ -421,6 +431,18 @@ impl Console {
                 None
             }
         };
+        // The audit (#328): a version this binary does not know refuses the start; Postgres
+        // unreachable does not (reads are served, writes answer 503 naming why on stderr).
+        #[cfg(feature = "postgres")]
+        if let Some(postgres) = &read.postgres
+            && let Err(version) = crate::postgres::probe(postgres)
+        {
+            problems.push(at("postgres", version));
+        }
+        #[cfg(feature = "postgres")]
+        let audit = crate::audit::Audit::new(read.postgres.clone());
+        #[cfg(not(feature = "postgres"))]
+        let audit = crate::audit::Audit::default();
         #[cfg(feature = "oidc")]
         let issuer = oidc.as_ref().map(|oidc| origin(oidc.login().0));
         #[cfg(not(feature = "oidc"))]
@@ -455,6 +477,7 @@ impl Console {
             holds,
             #[cfg(all(feature = "oidc", feature = "generation-pointer"))]
             entries: std::sync::Mutex::new(None),
+            audit,
         })
     }
 
@@ -543,6 +566,11 @@ impl Console {
                     "-",
                     &message,
                 );
+                // Recorded with the route's action and no argument: the body is never read.
+                let route = route.expect("an operation route");
+                let actor = write::actor(&session, session.owners());
+                let empty = json!({});
+                (self.audit).refused(&actor, write::recorded(route), &empty, &message);
                 return Err(Box::new(error(
                     StatusCode::FORBIDDEN,
                     "forbidden",
@@ -651,6 +679,9 @@ impl Console {
         if route == "query" && *method == Method::POST {
             return self.query(request.body(), session);
         }
+        if read && route == "audit" && self.audit.on() {
+            return self.audit_page(request.uri().query(), session);
+        }
         if read && let Some(answer) = self.operational(route, session) {
             return answer;
         }
@@ -683,6 +714,10 @@ impl Console {
             "operations": self.ui.operations,
             "public_url": self.ui.public_url,
         });
+        // With `[postgres]`, the audit page has its route (#328).
+        if self.audit.on() {
+            config["audit"] = true.into();
+        }
         #[cfg(feature = "oidc")]
         if let Some(oidc) = &self.oidc {
             let (issuer, scopes) = oidc.login();
@@ -849,6 +884,70 @@ impl Console {
                 "tool_error",
                 &e.to_string(),
             ),
+        }
+    }
+
+    /// `GET audit?before=<id>&limit=<n>` (#328), the global operator's alone: the records with an
+    /// id below `before`, newest first, at most `limit` (1 to 100, 50 by default), as
+    /// `{"records", "next"}`, `next` the `before` of the following page or null. Any other query is
+    /// a 400; Postgres unreachable a 503 `audit_unavailable`. A row that fails its checks is left
+    /// out with one stderr line naming the table.
+    fn audit_page(&self, query: Option<&str>, session: &Session) -> Answer {
+        if !session.operator {
+            let message = Msg::UiOperatorRequired.text();
+            return error(StatusCode::FORBIDDEN, "forbidden", &message);
+        }
+        let (mut before, mut limit) = (None, None);
+        for pair in query.into_iter().flat_map(|q| q.split('&')) {
+            let number = |text: &str| {
+                let digits = !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit());
+                digits.then(|| text.parse::<i64>().ok()).flatten()
+            };
+            let slot = match pair.split_once('=') {
+                Some(("before", id)) if before.is_none() => {
+                    before = number(id).filter(|id| *id > 0).map(Some);
+                    before.is_some()
+                }
+                Some(("limit", n)) if limit.is_none() => {
+                    limit = number(n)
+                        .filter(|n| (1..=AUDIT_LIMIT_MAX).contains(n))
+                        .map(Some);
+                    limit.is_some()
+                }
+                _ => false,
+            };
+            if !slot {
+                return error(
+                    StatusCode::BAD_REQUEST,
+                    "bad_request",
+                    &Msg::UiAuditQuery.text(),
+                );
+            }
+        }
+        let limit = limit.flatten().unwrap_or(AUDIT_LIMIT);
+        match self.audit.page(before.flatten(), limit) {
+            Ok(page) => {
+                for _ in 0..page.skipped {
+                    let table = self.audit.table();
+                    eprintln!("ui: {}", Msg::AuditBadRecord(&table).text());
+                }
+                json_answer(
+                    StatusCode::OK,
+                    &json!({"records": page.records, "next": page.next}),
+                )
+            }
+            Err(reason) => {
+                eprintln!(
+                    "ui: {}",
+                    Msg::PostgresUnreachable(&reason).text().escape_debug()
+                );
+                let message = Msg::AuditUnavailable.text();
+                error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "audit_unavailable",
+                    &message,
+                )
+            }
         }
     }
 

@@ -14,3 +14,4 @@
 .fence-recovery p { margin: 0; }
 .fence-recovery code { overflow-wrap: anywhere; }
 .fence-recovery input { width: 100%; padding: .5rem; font: inherit; border: 1px solid #aab7b2; border-radius: 4px; }
+.audit-pages { display: flex; gap: 0.5rem; margin-top: 1rem; }

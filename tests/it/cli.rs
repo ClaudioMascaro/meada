@@ -856,26 +856,26 @@ fn postgres_refusals_follow_lang() {
     assert_eq!(
         line(en, "9"),
         format!(
-            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 1: \
+            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 2: \
              run meada postgres migrate)"
         )
     );
     assert_eq!(
         line(pt, "9"),
         format!(
-            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da 1 deste Meada: \
+            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da 2 deste Meada: \
              rode meada postgres migrate)"
         )
     );
-    assert_eq!(meada(&dir, en, &at("9"), &MIGRATE).0, "1\n");
+    assert_eq!(meada(&dir, en, &at("9"), &MIGRATE).0, "2\n");
     for (lang, expected) in [
         (
             en,
-            format!("the schema {schema} is at version 1, above this Meada's 0: upgrade Meada"),
+            format!("the schema {schema} is at version 2, above this Meada's 0: upgrade Meada"),
         ),
         (
             pt,
-            format!("o schema {schema} está na versão 1, acima da 0 deste Meada: atualize o Meada"),
+            format!("o schema {schema} está na versão 2, acima da 0 deste Meada: atualize o Meada"),
         ),
     ] {
         let (_, stderr, code) = meada(&dir, lang, &at("0"), &MIGRATE);
@@ -886,4 +886,43 @@ fn postgres_refusals_follow_lang() {
         );
     }
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
+}
+
+/// The audit's refusal (#328) under `pt_BR` and `en_US`: with `[postgres]` and Postgres
+/// unreachable, a CLI twin of a console write exits 1 naming Postgres and stores nothing.
+#[cfg(all(feature = "generation-pointer", feature = "postgres"))]
+#[test]
+fn the_audit_refusal_follows_lang() {
+    use crate::postgres::{manifest, meada};
+    let dir = manifest("cli_audit_refusal", "schema = \"meada\"\n");
+    let entries = "[[repository]]\nrepo = \"e.test/a\"\npath = \"../a\"\n";
+    fs::write(dir.join("ops/entries.toml"), entries).unwrap();
+    let env = [("MEADA_POSTGRES_URL", "postgres://meada@127.0.0.1:1/meada")];
+    let import = [
+        "workspace",
+        "import",
+        "ops/entries.toml",
+        "--message",
+        "m",
+        "--workspace",
+        crate::manifest::MANIFEST,
+    ];
+    for (lang, expected) in [
+        (
+            "en_US.UTF-8",
+            "meada: the audit record cannot be written to Postgres, so nothing was changed: ",
+        ),
+        (
+            "pt_BR.UTF-8",
+            "meada: o registro de auditoria não pode ser gravado no Postgres, então nada foi \
+             alterado: ",
+        ),
+    ] {
+        let (stdout, stderr, code) = meada(&dir, lang, &env, &import);
+        assert_eq!((stdout.as_str(), code), ("", 1), "{stderr}");
+        assert!(
+            stderr.starts_with(expected) && stderr.lines().count() == 1,
+            "{lang}: {stderr}"
+        );
+    }
 }

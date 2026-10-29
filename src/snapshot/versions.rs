@@ -32,6 +32,8 @@ use redis::cmd;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as Json;
 
+#[cfg(feature = "refresh-lock")]
+use super::generations::OpError;
 use super::generations::{now, rfc3339};
 use super::store::Store;
 use super::{Config, entry_blocks, fence, is_id, pull};
@@ -207,7 +209,10 @@ async fn store_version(
 #[cfg(all(feature = "ui", feature = "refresh-lock"))]
 pub(crate) enum SaveError {
     Invalid(Vec<String>),
+    /// An operation's own refusal: the lock held or lost.
     Refused(String),
+    /// Anything else: the manifest, the store or Valkey.
+    Failed(String),
     /// The entries a team operator may not change, as `authorize_entries` lists them.
     Unauthorized(Vec<Refusal>),
     /// A team operator that the current version no longer makes one.
@@ -233,7 +238,7 @@ pub(crate) fn save(
 ) -> Result<(Imported, Vec<String>), SaveError> {
     let version = prepared("entries", src, message, author).map_err(SaveError::Invalid)?;
     let sections =
-        super::operation::sections(manifest).map_err(|e| SaveError::Refused(e.to_string()))?;
+        super::operation::sections(manifest).map_err(|e| SaveError::Failed(e.to_string()))?;
     let snapshot = sections.snapshot.clone();
     let holds = format!("workspace save {}", author.escape_debug());
     super::operation::locked(&sections, &holds, async move |valkey, config, _, held| {
@@ -267,7 +272,16 @@ pub(crate) fn save(
         super::lock::holds(valkey, config, &held.token).await?;
         Ok(Ok((imported, owners)))
     })
-    .map_err(|e| SaveError::Refused(e.to_string()))?
+    .map_err(|e| match OpError::refused(&*e) {
+        true => SaveError::Refused(e.to_string()),
+        false => SaveError::Failed(e.to_string()),
+    })?
+}
+
+/// The id of the version the entries `src` would be stored as, or the problems of the checks
+/// `import` and the console's save make first: what the audit records before the write.
+pub fn version_id(src: &str, message: &str, author: &str) -> Result<String, Vec<String>> {
+    prepared("entries", src, message, author).map(|v| v.id)
 }
 
 /// The entries of the version current in Valkey, checked; `None` when there is no pointer.
@@ -507,8 +521,19 @@ pub enum ApplyError {
     Refused(Vec<Refusal>),
     /// A team operator that the current version no longer makes one (`authorize::role`).
     RoleLost,
-    /// Anything else: the argument, the manifest, the store, Valkey, the lock or the pointer.
+    /// An operation's own refusal: the version not stored, the lock held or lost, a fence not
+    /// above the pointer's.
+    Conflict(String),
+    /// Anything else: the argument, the manifest, the store, Valkey or the pointer.
     Failed(String),
+}
+
+#[cfg(feature = "refresh-lock")]
+impl ApplyError {
+    /// Whether the audit records it as `refused` rather than `failed` (#328).
+    pub fn refused(&self) -> bool {
+        !matches!(self, ApplyError::Failed(_))
+    }
 }
 
 #[cfg(feature = "refresh-lock")]
@@ -519,7 +544,7 @@ impl std::fmt::Display for ApplyError {
                 f.write_str(&Msg::WorkspaceRefused(refused.len()).text())
             }
             ApplyError::RoleLost => f.write_str(&Msg::WorkspaceRoleLost.text()),
-            ApplyError::Failed(problem) => f.write_str(problem),
+            ApplyError::Conflict(problem) | ApplyError::Failed(problem) => f.write_str(problem),
         }
     }
 }
@@ -551,8 +576,11 @@ pub fn apply(
     groups: &[String],
     grant: &Grant,
 ) -> Result<Applied, ApplyError> {
-    fn failed(e: impl std::fmt::Display) -> ApplyError {
-        ApplyError::Failed(e.to_string())
+    fn failed(e: Box<dyn std::error::Error>) -> ApplyError {
+        match OpError::refused(&*e) {
+            true => ApplyError::Conflict(e.to_string()),
+            false => ApplyError::Failed(e.to_string()),
+        }
     }
     if !is_id(id) {
         let shown = id.escape_debug().to_string();
@@ -564,12 +592,12 @@ pub fn apply(
         let store = Store::connect(&sections.snapshot)?;
         match stored(&store, &key, id).await? {
             Some((version, _)) => Ok(version.repositories),
-            None => Err(Msg::WorkspaceNoVersion(&key).text()),
+            None => Err(OpError::Refused(Msg::WorkspaceNoVersion(&key).text())),
         }
     };
     let entries = crate::modules::block_on(check)
-        .map_err(failed)?
-        .map_err(ApplyError::Failed)?;
+        .map_err(|e| failed(e.into()))?
+        .map_err(|e| failed(e.into()))?;
     let snapshot = &sections.snapshot;
     let done = super::operation::locked(
         &sections,
@@ -599,14 +627,16 @@ pub fn apply(
                     line: format!("{id} {}", held.fence),
                     owners,
                 })),
-                0 => Err(Msg::LockNotHeld(&lock).text()),
-                -1 => Err(Msg::FenceRefused {
-                    fence: held.fence,
-                    current: &pointer,
-                    fence_key: &config.key("fence", true),
-                }
-                .text()),
-                _ => Err(Msg::WorkspaceBadPointer(&pointer).text()),
+                0 => Err(OpError::Refused(Msg::LockNotHeld(&lock).text())),
+                -1 => Err(OpError::Refused(
+                    Msg::FenceRefused {
+                        fence: held.fence,
+                        current: &pointer,
+                        fence_key: &config.key("fence", true),
+                    }
+                    .text(),
+                )),
+                _ => Err(Msg::WorkspaceBadPointer(&pointer).text().into()),
             }
         },
     );
