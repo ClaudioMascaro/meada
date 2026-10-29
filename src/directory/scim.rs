@@ -16,7 +16,7 @@
 //! which live in their own table; at most `SCIM_RESOURCE_MAX` bytes after every change. Meada's
 //! ids (32 lowercase hex characters, from Postgres) are checked wherever read. A deleted user
 //! leaves every group and a revocation marker (its `userName` and `externalId`) that only a write
-//! leaving an active user with the same `user_attribute` clears. An error is RFC 7644's, its
+//! naming `active` true for a user with the same `user_attribute` clears. An error is RFC 7644's, its
 //! detail fixed: none echoes a value. Postgres unreachable, or at a version this binary does not
 //! know, is a 503 and one `ui:` line naming why.
 
@@ -28,11 +28,11 @@ use tokio_postgres::types::ToSql;
 use crate::msg::Msg;
 use crate::postgres::Opened;
 
-/// The most bytes of a request's body.
+// ponytail: the most bytes of a request's body; past it a 413.
 pub const SCIM_BODY_MAX: usize = 1 << 20;
-/// The most bytes of a stored resource, as JSON.
+// ponytail: the most bytes of a stored resource, as JSON, after every change; past it a 413.
 pub const SCIM_RESOURCE_MAX: usize = 64 << 10;
-/// The most resources a page holds, and how many without `count`.
+// ponytail: the most resources a page holds, and how many without `count`.
 const PAGE_MAX: i64 = 100;
 
 const ERROR: &str = "urn:ietf:params:scim:api:messages:2.0:Error";
@@ -239,6 +239,9 @@ struct Candidate {
     name: String,
     external_id: Option<String>,
     active: bool,
+    /// Whether the resource names `active` itself: only an explicit active user clears a
+    /// revocation marker.
+    active_named: bool,
     /// A group's members, sorted, without repeats.
     members: Vec<String>,
 }
@@ -294,7 +297,7 @@ fn candidate(kind: Kind, mut resource: Map<String, Value>) -> Done<Candidate> {
         Some(Value::String(id)) => Some(id.clone()),
         Some(_) => return Err(invalid("externalId must be a string")),
     };
-    let mut active = true;
+    let (mut active, mut active_named) = (true, false);
     let mut members = Vec::new();
     match kind {
         Kind::Users => {
@@ -303,6 +306,7 @@ fn candidate(kind: Kind, mut resource: Map<String, Value>) -> Done<Candidate> {
                 None | Some(Value::Null) => {}
                 Some(value) => {
                     active = boolean(value).ok_or(invalid("active must be a boolean"))?;
+                    active_named = true;
                     resource.insert(key, active.into());
                 }
             }
@@ -333,6 +337,7 @@ fn candidate(kind: Kind, mut resource: Map<String, Value>) -> Done<Candidate> {
         name,
         external_id,
         active,
+        active_named,
         members,
     })
 }
@@ -468,14 +473,11 @@ fn operations(body: &Value) -> Done<Vec<Operation>> {
     Ok(operations)
 }
 
-/// Whether two values of a multi-valued attribute are the same: by their `value` when both are
-/// objects that have one, else equal.
-fn same(a: &Value, b: &Value) -> bool {
-    let value = |v: &Value| v.as_object().and_then(|o| get(o, "value")).cloned();
-    match (value(a), value(b)) {
-        (Some(a), Some(b)) => a == b,
-        _ => a == b,
-    }
+/// What tells a value of a multi-valued attribute from the others: its `value` when it is an
+/// object that has one, else itself, as JSON text.
+fn identity(v: &Value) -> String {
+    let value = v.as_object().and_then(|o| get(o, "value"));
+    value.unwrap_or(v).to_string()
 }
 
 /// Whether `element`, a value of a multi-valued attribute, has `sub` equal to `expected`
@@ -599,7 +601,8 @@ fn at(target: &mut Map<String, Value>, op: Op, steps: &[Step], value: Option<&Va
 fn leaf(target: &mut Map<String, Value>, key: String, op: Op, value: Option<&Value>) {
     match (op, target.get_mut(&key), value) {
         (Op::Remove, Some(Value::Array(values)), Some(Value::Array(removed))) => {
-            values.retain(|v| !removed.iter().any(|r| same(v, r)));
+            let removed: std::collections::HashSet<String> = removed.iter().map(identity).collect();
+            values.retain(|v| !removed.contains(&identity(v)));
         }
         (Op::Remove, _, _) => {
             target.remove(&key);
@@ -609,8 +612,9 @@ fn leaf(target: &mut Map<String, Value>, key: String, op: Op, value: Option<&Val
                 Value::Array(added) => added.clone(),
                 one => vec![one.clone()],
             };
+            let mut held: std::collections::HashSet<String> = values.iter().map(identity).collect();
             for value in added {
-                if !values.iter().any(|v| same(v, &value)) {
+                if held.insert(identity(&value)) {
                     values.push(value);
                 }
             }
@@ -675,13 +679,22 @@ impl Db {
     async fn query(&self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Done<Vec<Row>> {
         let sql = sql.replace("{s}", &self.schema);
         let rows = self.opened.client.query(&sql, params).await;
-        rows.map_err(|e| unavailable(&self.opened.scrub(e)))
+        rows.map_err(|e| self.failed(e))
     }
 
     async fn execute(&self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Done<u64> {
         let sql = sql.replace("{s}", &self.schema);
         let done = self.opened.client.execute(&sql, params).await;
-        done.map_err(|e| unavailable(&self.opened.scrub(e)))
+        done.map_err(|e| self.failed(e))
+    }
+
+    /// A statement's error: a value Postgres cannot store (SQLSTATE class 22, as a NUL in a
+    /// string) is the provider's `invalidValue`; anything else is Postgres unavailable.
+    fn failed(&self, e: tokio_postgres::Error) -> Fail {
+        match e.code().is_some_and(|code| code.code().starts_with("22")) {
+            true => bad("invalidValue", "a value cannot be stored"),
+            false => unavailable(&self.opened.scrub(e)),
+        }
     }
 
     /// The resource `id` of `kind`, if stored and sound.
@@ -761,7 +774,7 @@ impl Scim {
         let answered = match (steps.as_slice(), kind, method) {
             (["ServiceProviderConfig"], _, &Method::GET) => Ok(self.provider_config()),
             (["ResourceTypes"], _, &Method::GET) => Ok(self.resource_types()),
-            (["Schemas"], _, &Method::GET) => Ok(schemas()),
+            (["Schemas"], _, &Method::GET) => Ok(schemas(self.group_attribute)),
             (["ServiceProviderConfig" | "ResourceTypes" | "Schemas"], _, _) => Err(not_allowed()),
             ([_], Some(kind), &Method::GET) => self.list(kind, query).await,
             ([_], Some(kind), &Method::POST) => match parsed() {
@@ -1015,7 +1028,12 @@ impl Scim {
         };
         *named = Some(id.to_string());
         if kind == Kind::Users {
-            let (user_name, external_id): (String, Option<String>) = (row.get(0), row.get(1));
+            let (Ok(user_name), Ok(external_id)) = (
+                row.try_get::<_, String>(0),
+                row.try_get::<_, Option<String>>(1),
+            ) else {
+                return Err(not_found());
+            };
             let marker =
                 "INSERT INTO {s}.directory_revoked (user_name, external_id) VALUES ($1, $2)";
             db.execute(marker, &[&user_name, &external_id]).await?;
@@ -1048,6 +1066,7 @@ impl Scim {
             name,
             external_id,
             active,
+            active_named,
             members,
         } = candidate;
         let resource = Value::Object(resource).to_string();
@@ -1082,7 +1101,7 @@ impl Scim {
                             .await?
                     }
                 };
-                if active {
+                if active && active_named {
                     let clear = match self.user_attribute {
                         "externalId" => "DELETE FROM {s}.directory_revoked WHERE external_id = $1",
                         _ => "DELETE FROM {s}.directory_revoked WHERE lower(user_name) = lower($1)",
@@ -1221,13 +1240,15 @@ fn listed(resources: Vec<Value>) -> Value {
     })
 }
 
-/// `/Schemas`: the attributes Meada reads of a user and a group.
-fn schemas() -> Reply {
-    let attribute = |name: &str, kind: &str, uniqueness: &str| {
+/// `/Schemas`: the attributes Meada reads of a user and a group, as it compares them: only
+/// `userName` ignoring case, and a group's `group_attribute` unique.
+fn schemas(group_attribute: &str) -> Reply {
+    let attribute = |name: &str, unique: bool| {
         json!({
-            "name": name, "type": kind, "multiValued": false, "required": name != "externalId",
-            "caseExact": false, "mutability": "readWrite", "returned": "default",
-            "uniqueness": uniqueness,
+            "name": name, "type": "string", "multiValued": false,
+            "required": name != "externalId", "caseExact": name != "userName",
+            "mutability": "readWrite", "returned": "default",
+            "uniqueness": if unique { "server" } else { "none" },
         })
     };
     let members = json!({
@@ -1244,8 +1265,8 @@ fn schemas() -> Reply {
         "id": USER,
         "name": "User",
         "attributes": [
-            attribute("userName", "string", "server"),
-            attribute("externalId", "string", "server"),
+            attribute("userName", true),
+            attribute("externalId", true),
             {"name": "active", "type": "boolean", "multiValued": false, "required": false,
              "mutability": "readWrite", "returned": "default"},
         ],
@@ -1255,8 +1276,8 @@ fn schemas() -> Reply {
         "id": GROUP,
         "name": "Group",
         "attributes": [
-            attribute("displayName", "string", "none"),
-            attribute("externalId", "string", "none"),
+            attribute("displayName", group_attribute == "displayName"),
+            attribute("externalId", group_attribute == "externalId"),
             members,
         ],
     });

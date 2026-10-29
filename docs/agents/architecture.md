@@ -442,17 +442,21 @@ one for the area a change touches.
   group holds, exactly; a 409 `uniqueness`), the members check and the write cannot interleave
   with another write. A deleted user leaves every group and a revocation marker (its `userName`
   and `externalId` in `directory_revoked`), separate from the deleted resource, which a write
-  leaving an active user whose `user_attribute` matches it (a `userName` ignoring case) clears;
+  naming `active` true for a user whose `user_attribute` matches it (a `userName` ignoring case)
+  clears (active by default is not enough);
   nothing reads the markers yet. Errors are RFC 7644's, with `scimType` (`invalidFilter`,
   `invalidPath`, `invalidValue`, `noTarget`, `uniqueness`, `invalidSyntax`) for a 400 or 409, an
-  unknown id a 404, and a fixed detail that echoes no value. Postgres unreachable, or a schema
+  unknown id a 404, and a fixed detail that echoes no value; a value Postgres cannot store
+  (SQLSTATE class 22, as a NUL) is a 400 `invalidValue`. Postgres unreachable, or a schema
   version this binary does not know (`postgres::connected`), is a 503 in the same schema after
   one `ui: postgres: unreachable (<reason>)` line; the console's other routes are unaffected.
   Each `POST`, `PUT`, `PATCH` or `DELETE` under the prefix leaves one stderr line `scim:
   <method> <resource> <id>: <status>`, `<resource>` `Users`, `Groups` or `-`, `<id>` the stored
   resource the write named or `-` (a failed `POST`, an unknown id, a refusal before routing):
   no payload, attribute value, group name or token reaches stderr. The console's `manifest`
-  route shows `[directory]` as written, the token's variable or file name and never its value.
+  route shows `[directory]` as written, the token's variable or file name (the default
+  `token_env` filled in) and never its value. `/Schemas` describes the comparisons: `userName`
+  ignoring case, the `group_attribute` unique.
 - `oidc.rs` (feature `oidc`; with `github_app.rs` the only places `jsonwebtoken` is used, with
   RustCrypto as its backend, never aws-lc-rs): server mode as an OAuth 2.1 resource server. `File`
   is the `[oidc]` section, the identity provider (ADR 0016: the one token issuer of the

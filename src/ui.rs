@@ -480,6 +480,15 @@ impl Console {
             return Err(lines.join("\n").into());
         };
         let table: toml::Table = toml::from_str(&src)?;
+        #[cfg_attr(not(feature = "directory"), allow(unused_mut))]
+        let mut loaded = serde_json::to_value(table)?;
+        // The manifest route names where the SCIM token comes from, its default included.
+        #[cfg(feature = "directory")]
+        if let Some(directory) = loaded.get_mut("directory").and_then(Value::as_object_mut)
+            && !directory.contains_key("token_file")
+        {
+            (directory.entry("token_env")).or_insert(crate::directory::TOKEN_ENV.into());
+        }
         #[cfg(feature = "snapshot")]
         let holds = match &read.snapshot {
             Some(snapshot) => Holds::Generations(match &snapshot.local_dir {
@@ -498,7 +507,7 @@ impl Console {
             apps: Manifest::github_apps(file)?.1,
             ui,
             root,
-            loaded: serde_json::to_value(table)?,
+            loaded,
             csp: header::HeaderValue::from_str(&csp(issuer))?,
             #[cfg(feature = "oidc")]
             oidc,

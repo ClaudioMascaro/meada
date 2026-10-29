@@ -20,7 +20,7 @@ use crate::msg::Msg;
 pub mod scim;
 
 /// The variable `token_env` names by default.
-const TOKEN_ENV: &str = "MEADA_SCIM_TOKEN";
+pub const TOKEN_ENV: &str = "MEADA_SCIM_TOKEN";
 /// The fewest characters a SCIM token may have.
 const TOKEN_MIN: usize = 32;
 // ponytail: the most `token_file` may hold; past it the console refuses to start, naming the file.

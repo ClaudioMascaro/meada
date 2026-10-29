@@ -124,6 +124,20 @@ Console operations require OIDC and are off by default. When enabled, they use t
 
 With `[postgres]` in the bootstrap (and the schema up to date through `meada postgres migrate`), every console write and every CLI command that mirrors one (`meada workspace import` and `apply`, `meada snapshot pointer set`, `retain` and `drop`, `meada snapshot fence recover`) leaves a record in Postgres: who (subject, role and, for a team operator, the owners), what (action and arguments), when (Postgres's clock) and the outcome (`pending`, `accepted`, `refused` or `failed`). The record is written before the write touches Valkey or the store: when it cannot be written, the write is refused and nothing changes (the console answers 503 `audit_unavailable`, the CLI exits 1 naming Postgres). Role refusals and refusals under the lock are recorded too; invalid bodies (400, 413, 422) are not. The console starts with Postgres down (reads keep working) and refuses to start on a schema version it does not know. The global operator reads the records, newest first, on the **Audit log** page or through `GET /api/v1/audit?before=<id>&limit=<1 to 100>`. The stderr audit line is unchanged, with or without `[postgres]`, and Meada never deletes a record.
 
+## Directory (SCIM)
+
+With the `directory` feature (part of `cloud`), `[directory]` in the bootstrap, beside `[postgres]` and `[oidc]`, makes the console serve a SCIM 2.0 endpoint under `/scim/v2/`, which Entra ID's or Okta's provisioning pushes users and groups into:
+
+```toml
+[directory]
+token_env = "MEADA_SCIM_TOKEN"   # or token_file; read by the console at start
+user_claim = "oid"
+user_attribute = "externalId"    # or "userName"
+group_attribute = "externalId"   # "displayName" by default
+```
+
+The endpoint accepts only its own bearer token, at least 32 characters long: the console refuses to start with a short, missing or unreadable token, and rotating it means restarting the console. A console token is no good there, the SCIM token is no good under `/api/v1/`, and any request carrying `Origin` gets a 403. Users and groups live in the Postgres schema (run `meada postgres migrate` first) as the provider sent them, never with `password`; a body over 1 MiB or a resource over 64 KiB gets a 413. Deleting a user removes it from every group and leaves a revocation marker until it is provisioned again with `active` true. Each write leaves one stderr line, `scim: <method> <resource> <id>: <status>`, with no values. Nothing reads the directory yet.
+
 ## Teams
 
 Several teams can share one workspace: each changes its own entries and the global operator answers for the rest. The numbered rules below are the whole contract.

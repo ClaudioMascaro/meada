@@ -209,7 +209,7 @@ _Avoid_: user store, LDAP, address book, IdP sync
 **Revocation marker**:
 What deleting a provisioned user through the directory leaves: its `userName` and `externalId`,
 kept apart from the deleted SCIM resource, so that `GET` and `filter` show the user absent while
-the console can still refuse its live tokens. A write that leaves an active user matching it by
+the console can still refuse its live tokens. A write naming `active` true for a user matching it by
 `[directory] user_attribute` clears it; deactivating a user leaves none, and nodes never read it
 (ADR 0016, #334).
 _Avoid_: tombstone, soft delete

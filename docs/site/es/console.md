@@ -124,6 +124,20 @@ Las operaciones de la consola requieren OIDC y están desactivadas por defecto. 
 
 Con `[postgres]` en el bootstrap (y el schema al día con `meada postgres migrate`), cada escritura de la consola y cada comando del CLI que la refleja (`meada workspace import` y `apply`, `meada snapshot pointer set`, `retain` y `drop`, `meada snapshot fence recover`) deja un registro en Postgres: quién (sujeto, rol y, para un operador de equipo, los owners), qué (acción y argumentos), cuándo (el reloj de Postgres) y el resultado (`pending`, `accepted`, `refused` o `failed`). El registro se graba antes de que la escritura toque Valkey o el store: si no puede grabarse, la escritura se rechaza y nada cambia (la consola responde 503 `audit_unavailable`, el CLI sale con 1 nombrando Postgres). Los rechazos de rol y los rechazos bajo el lock también se registran; los bodies inválidos (400, 413, 422) no. La consola arranca con Postgres caído (las lecturas siguen) y se niega a arrancar con una versión de schema que no conoce. El operador global lee los registros, del más reciente al más antiguo, en la página **Audit log** o con `GET /api/v1/audit?before=<id>&limit=<1 a 100>`. La línea de auditoría en stderr no cambia, con o sin `[postgres]`, y Meada nunca borra un registro.
 
+## Directorio (SCIM)
+
+Con la feature `directory` (incluida en `cloud`), `[directory]` en el bootstrap, junto a `[postgres]` y `[oidc]`, hace que la consola sirva un endpoint SCIM 2.0 en `/scim/v2/`, al que el aprovisionamiento de Entra ID u Okta envía usuarios y grupos:
+
+```toml
+[directory]
+token_env = "MEADA_SCIM_TOKEN"   # o token_file; la consola lo lee al arrancar
+user_claim = "oid"
+user_attribute = "externalId"    # o "userName"
+group_attribute = "externalId"   # "displayName" por defecto
+```
+
+El endpoint acepta solo su propio bearer token, de al menos 32 caracteres: la consola no arranca con un token corto, ausente o ilegible, y rotarlo exige reiniciarla. Un token de la consola no sirve ahí, el token SCIM no sirve en `/api/v1/`, y cualquier petición con `Origin` recibe 403. Usuarios y grupos quedan en el schema de Postgres (ejecuta antes `meada postgres migrate`) tal como los envió el proveedor, nunca con `password`; un cuerpo de más de 1 MiB o un recurso de más de 64 KiB recibe 413. Borrar un usuario lo saca de todos los grupos y deja un marcador de revocación hasta que se lo aprovisione de nuevo con `active` verdadero. Cada escritura deja una línea en stderr, `scim: <método> <recurso> <id>: <status>`, sin valores. Todavía nada lee el directorio.
+
 ## Equipos
 
 Varios equipos pueden compartir un workspace: cada uno modifica sus propias entradas y el operador global responde por el resto. Las reglas numeradas son todo el contrato.

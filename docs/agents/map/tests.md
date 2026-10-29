@@ -575,13 +575,17 @@ unchanged by `PATCH` and `PUT`; 413 without `scimType` for a body over 1 MiB and
 over 64 KiB on `POST` and after a `PATCH`; eight concurrent `POST`s of one `userName` storing
 one; no error body or stderr line echoing a value. The revocation marker: none after a
 deactivation; one after deleting an inactive and an active user, which `filter` does not show;
-none for an unknown id; kept by an inactive reprovisioning, cleared by an active one (by
-`PATCH`, `userName` differing in case, and by a `POST` without `active`). Without a service (a
+none for an unknown id; kept by an inactive reprovisioning and by a `POST` active only by
+default, cleared by one naming `active` true (by `PATCH`, `userName` differing in case, and by a
+path-less `add`). Four concurrent `POST`s of one group name store one; a group `PUT` and `PATCH`
+renaming to a held name are 409 `uniqueness`; a user deleted while a `PATCH` adds it to a group
+leaves no membership; a NUL in a value is a 400 `invalidValue`, not a 503. Without a service (a
 `[postgres]` naming a closed port): no token, a console token, a wrong token, the token one
 character short and a `Basic` scheme each a 401 with `WWW-Authenticate: Bearer`; `Origin` a 403
 with and without the token; a foreign `Host` a 403; the SCIM token under `/api/v1/session` a
 401; another media type a 415; the three discovery documents' fixed content; a 405; a 503 for a
-resource with `config` answering; the `manifest` route naming `token_env` and not the token; the
+resource with `config` answering; the `manifest` route naming the default `token_env` and not the token; `/Schemas` marking the
+`group_attribute` unique; the
 console refusing to start with a 31-character token and with none, naming the key and its line
 in English under `en_US` and `pt_BR`. `tests/it/postgres.rs` holds migration 3's columns.
 

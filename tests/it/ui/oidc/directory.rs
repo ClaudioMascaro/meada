@@ -25,9 +25,8 @@ const GROUP: &str = "urn:ietf:params:scim:schemas:core:2.0:Group";
 const ENTERPRISE: &str = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User";
 const PATCH_OP: &str = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const ERROR: &str = "urn:ietf:params:scim:api:messages:2.0:Error";
-/// The `[directory]` of every console here.
-const DIRECTORY: &str = "\n[directory]\ntoken_env = \"MEADA_SCIM_TOKEN\"\nuser_claim = \"oid\"\nuser_attribute = \
-     \"userName\"\n";
+/// The `[directory]` of every console here, its token in the default `MEADA_SCIM_TOKEN`.
+const DIRECTORY: &str = "\n[directory]\nuser_claim = \"oid\"\nuser_attribute = \"userName\"\n";
 
 /// `text` appended to the console's manifest in `dir`.
 fn append(dir: &Path, text: &str) {
@@ -473,6 +472,18 @@ fn refusals_carry_their_scim_type_and_write_nothing() {
     let group = json!({"displayName": "Platform Team", "externalId": "g-plat-5"});
     expect(&console, "POST", "/Groups", Some(&group), 201);
     refused("POST", "/Groups", Some(&group), uniqueness);
+    let other = json!({"displayName": "Other Team"});
+    let other = expect(&console, "POST", "/Groups", Some(&other), 201)["id"].clone();
+    let other = format!("/Groups/{}", other.as_str().unwrap());
+    refused(
+        "PUT",
+        &other,
+        Some(&json!({"displayName": "Platform Team"})),
+        uniqueness,
+    );
+    let renamed =
+        patch(json!([{"op": "replace", "path": "displayName", "value": "Platform Team"}]));
+    refused("PATCH", &other, Some(&renamed), uniqueness);
     let invalid = (400, "invalidValue");
     let stranger = json!({"displayName": "Strangers", "members": [{"value": "0".repeat(32)}]});
     refused("POST", "/Groups", Some(&stranger), invalid);
@@ -561,6 +572,52 @@ fn refusals_carry_their_scim_type_and_write_nothing() {
     });
     statuses.sort();
     assert_eq!(statuses, [201, 409, 409, 409, 409, 409, 409, 409]);
+    // Four writers of one group name, one stored.
+    let mut statuses: Vec<u16> = std::thread::scope(|scope| {
+        let racers: Vec<_> = (0..4)
+            .map(|_| {
+                let console = &console;
+                scope.spawn(move || {
+                    let group = json!({"displayName": "Racers"});
+                    scim(console, "POST", "/Groups", Some(&group)).status
+                })
+            })
+            .collect();
+        racers.into_iter().map(|r| r.join().unwrap()).collect()
+    });
+    statuses.sort();
+    assert_eq!(statuses, [201, 409, 409, 409]);
+    // A user deleted while a group adds it: whichever writes second sees the first, and no
+    // membership outlives its user.
+    for round in 0..5 {
+        let user = json!({"userName": format!("erin{round}@contoso.example")});
+        let user = expect(&console, "POST", "/Users", Some(&user), 201)["id"].clone();
+        let group = json!({"displayName": format!("Round {round}")});
+        let group = expect(&console, "POST", "/Groups", Some(&group), 201)["id"].clone();
+        let (group, user) = (group.as_str().unwrap(), user.as_str().unwrap());
+        let add = patch(json!([{"op": "add", "path": "members", "value": [{"value": user}]}]));
+        let (at, gone) = (format!("/Groups/{group}"), format!("/Users/{user}"));
+        let (added, deleted) = std::thread::scope(|scope| {
+            let adding = scope.spawn(|| scim(&console, "PATCH", &at, Some(&add)).status);
+            let deleting = scope.spawn(|| scim(&console, "DELETE", &gone, None).status);
+            (adding.join().unwrap(), deleting.join().unwrap())
+        });
+        assert!(
+            matches!(added, 204 | 400) && deleted == 204,
+            "{added} {deleted}"
+        );
+        let held = expect(&console, "GET", &format!("/Groups/{group}"), None, 200);
+        assert_eq!(members(&held), Vec::<&str>::new(), "round {round}");
+    }
+    // A value Postgres cannot store is the provider's error, not an outage.
+    let nul = json!({"userName": "nul\u{0}@contoso.example"});
+    let reply = scim(&console, "POST", "/Users", Some(&nul));
+    assert_eq!(
+        scim_type(&reply),
+        (400, "invalidValue".into()),
+        "{}",
+        reply.body
+    );
 
     let stderr = console.stderr();
     for line in lines(&stderr) {
@@ -584,8 +641,8 @@ fn refusals_carry_their_scim_type_and_write_nothing() {
 
 /// The revocation marker: deactivating leaves none; deleting a provisioned user, inactive or
 /// active, leaves one that `GET` and `filter` do not show; deleting an unknown id leaves none;
-/// provisioning the user again inactive keeps it, and active (its `userName` compared ignoring
-/// case, the default `user_attribute`) clears it.
+/// provisioning the user again inactive, or active only by default, keeps it, and naming it
+/// active (its `userName` compared ignoring case, the default `user_attribute`) clears it.
 #[test]
 fn a_deleted_user_leaves_a_revocation_marker_until_provisioned_active() {
     let Some((_issuer, audit, console)) = provisioned("ui_directory_revoked") else {
@@ -650,16 +707,22 @@ fn a_deleted_user_leaves_a_revocation_marker_until_provisioned_active() {
         200,
     );
     assert_eq!(markers(), ["erin@contoso.example"]);
+    // Active by default is not explicit: the marker stays until `active` is named true.
     let erin = json!({"userName": "erin@contoso.example"});
-    expect(&console, "POST", "/Users", Some(&erin), 201);
+    let erin = expect(&console, "POST", "/Users", Some(&erin), 201)["id"].clone();
+    assert_eq!(markers(), ["erin@contoso.example"]);
+    let erin = format!("/Users/{}", erin.as_str().unwrap());
+    let on = patch(json!([{"op": "add", "value": {"active": true}}]));
+    expect(&console, "PATCH", &erin, Some(&on), 200);
     assert_eq!(markers(), Vec::<String>::new());
 }
 
 /// A console whose `[postgres]` names a closed port, so no service is needed: `PG_334_URL`.
-fn unreachable_console(case: &str, issuer: &Issuer) -> PathBuf {
+/// `directory` its `[directory]`.
+fn unreachable_console(case: &str, issuer: &Issuer, directory: &str) -> PathBuf {
     let dir = console_dir(case, Some(VERSION), &head(&issuer.base), &ui_oidc());
     let postgres = "\n[postgres]\nurl_env = \"PG_334_URL\"\nschema = \"meada_t334\"\n";
-    append(&dir, &format!("{postgres}{DIRECTORY}"));
+    append(&dir, &format!("{postgres}{directory}"));
     dir
 }
 
@@ -675,7 +738,7 @@ const CLOSED: &str = "postgres://meada:pg-secret-334@127.0.0.1:1/meada";
 fn admission_is_the_scim_token_alone() {
     let (signing, jwk) = key("k1");
     let issuer = Issuer::new(set(&[&jwk]));
-    let dir = unreachable_console("ui_directory_admission", &issuer);
+    let dir = unreachable_console("ui_directory_admission", &issuer, DIRECTORY);
     let console = start(&dir, &[("MEADA_SCIM_TOKEN", TOKEN), ("PG_334_URL", CLOSED)]);
     let console_token = sign(&signing, "k1", Algorithm::ES256, &claims(&issuer.base, &[]));
     let short = &TOKEN[..TOKEN.len() - 1];
@@ -767,6 +830,10 @@ fn admission_is_the_scim_token_alone() {
         listed.iter().map(|a| a["name"].clone()).collect()
     };
     assert_eq!(schemas["totalResults"], json!(2));
+    let unique = |at: usize, attribute: usize| &schemas["Resources"][at]["attributes"][attribute];
+    assert_eq!(unique(1, 0)["uniqueness"], json!("server"));
+    assert_eq!(unique(1, 1)["uniqueness"], json!("none"));
+    assert_eq!(unique(0, 0)["caseExact"], json!(false));
     assert_eq!(
         (attributes(0), attributes(1)),
         (
@@ -807,7 +874,11 @@ fn admission_is_the_scim_token_alone() {
 fn the_console_refuses_a_short_or_missing_token() {
     let (_, jwk) = key("k1");
     let issuer = Issuer::new(set(&[&jwk]));
-    let dir = unreachable_console("ui_directory_token", &issuer);
+    let dir = unreachable_console(
+        "ui_directory_token",
+        &issuer,
+        &DIRECTORY.replace("user_claim", "token_env = \"MEADA_SCIM_TOKEN\"\nuser_claim"),
+    );
     let line = fs::read_to_string(dir.join(MANIFEST)).unwrap();
     let line = 1 + line
         .lines()
