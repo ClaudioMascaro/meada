@@ -11,7 +11,8 @@ All notable changes to Meada are recorded here. The format follows
 The first release: the trunk of the roadmap (ADR 0003) and every spec merged since.
 The full list of changes is in [docs/releases/0.1.0.md](https://github.com/ClaudioMascaro/meada/blob/v0.1.0/docs/releases/0.1.0.md).
 Identity automation (ADR 0016, #319) and named workspaces (ADR 0020) are decided here and ship
-in a later release.
+in a later release. Prebuilt binaries cover Linux and macOS on x86_64 and arm64 and Windows on
+x86_64; Windows arm64 waits for a toolchain that builds it.
 
 ### Added
 
