@@ -805,6 +805,13 @@ pub enum Msg<'a> {
     WorkspaceNotVersion(&'a str),
     #[cfg(feature = "generation-pointer")]
     WorkspaceNoVersion(&'a str),
+    /// How many entries a version's apply may not change (ADR 0015); the console answers its
+    /// English text.
+    #[cfg(feature = "refresh-lock")]
+    WorkspaceRefused(usize),
+    /// A team operator whose groups own no entry it reads in the current version any more.
+    #[cfg(feature = "refresh-lock")]
+    WorkspaceRoleLost,
     /// A serialized import that its bounded reader could not read back.
     #[cfg(feature = "generation-pointer")]
     WorkspaceVersionTooLarge {
@@ -2644,6 +2651,26 @@ impl Msg<'_> {
             Msg::WorkspaceNoVersion(key) => pick(
                 format!("{key}: no such workspace version in the store"),
                 format!("{key}: essa versão do workspace não está no store"),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::WorkspaceRefused(n) => pick(
+                format!(
+                    "this change touches {n} entr{} you may not change: nothing applied",
+                    if *n == 1 { "y" } else { "ies" }
+                ),
+                format!(
+                    "esta mudança toca {n} {} que você não pode mudar: nada aplicado",
+                    if *n == 1 { "entrada" } else { "entradas" }
+                ),
+            ),
+            #[cfg(feature = "refresh-lock")]
+            Msg::WorkspaceRoleLost => pick(
+                "no group of yours owns an entry you read in the current workspace version any \
+                 more: nothing applied"
+                    .into(),
+                "nenhum grupo seu é mais owner de uma entrada que você lê na versão atual do \
+                 workspace: nada aplicado"
+                    .into(),
             ),
             #[cfg(feature = "generation-pointer")]
             Msg::WorkspaceVersionTooLarge { key, max } => pick(

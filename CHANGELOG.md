@@ -14,6 +14,13 @@ All notable changes to Meada are recorded here. The format follows
   and pulled like the entry's other keys, and changes the version id; an entry without it keeps
   its id, and generation and bundle ids never read it. `meada index` ignores it. In a bootstrap
   manifest's own `[[repository]]` entries it is an error naming `source = "store"`.
+- `meada-core` decides what a subject may change in a workspace version (ADR 0015):
+  `authorize_entries` lists each entry a team operator may not add, edit or remove with its
+  reason (`outside_grant`, `ownerless`, `owner_change`, `not_your_team`), and `compose_entries`
+  builds the version a team operator's save stores, keeping every entry outside its grant in
+  place. The browser gets both through WebAssembly. The apply path checks a team operator under
+  the refresh lock against the version then current; `meada workspace apply` acts as the global
+  operator, so its output and exit codes do not change.
 - ADR 0020 and the glossary record the direction of spec S5: a named query context over shared
   indexing and publication.
 - `meada status` ends a repository's lines with a pointer to the new `inference` issue form when the

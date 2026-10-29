@@ -162,7 +162,12 @@ fn workspace(command: WorkspaceCommand) -> ! {
         #[cfg(feature = "refresh-lock")]
         WorkspaceCommand::Apply { version, workspace } => {
             let author = versions::cli_author();
-            versions::apply(&workspace, &version, &author).map(|state| format!("{state}\n"))
+            // The CLI holds the store's and Valkey's credentials: the global operator (ADR 0015).
+            let operator = meada_core::authorize::Role::Operator;
+            let grant = meada_core::authorize::Grant::All;
+            versions::apply(&workspace, &version, &author, operator, &[], &grant)
+                .map(|state| format!("{state}\n"))
+                .map_err(Into::into)
         }
         // The id on stdout either way; that nothing changed on stderr.
         WorkspaceCommand::Pull { workspace } => versions::pull(&workspace).map(|pulled| {

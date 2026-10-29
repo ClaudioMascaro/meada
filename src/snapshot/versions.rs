@@ -21,6 +21,8 @@
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "refresh-lock")]
+use meada_core::authorize::{self, Grant, Refusal, Role, authorize_entries};
 use meada_core::ids::workspace_version_id;
 use meada_core::manifest::{EntryFile, validate, validate_import};
 use meada_core::workspace::entries_text;
@@ -432,38 +434,102 @@ pub fn cli_author() -> String {
     format!("cli:{login}@{}", host.to_lowercase())
 }
 
+/// Why `apply` moved nothing, kept apart for the console's answer and audit.
+#[cfg(feature = "refresh-lock")]
+#[derive(Debug)]
+pub enum ApplyError {
+    /// The entries the subject may not change, as `authorize_entries` lists them.
+    Refused(Vec<Refusal>),
+    /// A team operator that the current version no longer makes one (`authorize::role`).
+    RoleLost,
+    /// Anything else: the argument, the manifest, the store, Valkey, the lock or the pointer.
+    Failed(String),
+}
+
+#[cfg(feature = "refresh-lock")]
+impl std::fmt::Display for ApplyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ApplyError::Refused(refused) => {
+                f.write_str(&Msg::WorkspaceRefused(refused.len()).text())
+            }
+            ApplyError::RoleLost => f.write_str(&Msg::WorkspaceRoleLost.text()),
+            ApplyError::Failed(problem) => f.write_str(problem),
+        }
+    }
+}
+
+#[cfg(feature = "refresh-lock")]
+impl std::error::Error for ApplyError {}
+
 /// `meada workspace apply <version> --workspace <manifest>` (feature `refresh-lock`): once the
 /// store holds the version `id`'s document, checked, moves `{<key_prefix>}:workspace` to `id`
 /// with the operation's fence under the refresh lock (`APPLY`); `<id> <fence>`. The id is
-/// checked before anything is read.
+/// checked before anything is read. Anyone but the global operator (`role`, its `groups` and
+/// `grant`) is authorized under the lock, before the pointer moves, against the version then
+/// current: its role recomputed from it, then `authorize_entries` over its whole entries. The
+/// CLI passes the global operator.
 #[cfg(feature = "refresh-lock")]
-pub fn apply(manifest: &Path, id: &str, author: &str) -> crate::Result<String> {
-    if !is_id(id) {
-        return Err(Msg::BadVersionArg(&id.escape_debug().to_string())
-            .text()
-            .into());
+pub fn apply(
+    manifest: &Path,
+    id: &str,
+    author: &str,
+    role: Role,
+    groups: &[String],
+    grant: &Grant,
+) -> Result<String, ApplyError> {
+    fn failed(e: impl std::fmt::Display) -> ApplyError {
+        ApplyError::Failed(e.to_string())
     }
-    let sections = super::operation::sections(manifest)?;
+    if !is_id(id) {
+        let shown = id.escape_debug().to_string();
+        return Err(ApplyError::Failed(Msg::BadVersionArg(&shown).text()));
+    }
+    let sections = super::operation::sections(manifest).map_err(failed)?;
     let key = version_key(&sections.snapshot, id);
     let check = async {
         let store = Store::connect(&sections.snapshot)?;
         match stored(&store, &key, id).await? {
-            Some(_) => Ok(()),
+            Some((version, _)) => Ok(version.repositories),
             None => Err(Msg::WorkspaceNoVersion(&key).text()),
         }
     };
-    crate::modules::block_on(check)??;
-    super::operation::locked(
+    let entries = crate::modules::block_on(check)
+        .map_err(failed)?
+        .map_err(ApplyError::Failed)?;
+    let snapshot = &sections.snapshot;
+    let done = super::operation::locked(
         &sections,
         &format!("workspace apply {}", author.escape_debug()),
         async |valkey, config, _, held| {
+            if role != Role::Operator {
+                let current = match current(valkey, config).await? {
+                    Some((current, _)) => {
+                        let store = Store::connect(snapshot)?;
+                        let key = version_key(snapshot, &current);
+                        let stored = stored(&store, &key, &current).await?;
+                        stored
+                            .ok_or_else(|| Msg::WorkspaceNoVersion(&key).text())?
+                            .0
+                    }
+                    None => return Ok(Err(ApplyError::RoleLost)),
+                };
+                let current = current.repositories;
+                if authorize::role(role, groups, grant, &current) == Role::Viewer {
+                    return Ok(Err(ApplyError::RoleLost));
+                }
+                let refused = authorize_entries(role, groups, grant, &current, &entries);
+                if !refused.is_empty() {
+                    return Ok(Err(ApplyError::Refused(refused)));
+                }
+            }
             let (lock, pointer) = (config.key("lock", true), pointer_key(config));
             let mut script = cmd("EVAL");
             script.arg(APPLY).arg(2).arg(&lock).arg(&pointer);
             script.arg(&held.token).arg(id).arg(held.fence);
             let wrote = valkey.query::<i64>(&script).await;
             match wrote.map_err(|e| format!("{pointer}: {e}"))? {
-                1 => Ok(format!("{id} {}", held.fence)),
+                1 => Ok(Ok(format!("{id} {}", held.fence))),
                 0 => Err(Msg::LockNotHeld(&lock).text()),
                 -1 => Err(Msg::FenceRefused {
                     fence: held.fence,
@@ -474,7 +540,8 @@ pub fn apply(manifest: &Path, id: &str, author: &str) -> crate::Result<String> {
                 _ => Err(Msg::WorkspaceBadPointer(&pointer).text()),
             }
         },
-    )
+    );
+    done.map_err(failed)?
 }
 
 /// Points the workspace (`KEYS[2]`) at the version `ARGV[2]` with the fence `ARGV[3]` while the

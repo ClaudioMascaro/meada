@@ -88,8 +88,8 @@ The repository is a Cargo workspace (ADR 0014): the `meada` binary's crate at th
 share. Both take one version from the workspace, and `meada` depends on `meada-core` at exactly
 it. `meada-core` has no rusqlite, tree-sitter, filesystem, process or network code and no async
 runtime; it builds for `wasm32-unknown-unknown`, its `wasm-bindgen` feature (never the binary's)
-exporting `init`, `validate`, `workspaceVersionId`, `workspaceDiff`, `entriesText` and
-`parseExport`. CI's `core` job builds it
+exporting `init`, `validate`, `workspaceVersionId`, `workspaceDiff`, `entriesText`,
+`authorizeEntries`, `composeEntries` and `parseExport`. CI's `core` job builds it
 with wasm-pack and checks both trees.
 
 Every tree-sitter grammar is a crate except Kotlin's: `vendor/tree-sitter-kotlin-ng/` holds
@@ -106,7 +106,7 @@ other Kotlin grammar may enter the dependency tree: they all export `tree_sitter
   optional `owner` (ADR 0015), checked where the entry is read (`owner_problem`: one string, not
   empty, at most `OWNER_MAX` characters, no control character, no whitespace at either end;
   compared exactly), so the browser's validation, every import, every pull and every read of a
-  stored version check it alike; nothing reads it to decide a write yet (#323 and #324 will).
+  stored version check it alike; `authorize` reads it to decide a write (#323).
   `validate_import(file, src)`
   validates entries while ignoring other top-level keys, with CLI import's file prefix on
   identity errors; CLI, HTTP and WASM import validation share it, preserving empty workspaces and ignored
@@ -123,6 +123,20 @@ other Kotlin grammar may enter the dependency tree: they all export `tree_sitter
   pure JSON-repositories-to-TOML conversion shared with `snapshot::versions` and WASM; it prints
   an entry's `owner` right after its `path`, before the block tables, so the text reads back to
   the same id.
+- `meada-core/src/authorize.rs` (ADR 0015): what a subject may change in a workspace version,
+  over a version document's JSON `repositories`. `authorize_entries(role, groups, grant,
+  current, new)` returns the refused entries (`Refusal`: `identity`, `change` `add`/`edit`/
+  `remove`, `reason`), the new entries' order then the removed ones in the current order; the
+  global operator (`Role::Operator`) gets none. For anyone else, entries pair by `repo`, one is
+  changed when anything but its position differs, and each changed entry gets the first rule it
+  fails: `outside_grant`, `ownerless` (the current entry has no owner, or the addition has
+  none), `owner_change` (an edit's owner differs, cleared included), `not_your_team` (the owner
+  is none of its teams: its groups owning an entry of `current` the `Grant` reads). `role` is
+  admission's rule (#324): the global operator stays one, anyone else is a team operator while
+  it has a team, else a viewer. `compose_entries(grant, current, submitted)` is the version a
+  team operator's save stores: the current entries in place, those the grant reads replaced or
+  dropped, those outside it kept, additions appended in submitted order. The binary's apply and
+  the browser (`authorizeEntries`, `composeEntries` in `wasm.rs`) call the same functions.
 - `meada-core/src/msg.rs`: the messages of those checks and the language flag the binary's
   `msg.rs` reads too; `meada-core/src/http.rs`: `normalize_path` and `PARAM`, which the HTTP
   kind re-exports. `qualify` and `parent` (dotted names) live in its `lib.rs`.
@@ -657,7 +671,14 @@ one for the area a change touches.
   `apply` (`meada workspace apply <version>`, feature `refresh-lock`) checks the id first
   (`Msg::BadVersionArg`), needs `[refresh_lock]` (`operation::sections`), reads and checks the
   version's document in the store (missing, `Msg::WorkspaceNoVersion` naming its key), then runs
-  under `operation::locked` (holder `workspace apply <author>`) the `APPLY` script: it sets
+  under `operation::locked` (holder `workspace apply <author>`), for a subject other than the
+  global operator (its `Role`, groups and `Grant`), the authorization against the version then
+  current: its role recomputed (`authorize::role`; none current, or no team left, is
+  `ApplyError::RoleLost`), then `authorize_entries` over the whole current entries and the
+  applied ones (`ApplyError::Refused` with the refusals; `Msg::WorkspaceRefused` counts them).
+  Either releases the lock and moves nothing; two applies serialize on the lock, so a version is
+  checked against the one it replaces. The CLI and, until #324, the console pass the global
+  operator, which reads nothing more. Then the `APPLY` script: it sets
   `{<key_prefix>}:workspace` to `{id, fence}` only while the lock holds the token and the
   operation's fence is above the stored one (decimal text, as `POINT` compares;
   `Msg::FenceRefused` otherwise); it prints `<id> <fence>`. Rolling back is applying an older

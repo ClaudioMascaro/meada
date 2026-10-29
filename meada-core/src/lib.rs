@@ -1,11 +1,13 @@
 //! The deterministic core of Meada (ADR 0014): the schema of a workspace manifest's entries and
-//! the checks its text decides (`manifest`), the ids with their patterns (`ids`), workspace entry diffs (`workspace`), the export's
+//! the checks its text decides (`manifest`), the ids with their patterns (`ids`), workspace entry diffs (`workspace`), what a
+//! subject may change in them and a team operator's save (`authorize`, ADR 0015), the export's
 //! types (`export`), shapes and their drift (`shape`, `drift`), and the answers of `search`,
 //! `context` and `trace` with the token budget they share (`search`, `context`, `trace`,
 //! `render`). The `meada` binary and the console's front end, compiled to WebAssembly, share it.
 //! No filesystem, process or network code and no async runtime: it builds for
 //! `wasm32-unknown-unknown`.
 
+pub mod authorize;
 pub mod context;
 pub mod drift;
 pub mod export;
