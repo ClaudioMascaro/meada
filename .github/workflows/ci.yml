@@ -3,7 +3,13 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    # loop/**: the backlog loop's ticket branches, where this run is the gate before the merge.
+    branches: [main, 'loop/**']
+
+# A newer push to a loop branch supersedes its run in progress; main and pull requests keep every run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/heads/loop/') }}
 
 env:
   CARGO_TERM_COLOR: always
