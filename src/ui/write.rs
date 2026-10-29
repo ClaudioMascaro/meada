@@ -76,7 +76,7 @@ fn result(
 ) -> Answer {
     match result {
         Ok(result) => {
-            let owners = session.team().then_some(owners);
+            let owners = session.is_team_operator().then_some(owners);
             audit(
                 session.subject.as_deref(),
                 owners,
@@ -108,7 +108,7 @@ fn acting(session: &Session) -> (Role, Grant) {
 
 /// A refusal whose audit outcome is not its message.
 #[cfg(feature = "refresh-lock")]
-fn refusal(
+fn refused_with_outcome(
     session: &Session,
     action: &str,
     outcome: &str,
@@ -304,14 +304,16 @@ impl Console {
                 Ok((saved, owners)) => {
                     result(session, action, &saved.id, Ok(saved.id.clone()), &owners)
                 }
-                Err(crate::snapshot::versions::SaveError::Invalid(problems)) => refusal(
-                    session,
-                    action,
-                    &Msg::UiEntriesInvalid.text(),
-                    StatusCode::UNPROCESSABLE_ENTITY,
-                    "invalid_entries",
-                    &problems.join("\n"),
-                ),
+                Err(crate::snapshot::versions::SaveError::Invalid(problems)) => {
+                    refused_with_outcome(
+                        session,
+                        action,
+                        &Msg::UiEntriesInvalid.text(),
+                        StatusCode::UNPROCESSABLE_ENTITY,
+                        "invalid_entries",
+                        &problems.join("\n"),
+                    )
+                }
                 Err(crate::snapshot::versions::SaveError::Unauthorized(refused)) => {
                     entries_refused(session, action, "-", None, refused)
                 }

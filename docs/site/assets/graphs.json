@@ -477,9 +477,9 @@
         "es": "Versión, autorización, generación"
       },
       "summary": {
-        "pt": "Salvar, aplicar e publicar são ações distintas. Owners e autorização por equipe pertencem ao S3 planejado.",
-        "en": "Save, apply and publish are separate actions. Owners and team authorization belong to planned S3.",
-        "es": "Guardar, aplicar y publicar son acciones distintas. Owners y autorización por equipo pertenecen al S3 planeado."
+        "pt": "Salvar, aplicar e publicar são ações distintas. Um time salva e aplica só mudanças nas entradas que possui.",
+        "en": "Save, apply and publish are separate actions. A team saves and applies changes only to the entries it owns.",
+        "es": "Guardar, aplicar y publicar son acciones distintas. Un equipo guarda y aplica solo cambios en las entradas que posee."
       },
       "start": "editor",
       "nodes": [
@@ -613,14 +613,14 @@
           },
           "kind": "process",
           "detail": {
-            "pt": "Uma entrada poderá ter um owner, o nome exato de um grupo OIDC. O operador global delegará a primeira entrada; o operador de equipe poderá alterar apenas entradas dos seus grupos que seu grant permita ler. O viewer consultará o que seu grant admitir.",
-            "en": "Import validates the same entries as the console editor; importing the same content again preserves the id and the first write's metadata. apply moves the workspace pointer under the lock without publishing a generation. pull installs that version locally; subsequent commands read it without opening a connection during indexing. The job owns its bootstrap, index_dir, mirrors and local_dir; it shares only the module sections pointing to the same store and Valkey with the nodes and console. Run its entire refresh under one lock, with fetch outside Meada:",
-            "es": "Una entrada podrá tener un owner, el nombre exacto de un grupo OIDC. El operador global delegará la primera entrada; el operador de equipo podrá modificar solo entradas de sus grupos que su grant permita leer. El viewer consultará lo que su grant admita."
+            "pt": "O job publica a geração inteira ou nenhuma: uma falha de fetch ou de indexação mantém a geração atual, que os nós seguem servindo. Uma aplicação que muda só owners não gera uma geração nova.",
+            "en": "The job publishes the whole generation or nothing: a failed fetch or index keeps the current generation, which nodes keep serving. An apply that changes only owners makes no new generation.",
+            "es": "El job publica la generación entera o nada: un fetch o una indexación fallidos mantienen la generación actual, que los nodos siguen sirviendo. Un apply que cambia solo owners no genera una generación nueva."
           },
           "reference": {
-            "pt": "#ownership-por-equipe",
-            "en": "#import-and-apply-a-version",
-            "es": "#ownership-por-equipo"
+            "pt": "#da-versao-a-geracao",
+            "en": "#from-version-to-generation",
+            "es": "#de-la-version-a-la-generacion"
           }
         },
         {
@@ -639,13 +639,13 @@
             "x": 900,
             "y": 0
           },
-          "kind": "planned",
+          "kind": "delivered",
           "stage": "S3",
           "issue": 294,
           "detail": {
-            "pt": "Definir, substituir ou limpar um owner será owner_change, reservado ao operador global. Salvar uma proposta gerará uma versão imutável; aplicar a versão e publicar a geração continuarão sendo ações distintas. Uma aplicação somente de owners não exigirá reindexar o código.",
-            "en": "Setting, replacing or clearing an owner will be owner_change, reserved for the global operator. Saving a proposal will create an immutable version; applying the version and publishing a generation will remain separate actions. Applying only owner changes will not require indexing code again.",
-            "es": "Asignar, sustituir o borrar un owner será owner_change, reservado al operador global. Guardar una propuesta creará una versión inmutable; aplicar la versión y publicar la generación seguirán siendo acciones distintas. Aplicar solo cambios de owners no requerirá indexar el código otra vez."
+            "pt": "Um operador de time salva e aplica mudanças nas entradas dos seus times que seu grant lê. Definir, substituir ou limpar um owner é owner_change, reservado ao operador global, assim como entradas sem owner e as de outros times.",
+            "en": "A team operator saves and applies changes to its teams’ entries that its grant reads. Setting, replacing or clearing an owner is owner_change, reserved for the global operator, as are entries with no owner and other teams’ entries.",
+            "es": "Un operador de equipo guarda y aplica cambios en las entradas de sus equipos que su grant lee. Asignar, sustituir o borrar un owner es owner_change, reservado al operador global, igual que las entradas sin owner y las de otros equipos."
           },
           "reference": {
             "pt": "#ownership-por-equipe",
@@ -693,7 +693,7 @@
           "target": "editor",
           "sourceHandle": "top",
           "targetHandle": "top",
-          "kind": "planned"
+          "kind": "normal"
         },
         {
           "id": "owners-apply",
@@ -701,7 +701,7 @@
           "target": "apply",
           "sourceHandle": "left",
           "targetHandle": "right",
-          "kind": "planned"
+          "kind": "normal"
         }
       ]
     },

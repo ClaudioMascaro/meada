@@ -498,7 +498,8 @@ state, each refusal marked in text with the save disabled, a save of an edit, a 
 addition naming its teams with nothing sent before confirmation, a 403 `entries_refused` with
 its `hidden` count, a viewer refusal turning the editor read-only, apply and rollback offered
 by authorization, owners and an owner change for a viewer, no save or apply for a viewer or with
-operations off, and the global operator's unchanged editor and CLI command.
+operations off, the global operator's unchanged editor and CLI command, one unreadable stored
+version leaving the other applies, and a long version list read two versions at a time.
 `ui/tests/actions.test.ts` and `ui/tests/action-pages.test.tsx` keep the fleet and store pages
 action-free for a team operator.
 

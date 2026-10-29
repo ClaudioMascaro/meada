@@ -76,7 +76,16 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
     const ids = [...new Set([from, to, ...wanted])].filter(id => id && !cache[id]);
     if (!ids.length) return;
     // One version failing to read leaves the others cached: a team operator is offered an apply per readable version.
-    void Promise.allSettled(ids.map(id => api.request<WorkspaceVersion>(`workspace/versions/${encodeURIComponent(id)}`))).then(results => {
+    // ponytail: two reads at a time keep a long version list inside the console's four readers; page the list if it grows.
+    const queue = [...ids];
+    const results: PromiseSettledResult<WorkspaceVersion>[] = [];
+    const worker = async () => {
+      for (let id = queue.shift(); id !== undefined && active; id = queue.shift()) {
+        results.push(await api.request<WorkspaceVersion>(`workspace/versions/${encodeURIComponent(id)}`)
+          .then(value => ({ status: 'fulfilled', value }) as const, reason => ({ status: 'rejected', reason }) as const));
+      }
+    };
+    void Promise.all([worker(), worker()]).then(() => {
       if (!active) return;
       const versions = results.flatMap(result => result.status === 'fulfilled' ? [result.value] : []);
       if (versions.length) setCache(previous => ({ ...previous, ...Object.fromEntries(versions.map(version => [version.id, version])) }));

@@ -86,7 +86,8 @@ pub struct Refusal {
     pub reason: Reason,
 }
 
-fn repo(entry: &Json) -> &str {
+/// An entry's identity, its `repo`.
+pub fn repo(entry: &Json) -> &str {
     entry["repo"].as_str().unwrap_or_default()
 }
 

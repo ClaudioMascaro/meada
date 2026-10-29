@@ -58,6 +58,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- A refresh publishes the whole workspace or nothing (ADR 0012, #316): a failed fetch or index
+  stops it before publication and the current generation stays served. `meada index --workspace`
+  ends its failures with `index failed for <n> repositories`, and the Compose `fetch.sh` names
+  the repository and stage of a failed fetch and refuses a `REPOSITORIES` URL carrying
+  credentials, without echoing it.
 - `context` and `trace` show the overloads of one method (an ambiguous call whose candidates share a
   file, a class and a name) as one set: `Class.m (one of N overloads)` in `context`, a leaf
   `Class.m (N overloads)` in `trace`. The level, target and candidates in the export do not change.
