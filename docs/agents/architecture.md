@@ -123,8 +123,8 @@ other Kotlin grammar may enter the dependency tree: they all export `tree_sitter
   pure JSON-repositories-to-TOML conversion shared with `snapshot::versions` and WASM; it prints
   an entry's `owner` right after its `path`, before the block tables, so the text reads back to
   the same id. `version_entries` (`entriesJson`) is the opposite way, a text to the entries a
-  version document holds (`entry` builds one), shared with `snapshot::versions`, so the browser
-  authorizes and composes the same entries the server stores. An owner change alone is the
+  version document holds, so the browser authorizes and composes the same entries the server
+  stores: `entry`, which builds one, is the function `snapshot::versions` stores them with. An owner change alone is the
   changed dotted key `repository.owner`.
 - `meada-core/src/authorize.rs` (ADR 0015): what a subject may change in a workspace version,
   over a version document's JSON `repositories`. `authorize_entries(role, groups, grant,

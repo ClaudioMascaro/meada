@@ -4,7 +4,7 @@ import type { Api, Config, Session } from './api';
 import { loadCore } from './core';
 import type { Language } from './i18n';
 import { applyAction, authority, editorModel, entryRows, plainEntries, saveAction, teamApplyAction, teamEditorModel, teamSaveAction, versionText } from './workspace';
-import type { ApplyAction, CurrentWorkspace, Entry, EntryRow, Refusal, SaveAction, WorkspaceDiff, WorkspaceVersion, WorkspaceVersions } from './workspace';
+import type { ApplyAction, CurrentWorkspace, Entry, EntryRow, Refusal, SaveAction, VersionSummary, WorkspaceDiff, WorkspaceVersion, WorkspaceVersions } from './workspace';
 import { word, workspaceCopy } from './workspace-i18n';
 import type { WorkspaceCopy } from './workspace-i18n';
 import { canEditWorkspace, canOperate } from './actions';
@@ -75,9 +75,14 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
     const wanted = teamRole && listing ? listing.versions.map(version => version.id) : [];
     const ids = [...new Set([from, to, ...wanted])].filter(id => id && !cache[id]);
     if (!ids.length) return;
-    void Promise.all(ids.map(id => api.request<WorkspaceVersion>(`workspace/versions/${encodeURIComponent(id)}`))).then(versions => {
-      if (active) setCache(previous => ({ ...previous, ...Object.fromEntries(versions.map(version => [version.id, version])) }));
-    }).catch(problem => { if (active) setError(problem instanceof Error ? problem.message : t.loadError); });
+    // One version failing to read leaves the others cached: a team operator is offered an apply per readable version.
+    void Promise.allSettled(ids.map(id => api.request<WorkspaceVersion>(`workspace/versions/${encodeURIComponent(id)}`))).then(results => {
+      if (!active) return;
+      const versions = results.flatMap(result => result.status === 'fulfilled' ? [result.value] : []);
+      if (versions.length) setCache(previous => ({ ...previous, ...Object.fromEntries(versions.map(version => [version.id, version])) }));
+      const failed = results.find(result => result.status === 'rejected');
+      if (failed) setError(failed.reason instanceof Error ? failed.reason.message : t.loadError);
+    });
     return () => { active = false; };
   }, [api, cache, from, to, listing, teamRole, attempt, t.loadError]);
 
@@ -147,7 +152,7 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
   const text = (version: WorkspaceVersion) => versionText(version.repositories);
   const diff = ready === locale && before && after ? editorModel(text(after), text(before), locale).diff : undefined;
   const open = (next: SaveAction | ApplyAction) => { setOperationError(''); setRefusal(undefined); setAction(next); };
-  function applyFor(version: { id: string; author: string; time: string; message: string }): ApplyAction | undefined {
+  function applyFor(version: VersionSummary): ApplyAction | undefined {
     if (!allowed || !listing) return undefined;
     if (!team) return applyAction(version, workspace?.current?.id, listing.versions, file ?? '');
     const stored = cache[version.id];

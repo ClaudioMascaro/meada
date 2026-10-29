@@ -37,8 +37,8 @@ All notable changes to Meada are recorded here. The format follows
   Its save and apply confirmations name the teams that authorize them instead of a CLI command,
   a 403 `entries_refused` shows the server's entries and the hidden count, a lost role turns the
   editor read-only, and apply is offered only when the entries it reads authorize it. Every role
-  sees each entry's owner on the versions page, and an owner change is the changed key
-  `repository.owner` in every diff. `meada-core` exports `entriesJson` to WebAssembly.
+  sees each entry's owner on the versions page, where an owner change lists as the changed key
+  `repository.owner` like any other. `meada-core` exports `entriesJson` to WebAssembly.
 - ADR 0020 and the glossary record the direction of spec S5: a named query context over shared
   indexing and publication.
 - `meada status` ends a repository's lines with a pointer to the new `inference` issue form when the

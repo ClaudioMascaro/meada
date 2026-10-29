@@ -94,10 +94,13 @@ export function saveAction(entries: string, message: string, file: string): Save
     command: `meada workspace import <file> --message ${shellQuote(message)} --workspace ${shellQuote(file)}` };
 }
 
-export function applyAction(version: VersionSummary, current: string | undefined, versions: VersionSummary[], file: string): ApplyAction {
+function isRollback(version: VersionSummary, current: string | undefined, versions: VersionSummary[]): boolean {
   const before = versions.findIndex(row => row.id === current);
-  const after = versions.findIndex(row => row.id === version.id);
-  return { kind: 'apply', route: 'workspace/apply', body: { version: version.id }, rollback: before >= 0 && after > before,
+  return before >= 0 && versions.findIndex(row => row.id === version.id) > before;
+}
+
+export function applyAction(version: VersionSummary, current: string | undefined, versions: VersionSummary[], file: string): ApplyAction {
+  return { kind: 'apply', route: 'workspace/apply', body: { version: version.id }, rollback: isRollback(version, current, versions),
     command: `meada workspace apply ${shellQuote(version.id)} --workspace ${shellQuote(file)}` };
 }
 
@@ -115,5 +118,5 @@ export function teamApplyAction(version: VersionSummary, current: string | undef
   if (refusals(who, held, stored).length) return undefined;
   const diff = editorModel(versionText(stored), versionText(held), locale).diff;
   return { kind: 'apply', route: 'workspace/apply', body: { version: version.id },
-    rollback: applyAction(version, current, versions, '').rollback, teams: diff ? touchedOwners(diff, held, stored) : [] };
+    rollback: isRollback(version, current, versions), teams: diff ? touchedOwners(diff, held, stored) : [] };
 }

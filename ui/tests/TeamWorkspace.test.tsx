@@ -88,6 +88,7 @@ test.each(refusals.flatMap(row => (['pt-BR', 'en'] as const).map(locale => ({ ..
   expect(diff.textContent).toContain(repo);
   expect(diff.textContent).toContain(`${t.refusedMark}: `); expect(diff.textContent).toContain(t[`reason_${reason}`]);
   expect(getByRole(form, 'status').textContent).toBe(t.refusedSummary);
+  expect(diff.tabIndex).toBe(0); expect(diff.getAttribute('aria-label')).toBe(t.editorDiff); // the mark is text inside a focusable, labelled region
   expect(save.hasAttribute('disabled')).toBe(true);
   await type(entries, original);
   expect(getByRole(form, 'region', { name: t.editorDiff }).textContent).not.toContain(t.refusedMark);
@@ -115,6 +116,8 @@ test('a save of an edit, a removal and an addition sends the submitted entries a
   expect(dialog.textContent).toContain(`${t.authorizedBy}: team-a`);
   expect(dialog.textContent).not.toContain('meada workspace');
   expect(posts(fetch)).toHaveLength(0);
+  for (const name of [t.cancel, t.confirmSave]) expect(getByRole(dialog, 'button', { name }).tabIndex).toBe(0);
+  expect(dialog.getAttribute('aria-labelledby')).toBeTruthy(); expect(dialog.getAttribute('aria-describedby')).toBeTruthy();
   await act(() => fireEvent.click(getByRole(dialog, 'button', { name: t.confirmSave })));
   expect(posts(fetch)).toHaveLength(1);
   expect(JSON.parse(String(posts(fetch)[0]?.[1]?.body))).toEqual({ entries: edited, message: 'team save' });
@@ -195,4 +198,14 @@ test('the global operator keeps the whole editor: the full text, no marks and th
   const dialog = getByRole(host, 'dialog', { name: t.save });
   expect(dialog.textContent).toContain('meada workspace import <file> --message'); expect(dialog.textContent).not.toContain(t.authorizedBy);
   expect(posts(fetch)).toHaveLength(0);
+});
+
+test('one stored version failing to read leaves the other applies offered', async () => {
+  const read = reads();
+  const fetch = vi.fn(async (url: string) => url === `/api/v1/workspace/versions/${foreign.id}`
+    ? Response.json({ error: { code: 'unavailable', message: 'version unavailable' } }, { status: 503 }) : read(url));
+  await render(team, 'en', fetch);
+  await waitFor(() => expect(getByRole(host, 'button', { name: `Roll back workspace ${older.id}` })).toBeTruthy());
+  expect(getByRole(host, 'alert').textContent).toBe('version unavailable');
+  expect(queryByRole(host, 'button', { name: new RegExp(foreign.id) })).toBeNull();
 });
