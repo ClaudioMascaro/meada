@@ -11,7 +11,7 @@ import { actionsCopy } from './actions-i18n';
 import type { ActionButtonsProps } from './ActionControls';
 import { copy } from './i18n';
 import type { Language } from './i18n';
-import { checkModel, credentialsModel, fleetModel, missingSections, repositoriesModel, storeModel } from './operations';
+import { admissionModel, checkModel, credentialsModel, fleetModel, missingSections, repositoriesModel, storeModel } from './operations';
 import type { Admission, CheckResult, Credentials, Fleet, Generation, Missing, Repositories, Store } from './operations';
 import { operationsCopy } from './operations-i18n';
 import type { OperationsCopy } from './operations-i18n';
@@ -170,10 +170,7 @@ function AdmissionView({ data, api, t, locale }: { data: Admission; api: Api; t:
   }
   const checked = result && checkModel(result, t);
   return <>
-    <Fields rows={[
-      [t.issuer, data.issuer], [t.jwks, data.jwks_uri], [t.keyIds, data.keys.map(key => key ?? t.unknown).join(', ') || t.none],
-      [t.refreshed, data.refreshed], [t.identitiesClaim, data.identities_claim], [t.groupsClaim, data.groups_claim ?? t.none], [t.scopes, data.scopes.join(', ') || t.none],
-    ]} />
+    <Fields rows={admissionModel(data, t)} />
     {data.failed && <p className="error">{data.failed.time}: {data.failed.reason}</p>}
     <Table label={t.groups} t={t} headers={[t.group, t.identities]} rows={Object.entries(data.groups ?? {}).map(([group, identities]) => [group, identities.join(', ') || t.none])} />
     <h2>{t.metadata}</h2><pre className="configuration" role="region" aria-label={t.metadata} tabIndex={0}>{JSON.stringify(data.metadata, null, 2)}</pre>

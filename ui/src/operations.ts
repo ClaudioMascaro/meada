@@ -110,9 +110,17 @@ export function credentialsModel(data: Credentials | Missing, t: OperationsCopy)
 }
 
 export interface Admission {
-  issuer: string; metadata: unknown; jwks_uri: string; keys: (string | null)[]; refreshed: string;
+  type: string; issuer: string; metadata: unknown; jwks_uri: string; keys: (string | null)[]; refreshed: string;
   failed: { time: string; reason: string } | null; identities_claim: string; groups_claim: string | null;
   groups: Record<string, string[]> | null; scopes: string[];
+}
+/** The admission page's fields: the identity provider's type beside the issuer, then the JWKS cache and the claims. */
+export function admissionModel(data: Admission, t: OperationsCopy): [string, string][] {
+  return [
+    [t.issuer, data.issuer], [t.providerType, data.type], [t.jwks, data.jwks_uri],
+    [t.keyIds, data.keys.map(key => key ?? t.unknown).join(', ') || t.none], [t.refreshed, data.refreshed],
+    [t.identitiesClaim, data.identities_claim], [t.groupsClaim, data.groups_claim ?? t.none], [t.scopes, data.scopes.join(', ') || t.none],
+  ];
 }
 export interface CheckResult {
   checks: Record<'signature' | 'issuer' | 'audience' | 'lifetime' | 'scopes', boolean | null>;

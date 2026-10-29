@@ -15,6 +15,7 @@ não emite token, não registra cliente e nunca repassa um token.
 
 ```toml
 [oidc]
+type = "generic"                                # padrão; "entra", "okta" ou "keycloak"
 issuer = "https://id.exemplo.internal/realms/agentes"
 public_url = "https://meada.exemplo.internal"   # a URL que os clientes usam, atrás do proxy
 audience = "https://meada.exemplo.internal"     # opcional; padrão: a URL canônica do endpoint
@@ -27,6 +28,12 @@ jwks_refresh_seconds = 3600                      # padrão; no mínimo 60
 "time-pagamentos" = ["github.exemplo.internal/acme/payments-api", "github.exemplo.internal/acme/ledger"]
 "plataforma" = ["*"]
 ```
+
+`type` diz qual provedor de identidade emite os tokens: `generic` (o padrão), `entra`, `okta` ou
+`keycloak`. Nenhum muda a admissão, o grant ou uma resposta; o tipo aparece na página de admissão
+do console. Só `entra` tem uma tabela própria, `[oidc.entra]`, com uma chave, `overage`, que por
+enquanto aceita só `"ignore"` (o padrão): um token em overage, sem `groups`, não tem grupos.
+`[oidc.entra]` com outro `type` é um erro.
 
 ## Preparar o provedor de identidade
 

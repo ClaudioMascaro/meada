@@ -382,7 +382,13 @@ one for the area a change touches.
   `status` open one.
 - `oidc.rs` (feature `oidc`; with `github_app.rs` the only places `jsonwebtoken` is used, with
   RustCrypto as its backend, never aws-lc-rs): server mode as an OAuth 2.1 resource server. `File`
-  is the `[oidc]` section and `File::validate` its `Config` (`issuer` `https` or loopback `http`
+  is the `[oidc]` section, the identity provider (ADR 0016: the one token issuer of the
+  deployment), and `File::validate` its `Config` (`type` one of `TYPES`, `generic` by default,
+  `entra`, `okta` or `keycloak`, any other value or a value that is not a string the error naming
+  the four and never the value; `[oidc.entra]` only under `type = "entra"`, its one key `overage`
+  one of `OVERAGES`, only `ignore` until #336, a token in overage having no groups; `okta` and
+  `keycloak` take no table and, as `entra`, change no answer; `[oidc.github]` an unknown key until
+  #331; `issuer` `https` or loopback `http`
   with no user, query or fragment, `public_url` the same with no path (`modules::reachable`),
   `identities_claim` and `audience` not empty, `groups_claim` (not empty) and its `[oidc.groups]`
   table together, at least one of the two claims, scopes RFC 6749 scope-tokens,
@@ -403,16 +409,19 @@ one for the area a change touches.
   when none does (`refetch`, at most once per `KID_REFRESH_EVERY`), `exp` and `nbf` with
   `LEEWAY`, `iss`, `aud` against the configured audience or the path's and its identity's
   resources, then the scopes (403 when one is missing). The grant (`Grant::of`, once per
-  request) is the union of `identities_claim` and what `[oidc.groups]` maps the groups of
+  request, on nodes and in the console) is the union of every configured grant provider's
+  identities, of which the identity provider's claims grant (`claims_grant`) is the only one until
+  #332: the union of `identities_claim` and what `[oidc.groups]` maps the groups of
   `groups_claim` to, a claim counting only as an array of strings, `*` from either for all;
   routing checks it and it bounds the workspace of each answer (`mcp.rs`). No token, error text
   of `jsonwebtoken` or claim value is ever printed. With feature `ui`, the console reaches the
   same checks through `admit_console` (one audience, `[ui] audience`; a `Bearer` challenge with
   no `resource_metadata`), `check` (a pasted token's outcome per check, signature, issuer,
   audience as a node checks it, lifetime and scopes, and its grant when every check passes,
-  against the cached keys only, so it never fetches) and `admission` (the issuer's metadata as
-  read at start, the cached key ids, the last read and a refresh that failed since, with its
-  reason and never the answer's body, and the groups table bounded by the caller's grant).
+  against the cached keys only, so it never fetches) and `admission` (the identity provider's
+  `type`, always present, the issuer's metadata as read at start, the cached key ids, the last
+  read and a refresh that failed since, with its reason and never the answer's body, and the
+  groups table bounded by the caller's grant).
 - `ui.rs` (feature `ui`, no crate of its own; `cloud` enables it): the management console's
   process (ADR 0014), `meada ui --listen <addr> --workspace <bootstrap manifest>`,
   on the node's listener (`mcp::serve_http`, `mcp::address`, the same drain); never a node's
