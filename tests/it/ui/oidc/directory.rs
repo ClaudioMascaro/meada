@@ -19,17 +19,18 @@ use crate::postgres::{Audited, audited};
 use crate::server::Server;
 
 /// The SCIM token of every console here: 40 characters.
-const TOKEN: &str = "scim-334-token-0123456789abcdefghijklmno";
-const USER: &str = "urn:ietf:params:scim:schemas:core:2.0:User";
-const GROUP: &str = "urn:ietf:params:scim:schemas:core:2.0:Group";
+pub(super) const TOKEN: &str = "scim-334-token-0123456789abcdefghijklmno";
+pub(super) const USER: &str = "urn:ietf:params:scim:schemas:core:2.0:User";
+pub(super) const GROUP: &str = "urn:ietf:params:scim:schemas:core:2.0:Group";
 const ENTERPRISE: &str = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User";
 const PATCH_OP: &str = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const ERROR: &str = "urn:ietf:params:scim:api:messages:2.0:Error";
 /// The `[directory]` of every console here, its token in the default `MEADA_SCIM_TOKEN`.
-const DIRECTORY: &str = "\n[directory]\nuser_claim = \"oid\"\nuser_attribute = \"userName\"\n";
+pub(super) const DIRECTORY: &str =
+    "\n[directory]\nuser_claim = \"oid\"\nuser_attribute = \"userName\"\n";
 
 /// `text` appended to the console's manifest in `dir`.
-fn append(dir: &Path, text: &str) {
+pub(super) fn append(dir: &Path, text: &str) {
     let file = dir.join(MANIFEST);
     let source = fs::read_to_string(&file).unwrap();
     fs::write(&file, format!("{source}{text}")).unwrap();
@@ -53,7 +54,7 @@ fn provisioned(case: &'static str) -> Option<(Issuer, Audited, Server)> {
 }
 
 /// `method` on `/scim/v2<path>` with the SCIM token and `body`, as SCIM JSON.
-fn scim(console: &Server, method: &str, path: &str, body: Option<&Value>) -> Reply {
+pub(super) fn scim(console: &Server, method: &str, path: &str, body: Option<&Value>) -> Reply {
     let authorization = bearer(TOKEN);
     let mut headers = vec![("Authorization", authorization.as_str())];
     if body.is_some() {
@@ -64,7 +65,13 @@ fn scim(console: &Server, method: &str, path: &str, body: Option<&Value>) -> Rep
 }
 
 /// `scim`, asserting `status`; the document when there is one.
-fn expect(console: &Server, method: &str, path: &str, body: Option<&Value>, status: u16) -> Value {
+pub(super) fn expect(
+    console: &Server,
+    method: &str,
+    path: &str,
+    body: Option<&Value>,
+    status: u16,
+) -> Value {
     let reply = scim(console, method, path, body);
     assert_eq!(reply.status, status, "{method} {path}: {}", reply.body);
     match reply.body.is_empty() {
@@ -77,7 +84,7 @@ fn expect(console: &Server, method: &str, path: &str, body: Option<&Value>, stat
 }
 
 /// A `PATCH` body of `operations`.
-fn patch(operations: Value) -> Value {
+pub(super) fn patch(operations: Value) -> Value {
     json!({"schemas": [PATCH_OP], "Operations": operations})
 }
 

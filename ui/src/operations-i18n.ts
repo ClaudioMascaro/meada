@@ -27,6 +27,7 @@ const en = {
   groupsClaim: 'Groups claim', groups: 'Groups table', group: 'Group', identities: 'Admitted identities', metadata: 'Issuer metadata',
   token: 'Token to check', tokenHint: 'The token is sent in this request body and cleared when the check finishes.',
   checkToken: 'Check token', checking: 'Checking…', check: 'Check', outcome: 'Outcome', noGrant: 'No admitted grant.',
+  directory: 'Directory', directoryUsers: 'Directory users', directoryGroups: 'Directory groups', directoryLastWrite: 'Last SCIM write (UTC)', directoryUnavailable: 'Unavailable: the directory could not be read.',
 };
 export type OperationsCopy = { [K in keyof typeof en]: string };
 export const operationsCopy: Record<Language, OperationsCopy> = {
@@ -58,5 +59,6 @@ export const operationsCopy: Record<Language, OperationsCopy> = {
     groupsClaim: 'Claim de grupos', groups: 'Tabela de grupos', group: 'Grupo', identities: 'Identidades admitidas', metadata: 'Metadados do issuer',
     token: 'Token para verificar', tokenHint: 'O token segue no body desta requisição e é apagado quando a verificação termina.',
     checkToken: 'Verificar token', checking: 'Verificando…', check: 'Verificação', outcome: 'Resultado', noGrant: 'Nenhum grant admitido.',
+    directory: 'Diretório', directoryUsers: 'Usuários do diretório', directoryGroups: 'Grupos do diretório', directoryLastWrite: 'Última escrita SCIM (UTC)', directoryUnavailable: 'Indisponível: não foi possível ler o diretório.',
   },
 };

@@ -113,6 +113,13 @@ export interface Admission {
   type: string; issuer: string; metadata: unknown; jwks_uri: string; keys: (string | null)[]; refreshed: string;
   failed: { time: string; reason: string } | null; identities_claim: string; groups_claim: string | null;
   groups: Record<string, string[]> | null; scopes: string[];
+  /** With `[directory]`: its counts and the last SCIM write; null when it could not be read. */
+  directory?: { users: number; groups: number; last_write: string | null } | null;
+}
+function directoryRows(directory: Admission['directory'], t: OperationsCopy): [string, string][] {
+  if (directory === undefined) return [];
+  if (directory === null) return [[t.directory, t.directoryUnavailable]];
+  return [[t.directoryUsers, String(directory.users)], [t.directoryGroups, String(directory.groups)], [t.directoryLastWrite, directory.last_write ?? t.none]];
 }
 /** The admission page's fields: the identity provider's type beside the issuer, then the JWKS cache and the claims. */
 export function admissionModel(data: Admission, t: OperationsCopy): [string, string][] {
@@ -120,6 +127,7 @@ export function admissionModel(data: Admission, t: OperationsCopy): [string, str
     [t.issuer, data.issuer], [t.providerType, data.type], [t.jwks, data.jwks_uri],
     [t.keyIds, data.keys.map(key => key ?? t.unknown).join(', ') || t.none], [t.refreshed, data.refreshed],
     [t.identitiesClaim, data.identities_claim], [t.groupsClaim, data.groups_claim ?? t.none], [t.scopes, data.scopes.join(', ') || t.none],
+    ...directoryRows(data.directory, t),
   ];
 }
 export interface CheckResult {

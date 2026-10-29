@@ -108,6 +108,23 @@ const MIGRATIONS: &[&str] = &[
        external_id text,
        revoked timestamptz NOT NULL DEFAULT now()
      );",
+    // 4: the directory's state (#335), one row the SCIM endpoint updates in each write's
+    // transaction: whether a group was ever provisioned (a directory whose final group was
+    // deleted differs from one never fed, for `owner_missing`) and the time of the last write.
+    // An existing directory starts from what it holds.
+    "CREATE TABLE {schema}.directory_state (
+       singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
+       groups_provisioned boolean NOT NULL,
+       last_write timestamptz
+     );
+     INSERT INTO {schema}.directory_state (groups_provisioned, last_write) VALUES (
+       EXISTS (SELECT 1 FROM {schema}.directory_groups),
+       greatest(
+         (SELECT max(last_modified) FROM {schema}.directory_users),
+         (SELECT max(last_modified) FROM {schema}.directory_groups),
+         (SELECT max(revoked) FROM {schema}.directory_revoked)
+       )
+     );",
 ];
 
 /// The `[postgres]` section as written.

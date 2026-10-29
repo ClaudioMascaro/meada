@@ -117,6 +117,18 @@ impl Team {
         sign(&self.encoding, "team", Algorithm::ES256, &claims)
     }
 
+    /// A token for exactly `claims`, signed by the team's key.
+    pub(super) fn sign(&self, claims: &Value) -> String {
+        sign(&self.encoding, "team", Algorithm::ES256, claims)
+    }
+
+    /// The claims `token` mints for `subject`: the base of `sign`.
+    pub(super) fn claims(&self, subject: &str) -> Value {
+        let mut claims = claims(&self.issuer.base, &[]);
+        claims["sub"] = json!(subject);
+        claims
+    }
+
     fn post(&self, route: &str, token: &str, body: Value) -> Reply {
         send_body(
             &self.console,

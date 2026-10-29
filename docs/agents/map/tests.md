@@ -591,6 +591,26 @@ resource with `config` answering; the `manifest` route naming the default `token
 console refusing to start with a 31-character token and with none, naming the key and its line
 in English under `en_US` and `pt_BR`. `tests/it/postgres.rs` holds migration 3's columns.
 
+### Deprovisioning, the owner picker and `owner_missing` (#335)
+
+`tests/it/ui/oidc/deprovision.rs` runs the same console against the local Postgres (the `directory`
+and `refresh-lock` features). A deactivated user is a 403 `deprovisioned` on every route but
+`config` (a global and a team operator, a read and a write), the static files unchanged, the
+audit holding no row for the refusal and a never-provisioned user admitted; a deleted user stays
+refused until it is provisioned active; an `externalId` lookup is exact where a `userName` lookup
+ignores case. With the relay closed, reads are admitted, a write is a 503 `audit_unavailable` with
+no audit insert and one stderr line that names the directory and never the claim. The picker lists
+group names by exact prefix, sorted, an empty prefix the first 100, a prefix over 256 a 400, for
+the global operator alone (a team operator and a viewer are refused). `owner_missing` appears
+only when true in `workspace` and `workspace/versions/<id>`: nothing flagged before a group was
+provisioned, owned entries flagged after the last group is deleted, ownerless entries never,
+and no flags plus one stderr line with the directory unreadable. `GET admission` carries the
+counts and the last write. `ui/tests/Directory.test.tsx` holds the editor's picker (the global
+operator alone, the owner escaped into the TOML string, no request for a team operator or a
+viewer), the flag in text in the editor, the comparison and a team operator's table in both
+languages, the save and editor text without the flag, the admission page's rows and the
+deactivated-account page. `tests/it/postgres.rs` holds migration 4's columns.
+
 ## Java declarative clients (#90)
 
 `conformance-java` gains `example.declarative` (Feign with and without `url`, a Retrofit

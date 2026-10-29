@@ -6,8 +6,9 @@
 //! (`user_attribute`, `userName` or `externalId`) and the group attribute that names a group
 //! (`group_attribute`, `displayName` by default, or `externalId`). It needs `[postgres]` and
 //! `[oidc]`. Only the console reads the token, once at start: rotating it means restarting the
-//! console. Nodes read the section only for overage (#336), never the token. Nothing reads the
-//! directory yet: its uses come with S4 tickets 9 and 10.
+//! console. Nodes read the section only for overage (#336), never the token. The console reads
+//! the directory (`read`, #335) at its admission, for the owner picker, `owner_missing` and the
+//! admission counts; overage is S4 ticket 10.
 
 use std::path::Path;
 
@@ -16,6 +17,8 @@ use serde::Deserialize;
 use crate::modules::{Problem, Secret};
 use crate::msg::Msg;
 
+#[cfg(feature = "ui")]
+pub mod read;
 #[cfg(feature = "ui")]
 pub mod scim;
 
@@ -47,9 +50,9 @@ pub struct File {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Config {
     token: Secret,
-    /// The token claim naming a user: the console's deprovisioning and the overage (S4 tickets 9
-    /// and 10) read it.
-    #[allow(dead_code)]
+    /// The token claim naming a user: the console's deprovisioning (#335) and the overage (S4
+    /// ticket 10) read it.
+    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
     pub user_claim: String,
     /// `userName` or `externalId`: what `user_claim` matches, and what a revocation marker is
     /// cleared by.

@@ -73,6 +73,9 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
     {signedOut ? <>
       <h1>{t.session}</h1><button type="button" onClick={() => { void login(); }}>{t.signIn}</button>
       {error != null && <p className="error" role="alert">{t.loginError}</p>}
+    </> : error instanceof ApiError && error.code === 'deprovisioned' ? <>
+      <h1>{t.deprovisionedTitle}</h1><p className="error" role="alert">{t.deprovisioned}</p>
+      <button type="button" onClick={() => { setError(undefined); setAttempt(value => value + 1); }}>{t.retry}</button>
     </> : error != null ? <>
       <h1>{t.loadError}</h1><p className="error" role="alert">{failed}</p>
       <button type="button" onClick={() => { setError(undefined); setAttempt(value => value + 1); }}>{t.retry}</button>
