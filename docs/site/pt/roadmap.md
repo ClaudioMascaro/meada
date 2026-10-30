@@ -16,6 +16,6 @@ S5 depende das duas bases, da [publicação atômica, #316](https://github.com/C
 
 ## Depois das bases
 
-[S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) introduzirá [workspaces nomeados](named-workspaces.md) sobre indexação compartilhada. A [consolidação de contratos, #340](https://github.com/ClaudioMascaro/meada/issues/340), vem antes do runtime. A sequência aceita é contratos → catálogo elegível → primeiro workspace → versões e sobreposição → configuração entre repositórios. Depois, UI guiada e propostas MCP avançam em paralelo; a validação empresarial depende de ambas.
+[S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) introduzirá [workspaces nomeados](named-workspaces.md) sobre indexação compartilhada. A [consolidação de contratos, #340](https://github.com/ClaudioMascaro/meada/issues/340), está concluída (ADRs 0020 a 0022) e vem antes do runtime. A sequência aceita é contratos → catálogo elegível → primeiro workspace → versões e sobreposição → configuração entre repositórios. Depois, UI guiada e propostas MCP avançam em paralelo; a validação empresarial depende de ambas.
 
 As especificações vinculadas são a referência para o contrato completo. Um item planejado neste roadmap não é uma opção de configuração disponível.

@@ -8,6 +8,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Spec S5 consolidated (#340, documentation only; nothing is implemented): ADR 0020 now holds
+  the accepted domain decision (platform administrator, workspace operator and inherited viewer,
+  creation eligibility from accepted repository roles, the frozen Y/A/B matrix, hidden discovery
+  for partial readers, revocation), ADR 0021 the contracts (catalog, selected entries, shared
+  ingestion membership, version lifecycle, query selection, effective configuration,
+  deterministic ids, migration and the slice graph #341 to #347) and ADR 0022 the authenticated
+  stateless proposal server. The glossary gains the terms, ADRs 0002, 0012, 0014, 0015 and 0016
+  carry dated amendments, `tests/fixtures/named-workspaces.json` is the Y/A/B table with a
+  `meada-core` test that checks it against the rules, and the named workspaces and roadmap pages
+  are updated in three languages. No serialized role, route, id, golden or default build changes.
 - Identity automation for enterprise deployments (ADR 0016, spec #319), in the entries below: the
   `postgres` and `directory` features and the `[postgres]`, `[directory]`, `[oidc] type`,
   `[oidc.entra]` and `[oidc.github]` sections; `meada postgres migrate`, `meada github-app roles`

@@ -16,6 +16,6 @@ S5 depends on both foundations, [atomic publication, #316](https://github.com/Cl
 
 ## After the foundations
 
-[S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) will introduce [named workspaces](named-workspaces.md) over shared indexing. [Contract consolidation, #340](https://github.com/ClaudioMascaro/meada/issues/340), precedes runtime work. The accepted sequence is contracts → eligible catalog → first workspace → versions and overlap → cross-repository configuration. Guided UI and MCP proposals then advance in parallel; enterprise validation depends on both.
+[S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) will introduce [named workspaces](named-workspaces.md) over shared indexing. [Contract consolidation, #340](https://github.com/ClaudioMascaro/meada/issues/340), is done (ADRs 0020 to 0022) and precedes runtime work. The accepted sequence is contracts → eligible catalog → first workspace → versions and overlap → cross-repository configuration. Guided UI and MCP proposals then advance in parallel; enterprise validation depends on both.
 
 The linked specifications own the complete contracts. A planned roadmap item is not an available configuration option.

@@ -147,7 +147,10 @@ the spec fixes the details the slices build.
   every other admitted subject is a viewer. Operators are managed in the identity provider, not
   in Meada. (Amended 2026-10-22; #294: ADR 0015 adds the team operator, a subject one of whose
   groups owns an entry of the current workspace version that its grant reads, who may change
-  that group's entries and nothing else; this ADR's operator is the global operator.)
+  that group's entries and nothing else; this ADR's operator is the global operator.) (Amended
+  2026-10-30; #340: ADR 0020 names the global operator the platform administrator for named
+  workspaces and adds the workspace operator, a per-workspace authority that is not a session
+  role; `operator`, `team_operator` and `viewer` keep their serialized values.)
 - A viewer reads every view and writes nothing. A write from a viewer, and any write while
   `operations` is off, is a 403; the front end hides what the role cannot do, but the API is what
   refuses.
@@ -242,6 +245,9 @@ the spec fixes the details the slices build.
   `workspace` field. Generation and bundle ids do not change, a stored document is never
   rewritten, and older binaries ignore the field.
 - One workspace per deployment: one bootstrap manifest, one key prefix, one current version.
+  (Amended 2026-10-30; #340: this is the deployment workspace. With `[workspaces]`, ADR 0021 adds
+  named workspaces beside it over the same fleet, refresh lock, fence and generations; they keep
+  their versions in Postgres, not under this pointer.)
 
 ### The front end
 
@@ -328,7 +334,8 @@ the spec fixes the details the slices build.
   several workspaces per fleet and multi-tenant isolation out of scope, and lets teams own the
   entries of the one workspace instead. Amended 2026-10-23; #322: ADR 0020 records the direction
   of spec S5, a named query context over shared indexing and publication, so the rejection
-  stands for isolated workspaces with their own indexing and publication, not for that.)
+  stands for isolated workspaces with their own indexing and publication, not for that.
+  Amended 2026-10-30; #340: ADR 0020 and ADR 0021 accept it and fix its contracts.)
 
 ## Consequences
 

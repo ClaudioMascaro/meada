@@ -131,7 +131,10 @@ remaining points. This ADR records the decisions; the spec fixes the details the
   context over shared indexing and publication, which neither splits the link universe's
   indexes nor multiplies the operator's publication. The rejection stands for isolated
   workspaces; spec S5 owns the runtime and the final contracts, and the ownership of entries
-  here is unchanged.)
+  here is unchanged. Amended 2026-10-30; #340: ADR 0020 and ADR 0021 settle them. Owners and
+  teams act on the deployment workspace only: a named workspace's entries carry no `owner` and
+  no `added_by`, its operators are a per-workspace list, and clearing an owner is still
+  `owner_change`.)
 - **A federation of workspaces**, where each repository has one owning workspace and the others
   read it from that workspace's generation. Cross-workspace links would need generations of
   several workspaces at once on every node, a pin that names several generations and a fence per

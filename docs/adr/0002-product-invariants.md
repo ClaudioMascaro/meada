@@ -51,6 +51,9 @@ amended for it (2 and 4) and one was added (6).
    moves bundles Meada published; it never fetches from a git remote.) (Amended 2026-10-22;
    #289: Meada still never fetches. With the GitHub App module of ADR 0013, git fetches the
    operator's mirrors and Meada answers git's credential request with an installation token.)
+   (Amended 2026-10-30; #340: ADR 0022 adds a separate proposal server, `meada workspaces mcp`,
+   whose four tools write nothing and return derived text; it was reviewed against this
+   invariant and holds it. The nodes' query server gains no tool.)
 5. Each repository keeps its own index; cross-repo context links indexes without merging them.
 6. Determinism: the same inputs (the source tree, `meada.toml` and `meada.decisions.toml`) give
    the same answers and the same canonical export (`meada export`, sorted JSON). The index file

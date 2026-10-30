@@ -1,0 +1,214 @@
+{
+  "about": "The Y/A/B matrix of ADR 0020 and the contracts of ADR 0021, as data. Y grants an accepted role to groups A and B, repository A to group A only, repository B to group B only. Rows are the effective per-login rows of the permissions set (via is provenance and decides nothing). meada-core/tests/named_workspaces.rs checks the rows against the rules of the ADRs; the runtime tickets (#341 to #346) read the same rows in their Rust, public-process and WebAssembly tests and add rows, never rewrite one without an ADR amendment.",
+  "identities": {
+    "Y": "github.com/acme/y",
+    "A": "github.com/acme/a",
+    "B": "github.com/acme/b"
+  },
+  "accepted_roles": ["write", "maintain", "admin"],
+  "callers": {
+    "alice": {
+      "login": "alice",
+      "rows": [
+        { "identity": "Y", "role": "write", "via": "group:ab" },
+        { "identity": "A", "role": "write", "via": "group:a" }
+      ]
+    },
+    "dave": {
+      "login": "dave",
+      "rows": [
+        { "identity": "Y", "role": "write", "via": "direct" },
+        { "identity": "A", "role": "write", "via": "direct" }
+      ]
+    },
+    "erin": {
+      "login": "erin",
+      "rows": [
+        { "identity": "Y", "role": "maintain", "via": "group:ab" },
+        { "identity": "A", "role": "maintain", "via": "group:a" }
+      ]
+    },
+    "bob": {
+      "login": "bob",
+      "rows": [
+        { "identity": "Y", "role": "write", "via": "group:ab" },
+        { "identity": "B", "role": "write", "via": "group:b" }
+      ]
+    },
+    "carol": {
+      "login": "carol",
+      "rows": [
+        { "identity": "Y", "role": "write", "via": "group:ab" },
+        { "identity": "A", "role": "write", "via": "group:a" },
+        { "identity": "B", "role": "write", "via": "group:b" }
+      ]
+    },
+    "yoda": {
+      "login": "yoda",
+      "rows": [{ "identity": "Y", "role": "write", "via": "group:ab" }]
+    },
+    "zed": {
+      "login": "zed",
+      "rows": [
+        { "identity": "Y", "role": "read", "via": "group:ab" },
+        { "identity": "A", "role": "read", "via": "group:a" }
+      ]
+    },
+    "claims": {
+      "login": "claims",
+      "rows": [],
+      "claims_grant": ["Y", "A"]
+    },
+    "nologin": {
+      "login": null,
+      "rows": [],
+      "claims_grant": []
+    },
+    "root": {
+      "login": "root",
+      "rows": [],
+      "platform_administrator": true
+    }
+  },
+  "workspaces": {
+    "w_ya": { "entries": ["Y", "A"], "operators": ["alice"] },
+    "w_yb": { "entries": ["Y", "B"], "operators": ["bob"] },
+    "w_yab": { "entries": ["Y", "A", "B"], "operators": ["carol"] },
+    "w_y": { "entries": ["Y"], "operators": ["yoda"] }
+  },
+  "creation": [
+    { "caller": "alice", "select": ["Y", "A"], "allowed": true, "hidden": 0 },
+    { "caller": "alice", "select": ["Y", "B"], "allowed": false, "hidden": 1 },
+    { "caller": "alice", "select": ["Y", "A", "B"], "allowed": false, "hidden": 1 },
+    { "caller": "alice", "select": ["Y"], "allowed": true, "hidden": 0 },
+    { "caller": "dave", "select": ["Y", "A"], "allowed": true, "hidden": 0 },
+    { "caller": "dave", "select": ["Y", "B"], "allowed": false, "hidden": 1 },
+    { "caller": "dave", "select": ["Y", "A", "B"], "allowed": false, "hidden": 1 },
+    { "caller": "dave", "select": ["Y"], "allowed": true, "hidden": 0 },
+    { "caller": "erin", "select": ["Y", "A"], "allowed": true, "hidden": 0 },
+    { "caller": "erin", "select": ["Y", "B"], "allowed": false, "hidden": 1 },
+    { "caller": "bob", "select": ["Y", "A"], "allowed": false, "hidden": 1 },
+    { "caller": "bob", "select": ["Y", "B"], "allowed": true, "hidden": 0 },
+    { "caller": "bob", "select": ["Y", "A", "B"], "allowed": false, "hidden": 1 },
+    { "caller": "bob", "select": ["Y"], "allowed": true, "hidden": 0 },
+    { "caller": "carol", "select": ["Y", "A"], "allowed": true, "hidden": 0 },
+    { "caller": "carol", "select": ["Y", "B"], "allowed": true, "hidden": 0 },
+    { "caller": "carol", "select": ["Y", "A", "B"], "allowed": true, "hidden": 0 },
+    { "caller": "carol", "select": ["Y"], "allowed": true, "hidden": 0 },
+    { "caller": "yoda", "select": ["Y", "A"], "allowed": false, "hidden": 1 },
+    { "caller": "yoda", "select": ["Y", "B"], "allowed": false, "hidden": 1 },
+    { "caller": "yoda", "select": ["Y", "A", "B"], "allowed": false, "hidden": 2 },
+    { "caller": "yoda", "select": ["Y"], "allowed": true, "hidden": 0 },
+    { "caller": "zed", "select": ["Y", "A"], "allowed": false, "hidden": 2 },
+    { "caller": "zed", "select": ["Y"], "allowed": false, "hidden": 1 },
+    { "caller": "claims", "select": ["Y", "A"], "allowed": false, "named": ["Y", "A"], "hidden": 0 },
+    { "caller": "root", "select": ["Y", "A", "B"], "allowed": true, "hidden": 0 },
+    { "caller": "nologin", "select": ["Y"], "allowed": false, "pending": "missing_login" }
+  ],
+  "stale": [
+    { "caller": "alice", "select": ["Y", "A"], "allowed": false, "pending": "stale_set" },
+    { "caller": "carol", "select": ["Y"], "allowed": false, "pending": "stale_set" },
+    { "caller": "root", "select": ["Y"], "allowed": false, "pending": "stale_set" }
+  ],
+  "discovery": [
+    { "caller": "alice", "workspace": "w_ya", "visible": true },
+    { "caller": "erin", "workspace": "w_ya", "visible": true },
+    { "caller": "dave", "workspace": "w_ya", "visible": true },
+    { "caller": "claims", "workspace": "w_ya", "visible": true },
+    { "caller": "bob", "workspace": "w_ya", "visible": false },
+    { "caller": "yoda", "workspace": "w_ya", "visible": false },
+    { "caller": "zed", "workspace": "w_ya", "visible": false },
+    { "caller": "carol", "workspace": "w_ya", "visible": true },
+    { "caller": "alice", "workspace": "w_yb", "visible": false },
+    { "caller": "bob", "workspace": "w_yb", "visible": true },
+    { "caller": "carol", "workspace": "w_yb", "visible": true },
+    { "caller": "alice", "workspace": "w_yab", "visible": false },
+    { "caller": "bob", "workspace": "w_yab", "visible": false },
+    { "caller": "carol", "workspace": "w_yab", "visible": true },
+    { "caller": "yoda", "workspace": "w_y", "visible": true },
+    { "caller": "alice", "workspace": "w_y", "visible": true },
+    { "caller": "nologin", "workspace": "w_y", "visible": false },
+    { "caller": "root", "workspace": "w_yab", "visible": true }
+  ],
+  "authority": [
+    { "caller": "alice", "workspace": "w_ya", "may_mutate": true },
+    { "caller": "erin", "workspace": "w_ya", "may_mutate": false },
+    { "caller": "dave", "workspace": "w_ya", "may_mutate": false },
+    { "caller": "carol", "workspace": "w_ya", "may_mutate": false },
+    { "caller": "claims", "workspace": "w_ya", "may_mutate": false },
+    { "caller": "bob", "workspace": "w_yb", "may_mutate": true },
+    { "caller": "alice", "workspace": "w_yb", "may_mutate": false },
+    { "caller": "carol", "workspace": "w_yab", "may_mutate": true },
+    { "caller": "root", "workspace": "w_ya", "may_mutate": true },
+    { "caller": "root", "workspace": "w_yab", "may_mutate": true }
+  ],
+  "queries": [
+    { "caller": "erin", "workspace": "w_ya", "identity": "Y", "answers": true },
+    { "caller": "erin", "workspace": "w_ya", "identity": "A", "answers": true },
+    { "caller": "erin", "workspace": "w_ya", "identity": "B", "answers": false },
+    { "caller": "alice", "workspace": "w_ya", "identity": "B", "answers": false },
+    { "caller": "carol", "workspace": "w_ya", "identity": "B", "answers": false },
+    { "caller": "carol", "workspace": "w_yab", "identity": "B", "answers": true },
+    { "caller": "bob", "workspace": "w_yb", "identity": "A", "answers": false },
+    { "caller": "yoda", "workspace": "w_ya", "identity": "Y", "answers": false },
+    { "caller": "yoda", "workspace": "w_y", "identity": "Y", "answers": true }
+  ],
+  "links": [
+    { "caller": "erin", "workspace": "w_ya", "from": "Y", "to": "B", "shown": false },
+    { "caller": "carol", "workspace": "w_ya", "from": "Y", "to": "B", "shown": false },
+    { "caller": "carol", "workspace": "w_yab", "from": "Y", "to": "B", "shown": true },
+    { "caller": "carol", "workspace": "w_yab", "from": "Y", "to": "A", "shown": true },
+    { "caller": "erin", "workspace": "w_ya", "from": "Y", "to": "A", "shown": true },
+    { "caller": "bob", "workspace": "w_yb", "from": "Y", "to": "A", "shown": false }
+  ],
+  "revocation": [
+    {
+      "name": "the creator loses A: it keeps the workspace and a hidden count",
+      "revoke": { "caller": "alice", "identity": "A" },
+      "workspace": "w_ya",
+      "expect": [
+        { "caller": "alice", "visible": true, "readable": ["Y"], "hidden": 1, "may_add": ["Y"], "may_remove": ["Y"] },
+        { "caller": "erin", "visible": true, "readable": ["Y", "A"], "hidden": 0 }
+      ]
+    },
+    {
+      "name": "a group peer loses A: the workspace is hidden from it, the creator is untouched",
+      "revoke": { "caller": "erin", "identity": "A" },
+      "workspace": "w_ya",
+      "expect": [
+        { "caller": "erin", "visible": false },
+        { "caller": "alice", "visible": true, "readable": ["Y", "A"], "hidden": 0 }
+      ]
+    },
+    {
+      "name": "the group role on Y is revoked for the peer: hidden as well",
+      "revoke": { "caller": "erin", "identity": "Y" },
+      "workspace": "w_ya",
+      "expect": [
+        { "caller": "erin", "visible": false },
+        { "caller": "alice", "visible": true, "readable": ["Y", "A"], "hidden": 0 }
+      ]
+    }
+  ],
+  "sponsor": [
+    {
+      "name": "an entry no operator holds a role on is excluded before the fetch",
+      "workspace": "w_ya",
+      "revoke": { "caller": "alice", "identity": "A" },
+      "excluded": ["A"]
+    },
+    {
+      "name": "a role held by a second operator keeps the entry",
+      "workspace": "w_ya",
+      "operators": ["alice", "dave"],
+      "revoke": { "caller": "alice", "identity": "A" },
+      "excluded": []
+    }
+  ],
+  "membership": {
+    "about": "One entry per identity across the deployment workspace and every named workspace.",
+    "named": ["w_ya", "w_yb", "w_yab"],
+    "members": ["A", "B", "Y"],
+    "bundles": { "Y": 1, "A": 1, "B": 1 }
+  }
+}

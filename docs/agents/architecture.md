@@ -252,6 +252,16 @@ checks its tests; Rust/default stages gain no frontend input.
 Vitest exercises the built WASM and the public client, view-model and DOM
 seams, without a browser end-to-end suite.
 
+## Planned: named workspaces (spec S5)
+
+Nothing in this map describes named workspaces yet: they are decided, not built. ADR 0020 holds
+the domain decision, ADR 0021 the contracts (catalog, selected entries, shared ingestion
+membership, version lifecycle in Postgres, query selection through the generation document's
+`members` and `contexts` and the route `/-/workspaces/<id>/<identity>`, effective configuration,
+ids) and ADR 0022 the proposal server. Slices #341 to #347 build them in that order and each
+updates this map with what it delivers. Until then a reader of the code finds one workspace per
+deployment (ADR 0014), and `tests/fixtures/named-workspaces.json` is the only artifact of S5.
+
 ## Deployment profiles
 
 `deploy/compose/compose.yaml` supplies local and generations nodes; the explicit

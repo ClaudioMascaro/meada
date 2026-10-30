@@ -538,6 +538,12 @@ each rule and the names accepted; an `added_by` printed after the owner, its cha
 changed key `repository.added_by`, and `authorize_entries` treating it as an edit, #330, which
 under the GitHub grant provider is `added_by_change`, #333); the
 shared validation table below carries the `owner` and `added_by` rows in both languages.
+`tests/fixtures/named-workspaces.json` (#340) is the Y/A/B table of ADR 0020 and ADR 0021 for spec
+S5: callers with their effective per-login rows (direct and group-derived alike), creation,
+stale-set and missing-login rows, discovery, authority, queries, links, revocation, the sponsor
+rule and the shared membership. `meada-core/tests/named_workspaces.rs` checks every row against a
+small reference of the ADRs' rules and that the table covers the spec's scenarios; no runtime
+reads it yet, and #341 to #346 add their public-process, UI and WebAssembly readers and rows.
 `tests/fixtures/workspace-validation.json` is the single pt-BR/English validation table used
 by the real WASM in `ui/tests/core.test.ts` and the binary `workspace import` in
 `tests/it/generations/imports.rs` with generation-pointer and real configured store services.
