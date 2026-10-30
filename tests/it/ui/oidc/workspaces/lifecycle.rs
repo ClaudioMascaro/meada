@@ -26,13 +26,13 @@ impl Case {
         entries.iter().map(one).collect::<Vec<_>>().join("\n")
     }
 
-    fn save(&self, caller: &str, workspace: &str, text: &str, base: i64) -> Reply {
+    pub(super) fn save(&self, caller: &str, workspace: &str, text: &str, base: i64) -> Reply {
         let body = json!({"entries": text, "message": "edit", "base": base});
         let path = format!("/api/v1/workspaces/{workspace}/versions");
         self.post(&path, &self.token(caller), &body)
     }
 
-    fn apply(&self, caller: &str, workspace: &str, version: &str, base: i64) -> Reply {
+    pub(super) fn apply(&self, caller: &str, workspace: &str, version: &str, base: i64) -> Reply {
         let body = json!({"version": version, "base": base});
         let path = format!("/api/v1/workspaces/{workspace}/apply");
         self.post(&path, &self.token(caller), &body)

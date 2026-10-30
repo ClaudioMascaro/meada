@@ -173,3 +173,18 @@ pub fn named_visible(operates: bool, entries: &str, grant: &str) -> Result<bool,
         &from_json(grant)?,
     ))
 }
+
+/// The effective configuration of the named entries (ADR 0021, contract 6) as JSON
+/// `[{repo, source, blocks, ignored, coverage, diagnostics}]`. `entries` is the JSON
+/// `namedEntriesJson` gives, `facts` an object by identity of `{held, own, documents,
+/// excluded}` the console reads from the generation it holds; an identity without facts is a
+/// repository no held generation has. The decision is the console's: the browser calls it so the
+/// guided form and the server agree.
+#[wasm_bindgen(js_name = namedEffective)]
+pub fn named_effective(entries: &str, facts: &str) -> Result<String, String> {
+    let found = crate::effective::effective(
+        &from_json::<Vec<serde_json::Value>>(entries)?,
+        &from_json(facts)?,
+    );
+    serde_json::to_string(&found).map_err(|e| e.to_string())
+}

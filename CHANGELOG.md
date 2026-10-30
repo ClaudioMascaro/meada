@@ -8,6 +8,21 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Context-specific configuration of named workspaces (#344, ADR 0021 contract 6, feature
+  `workspaces`): `GET /api/v1/workspaces/<id>/effective[?version=]` shows, per entry the caller
+  reads, where its configuration comes from (the repository's own `meada.toml` wins whole, else
+  the workspace's `serve`, `resource` and `peer` blocks, else nothing), the blocks that are
+  ignored, whether the repository is indexed, pending ingestion or excluded, and diagnostics
+  (`ignored_by_repository`, `unknown_until_ingested`, `excluded_no_sponsor`, `peer_missing`,
+  `documents_not_indexed`). `POST /api/v1/workspaces/effective` shows the same view for manifest
+  text before it is saved and stores nothing; creation, save and apply answers carry the same
+  `diagnostics`, so an ignored declaration never looks plainly applied. Two workspaces that
+  share a repository keep their own peers, resources and serve hosts: the configuration is applied
+  when answering and never enters a bundle, so a change of it re-indexes nothing and a pinned
+  generation keeps what it recorded. The decision is `meada_core::effective`, also exported to
+  WebAssembly (`namedEffective`). The console's workspace page shows the view in text and has a
+  text editor for the manifest of a workspace the subject operates. Nothing changes without
+  `[workspaces]`.
 - The version lifecycle of named workspaces (#343, ADR 0021 contract 4, feature `workspaces`):
   `POST /api/v1/workspaces/<id>/versions` saves a version without moving anything (an operator
   submits the entries it reads and the version stored keeps the ones it cannot read; the

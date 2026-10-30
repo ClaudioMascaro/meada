@@ -16,6 +16,7 @@ use serde_json::{Value, json};
 
 use super::{PUBLIC, VERSION, claims, console_dir, oidc, ui_oidc};
 
+mod configuration;
 mod lifecycle;
 use crate::manifest::MANIFEST;
 use crate::oidc::github::{Github, LOGIN_CLAIM, POLL_MS};

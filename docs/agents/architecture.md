@@ -252,13 +252,29 @@ checks its tests; Rust/default stages gain no frontend input.
 Vitest exercises the built WASM and the public client, view-model and DOM
 seams, without a browser end-to-end suite.
 
-## Named workspaces (spec S5): the catalog, the first workspace and its lifecycle are built, the rest is planned
+## Named workspaces (spec S5): the catalog, the first workspace, its lifecycle and its configuration are built, the rest is planned
 
 ADR 0020 holds the domain decision, ADR 0021 the contracts (catalog, selected entries, shared
 ingestion membership, version lifecycle in Postgres, query selection through the generation
 document's `members` and `contexts` and the route `/-/workspaces/<id>/<identity>`, effective
 configuration, ids) and ADR 0022 the proposal server. Slices #341 to #347 build them in that
 order and each updates this map with what it delivers.
+
+Delivered by #344 (contract 6, the effective configuration; ADR 0021 "As built (#344)"), same feature:
+`meada-core/src/effective.rs` is the pure decision (`effective(entries, facts)`: per entry the
+`Source` (the repository's own `meada.toml` whole, the context's blocks, none), the ignored
+blocks, the `Coverage` and the diagnostics, with `labels` wording a block as `status` does),
+exported to WebAssembly as `namedEffective`; `snapshot/serve.rs` `Held::facts` is the one place
+that reads a mirror for it (its `meada.toml` and nothing else, bounded) and decides whether a
+bundle indexes documents; `ui/workspaces/effective.rs` is `GET /api/v1/workspaces/<id>/effective`
+(through `inspect`, under the discovery rule, entries filtered by the caller's grant, the
+`excluded` marks for operators), the stateless `POST /api/v1/workspaces/effective` preview and the
+`diagnostics` that creation, save and apply answers carry (`written_diagnostics`). Nothing enters
+a bundle id or the generation id: the ingestion-blocks rule of #342 already keeps a context's
+peers, resources and serve hosts query-time, so a configuration change is a new generation of the
+same bundles. The front end's `NamedWorkspacesPage.tsx` shows the view in text and has the
+manifest text editor (`EditWorkspace`: validate with the core, preview, confirm, save and apply at
+the base read). Not built: guided authoring (#345), proposals (#346), acceptance (#347).
 
 Delivered by #343 (contract 4's lifecycle; ADR 0021 "As built (#343)"), same feature:
 `workspaces/lifecycle.rs` is the atomic boundary of every other write (`transact`: one
@@ -276,7 +292,7 @@ cannot read, `named::changed` is what is rechecked, `named::diff` the diff of a 
 before the pending audit record; `workspaces/cli.rs` is `meada workspaces list|show|versions|diff|
 create|save|apply|rename|delete|operators` (the platform administrator, `audit::cli`); migration 8 is
 `workspace_versions.entries`; `audit.rs` knows the six new actions and the `base` argument. Not
-built: `effective` (#344) and the guided pages over versions and the diff (#345).
+built: `effective` (#344, above) and the guided pages over versions and the diff (#345).
 
 Delivered by #342 (contracts 2 to 5 as far as create, list, show, shared ingestion and the node
 route go; ADR 0021 "As built (#342)"), same feature: `workspaces.rs` is `[workspaces]` (`mirrors`,

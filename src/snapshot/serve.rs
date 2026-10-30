@@ -66,6 +66,43 @@ impl Held {
         Some(context.version.as_str())
     }
 
+    /// What this generation says about `identity` for the effective configuration (ADR 0021,
+    /// contract 6): whether it has a bundle, whether the bundle's mirror has a `meada.toml` of
+    /// its own, and whether the bundle indexes provider documents (its ingestion configuration
+    /// declares `[serve]`: the mirror's own file, else the deployment entry's blocks, which a
+    /// member only named workspaces select does not have). It reads the mirror's `meada.toml`
+    /// and nothing else of it. `None` when the generation holds no such repository. A file that
+    /// exists and cannot be read (malformed, too large) is still a file of its own: the bundle is
+    /// held, the file wins whole as it does for the node that cannot serve the generation, and
+    /// the view never says the repository is not ingested.
+    pub fn facts(&self, identity: &str) -> Option<meada_core::effective::Facts> {
+        let held = (self.document.repositories.iter()).chain(&self.document.members);
+        let entry = held.clone().find(|e| e.identity == identity)?;
+        let bundle = super::bundle_of(&entry.bundle);
+        if !is_id(bundle) {
+            return None;
+        }
+        let root = self.dir.join(bundle).join("mirror");
+        let max = Some(config::GENERATION_CONFIG_MAX);
+        let (own, documents) =
+            match config::read_own_up_to::<config::Config>(&root, "meada.toml", max) {
+                Ok(Some(own)) => (true, own.serve.declared),
+                Ok(None) => (false, entry.blocks.get("serve").is_some()),
+                Err(_) => (true, false),
+            };
+        Some(meada_core::effective::Facts {
+            held: true,
+            own,
+            documents,
+            excluded: false,
+        })
+    }
+
+    /// Whether context `id` was recorded at workspace version `version`.
+    pub fn records(&self, id: &str, version: &str) -> bool {
+        self.context_version(id) == Some(version)
+    }
+
     /// The workspace of context `id` as the generation recorded it (`Manifest::of_context`),
     /// built once; `None` when the generation has no such context.
     pub fn context(&self, id: &str) -> Result<Option<Arc<Manifest>>> {

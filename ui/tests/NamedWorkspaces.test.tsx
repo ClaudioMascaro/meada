@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { fireEvent, getAllByRole, getByLabelText, getByRole, queryByRole, waitFor } from '@testing-library/dom';
+import { fireEvent, getAllByRole, getByLabelText, getByRole, queryByRole, waitFor, within } from '@testing-library/dom';
 import { afterEach, beforeAll, expect, test, vi } from 'vitest';
 import { init, initSync } from '../wasm/meada_core';
 import { Api } from '../src/api';
@@ -88,6 +88,7 @@ test('the list shows what the server lists, and a workspace shows pending and ex
   const fetch = answers({
     'GET /api/v1/workspaces?': () => Response.json(workspaces),
     'GET /api/v1/catalog': () => Response.json(catalog([Y, A])),
+    'GET /api/v1/workspaces/0123456789abcdef/effective': () => Response.json(effectiveView([])),
     'GET /api/v1/workspaces/0123456789abcdef': () => Response.json(detail),
   });
   vi.stubGlobal('fetch', fetch);
@@ -111,6 +112,7 @@ test('a selection is written as the canonical manifest, reviewed, frozen and pos
     'GET /api/v1/workspaces?': () => Response.json({ workspaces: [], next: null }),
     'GET /api/v1/catalog': () => Response.json(catalog([Y, A])),
     'POST /api/v1/workspaces': () => Response.json(created, { status: 201 }),
+    'GET /api/v1/workspaces/0123456789abcdef/effective': () => Response.json(effectiveView([])),
     'GET /api/v1/workspaces/0123456789abcdef': () => Response.json(detail),
   });
   vi.stubGlobal('fetch', fetch);
@@ -165,4 +167,96 @@ test('a pending catalog says why and offers nothing to select', async () => {
   await waitFor(() => expect(host.textContent).toContain(t.stale_set));
   expect(queryByRole(host, 'checkbox')).toBeNull();
   expect(copy.en.workspaces).toBe('Named workspaces');
+});
+
+const operated: WorkspaceDetail = { ...detail, entries: [{ repo: Y, ingestion: 'pending', blocks: {} }], operate: true, hidden: 0, operators: [{ subject: 'alice', login: 'alice' }] };
+const ignored = { code: 'ignored_by_repository', detail: '[[repository.peer]] github.com/acme/a' };
+const effectiveView = (diagnostics: object[], source = 'repository') => ({
+  workspace: '0123456789abcdef', generation: 'cac067a808cf689d',
+  entries: [{ repo: Y, source, blocks: {}, ignored: ['[[repository.peer]] github.com/acme/a'], coverage: 'indexed', diagnostics }],
+});
+const editorBox = () => within(getByRole(host, 'region', { name: namedCopy.en.edit }));
+const peerText = `[[repository]]\nrepo = "${Y}"\n\n[[repository.peer]]\nrepo = "${A}"\nbase_url_env = ["GATEWAY_URL"]\n`;
+
+async function open(table: Record<string, () => Response>) {
+  const fetch = answers({
+    'GET /api/v1/workspaces?': () => Response.json({ ...workspaces, workspaces: [{ ...workspaces.workspaces[0]!, operate: true }] }),
+    'GET /api/v1/catalog': () => Response.json(catalog([Y, A])),
+    'GET /api/v1/workspaces/0123456789abcdef/effective': () => Response.json(effectiveView([])),
+    'GET /api/v1/workspaces/0123456789abcdef': () => Response.json(operated),
+    ...table,
+  });
+  vi.stubGlobal('fetch', fetch);
+  await page();
+  await waitFor(() => expect(getByRole(host, 'button', { name: `${namedCopy.en.show} Payments` })).toBeDefined());
+  await act(() => { fireEvent.click(getByRole(host, 'button', { name: `${namedCopy.en.show} Payments` })); });
+  await waitFor(() => expect(getByLabelText(host, namedCopy.en.manifestText)).toBeDefined());
+  return fetch;
+}
+
+test('an operator edits the manifest text, reads the effective configuration before saving and nothing is sent until it confirms', async () => {
+  const t = namedCopy.en;
+  const fetch = await open({
+    'POST /api/v1/workspaces/effective': () => Response.json(effectiveView([ignored])),
+    'POST /api/v1/workspaces/0123456789abcdef/versions': () => Response.json({ base: 1, version: 'aaaaaaaaaaaaaaaa', saved: true, diagnostics: [{ repo: Y, ...ignored }] }, { status: 201 }),
+    'POST /api/v1/workspaces/0123456789abcdef/apply': () => Response.json({ base: 2, version: 'aaaaaaaaaaaaaaaa', action: 'apply', diagnostics: [{ repo: Y, ...ignored }] }),
+  });
+  const editor = getByLabelText(host, t.manifestText) as HTMLTextAreaElement;
+  expect(editor.value).toContain(`repo = "${Y}"`);
+  expect((getByRole(host, 'button', { name: t.saveApply }) as HTMLButtonElement).disabled).toBe(true);
+  await act(() => { fireEvent.change(editor, { target: { value: peerText } }); });
+  await act(() => { fireEvent.change(editorBox().getByLabelText(t.message), { target: { value: 'link the gateway' } }); });
+  // The effective configuration is shown before anything is saved, in text: the repository's own file wins.
+  await act(() => { fireEvent.click(getByRole(host, 'button', { name: t.checkEffective })); });
+  await waitFor(() => expect(host.textContent).toContain(t.diagnostic_ignored_by_repository));
+  expect(host.textContent).toContain(t.source_repository);
+  expect(host.textContent).toContain(t.effectiveNote);
+  const posts = () => fetch.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST').map(([route]) => route);
+  expect(posts()).toEqual(['/api/v1/workspaces/effective']);
+  const preview = fetch.mock.calls.find(([route]) => route === '/api/v1/workspaces/effective')![1] as RequestInit;
+  expect(JSON.parse(preview.body as string)).toEqual({ entries: peerText });
+  // Review, then confirm: the saved payload is the reviewed text at the base the page read.
+  await act(() => { fireEvent.click(getByRole(host, 'button', { name: t.saveApply })); });
+  expect(posts()).toEqual(['/api/v1/workspaces/effective']);
+  await act(() => { fireEvent.click(getAllByRole(host, 'button', { name: t.saveApply }).at(-1)!); });
+  await waitFor(() => expect(posts()).toHaveLength(3));
+  const body = (route: string) => JSON.parse((fetch.mock.calls.find(([r]) => r === route)![1] as RequestInit).body as string) as Record<string, unknown>;
+  expect(body('/api/v1/workspaces/0123456789abcdef/versions')).toEqual({ entries: peerText, message: 'link the gateway', base: 1 });
+  expect(body('/api/v1/workspaces/0123456789abcdef/apply')).toEqual({ version: 'aaaaaaaaaaaaaaaa', base: 1 });
+  // An applied change that something overrides is not shown as plainly applied: the finding is read beside it.
+  await waitFor(() => expect(getByRole(host, 'alert', { name: t.findings }).textContent).toContain(`${Y}: ${t.diagnostic_ignored_by_repository}`));
+});
+
+test('a configuration the held generation has not recorded says so in text', async () => {
+  const t = namedCopy.en;
+  await open({ 'GET /api/v1/workspaces/0123456789abcdef/effective': () => Response.json({ ...effectiveView([]), recorded: false }) });
+  await waitFor(() => expect(host.textContent).toContain(t.notRecorded));
+  expect(getByRole(host, 'list', { name: t.effective })).toBeDefined();
+});
+
+test('a stale base is refused in words and a viewer gets no editor', async () => {
+  const t = namedCopy.en;
+  await open({
+    'POST /api/v1/workspaces/0123456789abcdef/versions': () => Response.json({ base: 1, version: 'aaaaaaaaaaaaaaaa', saved: true }, { status: 201 }),
+    'POST /api/v1/workspaces/0123456789abcdef/apply': () => Response.json({ error: { code: 'stale_base', message: 'changed', base: 2 } }, { status: 409 }),
+  });
+  await act(() => { fireEvent.change(getByLabelText(host, t.manifestText), { target: { value: peerText } }); });
+  await act(() => { fireEvent.change(editorBox().getByLabelText(t.message), { target: { value: 'm' } }); });
+  await act(() => { fireEvent.click(getByRole(host, 'button', { name: t.saveApply })); });
+  await act(() => { fireEvent.click(getAllByRole(host, 'button', { name: t.saveApply }).at(-1)!); });
+  await waitFor(() => expect(host.textContent).toContain(t.staleBase));
+  await act(() => root.render(null));
+  const viewing = answers({
+    'GET /api/v1/workspaces?': () => Response.json(workspaces),
+    'GET /api/v1/catalog': () => Response.json(catalog([Y, A])),
+    'GET /api/v1/workspaces/0123456789abcdef/effective': () => Response.json(effectiveView([])),
+    'GET /api/v1/workspaces/0123456789abcdef': () => Response.json(detail),
+  });
+  vi.stubGlobal('fetch', viewing);
+  await page();
+  await waitFor(() => expect(getByRole(host, 'button', { name: `${t.show} Payments` })).toBeDefined());
+  await act(() => { fireEvent.click(getByRole(host, 'button', { name: `${t.show} Payments` })); });
+  await waitFor(() => expect(getByRole(host, 'list', { name: t.effective })).toBeDefined());
+  expect(queryByRole(host, 'region', { name: t.edit })).toBeNull();
+  expect(host.textContent).not.toContain(t.manifestText);
 });

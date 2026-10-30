@@ -2,7 +2,8 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, expect, test } from 'vitest';
 import table from '../../tests/fixtures/named-workspaces.json';
-import { initSync, init, namedAuthorize, namedEntriesJson, namedEntriesText, namedVersionId, namedVisible } from '../wasm/meada_core';
+import effectiveTable from '../../tests/fixtures/effective-configuration.json';
+import { initSync, init, namedAuthorize, namedEntriesJson, namedEffective, namedEntriesText, namedVersionId, namedVisible } from '../wasm/meada_core';
 
 // The Y/A/B table (ADR 0020) the Rust tests read, through the actual WebAssembly bundle: the browser
 // marks what a selection may not include exactly as the server's `meada_core::named` decides it.
@@ -51,4 +52,36 @@ test('a named text is validated and written canonically, with no path, owner or 
     expect(() => namedEntriesJson(bad, 5)).toThrow(/reserved/);
   }
   expect(() => namedEntriesJson(text, 1)).toThrow();
+});
+
+// The effective-configuration table (ADR 0021 contract 6) the Rust tests read, through the actual
+// WebAssembly bundle: the browser and the server decide which source wins, what is ignored and what
+// is not yet in effect with one function.
+const ids = effectiveTable.identities as Record<string, string>;
+type Row = { name: string; entries: Record<string, unknown>[]; facts: Record<string, Record<string, boolean>>;
+  expect: { repo: string; source: string; coverage: string; ignored: string[]; diagnostics: string[] }[] };
+const spelled = (value: unknown): unknown => {
+  if (typeof value === 'string') return ids[value] ?? value;
+  if (Array.isArray(value)) return value.map(spelled);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [ids[k] ?? k, spelled(v)]));
+  return value;
+};
+const view = (entries: unknown, facts: unknown) =>
+  JSON.parse(namedEffective(json(spelled(entries)), json(spelled(facts)))) as { repo: string; source: string; coverage: string; ignored: string[]; blocks: unknown; diagnostics: { code: string }[] }[];
+
+test.each(effectiveTable.rows as unknown as Row[])('effective configuration: $name', row => {
+  const got = view(row.entries, row.facts);
+  expect(got.map(entry => ({ repo: entry.repo, source: entry.source, coverage: entry.coverage, ignored: entry.ignored, diagnostics: entry.diagnostics.map(d => d.code) })))
+    .toEqual(row.expect.map(want => ({ ...want, repo: ids[want.repo] })));
+});
+
+test('two contexts sharing a repository read only their own blocks, and the view is not part of a manifest', () => {
+  const row = effectiveTable.contexts[0]!;
+  const first = view(row.first, row.facts)[0]!, second = view(row.second, row.facts)[0]!;
+  expect(first.blocks).toEqual(spelled(row.blocks.first));
+  expect(second.blocks).toEqual(spelled(row.blocks.second));
+  // The annotations are computed and never enter canonical text or an id: the text of the entries is the same with or without them.
+  const text = namedEntriesText(json(spelled(row.first)));
+  expect(text).not.toMatch(/source|coverage|diagnostic|ignored/);
+  expect(namedVersionId(text, 5)).toBe(namedVersionId(namedEntriesText(json(JSON.parse(namedEntriesJson(text, 5)))), 5));
 });

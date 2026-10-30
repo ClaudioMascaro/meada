@@ -1,0 +1,113 @@
+{
+  "about": "The effective configuration of named-workspace entries (ADR 0021 contract 6, #344), as data. Each row gives the entries a version document holds (no path, owner or added_by), the facts the console reads from the generation it holds (held: a bundle exists; own: its mirror has a meada.toml; documents: its ingestion configuration declares [serve]; excluded: no sponsor) and what the pure function answers per entry: source, ignored blocks, coverage and diagnostic codes. meada-core/tests/effective.rs and ui/tests/named-core.test.ts read the same rows; a row is never rewritten without an ADR amendment.",
+  "identities": {
+    "Y": "github.com/acme/y",
+    "A": "github.com/acme/a",
+    "B": "github.com/acme/b"
+  },
+  "rows": [
+    {
+      "name": "a repository file wins whole and the context blocks are ignored",
+      "entries": [
+        { "repo": "Y", "serve": { "hosts": ["y.example"] }, "peer": [{ "repo": "A" }] },
+        { "repo": "A" }
+      ],
+      "facts": {
+        "Y": { "held": true, "own": true, "documents": true },
+        "A": { "held": true, "own": false, "documents": true }
+      },
+      "expect": [
+        {
+          "repo": "Y", "source": "repository", "coverage": "indexed",
+          "ignored": ["[repository.serve]", "[[repository.peer]] github.com/acme/a"],
+          "diagnostics": ["ignored_by_repository", "ignored_by_repository"]
+        },
+        { "repo": "A", "source": "none", "coverage": "indexed", "ignored": [], "diagnostics": [] }
+      ]
+    },
+    {
+      "name": "the context blocks apply when the mirror has no file of its own",
+      "entries": [
+        { "repo": "Y", "serve": { "hosts": ["y.example"], "prefix": "/y" }, "peer": [{ "repo": "A", "base_url_env": ["A_URL"] }] },
+        { "repo": "A" }
+      ],
+      "facts": {
+        "Y": { "held": true, "own": false, "documents": true },
+        "A": { "held": true, "own": false, "documents": true }
+      },
+      "expect": [
+        { "repo": "Y", "source": "context", "coverage": "indexed", "ignored": [], "diagnostics": [] },
+        { "repo": "A", "source": "none", "coverage": "indexed", "ignored": [], "diagnostics": [] }
+      ]
+    },
+    {
+      "name": "a peer outside the workspace is missing, never discovered",
+      "entries": [
+        { "repo": "Y", "peer": [{ "repo": "B" }] },
+        { "repo": "A" }
+      ],
+      "facts": {
+        "Y": { "held": true, "own": false, "documents": true },
+        "A": { "held": true, "own": false, "documents": true }
+      },
+      "expect": [
+        { "repo": "Y", "source": "context", "coverage": "indexed", "ignored": [], "diagnostics": ["peer_missing"] },
+        { "repo": "A", "source": "none", "coverage": "indexed", "ignored": [], "diagnostics": [] }
+      ]
+    },
+    {
+      "name": "a repository no held generation has is pending, its source unknown until ingested",
+      "entries": [{ "repo": "Y", "serve": { "hosts": ["y.example"] } }],
+      "facts": {},
+      "expect": [
+        { "repo": "Y", "source": "context", "coverage": "pending_ingestion", "ignored": [], "diagnostics": ["unknown_until_ingested"] }
+      ]
+    },
+    {
+      "name": "an entry no operator sponsors is excluded, not pending",
+      "entries": [{ "repo": "Y", "serve": { "hosts": ["y.example"] } }],
+      "facts": { "Y": { "excluded": true } },
+      "expect": [
+        { "repo": "Y", "source": "context", "coverage": "excluded", "ignored": [], "diagnostics": ["excluded_no_sponsor"] }
+      ]
+    },
+    {
+      "name": "serve hosts over a repository with no indexed documents say so",
+      "entries": [{ "repo": "Y", "serve": { "hosts": ["y.example"] } }],
+      "facts": { "Y": { "held": true, "own": false, "documents": false } },
+      "expect": [
+        { "repo": "Y", "source": "context", "coverage": "indexed", "ignored": [], "diagnostics": ["documents_not_indexed"] }
+      ]
+    },
+    {
+      "name": "a resource block is a context declaration, ignored under a repository file",
+      "entries": [{ "repo": "Y", "resource": [{ "kind": "postgres", "id": "orders", "role": "read" }] }],
+      "facts": { "Y": { "held": true, "own": true, "documents": true } },
+      "expect": [
+        {
+          "repo": "Y", "source": "repository", "coverage": "indexed",
+          "ignored": ["[[repository.resource]] postgres orders"],
+          "diagnostics": ["ignored_by_repository"]
+        }
+      ]
+    }
+  ],
+  "contexts": [
+    {
+      "name": "two contexts sharing Y read their own blocks and nothing of the other",
+      "facts": { "Y": { "held": true, "own": false, "documents": true }, "A": { "held": true, "documents": true }, "B": { "held": true, "documents": true } },
+      "first": [
+        { "repo": "Y", "serve": { "hosts": ["a.example"] }, "peer": [{ "repo": "A" }] },
+        { "repo": "A" }
+      ],
+      "second": [
+        { "repo": "Y", "serve": { "hosts": ["b.example"] }, "resource": [{ "kind": "postgres", "id": "orders", "role": "read" }] },
+        { "repo": "B" }
+      ],
+      "blocks": {
+        "first": { "serve": { "hosts": ["a.example"] }, "peer": [{ "repo": "A" }] },
+        "second": { "serve": { "hosts": ["b.example"] }, "resource": [{ "kind": "postgres", "id": "orders", "role": "read" }] }
+      }
+    }
+  ]
+}

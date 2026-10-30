@@ -18,7 +18,7 @@ export interface WorkspaceDetail {
   state: WorkspaceState; entries: WorkspaceEntry[]; operate: boolean; hidden?: number;
   operators?: { subject: string; login: string | null }[];
 }
-export interface Created { id: string; version: string; created: boolean }
+export interface Created { id: string; version: string; created: boolean; diagnostics?: ConfigurationFinding[] }
 /** What a refused creation says: the identities the session's grant reads, and a count of the others. */
 export interface Refusal { refused: { identity: string }[]; hidden: number }
 
@@ -49,4 +49,45 @@ export function stateText(state: WorkspaceState, t: NamedCopy): string { return 
 export function ingestionText(ingestion: Ingestion, t: NamedCopy): string { return t[ingestion]; }
 export function pendingText(reason: string | undefined, t: NamedCopy): string {
   return reason === 'no_set' || reason === 'stale_set' || reason === 'missing_login' ? t[reason] : t.pendingUnknown;
+}
+
+/** Where an entry's configuration comes from: the repository's own `meada.toml` wins whole (ADR 0011), else the context's blocks. */
+export type ConfigurationSource = 'repository' | 'context' | 'none';
+export type Coverage = 'indexed' | 'pending_ingestion' | 'excluded';
+export type DiagnosticCode = 'ignored_by_repository' | 'unknown_until_ingested' | 'excluded_no_sponsor' | 'peer_missing' | 'documents_not_indexed';
+export interface Diagnostic { code: DiagnosticCode; detail?: string }
+/** One entry of the effective-configuration view: computed by `meada-core`, never part of a manifest's text or of any id. */
+export interface EffectiveEntry {
+  repo: string; source: ConfigurationSource; blocks: Record<string, unknown>; ignored: string[]; coverage: Coverage; diagnostics: Diagnostic[];
+}
+/** `GET workspaces/<id>/effective` and `POST workspaces/effective`. */
+export interface EffectiveView {
+  workspace: string | null; generation: string | null; entries: EffectiveEntry[];
+  version?: string; current?: boolean; base?: number; state?: WorkspaceState; hidden?: number;
+  /** Whether the held generation recorded the context at this version: when not, these blocks reach queries after the next refresh. */
+  recorded?: boolean;
+}
+/** A diagnostic of an accepted write, beside its result: an ignored declaration never looks applied. */
+export interface ConfigurationFinding { repo: string; code: DiagnosticCode; detail?: string }
+/** `POST workspaces/<id>/versions` and `.../apply` answers. */
+export interface Written { base: number; version: string; state?: WorkspaceState; diagnostics?: ConfigurationFinding[] }
+
+export function effectiveRoute(id: string, version?: string): string {
+  return version ? `workspaces/${id}/effective?${new URLSearchParams({ version })}` : `workspaces/${id}/effective`;
+}
+/** The body of a preview of manifest text before it is saved: it stores nothing. */
+export function previewBody(entries: string): string { return JSON.stringify({ entries }); }
+export function saveBody(entries: string, message: string, base: number): string { return JSON.stringify({ entries, message, base }); }
+export function applyBody(version: string, base: number): string { return JSON.stringify({ version, base }); }
+
+export function sourceText(source: ConfigurationSource, t: NamedCopy): string { return t[`source_${source}`]; }
+export function coverageText(coverage: Coverage, t: NamedCopy): string { return t[`coverage_${coverage}`]; }
+/** A diagnostic in words, in text and never by color alone; `detail` is the block or the peer it is about. */
+export function diagnosticText(diagnostic: Diagnostic, t: NamedCopy): string {
+  const word = t[`diagnostic_${diagnostic.code}`];
+  return diagnostic.detail ? `${word} (${diagnostic.detail})` : word;
+}
+/** A diagnostic of a write, as the view words it. */
+export function findingText(finding: ConfigurationFinding, t: NamedCopy): string {
+  return `${finding.repo}: ${diagnosticText(finding, t)}`;
 }

@@ -421,7 +421,7 @@ async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
         #[cfg(feature = "workspaces")]
         "/api/v1/catalog/check" => CHECK_MAX,
         #[cfg(feature = "workspaces")]
-        "/api/v1/workspaces" => workspaces::CREATE_MAX,
+        "/api/v1/workspaces" | "/api/v1/workspaces/effective" => workspaces::CREATE_MAX,
         QUERY => QUERY_MAX,
         "/api/v1/pointer" => write::POINTER_MAX,
         "/api/v1/fence/recover" => write::FENCE_MAX,

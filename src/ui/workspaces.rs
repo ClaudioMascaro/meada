@@ -10,6 +10,7 @@ use std::collections::BTreeSet;
 use meada_core::authorize::Grant;
 use meada_core::named;
 
+mod effective;
 mod lifecycle;
 
 use super::write::{PendingRecord, finish, refused};
@@ -48,6 +49,7 @@ impl Console {
         match rest.strip_prefix('/') {
             None if rest.is_empty() && post => Some(self.create(request.body(), session)),
             None if rest.is_empty() && read => Some(self.list(request.uri().query(), session)),
+            Some("effective") if post => Some(self.preview(request.body(), session)),
             Some(rest) if post => self.operate(rest, request.body(), session),
             Some(rest) if read => {
                 // An identity holds slashes: everything between `repositories/` and `/export`.
@@ -226,9 +228,13 @@ impl Console {
                     true => StatusCode::CREATED,
                     false => StatusCode::OK,
                 };
+                let diagnostics = self.written_diagnostics(&created.id, &version, session);
                 json_answer(
                     status,
-                    &json!({"id": created.id, "version": version, "created": created.created}),
+                    &json!({
+                        "id": created.id, "version": version, "created": created.created,
+                        "state": "applied", "diagnostics": diagnostics,
+                    }),
                 )
             }
             Err(e) => self.refusal(record, session, &id, e),

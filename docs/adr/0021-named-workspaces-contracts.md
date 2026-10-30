@@ -27,9 +27,9 @@ Implementation status: #341 built contract 1 (the catalog, below), #342 the crea
 query of the first workspace (contracts 2 to 5 as far as create, list, show, the shared ingestion
 and the node route go, "As built (#342)" below) and #343 the rest of contract 4's lifecycle
 (save, apply, rollback, rename, delete, delegation, versions and history, "As built (#343)"
-below); the cargo feature `workspaces` has `[catalog]` and `[workspaces]`. The effective
-configuration (#344), guided authoring (#345) and proposals (#346) are not built. Current behavior
-without `[workspaces]` is ADR 0014's one workspace per deployment.
+below) and #344 contract 6 (the effective configuration, "As built (#344)" below); the cargo feature
+`workspaces` has `[catalog]` and `[workspaces]`. Guided authoring (#345) and proposals (#346) are
+not built. Current behavior without `[workspaces]` is ADR 0014's one workspace per deployment.
 
 ## Decision
 
@@ -463,9 +463,80 @@ CLI twins. Where a line differs from contract 4 above it says so.
   workspace, its versions and its history as one 404, an operator that loses one keeps the
   workspace, reads the entries it reads, and its graph answers (the console's export through a
   context) stay bounded by its grant.
-- **Not built.** `GET .../effective` (#344), and WebAssembly exports of `named::compose`,
-  `changed` and `diff` for the guided form (#345): the console's pages for versions and the diff
-  are #345's.
+- **Not built.** `GET .../effective` (#344, built below), and WebAssembly exports of
+  `named::compose`, `changed` and `diff` for the guided form (#345): the console's pages for
+  versions and the diff are #345's.
+
+**As built (#344).** Contract 6, the effective configuration, and the text editor's path from
+manifest text to query. Where a line differs from contract 6 above it says so.
+
+- **The decision** is `meada_core::effective::effective(entries, facts)`, pure and shared by the
+  console and the browser (WebAssembly `namedEffective(entries, facts)`). `entries` are the
+  entries of a named version document; `facts` is, per identity, `{held, own, documents,
+  excluded}`; an identity with no facts is a repository no held generation has. Per entry it
+  returns `{repo, source, blocks, ignored, coverage, diagnostics}` as contract 6 describes.
+  `source` is `repository` when the generation holds the repository and its mirror has a
+  `meada.toml` (the context's blocks are then all `ignored`, worded as `status` words them, and
+  `blocks` is `{}`: the file's own content is in the export, not repeated here), `context` when
+  the entry declares blocks and no file overrides them, else `none`. Coverage is `excluded`,
+  `indexed` (a held bundle) or `pending_ingestion`. Diagnostics, in this order per entry:
+  `excluded_no_sponsor`, else `unknown_until_ingested` (only when the entry declares blocks: the
+  source is provisional until the repository is ingested), `ignored_by_repository` once per
+  ignored block (`detail` names it), `peer_missing` once per peer outside the entries given
+  (`detail` names the peer) and `documents_not_indexed` (serve hosts that apply, over a held
+  repository whose ingestion declares no `[serve]`). A diagnostic carries a stable `code` and
+  an optional `detail`; the front end words them in both console languages.
+- **Facts** come from `Held::facts` (`snapshot/serve.rs`), which reads the one `meada.toml` of the
+  bundle's mirror in the generation the console holds, bounded as every pulled file is, and
+  nothing else of it. `documents` is the mirror's own `[serve]` declaration, else whether the
+  deployment entry's recorded blocks have a `serve` key (a member only named workspaces select
+  has none, as contract 3 says). No new index key, bundle input or id exists: the
+  indexed-document coverage is the ingestion-blocks rule contract 3 already built, so a
+  context's configuration never changes a bundle id and a change of it is a new generation of the
+  same bundles.
+- **Routes.** `GET /api/v1/workspaces/<id>/effective[?version=]` answers `{workspace, version,
+  current, base, state, generation, entries[, hidden]}` under the discovery rule (an unknown id,
+  a deleted workspace and a hidden one are one 404; `version` must be one of the workspace's,
+  404 `unknown_version`, and one the caller reads whole unless it operates). The entries are the
+  ones the caller reads (the platform administrator's management view is unfiltered); `peer_missing`
+  is decided against those alone, so a peer naming an entry the caller cannot read is reported
+  missing and confirms nothing; `hidden` and the `excluded` marks are for whoever operates the
+  workspace. `POST /api/v1/workspaces/effective` `{entries}` (80 KiB, an unknown key is a 400,
+  invalid text a 422 `invalid_entries`) answers the same view for manifest text before it is
+  saved: stateless, never audited, needing only an admitted session, with facts given only for
+  repositories the session's grant reads (any other is shown pending, as a repository no
+  generation holds, so the preview is no oracle). Creation, save and apply answers carry
+  `diagnostics: [{repo, code, detail?}]` for the stored version, as the caller reads it, so an
+  ignored or not-yet-effective declaration never looks plainly applied.
+- **Decisions this slice takes** where contract 6 left room: the view does not read the
+  repository's own configuration (`blocks` empty under `repository`); a pending repository's
+  `source` is provisional and says so; no CLI twin exists (the twin list of #343 is unchanged);
+  the unit of `unknown_until_ingested` is the entry; a file that exists and cannot be read counts
+  as the repository's own (the view never calls a held bundle not ingested); "provider
+  relationships" are the entry's peers (a peer names the repository that serves a contract), so
+  there is no fourth block; the preview cannot know the sponsor rule's exclusions (they belong to
+  a stored workspace), so it never marks `excluded`.
+- **In effect or not.** The facts come from the newest generation the console holds, which
+  records each context at the version it was published with. `GET .../effective` therefore
+  carries `recorded` (the held generation recorded this context at the version shown) beside
+  `state`, and an apply or a creation answers `state: "applied"` with its `diagnostics`: the
+  blocks of a version reach queries only after a refresh publishes them, and the front end says
+  so in text. The view of a repository already ingested is what a refresh will find, since a
+  repository's own `meada.toml` is part of its bundle.
+- **Front end.** The workspace detail shows the effective configuration in text (source,
+  coverage, diagnostics, never a color alone, in both console languages) and, for a workspace the
+  subject operates, a text editor: `namedEntriesJson` validates the text with the server's own
+  rules, "Show effective configuration" posts the preview, and save and apply run under a
+  confirmation that freezes the reviewed text, saving at the `base` the page read and then
+  applying that version at the same base; a `stale_base` or a lost authority is shown in words
+  and the page reloads. The page computes nothing the server does not decide again.
+- **Evidence.** `meada-core/tests/effective.rs` and `ui/tests/named-core.test.ts` read the table
+  `tests/fixtures/effective-configuration.json` (the real function, natively and as
+  WebAssembly); `tests/it/ui/oidc/workspaces/configuration.rs` drives two contexts sharing a
+  repository through the console, the job and the generation (distinct blocks per context, one
+  member, the same bundles across a configuration change, a pinned generation keeping its
+  configuration, a stale base, the discovery rule, refusals and the preview);
+  `ui/tests/NamedWorkspaces.test.tsx` drives the editor.
 
 ### Contract 6: effective configuration
 
@@ -584,7 +655,8 @@ predecessors merge; #345 and #346 run in parallel.
   "import" is save from a file.
 - **#344** builds Contract 6: the named-entry validation, the pure effective-configuration
   function, the view and its diagnostics, the context digest in the generation id. Its
-  "indexed-document coverage model" is the ingestion-blocks rule: no new index key.
+  "indexed-document coverage model" is the ingestion-blocks rule: no new index key. Delivered
+  ("As built (#344)" above).
 - **#345** builds the guided controls over #341 and #344. It adds no TypeScript policy: eligibility
   and effective configuration come from WebAssembly and the server.
 - **#346** builds ADR 0022 over the same functions.

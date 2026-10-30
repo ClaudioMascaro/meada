@@ -483,10 +483,15 @@ impl Console {
                 let mut body = json!({"base": done.seq});
                 match &request {
                     Decoded::Save(_) => {
+                        body["diagnostics"] = self.written_diagnostics(id, &version_text, session);
                         body["version"] = version_text.into();
                         body["saved"] = done.saved.into();
                     }
                     Decoded::Apply(_) => {
+                        // No generation can record a version just applied: it is stored, and
+                        // reaches queries when the next refresh publishes it.
+                        body["state"] = "applied".into();
+                        body["diagnostics"] = self.written_diagnostics(id, &version_text, session);
                         body["version"] = version_text.into();
                         body["action"] = done.action.into();
                     }
@@ -506,7 +511,13 @@ impl Console {
 
     /// The answer to a read of Postgres or the store that failed before the pending record: the
     /// 503, logged without the reason's text on the wire.
-    fn unreadable(&self, session: &Session, action: &str, id: &str, why: &str) -> Answer {
+    pub(super) fn unreadable(
+        &self,
+        session: &Session,
+        action: &str,
+        id: &str,
+        why: &str,
+    ) -> Answer {
         eprintln!(
             "ui: {}",
             Msg::PostgresUnreachable(why).text().escape_debug()
@@ -588,7 +599,7 @@ impl Console {
     ) -> Option<Answer> {
         let (id, tail) = rest.split_once('/')?;
         let reads = match tail {
-            "versions" | "history" => true,
+            "versions" | "history" | "effective" => true,
             _ => tail
                 .strip_prefix("versions/")
                 .is_some_and(|v| !v.contains('/')),
@@ -607,6 +618,7 @@ impl Console {
         Some(match tail {
             "versions" => self.versions(&record, query, session),
             "history" => self.history(&record, query, session),
+            "effective" => self.configuration(&record, query, session),
             _ => {
                 let version = tail.strip_prefix("versions/").unwrap_or_default();
                 self.show_version(&record, version, query, session)
@@ -615,7 +627,10 @@ impl Console {
     }
 
     /// The one query parameter these reads take, `name`, once, within its bound.
-    fn cursor(query: Option<&str>, name: &str) -> std::result::Result<Option<String>, Box<Answer>> {
+    pub(super) fn cursor(
+        query: Option<&str>,
+        name: &str,
+    ) -> std::result::Result<Option<String>, Box<Answer>> {
         let mut found = None;
         for pair in query.into_iter().flat_map(|q| q.split('&')) {
             match pair.split_once('=') {
@@ -639,7 +654,7 @@ impl Console {
 
     /// The entries of `entries` that `session` reads, which are all of them for the platform
     /// administrator's management view.
-    fn readable_entries(session: &Session, entries: Vec<Value>) -> Vec<Value> {
+    pub(super) fn readable_entries(session: &Session, entries: Vec<Value>) -> Vec<Value> {
         let grant = Self::read_grant(session);
         (entries.into_iter())
             .filter(|e| session.operator || e["repo"].as_str().is_some_and(|r| grant.reads(r)))
@@ -649,7 +664,7 @@ impl Console {
     /// Whether `session` reads a version whose document holds `identities`: the platform
     /// administrator and the operators see every version (filtered like the current one), anyone
     /// else only the versions it reads whole.
-    fn reads_version(session: &Session, record: &Record, identities: &[String]) -> bool {
+    pub(super) fn reads_version(session: &Session, record: &Record, identities: &[String]) -> bool {
         Self::operates(session, record)
             || named::visible(false, identities, &Self::read_grant(session))
     }
