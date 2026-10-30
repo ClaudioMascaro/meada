@@ -1,0 +1,70 @@
+$ meada --help
+LLM-free code graph for agents and people
+
+Usage: meada <COMMAND>
+
+Commands:
+  index   Build the indexes of the workspace of the repository in the current directory.
+  status  Show the workspace: each repository, its index state and any peer not found.
+  export  Print the index as sorted JSON, with the links that touch it.
+  mcp     Serve the repository in the current directory to agents over MCP (stdio).
+  decide  Resolve the open items of this repository, ambiguous links and dynamic URLs, and record the picks in meada.decisions.toml.
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+
+$ meada index --help
+Build the indexes of the workspace of the repository in the current directory.
+
+Usage: meada index [OPTIONS]
+
+Options:
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+  -h, --help                   Print help
+
+$ meada status --help
+Show the workspace: each repository, its index state and any peer not found.
+
+Usage: meada status [OPTIONS]
+
+Options:
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+  -h, --help                   Print help
+
+$ meada export --help
+Print the index as sorted JSON, with the links that touch it.
+
+Usage: meada export [OPTIONS]
+
+Options:
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+      --repo <REPO>            Server mode: the identity of the repository to export
+  -h, --help                   Print help
+
+$ meada mcp --help
+Serve the repository in the current directory to agents over MCP (stdio).
+
+Usage: meada mcp [OPTIONS]
+
+Options:
+      --listen <LISTEN>        Server mode: serve over MCP streamable HTTP at host:port, :port or port (loopback without a host), with --workspace
+      --workspace <WORKSPACE>  Server mode: every repository the workspace manifest at this path lists
+  -h, --help                   Print help
+
+$ meada decide --help
+Resolve the open items of this repository, ambiguous links and dynamic URLs, and record the picks in meada.decisions.toml.
+
+Usage: meada decide [OPTIONS]
+
+Options:
+      --item <ITEM>    Work on this item only, even one already decided, to redo it (a call-site id, as `meada decide --list` or the MCP `search` tool prints it).
+      --dry-run        Print the decisions the run would write and leave the file unchanged.
+      --list           Print the open items; neither ask nor write.
+      --prune          Remove the stale decisions from meada.decisions.toml; keep those waiting on a missing peer.
+      --decider        Ask the model the MEADA_DECIDER_* variables configure instead of a person.
+      --show-request   With --decider: print every request the run would send, and send none.
+      --min-p <MIN_P>  With --decider: write a model decision only from this probability up (default 0.5).
+  -h, --help           Print help
+

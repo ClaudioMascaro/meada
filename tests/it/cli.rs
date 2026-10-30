@@ -93,6 +93,62 @@ fn help_follows_lang() {
     }
 }
 
+/// The English help of every command and subcommand, found by following each `Commands:` list
+/// from `meada --help` down: the CLI surface 1.0 freezes (a removed flag or a renamed command
+/// shows up as a diff). The default build only, like `help_follows_lang`.
+#[cfg(not(any(
+    feature = "snapshot",
+    feature = "github-app",
+    feature = "ui",
+    feature = "postgres"
+)))]
+#[test]
+fn help_of_every_command_is_golden() {
+    fn help(repo: &Path, path: &[String]) -> String {
+        let out = Command::new(env!("CARGO_BIN_EXE_meada"))
+            .current_dir(repo)
+            .args(path)
+            .arg("--help")
+            .env("LANG", "en_US.UTF-8")
+            .output()
+            .expect("meada runs");
+        assert!(out.status.success(), "meada {path:?} --help failed");
+        String::from_utf8(out.stdout).expect("help is UTF-8")
+    }
+    fn walk(repo: &Path, path: &mut Vec<String>, all: &mut String) {
+        let text = help(repo, path);
+        let line: Vec<&str> = ["meada"]
+            .into_iter()
+            .chain(path.iter().map(String::as_str))
+            .collect();
+        all.push_str(&format!("$ {} --help\n", line.join(" ")));
+        all.push_str(&text);
+        all.push('\n');
+        let subs: Vec<String> = text
+            .split("\n\n")
+            .find(|section| section.starts_with("Commands:"))
+            .map(|section| {
+                section
+                    .lines()
+                    .skip(1)
+                    .filter_map(|l| l.split_whitespace().next())
+                    .filter(|name| *name != "help")
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default();
+        for sub in subs {
+            path.push(sub);
+            walk(repo, path, all);
+            path.pop();
+        }
+    }
+    let repo = fixture_repo("cli_help_all", "ts-basic", None);
+    let mut all = String::new();
+    walk(&repo, &mut Vec::new(), &mut all);
+    assert_golden("cli.help-all.en.txt", &all);
+}
+
 /// `meada ui` exists only in a build with the `ui` feature (ADR 0014).
 #[cfg(not(feature = "ui"))]
 #[test]
