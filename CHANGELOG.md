@@ -77,6 +77,15 @@ still needs the post-publication evidence.
   instead of 170 to 190 MB and answers in about 0.3 s instead of 1 to 1.4 s. The index gains
   seven lookup indexes (about 40% larger on junit5) and its schema version changes, so existing
   indexes are rebuilt. `meada export`, `status` and the decision report still read every row.
+- A Meada skill for agents, `skills/meada/SKILL.md`: when to reach for `search`, `context` and
+  `trace`, how to read each level, and that a missing caller is unproven. The READMEs and the
+  site's MCP page show how to install it.
+- Per-channel install and MCP setup: the READMEs open with one row per channel (npx, Cargo, shell
+  installer, archive, Docker) with its install line and MCP server command, and gain a Docker MCP
+  line that mounts the folder holding the repository at the same path and runs without a network.
+  `scripts/container-smoke` runs that line as a stdio client.
+- The site's Deploy page (`docs/site/{pt,en,es}/deploy.md`) covers Docker, Compose and Helm, and
+  the chart gains `values-minimal.yaml`, which `scripts/helm-check` renders.
 
 ### Changed
 
