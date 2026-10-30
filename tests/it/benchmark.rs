@@ -125,6 +125,151 @@ const SUITES: &[Suite] = &[
         edit: "src/sync.ts",
         symbol: "src/sync.ts::syncOrders",
     },
+    Suite {
+        name: "conformance-java",
+        fixtures: &["conformance-java"],
+        setup: |case| {
+            common::fixture_repo(
+                case,
+                "conformance-java",
+                Some("https://example.com/acme/conformance.git"),
+            )
+        },
+        edit: "maven/api/src/main/java/example/calls/Client.java",
+        symbol: "maven/api/src/main/java/example/calls/Client.java::example.calls.Client.typed(Repo)",
+    },
+    Suite {
+        name: "conformance-kotlin",
+        fixtures: &["conformance-kotlin"],
+        setup: |case| {
+            common::fixture_repo(
+                case,
+                "conformance-kotlin",
+                Some("https://example.com/acme/conformance.git"),
+            )
+        },
+        edit: "src/main/kotlin/example/chains/Chains.kt",
+        symbol: "src/main/kotlin/example/chains/Chains.kt::example.chains.use()",
+    },
+    Suite {
+        name: "conformance-csharp",
+        fixtures: &["conformance-csharp"],
+        setup: |case| {
+            common::fixture_repo(
+                case,
+                "conformance-csharp",
+                Some("https://example.com/acme/conformance.git"),
+            )
+        },
+        edit: "src/Acme.Core/Billing/Teller.cs",
+        symbol: "src/Acme.Core/Billing/Teller.cs::Acme.Core.Billing.Teller.Run(Account,IAuditor,List<Account>)",
+    },
+    Suite {
+        name: "conformance-swift",
+        fixtures: &["conformance-swift"],
+        setup: |case| {
+            common::fixture_repo(
+                case,
+                "conformance-swift",
+                Some("https://example.com/acme/conformance.git"),
+            )
+        },
+        edit: "Sources/Checkout/Checkout.swift",
+        symbol: "Sources/Checkout/Checkout.swift::Checkout.run()",
+    },
+    Suite {
+        name: "conformance-swift-alias",
+        fixtures: &["conformance-swift-alias"],
+        setup: |case| {
+            common::fixture_repo(
+                case,
+                "conformance-swift-alias",
+                Some("https://example.com/acme/conformance.git"),
+            )
+        },
+        edit: "Sources/App/main.swift",
+        symbol: "Sources/App/main.swift::use(_:_:_:_:)",
+    },
+    Suite {
+        name: "conformance-swift-app",
+        fixtures: &["conformance-swift-app"],
+        setup: |case| {
+            common::fixture_repo(
+                case,
+                "conformance-swift-app",
+                Some("https://example.com/acme/conformance.git"),
+            )
+        },
+        edit: "Sources/Receivers.swift",
+        symbol: "Sources/Receivers.swift::outside(_:_:_:_:)",
+    },
+    Suite {
+        name: "conformance-swift-capitalized",
+        fixtures: &["conformance-swift-capitalized"],
+        setup: |case| {
+            common::fixture_repo(
+                case,
+                "conformance-swift-capitalized",
+                Some("https://example.com/acme/conformance.git"),
+            )
+        },
+        edit: "Sources/Plain.swift",
+        symbol: "Sources/Plain.swift::run()",
+    },
+    Suite {
+        name: "conformance-swift-implicit",
+        fixtures: &["conformance-swift-implicit"],
+        setup: |case| {
+            common::fixture_repo(
+                case,
+                "conformance-swift-implicit",
+                Some("https://example.com/acme/conformance.git"),
+            )
+        },
+        edit: "Sources/Implicit.swift",
+        symbol: "Sources/Implicit.swift::Config.build()",
+    },
+    Suite {
+        name: "conformance-swift-packages",
+        fixtures: &["conformance-swift-packages"],
+        setup: |case| {
+            common::fixture_repo(
+                case,
+                "conformance-swift-packages",
+                Some("https://example.com/acme/conformance.git"),
+            )
+        },
+        edit: "one/Sources/App/App.swift",
+        symbol: "one/Sources/App/App.swift::start()",
+    },
+    Suite {
+        name: "xlang-java",
+        fixtures: &["xlang-java-web", "xlang-java-api"],
+        setup: |case| common::xlang_java(case).0,
+        edit: "src/sync.ts",
+        symbol: "src/sync.ts::syncOrders",
+    },
+    Suite {
+        name: "xlang-kotlin",
+        fixtures: &["xlang-kotlin-web", "xlang-kotlin-api"],
+        setup: |case| common::xlang_kotlin(case).0,
+        edit: "src/sync.ts",
+        symbol: "src/sync.ts::syncOrders",
+    },
+    Suite {
+        name: "xlang-csharp",
+        fixtures: &["xlang-csharp-web", "xlang-csharp-api"],
+        setup: |case| common::xlang_csharp(case).0,
+        edit: "src/sync.ts",
+        symbol: "src/sync.ts::syncOrders",
+    },
+    Suite {
+        name: "xlang-swift",
+        fixtures: &["xlang-swift-web", "xlang-swift-api"],
+        setup: |case| common::xlang_swift(case).0,
+        edit: "src/sync.ts",
+        symbol: "src/sync.ts::syncOrders",
+    },
 ];
 
 fn fixture_coverage() {
