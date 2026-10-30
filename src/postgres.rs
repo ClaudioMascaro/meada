@@ -159,6 +159,11 @@ const MIGRATIONS: &[&str] = &[
        reason text NOT NULL,
        PRIMARY KEY (set_id, identity)
      );",
+    // 6: where a repository of the permissions set came from (#341, ADR 0021): the workspace
+    // selects it (`selected`, every row so far), only `[catalog]` allows it (`catalog`), or both.
+    // The catalog is the `catalog` and `both` rows whose coverage is `listed`.
+    "ALTER TABLE {schema}.permission_repositories
+       ADD COLUMN source text NOT NULL DEFAULT 'selected';",
 ];
 
 /// The `[postgres]` section as written.

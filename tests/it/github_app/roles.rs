@@ -117,6 +117,26 @@ impl Case {
         assert_eq!(migrated.2, Some(0), "{}", migrated.1);
     }
 
+    /// `[catalog]` (#341) appended to the bootstrap: `allow` patterns and the cap `max`.
+    #[cfg(feature = "workspaces")]
+    fn catalog(&self, allow: &[&str], max: usize) {
+        let path = self.dir.join(BOOTSTRAP);
+        let patterns: Vec<String> = allow.iter().map(|p| format!("\"{p}\"")).collect();
+        let section = format!(
+            "\n[catalog]\nallow = [{}]\nmax_repositories = {max}\n",
+            patterns.join(", ")
+        );
+        fs::write(&path, fs::read_to_string(&path).unwrap() + &section).unwrap();
+    }
+
+    /// The fake lists `repos` (`<owner>/<repo>`) among the repositories installation `id`
+    /// covers.
+    #[cfg(feature = "workspaces")]
+    fn cover(&self, id: u64, repos: &[&str]) {
+        let repos = repos.iter().map(|r| r.to_string()).collect();
+        self.api.with(|s| s.covered.insert(id, repos));
+    }
+
     /// Lists `collaborators` (login, role) for `<owner>/<repo>`.
     fn list(&self, repo: &str, collaborators: &[(&str, &str)]) {
         let rows = (collaborators.iter())
@@ -768,7 +788,7 @@ fn the_role_check_refuses_a_schema_version_it_does_not_know() {
     );
     case.clean(&stderr);
     assert_eq!((stdout.as_str(), code), ("", Some(1)));
-    assert!(stderr.contains('5') && stderr.contains('4'), "{stderr}");
+    assert!(stderr.contains('6') && stderr.contains('4'), "{stderr}");
     assert!(case.listings().is_empty());
 }
 
@@ -988,4 +1008,242 @@ fn a_refresh_publishes_only_eligible_additions_and_an_adopted_one_after_its_chec
     let (g3, stderr, code) = refresh();
     assert_eq!(code, Some(0), "{stderr}");
     assert_eq!(g3, g2);
+}
+
+/// With `[catalog]` the role check lists, per installation whose owner a pattern names, every
+/// page of the repositories it covers, keeps those the allow list admits (names compared
+/// lowercase) and lists the collaborators of each beside the workspace's own: an installation on
+/// an owner no pattern names is never asked, and neither is a repository the list refuses.
+/// Selected and allowed repositories are counted once.
+#[cfg(feature = "workspaces")]
+#[test]
+fn the_catalog_adds_the_covered_and_allowed_repositories_to_the_set() {
+    let Some(case) = Case::new("roles_catalog", &[1]) else {
+        return;
+    };
+    case.bootstrap(None, false);
+    case.api.install(1, 12, "other");
+    case.api.install(1, 13, "ignored");
+    let allow = [
+        "example.com/chain/web",
+        "example.com/chain/gateway",
+        "example.com/chain/extra",
+        "example.com/other/tool",
+    ];
+    case.catalog(&allow, 3);
+    pull_version(&case.dir, &[(WEB, "../chain-web", None)]);
+    case.cover(
+        11,
+        &["chain/web", "Chain/Gateway", "chain/extra", "chain/secret"],
+    );
+    case.cover(12, &["other/tool", "other/more"]);
+    case.cover(13, &["ignored/x"]);
+    case.list("chain/web", &[("u0001", "write")]);
+    case.list("chain/gateway", &[("u0002", "admin")]);
+    case.list("chain/extra", &[("u0003", "read")]);
+    case.list("other/tool", &[("u0004", "maintain")]);
+    case.list("chain/secret", &[("u0005", "admin")]);
+    case.list("other/more", &[("u0006", "admin")]);
+
+    let counts = "4 repositories (4 in the catalog), 4 rows, 0 exclusions";
+    let (_, stderr) = case.checked(BOOTSTRAP, None, counts);
+    assert_eq!(stderr, "");
+    let listings = case.listings();
+    let covered: Vec<(u64, &str)> = (listings.iter())
+        .filter(|(_, path)| path.starts_with("/installation/repositories?"))
+        .map(|(id, path)| (*id, path.as_str()))
+        .collect();
+    let page = "/installation/repositories?per_page=100&page=1";
+    assert_eq!(covered, [(11, page), (12, page)]);
+    for refused in ["chain/secret", "other/more", "ignored"] {
+        assert!(
+            listings.iter().all(|(_, path)| !path.contains(refused)),
+            "{refused}: {listings:?}"
+        );
+    }
+    assert!(listings.iter().all(|(id, _)| *id != 13), "{listings:?}");
+}
+
+/// The catalog lists every page of an installation, and a candidate set above `max_repositories`
+/// (the selected repositories not counted) fails the run with the count and the cap, in both
+/// languages.
+#[cfg(feature = "workspaces")]
+#[test]
+fn the_catalog_lists_every_page_and_refuses_a_set_above_its_cap() {
+    let Some(case) = Case::new("roles_catalog_pages", &[1]) else {
+        return;
+    };
+    case.bootstrap(None, false);
+    case.catalog(&["example.com/chain/*"], 119);
+    pull_version(&case.dir, &[(WEB, "../chain-web", None)]);
+    let mut names: Vec<String> = (0..119).map(|i| format!("chain/r{i:03}")).collect();
+    names.push("chain/web".into());
+    let cover = |names: &[String]| {
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+        case.cover(11, &names);
+    };
+    cover(&names);
+    for name in &names {
+        case.list(name, &[("u0001", "write")]);
+    }
+    let counts = "120 repositories (120 in the catalog), 120 rows, 0 exclusions";
+    case.checked(BOOTSTRAP, None, counts);
+    let pages: Vec<String> = (case.listings().into_iter())
+        .filter(|(_, path)| path.starts_with("/installation/repositories?"))
+        .map(|(_, path)| path)
+        .collect();
+    assert_eq!(
+        pages,
+        [
+            "/installation/repositories?per_page=100&page=1",
+            "/installation/repositories?per_page=100&page=2"
+        ]
+    );
+
+    names.push("chain/r119".into());
+    cover(&names);
+    let (stdout, stderr, code) = case.roles(BOOTSTRAP, None);
+    assert_eq!((stdout.as_str(), code), ("", Some(1)));
+    assert_eq!(
+        stderr,
+        "meada: the catalog has 120 candidates besides the selected repositories, above \
+         [catalog] max_repositories = 119; nothing was written\n"
+    );
+    let pt = [("LANG", "pt_BR.UTF-8")];
+    let (_, stderr, _) = meada(
+        &case.dir,
+        &["github-app", "roles", "--workspace", BOOTSTRAP],
+        &pt,
+    );
+    assert_eq!(
+        stderr,
+        "meada: o catálogo tem 120 candidatos além dos repositórios selecionados, acima de \
+         [catalog] max_repositories = 119; nada foi gravado\n"
+    );
+}
+
+/// A catalog listing that fails (a cap exceeded, a throttled installation, a 5xx, a page that is
+/// not the documented object) fails the run and writes nothing: after each one the set of the
+/// run before still stands, so a run at a fence between them is accepted. The throttled
+/// installation is marked, as every other REST use of the module marks it.
+#[cfg(all(feature = "workspaces", feature = "refresh-lock"))]
+#[test]
+fn a_failed_catalog_listing_writes_nothing() {
+    let Some(case) = Case::new("roles_catalog_fail", &[1]) else {
+        return;
+    };
+    case.bootstrap(None, true);
+    case.catalog(&["example.com/chain/*"], 3);
+    pull_version(&case.dir, &[(WEB, "../chain-web", None)]);
+    let four = ["chain/web", "chain/a1", "chain/a2", "chain/a3"];
+    case.cover(11, &four);
+    for name in four {
+        case.list(name, &[("u0001", "write")]);
+    }
+    let counts = "4 repositories (4 in the catalog), 4 rows, 0 exclusions";
+    case.checked(BOOTSTRAP, Some(5), counts);
+
+    let failed = |fence: u64| {
+        let (stdout, stderr, code) = case.roles(BOOTSTRAP, Some(fence));
+        assert_eq!((stdout.as_str(), code), ("", Some(1)), "{stderr}");
+        stderr
+    };
+    let mut five = four.to_vec();
+    five.extend(["chain/a4", "chain/a5"]);
+    case.cover(11, &five);
+    assert_eq!(
+        failed(7),
+        "meada: the catalog has 5 candidates besides the selected repositories, above [catalog] \
+         max_repositories = 3; nothing was written\n"
+    );
+
+    case.cover(11, &four);
+    case.api
+        .with(|s| s.listing_throttled.insert(11, (429, Some(30))));
+    let stderr = failed(7);
+    assert_eq!(
+        stderr,
+        "meada: installation 11: throttled for 30 s\nmeada: installation 11: listing its \
+         repositories for the catalog failed: throttled (http status 429); nothing was written\n"
+    );
+    // The mark holds: the next run does not ask the installation at all.
+    let before = case.listings().len();
+    let stderr = failed(7);
+    assert_eq!(
+        stderr,
+        "meada: installation 11: listing its repositories for the catalog failed: throttled; \
+         nothing was written\n"
+    );
+    assert_eq!(case.listings().len(), before);
+    let mut valkey = super::admin(&case.valkey);
+    let key = format!(
+        "{}:github-app:{HOST}:installation:11:throttled",
+        prefix(case.case)
+    );
+    let _: () = redis::cmd("DEL").arg(key).query(&mut valkey).unwrap();
+
+    case.api.with(|s| {
+        s.listing_throttled.clear();
+        s.listing_status = Some(503);
+    });
+    let stderr = failed(7);
+    assert!(
+        stderr.starts_with(
+            "meada: installation 11: listing its repositories for the catalog failed: "
+        ) && stderr.ends_with(": http status 503; nothing was written\n"),
+        "{stderr}"
+    );
+    for body in ["[]", "{\"repositories\": 3}", "{\"total_count\": 1}"] {
+        case.api.with(|s| {
+            s.listing_status = None;
+            s.covered_body = Some(body.into());
+        });
+        let stderr = failed(7);
+        assert!(
+            stderr.contains("listing its repositories for the catalog failed: ")
+                && stderr.ends_with("; nothing was written\n"),
+            "{body}: {stderr}"
+        );
+        case.clean(&stderr);
+    }
+
+    // An App whose installations cannot be listed fails the run too, though Valkey still holds
+    // the last listing: skipping its owners would empty their repositories from the catalog.
+    case.api.with(|s| {
+        s.covered_body = None;
+        s.installations_status = Some(500);
+    });
+    let mut valkey = super::admin(&case.valkey);
+    let listed = format!("{}:github-app:{HOST}:app:1:listed", prefix(case.case));
+    let _: () = redis::cmd("DEL").arg(listed).query(&mut valkey).unwrap();
+    let stderr = failed(7);
+    assert!(
+        stderr
+            .starts_with("meada: GitHub App 1: listing its installations for the catalog failed: ")
+            && stderr.ends_with("; nothing was written\n"),
+        "{stderr}"
+    );
+    case.api.with(|s| s.installations_status = None);
+
+    // An App throttled with nothing held and no recent listing fails it as well, without asking.
+    let app = |name: &str| format!("{}:github-app:{HOST}:app:1:{name}", prefix(case.case));
+    let mut send = |args: &[&str]| {
+        let _: () = redis::cmd(args[0])
+            .arg(&args[1..])
+            .query(&mut valkey)
+            .unwrap();
+    };
+    send(&["DEL", &app("installations"), &app("listed")]);
+    send(&["SET", &app("throttled"), "60", "EX", "60"]);
+    let before = case.listings().len();
+    assert_eq!(
+        failed(7),
+        "meada: GitHub App 1: listing its installations for the catalog failed: throttled; \
+         nothing was written\n"
+    );
+    assert_eq!(case.listings().len(), before);
+    send(&["DEL", &app("throttled")]);
+
+    // None of them wrote a set at fence 7: a run at 6 is accepted.
+    case.checked(BOOTSTRAP, Some(6), counts);
 }

@@ -312,7 +312,8 @@ _Avoid_: member, guest, invited viewer
 The repositories a named workspace could select: those the installations of the GitHub App cover
 that the platform administrator's allow list admits, listed by the job in the same permissions set
 as the roles. It is not an entitlement: only a repository on which the caller's login holds an
-accepted role is selectable (ADR 0021).
+accepted role is selectable (ADR 0021). Built by #341: `[catalog]`, the job's installation
+listing, the `source` column of the permissions set and `GET /api/v1/catalog`.
 _Avoid_: repository list, inventory, discovery index
 
 **Eligible**:

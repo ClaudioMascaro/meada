@@ -123,6 +123,8 @@ fn max_age_min() -> i64 {
 
 #[cfg(feature = "postgres")]
 mod permissions;
+#[cfg(feature = "workspaces")]
+pub(crate) use permissions::Catalog;
 
 #[cfg(feature = "directory")]
 mod overage;
@@ -188,6 +190,10 @@ pub struct Github {
     /// refuses `[oidc.github]` without it.
     #[cfg(feature = "postgres")]
     pub postgres: Option<crate::postgres::Config>,
+    /// Whether the manifest has `[catalog]` (#341): `Manifest::read` sets it, and the permissions
+    /// cache then reads the newest set's catalog beside its rows.
+    #[cfg(feature = "workspaces")]
+    pub catalog: bool,
 }
 
 /// Whether `role` is a role name `[oidc.github] roles` takes: 1 to `ROLE_MAX` characters with no
@@ -237,6 +243,8 @@ impl GithubFile {
             max_age: Duration::from_secs(max_age),
             #[cfg(feature = "postgres")]
             postgres: None,
+            #[cfg(feature = "workspaces")]
+            catalog: false,
         })
     }
 }
@@ -827,6 +835,15 @@ impl Oidc {
             return Some((cache.host(), cache.state()));
         }
         None
+    }
+
+    /// With `[oidc.github]`, the catalog as `login` may select from it (#341): the whole fresh
+    /// catalog for the platform administrator. `None` without the permissions cache.
+    #[cfg(feature = "workspaces")]
+    pub fn catalog(&self, login: Option<&str>, administrator: bool) -> Option<Catalog> {
+        self.permissions
+            .as_ref()
+            .map(|cache| cache.catalog(login, administrator))
     }
 
     /// With `[oidc.github]`, the newest permissions set's workspace version and the identities it

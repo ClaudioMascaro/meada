@@ -207,6 +207,10 @@ pub struct Manifest {
     /// `[postgres]` and `[oidc]` are there too.
     #[cfg(feature = "directory")]
     pub directory: Option<crate::directory::Config>,
+    /// The `[catalog]` section, when the build has the module (#341, ADR 0021); `read` checks
+    /// that `[oidc.github]` is there too.
+    #[cfg(feature = "workspaces")]
+    pub catalog: Option<crate::catalog::Config>,
     /// `[workspace] source = "store"` (ADR 0014): the repositories come from the current
     /// workspace version: `entries` is empty, or with `read_listed` the pulled version's.
     #[cfg(feature = "generation-pointer")]
@@ -258,6 +262,8 @@ struct ManifestFile {
     postgres: Option<crate::postgres::File>,
     #[cfg(feature = "directory")]
     directory: Option<crate::directory::File>,
+    #[cfg(feature = "workspaces")]
+    catalog: Option<crate::catalog::File>,
     #[cfg(feature = "github-app")]
     #[serde(default, rename = "github_app")]
     github_apps: Vec<crate::github_app::File>,
@@ -361,6 +367,24 @@ impl Manifest {
         let github = oidc.as_ref().is_some_and(|o| o.github.is_some());
         #[cfg(not(feature = "oidc"))]
         let github = false;
+        // `[catalog]` (#341) names its patterns on `[oidc.github] host` and is read by the role
+        // check and the console beside it.
+        #[cfg(feature = "workspaces")]
+        let catalog = {
+            let host = oidc
+                .as_ref()
+                .and_then(|o| o.github.as_ref())
+                .map(|g| g.host.clone());
+            if parsed.catalog.is_some() && host.is_none() {
+                modules::needs(file, &src, "catalog", &["oidc.github"])?;
+            }
+            let host = host.unwrap_or_default();
+            modules::validated(file, &src, parsed.catalog, |c| c.validate(&host))?
+        };
+        #[cfg(feature = "workspaces")]
+        if let Some(github) = oidc.as_mut().and_then(|o| o.github.as_mut()) {
+            github.catalog = catalog.is_some();
+        }
         #[cfg(feature = "directory")]
         let directory = modules::validated(file, &src, parsed.directory, |d| d.validate(base))?;
         #[cfg(feature = "directory")]
@@ -520,6 +544,8 @@ impl Manifest {
             postgres,
             #[cfg(feature = "directory")]
             directory,
+            #[cfg(feature = "workspaces")]
+            catalog,
             #[cfg(feature = "generation-pointer")]
             store,
             #[cfg(feature = "generation-pointer")]
@@ -649,6 +675,8 @@ impl Manifest {
             postgres: None,
             #[cfg(feature = "directory")]
             directory: None,
+            #[cfg(feature = "workspaces")]
+            catalog: None,
             #[cfg(feature = "generation-pointer")]
             store: false,
             #[cfg(feature = "generation-pointer")]

@@ -543,7 +543,8 @@ S5: callers with their effective per-login rows (direct and group-derived alike)
 stale-set and missing-login rows, discovery, authority, queries, links, revocation, the sponsor
 rule and the shared membership. `meada-core/tests/named_workspaces.rs` checks every row against a
 small reference of the ADRs' rules and that the table covers the spec's scenarios; no runtime
-reads it yet, and #341 to #346 add their public-process, UI and WebAssembly readers and rows.
+reads it in the catalog's tests (below), and #342 to #346 add their public-process, UI and
+WebAssembly readers and rows.
 `tests/fixtures/workspace-validation.json` is the single pt-BR/English validation table used
 by the real WASM in `ui/tests/core.test.ts` and the binary `workspace import` in
 `tests/it/generations/imports.rs` with generation-pointer and real configured store services.
@@ -729,6 +730,32 @@ with the GitHub identity in `grant`, a group owning an entry only GitHub grants 
 loopback issuer or the fake GitHub; `admission`'s `github` with the set's id, `finished`, age,
 `max_age_seconds` and the counts the job wrote; an audited write's record carrying the login;
 then `expired`, a viewer with an empty grant.
+
+`tests/it/ui/oidc/catalog.rs` (#341, feature `workspaces`) runs a console with `[oidc.github]`,
+`[postgres]` and `[catalog]` over a permissions set the real `meada github-app roles` wrote
+against the fake GitHub (an installation on the owner `acme` covering the table's repositories, a
+repository nobody collaborates on and a covered owner no pattern admits), with a token per caller
+of the shared Y/A/B table: `GET catalog` lists exactly the identities the caller's login holds an
+accepted role on, direct or through a group alike, nothing through a rejected role, a claims grant
+or a raw group name, `missing_login` pending without a login, the whole catalog for the platform
+administrator, and names no repository the caller may not select anywhere in the answer; `POST
+catalog/check` agrees with every creation row of the table (`pending` included), reads an
+identity outside the catalog like one the caller may not select (`unavailable`, no reason), and
+refuses bodies and queries past their bounds with one fixed 400; pagination by opaque cursor and
+prefix; a set past `max_age_seconds` pending `stale_set` for everyone, the administrator
+included, a failed run leaving the set to age, a new set restoring it; `config` naming the
+picker, `manifest` hiding `catalog.allow` from everyone but the global operator, `admission`
+counting the catalog, and the fake seeing no request while the console answers. The
+`oidc::permissions` unit test reads the same table against the cache. In
+`tests/it/github_app/roles.rs` the catalog cases check the installation listing (the owners a
+pattern names, every page, the allow list, names compared lowercase, an owner no pattern names
+never asked, a repository the list refuses never listed for collaborators), the cap (the count and
+the cap in both languages) and that a cap, a throttle (marking the installation), a 5xx or a
+body that is not the documented object each fail the run and write nothing (a run at a fence
+between them is accepted); `tests/it/manifest.rs` checks each `[catalog]` error at its line and
+key without echoing a pattern; the Postgres tests count migration 6. The front end's
+`ui/tests/catalog.test.tsx` checks the picker's routes, pages, selection, verification, pending
+states and refusals in both languages.
 
 `tests/it/ui/oidc/additions.rs` (#333) runs the same console with `[oidc.github]` and
 `[postgres]` (every write audited) and the role check over the store's version: a team

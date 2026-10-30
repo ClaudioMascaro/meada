@@ -23,7 +23,9 @@ The maintainer's decision of 2026-10-29 applies: the real-organization measureme
 github-app roles` (#338) does not gate S5. This ADR consolidates against the merged code and
 the existing fakes, and the assumption real evidence would confirm is named under Open.
 
-Nothing here is implemented. Current behavior is ADR 0014's one workspace per deployment.
+Implementation status: #341 built contract 1 (the catalog, below) and, as of 2026-10-30, nothing
+else here; the cargo feature `workspaces` exists with `[catalog]` as its only section. Current
+behavior otherwise is ADR 0014's one workspace per deployment.
 
 ## Decision
 
@@ -92,13 +94,25 @@ workspace and not an index.
   identity. `POST /api/v1/catalog/check` takes `{"identities":[...]}` (at most 50, each checked
   as an identity) and returns `{"state","reason","results":[{"identity","state"}]}`. Both need an
   admitted, non-deprovisioned subject. Answers carry no identity the caller cannot select.
-- **Cost.** The job pays `ceil(candidates / 100)` installation pages and, per candidate,
+- **Cost.** The job pays `ceil(covered / 100)` pages per installation listed (`covered` counts
+  every repository the installation covers, not only those `allow` admits) and, per candidate,
   `ceil(collaborators / 100)` collaborator pages, on top of ADR 0016's ceiling. Expanded
   coverage is enabled only by an operator who set `max_repositories`; the base-role upgrade path
   ADR 0016 names (list the base role's members once) is the first remedy when measurement says
   the hour is exceeded.
 - Discovery creates no workspace, ACL or index, and the console and the nodes still never call
   GitHub (ADR 0012, ADR 0016).
+- **As built (#341).** The listing lives in `github_app/catalog.rs` and only asks installations
+  whose owner some `allow` pattern names. An App with no installations held and no recent
+  listing (throttled, or another run's listing unfinished when the lock expires) fails the run;
+  while it is throttled, the installations it holds (at most an hour old) are used, as for the
+  selected repositories. `Permissions` (`oidc/permissions.rs`) loads the catalog
+  with the rows only when `[catalog]` is present, and answers per subject; its identities are at
+  most 192 bytes (the cursor is base64url of the identity within the 256 characters above). A
+  `check` repeating an identity answers it once, and a body or query past its bounds is one fixed
+  400. `GET /api/v1/manifest` hides `catalog.allow` from everyone but the platform administrator,
+  since the patterns name owners nobody may have been granted. The platform administrator is the
+  session the console already treats as the global operator.
 
 ### Contract 2: selected entries (what a workspace declares)
 

@@ -6,6 +6,8 @@ export interface Config {
   operations: boolean;
   /** With `[postgres]`: the audit page has its route. */
   audit?: boolean;
+  /** With `[catalog]` (#341): the catalog and its picker have their routes. */
+  catalog?: boolean;
   issuer?: string;
   client_id?: string;
   scopes?: string[];

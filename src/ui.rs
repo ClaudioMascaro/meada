@@ -39,6 +39,8 @@ use crate::modules::{self, Problem, Shape};
 use crate::msg::Msg;
 use crate::workspace::Manifest;
 
+#[cfg(feature = "workspaces")]
+mod catalog;
 #[cfg(feature = "directory")]
 mod directory;
 mod read;
@@ -414,6 +416,8 @@ pub fn listen(listen: &str, manifest: &Path) -> Result<()> {
 async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
     let max = match parts.uri.path() {
         CHECK => CHECK_MAX,
+        #[cfg(feature = "workspaces")]
+        "/api/v1/catalog/check" => CHECK_MAX,
         QUERY => QUERY_MAX,
         "/api/v1/pointer" => write::POINTER_MAX,
         "/api/v1/fence/recover" => write::FENCE_MAX,
@@ -883,6 +887,14 @@ impl Console {
         if route == "query" && *method == Method::POST {
             return self.query(request.body(), session);
         }
+        #[cfg(feature = "workspaces")]
+        if route == "catalog" && read {
+            return self.catalog(request.uri().query(), session);
+        }
+        #[cfg(feature = "workspaces")]
+        if route == "catalog/check" && *method == Method::POST {
+            return self.catalog_check(request.body(), session);
+        }
         if read && route == "audit" && self.audit.on() {
             return self.audit_page(request.uri().query(), session);
         }
@@ -932,6 +944,11 @@ impl Console {
         if self.audit.on() {
             config["audit"] = true.into();
         }
+        // With `[catalog]` (#341), the picker has its routes.
+        #[cfg(feature = "workspaces")]
+        if self.bootstrap.catalog.is_some() && self.oidc.is_some() {
+            config["catalog"] = true.into();
+        }
         #[cfg(feature = "oidc")]
         if let Some(oidc) = &self.oidc {
             let (issuer, scopes) = oidc.login();
@@ -954,6 +971,14 @@ impl Console {
             Err(e) => e.to_string().lines().map(String::from).collect(),
         };
         let mut loaded = self.loaded.clone();
+        // The allow list names owners and repositories nobody may have been granted: only the
+        // global operator reads it (#341).
+        #[cfg(feature = "workspaces")]
+        if !session.operator
+            && let Some(catalog) = loaded.get_mut("catalog").and_then(Value::as_object_mut)
+        {
+            catalog.remove("allow");
+        }
         if !session.whole() {
             if let Some(Value::Array(entries)) = loaded.get_mut("repository") {
                 read::filter_entries(entries, "repo", session);

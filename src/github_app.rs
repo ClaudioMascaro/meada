@@ -862,6 +862,9 @@ pub fn throttled(manifest: &Path, url: &str, retry_after: Option<u64>) -> crate:
 
 // The role check (#331, ADR 0016): `meada github-app roles`, the job's second REST use.
 
+#[cfg(feature = "workspaces")]
+mod catalog;
+
 // ponytail: the most pages of one repository's collaborators the role check lists, `PER_PAGE`
 // each (100,000 collaborators); past it the run fails, writing nothing.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
@@ -1096,6 +1099,8 @@ pub fn roles(manifest: &Path) -> crate::Result<Reply> {
         valkey: &valkey,
         apps: &apps,
         github: &github,
+        #[cfg(feature = "workspaces")]
+        catalog: read.catalog.as_ref(),
         fence,
         version,
         entries,
@@ -1121,6 +1126,9 @@ struct Check<'a> {
     valkey: &'a valkey::Config,
     apps: &'a [&'a Config],
     github: &'a crate::oidc::Github,
+    /// `[catalog]` (#341): the repositories listed besides the workspace's own.
+    #[cfg(feature = "workspaces")]
+    catalog: Option<&'a crate::catalog::Config>,
     fence: u64,
     version: Option<String>,
     entries: Vec<Entry>,
@@ -1149,6 +1157,8 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         valkey,
         apps,
         github,
+        #[cfg(feature = "workspaces")]
+        catalog,
         fence,
         version,
         entries,
@@ -1195,27 +1205,48 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     // Every identity on the host, listed; rows keyed by identity and login, the first kept.
     let mut run = Run::open(valkey).await?;
     let mut rows: BTreeMap<(String, String), String> = BTreeMap::new();
+    // The catalog's candidates (#341): what the installations cover and `[catalog] allow`
+    // admits, listed before any collaborator so a failure writes nothing.
+    #[cfg_attr(not(feature = "workspaces"), allow(unused_mut))]
+    let mut candidates: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    #[cfg(feature = "workspaces")]
+    if let Some(catalog) = catalog {
+        let selected = entries.iter().map(|(i, _)| i.as_str()).collect();
+        let listed = catalog::candidates(&mut run, apps, &github.host, catalog, &selected).await;
+        notes.append(&mut run.notes);
+        candidates = listed?;
+    }
+    // Where each identity comes from (`source`): the workspace's own in its order, then the
+    // catalog's alone, sorted.
+    let mut targets: Vec<(&str, &str)> = Vec::new();
+    for (identity, _) in &entries {
+        let both = candidates.contains(identity);
+        targets.push((identity.as_str(), if both { "both" } else { "selected" }));
+    }
+    let own: std::collections::HashSet<&str> = entries.iter().map(|(i, _)| i.as_str()).collect();
+    let alone = candidates.iter().filter(|c| !own.contains(c.as_str()));
+    targets.extend(alone.map(|c| (c.as_str(), "catalog")));
     // Per identity on the host, what GitHub showed of it: the App and repository coverage.
-    let mut coverage: Vec<(&str, &str)> = Vec::new();
+    let mut coverage: Vec<(&str, &str, &str)> = Vec::new();
     let prefix = format!("{}/", github.host);
     let mut list_all = async || {
-        for (identity, _) in &entries {
+        for &(identity, source) in &targets {
             let Some(rest) = identity.strip_prefix(&prefix) else {
                 continue;
             };
             let Some((owner, repo)) = repository(rest).filter(|_| !rest.ends_with(".git")) else {
                 run.notes.push(Msg::RolesNotRepository(identity).text());
-                coverage.push((identity, "not_a_repository"));
+                coverage.push((identity, "not_a_repository", source));
                 continue;
             };
             let shown = listed(&mut run, apps, &github.host, identity, &owner, &repo).await?;
             let Shown::Listed(found) = shown else {
-                coverage.push((identity, shown.coverage()));
+                coverage.push((identity, shown.coverage(), source));
                 continue;
             };
-            coverage.push((identity, "listed"));
+            coverage.push((identity, "listed", source));
             for (login, role) in found {
-                rows.entry((identity.clone(), login)).or_insert(role);
+                rows.entry((identity.to_string(), login)).or_insert(role);
             }
         }
         Ok::<_, String>(())
@@ -1226,7 +1257,7 @@ async fn check(check: Check<'_>) -> Result<String, String> {
 
     // The additions whose `added_by` holds no accepted role on their repository, with
     // `source = "store"` only (a file's entries have no `added_by`).
-    let repositories = coverage.iter().filter(|(_, c)| *c == "listed").count();
+    let repositories = coverage.iter().filter(|(_, c, _)| *c == "listed").count();
     let mut excluded: BTreeMap<&str, (&str, &str)> = BTreeMap::new();
     for (identity, added_by) in &entries {
         let Some(login) = added_by.as_ref().filter(|_| identity.starts_with(&prefix)) else {
@@ -1283,12 +1314,15 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     let params: [&(dyn tokio_postgres::types::ToSql + Sync); 4] =
         [&id, &identities, &logins, &roles];
     tx.execute(&insert, &params).await.map_err(&scrub)?;
-    let (identities, shown): (Vec<&str>, Vec<&str>) = coverage.iter().copied().unzip();
+    let identities: Vec<&str> = coverage.iter().map(|(i, _, _)| *i).collect();
+    let shown: Vec<&str> = coverage.iter().map(|(_, c, _)| *c).collect();
+    let sources: Vec<&str> = coverage.iter().map(|(_, _, s)| *s).collect();
     let insert = format!(
-        "INSERT INTO {q}.permission_repositories (set_id, identity, coverage) \
-         SELECT $1, i, c FROM unnest($2::text[], $3::text[]) AS t (i, c)"
+        "INSERT INTO {q}.permission_repositories (set_id, identity, coverage, source) \
+         SELECT $1, i, c, s FROM unnest($2::text[], $3::text[], $4::text[]) AS t (i, c, s)"
     );
-    let params: [&(dyn tokio_postgres::types::ToSql + Sync); 3] = [&id, &identities, &shown];
+    let params: [&(dyn tokio_postgres::types::ToSql + Sync); 4] =
+        [&id, &identities, &shown, &sources];
     tx.execute(&insert, &params).await.map_err(&scrub)?;
     let identities: Vec<&str> = excluded.keys().copied().collect();
     let (logins, reasons): (Vec<&str>, Vec<&str>) = excluded.values().copied().unzip();
@@ -1316,6 +1350,20 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         }
         let identities = excluded.keys().map(|i| i.to_string()).collect();
         crate::snapshot::versions::write_excluded(dir, version, &identities)?;
+    }
+    #[cfg(feature = "workspaces")]
+    if catalog.is_some() {
+        let catalog = (coverage.iter())
+            .filter(|(_, c, s)| *c == "listed" && *s != "selected")
+            .count();
+        return Ok(Msg::RolesSetCatalog {
+            id: &id,
+            repositories,
+            catalog,
+            rows: rows.len(),
+            exclusions: excluded.len(),
+        }
+        .text());
     }
     Ok(Msg::RolesSet {
         id: &id,

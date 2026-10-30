@@ -8,6 +8,21 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The repository catalog of spec S5 (#341, ADR 0021 contract 1, cargo feature `workspaces`,
+  part of `cloud`): `[catalog]` (`allow` patterns on `[oidc.github] host`, `max_repositories`
+  1 to 5000 with no default) makes `meada github-app roles` list, besides the workspace's own
+  repositories, those the Apps' installations cover (`GET /installation/repositories`, every page,
+  only for owners a pattern names) and `allow` admits, into the same permissions set with a
+  `source` on each repository (Postgres migration 6; run `meada postgres migrate`). A failed or
+  throttled listing, a body that is not the documented object or a candidate set above the cap
+  fails the run and writes nothing. The console gains `GET /api/v1/catalog` (bounded, opaque
+  pagination, `limit`, `after`, `q`) and `POST /api/v1/catalog/check`, answering only the
+  repositories the caller's login holds an accepted role on, direct or group-derived alike, with
+  the states `ready` and `pending` (`no_set`, `stale_set`, `missing_login`) and `unavailable`
+  without a reason, plus the repository catalog page; App coverage, group names in a token and
+  agent metadata alone grant nothing, and discovery creates no workspace, ACL or index. Without
+  `[catalog]` every process behaves as before. The cost of expanded coverage against a real
+  organization is not measured (#338 does not gate it).
 - Spec S5 consolidated (#340, documentation only; nothing is implemented): ADR 0020 now holds
   the accepted domain decision (platform administrator, workspace operator and inherited viewer,
   creation eligibility from accepted repository roles, the frozen Y/A/B matrix, hidden discovery

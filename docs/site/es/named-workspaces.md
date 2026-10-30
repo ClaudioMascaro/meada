@@ -1,7 +1,7 @@
 # Workspaces con nombre
 
-!!! warning "Planificado: S5, contratos decididos"
-    [S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) es alcance secuencial aceptado después de S3 y S4. La [consolidación de contratos, #340](https://github.com/ClaudioMascaro/meada/issues/340), está terminada: los ADR 0020, 0021 y 0022 fijan los contratos descritos aquí. El runtime no está entregado. La consola que puedes ejecutar hoy aún opera con un workspace por deployment, y nada de lo siguiente es todavía una opción de configuración.
+!!! warning "Planificado: S5, contratos decididos; el catálogo ya existe"
+    [S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) es alcance secuencial aceptado después de S3 y S4. La [consolidación de contratos, #340](https://github.com/ClaudioMascaro/meada/issues/340), está terminada: los ADR 0020, 0021 y 0022 fijan los contratos descritos aquí. Del runtime solo se entregó el **catálogo** ([#341](https://github.com/ClaudioMascaro/meada/issues/341)): `[catalog]`, el listado del job, `GET /api/v1/catalog`, `POST /api/v1/catalog/check` y el selector de la consola, descritos en [el catálogo](github-app.md#el-catalogo-de-repositorios) y en la [consola](console.md#catalogo-de-repositorios). La consola que puedes ejecutar hoy aún opera con un workspace por deployment, y el resto de lo siguiente no es todavía una opción de configuración.
 
 ## Componer sin duplicar la indexación
 
@@ -27,7 +27,7 @@ La pérdida de un rol o de la pertenencia a un grupo quita el acceso en el sigui
 
 ## Contratos distintos
 
-1. **Catálogo**: los repositorios que cubre el GitHub App y que admite la lista de permitidos del administrador, listados por el job en el mismo conjunto de permisos que los roles. Quien consulta ve solo los repositorios que puede seleccionar; la cobertura no es un derecho.
+1. **Catálogo** (entregado): los repositorios que cubre el GitHub App y que admite la lista de permitidos del administrador, listados por el job en el mismo conjunto de permisos que los roles. Quien consulta ve solo los repositorios que puede seleccionar; la cobertura no es un derecho.
 2. **Entradas seleccionadas**: un manifiesto versionado de repositorios con peers, relaciones de proveedor, referencias a variables de entorno, recursos y configuración de serve. No lleva ruta de mirror, valor secreto, owner ni lista de documentos.
 3. **Ingestión compartida**: una entrada por repositorio entre todos los workspaces. Una entrada en la que ningún operador de su workspace tiene un rol aceptado se excluye antes del fetch, lo que no es un fetch fallido. Un fallo de fetch o de índice sigue abortando la publicación entera, y todo workspace conserva la última generación completa.
 4. **Versiones**: guardar, aplicar, revertir, renombrar y eliminar, cada una comprobada en una transacción contra la versión base, la autoridad de quien la hace y la elegibilidad actual, y cada una auditada.

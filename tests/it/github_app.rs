@@ -62,10 +62,18 @@ pub(crate) struct State {
     /// Per `<owner>/<repo>`: its collaborators, login and `role_name`, in the order listed; a
     /// repository not here answers 404.
     pub(crate) collaborators: HashMap<String, Vec<(String, String)>>,
+    /// Per installation id: the `<owner>/<repo>` names `GET /installation/repositories` lists
+    /// for it, in order; an installation not here lists none.
+    pub(crate) covered: HashMap<u64, Vec<String>>,
+    /// The body every `/installation/repositories` page answers instead of the fake's own, when
+    /// set (a hostile or malformed one).
+    pub(crate) covered_body: Option<String>,
     /// Installations whose listings answer this status (403 or 429), with this `retry-after`.
     listing_throttled: HashMap<u64, (u16, Option<u64>)>,
     /// The status every listing answers, when set (a 5xx).
-    listing_status: Option<u16>,
+    pub(crate) listing_status: Option<u16>,
+    /// The status `GET /app/installations` answers, when set (a 5xx).
+    pub(crate) installations_status: Option<u16>,
     /// Every listing answers a body of this many bytes, when set.
     listing_bytes: Option<usize>,
     /// The `Link` header every listing page answers instead of the fake's own `next`.
@@ -211,6 +219,9 @@ fn answer(
     {
         return collaborators(&mut state, base, method, path, listing, &jwt);
     }
+    if let Some(query) = path.strip_prefix("/installation/repositories?") {
+        return covered(&mut state, method, path, query, &jwt);
+    }
     state.jwts.push(jwt.clone());
     let now = jsonwebtoken::get_current_timestamp();
     let app = keys.iter().find_map(|(app, key)| {
@@ -225,6 +236,9 @@ fn answer(
     };
     let installations = state.apps.get(&app).cloned().unwrap_or_default();
     if method == "GET" && path.starts_with("/app/installations?per_page=100&page=") {
+        if let Some(status) = state.installations_status {
+            return (status, String::new(), String::new());
+        }
         let page: Vec<Value> = match path.ends_with("page=1") {
             true => (installations.iter())
                 .map(|(id, login)| json!({"id": id, "account": {"login": login}}))
@@ -303,6 +317,45 @@ fn collaborators(
         None => String::new(),
     };
     (200, link, json!(rows).to_string())
+}
+
+/// The fake's answer to an installation's repositories listing (#341): 100 a page as
+/// `{"total_count", "repositories": [{"full_name"}]}`, for the installation `token` was minted
+/// for, with the throttles and failures the collaborators listing has.
+fn covered(
+    state: &mut State,
+    method: &str,
+    path: &str,
+    query: &str,
+    token: &str,
+) -> (u16, String, String) {
+    let Some(&(id, _)) = state.minted.iter().find(|(_, t)| t == token) else {
+        return (401, String::new(), String::new());
+    };
+    state.listings.push((id, path.to_string()));
+    if method != "GET" {
+        return (404, String::new(), String::new());
+    }
+    if let Some(&(status, after)) = state.listing_throttled.get(&id) {
+        let after = after.map_or(String::new(), |a| format!("Retry-After: {a}\r\n"));
+        return (status, after, String::new());
+    }
+    if let Some(status) = state.listing_status {
+        return (status, String::new(), String::new());
+    }
+    if let Some(body) = &state.covered_body {
+        return (200, String::new(), body.clone());
+    }
+    let page: usize = (query.split('&'))
+        .find_map(|pair| pair.strip_prefix("page="))
+        .and_then(|page| page.parse().ok())
+        .unwrap_or(1);
+    let all = state.covered.get(&id).cloned().unwrap_or_default();
+    let names: Vec<Value> = (all.iter().skip((page - 1) * 100).take(100))
+        .map(|name| json!({"full_name": name, "id": 1}))
+        .collect();
+    let body = json!({"total_count": all.len(), "repositories": names});
+    (200, String::new(), body.to_string())
 }
 
 /// `<case>/meada.workspace.toml` with `[valkey]` at `valkey` (the case's own key prefix) and

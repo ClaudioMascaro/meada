@@ -734,6 +734,53 @@ pub enum Msg<'a> {
         rows: usize,
         exclusions: usize,
     },
+    /// `[catalog] allow` that is not a non-empty array of distinct lowercase patterns on this
+    /// host (#341).
+    #[cfg(feature = "workspaces")]
+    CatalogAllow(&'a str),
+    /// An installation listing that fails the role check (#341): the installation and why.
+    #[cfg(feature = "workspaces")]
+    RolesCatalogFailed {
+        installation: u64,
+        why: &'a str,
+    },
+    /// An App whose installations could not be listed for the catalog: the App id and why.
+    #[cfg(feature = "workspaces")]
+    RolesCatalogInstallations {
+        app: u64,
+        why: &'a str,
+    },
+    /// An installation throttled while the catalog was listed, with the status answered, if any.
+    #[cfg(feature = "workspaces")]
+    RolesCatalogThrottled(Option<u16>),
+    /// An App with no installations held and no recent listing, after waiting for another
+    /// run's listing for the lock's lifetime.
+    #[cfg(feature = "workspaces")]
+    RolesCatalogUnlisted,
+    /// More pages of one installation's repositories than the role check lists.
+    #[cfg(feature = "workspaces")]
+    RolesCatalogPages(u32),
+    /// More candidates, besides the selected repositories, than `[catalog] max_repositories`.
+    #[cfg(feature = "workspaces")]
+    RolesCatalogCap {
+        found: usize,
+        max: usize,
+    },
+    /// The role check's line on success under `[catalog]`.
+    #[cfg(feature = "workspaces")]
+    RolesSetCatalog {
+        id: &'a str,
+        repositories: usize,
+        catalog: usize,
+        rows: usize,
+        exclusions: usize,
+    },
+    /// A catalog query the console refuses: its parameters, never echoed.
+    #[cfg(feature = "workspaces")]
+    CatalogQuery(usize),
+    /// A catalog check whose body is not `{"identities": [...]}` of identities.
+    #[cfg(feature = "workspaces")]
+    CatalogCheckBody(usize),
     /// The exclusions file a reader of the pulled version needs (#331).
     #[cfg(feature = "generation-pointer")]
     ExcludedMissing(&'a str),
@@ -2576,6 +2623,100 @@ impl Msg<'_> {
                     "conjunto de permissões {id}: {repositories} repositórios, {rows} linhas, \
                      {exclusions} exclusões"
                 ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::CatalogAllow(host) => pick(
+                format!(
+                    "must be a non-empty array of distinct lowercase patterns, each {host}/<owner>/* \
+                     or {host}/<owner>/<repo>"
+                ),
+                format!(
+                    "deve ser um array não vazio de padrões distintos em minúsculas, cada um \
+                     {host}/<dono>/* ou {host}/<dono>/<repositório>"
+                ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesCatalogFailed { installation, why } => pick(
+                format!(
+                    "installation {installation}: listing its repositories for the catalog \
+                     failed: {why}; nothing was written"
+                ),
+                format!(
+                    "instalação {installation}: a listagem dos seus repositórios para o catálogo \
+                     falhou: {why}; nada foi gravado"
+                ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesCatalogInstallations { app, why } => pick(
+                format!(
+                    "GitHub App {app}: listing its installations for the catalog failed: {why}; \
+                     nothing was written"
+                ),
+                format!(
+                    "GitHub App {app}: a listagem das suas instalações para o catálogo falhou: \
+                     {why}; nada foi gravado"
+                ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesCatalogThrottled(None) => pick("throttled".into(), "limitada".into()),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesCatalogThrottled(Some(status)) => pick(
+                format!("throttled (http status {status})"),
+                format!("limitada (status http {status})"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesCatalogUnlisted => pick(
+                "another run's listing did not finish in time".into(),
+                "a listagem de outra execução não terminou a tempo".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesCatalogPages(max) => pick(
+                format!("more than {max} pages of repositories"),
+                format!("mais de {max} páginas de repositórios"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesCatalogCap { found, max } => pick(
+                format!(
+                    "the catalog has {found} candidates besides the selected repositories, above \
+                     [catalog] max_repositories = {max}; nothing was written"
+                ),
+                format!(
+                    "o catálogo tem {found} candidatos além dos repositórios selecionados, acima \
+                     de [catalog] max_repositories = {max}; nada foi gravado"
+                ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesSetCatalog {
+                id,
+                repositories,
+                catalog,
+                rows,
+                exclusions,
+            } => pick(
+                format!(
+                    "permissions set {id}: {repositories} repositories ({catalog} in the catalog), \
+                     {rows} rows, {exclusions} exclusions"
+                ),
+                format!(
+                    "conjunto de permissões {id}: {repositories} repositórios ({catalog} no \
+                     catálogo), {rows} linhas, {exclusions} exclusões"
+                ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::CatalogQuery(max) => pick(
+                format!(
+                    "the catalog takes limit (1 to 100), after and q (at most {max} characters), \
+                     each once"
+                ),
+                format!(
+                    "o catálogo aceita limit (1 a 100), after e q (no máximo {max} caracteres), \
+                     cada um uma vez"
+                ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::CatalogCheckBody(max) => pick(
+                format!("the body must be {{\"identities\": [...]}} with at most {max} identities"),
+                format!("o corpo deve ser {{\"identities\": [...]}} com no máximo {max} identidades"),
             ),
             #[cfg(feature = "generation-pointer")]
             Msg::ExcludedMissing(file) => pick(

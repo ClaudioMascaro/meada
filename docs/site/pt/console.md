@@ -124,6 +124,32 @@ As operações da console exigem OIDC e ficam desligadas por padrão. Quando hab
 
 Com `[postgres]` no bootstrap (e o schema em dia com `meada postgres migrate`), cada escrita da console e cada comando do CLI que a espelha (`meada workspace import` e `apply`, `meada snapshot pointer set`, `retain` e `drop`, `meada snapshot fence recover`) deixa um registro no Postgres: quem (sujeito, papel e, para um operador de time, os owners), o quê (ação e argumentos), quando (o relógio do Postgres) e o resultado (`pending`, `accepted`, `refused` ou `failed`). O registro é gravado antes de a escrita tocar o Valkey ou o store: se ele não puder ser gravado, a escrita é recusada e nada muda (a console responde 503 `audit_unavailable`, o CLI sai com 1 nomeando o Postgres). Recusas de papel e recusas sob a trava também são registradas; bodies inválidos (400, 413, 422) não. A console sobe com o Postgres fora do ar (as leituras continuam) e se recusa a subir com uma versão de schema que não conhece. O operador global lê os registros, do mais recente ao mais antigo, na página **Registro de auditoria** ou em `GET /api/v1/audit?before=<id>&limit=<1 a 100>`. A linha de auditoria em stderr não muda, com ou sem `[postgres]`, e a Meada nunca apaga um registro.
 
+## Catálogo de repositórios
+
+Com `[catalog]` no bootstrap (feature `workspaces`, junto de `[oidc.github]`; veja [o catálogo](github-app.md#o-catalogo-de-repositorios)),
+a console oferece o **Catálogo de repositórios** a todo sujeito admitido, e `GET /api/v1/config` traz `"catalog": true`.
+É o seletor que vem antes de qualquer manifesto: lista só os repositórios que a pessoa pode selecionar, ou seja, que o
+catálogo contém e nos quais o login dela tem um papel aceito no conjunto de permissões mais recente (o administrador da
+plataforma vê o catálogo inteiro). Não cria workspace, lista de acesso nem índice.
+
+- `GET /api/v1/catalog?limit=&after=&q=` responde `{"state", "reason", "set", "repositories": [{"identity"}], "next"}`,
+  ordenado por identidade, com `limit` de 1 a 100 (50 por padrão), `q` um prefixo de até 128 caracteres e `after` o
+  cursor opaco (até 256 caracteres) que `next` devolveu. Qualquer outro parâmetro, um repetido ou um valor fora do
+  limite é um 400 com mensagem fixa.
+- `POST /api/v1/catalog/check` recebe `{"identities": [...]}` (até 50, 16 KiB) e responde `{"state", "reason", "results":
+  [{"identity", "state"}]}`, na ordem pedida: `selectable`, `unavailable` ou `pending`.
+- `state` é `ready` ou `pending`. **Pendente** é uma condição da plataforma ou de quem pergunta, igual para toda
+  identidade: `no_set` (o job ainda não gravou conjunto), `stale_set` (o conjunto passou de `max_age_seconds`, também
+  para o administrador) ou `missing_login` (o token não traz um login válido). Pendente não lista nada e nada novo
+  pode ser selecionado; as entradas que um manifesto já tem permanecem.
+- `unavailable` é todo outro caso (sem papel aceito, fora do catálogo, não coberto, novo desde o último conjunto) e **não
+  traz motivo**: um motivo seria um oráculo sobre o catálogo. A leitura nunca lista um repositório indisponível, e uma
+  identidade que não existe responde igual a uma que a pessoa não pode selecionar.
+
+As duas rotas exigem um sujeito admitido e não desativado (o bloqueio por SCIM vale aqui como em toda rota), e a
+console as responde do conjunto que já tem em memória, sem chamar o GitHub nem o Postgres. `GET /api/v1/manifest` só
+mostra `catalog.allow` ao operador global.
+
 ## Diretório (SCIM)
 
 Com a feature `directory` (incluída em `cloud`), `[directory]` no bootstrap, junto de `[postgres]` e `[oidc]`, faz a console servir um endpoint SCIM 2.0 em `/scim/v2/`, para onde o provisionamento do Entra ID ou do Okta empurra usuários e grupos:

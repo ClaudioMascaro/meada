@@ -17,16 +17,17 @@ export const routes = [
   { path: '/credentials', label: 'credentials' },
   { path: '/admission', label: 'admission' },
   { path: '/audit', label: 'audit' },
+  { path: '/catalog', label: 'catalog' },
 ] as const;
 
-/** The pages `session` is offered: the audit, when the console has one, is the global operator's alone. */
-export function offered(session?: Session, audit = false) {
-  return routes.filter(route => route.path !== '/audit' || (audit && session?.role === 'operator'));
+/** The pages `session` is offered: the audit, when the console has one, is the global operator's alone, and the catalog (#341) is every admitted subject's when the console has one. */
+export function offered(session?: Session, audit = false, catalog = false) {
+  return routes.filter(route => (route.path !== '/audit' || (audit && session?.role === 'operator')) && (route.path !== '/catalog' || catalog));
 }
 
-export function Shell({ path, locale, onLanguage, session, t, children, onNavigate, audit }: {
+export function Shell({ path, locale, onLanguage, session, t, children, onNavigate, audit, catalog }: {
   path: string; locale: Language; onLanguage: (language: Language) => void;
-  session?: Session; t: Copy; children: ReactNode; onNavigate?: (path: string) => void; audit?: boolean;
+  session?: Session; t: Copy; children: ReactNode; onNavigate?: (path: string) => void; audit?: boolean; catalog?: boolean;
 }) {
   function follow(event: MouseEvent<HTMLAnchorElement>, target: string) {
     if (!onNavigate || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
@@ -45,7 +46,7 @@ export function Shell({ path, locale, onLanguage, session, t, children, onNaviga
     </header>
     <aside className="sidebar">
       <nav aria-label={t.navigation}>
-        {offered(session, audit).map(route => <a key={route.path} href={route.path} onClick={event => follow(event, route.path)} aria-current={path === route.path ? 'page' : undefined}>
+        {offered(session, audit, catalog).map(route => <a key={route.path} href={route.path} onClick={event => follow(event, route.path)} aria-current={path === route.path ? 'page' : undefined}>
           {t[route.label]}
         </a>)}
       </nav>

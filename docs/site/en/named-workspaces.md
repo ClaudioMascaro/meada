@@ -1,7 +1,7 @@
 # Named workspaces
 
-!!! warning "Planned: S5, contracts decided"
-    [S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) is accepted sequential scope after S3 and S4. [Contract consolidation, #340](https://github.com/ClaudioMascaro/meada/issues/340), is done: ADRs 0020, 0021 and 0022 fix the contracts described here. The runtime is not delivered. The console you can run today still operates with one workspace per deployment, and nothing below is a configuration option yet.
+!!! warning "Planned: S5, contracts decided; the catalog exists"
+    [S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) is accepted sequential scope after S3 and S4. [Contract consolidation, #340](https://github.com/ClaudioMascaro/meada/issues/340), is done: ADRs 0020, 0021 and 0022 fix the contracts described here. Of the runtime only the **catalog** is delivered ([#341](https://github.com/ClaudioMascaro/meada/issues/341)): `[catalog]`, the job's listing, `GET /api/v1/catalog`, `POST /api/v1/catalog/check` and the console picker, described in [the catalog](github-app.md#the-repository-catalog) and the [console](console.md#repository-catalog). The console you can run today still operates with one workspace per deployment, and the rest below is not a configuration option yet.
 
 ## Compose without duplicating indexing
 
@@ -27,7 +27,7 @@ Loss of a role or group membership removes access at the next permissions set an
 
 ## Distinct contracts
 
-1. **Catalog**: the repositories the GitHub App covers and an administrator's allow list admits, listed by the job in the same permissions set as the roles. A caller sees only repositories it can select; coverage is not entitlement.
+1. **Catalog** (delivered): the repositories the GitHub App covers and an administrator's allow list admits, listed by the job in the same permissions set as the roles. A caller sees only repositories it can select; coverage is not entitlement.
 2. **Selected entries**: a versioned manifest of repositories with peers, provider relationships, environment-variable references, resources and serve settings. It carries no mirror path, secret value, owner or document list.
 3. **Shared ingestion**: one entry per repository across all workspaces. An entry that no operator of its workspace holds an accepted role on is excluded before the fetch, which is not a failed fetch. A failed fetch or index still aborts the whole publication and every workspace keeps the last complete generation.
 4. **Versions**: save, apply, roll back, rename and delete, each checked in one transaction against the base version, the author's authority and current eligibility, and each audited.

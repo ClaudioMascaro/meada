@@ -124,6 +124,32 @@ Las operaciones de la consola requieren OIDC y están desactivadas por defecto. 
 
 Con `[postgres]` en el bootstrap (y el schema al día con `meada postgres migrate`), cada escritura de la consola y cada comando del CLI que la refleja (`meada workspace import` y `apply`, `meada snapshot pointer set`, `retain` y `drop`, `meada snapshot fence recover`) deja un registro en Postgres: quién (sujeto, rol y, para un operador de equipo, los owners), qué (acción y argumentos), cuándo (el reloj de Postgres) y el resultado (`pending`, `accepted`, `refused` o `failed`). El registro se graba antes de que la escritura toque Valkey o el store: si no puede grabarse, la escritura se rechaza y nada cambia (la consola responde 503 `audit_unavailable`, el CLI sale con 1 nombrando Postgres). Los rechazos de rol y los rechazos bajo el lock también se registran; los bodies inválidos (400, 413, 422) no. La consola arranca con Postgres caído (las lecturas siguen) y se niega a arrancar con una versión de schema que no conoce. El operador global lee los registros, del más reciente al más antiguo, en la página **Audit log** o con `GET /api/v1/audit?before=<id>&limit=<1 a 100>`. La línea de auditoría en stderr no cambia, con o sin `[postgres]`, y Meada nunca borra un registro.
 
+## Catálogo de repositorios
+
+Con `[catalog]` en el bootstrap (feature `workspaces`, junto a `[oidc.github]`; vea [el catálogo](github-app.md#el-catalogo-de-repositorios)),
+la consola ofrece el **Catálogo de repositorios** a todo sujeto admitido, y `GET /api/v1/config` trae `"catalog": true`.
+Es el selector que viene antes de cualquier manifiesto: lista solo los repositorios que la persona puede seleccionar, es
+decir, los que el catálogo contiene y en los que su login tiene un rol aceptado en el conjunto de permisos más reciente
+(el administrador de la plataforma ve el catálogo entero). No crea workspace, lista de acceso ni índice.
+
+- `GET /api/v1/catalog?limit=&after=&q=` responde `{"state", "reason", "set", "repositories": [{"identity"}], "next"}`,
+  ordenado por identidad, con `limit` de 1 a 100 (50 por defecto), `q` un prefijo de hasta 128 caracteres y `after` el
+  cursor opaco (hasta 256 caracteres) que devolvió `next`. Cualquier otro parámetro, uno repetido o un valor fuera de
+  rango es un 400 con mensaje fijo.
+- `POST /api/v1/catalog/check` recibe `{"identities": [...]}` (hasta 50, 16 KiB) y responde `{"state", "reason",
+  "results": [{"identity", "state"}]}` en el orden pedido: `selectable`, `unavailable` o `pending`.
+- `state` es `ready` o `pending`. **Pendiente** es una condición de la plataforma o de quien pregunta, igual para toda
+  identidad: `no_set` (el job aún no escribió un conjunto), `stale_set` (el conjunto superó `max_age_seconds`, también
+  para el administrador) o `missing_login` (el token no trae un login válido). Mientras está pendiente no se lista nada
+  y nada nuevo puede seleccionarse; las entradas que un manifiesto ya tiene permanecen.
+- `unavailable` es todo otro caso (sin rol aceptado, fuera del catálogo, no cubierto, nuevo desde el último conjunto) y
+  **no trae motivo**: un motivo sería un oráculo sobre el catálogo. La lectura nunca lista un repositorio no disponible,
+  y una identidad que no existe responde igual que una que la persona no puede seleccionar.
+
+Las dos rutas exigen un sujeto admitido y no desactivado (el bloqueo por SCIM rige aquí como en toda ruta), y la consola
+las responde del conjunto que ya tiene en memoria, sin llamar a GitHub ni a Postgres. `GET /api/v1/manifest` solo muestra
+`catalog.allow` al operador global.
+
 ## Directorio (SCIM)
 
 Con la feature `directory` (incluida en `cloud`), `[directory]` en el bootstrap, junto a `[postgres]` y `[oidc]`, hace que la consola sirva un endpoint SCIM 2.0 en `/scim/v2/`, al que el aprovisionamiento de Entra ID u Okta envía usuarios y grupos:

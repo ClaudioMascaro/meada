@@ -28,8 +28,13 @@ use crate::msg::Msg;
 // builds.
 const PERMISSIONS_POLL: Duration = Duration::from_secs(60);
 /// The statements of one read: the version, the newest set, its counts, its rows and its
-/// exclusions.
-const STATEMENTS: u32 = 5;
+/// exclusions, and with `[catalog]` its catalog.
+const STATEMENTS: u32 = 5 + cfg!(feature = "workspaces") as u32;
+
+// ponytail: the longest identity the catalog holds, in bytes, so that its pagination cursor (the
+// identity in base64, at most 256 characters) names any of them; a longer row counts as hostile.
+#[cfg(feature = "workspaces")]
+const CATALOG_IDENTITY_MAX: usize = 192;
 
 /// How often a process reads the newest permissions set. In debug builds
 /// `MEADA_PERMISSIONS_POLL_MS` shortens it (a knob for tests and not documented, as
@@ -83,6 +88,10 @@ struct Set {
     /// the set left out (`excluded`).
     version: Option<String>,
     excluded: BTreeSet<String>,
+    /// With `[catalog]` (#341), the identities the catalog holds: the set's `catalog` and `both`
+    /// repositories GitHub showed (`listed`). Coverage, not entitlement.
+    #[cfg(feature = "workspaces")]
+    catalog: BTreeSet<String>,
 }
 
 impl Set {
@@ -95,6 +104,35 @@ impl Set {
     fn seen(&mut self, age: Duration, now: Instant) {
         self.age = age.max(self.age(now));
         self.read = now;
+    }
+}
+
+/// The newest set's age, as the catalog answer shows it.
+#[cfg(feature = "workspaces")]
+pub(crate) struct SetInfo {
+    pub(crate) finished: String,
+    pub(crate) age_seconds: u64,
+    pub(crate) max_age_seconds: u64,
+}
+
+/// The catalog as one subject sees it: `reason` is why nothing is selectable (a condition of the
+/// platform or of the subject, the same for every identity), else `selectable` holds the
+/// identities it may select, sorted.
+#[cfg(feature = "workspaces")]
+pub(crate) struct Catalog {
+    pub(crate) reason: Option<&'static str>,
+    pub(crate) set: Option<SetInfo>,
+    pub(crate) selectable: BTreeSet<String>,
+}
+
+#[cfg(feature = "workspaces")]
+impl Catalog {
+    fn pending(reason: &'static str, set: Option<SetInfo>) -> Self {
+        Self {
+            reason: Some(reason),
+            set,
+            selectable: BTreeSet::new(),
+        }
     }
 }
 
@@ -179,14 +217,20 @@ impl Permissions {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
         let now = Instant::now();
         let set = state.set.as_ref().map(|set| {
-            json!({
+            #[allow(unused_mut)]
+            let mut shown = json!({
                 "id": set.id,
                 "finished": set.finished,
                 "age_seconds": set.age(now).as_secs(),
                 "repositories": set.repositories,
                 "rows": set.rows,
                 "exclusions": set.exclusions,
-            })
+            });
+            #[cfg(feature = "workspaces")]
+            if self.github.catalog {
+                shown["catalog"] = json!(set.catalog.len());
+            }
+            shown
         });
         json!({
             "host": self.github.host,
@@ -196,6 +240,46 @@ impl Permissions {
             "grant": self.state_of(state.set.as_ref(), now),
             "set": set,
         })
+    }
+
+    /// The catalog as `login` may select from it (#341, ADR 0021): `administrator` the whole
+    /// catalog, anyone else the repositories its login holds an accepted role on in the newest
+    /// set. Pending (nothing selectable) while no set is loaded, while the set is past
+    /// `max_age_seconds` and, for anyone but the administrator, without a login. Never reads
+    /// Postgres.
+    #[cfg(feature = "workspaces")]
+    pub(super) fn catalog(&self, login: Option<&str>, administrator: bool) -> Catalog {
+        let state = self.state.read().unwrap_or_else(|e| e.into_inner());
+        let now = Instant::now();
+        let Some(set) = &state.set else {
+            return Catalog::pending("no_set", None);
+        };
+        let age = set.age(now);
+        let info = Some(SetInfo {
+            finished: set.finished.clone(),
+            age_seconds: age.as_secs(),
+            max_age_seconds: self.github.max_age.as_secs(),
+        });
+        if age > self.github.max_age {
+            return Catalog::pending("stale_set", info);
+        }
+        let selectable = match (administrator, login) {
+            (true, _) => set.catalog.clone(),
+            (false, None) => return Catalog::pending("missing_login", info),
+            (false, Some(login)) => {
+                let roles = set.logins.get(login).map(Vec::as_slice).unwrap_or_default();
+                roles
+                    .iter()
+                    .filter(|i| set.catalog.contains(*i))
+                    .cloned()
+                    .collect()
+            }
+        };
+        Catalog {
+            reason: None,
+            set: info,
+            selectable,
+        }
     }
 
     /// One poll: the newest set read, the cache updated, or the stderr line of a failure.
@@ -309,6 +393,8 @@ impl Permissions {
                 _ => eprintln!("{}", Msg::PermissionsBadRow(&table).text()),
             }
         }
+        #[cfg(feature = "workspaces")]
+        let catalog = self.read_catalog(&tx, &q, &id).await.map_err(failed)?;
         let exclusions =
             format!("SELECT identity FROM {q}.permission_exclusions WHERE set_id = $1");
         let table = format!("{q}.permission_exclusions");
@@ -332,7 +418,41 @@ impl Permissions {
             logins,
             version,
             excluded,
+            #[cfg(feature = "workspaces")]
+            catalog,
         }))
+    }
+
+    /// The identities of the set's catalog, with `[catalog]` only: its `catalog` and `both`
+    /// repositories whose coverage is `listed`. A row that fails its checks is skipped with one
+    /// line naming its table.
+    #[cfg(feature = "workspaces")]
+    async fn read_catalog(
+        &self,
+        tx: &tokio_postgres::Transaction<'_>,
+        q: &str,
+        id: &str,
+    ) -> Result<BTreeSet<String>, tokio_postgres::Error> {
+        let mut catalog = BTreeSet::new();
+        if !self.github.catalog {
+            return Ok(catalog);
+        }
+        let listed = format!(
+            "SELECT identity FROM {q}.permission_repositories \
+             WHERE set_id = $1 AND source IN ('catalog', 'both') AND coverage = 'listed'"
+        );
+        let table = format!("{q}.permission_repositories");
+        for row in tx.query(&listed, &[&id]).await? {
+            match row.try_get::<_, String>(0).ok() {
+                Some(identity)
+                    if self.identity_ok(&identity) && identity.len() <= CATALOG_IDENTITY_MAX =>
+                {
+                    catalog.insert(identity);
+                }
+                _ => eprintln!("{}", Msg::PermissionsBadRow(&table).text()),
+            }
+        }
+        Ok(catalog)
     }
 
     /// Whether a row's identity may enter a grant: on `host`, an identity a served repository
@@ -386,6 +506,8 @@ mod tests {
             roles: vec!["write".into()],
             max_age: Duration::from_secs(max_age),
             postgres: None,
+            #[cfg(feature = "workspaces")]
+            catalog: false,
         }
     }
 
@@ -412,6 +534,8 @@ mod tests {
             logins: HashMap::from([("ana".into(), vec!["github.com/acme/api".into()])]),
             version: None,
             excluded: BTreeSet::new(),
+            #[cfg(feature = "workspaces")]
+            catalog: BTreeSet::new(),
         }
     }
 
@@ -489,5 +613,116 @@ mod tests {
         }
         assert!(set_id_ok(&"ab".repeat(16)));
         assert!(!set_id_ok(&"AB".repeat(16)) && !set_id_ok("abc"));
+    }
+
+    /// The catalog against the shared Y/A/B table (`tests/fixtures/named-workspaces.json`,
+    /// ADR 0020): a set whose rows are the table's accepted ones and whose catalog holds Y, A and
+    /// B answers each caller's creation rows alike, at a fresh age and past `max_age_seconds`.
+    #[cfg(feature = "workspaces")]
+    #[test]
+    fn the_catalog_follows_the_shared_table() {
+        use serde::Deserialize;
+
+        #[derive(Deserialize)]
+        struct Table {
+            identities: HashMap<String, String>,
+            accepted_roles: Vec<String>,
+            callers: HashMap<String, Caller>,
+            creation: Vec<Case>,
+            stale: Vec<Case>,
+        }
+        #[derive(Deserialize)]
+        struct Caller {
+            login: Option<String>,
+            rows: Vec<Row>,
+            #[serde(default)]
+            platform_administrator: bool,
+        }
+        #[derive(Deserialize)]
+        struct Row {
+            identity: String,
+            role: String,
+        }
+        #[derive(Deserialize)]
+        struct Case {
+            caller: String,
+            select: Vec<String>,
+            allowed: bool,
+            pending: Option<String>,
+        }
+        let table: Table =
+            serde_json::from_str(include_str!("../../tests/fixtures/named-workspaces.json"))
+                .unwrap();
+        let mut github = github(60);
+        github.roles = table.accepted_roles.clone();
+        github.catalog = true;
+        let mut cache = cache(60);
+        cache.github = github;
+        let mut fresh = set(0, Instant::now());
+        fresh.logins.clear();
+        for caller in table.callers.values() {
+            let Some(login) = &caller.login else { continue };
+            for row in &caller.rows {
+                if table.accepted_roles.contains(&row.role) {
+                    let identity = table.identities[&row.identity].clone();
+                    fresh
+                        .logins
+                        .entry(login.clone())
+                        .or_default()
+                        .push(identity);
+                }
+            }
+        }
+        fresh.catalog = table.identities.values().cloned().collect();
+        let mut stale = set(61, Instant::now());
+        stale.logins = fresh.logins.clone();
+        stale.catalog = fresh.catalog.clone();
+
+        for (set, cases) in [(fresh, &table.creation), (stale, &table.stale)] {
+            cache.state.write().unwrap().set = Some(set);
+            for case in cases {
+                let caller = &table.callers[&case.caller];
+                let seen = cache.catalog(caller.login.as_deref(), caller.platform_administrator);
+                let name = format!("{} selects {:?}", case.caller, case.select);
+                if let Some(pending) = &case.pending {
+                    assert_eq!(seen.reason, Some(pending.as_str()), "{name}");
+                    assert!(seen.selectable.is_empty(), "{name}");
+                    continue;
+                }
+                let wanted = case.select.iter().map(|i| &table.identities[i]);
+                let all = wanted.clone().all(|i| seen.selectable.contains(i));
+                assert_eq!((seen.reason, all), (None, case.allowed), "{name}");
+                // Nothing beyond the caller's accepted rows, or the whole catalog for the
+                // administrator, is ever selectable.
+                let rows = caller
+                    .rows
+                    .iter()
+                    .filter(|r| table.accepted_roles.contains(&r.role))
+                    .map(|r| table.identities[&r.identity].clone());
+                let expected: BTreeSet<String> = match caller.platform_administrator {
+                    true => table.identities.values().cloned().collect(),
+                    false => rows.collect(),
+                };
+                assert_eq!(seen.selectable, expected, "{name}");
+            }
+        }
+    }
+
+    /// Without a set the catalog is pending `no_set`; a row outside the catalog is not
+    /// selectable though its login holds a role on it (coverage is the catalog's, the role is
+    /// the login's, and only both select).
+    #[cfg(feature = "workspaces")]
+    #[test]
+    fn the_catalog_needs_a_set_and_both_coverage_and_a_role() {
+        let mut cache = cache(60);
+        cache.github.catalog = true;
+        assert_eq!(cache.catalog(Some("ana"), false).reason, Some("no_set"));
+        let mut loaded = set(0, Instant::now());
+        loaded.catalog = ["github.com/acme/other".to_string()].into();
+        cache.state.write().unwrap().set = Some(loaded);
+        let seen = cache.catalog(Some("ana"), false);
+        assert_eq!((seen.reason, seen.selectable.len()), (None, 0));
+        assert_eq!(cache.catalog(None, false).reason, Some("missing_login"));
+        assert_eq!(cache.catalog(None, true).selectable.len(), 1);
     }
 }

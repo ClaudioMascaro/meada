@@ -1,6 +1,6 @@
 # Roadmap
 
-S1, S2 y S4 están entregados. S3 y S5 siguen planeados. Este mapa muestra dependencias y límites de alcance, sin prometer fechas.
+S1, S2 y S4 están entregados. S3 sigue planeado y S5 empezó: el catálogo elegible está entregado. Este mapa muestra dependencias y límites de alcance, sin prometer fechas.
 
 <!-- meada-graph:roadmap -->
 
@@ -16,6 +16,6 @@ S5 depende de ambas bases, de la [publicación atómica, #316](https://github.co
 
 ## Después de las bases
 
-[S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) introducirá [workspaces con nombre](named-workspaces.md) sobre indexación compartida. La [consolidación de contratos, #340](https://github.com/ClaudioMascaro/meada/issues/340), está terminada (ADR 0020 a 0022) y precede al runtime. La secuencia aceptada es contratos → catálogo elegible → primer workspace → versiones y superposición → configuración entre repositorios. Después, UI guiada y propuestas MCP avanzan en paralelo; la validación empresarial depende de ambas.
+[S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) introducirá [workspaces con nombre](named-workspaces.md) sobre indexación compartida. La [consolidación de contratos, #340](https://github.com/ClaudioMascaro/meada/issues/340), está terminada (ADR 0020 a 0022) y precede al runtime. La secuencia aceptada es contratos → catálogo elegible → primer workspace → versiones y superposición → configuración entre repositorios. El catálogo elegible ([#341](https://github.com/ClaudioMascaro/meada/issues/341)) está entregado: descubrir los repositorios seleccionables antes de que exista un manifiesto, sin crear workspace ni índice; la medición contra una organización real de GitHub ([#338](https://github.com/ClaudioMascaro/meada/issues/338)) sigue pendiente y condiciona la aceptación empresarial, no estos pasos. Después, UI guiada y propuestas MCP avanzan en paralelo; la validación empresarial depende de ambas.
 
 Las especificaciones enlazadas son la referencia del contrato completo. Un elemento planeado del roadmap no es una opción de configuración disponible.

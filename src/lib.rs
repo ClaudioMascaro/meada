@@ -3,6 +3,8 @@
 
 #[cfg(any(feature = "ui", feature = "generation-pointer"))]
 pub mod audit;
+#[cfg(feature = "workspaces")]
+mod catalog;
 mod channel;
 mod community;
 mod config;
