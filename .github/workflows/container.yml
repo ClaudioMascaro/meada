@@ -3,10 +3,6 @@ name: Container
 on:
   release:
     types: [published]
-  # cargo-dist publishes with GITHUB_TOKEN, whose release event starts no workflow.
-  workflow_run:
-    workflows: [Release]
-    types: [completed]
   pull_request:
     paths:
       - Dockerfile
@@ -61,11 +57,7 @@ jobs:
       - run: python3 scripts/container-smoke meada:check-cloud --cloud --ui-tarball ui-artifacts/meada-ui-${{ steps.version.outputs.version }}.tar.gz
 
   publish:
-    if: >-
-      github.event_name == 'release' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_repository.full_name == github.repository)
+    if: github.event_name == 'release'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -85,15 +77,10 @@ jobs:
         id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ github.event.release.tag_name || github.event.workflow_run.head_branch }}
-          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         shell: bash
         run: |
           release=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")
-          if [ -n "$RELEASE_SHA" ]; then
-            # release.yml gives gh release create --target the exact release commit.
-            test "$(jq -r '.target_commitish' <<< "$release")" = "$RELEASE_SHA"
-          fi
           test "$(jq -r '.draft' <<< "$release")" = false
           tag=$(jq -er '.tag_name' <<< "$release")
           prerelease=$(jq -er '.prerelease | tostring' <<< "$release")

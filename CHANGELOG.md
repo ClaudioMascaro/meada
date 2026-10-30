@@ -8,6 +8,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Public fixture benchmark (issue #149): release-profile index/reindex timings, root and
+  workspace index sizes, and default-answer/tool-list token estimates in every PR/main CI
+  summary and retained JSON/Markdown artifact. Timings are informational.
+
 - The English user guide and README (#150, spec #32): `docs/user-guide.en.md` translates both
   halves of the pt-BR guide section by section (sections 1 to 11) with the same neutral examples
   and links the English stability page; `README.en.md` now links it instead of the pt-BR guide.
@@ -72,6 +76,58 @@ All notable changes to Meada are recorded here. The format follows
 - Console GitHub grant (#496): a session's GitHub grant and its state (`unread`, `current`,
   `expired`) are read from the same permissions set at the same instant, so a session never shows
   `expired` with a grant read while the set was fresh.
+- Release preparation keeps the GitHub release in draft state for the maintainer to publish.
+  A pinned cargo-dist regeneration helper compares the entire workflow after the explicit
+  draft policy; OCI publication follows the human `release: published` event.
+
+## [1.0.0] - Unreleased
+
+Preparation only: the workspace still declares `0.1.0`; the maintainer raises both crates to
+`1.0.0` while performing [#154](https://github.com/ClaudioMascaro/meada/issues/154), right before
+the tag. No 1.0 tag or publication is claimed.
+Release notes and the scope evidence checklist are available in
+[pt-BR](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.0.0.md),
+[English](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.0.0.en.md) and
+[Spanish](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.0.0.es.md).
+The [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md)
+starts at publication. The [#32 tracking checklist](https://github.com/ClaudioMascaro/meada/issues/32)
+still needs final acceptance and human signoff.
+
+### Prepared
+
+- The v1 scope: HTTP, declared resources and gateway paths, OpenAPI/AsyncAPI, channels and
+  packages; levels and cross-repository chains, recorded decisions with optional deciders,
+  shape drift, TypeScript/JavaScript, Python, Go, Rust, communities and processes.
+- The R1 stability promise, normative MCP output grammar, surface goldens, complete user
+  references and public-fixture CI benchmark. Fixture timings are informational.
+- Configured Cargo, binary, shell, npm and OCI distribution. Configuration is not evidence
+  of actual publication or a successful published-installer smoke check.
+
+### Acceptance pending
+
+The [public #152 receipt](https://github.com/ClaudioMascaro/meada/issues/152#issuecomment-6379316350)
+retains both complete runs on AMD Ryzen 7 5825U, 16 logical CPUs, 7.16 GiB RAM,
+Ubuntu 24.04.5 LTS, x86_64. The measured build was
+`9b99c3a4091b6c1b2c590c43059763f25b6987ef`, `meada 0.1.0`, not every later documentation head.
+
+| Metric | Target | First complete run | Complete rerun |
+| --- | --- | --- | --- |
+| Cold configured-workspace index | <= 7 s | 12.680 s, not met | 2.711 s, met |
+| Root index size | <= 37 MB | 21.057536 MB, met | 21.057536 MB, met |
+| Single-file configured-workspace reindex | <= 1 s | 1.346 s, not met | 1.152 s, not met |
+| Compact MCP `tools/list` result | <= 1,000 tokens | 622, met | 622, met |
+| Largest default answer among 11 queries | <= 2,000 tokens | 1,996, met | 1,996, met |
+
+MB means 10^6 bytes; tokens are ceil(UTF-8 bytes / 4). Public fixture peers supplement the
+private workload; the receipt does not claim every feature naturally occurs in the private root.
+A [rerun on 2026-10-30](https://github.com/ClaudioMascaro/meada/issues/152#issuecomment-6531862493) with main
+`1d648ad6` on a reconstructed workspace (not directly comparable) meets every target in its
+quietest run (cold index 5.586 s, 31.883266 MB, reindex 0.931 s, 643 and 1,999 tokens) and
+misses the reindex target under load (1.068 and 1.123 s, met in 2 of 4 runs). Acceptance remains
+pending under [#350](https://github.com/ClaudioMascaro/meada/issues/350), which stays open until the
+single-file reindex meets 1 s with headroom. Published-installation checks,
+community setup and final-head validation remain pending; the maintainer performs tagging and
+publication separately under [#154](https://github.com/ClaudioMascaro/meada/issues/154).
 
 ## [0.1.0] - 2026-10-30
 
@@ -623,4 +679,5 @@ The rise of the single-file reindex since 2026-10-14 predates it (specs #22 and 
 692 files it is close to its target.
 
 [Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v0.1.0...HEAD
+[1.0.0]: docs/releases/1.0.0.md
 [0.1.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v0.1.0
