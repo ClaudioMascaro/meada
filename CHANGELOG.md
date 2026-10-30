@@ -60,6 +60,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- `meada workspace import` reads its file once, bounded by the version size limit, and audits the
+  id of the text it stored (#450); a file past the bound or not a regular file is refused before
+  any audit record is written.
+
 - Manifest type errors (#449): a `meada.toml` or workspace manifest key of the wrong type, or
   with an invalid value, reports the key and the expected kind (`` `oidc.entra`: has the wrong
   type (a table was expected) ``) instead of serde's message, which echoed the written value, so a
