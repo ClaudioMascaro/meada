@@ -60,6 +60,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Helm: the default `workspace.fetch` (#444, from #316) reads the repositories from `$1` when
+  given (the pulled list under `modules.oidc.github`) else from the bootstrap manifest, refuses a
+  URL carrying a credential, and on failure prints `refresh: fetch failed for <identity>; the
+  refresh stops before publication` and exits nonzero without echoing a URL or token.
+  `scripts/helm-check` asserts the three behaviors on the rendered script; the chart READMEs
+  describe it.
 - `meada workspace import` reads its file once, bounded by the version size limit, and audits the
   id of the text it stored (#450); a file past the bound or not a regular file is refused before
   any audit record is written.

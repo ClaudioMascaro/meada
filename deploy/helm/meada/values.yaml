@@ -46,16 +46,45 @@ workspace:
     [[repository]]
     repo = "github.com/claudiomascaro/meada"
     path = "/data/mirrors/meada"
-  # Runs outside Meada. Fetch and index finish before a module-free node starts.
+  # Runs outside Meada. Fetch and index finish before a module-free node starts. It reads the
+  # repositories from $1 when given (under modules.oidc.github, the file `meada workspace show
+  # --pulled` writes), else from the bootstrap manifest. A failed fetch stops the refresh before
+  # publication (#316); no line carries a URL or a token.
   fetch: |
     set -eu
-    mkdir -p /data/mirrors
-    if [ ! -d /data/mirrors/meada/.git ]; then
-      git clone --depth 1 https://github.com/ClaudioMascaro/meada.git /data/mirrors/meada
-    else
-      git -C /data/mirrors/meada fetch --depth 1 origin HEAD
-      git -C /data/mirrors/meada checkout --detach FETCH_HEAD
-    fi
+    list=${1:-/etc/meada/meada.workspace.toml}
+    pairs=$(awk '
+      /^\[\[repository\]\]/ { if (repo != "" || path != "") print repo " " path; repo = ""; path = "" }
+      /^repo = "/ { repo = $0; sub(/^repo = "/, "", repo); sub(/"$/, "", repo) }
+      /^path = "/ { path = $0; sub(/^path = "/, "", path); sub(/"$/, "", path) }
+      END { if (repo != "" || path != "") print repo " " path }
+    ' "$list")
+    [ -n "$pairs" ] || exit 0
+    while read -r identity path; do
+      case "${identity%%/*}" in
+        *@*) echo 'REPOSITORIES takes URLs without credentials; give git a credential helper' >&2; exit 1 ;;
+      esac
+      case "/$identity/" in
+        *//*|*/../*|*/./*) echo 'Invalid repository path' >&2; exit 1 ;;
+      esac
+      case "$path" in
+        */../*|*/..) echo "refresh: the path of $identity must stay under /data/mirrors" >&2; exit 1 ;;
+        /data/mirrors/?*) ;;
+        *) echo "refresh: the path of $identity must stay under /data/mirrors" >&2; exit 1 ;;
+      esac
+      mkdir -p /data/mirrors
+      if [ -d "$path/.git" ]; then
+        git -c "safe.directory=$path" -C "$path" fetch --depth 1 origin HEAD >/dev/null 2>&1 &&
+          git -c "safe.directory=$path" -C "$path" checkout --detach FETCH_HEAD >/dev/null 2>&1
+      else
+        git clone --depth 1 -- "https://$identity.git" "$path" >/dev/null 2>&1
+      fi || {
+        echo "refresh: fetch failed for $identity; the refresh stops before publication" >&2
+        exit 1
+      }
+    done <<EOF
+    $pairs
+    EOF
   gitCredentialsSecret: ""
 # Mounted as ca.crt: snapshot adds these roots to platform trust; Valkey uses only these roots.
 tls:
