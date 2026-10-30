@@ -193,7 +193,7 @@ app.kubernetes.io/component: console
       key: {{ .key }}
 {{- end }}
 {{- end -}}
-{{- /* The init container that holds a pod back until the schema is migrated: `meada status` reports "postgres: reachable" only at a schema version it knows. */ -}}
+{{- /* The init container that holds the console and the refresh back until the schema is migrated: `meada status` reports "postgres: reachable" only at a schema version it knows. Nodes start and serve without Postgres (#332), so they never wait. */ -}}
 {{- define "meada.waitPostgres" -}}
 {{- if .root.Values.modules.postgres.enabled }}
 - name: wait-postgres

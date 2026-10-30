@@ -27,7 +27,6 @@ spec:
       imagePullSecrets: {{ toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
-        {{- include "meada.waitPostgres" (dict "root" . "key" "read-url") | nindent 8 }}
         {{- if .Values.modules.snapshot.enabled }}
         - name: pull-initial
           image: {{ include "meada.image" . }}

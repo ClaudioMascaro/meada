@@ -747,10 +747,10 @@ impl Console {
                     &message,
                 );
                 // Recorded with the route's action and no argument: the body is never read.
-                let route = route.expect("an operation route");
-                let actor = write::actor(&session, session.owners());
-                let empty = json!({});
-                (self.audit).refused(&actor, write::recorded(route), &empty, &message);
+                if let Some(action) = route.and_then(write::recorded) {
+                    let actor = write::actor(&session, session.owners());
+                    (self.audit).refused(&actor, action, &json!({}), &message);
+                }
                 return Err(Box::new(error(
                     StatusCode::FORBIDDEN,
                     "forbidden",

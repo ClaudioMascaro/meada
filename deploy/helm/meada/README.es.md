@@ -147,8 +147,9 @@ helm upgrade --install meada deploy/helm/meada -f deploy/helm/meada/values-conso
 
 Con `modules.postgres.enabled`, un Job de hook ejecuta `meada postgres migrate` con el rol de
 `migrate-url`, en `pre-install,pre-upgrade`, antes de que el chart cree los Deployments y el
-CronJob; cada pod espera además en un init container (`wait-postgres`) hasta que el schema esté
-migrado. Los nodos leen `read-url`; la consola y el refresh, `write-url`. Con
+CronJob; la consola y el refresh esperan además en un init container (`wait-postgres`) hasta que
+el schema esté migrado, mientras los nodos arrancan y sirven sin Postgres (su grant de GitHub queda
+vacío hasta que leen un conjunto). Los nodos leen `read-url`; la consola y el refresh, `write-url`. Con
 `modules.oidc.github.enabled`, el CronJob usa el bootstrap `job.workspace.toml` (el único con
 `[[github_app]]`) y ejecuta `meada workspace pull`, `meada github-app roles`,
 `meada workspace show --pulled`, tu `workspace.fetch` (que recibe ese archivo en `$1`), `index` y
@@ -156,6 +157,7 @@ migrado. Los nodos leen `read-url`; la consola y el refresh, `write-url`. Con
 
 `postgres.enabled=true` renderiza un Postgres de ejemplo, para evaluación (una réplica; Secrets
 `meada-postgres-server` y `meada-postgres-tls`, con un certificado que nombre el Service). Como la
-base no existe antes del release, el hook de migración pasa a `post-install,post-upgrade` y los
-pods esperan el schema. En producción usa tu propio Postgres 15 o posterior, con TLS y los tres
+base no existe antes del release, el hook de migración pasa a `post-install,post-upgrade` y la
+consola espera el schema: `helm install --wait` esperaría a la consola antes de que corra el hook,
+así que instala sin `--wait` en ese caso. En producción usa tu propio Postgres 15 o posterior, con TLS y los tres
 roles; la misma `tls.caSecret` verifica su certificado (`ca_file`).

@@ -8,7 +8,7 @@ use std::collections::HashSet;
 
 use crate::postgres::Config as Postgres;
 
-/// The most groups the owner picker lists.
+// ponytail: the most groups the owner picker lists; a longer prefix narrows it.
 pub const PICKER_MAX: i64 = 100;
 
 /// The directory as the console reads it.
@@ -51,6 +51,11 @@ impl Directory {
             "externalId" => "external_id",
             _ => "display_name",
         }
+    }
+
+    /// How long one call (a connection, the version read and one statement) may take, all told.
+    pub fn bound(&self) -> std::time::Duration {
+        self.postgres.bound(2)
     }
 
     async fn connect(&self) -> Result<(crate::postgres::Opened, String), String> {
@@ -114,7 +119,7 @@ impl Directory {
         match provisioned {
             Some(true) => Ok(Some(named.into_iter().flatten().collect())),
             Some(false) => Ok(None),
-            None => Err("the directory's state is missing".into()),
+            None => Err(crate::msg::Msg::DirectoryStateMissing.text()),
         }
     }
 

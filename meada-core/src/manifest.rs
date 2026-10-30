@@ -245,7 +245,8 @@ pub struct EntryFile {
     #[serde(default, deserialize_with = "owner")]
     pub owner: Option<String>,
     /// The GitHub login that added the entry (#330): metadata like `owner`, attribution and no
-    /// grant; nothing reads it to decide anything yet.
+    /// grant. Under the GitHub grant provider `authorize` reads it to decide a write (#333) and
+    /// the role check excludes an addition whose adder holds no accepted role (#331).
     #[serde(default, deserialize_with = "added_by")]
     pub added_by: Option<String>,
     #[serde(default, deserialize_with = "declared")]

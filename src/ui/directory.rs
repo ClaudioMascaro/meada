@@ -13,11 +13,13 @@ fn unreadable(reason: &str) {
     );
 }
 
-/// `ask` run to its end on a runtime of its own, as the audit's calls are; a failure writes its
-/// line.
-fn blocking<T>(ask: impl Future<Output = std::result::Result<T, String>>) -> Option<T> {
-    let answered = crate::modules::block_on(ask).map_err(|e| e.to_string());
-    match answered.and_then(|answer| answer) {
+/// `ask` run on a runtime of its own within `directory`'s bound, as the audit's calls are; a
+/// failure writes its line.
+fn blocking<T>(
+    directory: &crate::directory::read::Directory,
+    ask: impl Future<Output = std::result::Result<T, String>>,
+) -> Option<T> {
+    match crate::modules::within(directory.bound(), ask, Msg::PostgresTimeout) {
         Ok(answer) => Some(answer),
         Err(reason) => {
             unreadable(&reason);
@@ -40,7 +42,7 @@ impl Console {
         write: bool,
     ) -> Option<(Box<Answer>, String)> {
         let (directory, user) = (self.directory.as_ref()?, user?);
-        match blocking(directory.deprovisioned(user)) {
+        match blocking(directory, directory.deprovisioned(user)) {
             Some(false) => None,
             Some(true) => {
                 let message = Msg::UiDeprovisioned.text();
@@ -90,7 +92,7 @@ impl Console {
         if prefix.contains('\0') {
             return json_answer(StatusCode::OK, &json!({"groups": []}));
         }
-        match blocking(directory.groups(&prefix)) {
+        match blocking(directory, directory.groups(&prefix)) {
             Some(groups) => json_answer(StatusCode::OK, &json!({"groups": groups})),
             None => {
                 let message = Msg::DirectoryUnavailable.text();
@@ -133,7 +135,7 @@ impl Console {
         let Some(directory) = &self.directory else {
             return;
         };
-        document["directory"] = match blocking(directory.counts()) {
+        document["directory"] = match blocking(directory, directory.counts()) {
             Some(counts) => json!({
                 "users": counts.users,
                 "groups": counts.groups,

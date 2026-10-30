@@ -167,7 +167,11 @@ migrate_toml = tomllib.loads(migrate_config["data"]["postgres.workspace.toml"])
 assert list(migrate_toml) == ["postgres"] and migrate_toml["postgres"]["url_env"] == "MEADA_POSTGRES_MIGRATE_URL"
 for deployment in [item for item in identity if item["kind"] == "Deployment"]:
     spec = deployment["spec"]["template"]["spec"]
-    assert spec["initContainers"][0]["name"] == "wait-postgres", "pods hold back until the schema is migrated"
+    waits = [container["name"] for container in spec["initContainers"]].count("wait-postgres")
+    if deployment["metadata"]["name"].endswith("-console"):
+        assert spec["initContainers"][0]["name"] == "wait-postgres", "the console holds back until the schema is migrated"
+    else:
+        assert waits == 0, "a node starts and serves without Postgres"
 refresh_job = resource(identity, "CronJob")["spec"]["jobTemplate"]["spec"]["template"]["spec"]
 assert refresh_job["initContainers"][0]["name"] == "wait-postgres"
 steps = refresh_job["containers"][0]["args"][-1].split(" && ")

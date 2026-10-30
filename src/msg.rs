@@ -844,6 +844,9 @@ pub enum Msg<'a> {
     /// The 503 of a route that answers from the directory alone.
     #[cfg(all(feature = "ui", feature = "directory"))]
     DirectoryUnavailable,
+    /// The directory's state row (migration 4) is missing: why the directory cannot be read.
+    #[cfg(all(feature = "ui", feature = "directory"))]
+    DirectoryStateMissing,
     /// `GET directory/groups` with a query other than one `prefix` of at most `OWNER_MAX`
     /// characters.
     #[cfg(all(feature = "ui", feature = "directory"))]
@@ -2793,6 +2796,11 @@ impl Msg<'_> {
             Msg::DirectoryUnavailable => pick(
                 "the directory in Postgres is unavailable".into(),
                 "o diretório no Postgres está indisponível".into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "directory"))]
+            Msg::DirectoryStateMissing => pick(
+                "the directory's state is missing".into(),
+                "o estado do diretório está ausente".into(),
             ),
             #[cfg(all(feature = "ui", feature = "directory"))]
             Msg::UiDirectoryQuery(max) => pick(

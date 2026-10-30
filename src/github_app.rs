@@ -1129,8 +1129,9 @@ struct Check<'a> {
     notes: &'a mut Vec<String>,
 }
 
-/// The role check, in this order. Postgres is reached and the fence checked before anything
-/// changes. The exclusions file is removed, so no reader admits the previous check's exclusions
+/// The role check, in this order. Postgres is reached and the fence checked: a run the fence
+/// refuses changes nothing, and one that cannot reach Postgres removes the exclusions file and
+/// stops. The exclusions file is removed, so no reader admits the previous check's exclusions
 /// once this one has started, whatever it ends in. Every identity is listed. Then, holding
 /// `excluded.lock` from here to the end, one transaction, under a lock on the sets that serializes
 /// writers, checks the fence again (a refused run leaves the file as it is), removes the file
@@ -1154,24 +1155,42 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         dir,
         notes,
     } = check;
-    let opened = crate::postgres::connected(postgres).await?;
-    let scrub = opened.scrubber();
-    let mut client = opened.client;
+    let remove_excluded = || -> Result<(), String> {
+        #[cfg(not(feature = "generation-pointer"))]
+        let _ = &dir;
+        #[cfg(feature = "generation-pointer")]
+        if let Some(dir) = &dir {
+            crate::snapshot::versions::remove_excluded(dir)?;
+        }
+        Ok(())
+    };
     let q = postgres.quoted();
+    let first = format!("SELECT (SELECT max(fence) FROM {q}.permission_sets), now()::text");
+    let reached = async {
+        let opened = crate::postgres::connected(postgres).await?;
+        let scrub = opened.scrubber();
+        let row = (opened.client)
+            .query_one(&first, &[])
+            .await
+            .map_err(&scrub)?;
+        Ok::<_, String>((opened.client, scrub, row))
+    };
+    // A check that cannot reach Postgres has failed all the same: the file goes, so a pulled
+    // version that did not change admits no previous check's exclusions.
+    let (mut client, scrub, row) = match reached.await {
+        Ok(reached) => reached,
+        Err(why) => {
+            remove_excluded()?;
+            return Err(why);
+        }
+    };
     let held_fence = |held: Option<i64>| match held {
         Some(held) if held > fence as i64 => Err(Msg::RolesFenceBelow { fence, held }.text()),
         _ => Ok(()),
     };
-    let first = format!("SELECT (SELECT max(fence) FROM {q}.permission_sets), now()::text");
-    let row = client.query_one(&first, &[]).await.map_err(&scrub)?;
     held_fence(row.get(0))?;
     let started: String = row.get(1);
-    #[cfg(not(feature = "generation-pointer"))]
-    let _ = &dir;
-    #[cfg(feature = "generation-pointer")]
-    if let Some(dir) = &dir {
-        crate::snapshot::versions::remove_excluded(dir)?;
-    }
+    remove_excluded()?;
 
     // Every identity on the host, listed; rows keyed by identity and login, the first kept.
     let mut run = Run::open(valkey).await?;

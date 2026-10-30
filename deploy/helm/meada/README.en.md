@@ -144,8 +144,10 @@ helm upgrade --install meada deploy/helm/meada -f deploy/helm/meada/values-conso
 ```
 
 With `modules.postgres.enabled`, a hook Job runs `meada postgres migrate` with the `migrate-url`
-role, as `pre-install,pre-upgrade`, before the chart creates the Deployments and the CronJob; each
-pod also waits in an init container (`wait-postgres`) until the schema is migrated. Nodes read
+role, as `pre-install,pre-upgrade`, before the chart creates the Deployments and the CronJob; the
+console and the refresh also wait in an init container (`wait-postgres`) until the schema is
+migrated, while nodes start and serve without Postgres (their GitHub grant stays empty until they
+read a set). Nodes read
 `read-url`; the console and the refresh, `write-url`. With `modules.oidc.github.enabled`, the
 CronJob uses the `job.workspace.toml` bootstrap (the only one with `[[github_app]]`) and runs
 `meada workspace pull`, `meada github-app roles`, `meada workspace show --pulled`, your
@@ -154,5 +156,6 @@ CronJob uses the `job.workspace.toml` bootstrap (the only one with `[[github_app
 `postgres.enabled=true` renders an example Postgres for evaluation (one replica; Secrets
 `meada-postgres-server` and `meada-postgres-tls`, with a certificate naming the Service). Since the
 database does not exist before the release, the migrate hook becomes `post-install,post-upgrade`
-and the pods wait for the schema. In production use your own Postgres 15 or later, with TLS and the
+and the console waits for the schema: `helm install --wait` would wait for the console before the
+hook runs, so install without `--wait` there. In production use your own Postgres 15 or later, with TLS and the
 three roles; the same `tls.caSecret` verifies its certificate (`ca_file`).

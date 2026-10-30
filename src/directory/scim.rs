@@ -491,10 +491,18 @@ fn matches(element: &Value, (sub, expected): &(String, Value)) -> bool {
     }
 }
 
-/// `new`'s attributes set in `into`, names compared ignoring case.
+/// `new`'s attributes set in `into`, names compared ignoring case. The keys are indexed once, so
+/// a body of many attributes costs linear time under the directory's lock.
 fn merge(into: &mut Map<String, Value>, new: &Map<String, Value>) {
+    let mut keys = std::collections::HashMap::new();
+    for key in into.keys() {
+        keys.entry(key.to_ascii_lowercase())
+            .or_insert_with(|| key.clone());
+    }
     for (name, value) in new {
-        into.insert(key_of(into, name), value.clone());
+        let lower = name.to_ascii_lowercase();
+        let key = keys.entry(lower).or_insert_with(|| name.clone()).clone();
+        into.insert(key, value.clone());
     }
 }
 

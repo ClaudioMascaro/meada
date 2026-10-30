@@ -562,25 +562,27 @@ impl Console {
     }
 }
 
+/// The four operation routes, each with the name its stderr line gives it and the action its
+/// audit record names: only these fixed names enter a pre-authentication line or record.
+const OPERATIONS: [(&str, &str, &str); 4] = [
+    ("pointer", "pointer", "pointer"),
+    ("fence/recover", "fence recover", "fence.recover"),
+    ("workspace/versions", "workspace save", "workspace.save"),
+    ("workspace/apply", "workspace apply", "workspace.apply"),
+];
+
 /// The action a record of a refusal before the body is read names: fixed by the route.
-pub(super) fn recorded(route: &str) -> &'static str {
-    match route {
-        "pointer" => "pointer",
-        "fence/recover" => "fence.recover",
-        "workspace/versions" => "workspace.save",
-        _ => "workspace.apply",
-    }
+pub(super) fn recorded(route: &str) -> Option<&'static str> {
+    (OPERATIONS.iter())
+        .find(|(r, ..)| *r == route)
+        .map(|(.., action)| *action)
 }
 
-/// The four operation routes; only their fixed names can enter a pre-authentication audit.
+/// The name of an operation route in a stderr line; none for any other route.
 pub(super) fn operation(route: &str) -> Option<&'static str> {
-    Some(match route {
-        "pointer" => "pointer",
-        "fence/recover" => "fence recover",
-        "workspace/versions" => "workspace save",
-        "workspace/apply" => "workspace apply",
-        _ => return None,
-    })
+    (OPERATIONS.iter())
+        .find(|(r, ..)| *r == route)
+        .map(|(_, name, _)| *name)
 }
 
 /// One line even for hostile subjects, arguments and multiline catalog messages. Neither

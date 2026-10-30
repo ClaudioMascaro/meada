@@ -591,7 +591,6 @@ impl Config {
     /// How long a connection and `statements` statements on it may take, all told: what a
     /// caller with no one waiting on it bounds itself by, since a peer that stops answering
     /// without closing the connection would hold it forever.
-    #[cfg(feature = "oidc")]
     pub(crate) fn bound(&self, statements: u32) -> Duration {
         self.connect_timeout + self.statement_timeout * statements
     }

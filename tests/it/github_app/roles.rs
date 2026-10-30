@@ -618,9 +618,9 @@ fn every_reader_refuses_a_missing_stale_or_malformed_exclusions_file() {
     );
 }
 
-/// The local publication of a check (amendment of 2026-10-23): a failed check, a commit whose
-/// exclusions file cannot be written and a check killed mid-listing each leave no exclusions
-/// file, so a reader refuses rather than admit the previous check's exclusions for the same
+/// The local publication of a check (amendment of 2026-10-23): a failed check (a listing that
+/// fails or Postgres unreachable), a commit whose exclusions file cannot be written and a check
+/// killed mid-listing each leave no exclusions file, so a reader refuses rather than admit the previous check's exclusions for the same
 /// version, and the next check that succeeds writes it. Two checks at once: a low fence held
 /// mid-listing while a high one completes is refused at its commit, naming the high fence, and
 /// leaves the high check's file as it wrote it.
@@ -655,6 +655,16 @@ fn a_failed_or_stale_check_never_leaves_exclusions_a_reader_admits() {
     assert_eq!(case.excluded(), None);
     refused(dir);
     case.api.with(|s| s.listing_status = None);
+    case.checked(BOOTSTRAP, Some(1), rows);
+    assert_eq!(case.excluded().as_deref(), Some(excluding.as_str()));
+
+    // Postgres unreachable fails the check all the same: the file is gone.
+    let pg_url = dir.join("ops/pg-url");
+    fs::write(&pg_url, "postgres://meada:closed@127.0.0.1:9/meada").unwrap();
+    assert_eq!(case.roles(BOOTSTRAP, Some(1)).2, Some(1));
+    assert_eq!(case.excluded(), None);
+    refused(dir);
+    fs::write(&pg_url, &case.url).unwrap();
     case.checked(BOOTSTRAP, Some(1), rows);
     assert_eq!(case.excluded().as_deref(), Some(excluding.as_str()));
 
