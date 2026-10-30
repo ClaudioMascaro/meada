@@ -17,4 +17,6 @@ github-custom-job-permissions = { "publish-npm-staged" = { contents = "read" } }
 # Run the dist plan on pull requests that touch the release configuration
 pr-run-mode = "plan"
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "aarch64-pc-windows-msvc", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
+# Windows arm64 is out until it can be built: the default cargo-xwin cross-compile fails on
+# `ring` (ureq's rustls), and dist 0.32 ships no arm64 Windows binary for a native runner
+targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
