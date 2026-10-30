@@ -25,3 +25,8 @@ pr-run-mode = "plan"
 # Windows arm64 is out until it can be built: the default cargo-xwin cross-compile fails on
 # `ring` (ureq's rustls), and dist 0.32 ships no arm64 Windows binary for a native runner
 targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
+
+# dist 0.32 builds aarch64-apple-darwin on macos-14, which GitHub retires on 2026-11-02 (with
+# brownouts before that: actions/runner-images#13518)
+[dist.github-custom-runners]
+aarch64-apple-darwin = "macos-15"
