@@ -192,6 +192,11 @@ cloud = [
 name = "golden_diff"
 test = true
 
+# The benchmark over the public fixtures (spec #32), run by CI; its checks are tests too.
+[[example]]
+name = "bench"
+test = true
+
 # The vendored Kotlin grammar's C sources (ADR 0017).
 [build-dependencies]
 cc = "1.8.0"

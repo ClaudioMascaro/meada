@@ -8,6 +8,21 @@ Reviewing a change to an `*.export.json` golden: `cargo run --example golden_dif
 diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_diff.rs` for the
 `--range` forms) prints added, removed and moved entries per section instead of the raw JSON.
 
+The benchmark over the public fixtures (spec #32) is `examples/bench.rs`, a development harness
+and no command, so it adds nothing to the frozen surface: `cargo build --release --bin meada`,
+then `cargo run --release --example bench -- [--out <dir>]`. It copies the chain of ADR 0003
+(`chain-{web,gateway,catalog,worker}`, one workspace), every `conformance-*` fixture and each
+`xlang-*` pair to `<dir>/work/`, and measures per scenario the cold index time and size, the
+single-file reindex time (a trailing newline appended to the probe's file) and the estimated
+tokens of four default answers (`search`, `context`, `trace` down and up, about the symbol that
+makes the most calls), plus the tool list's tokens read from `meada mcp`. Timings are the
+median of `MEADA_BENCH_RUNS` runs (default 3) and are never judged; tokens are
+`meada_core::render::tokens`, gated by the tests (`mcp.tools.json`, the grammar goldens) and not
+by the harness. It writes `bench.md` and `bench.json` to `<dir>` (default `target/bench`) and
+appends the table to `$GITHUB_STEP_SUMMARY`; it exits non-zero only when it cannot measure. A
+new `xlang-*` fixture joins `XLANG` (a test of the example fails until it does); a new
+`conformance-*` fixture is found by its name.
+
 - `ui/tests/operations.test.ts` projects operational API fixtures into fleet diagnostics,
   retention/bundle metadata, repository provenance, cached credential lifetime, token-check
   outcomes and the admission page's fields, the identity provider's type beside the issuer. `operations.test.tsx` exercises the five pages through their DOM and HTTP client,
