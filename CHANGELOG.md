@@ -60,6 +60,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Resolution: the receiver and call depth (`RECEIVER_DEPTH`) is one count for the whole lookup
+  (#432, from #417), carried through a glob, an alias or an on-demand import as the link count is,
+  so a chain that alternates receivers and imports costs its length, not `RECEIVER_DEPTH` per link
+  up to `LINK_DEPTH`. No limit changed and no answer under the limits; no golden changed.
 - Helm: the default `workspace.fetch` (#444, from #316) reads the repositories from `$1` when
   given (the pulled list under `modules.oidc.github`) else from the bootstrap manifest, refuses a
   URL carrying a credential, and on failure prints `refresh: fetch failed for <identity>; the

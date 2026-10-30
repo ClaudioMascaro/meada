@@ -2267,9 +2267,10 @@ one for the area a change touches.
   `implements I, J` with `J extends I`), and a `base_receiver` call reads the overloads of the
   family past the class (`Resolver::base_member`). A call made on a call's result names it
   (`Call::on`), as a local may (`Class::Result`): the receiver is the class the declared result
-  of that call's exact target names (`Resolver::result_of`, bounded by `RECEIVER_DEPTH`). A name
-  match of a call narrowed by `Call::arity` (`Resolver::matched`) reads the family that owns it:
-  a typed receiver, `this` or a bare call match within that family alone, a bare call past an
+  of that call's exact target names (`Resolver::result_of`, bounded by `RECEIVER_DEPTH`, across
+  imports too, see Known ceilings). A name match of a call narrowed by `Call::arity`
+  (`Resolver::matched`) reads the family that owns it: a typed receiver, `this` or a bare call
+  match within that family alone, a bare call past an
   opaque base, or past a class around it with one for the name (`Resolver::outer_opaque`), falls
   back to what its scope binds, and any other receiver takes, from several,
   the one declared in the family of the class around the call other than the caller; a match
@@ -3204,10 +3205,15 @@ qualification budget does (ADR 0017).
   more receivers than that, each through the next (`x: y.C`, `x = y.C()`, or a Rust `let` that
   takes the class of a call's result on the next, `let x = y.f()`, `Class::Returned`), holds an
   unknown class.
-  The receivers count from where the walk started. When `FAMILY_DEPTH` or `RECEIVER_DEPTH` cuts
-  a walk, or `LINK_DEPTH` cuts one begun past an import, the families being linearized give up
-  and none is kept: each is linearized again when asked for, and does not depend on the walk
-  that first reached it.
+  The receivers and the calls whose result is being read count from where the walk started, and
+  across a walk begun past a glob, an alias or an on-demand import: the count is one for the
+  whole lookup (`Resolver::chain`, as `Resolver::links` is for the links), so a chain that
+  alternates receivers and imports costs its length, not `RECEIVER_DEPTH` per link up to
+  `LINK_DEPTH`. A receiver or call met again is found in its own `Work` alone, and so are the
+  families linearized so far: an import's lookup begins with none. When `FAMILY_DEPTH` or
+  `RECEIVER_DEPTH` cuts a walk, or `LINK_DEPTH` cuts one begun past an import, the families
+  being linearized give up and none is kept: each is linearized again when asked for, and does
+  not depend on the walk that first reached it.
 - `lang/go/values.rs`: `VALUE_DEPTH` (64): a value (an argument, a returned or held expression)
   nested deeper (`f(g(h(..)))`) is unknown. A name is a constant only when it is bound once in
   the function (`:=` or `var`, one name, never assigned, in a statement of the function body, not
