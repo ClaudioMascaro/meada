@@ -298,7 +298,11 @@ fn manifests<'t, 'c>(
 pub fn features(configs: &[(&str, &[u8])]) -> Vec<(String, String)> {
     (manifests(&tables(configs)))
         .map(|(dir, manifest)| {
-            let on: Vec<String> = super::cfg::defaults(manifest).into_iter().collect();
+            // A name with a control character is none Cargo builds, and a line break would end
+            // the setting's first line (`lang::setting`).
+            let on: Vec<String> = (super::cfg::defaults(manifest).into_iter())
+                .filter(|f| !f.chars().any(char::is_control))
+                .collect();
             (dir.to_string(), on.join(","))
         })
         .collect()

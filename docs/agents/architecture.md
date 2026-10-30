@@ -1996,7 +1996,13 @@ one for the area a change touches.
   them (`http/<language>.rs`, `channel/<language>.rs`). A pack whose facts depend on its config files
   (Rust's default features) also gives `settings` (a string per file path, stored as
   `files.setting` and `Facts::setting`) and takes it in `parse_with`; a file whose setting
-  changed is parsed again, whatever its content. Besides `parse` and `modules`, it says what the
+  changed is parsed again, whatever its content. A pack whose facts depend on other files of the
+  pack (Rust's item macros, #398) also gives `extend`, what the facts of every file add to each
+  one's setting, on the lines after it (`lang::setting`, `lang::base`, `lang::extra`): it reads
+  only facts no setting changes, so `index::settle` parses each file whose setting moved once
+  more, after the changed files are parsed and the kept ones read, and a cold index and a refresh
+  agree. `refresh` and `fresh` compare only the first line with `settings`: the rest moves only
+  when some file's facts do. Besides `parse` and `modules`, it says what the
   shared resolution cannot guess: `members_in_scope` (bare names may name class members),
   `assigned_members` (a definition named by a dotted path, `app.use` of `app.use = function`, is what
   that path written in a call reaches, though its head is a local or constant: JavaScript's),
@@ -2472,7 +2478,11 @@ one for the area a change touches.
   parts, scalar leaves, declared and optional paths and the imports they leave to fill, issue
   #175; what crosses repositories is this shape of an exported name,
   never its source text), the names of the Cargo features a Rust crate enables by default
-  (`files.setting`, a comma-separated list per file, from `[features] default`), and what a
+  (`files.setting`, a comma-separated list per file, from `[features] default`), the Rust item
+  macros a file invokes (#398: the lines after it in `files.setting`, each a macro's name and the
+  `cfg` predicates its arm writes, as tokens; `Facts::macro_rules`, the outer attributes each
+  `macro_rules!` of a file writes on the items it passes through, as tokens; `Facts::invokes`,
+  the names of the macros a file invokes with braces), and what a
   provider document states (`documents.summary`: format, version, title, normalized route paths
   and methods, channel sides (broker kind, name, role), the field paths of their response and
   payload shapes (fields, open parts, scalar leaves) and the external references met, the
@@ -3896,6 +3906,15 @@ qualification budget does (ADR 0017).
   `any` and `not` deeper is false; `FEATURES` (4096): the default features of a crate followed
   through features that enable others (a cycle ends sooner, by the visited set), the rest is
   not followed.
+- `lang/rust/macros.rs` (#398): `ITEM_MACRO_DEPTH` (8): item macros nested deeper in one
+  another's bodies are skipped, as any other macro; each level parses its body again;
+  `ATTRIBUTE_BYTES` (1024): an arm whose attributes take more, as tokens, is no item macro, since
+  each file that invokes it stores them in its setting. An item
+  macro is found by name alone (no `#[macro_use]`, `#[macro_export]` or textual scope is
+  followed), across every Rust file of the repository whatever its `cfg`, so a definition of the
+  name anywhere that disagrees leaves every invocation unread (no marker); only a plain name
+  invoked with braces in a module qualifies (`crate::m! {}`, `m!(..)` and invocations in an
+  `impl`, a trait or a function body are skipped, no marker).
 - `lang/rust.rs` (spec #30): `DEFINITION_DEPTH` (128) as in the other packs; `BINDING_DEPTH`
   (64): a pattern or a `use` tree deeper binds nothing; `PATH_DEPTH` (256): a longer path or
   member chain in a callee is its node kind, and an `impl` type behind more references names

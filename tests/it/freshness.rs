@@ -786,6 +786,82 @@ fn a_default_feature_toggled_in_cargo_toml_refreshes_to_the_cold_export() {
     );
 }
 
+/// Refreshes a copy of the Rust item macro fixture (#398) after `edit`, checks it equals a cold
+/// export of the same files and differs from the export before, and gives both exports.
+fn item_macros_refreshed(case: &str, edit: impl Fn(&Path)) -> (String, String) {
+    let repo = fixture_repo(case, "rust-item-macros", ORIGIN);
+    age(&repo);
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    edit(&repo);
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+    assert_ne!(before, refreshed);
+    let cold = cold_export(&format!("{case}_cold"), "rust-item-macros", ORIGIN, &edit);
+    assert_eq!(refreshed, cold);
+    (before, refreshed)
+}
+
+#[test]
+fn a_file_only_an_item_macro_reaches_refreshes_to_the_cold_export() {
+    let (before, after) = item_macros_refreshed("fresh_rust_item_macro_file", |repo| {
+        edit_file(
+            repo,
+            "src/rt.rs",
+            "fn park() {}",
+            "fn park() {}\n\npub fn more() {}",
+        );
+    });
+    assert!(!before.contains("src/rt.rs::more"));
+    assert!(after.contains("src/rt.rs::more"));
+}
+
+#[test]
+fn an_item_macro_edited_in_another_file_refreshes_its_callers_to_the_cold_export() {
+    // `lib.rs` does not change on disk: what its setting carries of `cfg_runtime` does.
+    let (before, after) = item_macros_refreshed("fresh_rust_item_macro_gate", |repo| {
+        let gate = "#[cfg(feature = \"rt\")]\n            #[cfg_attr";
+        let net = "#[cfg(feature = \"net\")]\n            #[cfg_attr";
+        edit_file(repo, "src/macros.rs", gate, net);
+    });
+    assert!(before.contains("src/runtime.rs::start"));
+    assert!(!after.contains("src/runtime.rs"));
+    let (before, after) = item_macros_refreshed("fresh_rust_item_macro_unwrapped", |repo| {
+        edit_file(
+            repo,
+            "src/macros.rs",
+            "mod hidden { $($item)* }",
+            "$($item)*",
+        );
+    });
+    assert!(!before.contains("src/skipped.rs"));
+    assert!(after.contains("src/skipped.rs::never"));
+    assert!(after.contains("src/lib.rs::unread"));
+}
+
+#[test]
+fn deleting_the_file_that_defines_an_item_macro_refreshes_to_the_cold_export() {
+    let (before, after) = item_macros_refreshed("fresh_rust_item_macro_deleted", |repo| {
+        fs::remove_file(repo.join("src/macros.rs")).unwrap();
+    });
+    assert!(before.contains("src/runtime.rs::start"));
+    assert!(!after.contains("src/runtime.rs"));
+    // `cfg_rt` is defined in `lib.rs` itself.
+    assert!(after.contains("src/rt.rs::block_on"));
+}
+
+#[test]
+fn a_default_feature_an_item_macro_gates_on_refreshes_to_the_cold_export() {
+    let (before, after) = item_macros_refreshed("fresh_rust_item_macro_feature", |repo| {
+        edit_file(
+            repo,
+            "Cargo.toml",
+            "default = [\"rt\"]",
+            "default = [\"rt\", \"net\"]",
+        );
+    });
+    assert!(!before.contains("src/net.rs"));
+    assert!(after.contains("src/net.rs::bind"));
+}
+
 fn edit_file(repo: &Path, file: &str, from: &str, to: &str) {
     let text = fs::read_to_string(repo.join(file)).unwrap();
     assert!(text.contains(from), "{file} holds {from}");

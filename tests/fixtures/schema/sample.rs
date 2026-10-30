@@ -46,3 +46,14 @@ pub fn save(store: &Store) {
     made.flush();
     println!("{}", inner::helper());
 }
+
+// An item macro (#398): its definition and the braced invocations are stored facts.
+macro_rules! cfg_disk {
+    ($($item:item)*) => {
+        $( #[cfg(feature = "disk")] $item )*
+    }
+}
+
+cfg_disk! {
+    pub fn sync() {}
+}

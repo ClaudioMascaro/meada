@@ -282,6 +282,15 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Rust item macros (#398): the braced body of a `macro_rules!` of the repository whose first arm
+  takes `$($x:item)*` and writes each item back behind outer attributes only (tokio's
+  `cfg_rt! { pub mod runtime; }`) is read as items of the module invoking it: its functions,
+  types, `impl` blocks, `use` and `mod` declarations and the calls inside them, with spans into
+  the file. A `mod` in it reaches its file, and the `#[cfg(..)]` attributes the arm writes gate
+  every item under the crate's default features. A name defined several times qualifies only when
+  all definitions agree; any other macro stays unread. A refresh parses a file again when what it
+  invokes changes elsewhere, and equals a cold index.
+
 - Imports of a project under a nested `pyproject.toml` resolve: the nearest manifest above an
   importer gives its package roots (`src`, Poetry `from`, setuptools `where`), so `from app.crud
   import f` in a template's `backend/` reaches `backend/app/crud.py`, and two sibling projects
