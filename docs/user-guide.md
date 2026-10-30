@@ -651,7 +651,7 @@ páginas de operação.
 
 | Comando | Módulo | Papel |
 | --- | --- | --- |
-| `meada snapshot` | `snapshot` | O armazenamento de gerações: `publish`, `pull`, `lock`, `pointer` e `fence` |
+| `meada snapshot` | `snapshot` | O store de snapshots: `publish`, `pull`, `lock`, `pointer` e `fence` |
 | `meada workspace` | `generation-pointer` | As versões do workspace no store de snapshots |
 | `meada workspaces` | `workspaces` | Os workspaces nomeados, com `mcp` no módulo `proposals` |
 | `meada ui` | `ui` | A console de gestão |
@@ -769,9 +769,10 @@ Como saber se um elo que falta é bug:
   `meada status` e `search` com `kind=unresolved` e `kind=ambiguous` para ver se o Meada leu o
   lado e não o ligou, e então abra uma issue com a consulta, a resposta e a esperada.
 - Uma chamada dentro de uma macro Rust não é indexada: um chamador que falta ali é "não provado".
-- Um nome que o Meada não consegue calcular (uma URL montada em tempo de execução, um tópico
-  lido do ambiente) não gera elo por si só. Ele aparece como lado não resolvido, e você decide com
-  `meada decide` (seção 5).
+- Um nome que o Meada não consegue calcular não gera elo por si só. Uma URL montada em tempo de
+  execução é um consumidor não resolvido, que você decide com `meada decide` (seção 5). Um nome de
+  canal lido do ambiente é um lado não resolvido, um limite conhecido que nenhuma decisão resolve
+  (seção 8.4).
 
 ### 8.1 Rotas HTTP
 
@@ -979,8 +980,9 @@ Regras que valem para as quatro linguagens:
 
 **Java, Kotlin, C# e Swift** são trabalho planejado da Release 2 do ADR 0003 e não fazem parte do
 1.0. Eles chegam depois, como versões menores 1.x, sob as issues #26 a #29. Este guia e a
-promessa de estabilidade do 1.0 não os cobrem; para um repositório nessas linguagens, conte
-apenas com o que ele declara: um `meada.toml`, um documento OpenAPI ou AsyncAPI.
+promessa de estabilidade do 1.0 não os cobrem: o build atual já lê arquivos nessas linguagens,
+mas o que o Meada liga neles pode mudar em qualquer versão. Num repositório nessas linguagens, só
+o que ele declara (um `meada.toml`, um documento OpenAPI ou AsyncAPI) está coberto.
 
 ### 9.1 TypeScript e JavaScript
 

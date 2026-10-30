@@ -232,7 +232,7 @@ impl Grammar {
         })
     }
 
-    /// The positions matching the field `name` from any of `at` ends at.
+    /// The end positions of the field `name` when it starts at any position `at` marks.
     fn field(&self, name: &str, line: &str, at: &[bool]) -> Vec<bool> {
         let mut next = vec![false; at.len()];
         // A run of characters each `fits`, at least one: every end after a start within it.
@@ -328,6 +328,7 @@ impl Grammar {
         out
     }
 
+    /// The documented kind `name` of `tool`; panics when there is none.
     fn kind(&self, tool: &str, name: &str) -> &Kind {
         (self.kinds.iter())
             .find(|k| k.tool.as_deref() == Some(tool) && k.name == name)
@@ -446,7 +447,8 @@ fn range(head: &str) -> usize {
     let place = head.split(' ').nth(1).unwrap_or_default();
     let (_, range) = place.rsplit_once(':').unwrap_or_default();
     let (first, last) = range.split_once('-').unwrap_or_default();
-    let (first, last): (usize, usize) = (first.parse().unwrap(), last.parse().unwrap());
+    let number = |n: &str| (n.parse()).unwrap_or_else(|_| panic!("no range in the head `{head}`"));
+    let (first, last): (usize, usize) = (number(first), number(last));
     (last + 1).saturating_sub(first)
 }
 
@@ -455,6 +457,7 @@ fn tool_of(kind: &Kind) -> &str {
     kind.tool.as_deref().unwrap_or("every")
 }
 
+/// Every rendered-answer golden: its name, its tool and its text.
 fn goldens() -> Vec<(String, &'static str, String)> {
     (rendered().into_iter())
         .map(|(name, tool)| {
@@ -505,6 +508,7 @@ fn every_documented_line_kind_is_shown_by_a_golden() {
         "line kinds no golden shows: {unshown:?}"
     );
     for (tool, name) in UNSHOWN {
+        // Panics when the entry names no documented kind.
         grammar.kind(tool, name);
         let shown = report.shown.contains(&(tool.to_string(), name.to_string()));
         assert!(
@@ -546,6 +550,7 @@ fn every_section_of_context_lists_its_line_kinds() {
         "no row for the lines before `callers:`"
     );
     for name in grammar.sections.values().flatten() {
+        // Panics when a section lists no documented kind.
         grammar.kind("context", name);
     }
 }
@@ -732,7 +737,7 @@ fn span_text_is_verbatim_for_its_range_and_shorter_when_cut() {
 }
 
 #[test]
-fn a_documented_kind_shown_by_no_golden_is_reported() {
+fn the_report_shows_only_the_kinds_a_golden_matches() {
     let grammar = Grammar::parse(SMALL);
 
     let report = check(&grammar, &one("x.search-a.txt", "search", "r a.ts:1 add\n"));

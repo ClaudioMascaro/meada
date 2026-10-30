@@ -101,11 +101,14 @@ async fn serves_three_tools_over_stdio_within_the_description_budget() {
         "tool list costs {} tokens",
         bytes.div_ceil(4)
     );
+    // The defaults 1.0 freezes, which the tool list only states in its descriptions.
+    assert_eq!(meada_core::render::DEFAULT_BUDGET, 2_000);
 
+    // No `direction`: the default walks down.
     let answer = client
         .call_tool(
             CallToolRequestParams::new("trace").with_arguments(
-                serde_json::json!({"from": "sum", "direction": "down"})
+                serde_json::json!({"from": "sum"})
                     .as_object()
                     .unwrap()
                     .clone(),

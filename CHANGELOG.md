@@ -24,8 +24,8 @@ All notable changes to Meada are recorded here. The format follows
   fields they do not know. Its tables are the grammar check's input: `tests/it/grammar.rs` matches
   every line of every rendered-answer golden against the line kinds of its tool and fails naming
   the golden and the line, fails on a documented line kind no golden shows, and holds the
-  document's levels, entry kinds, open item kinds and `search` kinds to the code's. The stability document links
-  it. No output changed; new goldens pin the answers only inline assertions covered (`no symbol
+  document's levels, entry kinds, open item kinds and `search` kinds to the code's. The stability
+  document links it. No output changed; new goldens pin the answers only inline assertions covered (`no symbol
   matches`, `no resource matches`, the server's `index behind the mirror`, and `trace` with no
   start, several symbols, several call sites or a clean working tree).
 - The pt-BR user guide, second half (#147, spec #32), in `docs/user-guide.md` (sections 8 to 11):
@@ -41,8 +41,16 @@ All notable changes to Meada are recorded here. The format follows
   table and key), decisions and deciders (protocols, environment variables, what is sent,
   privacy), every CLI command and the export. The READMEs in all three languages gain the
   installation channels, first steps, MCP setup and a 1.0 status section with the stability
-  promise; the guide's English and Spanish translations are still to come. No code, default
-  dependency or golden changed.
+  promise. No code, default dependency or golden changed.
+- Surface goldens (#144, spec #32): `tests/golden/mcp.tools.json` holds the MCP tool list (names,
+  descriptions and parameter schemas of `search`, `context` and `trace`), checked beside the
+  1,000-token limit of the descriptions, and `tests/golden/cli.help-all.en.txt` the English help of
+  every command of the default build. A test pins the default token budget of 2,000. Both
+  goldens change only with `MEADA_BLESS=1`.
+- The stability document (#148, spec #32), `docs/site/{pt,en,es}/stability.md`: the surface 1.x
+  freezes (the MCP tools, the output grammar, CLI commands and flags, the `meada.toml`,
+  `meada.decisions.toml` and `meada.workspace.toml` schemas, the export), what is breaking, what is
+  minor, what is not frozen, and the review gate. The READMEs and the site home pages link it.
 - Validation and operation of the named-workspace flow (#347, spec S5): a failure test that forces
   the role check, the fetch/index and the local publication to fail in turn and shows the current
   generation stays queryable, eligibility stays fail closed and a revoked grant never revives

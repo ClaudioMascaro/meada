@@ -651,7 +651,7 @@ organisation's service. They are not part of local use and are described in the 
 
 | Command | Module | Role |
 | --- | --- | --- |
-| `meada snapshot` | `snapshot` | The generation store: `publish`, `pull`, `lock`, `pointer` and `fence` |
+| `meada snapshot` | `snapshot` | The snapshot store: `publish`, `pull`, `lock`, `pointer` and `fence` |
 | `meada workspace` | `generation-pointer` | The workspace versions in the snapshot store |
 | `meada workspaces` | `workspaces` | The named workspaces, with `mcp` in the `proposals` module |
 | `meada ui` | `ui` | The management console |
@@ -769,9 +769,9 @@ How to tell whether a missing link is a bug:
   read the side and did not link it, and then open an issue with the query, the answer and the
   expected one.
 - A call inside a Rust macro is not indexed: a caller that is missing there is "unproven".
-- A name that Meada cannot compute (a URL built at run time, a topic read from the environment)
-  yields no link by itself. It shows up as an unresolved side, and you decide it with
-  `meada decide` (section 5).
+- A name that Meada cannot compute yields no link by itself. A URL built at run time is an
+  unresolved consumer, which you decide with `meada decide` (section 5). A channel name read from
+  the environment is an unresolved side, a known limit that no decision resolves (section 8.4).
 
 ### 8.1 HTTP routes
 
@@ -977,8 +977,9 @@ Rules that apply to all four languages:
 
 **Java, Kotlin, C# and Swift** are planned Release 2 work of ADR 0003 and are not part of 1.0.
 They arrive later, as 1.x minor versions, under issues #26 to #29. This guide and the 1.0
-stability promise do not cover them; for a repository in those languages, count only on what it
-declares: a `meada.toml`, an OpenAPI or AsyncAPI document.
+stability promise do not cover them: the current build already reads files in those languages,
+but what Meada links in them may change in any version. In a repository in those languages, only
+what it declares (a `meada.toml`, an OpenAPI or AsyncAPI document) is covered.
 
 ### 9.1 TypeScript and JavaScript
 

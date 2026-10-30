@@ -336,11 +336,11 @@ words:
 start reaches) or `up` (what reaches it). Its answer is a **chain** or a message.
 
 A chain is one line per node the walk reaches, each indented two spaces per level of depth
-below its start, which is at no indentation; a route several providers serve, or `changes: uncommitted`,
-may give several starts. A line reached through a link begins with the link notation. A node already shown above is written
-again, with `(see above)`, and not followed; a node that is one of its own ancestors ends with
-`(cycle)`. When the budget cuts the chain, the cut note follows the lines that fit. The
-**footer** closes the chain:
+below its start, which is at no indentation; a route several providers serve, or
+`changes: uncommitted`, may give several starts. A line reached through a link begins with the
+link notation. A node already shown above is written again, with `(see above)`, and not
+followed; a node that is one of its own ancestors ends with `(cycle)`. When the budget cuts the
+chain, the cut note follows the lines that fit. The **footer** closes the chain:
 
 `chain: <chain-level> · <n> hops · <n> repos · <n> tokens`
 

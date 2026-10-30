@@ -1,5 +1,8 @@
 # Guía del usuario
 
+> Esta es una traducción. La [guía](user-guide.md) en portugués de Brasil es la fuente; si no
+> coinciden, vale el original, y cualquier corrección a esta página es bienvenida.
+
 Esta guía lleva a una persona que habla español de cero a Meada funcionando: instalar, conectar
 un agente, configurar un workspace, decidir lo que el código no deja claro, usar la línea de
 comandos y leer el export. Los ejemplos usan los repositorios `web`, `api` y `worker` y el host
@@ -655,7 +658,7 @@ páginas de operación.
 
 | Comando | Módulo | Papel |
 | --- | --- | --- |
-| `meada snapshot` | `snapshot` | El almacenamiento de generaciones: `publish`, `pull`, `lock`, `pointer` y `fence` |
+| `meada snapshot` | `snapshot` | El store de snapshots: `publish`, `pull`, `lock`, `pointer` y `fence` |
 | `meada workspace` | `generation-pointer` | Las versiones del workspace en el store de snapshots |
 | `meada workspaces` | `workspaces` | Los workspaces nombrados, con `mcp` en el módulo `proposals` |
 | `meada ui` | `ui` | La consola de gestión |
@@ -775,9 +778,10 @@ Cómo saber si un enlace que falta es un bug:
   leyó el lado y no lo enlazó, y entonces abra un issue con la consulta, la respuesta y la
   esperada.
 - Una llamada dentro de una macro de Rust no se indexa: un caller que falta ahí es "no probado".
-- Un nombre que Meada no consigue calcular (una URL armada en tiempo de ejecución, un tópico
-  leído del entorno) no genera un enlace por sí solo. Aparece como lado no resuelto, y usted
-  decide con `meada decide` (sección 5).
+- Un nombre que Meada no consigue calcular no genera un enlace por sí solo. Una URL armada en
+  tiempo de ejecución es un consumidor no resuelto, que usted decide con `meada decide` (sección
+  5). Un nombre de canal leído del entorno es un lado no resuelto, un límite conocido que ninguna
+  decisión resuelve (sección 8.4).
 
 ### 8.1 Rutas HTTP
 
@@ -991,8 +995,10 @@ Reglas que valen para los cuatro lenguajes:
 
 **Java, Kotlin, C# y Swift** son trabajo planificado de la Release 2 del ADR 0003 y no forman
 parte de 1.0. Llegan después, como versiones menores 1.x, bajo los issues #26 a #29. Esta guía y
-la promesa de estabilidad de 1.0 no los cubren; para un repositorio en esos lenguajes, cuente
-solo con lo que él declara: un `meada.toml`, un documento OpenAPI o AsyncAPI.
+la promesa de estabilidad de 1.0 no los cubren: el build actual ya lee archivos en esos
+lenguajes, pero lo que Meada enlaza en ellos puede cambiar en cualquier versión. En un repositorio
+en esos lenguajes, solo lo que él declara (un `meada.toml`, un documento OpenAPI o AsyncAPI) está
+cubierto.
 
 ### 9.1 TypeScript y JavaScript
 
