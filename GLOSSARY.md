@@ -323,10 +323,10 @@ listing, the `source` column of the permissions set and `GET /api/v1/catalog`.
 _Avoid_: repository list, inventory, discovery index
 
 **Context**:
-A named workspace as a generation records it: its id, the version it was at and its non-excluded
-entries with their blocks, and nothing else (no name, description or operator, which exist only in
-Postgres). A pinned generation reproduces it exactly; the node answers it at
-`/-/workspaces/<id>/<identity>` (ADR 0021, #342).
+A named workspace as a generation records it: its id, the version it was at, its non-excluded
+entries with their blocks and the identities that version excludes, and nothing else (no name,
+description or operator, which exist only in Postgres). A pinned generation reproduces it
+exactly; the node answers it at `/-/workspaces/<id>/<identity>` (ADR 0021, #342).
 _Avoid_: view, scope, tenant
 
 **Member**:
