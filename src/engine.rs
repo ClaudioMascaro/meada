@@ -7,7 +7,7 @@ use rusqlite::Connection;
 
 use crate::contract::{self, ContractKind, Hit, KINDS, Level, Link, Role, Search, View};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
-use crate::index::{CallSite, Export, State, Symbol};
+use crate::index::{CallSite, Dropped, Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::{Fix, Msg};
 use crate::partial::{self, Partial};
@@ -299,12 +299,9 @@ impl Engine {
                     .flat_map(|kind| kind.status(repo, export, &links))
                     .collect();
                 lines.extend(document::report(repo, export));
-                lines.extend(export.dropped.iter().map(|(path, limit)| {
-                    Msg::FileTooBroad {
-                        path,
-                        limit: *limit,
-                    }
-                    .text()
+                lines.extend(export.dropped.iter().map(|(path, limit)| match *limit {
+                    Dropped::Bytes(limit) => Msg::FileTooBroad { path, limit }.text(),
+                    Dropped::Usings(limit) => Msg::FileTooManyUsings { path, limit }.text(),
                 }));
                 if drift > 0 {
                     lines.push(Msg::Drift(drift).text());

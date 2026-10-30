@@ -764,12 +764,38 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     // ponytail: serializes each changed file a second time and holds every file's values until
     // here, since a join reads some (`Def::type_params`); dropping them at parse needs those
     // fields kept in the index.
+    // A drop past a project's count (`Facts::usings`) is the project's, not the file's parse:
+    // only a join sees it. The files whose mark a join set or cleared are stamped into their
+    // stored facts below, which `contracts` reads for `meada status`.
+    // ponytail: a file still over the count is read and written back on every refresh that
+    // reaches here; only the files of a project past a count pay it.
+    let mut restamp: Vec<(String, Option<usize>)> = Vec::new();
     for p in &mut changed {
         p.facts = serde_json::from_str(&serde_json::to_string(&p.facts)?)?;
         joins[&packs[p.path.as_str()]](&p.path, &mut p.facts);
+        if p.facts.usings.is_some() {
+            restamp.push((p.path.clone(), p.facts.usings));
+        }
     }
     for (path, facts) in &mut kept {
+        let stored = facts.usings;
         joins[&packs[path.as_str()]](path, facts);
+        if facts.usings != stored {
+            restamp.push((path.clone(), facts.usings));
+        }
+    }
+    for (path, usings) in restamp {
+        let stored: String = tx.query_row(
+            "SELECT facts FROM files WHERE path = ?1",
+            params![path],
+            |r| r.get(0),
+        )?;
+        let mut facts: Facts = serde_json::from_str(&stored)?;
+        facts.usings = usings;
+        tx.execute(
+            "UPDATE files SET facts = ?2 WHERE path = ?1",
+            params![path, serde_json::to_string(&facts)?],
+        )?;
     }
     let parsed: BTreeMap<&str, &Facts> = changed
         .iter()
@@ -1738,6 +1764,15 @@ fn relative(root: &Path, path: &Path) -> Option<String> {
     Some(parts?.join("/"))
 }
 
+/// The limit a pack dropped a file for passing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Dropped {
+    /// The bytes of the qualified-names budget (`Facts::budget`).
+    Bytes(usize),
+    /// The count of usings a project may give its files (`Facts::usings`).
+    Usings(usize),
+}
+
 /// One repository's index content, as the engine builds on it: what the export writes
 /// (`written`), and what only the build needs.
 #[cfg_attr(test, derive(Default))]
@@ -1746,9 +1781,9 @@ pub(crate) struct Export {
     /// Where the repository stands in the workspace; set by the engine, never stored or shown.
     pub(crate) root: PathBuf,
     pub(crate) files: Vec<File>,
-    /// The files a pack dropped for exhausting a budget (`Facts::budget`), each with the
-    /// budget's size in bytes, in path order: no symbols, no calls. Shown by `meada status` only.
-    pub(crate) dropped: Vec<(String, usize)>,
+    /// The files a pack dropped for passing a limit (`Facts::budget`, `Facts::usings`), each with
+    /// the limit, in path order: no symbols, no calls. Shown by `meada status` only.
+    pub(crate) dropped: Vec<(String, Dropped)>,
     pub(crate) symbols: Vec<Symbol>,
     pub(crate) calls: Vec<CallSite>,
     pub(crate) providers: Vec<Provider>,
@@ -1983,14 +2018,20 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         .prepare(
             "SELECT path, facts FROM files WHERE NOT EXISTS \
              (SELECT 1 FROM symbols s WHERE s.path = files.path) \
-             AND instr(facts, '\"budget\":') > 0 ORDER BY path",
+             AND (instr(facts, '\"budget\":') > 0 OR instr(facts, '\"usings\":') > 0) \
+             ORDER BY path",
         )?
         .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
         .collect::<rusqlite::Result<Vec<_>>>()?
         .into_iter()
         .filter_map(|(path, facts)| {
             let facts: Facts = serde_json::from_str(&facts).ok()?;
-            Some((path, facts.budget?))
+            let limit = match (facts.budget, facts.usings) {
+                (Some(bytes), _) => Dropped::Bytes(bytes),
+                (None, Some(count)) => Dropped::Usings(count),
+                (None, None) => return None,
+            };
+            Some((path, limit))
         })
         .collect();
     let providers = db

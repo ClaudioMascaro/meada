@@ -883,16 +883,55 @@ fn status_reports_documents_follow_lang() {
     }
 }
 
-/// A C# file whose qualified names pass the pack's budget is dropped, and `status` names it
-/// and the limit.
+/// A file whose qualified names pass its pack's budget (C#, Java, Kotlin, Swift) and a C# file
+/// of a project that gives more usings than the pack takes are dropped, and `status` names each
+/// and its limit.
 #[test]
-fn status_reports_a_file_over_a_pack_budget_follow_lang() {
+fn status_reports_a_file_over_a_pack_limit_follow_lang() {
     let repo = fixture_repo("cli_budget", "ts-basic", None);
-    let mut source = format!("namespace N{};\npublic class C {{\n", "a".repeat(4096));
+    let name = "a".repeat(4096);
+    let mut source = format!("namespace N{name};\npublic class C {{\n");
     for n in 0..2000 {
         source += &format!("public void M{n}() {{ F(); }}\n");
     }
     fs::write(repo.join("Broad.cs"), source + "}\n").unwrap();
+    // A long enclosing name repeated by every node under it, 64 KiB at a time.
+    let name = "N".repeat(64 * 1024);
+    let repeats = 4 * 1024 * 1024 / name.len() + 1;
+    fs::write(
+        repo.join("Broad.java"),
+        format!(
+            "class {name} {{\n{}}}\n",
+            "void m() { f(); }\n".repeat(repeats)
+        ),
+    )
+    .unwrap();
+    fs::write(
+        repo.join("Broad.kt"),
+        format!(
+            "package a\nclass {name} {{\n{}}}\n",
+            "fun m() { f() }\n".repeat(repeats)
+        ),
+    )
+    .unwrap();
+    fs::write(
+        repo.join("Broad.swift"),
+        format!(
+            "struct {name} {{ func g() {{\n{}}} }}\n",
+            "f()\n".repeat(repeats)
+        ),
+    )
+    .unwrap();
+    // A project whose global usings pass the count every file of it is dropped for.
+    fs::create_dir_all(repo.join("many")).unwrap();
+    fs::write(
+        repo.join("many/Many.csproj"),
+        "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>",
+    )
+    .unwrap();
+    let usings: String = (0..=256).map(|n| format!("global using N{n};\n")).collect();
+    fs::write(repo.join("many/Global.cs"), usings).unwrap();
+    fs::write(repo.join("many/A.cs"), "class A { void M() {} }\n").unwrap();
     // A file a pack leaves unbuilt on purpose is not this drop.
     fs::write(
         repo.join("cgo.go"),
@@ -905,6 +944,21 @@ fn status_reports_a_file_over_a_pack_budget_follow_lang() {
         assert!(!status.contains("cgo.go"), "{status}");
         assert_golden(&format!("cli.status-budget.{name}.txt"), &status);
     }
+    // The project back within the count: its files are indexed again, with no line.
+    fs::write(repo.join("many/Global.cs"), "global using N0;\n").unwrap();
+    meada(&repo, "en_US.UTF-8", "index");
+    let status = meada(&repo, "en_US.UTF-8", "status");
+    assert!(!status.contains("many/"), "{status}");
+    assert!(status.contains("Broad.java"), "{status}");
+    // Edited past the count again: the unchanged file of the project is named too.
+    let usings: String = (0..=256).map(|n| format!("global using N{n};\n")).collect();
+    fs::write(repo.join("many/Global.cs"), usings).unwrap();
+    meada(&repo, "en_US.UTF-8", "index");
+    let status = meada(&repo, "en_US.UTF-8", "status");
+    assert!(
+        status.contains("many/A.cs: its project gives more than 256 usings"),
+        "{status}"
+    );
 }
 
 #[test]

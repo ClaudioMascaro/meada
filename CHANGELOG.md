@@ -60,6 +60,15 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Indexing: a file a pack drops for passing a limit is named by `meada status` (#434, from
+  #419). The Java, Kotlin and Swift qualified-name budget (4 MiB) now sets `Facts::budget`, as the
+  C# one does, instead of `unbuilt`, which prints nothing; a C# project that gives its files more
+  than 256 usings (`PROJECT_USINGS`) marks each of them with the new `Facts::usings`, which a new
+  status line names (`Msg::FileTooManyUsings`, with the count). Kotlin's `misparsed` file stays
+  `unbuilt` (a grammar defect, not a limit). An index built before this change keeps a Java,
+  Kotlin or Swift file dropped by its budget as `unbuilt` until the file changes. No limit changed. The `cli.status-budget` goldens gained the new cases; no stored
+  format golden changed (the new field is absent from every sample), so the schema version is the
+  same.
 - Resolution: the receiver and call depth (`RECEIVER_DEPTH`) is one count for the whole lookup
   (#432, from #417), carried through a glob, an alias or an on-demand import as the link count is,
   so a chain that alternates receivers and imports costs its length, not `RECEIVER_DEPTH` per link

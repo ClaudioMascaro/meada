@@ -303,7 +303,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         let Some(left) = budget.checked_sub(charge) else {
             // A partial overload family could turn an ambiguous call into a false exact one.
             return Ok(Facts {
-                unbuilt: true,
+                budget: Some(QUALIFICATION_BYTES),
                 ..Facts::default()
             });
         };
@@ -2435,6 +2435,23 @@ fn encloses(class: &str, scope: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A long enclosing name repeated by every declaration under it exhausts the budget: the
+    /// file keeps no definitions and carries the budget `meada status` names, not `unbuilt`.
+    #[test]
+    fn a_file_past_the_qualification_budget_keeps_no_facts() {
+        let name = "N".repeat(64 * 1024);
+        let funs = "fun m() { f() }\n".repeat(QUALIFICATION_BYTES / name.len() + 1);
+        let src = format!("package a\nclass {name} {{\n{funs}}}\n");
+        let facts = parse(src.as_bytes(), false).unwrap();
+        assert!(facts.defs.is_empty() && facts.calls.is_empty());
+        assert_eq!(facts.budget, Some(QUALIFICATION_BYTES));
+        assert!(!facts.unbuilt);
+        let src = format!("package a\nclass {name} {{\nfun m() {{ f() }}\n}}\n");
+        let facts = parse(src.as_bytes(), false).unwrap();
+        assert_eq!(facts.budget, None);
+        assert!(!facts.defs.is_empty());
+    }
 
     /// A secondary constructor is a method `C.C(types)` in the overload family of its class's
     /// name, hidden when `internal` or `private`; an enum's included.

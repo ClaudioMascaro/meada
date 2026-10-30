@@ -114,7 +114,7 @@ impl LanguagePack for Java {
         let mut tops: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for (&path, facts) in files {
             // A Kotlin script's declarations are its own: no package or import reaches them.
-            if facts.unbuilt || path.ends_with(".kts") {
+            if facts.unbuilt || facts.budget.is_some() || path.ends_with(".kts") {
                 continue;
             }
             packages
@@ -239,7 +239,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         let Some(remaining) = qualification_bytes.checked_sub(scope.len()) else {
             // A partial overload family could turn an ambiguous call into a false exact one.
             return Ok(Facts {
-                unbuilt: true,
+                budget: Some(QUALIFICATION_BYTES),
                 ..Facts::default()
             });
         };
@@ -1411,6 +1411,23 @@ fn encloses(class: &str, scope: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A long enclosing name repeated by every node under it exhausts the budget: the file keeps
+    /// no definitions and carries the budget `meada status` names, not `unbuilt`.
+    #[test]
+    fn a_file_past_the_qualification_budget_keeps_no_facts() {
+        let name = "N".repeat(64 * 1024);
+        let methods = "void m() { f(); }\n".repeat(QUALIFICATION_BYTES / name.len() + 1);
+        let src = format!("class {name} {{\n{methods}}}\n");
+        let facts = Java.parse("C.java", src.as_bytes()).unwrap();
+        assert!(facts.defs.is_empty() && facts.calls.is_empty());
+        assert_eq!(facts.budget, Some(QUALIFICATION_BYTES));
+        assert!(!facts.unbuilt);
+        let src = format!("class {name} {{\nvoid m() {{ f(); }}\n}}\n");
+        let facts = Java.parse("C.java", src.as_bytes()).unwrap();
+        assert_eq!(facts.budget, None);
+        assert!(!facts.defs.is_empty());
+    }
 
     #[test]
     fn every_annotated_field_is_recorded_with_whether_it_is_static() {

@@ -228,11 +228,12 @@ impl LanguagePack for CSharp {
             };
             if found.len() > PROJECT_USINGS {
                 *facts = Facts {
-                    unbuilt: true,
+                    usings: Some(PROJECT_USINGS),
                     ..Facts::default()
                 };
                 return;
             }
+            facts.usings = None;
             for using in found {
                 apply(using, facts);
             }
@@ -2645,12 +2646,14 @@ mod tests {
             ("p/A.cs", "class A { void M() {} }"),
         ];
         let facts = joined(&[("p/P.csproj", sdk), ("q/Q.csproj", sdk)], &crafted);
-        assert!(facts["p/A.cs"].defs.is_empty() && facts["p/A.cs"].unbuilt);
+        assert!(facts["p/A.cs"].defs.is_empty() && !facts["p/A.cs"].unbuilt);
+        assert_eq!(facts["p/A.cs"].usings, Some(PROJECT_USINGS));
         let facts = joined(
             &[("q/Q.csproj", sdk)],
             &[("q/G.cs", few), ("q/A.cs", "class A {}")],
         );
         assert_eq!(namespaces(&facts["q/A.cs"]), ["A"]);
+        assert_eq!(facts["q/A.cs"].usings, None);
     }
 
     #[test]

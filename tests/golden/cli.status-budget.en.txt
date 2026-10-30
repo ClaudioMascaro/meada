@@ -1,2 +1,7 @@
-local/ts-basic (.) indexed, 3 files
+local/ts-basic (.) indexed, 8 files
   Broad.cs: too broad, its qualified names passed the 4194304-byte budget: no symbols or calls
+  Broad.java: too broad, its qualified names passed the 4194304-byte budget: no symbols or calls
+  Broad.kt: too broad, its qualified names passed the 4194304-byte budget: no symbols or calls
+  Broad.swift: too broad, its qualified names passed the 4194304-byte budget: no symbols or calls
+  many/A.cs: its project gives more than 256 usings: no symbols or calls
+  many/Global.cs: its project gives more than 256 usings: no symbols or calls

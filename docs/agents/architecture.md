@@ -2602,7 +2602,9 @@ one for the area a change touches.
   (`Facts::project`, names as `Facts::imports` holds them), the qualified names of the types a C#
   file declares in `partial` parts (`Facts::partial`), the qualified names of the classes a
   Kotlin file declares `expect` or `actual` (`Facts::expect`, `Facts::actual`), the size of the budget a file exhausted
-  (`Facts::budget`, which `meada status` names), the literal URL path fragments and the
+  (`Facts::budget`, which `meada status` names), the count of usings the project of a file
+  passed (`Facts::usings`, set by a join and stamped into the stored facts after it, which
+  `meada status` names), the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
   consumer reads from the parsed response, and those of the zod schema or object literals a
@@ -2839,7 +2841,8 @@ one for the area a change touches.
   `QUALIFICATION_BYTES` (4 MiB) bounds enclosing-name bytes across syntax visits, before each
   visit's bounded metadata fanout. Pending visits share their scope strings. A file that
   exceeds this budget contributes no facts or package layout, so an incomplete overload
-  family cannot produce an exact link; other files still index. The Java hostile-depth and
+  family cannot produce an exact link; other files still index, and `Facts::budget` (not
+  `unbuilt`) makes `meada status` name the file, as for C#. The Java hostile-depth and
   long-prefix engine fixtures exceed these limits.
 
 - `jvm/names.rs`: `LOCAL_DEPTH` (8) bounds how many locals a JVM client reader (Ktor,
@@ -2922,7 +2925,7 @@ qualification budget does (ADR 0017).
   around a definition and the segments of a callee (past them a body keeps its enclosing
   symbol and a callee is `(navigation_expression)`); `QUALIFICATION_BYTES` (4 MiB) bounds the
   enclosing-name bytes a file's definitions, calls and bindings store, past which the file
-  keeps no facts; `ALIAS_DEPTH` (16) bounds the aliases of aliases of a function type `join`
+  keeps no facts and `Facts::budget`, which `meada status` names; `ALIAS_DEPTH` (16) bounds the aliases of aliases of a function type `join`
   follows (`function_aliases`), past which a parameter written as one takes no trailing closure.
   The pack's unit tests exceed each. Beyond the limits, what the pack leaves out
   (spec #29, #117): a target's `sources:` and `exclude:`, a closure,
@@ -2952,7 +2955,10 @@ qualification budget does (ADR 0017).
   pack sets for a file it leaves out on purpose) makes `meada status` name it (`index::export`
   reads it from the stored facts of the files with no symbols, as `Export::dropped`); `PROJECT_USINGS` (256) bounds the distinct usings `join` adds to every file of a
   project, past which the project's files keep no facts, since a partial set could make a
-  name exact that a missing using leaves ambiguous. The C# hostile-depth, long-prefix and
+  name exact that a missing using leaves ambiguous; `join` marks each such file with
+  `Facts::usings`, the index writer stamps the mark into its stored facts (and clears it
+  once the project is back within the count), and `meada status` names the file and the
+  count (`Msg::FileTooManyUsings`). The C# hostile-depth, long-prefix and
   pack unit tests exceed them. Beyond the limits, what the pack leaves out (spec #28, #107):
   a `using` inside a namespace block binds in the whole file, and a file joins its first
   namespace's group (`Facts::package`): a type it declares in another namespace binds there

@@ -123,6 +123,12 @@ pub enum Msg<'a> {
         path: &'a str,
         limit: usize,
     },
+    /// A source file of a project that gives its files more usings than a pack takes: no
+    /// symbols, no calls.
+    FileTooManyUsings {
+        path: &'a str,
+        limit: usize,
+    },
     DocumentUnreadable {
         path: &'a str,
         line: usize,
@@ -1460,6 +1466,10 @@ impl Msg<'_> {
             Msg::FileTooBroad { path, limit } => pick(
                 format!("{path}: too broad, its qualified names passed the {limit}-byte budget: no symbols or calls"),
                 format!("{path}: abrangente demais, seus nomes qualificados passaram do orçamento de {limit} bytes: sem símbolos nem chamadas"),
+            ),
+            Msg::FileTooManyUsings { path, limit } => pick(
+                format!("{path}: its project gives more than {limit} usings: no symbols or calls"),
+                format!("{path}: seu projeto dá mais de {limit} usings: sem símbolos nem chamadas"),
             ),
             Msg::DocumentUnreadable { path, line, error } => pick(
                 format!("{path}:{line}: unreadable document ({error}), ignored"),
