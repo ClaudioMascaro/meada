@@ -3,6 +3,8 @@
 
 #[cfg(any(feature = "ui", feature = "generation-pointer"))]
 pub mod audit;
+#[cfg(feature = "workspaces")]
+mod catalog;
 mod channel;
 mod community;
 mod config;
@@ -37,6 +39,8 @@ mod oidc;
 mod package;
 #[cfg(feature = "postgres")]
 pub mod postgres;
+#[cfg(feature = "proposals")]
+mod proposals;
 mod render;
 pub mod repo;
 mod resolve;
@@ -50,6 +54,8 @@ pub mod ui;
 #[cfg(feature = "valkey")]
 mod valkey;
 mod workspace;
+#[cfg(feature = "workspaces")]
+pub mod workspaces;
 mod xml;
 mod zod;
 

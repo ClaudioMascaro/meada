@@ -1097,6 +1097,14 @@ sample.rs
     "maps",
     "Map",
     "inner"
+  ],
+  "macro_rules": {
+    "cfg_disk": [
+      "cfg ( feature = \"disk\" )"
+    ]
+  },
+  "invokes": [
+    "cfg_disk"
   ]
 }
 

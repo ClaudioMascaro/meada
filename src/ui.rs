@@ -39,9 +39,13 @@ use crate::modules::{self, Problem, Shape};
 use crate::msg::Msg;
 use crate::workspace::Manifest;
 
+#[cfg(feature = "workspaces")]
+mod catalog;
 #[cfg(feature = "directory")]
 mod directory;
 mod read;
+#[cfg(feature = "workspaces")]
+mod workspaces;
 mod write;
 
 type Answer = Response<BoxBody<Bytes, Infallible>>;
@@ -250,6 +254,21 @@ enum Holds {
     Generations(std::result::Result<crate::snapshot::serve::Current, String>),
 }
 
+impl Holds {
+    /// What a console of the bootstrap `read` (at `file`) answers from.
+    fn of(file: &Path, read: &Manifest) -> Self {
+        #[cfg(feature = "snapshot")]
+        if let Some(snapshot) = &read.snapshot {
+            return Holds::Generations(match &snapshot.local_dir {
+                Some(local) => Ok(crate::snapshot::serve::Current::new(local.clone())),
+                None => Err(Msg::SnapshotNoLocalDir(&file.display().to_string()).text()),
+            });
+        }
+        let _ = file;
+        Holds::Listed(Box::new(read.clone()))
+    }
+}
+
 /// Who asks: the admitted subject (none behind the proxy), its role and what it may read.
 #[derive(Clone)]
 struct Session {
@@ -272,6 +291,25 @@ struct Session {
 }
 
 impl Session {
+    /// The session of a token `oidc` admitted, with a team operator's `teams`: the console's,
+    /// and the proposal server's with none (ADR 0022).
+    #[cfg(feature = "oidc")]
+    fn admitted(
+        admitted: crate::oidc::Admitted,
+        teams: Vec<String>,
+        oidc: &crate::oidc::Oidc,
+    ) -> Self {
+        Session {
+            subject: admitted.subject,
+            grant: Some(admitted.grant),
+            operator: admitted.operator,
+            groups: admitted.groups,
+            teams,
+            login: admitted.login,
+            github: oidc.github().map(|(host, state)| (host.to_string(), state)),
+        }
+    }
+
     /// Whether the session may read `identity`. Every view that lists or answers about a
     /// repository asks it (the manifest's entries here; the read routes and the playground of
     /// #304 and #305 through the same call), as a node bounds its answers (#290).
@@ -409,16 +447,33 @@ pub fn listen(listen: &str, manifest: &Path) -> Result<()> {
     })
 }
 
+/// `meada workspaces mcp` (ADR 0022, feature `proposals`): the proposal server, the console's
+/// named-workspace functions answered over MCP to agents with persistence off.
+#[cfg(feature = "proposals")]
+pub fn proposals(listen: &str, manifest: &Path) -> Result<()> {
+    workspaces::proposals::listen(listen, manifest)
+}
+
 /// Bounded POST bodies for token checks, playground queries and already-authorized operations.
 /// Other bodies stay unread. Tokens and raw uploads are never printed or forwarded.
 async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
     let max = match parts.uri.path() {
         CHECK => CHECK_MAX,
+        #[cfg(feature = "workspaces")]
+        "/api/v1/catalog/check" => catalog::CHECK_BODY_MAX,
+        #[cfg(feature = "workspaces")]
+        "/api/v1/workspaces" | "/api/v1/workspaces/effective" => workspaces::CREATE_MAX,
         QUERY => QUERY_MAX,
         "/api/v1/pointer" => write::POINTER_MAX,
         "/api/v1/fence/recover" => write::FENCE_MAX,
         "/api/v1/workspace/versions" => write::SAVE_MAX,
         "/api/v1/workspace/apply" => write::APPLY_MAX,
+        #[cfg(feature = "workspaces")]
+        path => match workspaces::body_max(path) {
+            Some(max) => max,
+            None => return Ok(Bytes::new()),
+        },
+        #[cfg(not(feature = "workspaces"))]
         _ => return Ok(Bytes::new()),
     };
     if parts.method != Method::POST {
@@ -501,13 +556,7 @@ impl Console {
             _ => None,
         };
         #[cfg(feature = "directory")]
-        let directory = match (&read.directory, &read.postgres) {
-            (Some(directory), Some(postgres)) => Some(crate::directory::read::Directory::new(
-                directory,
-                postgres.clone(),
-            )),
-            _ => None,
-        };
+        let directory = Self::directory_of(&read);
         #[cfg(feature = "postgres")]
         let audit = crate::audit::Audit::new(read.postgres.clone());
         #[cfg(not(feature = "postgres"))]
@@ -530,16 +579,7 @@ impl Console {
         {
             (directory.entry("token_env")).or_insert(crate::directory::TOKEN_ENV.into());
         }
-        #[cfg(feature = "snapshot")]
-        let holds = match &read.snapshot {
-            Some(snapshot) => Holds::Generations(match &snapshot.local_dir {
-                Some(local) => Ok(crate::snapshot::serve::Current::new(local.clone())),
-                None => Err(Msg::SnapshotNoLocalDir(&file.display().to_string()).text()),
-            }),
-            None => Holds::Listed(Box::new(read.clone())),
-        };
-        #[cfg(not(feature = "snapshot"))]
-        let holds = Holds::Listed(Box::new(read.clone()));
+        let holds = Holds::of(file, &read);
         Ok(Self {
             file: file.to_path_buf(),
             bootstrap: read.clone(),
@@ -561,6 +601,16 @@ impl Console {
             #[cfg(feature = "directory")]
             directory,
         })
+    }
+
+    /// What the console reads of the directory, with `[directory]` and `[postgres]` (#335).
+    #[cfg(feature = "directory")]
+    fn directory_of(read: &Manifest) -> Option<crate::directory::read::Directory> {
+        let (directory, postgres) = (read.directory.as_ref()?, read.postgres.as_ref()?);
+        Some(crate::directory::read::Directory::new(
+            directory,
+            postgres.clone(),
+        ))
     }
 
     /// A request under `/scim/v2/` (#334), in order: the `Host` check, a 403 for any request
@@ -721,7 +771,14 @@ impl Console {
                 &message,
             )));
         }
-        let session = match self.admit(headers, route, operation.is_some()) {
+        // A named workspace's creation (#342) is a write too: a directory that cannot say whether
+        // the subject was deprovisioned refuses it as it refuses an operation.
+        #[cfg(feature = "workspaces")]
+        let writes =
+            operation.is_some() || (write && route.is_some_and(|r| r.starts_with("workspaces")));
+        #[cfg(not(feature = "workspaces"))]
+        let writes = operation.is_some();
+        let session = match self.admit(headers, route, writes) {
             Ok(session) => session,
             Err((refused, message)) => {
                 audit(None, &message);
@@ -810,16 +867,7 @@ impl Console {
                         true => Vec::new(),
                         false => self.teams(&admitted.groups, &admitted.grant),
                     };
-                    let github = oidc.github().map(|(host, state)| (host.to_string(), state));
-                    Ok(Session {
-                        subject: admitted.subject,
-                        grant: Some(admitted.grant),
-                        operator: admitted.operator,
-                        groups: admitted.groups,
-                        teams,
-                        login: admitted.login,
-                        github,
-                    })
+                    Ok(Session::admitted(admitted, teams, oidc))
                 }
                 Err((status, challenge)) => {
                     let (code, message) = match status {
@@ -873,6 +921,10 @@ impl Console {
         if !read && write::operation(route).is_some() {
             return self.write(route, method, request.body(), session);
         }
+        #[cfg(feature = "workspaces")]
+        if let Some(answer) = self.workspaces(request, route, session) {
+            return answer;
+        }
         // An identity holds slashes: everything between `repositories/` and the last `/export`.
         if read
             && let Some(identity) =
@@ -882,6 +934,14 @@ impl Console {
         }
         if route == "query" && *method == Method::POST {
             return self.query(request.body(), session);
+        }
+        #[cfg(feature = "workspaces")]
+        if route == "catalog" && read {
+            return self.catalog(request.uri().query(), session);
+        }
+        #[cfg(feature = "workspaces")]
+        if route == "catalog/check" && *method == Method::POST {
+            return self.catalog_check(request.body(), session);
         }
         if read && route == "audit" && self.audit.on() {
             return self.audit_page(request.uri().query(), session);
@@ -932,6 +992,17 @@ impl Console {
         if self.audit.on() {
             config["audit"] = true.into();
         }
+        // With `[catalog]` (#341), the picker has its routes.
+        #[cfg(feature = "workspaces")]
+        if self.bootstrap.catalog.is_some() && self.oidc.is_some() {
+            config["catalog"] = true.into();
+        }
+        // With `[workspaces]` (#342), the workspaces pages have their routes and the bound the
+        // form checks a selection against.
+        #[cfg(feature = "workspaces")]
+        if let Some(section) = &self.bootstrap.workspaces {
+            config["workspaces"] = json!({"max_entries": section.max_entries});
+        }
         #[cfg(feature = "oidc")]
         if let Some(oidc) = &self.oidc {
             let (issuer, scopes) = oidc.login();
@@ -954,6 +1025,18 @@ impl Console {
             Err(e) => e.to_string().lines().map(String::from).collect(),
         };
         let mut loaded = self.loaded.clone();
+        // The allow list names owners and repositories nobody may have been granted: only the
+        // global operator reads it (#341).
+        #[cfg(feature = "workspaces")]
+        if !session.operator {
+            if let Some(catalog) = loaded.get_mut("catalog").and_then(Value::as_object_mut) {
+                catalog.remove("allow");
+            }
+            // The mirrors' root is a physical path of the platform (#342).
+            if let Some(section) = loaded.get_mut("workspaces").and_then(Value::as_object_mut) {
+                section.remove("mirrors");
+            }
+        }
         if !session.whole() {
             if let Some(Value::Array(entries)) = loaded.get_mut("repository") {
                 read::filter_entries(entries, "repo", session);
@@ -1081,6 +1164,9 @@ impl Console {
             repository: String,
             #[serde(default)]
             generation: Option<String>,
+            /// A named workspace to ask through (#342), under the discovery rule.
+            #[serde(default)]
+            workspace: Option<String>,
             tool: String,
             arguments: Value,
         }
@@ -1101,11 +1187,15 @@ impl Console {
             Err(None) => return bad(&Msg::UiQueryBody.text()),
             Err(Some(refused)) => return bad(&refused),
         };
-        let (engine, generation) =
-            match self.open(&query.repository, query.generation.as_deref(), session) {
-                Ok(opened) => opened,
-                Err(refused) => return *refused,
-            };
+        let (engine, generation) = match self.open(
+            &query.repository,
+            query.generation.as_deref(),
+            query.workspace.as_deref(),
+            session,
+        ) {
+            Ok(opened) => opened,
+            Err(refused) => return *refused,
+        };
         match ask(&engine) {
             Ok(text) => json_answer(
                 StatusCode::OK,
@@ -1191,7 +1281,7 @@ impl Console {
         let generation = (query.into_iter().flat_map(|q| q.split('&')))
             .find_map(|pair| pair.strip_prefix("generation="))
             .map(|id| percent_decode_str(id).decode_utf8_lossy());
-        let engine = match self.open(&identity, generation.as_deref(), session) {
+        let engine = match self.open(&identity, generation.as_deref(), None, session) {
             Ok((engine, _)) => engine,
             Err(refused) => return *refused,
         };
@@ -1219,6 +1309,7 @@ impl Console {
         &self,
         repository: &str,
         generation: Option<&str>,
+        workspace: Option<&str>,
         session: &Session,
     ) -> std::result::Result<(Engine, Option<String>), Box<Answer>> {
         let unknown = || {
@@ -1240,8 +1331,20 @@ impl Console {
         if !session.reads(repository) {
             return Err(unknown());
         }
+        // A named workspace (#342): the one 404 of an unknown id for anything the caller may not
+        // ask through, without `[workspaces]` as before.
+        #[cfg(feature = "workspaces")]
+        let through = workspace.filter(|_| self.bootstrap.workspaces.is_some());
+        #[cfg(not(feature = "workspaces"))]
+        let through: Option<&str> = None;
+        if workspace.is_some() && through.is_none() {
+            return Err(unknown());
+        }
         match &self.holds {
             Holds::Listed(listed) => {
+                if through.is_some() {
+                    return Err(unknown());
+                }
                 if let Some(id) = generation {
                     return Err(not_held(id, &[]));
                 }
@@ -1266,6 +1369,22 @@ impl Console {
                     },
                 };
                 let held = held.map_err(|e| unavailable(e.to_string()))?;
+                #[cfg(feature = "workspaces")]
+                if let Some(id) = through {
+                    if !self.through_workspace(id, repository, &held, session) {
+                        let message = Msg::WorkspacesNotFound.text();
+                        return Err(Box::new(error(
+                            StatusCode::NOT_FOUND,
+                            "not_found",
+                            &message,
+                        )));
+                    }
+                    let listed = held.context(id).map_err(|e| unavailable(e.to_string()))?;
+                    let listed = listed.ok_or_else(unknown)?;
+                    return Engine::open_context(&held, &listed, repository, &reads)
+                        .map(|engine| (engine, Some(held.id.clone())))
+                        .map_err(|e| unavailable(e.to_string()));
+                }
                 if !held.listed.entries.iter().any(|l| l.repo == repository) {
                     return Err(unknown());
                 }

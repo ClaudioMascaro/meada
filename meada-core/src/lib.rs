@@ -10,11 +10,13 @@
 pub mod authorize;
 pub mod context;
 pub mod drift;
+pub mod effective;
 pub mod export;
 pub mod http;
 pub mod ids;
 pub mod manifest;
 pub mod msg;
+pub mod named;
 pub mod render;
 pub mod search;
 pub mod shape;

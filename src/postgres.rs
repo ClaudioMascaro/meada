@@ -159,6 +159,71 @@ const MIGRATIONS: &[&str] = &[
        reason text NOT NULL,
        PRIMARY KEY (set_id, identity)
      );",
+    // 6: where a repository of the permissions set came from (#341, ADR 0021): the workspace
+    // selects it (`selected`, every row so far), only `[catalog]` allows it (`catalog`), or both.
+    // The catalog is the `catalog` and `both` rows whose coverage is `listed`.
+    "ALTER TABLE {schema}.permission_repositories
+       ADD COLUMN source text NOT NULL DEFAULT 'selected';",
+    // 7: named workspaces (#342, ADR 0021). A workspace is a stable id with a name, a current
+    // version and a `seq`, the base every write must still find; `entries` is the identities of
+    // the current version in manifest order, a copy that moves with `current` so that a list
+    // reads no store document. Operators are (workspace, subject) pairs; a version row says who
+    // stored a document of the shared store and when; the history is append only. An exclusion
+    // belongs to the deployment workspace (`context` empty) or to one named workspace, and a
+    // named entry has no `added_by`.
+    "CREATE TABLE {schema}.workspaces (
+       id text PRIMARY KEY,
+       name text NOT NULL,
+       description text NOT NULL DEFAULT '',
+       creator text NOT NULL,
+       creator_login text,
+       created timestamptz NOT NULL DEFAULT now(),
+       deleted timestamptz,
+       seq bigint NOT NULL,
+       current text NOT NULL,
+       entries text[] NOT NULL DEFAULT '{}'
+     );
+     CREATE TABLE {schema}.workspace_operators (
+       workspace_id text NOT NULL REFERENCES {schema}.workspaces (id),
+       subject text NOT NULL,
+       login text,
+       added_by text NOT NULL,
+       added timestamptz NOT NULL DEFAULT now(),
+       PRIMARY KEY (workspace_id, subject)
+     );
+     CREATE TABLE {schema}.workspace_versions (
+       workspace_id text NOT NULL REFERENCES {schema}.workspaces (id),
+       version text NOT NULL,
+       author text NOT NULL,
+       saved timestamptz NOT NULL DEFAULT now(),
+       message text NOT NULL,
+       PRIMARY KEY (workspace_id, version)
+     );
+     CREATE TABLE {schema}.workspace_history (
+       workspace_id text NOT NULL REFERENCES {schema}.workspaces (id),
+       seq bigint NOT NULL,
+       action text NOT NULL,
+       version text,
+       actor text NOT NULL,
+       authority text NOT NULL,
+       \"time\" timestamptz NOT NULL DEFAULT now(),
+       message text,
+       PRIMARY KEY (workspace_id, seq)
+     );
+     ALTER TABLE {schema}.permission_exclusions DROP CONSTRAINT permission_exclusions_pkey;
+     ALTER TABLE {schema}.permission_exclusions ADD COLUMN context text NOT NULL DEFAULT '';
+     ALTER TABLE {schema}.permission_exclusions ALTER COLUMN added_by DROP NOT NULL;
+     ALTER TABLE {schema}.permission_exclusions ADD PRIMARY KEY (set_id, context, identity);",
+    // 8: the version lifecycle of named workspaces (#343, ADR 0021 contract 4). A version row
+    // keeps the identities of its document, in manifest order, so that a list of versions
+    // filters by the reader's grant without reading a store document per row, as `workspaces
+    // .entries` does for the current one. Every row so far is a creation's version, which is
+    // still the workspace's current one. The column is NOT NULL once filled: a row the backfill
+    // missed fails the migration instead of reading as an empty set, which every grant contains.
+    "ALTER TABLE {schema}.workspace_versions ADD COLUMN entries text[];
+     UPDATE {schema}.workspace_versions v SET entries = w.entries
+       FROM {schema}.workspaces w WHERE w.id = v.workspace_id AND w.current = v.version;
+     ALTER TABLE {schema}.workspace_versions ALTER COLUMN entries SET NOT NULL;",
 ];
 
 /// The `[postgres]` section as written.
@@ -186,6 +251,20 @@ pub struct Config {
     pool_size: u64,
     connect_timeout: Duration,
     statement_timeout: Duration,
+    /// Every transaction read-only (`default_transaction_read_only`): the proposal server's
+    /// connections (ADR 0022), where a write is refused by Postgres itself.
+    read_only: bool,
+}
+
+impl Config {
+    /// This configuration with every session it opens read-only.
+    #[cfg(feature = "proposals")]
+    pub fn read_only(self) -> Self {
+        Self {
+            read_only: true,
+            ..self
+        }
+    }
 }
 
 impl File {
@@ -216,6 +295,7 @@ impl File {
                 }
                 bound => bound,
             },
+            read_only: false,
         })
     }
 }
@@ -455,8 +535,11 @@ async fn handshake(config: &Config) -> Result<Opened, String> {
         pg.dbname(dbname);
     }
     let statement = config.statement_timeout.as_millis();
-    pg.application_name("meada")
-        .options(format!("-c statement_timeout={statement}"));
+    let mut options = format!("-c statement_timeout={statement}");
+    if config.read_only {
+        options.push_str(" -c default_transaction_read_only=on");
+    }
+    pg.application_name("meada").options(options);
     let tls = over_tls(&url.host, config.ca_file.is_some());
     let ca_file = config.ca_file.clone();
     let connected: Result<_, String> = async {

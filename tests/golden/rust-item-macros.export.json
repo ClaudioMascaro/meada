@@ -1,0 +1,248 @@
+{
+  "repository": "example.com/acme/conformance",
+  "files": [
+    {
+      "path": "src/lib.rs",
+      "hash": "12314ec5f0bf7a05a2a28c1d62a539ddac1237346b2d09074bbe856579de335c"
+    },
+    {
+      "path": "src/macros.rs",
+      "hash": "32b83975d8389ba2107a171e46ffbc572427df801d21eb1b195f060b4b076334"
+    },
+    {
+      "path": "src/rt.rs",
+      "hash": "e25a09cb41889399b225f9711ea169ed6dfd5bc93e471bc90e2083a3b5c7cc2f"
+    },
+    {
+      "path": "src/runtime.rs",
+      "hash": "345197aeec0fe57b46b6108ee1c641df800be31d6dd912c8eb7abb435f74910c"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::caller",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 275,
+        "end": 303
+      },
+      "hash": "3dd7674255f6ae9e21d1ba11e98e6fd6c1692c0b3d642662e0f316f50943f0ce"
+    },
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::enter",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 649,
+        "end": 709
+      },
+      "hash": "484d3af6af4130d31604e807cbf0c7db415dec51bea09307b9709c555a95e3fe"
+    },
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::macros",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 160,
+        "end": 171
+      },
+      "hash": "21320fdda8b6e798ff2b6ed668d8e3227d39a14eb33e7bf0ab5b551eda32b212"
+    },
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::rt",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 261,
+        "end": 272
+      },
+      "hash": "34d89cb2a23e01adea569a4828a7c9bd64e4fae5d38479b378ca78f3452b81ac"
+    },
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::runtime",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 384,
+        "end": 400
+      },
+      "hash": "be4c73a193e477d1ce9b88d75bf24aa973d1f35201d9598e5e51e519aab7cfcd"
+    },
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::spawn",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 239,
+        "end": 256
+      },
+      "hash": "ba70b401caa8c4e5bacb895aaea3237ba4ec62d7a2692123f37068c1f825f843"
+    },
+    {
+      "id": "example.com/acme/conformance::src/rt.rs::block_on",
+      "span": {
+        "path": "src/rt.rs",
+        "start": 0,
+        "end": 33
+      },
+      "hash": "bee70d7545096fde3b85fe6c5d907b09e1a58120ea9ccc363dbddc5cb2f64607"
+    },
+    {
+      "id": "example.com/acme/conformance::src/rt.rs::park",
+      "span": {
+        "path": "src/rt.rs",
+        "start": 35,
+        "end": 47
+      },
+      "hash": "5fbf8406ae70621a7326fe486e612bb4915412818f1f02112568b3f597c9755e"
+    },
+    {
+      "id": "example.com/acme/conformance::src/runtime.rs::start",
+      "span": {
+        "path": "src/runtime.rs",
+        "start": 0,
+        "end": 17
+      },
+      "hash": "d483439c4fa51a16d03bcdd6fc7d1e602b3beb9705935a18629f57dbfa8bf120"
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::caller::spawn#0",
+      "caller": "example.com/acme/conformance::src/lib.rs::caller",
+      "target": "example.com/acme/conformance::src/lib.rs::spawn",
+      "level": "exact",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 293,
+        "end": 300
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::enter::rt.block_on#0",
+      "caller": "example.com/acme/conformance::src/lib.rs::enter",
+      "target": "example.com/acme/conformance::src/rt.rs::block_on",
+      "level": "exact",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 670,
+        "end": 684
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::enter::runtime.start#0",
+      "caller": "example.com/acme/conformance::src/lib.rs::enter",
+      "target": "example.com/acme/conformance::src/runtime.rs::start",
+      "level": "exact",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 690,
+        "end": 706
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/rt.rs::block_on::park#0",
+      "caller": "example.com/acme/conformance::src/rt.rs::block_on",
+      "target": "example.com/acme/conformance::src/rt.rs::park",
+      "level": "exact",
+      "span": {
+        "path": "src/rt.rs",
+        "start": 24,
+        "end": 30
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::cargo::items",
+      "site": "example.com/acme/conformance::Cargo.toml"
+    }
+  ],
+  "consumers": [],
+  "packages": [
+    {
+      "name": "items",
+      "version": "0.1.0",
+      "repository": "example.com/acme/conformance",
+      "directory": ".",
+      "ecosystem": "cargo"
+    }
+  ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/acme/conformance::src/lib.rs::caller",
+        "example.com/acme/conformance::src/lib.rs::spawn"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/acme/conformance::src/lib.rs::enter",
+        "example.com/acme/conformance::src/runtime.rs::start"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/acme/conformance::src/rt.rs::block_on",
+        "example.com/acme/conformance::src/rt.rs::park"
+      ]
+    }
+  ],
+  "links": [],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/conformance::src/lib.rs::caller",
+      "kind": "export",
+      "label": "caller",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/lib.rs::caller"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/lib.rs::spawn"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/lib.rs::enter",
+      "kind": "export",
+      "label": "enter",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/lib.rs::enter"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/rt.rs::block_on"
+        },
+        {
+          "depth": 2,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/rt.rs::park"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/runtime.rs::start"
+        }
+      ]
+    }
+  ]
+}

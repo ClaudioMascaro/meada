@@ -27,8 +27,96 @@ pub struct Held {
     /// `<local_dir>/<id>`.
     pub dir: PathBuf,
     /// Its repositories, in the document's order, each mirror and index inside the generation's
-    /// directory.
+    /// directory. The repositories only named workspaces select are not here: the plain route
+    /// serves the deployment workspace alone.
     pub listed: Manifest,
+    /// The document, for the named workspaces it records (#342, ADR 0021).
+    document: Document,
+    /// The workspace of each context read so far, by id: built when a request first names the
+    /// context and kept with the generation, which never changes.
+    built: Mutex<HashMap<String, Arc<Manifest>>>,
+}
+
+impl Held {
+    /// The ids of the contexts the generation records, sorted.
+    pub fn context_ids(&self) -> Vec<&str> {
+        self.document
+            .contexts
+            .iter()
+            .map(|c| c.id.as_str())
+            .collect()
+    }
+
+    /// The identities context `id` records, in its order; `None` when the generation has no such
+    /// context.
+    pub fn context_repositories(&self, id: &str) -> Option<Vec<&str>> {
+        let context = self.document.contexts.iter().find(|c| c.id == id)?;
+        Some(
+            context
+                .repositories
+                .iter()
+                .map(|r| r.repo.as_str())
+                .collect(),
+        )
+    }
+
+    /// The workspace version context `id` was recorded at.
+    pub fn context_version(&self, id: &str) -> Option<&str> {
+        let context = self.document.contexts.iter().find(|c| c.id == id)?;
+        Some(context.version.as_str())
+    }
+
+    /// What this generation says about `identity` for the effective configuration (ADR 0021,
+    /// contract 6): whether it has a bundle, whether the bundle's mirror has a `meada.toml` of
+    /// its own, and whether the bundle indexes provider documents (its ingestion configuration
+    /// declares `[serve]`: the mirror's own file, else the deployment entry's blocks, which a
+    /// member only named workspaces select does not have). It reads the mirror's `meada.toml`
+    /// and nothing else of it. `None` when the generation holds no such repository. A file that
+    /// exists and cannot be read (malformed, too large) is still a file of its own: the bundle is
+    /// held, the file wins whole as it does for the node that cannot serve the generation, and
+    /// the view never says the repository is not ingested.
+    pub fn facts(&self, identity: &str) -> Option<meada_core::effective::Facts> {
+        let held = (self.document.repositories.iter()).chain(&self.document.members);
+        let entry = held.clone().find(|e| e.identity == identity)?;
+        let bundle = super::bundle_of(&entry.bundle);
+        if !is_id(bundle) {
+            return None;
+        }
+        let root = self.dir.join(bundle).join("mirror");
+        let max = Some(config::GENERATION_CONFIG_MAX);
+        let (own, documents) =
+            match config::read_own_up_to::<config::Config>(&root, "meada.toml", max) {
+                Ok(Some(own)) => (true, own.serve.declared),
+                Ok(None) => (false, entry.blocks.get("serve").is_some()),
+                Err(_) => (true, false),
+            };
+        Some(meada_core::effective::Facts {
+            held: true,
+            own,
+            documents,
+            excluded: false,
+        })
+    }
+
+    /// Whether context `id` was recorded at workspace version `version`.
+    pub fn records(&self, id: &str, version: &str) -> bool {
+        self.context_version(id) == Some(version)
+    }
+
+    /// The workspace of context `id` as the generation recorded it (`Manifest::of_context`),
+    /// built once; `None` when the generation has no such context.
+    pub fn context(&self, id: &str) -> Result<Option<Arc<Manifest>>> {
+        let Some(context) = self.document.contexts.iter().find(|c| c.id == id) else {
+            return Ok(None);
+        };
+        let mut built = self.built.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(manifest) = built.get(id) {
+            return Ok(Some(manifest.clone()));
+        }
+        let manifest = Arc::new(Manifest::of_context(&self.dir, &self.document, context)?);
+        built.insert(id.to_string(), manifest.clone());
+        Ok(Some(manifest))
+    }
 }
 
 /// The generation `<local_dir>/current` names, read once per generation: a generation's
@@ -138,7 +226,13 @@ fn load(local: &Path, id: String) -> Result<Held> {
         return Err(not().into());
     }
     let listed = Manifest::of_generation(&dir, &document)?;
-    Ok(Held { id, dir, listed })
+    Ok(Held {
+        id,
+        dir,
+        listed,
+        document,
+        built: Mutex::new(HashMap::new()),
+    })
 }
 
 /// The ids of the generations `local` holds, sorted: its directories named by an id. A pull in

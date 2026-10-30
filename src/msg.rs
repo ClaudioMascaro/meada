@@ -531,6 +531,9 @@ pub enum Msg<'a> {
     SnapshotLockCommand,
     #[cfg(feature = "snapshot")]
     GenerationNotHeld(&'a str),
+    /// A pinned generation that records no such workspace for the caller (#342).
+    #[cfg(feature = "snapshot")]
+    GenerationNoContext(&'a str),
     /// An `[oidc]` URL, or `[ui] public_url`, that is not `https` (or `http` on loopback) with
     /// a host and no user, query or fragment; with `bare`, no path either.
     #[cfg(any(feature = "oidc", feature = "ui"))]
@@ -734,6 +737,197 @@ pub enum Msg<'a> {
         rows: usize,
         exclusions: usize,
     },
+    /// `[catalog] allow` that is not a non-empty array of distinct lowercase patterns on this
+    /// host (#341).
+    #[cfg(feature = "workspaces")]
+    CatalogAllow(&'a str),
+    /// An installation listing that fails the role check (#341): the installation and why.
+    #[cfg(feature = "workspaces")]
+    RolesCatalogFailed {
+        installation: u64,
+        why: &'a str,
+    },
+    /// An App whose installations could not be listed for the catalog: the App id and why.
+    #[cfg(feature = "workspaces")]
+    RolesCatalogInstallations {
+        app: u64,
+        why: &'a str,
+    },
+    /// An installation throttled while the catalog was listed, with the status answered, if any.
+    #[cfg(feature = "workspaces")]
+    RolesCatalogThrottled(Option<u16>),
+    /// An App with no installations held and no recent listing, after waiting for another
+    /// run's listing for the lock's lifetime.
+    #[cfg(feature = "workspaces")]
+    RolesCatalogUnlisted,
+    /// More pages of one installation's repositories than the role check lists.
+    #[cfg(feature = "workspaces")]
+    RolesCatalogPages(u32),
+    /// More candidates, besides the selected repositories, than `[catalog] max_repositories`.
+    #[cfg(feature = "workspaces")]
+    RolesCatalogCap {
+        found: usize,
+        max: usize,
+    },
+    /// The role check's line on success under `[catalog]`.
+    #[cfg(feature = "workspaces")]
+    RolesSetCatalog {
+        id: &'a str,
+        repositories: usize,
+        catalog: usize,
+        rows: usize,
+        exclusions: usize,
+    },
+    /// A catalog query the console refuses: its parameters, never echoed.
+    #[cfg(feature = "workspaces")]
+    CatalogQuery(usize),
+    /// A catalog check whose body is not `{"identities": [...]}` of identities.
+    #[cfg(feature = "workspaces")]
+    CatalogCheckBody(usize),
+    /// An entry of a named workspace left out before the fetch because no operator of the
+    /// workspace holds an accepted role on it (#342): the workspace and the identity.
+    #[cfg(feature = "workspaces")]
+    RolesNoSponsor {
+        context: &'a str,
+        identity: &'a str,
+    },
+    /// `[workspaces] mirrors` that is not an absolute path without `..` (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesMirrors,
+    /// `[workspaces]` without `[ui] operations = true` (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesNeedsOperations,
+    /// `[workspaces]` without `[workspace] source = "store"` (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesNeedsStore,
+    /// The contexts file a reader needs, missing (#342): the pull that writes it.
+    #[cfg(feature = "workspaces")]
+    ContextsMissing(&'a str),
+    /// A contexts file that does not check (#342).
+    #[cfg(feature = "workspaces")]
+    ContextsBad(&'a str),
+    /// The contexts file the exclusions file was not written for (#342).
+    #[cfg(feature = "workspaces")]
+    ContextsOther(&'a str),
+    /// A named version document that does not check (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesDocumentBad(&'a str),
+    /// A creation body that is not `{name, description?, entries, message}` (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesBody,
+    /// A workspace that is not found, hidden or deleted: one answer for all (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesNotFound,
+    /// The store or Postgres did not answer a workspace write or read (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesUnavailable,
+    /// A creation refused because some selected repository is not eligible (#342): how many.
+    #[cfg(feature = "workspaces")]
+    WorkspacesRefused(usize),
+    /// A creation or selection while the permissions set cannot decide (#342): the reason.
+    #[cfg(feature = "workspaces")]
+    WorkspacesPending(&'a str),
+    /// More workspaces than `[workspaces] max_workspaces` (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesLimit(usize),
+    /// The same triple created and then deleted (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspaceDeleted,
+    /// A list query the console refuses (#342): its parameters, never echoed.
+    #[cfg(feature = "workspaces")]
+    WorkspacesQuery(usize),
+    /// The line `meada workspace pull` prints for the contexts it wrote (#342).
+    #[cfg(feature = "workspaces")]
+    ContextsWritten(usize),
+    /// A named workspace's entry names an identity outside the catalog (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesReservedSegment(&'a str),
+    /// `meada workspaces` and its subcommands' descriptions (#343).
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmd,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdList,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdShow,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdVersions,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdDiff,
+    #[cfg(feature = "workspaces")]
+    WorkspacesHelpAgainst,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdCreate,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdSave,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdApply,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdRename,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdDelete,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdOperators,
+    #[cfg(feature = "workspaces")]
+    WorkspacesHelpId,
+    #[cfg(feature = "workspaces")]
+    WorkspacesHelpBase,
+    #[cfg(feature = "workspaces")]
+    WorkspacesHelpName,
+    #[cfg(feature = "workspaces")]
+    WorkspacesHelpDescription,
+    #[cfg(feature = "workspaces")]
+    WorkspacesHelpAdd,
+    #[cfg(feature = "workspaces")]
+    WorkspacesHelpRemove,
+    /// A lifecycle body that is not the shape its route takes (#343): the shape.
+    #[cfg(feature = "workspaces")]
+    WorkspacesOpBody(&'a str),
+    /// A write whose `base` is not the workspace's `seq` any more (#343): the current one.
+    #[cfg(feature = "workspaces")]
+    WorkspacesStale(i64),
+    /// A write by someone who neither operates the workspace nor administers the platform (#343).
+    #[cfg(feature = "workspaces")]
+    WorkspacesNotOperator,
+    /// The operators' route, which only the platform administrator may use (#343).
+    #[cfg(feature = "workspaces")]
+    WorkspacesNotAdministrator,
+    /// A version that is not one of the workspace's (#343).
+    #[cfg(feature = "workspaces")]
+    WorkspacesUnknownVersion,
+    /// An apply of the version that is current (#343).
+    #[cfg(feature = "workspaces")]
+    WorkspacesAlreadyCurrent,
+    /// `meada workspaces mcp` and its arguments' help (ADR 0022).
+    #[cfg(feature = "proposals")]
+    ProposalsCmd,
+    #[cfg(feature = "proposals")]
+    ProposalsListenHelp,
+    #[cfg(feature = "proposals")]
+    ProposalsWorkspaceHelp,
+    /// A bootstrap manifest without `[proposals]` given to `meada workspaces mcp` (ADR 0022).
+    #[cfg(feature = "proposals")]
+    ProposalsNoSection,
+    /// A tool's argument past its bound (ADR 0022): what the argument takes, never its value.
+    #[cfg(feature = "proposals")]
+    ProposalsArgument(&'a str),
+    /// A tool's answer past the output cap (ADR 0022): the cap in bytes.
+    #[cfg(feature = "proposals")]
+    ProposalsTooLarge(usize),
+    /// A call while the most calls are in flight (ADR 0022).
+    #[cfg(feature = "proposals")]
+    ProposalsBusy,
+    /// A call that reached a tool without the admission the listener gives (ADR 0022).
+    #[cfg(feature = "proposals")]
+    ProposalsNotAdmitted,
+    /// An operator list that would hold none or too many (#343): the reason.
+    #[cfg(feature = "workspaces")]
+    WorkspacesOperators(&'a str),
+    /// A versions or history query the console refuses (#343): its cursor bound, never echoed.
+    #[cfg(feature = "workspaces")]
+    WorkspacesPageQuery(usize),
+    /// A save whose stored version would hold no entry (#343).
+    #[cfg(feature = "workspaces")]
+    WorkspacesEmptyVersion,
     /// The exclusions file a reader of the pulled version needs (#331).
     #[cfg(feature = "generation-pointer")]
     ExcludedMissing(&'a str),
@@ -2145,6 +2339,11 @@ impl Msg<'_> {
                     .into(),
             ),
             #[cfg(feature = "snapshot")]
+            Msg::GenerationNoContext(id) => pick(
+                format!("generation {id} records no such workspace"),
+                format!("a geração {id} não registra tal workspace"),
+            ),
+            #[cfg(feature = "snapshot")]
             Msg::GenerationNotHeld(id) => pick(
                 format!("generation {id} is not held here"),
                 format!("a geração {id} não está retida aqui"),
@@ -2576,6 +2775,419 @@ impl Msg<'_> {
                     "conjunto de permissões {id}: {repositories} repositórios, {rows} linhas, \
                      {exclusions} exclusões"
                 ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::CatalogAllow(host) => pick(
+                format!(
+                    "must be a non-empty array of distinct lowercase patterns, each {host}/<owner>/* \
+                     or {host}/<owner>/<repo>"
+                ),
+                format!(
+                    "deve ser um array não vazio de padrões distintos em minúsculas, cada um \
+                     {host}/<dono>/* ou {host}/<dono>/<repositório>"
+                ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesCatalogFailed { installation, why } => pick(
+                format!(
+                    "installation {installation}: listing its repositories for the catalog \
+                     failed: {why}; nothing was written"
+                ),
+                format!(
+                    "instalação {installation}: a listagem dos seus repositórios para o catálogo \
+                     falhou: {why}; nada foi gravado"
+                ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesCatalogInstallations { app, why } => pick(
+                format!(
+                    "GitHub App {app}: listing its installations for the catalog failed: {why}; \
+                     nothing was written"
+                ),
+                format!(
+                    "GitHub App {app}: a listagem das suas instalações para o catálogo falhou: \
+                     {why}; nada foi gravado"
+                ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesCatalogThrottled(None) => pick("throttled".into(), "limitada".into()),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesCatalogThrottled(Some(status)) => pick(
+                format!("throttled (http status {status})"),
+                format!("limitada (status http {status})"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesCatalogUnlisted => pick(
+                "another run's listing did not finish in time".into(),
+                "a listagem de outra execução não terminou a tempo".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesCatalogPages(max) => pick(
+                format!("more than {max} pages of repositories"),
+                format!("mais de {max} páginas de repositórios"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesCatalogCap { found, max } => pick(
+                format!(
+                    "the catalog has {found} candidates besides the selected repositories, above \
+                     [catalog] max_repositories = {max}; nothing was written"
+                ),
+                format!(
+                    "o catálogo tem {found} candidatos além dos repositórios selecionados, acima \
+                     de [catalog] max_repositories = {max}; nada foi gravado"
+                ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesSetCatalog {
+                id,
+                repositories,
+                catalog,
+                rows,
+                exclusions,
+            } => pick(
+                format!(
+                    "permissions set {id}: {repositories} repositories ({catalog} in the catalog), \
+                     {rows} rows, {exclusions} exclusions"
+                ),
+                format!(
+                    "conjunto de permissões {id}: {repositories} repositórios ({catalog} no \
+                     catálogo), {rows} linhas, {exclusions} exclusões"
+                ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::CatalogQuery(max) => pick(
+                format!(
+                    "the catalog takes limit (1 to 100), after and q (at most {max} characters), \
+                     each once"
+                ),
+                format!(
+                    "o catálogo aceita limit (1 a 100), after e q (no máximo {max} caracteres), \
+                     cada um uma vez"
+                ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::CatalogCheckBody(max) => pick(
+                format!("the body must be {{\"identities\": [...]}} with at most {max} identities"),
+                format!("o corpo deve ser {{\"identities\": [...]}} com no máximo {max} identidades"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesNoSponsor { context, identity } => pick(
+                format!("{context}: {identity}: excluded: no operator of the workspace holds an accepted role on it"),
+                format!("{context}: {identity}: excluído: nenhum operador do workspace tem papel aceito nele"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesMirrors => pick(
+                "must be an absolute path without `..`, the root of the mirrors named workspaces use"
+                    .into(),
+                "deve ser um caminho absoluto sem `..`, a raiz dos espelhos que os workspaces nomeados usam"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesNeedsOperations => pick(
+                "[workspaces] needs [ui] operations = true".into(),
+                "[workspaces] precisa de [ui] operations = true".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesNeedsStore => pick(
+                "[workspaces] needs [workspace] source = \"store\"".into(),
+                "[workspaces] precisa de [workspace] source = \"store\"".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::ContextsMissing(file) => pick(
+                format!("{file} is missing: run `meada workspace pull` first"),
+                format!("{file} não existe: rode `meada workspace pull` antes"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::ContextsBad(file) => pick(
+                format!("{file} is not a contexts file `meada workspace pull` wrote"),
+                format!("{file} não é um arquivo de contextos que `meada workspace pull` gravou"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::ContextsOther(file) => pick(
+                format!(
+                    "{file} names other contexts than the contexts file holds: run `meada \
+                     github-app roles` after `meada workspace pull`"
+                ),
+                format!(
+                    "{file} nomeia outros contextos que os do arquivo de contextos: rode `meada \
+                     github-app roles` depois de `meada workspace pull`"
+                ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesDocumentBad(key) => pick(
+                format!("{key} is not a named workspace version document"),
+                format!("{key} não é um documento de versão de workspace nomeado"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesBody => pick(
+                "the body must be {\"name\", \"description\"?, \"entries\", \"message\"}".into(),
+                "o corpo deve ser {\"name\", \"description\"?, \"entries\", \"message\"}".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesNotFound => pick(
+                "no such workspace".into(),
+                "não há tal workspace".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesUnavailable => pick(
+                "the workspaces cannot be read or written now (Postgres or the store did not answer)"
+                    .into(),
+                "os workspaces não podem ser lidos nem gravados agora (o Postgres ou o store não respondeu)"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesRefused(count) => pick(
+                format!("{count} selected repositories are not eligible for you; nothing was created"),
+                format!("{count} repositórios selecionados não são elegíveis para você; nada foi criado"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesPending(reason) => pick(
+                format!("the permissions set cannot decide now ({reason}); nothing can be selected"),
+                format!("o conjunto de permissões não pode decidir agora ({reason}); nada pode ser selecionado"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesLimit(max) => pick(
+                format!("there are already {max} workspaces ([workspaces] max_workspaces)"),
+                format!("já existem {max} workspaces ([workspaces] max_workspaces)"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspaceDeleted => pick(
+                "that workspace was created and deleted: use another name or other entries".into(),
+                "esse workspace foi criado e apagado: use outro nome ou outras entradas".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesQuery(max) => pick(
+                format!("the list takes limit (1 to 100) and after (at most {max} characters), each once"),
+                format!("a lista aceita limit (1 a 100) e after (no máximo {max} caracteres), cada um uma vez"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::ContextsWritten(count) => pick(
+                format!("contexts: {count} named workspaces"),
+                format!("contextos: {count} workspaces nomeados"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmd => pick(
+                "Manage the named workspaces as the platform administrator (feature workspaces)"
+                    .into(),
+                "Gerencia os workspaces nomeados como administrador da plataforma (feature \
+                 workspaces)"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdList => pick(
+                "List the named workspaces: id, current version, base and name".into(),
+                "Lista os workspaces nomeados: id, versão atual, base e nome".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdShow => pick(
+                "Print a named workspace's current version (or another) as [[repository]] entries"
+                    .into(),
+                "Imprime a versão atual (ou outra) de um workspace nomeado como entradas \
+                 [[repository]]"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdVersions => pick(
+                "List the versions of a named workspace, newest first, the current one marked"
+                    .into(),
+                "Lista as versões de um workspace nomeado, da mais nova à mais antiga, marcando \
+                 a atual"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdDiff => pick(
+                "Print what a version of a named workspace adds, drops and changes against \
+                 another"
+                    .into(),
+                "Imprime o que uma versão de um workspace nomeado adiciona, remove e altera em \
+                 relação a outra"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesHelpAgainst => pick(
+                "The version to compare with, or `current` (the default)".into(),
+                "A versão com a qual comparar, ou `current` (o padrão)".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdCreate => pick(
+                "Create a named workspace from the [[repository]] entries of a manifest file and \
+                 print its id"
+                    .into(),
+                "Cria um workspace nomeado com as entradas [[repository]] de um manifesto e \
+                 imprime seu id"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdSave => pick(
+                "Store the [[repository]] entries of a manifest file as a version of a named \
+                 workspace, moving nothing, and print the version id"
+                    .into(),
+                "Guarda as entradas [[repository]] de um manifesto como uma versão de um \
+                 workspace nomeado, sem mover nada, e imprime o id da versão"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdApply => pick(
+                "Make a stored version the current one of a named workspace (a version that was \
+                 current before is a rollback)"
+                    .into(),
+                "Torna uma versão guardada a atual de um workspace nomeado (uma versão que já \
+                 foi a atual é um rollback)"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdRename => pick(
+                "Rename a named workspace".into(),
+                "Renomeia um workspace nomeado".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdDelete => pick(
+                "Delete a named workspace, keeping its versions and history".into(),
+                "Apaga um workspace nomeado, mantendo suas versões e seu histórico".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdOperators => pick(
+                "Add or remove the operators of a named workspace".into(),
+                "Adiciona ou remove os operadores de um workspace nomeado".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesHelpId => pick(
+                "The workspace id".into(),
+                "O id do workspace".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesHelpBase => pick(
+                "The base the change was made against (the base `show` and `list` print)".into(),
+                "A base sobre a qual a mudança foi feita (a base que `show` e `list` imprimem)"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesHelpName => pick(
+                "The workspace's name (1 to 80 characters)".into(),
+                "O nome do workspace (1 a 80 caracteres)".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesHelpDescription => pick(
+                "The workspace's description (0 to 500 characters)".into(),
+                "A descrição do workspace (0 a 500 caracteres)".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesHelpAdd => pick(
+                "An operator to add, as <subject>=<github login> (repeatable)".into(),
+                "Um operador a adicionar, como <sujeito>=<login do github> (repetível)".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesHelpRemove => pick(
+                "The subject of an operator to remove (repeatable)".into(),
+                "O sujeito de um operador a remover (repetível)".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesOpBody(shape) => pick(
+                format!("the body must be {shape}"),
+                format!("o corpo deve ser {shape}"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesStale(seq) => pick(
+                format!("the workspace changed since you read it (it is at base {seq} now): reload it and review the change"),
+                format!("o workspace mudou desde a sua leitura (está na base {seq} agora): recarregue e revise a mudança"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesNotOperator => pick(
+                "only an operator of this workspace or the platform administrator may change it".into(),
+                "só um operador deste workspace ou o administrador da plataforma pode alterá-lo".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesNotAdministrator => pick(
+                "only the platform administrator changes a workspace's operators".into(),
+                "só o administrador da plataforma altera os operadores de um workspace".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesUnknownVersion => pick(
+                "no such version of this workspace".into(),
+                "não há tal versão deste workspace".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesAlreadyCurrent => pick(
+                "that version is already the current one; nothing changed".into(),
+                "essa versão já é a atual; nada mudou".into(),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsCmd => pick(
+                "Serve the named workspaces' catalog, validation and stateless proposals to \
+                 agents over MCP at host:port, :port or port (loopback without a host); it \
+                 writes nothing"
+                    .into(),
+                "Serve o catálogo, a validação e as propostas sem estado dos workspaces nomeados \
+                 a agentes via MCP em host:porta, :porta ou porta (loopback sem host); não grava \
+                 nada"
+                    .into(),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsListenHelp => pick(
+                "Where the proposal server listens: host:port, :port or port (loopback without a \
+                 host)"
+                    .into(),
+                "Onde o servidor de propostas escuta: host:porta, :porta ou porta (loopback sem \
+                 host)"
+                    .into(),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsWorkspaceHelp => pick(
+                "The bootstrap manifest, with its [proposals] and [workspaces] sections".into(),
+                "O manifesto de bootstrap, com as seções [proposals] e [workspaces]".into(),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsNoSection => pick(
+                "the bootstrap manifest has no [proposals] section".into(),
+                "o manifesto de bootstrap não tem seção [proposals]".into(),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsArgument(what) => pick(
+                format!("invalid arguments: {what}"),
+                format!("argumentos inválidos: {what}"),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsTooLarge(max) => pick(
+                format!("the answer would exceed {max} bytes; ask for fewer entries or a page"),
+                format!("a resposta passaria de {max} bytes; peça menos entradas ou uma página"),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsBusy => pick(
+                "too many calls in flight; retry shortly".into(),
+                "chamadas demais em andamento; tente de novo em instantes".into(),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsNotAdmitted => pick(
+                "the call was not admitted".into(),
+                "a chamada não foi admitida".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesOperators(reason) => pick(
+                match *reason {
+                    "last_operator" => "a workspace keeps at least one operator".to_string(),
+                    "too_many_operators" => "a workspace holds at most 20 operators".to_string(),
+                    _ => "the operator list is not valid".to_string(),
+                },
+                match *reason {
+                    "last_operator" => "um workspace mantém pelo menos um operador".to_string(),
+                    "too_many_operators" => "um workspace tem no máximo 20 operadores".to_string(),
+                    _ => "a lista de operadores não é válida".to_string(),
+                },
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesPageQuery(max) => pick(
+                format!("the query takes after (at most {max} characters), once"),
+                format!("a consulta aceita after (no máximo {max} caracteres), uma vez"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesEmptyVersion => pick(
+                "the version would hold no entry: delete the workspace instead".into(),
+                "a versão ficaria sem nenhuma entrada: apague o workspace".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesReservedSegment(identity) => pick(
+                format!("{identity}: the first segment `-` is reserved for named workspaces' routes"),
+                format!("{identity}: o primeiro segmento `-` é reservado às rotas de workspaces nomeados"),
             ),
             #[cfg(feature = "generation-pointer")]
             Msg::ExcludedMissing(file) => pick(

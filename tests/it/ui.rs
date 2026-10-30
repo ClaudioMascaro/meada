@@ -212,7 +212,10 @@ fn serves_config_session_and_manifest() {
             "github_app",
             "ui",
             "postgres",
-            "directory"
+            "directory",
+            "catalog",
+            "workspaces",
+            "proposals"
         ]
     );
     for module in modules {
@@ -226,6 +229,8 @@ fn serves_config_session_and_manifest() {
             "ui" => true,
             "postgres" => cfg!(feature = "postgres"),
             "directory" => cfg!(feature = "directory"),
+            "workspaces" => cfg!(feature = "workspaces"),
+            "proposals" => cfg!(feature = "proposals"),
             other => panic!("{other}"),
         };
         assert_eq!(module["built"], json!(built), "{module}");

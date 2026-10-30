@@ -161,3 +161,15 @@ base no existe antes del release, el hook de migración pasa a `post-install,pos
 consola espera el schema: `helm install --wait` esperaría a la consola antes de que corra el hook,
 así que instala sin `--wait` en ese caso. En producción usa tu propio Postgres 15 o posterior, con TLS y los tres
 roles; la misma `tls.caSecret` verifica su certificado (`ca_file`).
+
+### Workspaces nombrados
+
+`values-workspaces.yaml` (sobre `values-console.yaml` y `values-identity.yaml`) habilita
+`modules.workspaces`: las secciones `[catalog]` y `[workspaces]` van al bootstrap de la consola y al
+`job.workspace.toml` del job de refresh, con el bloque `[ui]` que el job pasa a necesitar, y nunca al
+de un nodo. El chart lo rechaza sin `console.operations`, `modules.oidc.github`, un `allow` no vacío
+y un `maxRepositories` definido por ti (no tiene valor por defecto). Actualiza todas las imágenes,
+nodos incluidos, antes del primer refresh que registre un workspace. Tu `workspace.fetch` debe
+clonar los repositorios que solo seleccionan workspaces nombrados bajo `modules.workspaces.mirrors`,
+en las rutas que lista `meada workspace show --pulled`. El servidor de propuestas no forma parte del
+chart.

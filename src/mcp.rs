@@ -196,6 +196,9 @@ enum Source {
         held: Arc<crate::snapshot::serve::Held>,
         identity: Arc<str>,
         named: bool,
+        /// A named workspace of the generation (#342): its workspace and its id, which each
+        /// result names in `_meta` (`meada/workspace`).
+        context: Option<(Arc<Manifest>, Arc<str>)>,
     },
 }
 
@@ -233,11 +236,20 @@ impl Meada {
                 Engine::open_listed(listed, identity, manifest, &|i| pass.reads(i))
             }),
             #[cfg(feature = "snapshot")]
-            (Source::Generation { held, identity, .. }, Some(pass)) => {
-                tokio::task::block_in_place(|| {
-                    Engine::open_held(held, identity, &|i| pass.reads(i))
-                })
-            }
+            (
+                Source::Generation {
+                    held,
+                    identity,
+                    context,
+                    ..
+                },
+                Some(pass),
+            ) => tokio::task::block_in_place(|| match context {
+                Some((listed, _)) => {
+                    Engine::open_context(held, listed, identity, &|i| pass.reads(i))
+                }
+                None => Engine::open_held(held, identity, &|i| pass.reads(i)),
+            }),
         };
         let answer = tokio::task::block_in_place(|| open.and_then(|engine| ask(&engine)));
         self.result(answer.map_err(|e| e.to_string())).into()
@@ -253,11 +265,17 @@ impl Meada {
         };
         #[cfg(feature = "snapshot")]
         if let Source::Generation {
-            held, named: true, ..
+            held,
+            named: true,
+            context,
+            ..
         } = &self.source
         {
             let mut meta = rmcp::model::MetaObject::new();
             meta.insert(GENERATION_META.into(), held.id.clone().into());
+            if let Some((_, id)) = context {
+                meta.insert(WORKSPACE_META.into(), id.to_string().into());
+            }
             result.meta = Some(meta);
         }
         result
@@ -267,6 +285,10 @@ impl Meada {
 /// The `_meta` key of a result that names its generation.
 #[cfg(feature = "snapshot")]
 const GENERATION_META: &str = "meada/generation";
+
+/// The `_meta` key naming the named workspace an answer was read through (#342).
+#[cfg(feature = "snapshot")]
+const WORKSPACE_META: &str = "meada/workspace";
 
 /// What `root_dir` found: the directory, or the round trip to ask the client for it.
 enum Root {
@@ -835,6 +857,14 @@ async fn route(
     let target = pin.map_or(identity, |(identity, _)| identity);
     #[cfg(not(feature = "snapshot"))]
     let target = identity;
+    // `/-/workspaces/<id>/<identity>` (#342): a named workspace's route. The first segment `-` is
+    // reserved, so it is never a repository's.
+    #[cfg(feature = "snapshot")]
+    let (workspace, target) =
+        match (target.strip_prefix("-/workspaces/")).and_then(|r| r.split_once('/')) {
+            Some((id, repo)) if crate::snapshot::is_id(id) => (Some(id), repo),
+            _ => (None, target),
+        };
     let pass = match gate.admit(&request, identity, target) {
         Ok(pass) => pass,
         Err(answer) => return *answer,
@@ -874,8 +904,66 @@ async fn route(
                 }
                 response
             };
-            match held.map_err(|e| e.to_string()) {
-                Ok(Some(held)) if held.listed.entries.iter().any(|l| l.repo == target) => {
+            let held = held.map_err(|e| e.to_string());
+            // A named workspace's route is admitted only when the generation records the context
+            // and the token reads every repository it records; otherwise the answer is the 404 an
+            // unknown id gets, listing the workspaces the token may view (ADR 0021).
+            if let (Some(id), Ok(Some(held))) = (workspace, held.as_ref()) {
+                let reads_all = |id: &str| {
+                    (held.context_repositories(id))
+                        .is_some_and(|repos| repos.iter().all(|r| pass.reads(r)))
+                };
+                let admitted = reads_all(id)
+                    && (held.context_repositories(id)).is_some_and(|r| r.contains(&target));
+                let context = match admitted {
+                    true => {
+                        tokio::task::block_in_place(|| held.context(id)).map_err(|e| e.to_string())
+                    }
+                    false => Ok(None),
+                };
+                return match context {
+                    Ok(Some(listed)) => {
+                        let source = Source::Generation {
+                            held: held.clone(),
+                            identity: target.into(),
+                            named: *pins,
+                            context: Some((listed, id.into())),
+                        };
+                        request.extensions_mut().insert(pass.clone());
+                        named(endpoint(source, config).handle(request).await, &held.id)
+                    }
+                    // A pin of a generation with no such context for the caller names the requested
+                    // and the current generation, never another workspace's id.
+                    Ok(None) if pin.is_some() => {
+                        let now = crate::snapshot::pull::current(current.local())
+                            .ok()
+                            .flatten();
+                        let now = now.map(|(id, _)| id);
+                        let body = format!(
+                            "{}\n{}\n",
+                            Msg::GenerationNoContext(&held.id).text(),
+                            Msg::SnapshotStatusCurrent(now.as_deref()).text(),
+                        );
+                        named(plain(StatusCode::NOT_FOUND, body), &held.id)
+                    }
+                    Ok(None) => {
+                        let viewable: String = (held.context_ids().into_iter())
+                            .filter(|c| reads_all(c))
+                            .map(|c| format!("{c}\n"))
+                            .collect();
+                        named(plain(StatusCode::NOT_FOUND, viewable), &held.id)
+                    }
+                    Err(problem) => {
+                        eprintln!("meada: {problem}");
+                        plain(StatusCode::SERVICE_UNAVAILABLE, UNSERVABLE.into())
+                    }
+                };
+            }
+            match held {
+                Ok(Some(held))
+                    if workspace.is_none()
+                        && held.listed.entries.iter().any(|l| l.repo == target) =>
+                {
                     if let Some(refused) = pass.refused(identity, target) {
                         return refused;
                     }
@@ -884,6 +972,7 @@ async fn route(
                         held,
                         identity: target.into(),
                         named: *pins,
+                        context: None,
                     };
                     request.extensions_mut().insert(pass.clone());
                     named(endpoint(source, config).handle(request).await, &id)
@@ -895,8 +984,15 @@ async fn route(
                 // A pin of a generation the node does not hold: only to a request that may read
                 // the identity it names.
                 Ok(None) => {
-                    if let Some(refused) = pass.refused(identity, target) {
+                    // A workspace route answers 404 where the plain route would say 403: a 403
+                    // would confirm that the id exists.
+                    if workspace.is_none()
+                        && let Some(refused) = pass.refused(identity, target)
+                    {
                         return refused;
+                    }
+                    if workspace.is_some() && !pass.reads(target) {
+                        return plain(StatusCode::NOT_FOUND, String::new());
                     }
                     let local = current.local();
                     let now = crate::snapshot::pull::current(local).ok().flatten();

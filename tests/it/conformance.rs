@@ -8276,6 +8276,43 @@ fn rust() {
     assert!(!export.contains("orphan.rs"));
 }
 
+/// Item macros in the Rust pack (#398): the body of a repository `macro_rules!` that passes
+/// items through is read as items of the module invoking it, under the `cfg` attributes its arm
+/// writes on each, and a `mod` in it reaches its file. A macro that wraps its items, and an
+/// item gated off, stay out.
+#[test]
+fn rust_item_macros() {
+    conform(
+        "rust-item-macros",
+        &[
+            "src/lib.rs::caller",
+            "src/lib.rs::enter",
+            "src/lib.rs::macros",
+            "src/lib.rs::rt",
+            "src/lib.rs::runtime",
+            "src/lib.rs::spawn",
+            "src/rt.rs::block_on",
+            "src/rt.rs::park",
+            "src/runtime.rs::start",
+        ],
+        &[],
+        &[
+            ("src/lib.rs::caller::spawn#0", EXACT, &["src/lib.rs::spawn"]),
+            (
+                "src/lib.rs::enter::rt.block_on#0",
+                EXACT,
+                &["src/rt.rs::block_on"],
+            ),
+            (
+                "src/lib.rs::enter::runtime.start#0",
+                EXACT,
+                &["src/runtime.rs::start"],
+            ),
+            ("src/rt.rs::block_on::park#0", EXACT, &["src/rt.rs::park"]),
+        ],
+    );
+}
+
 /// The Go pack (spec #25): functions, methods by their receiver's type, types and interface
 /// methods; imports through the module path of `go.mod`, a `replace` and a nested module; one
 /// scope per package directory; and build constraints for `linux/amd64`. A sibling repository of

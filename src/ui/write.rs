@@ -51,10 +51,15 @@ fn decode<T: serde::de::DeserializeOwned>(
 }
 
 /// A write's pending record and the audit it goes to; `None` before it was inserted.
-type PendingRecord<'a> = Option<(&'a Audit, Pending)>;
+pub(super) type PendingRecord<'a> = Option<(&'a Audit, Pending)>;
 
 /// Finishes `record` as `outcome` with the stderr line's `message` and `owners`.
-fn finish(record: PendingRecord, outcome: Outcome, message: &str, owners: Option<&[String]>) {
+pub(super) fn finish(
+    record: PendingRecord,
+    outcome: Outcome,
+    message: &str,
+    owners: Option<&[String]>,
+) {
     if let Some((audit, pending)) = record {
         audit.finish(pending, outcome, message, owners);
     }
@@ -71,7 +76,7 @@ pub(super) fn actor<'a>(session: &'a Session, owners: Option<&'a [String]>) -> A
     }
 }
 
-fn refused(
+pub(super) fn refused(
     record: PendingRecord,
     session: &Session,
     action: &str,
@@ -262,7 +267,7 @@ impl Console {
     /// the insert fails, the 503 `audit_unavailable` with the write's stderr line and one line
     /// naming why, and nothing is written.
     #[cfg(feature = "refresh-lock")]
-    fn pending(
+    pub(super) fn pending(
         &self,
         session: &Session,
         (line_action, line_arguments): (&str, &str),

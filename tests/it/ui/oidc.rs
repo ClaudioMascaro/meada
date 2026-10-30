@@ -451,7 +451,7 @@ fn a_viewer_s_grant_bounds_every_view() {
         manifest["manifest"]["ui"]["client_id"],
         json!("meada-console")
     );
-    assert_eq!(manifest["modules"].as_array().unwrap().len(), 9);
+    assert_eq!(manifest["modules"].as_array().unwrap().len(), 12);
     assert!(!manifest.to_string().contains("../gateway"));
     assert!(!manifest.to_string().contains(GATEWAY), "{manifest}");
     assert_eq!(
@@ -1092,6 +1092,8 @@ fn refused_writes_are_authorized_and_audited_before_any_body_is_consumed() {
 mod additions;
 #[cfg(all(feature = "refresh-lock", feature = "postgres"))]
 mod audit;
+#[cfg(feature = "workspaces")]
+mod catalog;
 #[cfg(all(feature = "directory", feature = "refresh-lock"))]
 mod deprovision;
 #[cfg(feature = "directory")]
@@ -1102,5 +1104,7 @@ mod github;
 mod overage;
 #[cfg(feature = "refresh-lock")]
 mod team;
+#[cfg(feature = "workspaces")]
+mod workspaces;
 #[cfg(feature = "refresh-lock")]
 mod writes;

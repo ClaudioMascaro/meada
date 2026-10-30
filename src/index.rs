@@ -641,7 +641,8 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         let setting = settings[&pack](path);
         let (size, mtime, trusted) = stat(abs, now)?;
         let known = stored.get(path);
-        let current = known.is_some_and(|k| k.setting == setting);
+        // What `extend` added is settled once every file is parsed (`settle`).
+        let current = known.is_some_and(|k| lang::base(&k.setting) == setting);
         if current && known.is_some_and(|k| k.mtime.is_some() && k.mtime == mtime && k.size == size)
         {
             continue;
@@ -656,6 +657,9 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             )?;
             continue;
         }
+        // What `extend` added last time is most likely what it adds again.
+        let extra = known.map_or("", |k| lang::extra(&k.setting));
+        let setting = lang::setting(&setting, extra);
         let mut facts = lang::pack(pack).parse_with(path, &src, &setting)?;
         lang::hash_spans(&mut facts, &src);
         changed.push(Parsed {
@@ -715,6 +719,21 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         db.execute("DELETE FROM meta", [])?;
         return refresh(db, root, identity, serve);
     };
+    settle(
+        &tx,
+        &mut changed,
+        &mut kept,
+        &walked,
+        &packs,
+        &settings,
+        now,
+    )?;
+    let changed_paths: HashSet<String> = changed.iter().map(|p| p.path.clone()).collect();
+    // The setting each file is parsed under, for the files the contracts parse again.
+    let parsed_under: HashMap<String, String> = (changed.iter())
+        .map(|p| (p.path.clone(), p.facts.setting.clone()))
+        .chain(kept.iter().map(|(p, f)| (p.clone(), f.setting.clone())))
+        .collect();
     let found_configs = |pack: usize| -> Vec<(&str, &[u8])> {
         (configs.get(&pack).into_iter().flatten())
             .map(|(n, c)| (*n, c.as_slice()))
@@ -822,7 +841,9 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     let reparse = |path: &str| -> Result<Facts> {
         let src = fs::read(root.join(path))?;
         let pack = packs[path];
-        let mut facts = lang::pack(pack).parse_with(path, &src, &settings[&pack](path))?;
+        let setting = parsed_under.get(path).cloned();
+        let setting = setting.unwrap_or_else(|| settings[&pack](path));
+        let mut facts = lang::pack(pack).parse_with(path, &src, &setting)?;
         if let Some(join) = joins.get(&pack) {
             join(path, &mut facts);
         }
@@ -1249,7 +1270,9 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
         let Some(k) = stored.get(path) else {
             return Ok(false);
         };
-        if k.setting != settings[&pack](path) || !same(&k.hash, k.mtime, k.size, abs, &read) {
+        // Facts that hold every file's content and first line hold what `extend` adds as well.
+        let base = lang::base(&k.setting);
+        if base != settings[&pack](path) || !same(&k.hash, k.mtime, k.size, abs, &read) {
             return Ok(false);
         }
     }
@@ -1524,6 +1547,64 @@ fn walk(root: &Path) -> Vec<(String, PathBuf)> {
         files.reverse();
     }
     files
+}
+
+/// Parses again, under its setting, each file whose facts were parsed under another: what
+/// `LanguagePack::settings` answers for it and what `LanguagePack::extend` adds from the facts
+/// of every file of its pack (`lang::setting`). A kept file parsed again joins `changed`. One
+/// pass settles every file, since `extend` reads no fact a setting changes; a cold index and a
+/// refresh reach the same settings.
+fn settle(
+    tx: &Transaction,
+    changed: &mut Vec<Parsed>,
+    kept: &mut Vec<(String, Facts)>,
+    walked: &[(&String, &PathBuf, usize)],
+    packs: &BTreeMap<&str, usize>,
+    settings: &BTreeMap<usize, Setting>,
+    now: SystemTime,
+) -> Result<()> {
+    let mut wanted: BTreeMap<String, String> = BTreeMap::new();
+    let mut files: BTreeMap<usize, BTreeMap<&str, &Facts>> = BTreeMap::new();
+    let changed_facts = changed.iter().map(|p| (p.path.as_str(), &p.facts));
+    for (path, facts) in changed_facts.chain(kept.iter().map(|(p, f)| (p.as_str(), f))) {
+        files.entry(packs[path]).or_default().insert(path, facts);
+    }
+    for (&pack, files) in &files {
+        let extra = lang::pack(pack).extend(files);
+        for (&path, facts) in files {
+            let extra = extra.get(path).map_or("", String::as_str);
+            let setting = lang::setting(&settings[&pack](path), extra);
+            if facts.setting != setting {
+                wanted.insert(path.to_string(), setting);
+            }
+        }
+    }
+    drop(files);
+    if wanted.is_empty() {
+        return Ok(());
+    }
+    kept.retain(|(path, _)| !wanted.contains_key(path));
+    changed.retain(|p| !wanted.contains_key(&p.path));
+    for &(path, abs, pack) in walked {
+        let Some(setting) = wanted.get(path.as_str()) else {
+            continue;
+        };
+        let (size, mtime, trusted) = stat(abs, now)?;
+        let src = fs::read(abs)?;
+        let hash = blake3::hash(&src).to_hex().to_string();
+        let mut facts = lang::pack(pack).parse_with(path, &src, setting)?;
+        lang::hash_spans(&mut facts, &src);
+        let parsed = Parsed {
+            path: path.clone(),
+            hash,
+            mtime: mtime.filter(|_| trusted),
+            size,
+            facts,
+        };
+        write_file(tx, &parsed)?;
+        changed.push(parsed);
+    }
+    Ok(())
 }
 
 /// Replaces a changed file's row and facts. Its symbols and calls are written once resolved,

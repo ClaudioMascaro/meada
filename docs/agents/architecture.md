@@ -89,7 +89,9 @@ share. Both take one version from the workspace, and `meada` depends on `meada-c
 it. `meada-core` has no rusqlite, tree-sitter, filesystem, process or network code and no async
 runtime; it builds for `wasm32-unknown-unknown`, its `wasm-bindgen` feature (never the binary's)
 exporting `init`, `validate`, `workspaceVersionId`, `workspaceDiff`, `entriesText`,
-`entriesJson`, `authorizeEntries`, `composeEntries` and `parseExport`. CI's `core` job builds it
+`entriesJson`, `authorizeEntries`, `composeEntries`, `parseExport` and the named-workspace set
+(`namedEntriesJson`, `namedEntriesText`, `namedVersionId`, `namedAuthorize`, `namedVisible`,
+`namedEffective`, `namedDiff`, `namedChanged`). CI's `core` job builds it
 with wasm-pack and checks both trees.
 
 Every tree-sitter grammar is a crate except Kotlin's: `vendor/tree-sitter-kotlin-ng/` holds
@@ -252,6 +254,137 @@ checks its tests; Rust/default stages gain no frontend input.
 Vitest exercises the built WASM and the public client, view-model and DOM
 seams, without a browser end-to-end suite.
 
+## Named workspaces (spec S5): built and validated end to end (#347)
+
+ADR 0020 holds the domain decision, ADR 0021 the contracts (catalog, selected entries, shared
+ingestion membership, version lifecycle in Postgres, query selection through the generation
+document's `members` and `contexts` and the route `/-/workspaces/<id>/<identity>`, effective
+configuration, ids) and ADR 0022 the proposal server. Slices #341 to #347 build them in that
+order and each updates this map with what it delivers.
+
+Delivered by #346 (ADR 0022's proposal server; ADR 0022 "As built (#346)"), feature `proposals`
+(implies `workspaces`, enabled by `cloud`): `proposals.rs` is `[proposals]` (`public_url`,
+`audience`), which needs `[workspaces]`; `ui/workspaces/proposals.rs` is `meada workspaces mcp`
+(`ui::proposals`, a `WorkspacesCommand::Mcp` that `main` serves as it serves `meada ui`): a
+`Console` started for it (`for_proposals`: every Postgres session read-only through
+`Manifest::read_only` and `postgres::Config::read_only`, the audit off, no SCIM, front end or
+GitHub App; `Holds::of`, `directory_of` and `Session::admitted` are the console's own), the hyper
+listener of `mcp::serve_http` with its own route (`Origin` 403, the protected resource metadata,
+`Oidc::admit_console` with `[proposals] audience` and the directory's block, `/` only, a semaphore
+of calls in flight, the body bound) and an rmcp `StreamableHttpService` of four read-only tools,
+`catalog`, `workspaces`, `show` and `propose`, each calling the console's own functions
+(`catalog` and `ui/catalog.rs` `checked`, `page` and `summary` of the list, `show`,
+`visible_records`, `precheck`, `named::compose`, `changed`, `diff`, the effective view, and
+`workspaces/store.rs` `creation_conflict`, the read of what a creation's transaction would refuse)
+with the session in the request's extensions; a console answer becomes a tool's through
+`from_console`. The node's `mcp.rs` and the console's routes are unchanged.
+
+Delivered by #345 (the guided controls; ADR 0021 "As built (#345)"), front end only plus two
+WebAssembly exports (`namedDiff` and `namedChanged` in `meada-core/src/wasm.rs`, over `named::diff`
+and `named::changed`): `EditWorkspace.tsx` is the operator's editor (it replaces #344's text-only
+`EditWorkspace` in `NamedWorkspacesPage.tsx`), holding the manifest text and a model of its entries
+that rewrite each other through `namedEntriesText` and `namedEntriesJson`, so the form and the text
+are one canonical document; `GuidedForm.tsx` is the form (repositories from the catalog, per entry
+serve settings, resources and peers with environment-variable names) and decides nothing;
+`guided.ts` only reshapes entries (`normalize`) and words a diff, `guided-i18n.ts` is its pt-BR/en
+copy; `useCatalog.ts` reads the catalog page by page, remembers the identities the server said
+the session may select and the `catalog/check` results, and is shared by the creation form and the
+editor; `EffectiveList.tsx` is #344's view, extracted. The editor marks each changed entry
+(`namedChanged`) with `namedAuthorize`, shows the diff (`namedDiff`) and freezes the reviewed
+payload until the confirmation. Tests: `ui/tests/guided.test.ts` (actual WebAssembly) and
+`ui/tests/GuidedWorkspace.test.tsx` (DOM). Not built: the page over versions with rollback; proposals are
+#346 (above).
+
+Delivered by #344 (contract 6, the effective configuration; ADR 0021 "As built (#344)"), same feature:
+`meada-core/src/effective.rs` is the pure decision (`effective(entries, facts)`: per entry the
+`Source` (the repository's own `meada.toml` whole, the context's blocks, none), the ignored
+blocks, the `Coverage` and the diagnostics, with `labels` wording a block as `status` does),
+exported to WebAssembly as `namedEffective`; `snapshot/serve.rs` `Held::facts` is the one place
+that reads a mirror for it (its `meada.toml` and nothing else, bounded) and decides whether a
+bundle indexes documents; `ui/workspaces/effective.rs` is `GET /api/v1/workspaces/<id>/effective`
+(through `inspect`, under the discovery rule, entries filtered by the caller's grant, the
+`excluded` marks for operators), the stateless `POST /api/v1/workspaces/effective` preview and the
+`diagnostics` that creation, save and apply answers carry (`written_diagnostics`). Nothing enters
+a bundle id or the generation id: the ingestion-blocks rule of #342 already keeps a context's
+peers, resources and serve hosts query-time, so a configuration change is a new generation of the
+same bundles. The front end's `NamedWorkspacesPage.tsx` shows the view in text and has the
+manifest text editor (`EditWorkspace`: validate with the core, preview, confirm, save and apply at
+the base read). Not built by #344: guided authoring (#345, above), proposals (#346, above),
+acceptance (#347).
+
+Delivered by #343 (contract 4's lifecycle; ADR 0021 "As built (#343)"), same feature:
+`workspaces/lifecycle.rs` is the atomic boundary of every other write (`transact`: one
+transaction, `SELECT ... FOR UPDATE` on the workspace row, then deleted, base, authority and the
+eligibility of the entries an operation adds or changes from the newest set via
+`store::eligible`, then the move and the history row) for `Op::Save`, `Apply` (a rollback when
+the version was ever current), `Rename`, `Delete` and `Operators`, and the reads of versions and
+history (`versions`, `version`, `histories`; the opaque cursor is a version's UTC microsecond time
+and its id); `workspaces/store.rs` gained `eligible` (shared with `create`) and the store's
+`put_document` and `get_document`; `ui/workspaces/lifecycle.rs` is the console's routes
+(`POST /api/v1/workspaces/<id>/versions|apply|rename|delete|operators`, `GET .../versions[/<v>]`
+and `.../history`, the body caps in `body_max` that `ui.rs`'s `read` asks for), which resolve the
+operation against the stored current version (`named::compose` keeps the entries an operator
+cannot read, `named::changed` is what is rechecked, `named::diff` the diff of a version read)
+before the pending audit record; `workspaces/cli.rs` is `meada workspaces list|show|versions|diff|
+create|save|apply|rename|delete|operators` (the platform administrator, `audit::cli`); migration 8 is
+`workspace_versions.entries`; `audit.rs` knows the six new actions and the `base` argument. Not
+built: `effective` (#344, above) and the guided pages over versions and the diff (#345).
+
+Delivered by #342 (contracts 2 to 5 as far as create, list, show, shared ingestion and the node
+route go; ADR 0021 "As built (#342)"), same feature: `workspaces.rs` is `[workspaces]` (`mirrors`,
+`max_workspaces`, `max_entries`), the contexts file (`Context`, `read_contexts`, `write_contexts`,
+checked as hostile input) and `membership` (the contexts the sponsor rule left entries in, and the
+repositories only they select); `workspaces/store.rs` is the Postgres side (`create`, the one
+transaction that decides eligibility from the newest set; `records`; `current_contexts` for the
+pull; the version document's text and check); migration 7 adds the four tables, `workspaces.entries`
+and the `context` column of `permission_exclusions`; `ui/workspaces.rs` is `POST` and `GET
+/api/v1/workspaces[/<id>]` and the export through a context, and `Console::open` takes the
+optional workspace the playground and the export ask through; `snapshot/versions.rs` pulls the
+contexts beside the deployment version (`Pulled::Empty`), reads and writes the exclusions file
+with its context lines and digest (`excluded_contexts`, `write_excluded_with`); `github_app.rs`
+lists the contexts' identities and applies the sponsor rule (`no_sponsor`);
+`workspace.rs` gives `Listed` its `member` flag, builds the members after the deployment entries
+from `membership`, and `Manifest::of_context` builds a recorded context; `snapshot.rs` records
+`members` and `contexts` in the document (`Context::digest`) and `generation_id_of` hashes them;
+`snapshot/pull.rs` checks them; `snapshot/serve.rs` `Held::context` builds a context once;
+`mcp.rs` routes `/-/workspaces/<id>/<identity>` and `Engine::open_context` opens it;
+`meada-core/src/named.rs` holds the pure rules (`creation`, `visible`, `answers`, `shown`,
+`unsponsored`, names, named entries and their version id) that the Rust table test, the console
+and the front end's WebAssembly (`namedAuthorize`, `namedVisible`, `namedEntriesJson`,
+`namedEntriesText`, `namedVersionId`) share, with `validate_named` in `manifest.rs`; the front
+end's `NamedWorkspacesPage.tsx` lists, shows and creates. Not built by #342: save, apply,
+rollback, rename, delete and delegation (#343, above), the effective configuration (#344), guided
+authoring (#345) and proposals (#346).
+
+Delivered by #341 (contract 1, the catalog), behind the cargo feature `workspaces` (it implies
+`ui`, `oidc`, `postgres`, `github-app`, `generation-pointer` and `refresh-lock`; `cloud` turns it
+on): `catalog.rs` is `[catalog]` (`allow` patterns on `[oidc.github] host`, `max_repositories`
+1 to 5000, no default; `Manifest::read` needs `[oidc.github]` and reads it in the job, the CLI
+and the console alike); `github_app/catalog.rs` is the job's installation listing
+(`GET /installation/repositories`, every page, for each installation of the host's Apps whose
+owner some pattern names, under ADR 0013's tokens and throttle marks; a failure, a throttle or a
+set above the cap fails the run before anything is written); migration 6 is
+`permission_repositories.source` (`selected`, `catalog` or `both`); `oidc/permissions.rs` loads
+the catalog beside the rows (`Catalog`, the identities `catalog` or `both` and `listed`, only
+with `[catalog]`) and answers per subject (`Permissions::catalog`: the whole fresh catalog for the
+platform administrator, else the catalog intersected with the identities the login holds an
+accepted role on, pending `no_set`, `stale_set` or `missing_login`); `ui/catalog.rs` is `GET
+/api/v1/catalog` and `POST /api/v1/catalog/check`; the front end's `CatalogPage.tsx` is the
+picker. Nothing else of S5 exists yet: no workspace record, route, table beyond that column or
+manifest, and discovery creates no ACL and no index. Until #342 a reader of the code finds one
+workspace per deployment (ADR 0014); `tests/fixtures/named-workspaces.json` is the shared Y/A/B
+table the catalog's tests read.
+
+Delivered by #347 (acceptance and operations; no new module): `tests/it/ui/oidc/workspaces/acceptance.rs`
+forces the roles, fetch/index and local-publication failures of one refresh in turn and shows the
+pointer stays, the previous permissions set keeps deciding, a revocation the job committed stays
+effective whatever happens to the publication and a grant returns only through a later complete
+set. The Compose and Helm profiles carry the sections (`[catalog]`, `[workspaces]` and the `[ui]`
+block the job then needs, never a node's: `deploy/helm/meada/values-workspaces.yaml`,
+`templates/_workspaces.tpl`, checked by `scripts/helm-check`), and the site's named-workspaces page
+holds the upgrade procedure, the failure table and the acceptance map. The proposal server is not
+packaged in either profile. The real-organization measurement (#338) stays open and does not gate S5.
+
 ## Deployment profiles
 
 `deploy/compose/compose.yaml` supplies local and generations nodes; the explicit
@@ -331,7 +464,7 @@ one for the area a change touches.
 - `modules.rs`, `valkey.rs`: the cloud modules (ADR 0012). `modules.rs` is the section table,
   in every build: each module section of `meada.workspace.toml` (`[valkey]`, `[snapshot]`,
   `[generations]`, `[refresh_lock]`, `[oidc]`, `[[github_app]]`, `[ui]`, `[postgres]`,
-  `[directory]`) with the cargo feature that
+  `[directory]`, `[catalog]`) with the cargo feature that
   owns it and whether this build has it. `Manifest::read` checks it before the typed parse, so a
   section whose feature is missing is an error naming the file, the line, the section and the
   feature, and a section the table lacks stays an unknown key. A module ticket adds its row and
@@ -392,7 +525,9 @@ one for the area a change touches.
   `gen_random_uuid`, `fence`, `version`, `started`, `finished` from Postgres's clock,
   `repositories`), `<schema>.permission_rows` (`identity`, `login` lowercase, `role` as GitHub
   spells it) and `<schema>.permission_exclusions` (`identity`, `added_by`), both cascading from
-  their set. `connected` is `connect` keeping the password for scrubbing a later statement's
+  their set; migration 6 `permission_repositories.source` (#341); migration 7 the named
+  workspaces' tables (#342); migration 8 `workspace_versions.entries` (#343).
+  `connected` is `connect` keeping the password for scrubbing a later statement's
   error (`Opened::scrubber` a copy of it for a transaction, which borrows the client), and `probe` is the console's start check (a version refusal refuses the start, Postgres
   unreachable does not). `migrate` (`meada postgres migrate --workspace
   <bootstrap manifest>`, reading `Manifest::postgres`, no mirror) is the only command that
@@ -829,7 +964,14 @@ one for the area a change touches.
   installation and passes to the next, every one throttled, a 5xx, a timeout, an answer past
   `ANSWER_MAX` or a page that is not a JSON array fails the run with `Msg::RolesFailed` naming the
   identity and why; a 404 (`Failure::Missing`) and an owner no installation covers are a warning
-  and no rows; an identity on the host that is not `<host>/<owner>/<repo>` likewise); one
+  and no rows; an identity on the host that is not `<host>/<owner>/<repo>` likewise; with
+  `[catalog]` (#341, `github_app/catalog.rs`) the identities are the workspace's own, in order,
+  then the catalog's candidates alone, sorted, each recorded with its `source`: the candidates
+  come first, from every installation of the host's Apps whose owner a pattern names, every
+  page of `GET /installation/repositories`, filtered by `[catalog] allow`, and a failed or
+  throttled listing, a body that is not the documented object, more than `PAGES_MAX` pages or
+  more candidates than `max_repositories` besides the selected ones fails the run before the
+  transaction; the line on stdout then reads `Msg::RolesSetCatalog`); one
   transaction under `LOCK TABLE permission_sets IN EXCLUSIVE MODE`, which serializes writers and
   lets readers see the old set or the new one, checking the fence again, inserting the set, its
   repositories' coverage (`Shown`: `listed`, `not_found`, `uncovered`, plus `not_a_repository`),
@@ -1961,7 +2103,13 @@ one for the area a change touches.
   them (`http/<language>.rs`, `channel/<language>.rs`). A pack whose facts depend on its config files
   (Rust's default features) also gives `settings` (a string per file path, stored as
   `files.setting` and `Facts::setting`) and takes it in `parse_with`; a file whose setting
-  changed is parsed again, whatever its content. Besides `parse` and `modules`, it says what the
+  changed is parsed again, whatever its content. A pack whose facts depend on other files of the
+  pack (Rust's item macros, #398) also gives `extend`, what the facts of every file add to each
+  one's setting, on the lines after it (`lang::setting`, `lang::base`, `lang::extra`): it reads
+  only facts no setting changes, so `index::settle` parses each file whose setting moved once
+  more, after the changed files are parsed and the kept ones read, and a cold index and a refresh
+  agree. `refresh` and `fresh` compare only the first line with `settings`: the rest moves only
+  when some file's facts do. Besides `parse` and `modules`, it says what the
   shared resolution cannot guess: `members_in_scope` (bare names may name class members),
   `assigned_members` (a definition named by a dotted path, `app.use` of `app.use = function`, is what
   that path written in a call reaches, though its head is a local or constant: JavaScript's),
@@ -2437,7 +2585,11 @@ one for the area a change touches.
   parts, scalar leaves, declared and optional paths and the imports they leave to fill, issue
   #175; what crosses repositories is this shape of an exported name,
   never its source text), the names of the Cargo features a Rust crate enables by default
-  (`files.setting`, a comma-separated list per file, from `[features] default`), and what a
+  (`files.setting`, a comma-separated list per file, from `[features] default`), the Rust item
+  macros a file invokes (#398: the lines after it in `files.setting`, each a macro's name and the
+  `cfg` predicates its arm writes, as tokens; `Facts::macro_rules`, the outer attributes each
+  `macro_rules!` of a file writes on the items it passes through, as tokens; `Facts::invokes`,
+  the names of the macros a file invokes with braces), and what a
   provider document states (`documents.summary`: format, version, title, normalized route paths
   and methods, channel sides (broker kind, name, role), the field paths of their response and
   payload shapes (fields, open parts, scalar leaves) and the external references met, the
@@ -2610,12 +2762,37 @@ one for the area a change touches.
 
 ## Known ceilings
 
+- `ui/workspaces/proposals.rs` (#346, ADR 0022): `BODY_MAX` (80 KiB) bounds a request's body
+  (413), `OUTPUT_MAX` (192 KiB) a tool's answer (`too_large` with its counts, never cut),
+  `CALLS_MAX` (32) the calls in flight (503 `busy`; `MEADA_PROPOSALS_CALLS` lowers it in a debug
+  build for a test), `HINTS_MAX` (50) and `NOTE_MAX` (256 characters) a proposal's hints; the
+  catalog tool takes the console's `PREFIX_MAX`, `CURSOR_MAX` and `LIMIT_MAX` (`ui/catalog.rs`),
+  and a manifest is `named::TEXT_MAX`.
+- `ui/workspaces.rs`, `workspaces.rs`, `snapshot/versions.rs`, `meada-core/src/named.rs` (#342):
+  `CREATE_MAX` (80 KiB) bounds a creation's body (413), `TEXT_MAX` (64 KiB) a named manifest's
+  text, `NAME_MAX` (80) and `DESCRIPTION_MAX` (500) their characters, `LIST_LIMIT_MAX` (100) and
+  `AFTER_MAX` (256) a list page and its cursor, `WORKSPACES_MAX` (2000) and `ENTRIES_MAX` (500)
+  what `max_workspaces` and `max_entries` may allow and what a reader of the contexts file or a
+  version document accepts whatever they say now (a version document is also bounded by the
+  deployment version's `VERSION_MAX`), `OPERATORS_MAX` (20) a workspace's operators (the
+  console's lifecycle bodies are capped by `APPLY_BODY_MAX` (1 KiB), `RENAME_BODY_MAX` (4 KiB),
+  `DELETE_BODY_MAX` (1 KiB) and `OPERATORS_BODY_MAX` (16 KiB), a delegated subject holds at most `SUBJECT_MAX` (256) bytes and `PAGE_MAX` (50)
+  bounds a page of versions or history, #343),
+  `CONTEXTS_MAX` (256 MiB) the contexts file `meada workspace pull` writes and `EXCLUDED_MAX`
+  (128 MiB) the exclusions file; past one the file counts as hostile. Their product is what a
+  refresh pulls and publishes: the single failure domain of one fleet (ADR 0021).
 - `directory/read.rs`: the owner picker lists at most `PICKER_MAX` (100) group names and says
   nothing when it cut the list; the global operator narrows it by typing more of the prefix
   (#335).
 - `meada-core/src/manifest.rs`: an entry's `owner` holds at most `OWNER_MAX` (256) characters
   (ADR 0015); a longer name is an error naming its line and key, wherever the entry is read
-  (import, a stored version, a pull, the browser).
+  (import, a stored version, a pull, the browser). A named entry's peer names environment
+  variables of at most `ENV_NAME_MAX` (128) bytes in `base_url_env` (#342).
+- `ui/catalog.rs` and `catalog.rs` (#341): `GET catalog` answers at most `LIMIT_MAX` (100)
+  records a page, takes a `q` of at most `PREFIX_MAX` (128) characters and an `after` of at most
+  `CURSOR_MAX` (256); `POST catalog/check` takes at most `CHECK_IDENTITIES` (50) identities in a body of at most
+  `CHECK_BODY_MAX` (16 KiB);
+  `[catalog] max_repositories` may allow at most `MAX_REPOSITORIES` (5000).
 - `meada-core/src/authorize.rs`: a refusal's `refused` list (ADR 0015) holds one `Refusal` per
   changed entry, so it is bounded by the version's entries, which `VERSION_MAX` in `src/snapshot/versions.rs` (4 MiB, S2's
   document size cap) bounds; it is not truncated.
@@ -2865,7 +3042,14 @@ qualification budget does (ADR 0017).
   most `ANSWER_MAX` (4 MiB); an App's installations are listed over at most `PAGES_MAX` pages of
   100 (10,000 installations), the rest unseen; the role check lists one repository's
   collaborators over at most `COLLABORATOR_PAGES_MAX` pages of 100 (100,000 collaborators), past
-  which the run fails, writing nothing. It costs one listing per repository on the host,
+  which the run fails, writing nothing; with `[catalog]` (#341) it lists one installation's
+  repositories over at most `PAGES_MAX` pages of 100 (10,000 repositories), past which it fails
+  too (a truncated catalog would revoke), and refuses a candidate set above `max_repositories`
+  (at most 5000, no default), costing `ceil(covered / 100)` more requests per installation
+  (every repository it covers, allowed or not) and the collaborator pages of each candidate;
+  the permissions cache keeps a catalog identity of at most `CATALOG_IDENTITY_MAX` (192) bytes,
+  so that the pagination cursor (at most 256 characters of base64url) can name it, and counts
+  a longer row as hostile. It costs one listing per repository on the host,
   `ceil(collaborators / 100)` requests each, against the installation's REST budget (#319's
   Known ceilings), and it holds every row of the set in memory once, as Postgres receives it; a `private_key_file` holds at most `KEY_MAX` (16
   KiB) and git's request at most `INPUT_MAX` (64 KiB). The time margins are fixed, not
@@ -3854,6 +4038,15 @@ qualification budget does (ADR 0017).
   `any` and `not` deeper is false; `FEATURES` (4096): the default features of a crate followed
   through features that enable others (a cycle ends sooner, by the visited set), the rest is
   not followed.
+- `lang/rust/macros.rs` (#398): `ITEM_MACRO_DEPTH` (8): item macros nested deeper in one
+  another's bodies are skipped, as any other macro; each level parses its body again;
+  `ATTRIBUTE_BYTES` (1024): an arm whose attributes take more, as tokens, is no item macro, since
+  each file that invokes it stores them in its setting. An item
+  macro is found by name alone (no `#[macro_use]`, `#[macro_export]` or textual scope is
+  followed), across every Rust file of the repository whatever its `cfg`, so a definition of the
+  name anywhere that disagrees leaves every invocation unread (no marker); only a plain name
+  invoked with braces in a module qualifies (`crate::m! {}`, `m!(..)` and invocations in an
+  `impl`, a trait or a function body are skipped, no marker).
 - `lang/rust.rs` (spec #30): `DEFINITION_DEPTH` (128) as in the other packs; `BINDING_DEPTH`
   (64): a pattern or a `use` tree deeper binds nothing; `PATH_DEPTH` (256): a longer path or
   member chain in a callee is its node kind, and an `impl` type behind more references names

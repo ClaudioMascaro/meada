@@ -178,3 +178,14 @@ descomentar `[postgres]` e as seções que dependem dele nos bootstraps: `[oidc.
 espelhos que `meada workspace show --pulled` lista (`fetch-pulled.sh`); sem a seção, o fetch
 continua o de `REPOSITORIES`. Para `[directory]`, exporte `MEADA_SCIM_TOKEN` (pelo menos 32
 caracteres). As receitas de Entra ID, Okta e Keycloak estão na documentação do site.
+
+### Workspaces nomeados
+
+A spec S5 (workspaces nomeados sobre indexação compartilhada) é opt-in sobre as seções de identidade
+acima: `[catalog]` e `[workspaces]` (comentadas em `job.workspace.toml` e `console.workspace.toml`,
+com o bloco `[ui]` de que o job também precisa, pois todo processo que lê `[workspaces]` lê `[ui]`
+com `operations = true`). Atualize todas as imagens, nós incluídos, antes do primeiro refresh que
+registre um workspace: um nó antigo recusa essa geração e mantém a última. `mirrors = "/srv/mirrors"`
+é o volume de espelhos do job, onde `fetch-pulled.sh` clona cada repositório que só workspaces
+nomeados selecionam. O servidor de propostas (`meada workspaces mcp`) não faz parte deste exemplo.
+O procedimento e seus modos de falha estão na página de workspaces nomeados do site.

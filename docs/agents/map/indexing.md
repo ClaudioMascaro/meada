@@ -38,7 +38,9 @@ modules updates it.
   (`declare`, `workspace_step`, `link`, `after_links`) never run at index time.
 - `index.rs`: SQLite schema, `refresh`, `export` and the export types. Freshness is a pipeline in
   `refresh`: stat (mtime/size, trusted only if older than `RACY` = 2 s), hash with BLAKE3, parse
-  only changed files, resolve every file's calls in memory, rewrite rows only when a file's
+  only changed files (or those whose `settings` line moved, under the rest of their stored
+  setting), parse again each file whose setting `LanguagePack::extend` now makes differ
+  (`settle`, once: a kept file so parsed joins the changed ones), resolve every file's calls in memory, rewrite rows only when a file's
   `resolved` digest changed, re-extract contracts for the whole repository (one row per side, the
   `Found::shape`s of a side reached several ways merged, as JSON in `contracts.shape`, which `export` loads into `Provider::shape` and
   `Consumer::shape`). The extraction reads values the index does not keep, so it parses again
@@ -316,7 +318,21 @@ modules updates it.
   `d`, `e`; `local` is qualified by the scope holding the `use`; `as _` and `use serde;` bind
   nothing) or an `Imported::Glob` import (`local` is `*` qualified the same way), its path
   normalized like a call's, `use super::*` and `use self::*` being `inside`. Macro invocations
-  are not read. Conditional compilation (`lang/rust/cfg.rs`): `parse` skips a node whose
+  are not read, apart from item macros (`lang/rust/macros.rs`, #398): a `macro_rules!` whose
+  first arm's matcher is exactly `$($x:item)*` (no separator) and whose transcriber is exactly
+  `$( #[..] .. $x )*` (outer attributes only, no `#[path]`, no metavariable in them) passes items
+  through. `record` reads, whatever the setting and the `cfg`, each file's definitions
+  (`Facts::macro_rules`: the attributes as tokens, or `None` for any other definition, two that
+  disagree, or one written inside macro tokens) and the names it invokes with braces
+  (`Facts::invokes`, inside macro tokens too). `Rust::extend` gives each file the item macros it
+  invokes whose every definition in the repository agrees, a line each after the features (the
+  name, then the `cfg` predicates of its attributes, tab-separated); `table` reads them back.
+  `bodies` parses, before the walk, the braced body of each such invocation written by a plain
+  name among the items of the file or of a module written in place, over the file's bytes
+  (`set_included_ranges`, so spans are the file's), `ITEM_MACRO_DEPTH` deep; a body with an
+  error is left out. `built` gives a built invocation's body items in its place, each judged by
+  its own attributes after the arm's predicates (`Built::keep`), so a `mod x;` in one is a `mod`
+  declaration of the module and reaches its file. Conditional compilation (`lang/rust/cfg.rs`): `parse` skips a node whose
   preceding `#[cfg(..)]` attributes are not all true (`compiled`), for the fixed target
   `x86_64` Linux (`unix`, `target_os = "linux"`, `target_family = "unix"`,
   `target_arch = "x86_64"`, `target_pointer_width = "64"`, `target_endian = "little"`,

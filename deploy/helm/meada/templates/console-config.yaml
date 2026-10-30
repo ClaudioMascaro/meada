@@ -12,6 +12,7 @@ data:
     [workspace]
     source = "store"
     {{- include "meada.modules" (dict "Values" .Values "localDir" "/data/console/generations") | nindent 4 }}
+    {{- include "meada.namedWorkspaces" . | nindent 4 }}
 
     [ui]
     dir = "/usr/share/meada/ui"

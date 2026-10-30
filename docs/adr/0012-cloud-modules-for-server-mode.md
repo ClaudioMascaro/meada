@@ -83,7 +83,10 @@ sections.) (Amended 2026-10-22; #319: ADR 0016 adds two rows: `postgres`, sectio
 `[postgres]`, needing no other section, adding `meada postgres migrate`; and `directory`,
 implying `postgres`, section `[directory]`, needing `[postgres]` and `[oidc]`, adding the SCIM
 endpoint of the console. `cloud` enables both. The `github-app` module of ADR 0013 gains `meada
-github-app roles`, which also needs `postgres`.)
+github-app roles`, which also needs `postgres`.) (Amended 2026-10-30; #340: ADR 0021 adds
+`workspaces`, implying `ui`, `oidc`, `postgres`, `github-app`, `generation-pointer` and
+`refresh-lock`, with the sections `[workspaces]` and `[catalog]`; ADR 0022 adds `proposals`,
+implying `workspaces`, with `[proposals]` and `meada workspaces mcp`. `cloud` enables both.)
 
 - `valkey` is internal: it is enabled through the modules that need it, and `[valkey]` alone
   only makes `meada status` report the connection.
@@ -201,6 +204,13 @@ github-app roles`, which also needs `postgres`.)
   nothing, checks that the document and every bundle it lists are stored with the recorded size
   and hash, and only moves the pointer to it when it is not already current. Two publishers at
   once are kept apart by the operator's scheduler or by the refresh lock.
+- (Amended 2026-10-30; #340: with `[workspaces]`, ADR 0021 gives the generation document the
+  optional fields `members` (bundles only named workspaces select) and `contexts` (per named
+  workspace, its recorded entries and blocks), and the generation id the lines `# member` and
+  `# context`; a deployment with no named workspace adds none, so its ids are unchanged. A node
+  of an older binary refuses such a generation (its id check) and keeps the last one. Bundle
+  ids are unchanged: a named workspace's blocks never enter one. Nodes serve a context at
+  `/-/workspaces/<id>/<identity>`.)
 - Nodes pull: `meada snapshot pull` treats everything it reads from the store as hostile input
   (ids, identities, archives, the mirrors' git configuration), verifies sizes and hashes against
   the document, extracts into its `local_dir`, and swaps the node's pointer file by rename, so a

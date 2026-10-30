@@ -87,6 +87,23 @@ impl Engine {
         Self::read(held.listed.clone().workspace(repo, reads)?, fix)
     }
 
+    /// `open_held` over one named workspace of the generation (#342): `listed` is the workspace
+    /// `Held::context` built, `repo` first.
+    #[cfg(feature = "snapshot")]
+    pub(crate) fn open_context(
+        held: &crate::snapshot::serve::Held,
+        listed: &Manifest,
+        repo: &str,
+        reads: &dyn Fn(&str) -> bool,
+    ) -> Result<Self> {
+        let dir = held.dir.display().to_string();
+        let fix = Fix::Generation {
+            id: &held.id,
+            dir: &dir,
+        };
+        Self::read(listed.clone().workspace(repo, reads)?, fix)
+    }
+
     /// `open_held` over the generation current in the `local_dir` of the node manifest at
     /// `manifest` (`meada export --generations`).
     #[cfg(feature = "snapshot")]
@@ -1282,25 +1299,45 @@ pub fn served_generation(manifest: &Path) -> Result<(PathBuf, Vec<String>)> {
         id: &held.id,
         dir: &dir,
     };
-    let problems: Vec<String> = (held.listed.entries.iter())
-        .filter_map(|l| {
-            let r = l.repository.as_ref().ok()?;
-            repo::trust(&r.root);
-            match r.recheck() {
-                Err(problem) => Some(format!("{}: {problem}", l.repo)),
-                Ok(()) => (index::open_read(&r.index, &r.identity, fix))
-                    .and_then(|_| index::vet(&r.index, &r.identity, fix))
-                    .err()
-                    .map(|e| e.to_string()),
-            }
-        })
+    // The deployment workspace's repositories and the contexts' (#342), each checked once.
+    let mut contexts = Vec::new();
+    for id in held.context_ids() {
+        contexts.extend(held.context(id)?);
+    }
+    let mut seen = std::collections::HashSet::new();
+    let vetted = |l: &crate::workspace::Listed| -> Option<String> {
+        let r = l.repository.as_ref().ok()?;
+        repo::trust(&r.root);
+        match r.recheck() {
+            Err(problem) => Some(format!("{}: {problem}", l.repo)),
+            Ok(()) => (index::open_read(&r.index, &r.identity, fix))
+                .and_then(|_| index::vet(&r.index, &r.identity, fix))
+                .err()
+                .map(|e| e.to_string()),
+        }
+    };
+    let all = held.listed.entries.iter();
+    let all = all.chain(contexts.iter().flat_map(|c| c.entries.iter()));
+    let problems: Vec<String> = all
+        .filter(|l| seen.insert((l.repo.as_str(), l.path.as_str())))
+        .filter_map(vetted)
         .collect();
     if !problems.is_empty() {
         return Err(problems.join("\n").into());
     }
-    let first = (held.listed.entries.first())
-        .ok_or_else(|| format!("{}: no repository listed", local.display()))?;
-    Engine::open_held(&held, &first.repo, &|_| true)?;
+    match held.listed.entries.first() {
+        Some(first) => {
+            Engine::open_held(&held, &first.repo, &|_| true)?;
+        }
+        None => {
+            let first = contexts
+                .iter()
+                .find_map(|c| c.entries.first().map(|l| (c, l)));
+            let (context, first) =
+                first.ok_or_else(|| format!("{}: no repository listed", local.display()))?;
+            Engine::open_context(&held, context, &first.repo, &|_| true)?;
+        }
+    }
     let served = held.listed.entries.iter().map(|l| l.repo.clone());
     Ok((local, served.collect()))
 }

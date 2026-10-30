@@ -1,0 +1,17 @@
+# Named workspaces (spec S5, ADR 0020 to 0022) on top of values-console.yaml and values-identity.yaml:
+#   helm upgrade --install meada deploy/helm/meada -f deploy/helm/meada/values-console.yaml \
+#     -f deploy/helm/meada/values-identity.yaml -f deploy/helm/meada/values-workspaces.yaml -f my-values.yaml
+# Upgrade every image, the nodes included, before the first refresh that records a workspace: an older
+# node refuses the generation and keeps its last one. The migrate step brings Postgres to schema
+# version 8. Then set modules.workspaces.allow to your owners and modules.workspaces.maxRepositories
+# to a cap you measured (docs: "Discovery evidence"). The refresh job's workspace.fetch receives
+# `meada workspace show --pulled` as $1 and must clone each member at the path listed there, under
+# modules.workspaces.mirrors, on a volume the job keeps. The proposal server (`meada workspaces mcp`)
+# is not part of this chart: run it beside the console, behind your own TLS and its own audience.
+console:
+  operations: true
+modules:
+  workspaces:
+    enabled: true
+    allow: [github.com/acme/*]
+    maxRepositories: 200

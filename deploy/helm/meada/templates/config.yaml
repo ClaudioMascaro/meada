@@ -21,6 +21,8 @@ data:
     app_id = {{ .appId }}
     private_key_env = "MEADA_GITHUB_APP_KEY"
     {{- end }}
+    {{- include "meada.namedWorkspaces" . | nindent 4 }}
+    {{- include "meada.jobUi" . | nindent 4 }}
   {{- end }}
   {{- if .Values.modules.postgres.enabled }}
   postgres.workspace.toml: |

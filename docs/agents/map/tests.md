@@ -538,6 +538,13 @@ each rule and the names accepted; an `added_by` printed after the owner, its cha
 changed key `repository.added_by`, and `authorize_entries` treating it as an edit, #330, which
 under the GitHub grant provider is `added_by_change`, #333); the
 shared validation table below carries the `owner` and `added_by` rows in both languages.
+`tests/fixtures/named-workspaces.json` (#340) is the Y/A/B table of ADR 0020 and ADR 0021 for spec
+S5: callers with their effective per-login rows (direct and group-derived alike), creation,
+stale-set and missing-login rows, discovery, authority, queries, links, revocation, the sponsor
+rule and the shared membership. `meada-core/tests/named_workspaces.rs` checks every row against a
+small reference of the ADRs' rules and that the table covers the spec's scenarios; no runtime
+reads it in the catalog's tests (below), and #342 to #346 add their public-process, UI and
+WebAssembly readers and rows.
 `tests/fixtures/workspace-validation.json` is the single pt-BR/English validation table used
 by the real WASM in `ui/tests/core.test.ts` and the binary `workspace import` in
 `tests/it/generations/imports.rs` with generation-pointer and real configured store services.
@@ -724,6 +731,32 @@ loopback issuer or the fake GitHub; `admission`'s `github` with the set's id, `f
 `max_age_seconds` and the counts the job wrote; an audited write's record carrying the login;
 then `expired`, a viewer with an empty grant.
 
+`tests/it/ui/oidc/catalog.rs` (#341, feature `workspaces`) runs a console with `[oidc.github]`,
+`[postgres]` and `[catalog]` over a permissions set the real `meada github-app roles` wrote
+against the fake GitHub (an installation on the owner `acme` covering the table's repositories, a
+repository nobody collaborates on and a covered owner no pattern admits), with a token per caller
+of the shared Y/A/B table: `GET catalog` lists exactly the identities the caller's login holds an
+accepted role on, direct or through a group alike, nothing through a rejected role, a claims grant
+or a raw group name, `missing_login` pending without a login, the whole catalog for the platform
+administrator, and names no repository the caller may not select anywhere in the answer; `POST
+catalog/check` agrees with every creation row of the table (`pending` included), reads an
+identity outside the catalog like one the caller may not select (`unavailable`, no reason), and
+refuses bodies and queries past their bounds with one fixed 400; pagination by opaque cursor and
+prefix; a set past `max_age_seconds` pending `stale_set` for everyone, the administrator
+included, a failed run leaving the set to age, a new set restoring it; `config` naming the
+picker, `manifest` hiding `catalog.allow` from everyone but the global operator, `admission`
+counting the catalog, and the fake seeing no request while the console answers. The
+`oidc::permissions` unit test reads the same table against the cache. In
+`tests/it/github_app/roles.rs` the catalog cases check the installation listing (the owners a
+pattern names, every page, the allow list, names compared lowercase, an owner no pattern names
+never asked, a repository the list refuses never listed for collaborators), the cap (the count and
+the cap in both languages) and that a cap, a throttle (marking the installation), a 5xx or a
+body that is not the documented object each fail the run and write nothing (a run at a fence
+between them is accepted); `tests/it/manifest.rs` checks each `[catalog]` error at its line and
+key without echoing a pattern; the Postgres tests count migration 6. The front end's
+`ui/tests/catalog.test.tsx` checks the picker's routes, pages, selection, verification, pending
+states and refusals in both languages.
+
 `tests/it/ui/oidc/additions.rs` (#333) runs the same console with `[oidc.github]` and
 `[postgres]` (every write audited) and the role check over the store's version: a team
 operator's addition on the host outside its grant stored with `added_by` set from its login over
@@ -795,3 +828,99 @@ chains and `var` through the overload called, `super`, initializer locals, `Obje
 members, and receivers left unknown: a type parameter, a local named like a field, same-named
 locals of different types, an anonymous class and a cyclic family. `java_static_imports_an_outside_base_may_shadow_are_name_matches` keeps a static import `exact` in a plain class and
 `inferred` under an outside base.
+
+## Named workspaces: creation to query (#342)
+
+`tests/it/ui/oidc/workspaces.rs` drives the console, the job and a node as processes over the
+shared Y/A/B table (`tests/fixtures/named-workspaces.json`), the loopback issuer, the fake GitHub
+API and the local Valkey, Postgres and S3-compatible store: the creation rows (allowed, refused
+with `hidden`, pending, forged keys), peers listing and showing through their own grants, the
+whole pipeline (pull, roles, index, publish, node pull, `/-/workspaces/<id>/<identity>` per
+caller, one bundle of Y, `members` and `contexts` in the document, `state` `applied` then `live`)
+and the sponsor rule (`excluded`, not a failure). `meada-core/tests/named_workspaces.rs` reads
+the same table through `meada_core::named`, and `ui/tests/named-core.test.ts` through the built
+WebAssembly; `ui/tests/NamedWorkspaces.test.tsx` drives the page.
+
+## Named workspaces: versions and overlap (#343)
+
+`tests/it/ui/oidc/workspaces/lifecycle.rs` runs on the same case as `workspaces.rs` (console, job,
+fake GitHub, Valkey, Postgres, S3-compatible store, the Y/A/B table): the lifecycle along the base
+(save moves nothing, apply, rollback marked as such, stale base, `already_current`, unknown
+version, rename, delegation by the administrator alone, the last operator, delete as one 404
+for everyone, the same triple still `workspace_deleted`, versions and history in order, one
+audit record per operation with its actor, authority and base); two writers of one base (one
+wins, the other is `stale_base`, one history row per accepted change); partial revocation (the
+creator keeps the workspace with a hidden count, saves without dropping what it cannot read, is
+refused B with `hidden`, cannot apply what a lost role no longer covers, nothing moves; a
+peer sees one 404 on the workspace, its versions and its history); overlapping Y+A and Y+B
+(independent edits and deletes, one member and one bundle of Y, graph answers through the context
+bounded by the grant); a SCIM-deleted operator blocked on every lifecycle route until
+provisioned active, a never-provisioned subject admitted (`directory`); and the `meada
+workspaces` twins as the administrator with `cli` audit records. `meada-core/tests/
+named_workspaces.rs` checks the `lifecycle` rows of the table (compose keeps hidden entries,
+`changed` is what is rechecked) and `meada-core/src/named.rs` the diff.
+
+## Named workspaces: context configuration (#344)
+
+`tests/fixtures/effective-configuration.json` is the table of ADR 0021 contract 6: entries as a
+version document holds them, the facts the console reads from a generation (`held`, `own`,
+`documents`, `excluded`) and the answer per entry (source, ignored blocks, coverage, diagnostic
+codes), plus the context pair that shares Y. `meada-core/tests/effective.rs` reads it through
+`meada_core::effective` (and the module's unit tests cover the same rules inline), and
+`ui/tests/named-core.test.ts` through the built WebAssembly (`namedEffective`), with the check that
+the view's annotations never enter a manifest's text or version id.
+
+`tests/it/ui/oidc/workspaces/configuration.rs` runs on the same case as `workspaces.rs` (console,
+job, fake GitHub, Valkey, Postgres, S3-compatible store, the Y/A/B table) with the mirror of Y
+committed without a `meada.toml`: two contexts sharing Y declare different peers and serve hosts
+and each view, recorded context and context export shows only its own (the peer links of Y exist
+through one and not the other); before the job ingests, the view says pending and the workspace is
+applied; after it, a repository's own `meada.toml` wins whole and the ignored block is said beside
+the accepted apply; a configuration change is a new generation with the same `members` bundles,
+the other context's recorded entry unchanged and a pinned generation's export keeping the old
+configuration; a stale base is refused and the other workspace's base does not move; an earlier
+version is viewed with `?version=`; an unrelated caller, a peer who operates nothing and an
+unknown id get the discovery rule's answers. The refusals test posts reserved keys, a value or a
+URL where a variable name belongs, a peer `path` and an unknown key (all 422 with nothing
+stored), the stateless preview before saving (no version stored, a missing peer and an ignored
+block shown, a repository the caller cannot read shown pending), a forged key (400) and an
+anonymous call (401). `ui/tests/NamedWorkspaces.test.tsx` drives the editor: the canonical text,
+the effective configuration shown in text before any POST of a save, the frozen reviewed payload
+at the base read, the findings beside an applied change, a stale base in words, and no editor for
+a viewer.
+
+`tests/it/ui/oidc/workspaces/proposals.rs` (feature `proposals`) runs on the same case and adds the
+proposal server (`meada workspaces mcp`, `[proposals]` appended to the bootstrap the console
+read), called over MCP with tokens for its own audience: no token, a forged one, a console's and a
+node's are a 401 naming the metadata, a browser a 403, and its token opens nothing on the
+console; `tools/list` gives four read-only tools with closed schemas naming no authority; every
+creation row of the Y/A/B table through `propose` is the console's decision, each refusal the
+console's own error byte for byte; a hidden repository is counted and never named, hints and
+`_meta` or headers asserting a role change nothing, a forged argument and every bound are
+refused as invalid arguments, a body past 80 KiB is a 413; the catalog is the console's, empty
+for a claims grant and pending for a missing login; the fake GitHub counts no request and stderr
+holds no token, note or manifest. Over existing workspaces it lists and shows under the discovery
+rule, proposes a change with its base, diff and effective view, refuses B and a peer, gives
+equal bytes for equal calls, leaves the console's records, versions, history and audit as they
+were, and the manifest is then saved and applied by a person in the console, after which the old
+base is stale; the table's discovery rows go through `show`; once the creator loses A, its
+proposals and `show` compose over A without naming it, even when it names A; a creation of a
+workspace created and deleted is refused `workspace_deleted`. A set past `max_age_seconds` makes
+every proposal pending `stale_set`; a server allowed no call in flight (`MEADA_PROPOSALS_CALLS`)
+answers 503 `busy`; with `[directory]`, a deleted user is a 403 `deprovisioned` until it is
+provisioned active again.
+
+## Named workspaces: acceptance (#347)
+
+`tests/it/ui/oidc/workspaces/acceptance.rs` runs on the same case as `workspaces.rs` and forces the
+stages of a refresh to fail in turn, with a node serving the first generation: the role check
+(GitHub answering 500) exits non-zero and writes no set, so the pointer and the catalog stay; a
+revocation committed by a later complete check is effective at the node while the generation is
+unchanged; a role check that fails again while GitHub already shows the role restored brings
+nothing back; a missing member mirror stops `index` (an entry left without a sponsor needs none)
+and a missing index directory stops `snapshot publish`, each leaving the pointer on the first
+generation and the other group's workspace answering; only a later complete set restores the
+grant. `Case::grant_all_but` and `Case::await_check` (in `lifecycle.rs`) are the revocation helper
+split in two. `scripts/helm-check` renders `values-workspaces.yaml` and checks the sections are in
+the console's and the job's bootstrap and not a node's, and the three refusals of the chart. The
+site's named-workspaces page maps each acceptance criterion to the tests that show it.

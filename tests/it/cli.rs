@@ -106,6 +106,31 @@ fn the_console_subcommand_is_absent_without_its_feature() {
     assert!(stderr.contains("unrecognized subcommand 'ui'"), "{stderr}");
 }
 
+/// `meada workspaces mcp` exists only in a build with the `proposals` feature (ADR 0022): the
+/// default build has no `workspaces` at all, and a build with `workspaces` alone has no `mcp`.
+#[cfg(not(feature = "proposals"))]
+#[test]
+fn the_proposal_server_is_absent_without_its_feature() {
+    let out = Command::new(env!("CARGO_BIN_EXE_meada"))
+        .args([
+            "workspaces",
+            "mcp",
+            "--listen",
+            "0",
+            "--workspace",
+            "m.toml",
+        ])
+        .output()
+        .expect("meada runs");
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let missing = match cfg!(feature = "workspaces") {
+        true => "unrecognized subcommand 'mcp'",
+        false => "unrecognized subcommand 'workspaces'",
+    };
+    assert!(stderr.contains(missing), "{stderr}");
+}
+
 /// Without the `refresh-lock` feature, `meada snapshot pointer` and `meada snapshot fence` do
 /// not exist.
 #[cfg(not(feature = "refresh-lock"))]
@@ -1137,26 +1162,26 @@ fn postgres_refusals_follow_lang() {
     assert_eq!(
         line(en, "9"),
         format!(
-            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 5: \
+            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 8: \
              run meada postgres migrate)"
         )
     );
     assert_eq!(
         line(pt, "9"),
         format!(
-            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da 5 deste Meada: \
+            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da 8 deste Meada: \
              rode meada postgres migrate)"
         )
     );
-    assert_eq!(meada(&dir, en, &at("9"), &MIGRATE).0, "5\n");
+    assert_eq!(meada(&dir, en, &at("9"), &MIGRATE).0, "8\n");
     for (lang, expected) in [
         (
             en,
-            format!("the schema {schema} is at version 5, above this Meada's 0: upgrade Meada"),
+            format!("the schema {schema} is at version 8, above this Meada's 0: upgrade Meada"),
         ),
         (
             pt,
-            format!("o schema {schema} está na versão 5, acima da 0 deste Meada: atualize o Meada"),
+            format!("o schema {schema} está na versão 8, acima da 0 deste Meada: atualize o Meada"),
         ),
     ] {
         let (_, stderr, code) = meada(&dir, lang, &at("0"), &MIGRATE);

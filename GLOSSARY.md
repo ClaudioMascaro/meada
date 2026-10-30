@@ -143,7 +143,8 @@ _Avoid_: dashboard, admin panel, UI
 Whoever runs a server mode deployment and owns its boundary, its admission, its services and
 its job. In the console, the global operator is the role that may make every write, held by the
 admitted people the identity provider marks with the group or claim the console names; a team
-operator may change only its teams' entries (ADR 0015).
+operator may change only its teams' entries (ADR 0015). Its authority over named workspaces is the
+**platform administrator** (ADR 0020).
 _Avoid_: admin, superuser
 
 **Viewer**:
@@ -265,16 +266,111 @@ is the rollback, and each generation records the version that produced it.
 _Avoid_: revision, snapshot, manifest version
 
 **Named workspace**:
-A named query context: a name under which a query reads a chosen set of the repositories a
-deployment serves, and the links between them. It decides what an answer can see, and says
-nothing about how a repository is indexed or published; spec S5 owns its runtime (ADR 0020).
+A named query context over a deployment's shared indexed repositories: a record with a
+deterministic id, a name and a description, its operators and a versioned manifest of the
+repositories and links it selects. It decides what an answer can see and says nothing about how a
+repository is indexed or published. Accepted by ADR 0020, whose contracts are ADR 0021; not yet
+delivered: the delivered console serves one workspace per deployment.
 _Avoid_: tenant, project, environment, isolated workspace
+
+**Deployment workspace**:
+ADR 0014's one workspace per deployment, kept as it is when named workspaces exist: the current
+workspace version at `{<key_prefix>}:workspace`, with its owners, teams and exclusions, served
+by the plain route `/<identity>`. A named workspace is never part of it.
+_Avoid_: default workspace, main workspace, global workspace
 
 **Shared indexing**:
 Indexing a repository and publishing its bundle and generation once, whatever number of named
 workspaces read it: no name costs a second index of the same repository at the same commit, and
-`meada index` reads no name (ADR 0020).
+`meada index` reads no name (ADR 0020). The repositories one refresh fetches, indexes and
+publishes are the **ingestion membership**: the deployment workspace's entries and the entries of
+the named workspaces, one per identity (ADR 0021).
 _Avoid_: shared index, index sharing, replication
+
+**Platform administrator**:
+The global operator of ADR 0014 and ADR 0015, named for the authority it has over named
+workspaces: it delegates operators, administers any workspace and is bound by the catalog but not
+by repository eligibility. A name for an existing authority, not a new role: no serialized value
+changes (ADR 0020).
+_Avoid_: admin, superuser, root
+
+**Workspace operator**:
+A subject that creates or is delegated one named workspace, and may save, apply, roll back,
+rename and delete that workspace only. A fact about a (subject, workspace) pair, recorded in the
+workspace's operator list; never a session role, and neither the team operator nor an owner
+(ADR 0020).
+_Avoid_: workspace owner, workspace admin, team operator
+
+**Inherited viewer**:
+Whoever views a named workspace because their own current grant reads every one of its entries.
+Nobody is given the role: there is no viewer list, invitation or enrollment, and a group peer of
+the creator is a viewer because its own grant reads the same repositories, for instance through
+the same repository roles (ADR 0020).
+_Avoid_: member, guest, invited viewer
+
+**Catalog**:
+The repositories a named workspace could select: those the installations of the GitHub App cover
+that the platform administrator's allow list admits, listed by the job in the same permissions set
+as the roles. It is not an entitlement: only a repository on which the caller's login holds an
+accepted role is selectable (ADR 0021). Built by #341: `[catalog]`, the job's installation
+listing, the `source` column of the permissions set and `GET /api/v1/catalog`.
+_Avoid_: repository list, inventory, discovery index
+
+**Context**:
+A named workspace as a generation records it: its id, the version it was at and its non-excluded
+entries with their blocks, and nothing else (no name, description or operator, which exist only in
+Postgres). A pinned generation reproduces it exactly; the node answers it at
+`/-/workspaces/<id>/<identity>` (ADR 0021, #342).
+_Avoid_: view, scope, tenant
+
+**Member**:
+A repository only named workspaces select: it is fetched, indexed and bundled once, at
+`<[workspaces] mirrors>/<identity>`, and a generation lists it apart from the deployment
+workspace's repositories (#342). The plain route never serves it.
+_Avoid_: shared repository, extra repository
+
+**Base**:
+The `seq` of a named workspace a client read: the fact a write must still find. Every row of its
+history moves it by one (apply, rollback, rename, delete, delegation); saving a version does not.
+A write whose base is not the workspace's `seq` is `stale_base` and changes nothing (ADR 0021,
+#343).
+_Avoid_: etag, revision, version number
+
+**Rollback**:
+An apply of a version of a named workspace that was current before. Checked like any apply: only
+the entries it adds or changes against the current version need eligibility (#343).
+_Avoid_: undo, revert
+
+**Eligible**:
+Said of a repository for a subject: the catalog holds it, the newest permissions set is fresh and
+the subject's login holds an accepted role on it, directly or through a repository group. Creation
+and every addition to a named workspace need it; reading uses the grant (ADR 0020).
+_Avoid_: entitled, authorized, allowed
+
+**Sponsor**:
+An operator of a named workspace whose login holds an accepted role on one of its entries. An
+entry no sponsor backs is excluded before the fetch (`no_sponsor`), so the fleet's credentials
+never fetch a repository for a workspace GitHub does not let its operators read (ADR 0021).
+_Avoid_: adder, requester
+
+**Effective configuration**:
+What a repository declares in one context: its own `meada.toml` whole if its mirror has one, else
+the context's blocks for the entry, never merged, with the source shown. Indexed-document
+coverage belongs to ingestion and is the same in every context; peers, resources and serve hosts
+are query-time and may differ per context (ADR 0021).
+_Avoid_: merged configuration, resolved config
+
+**Proposal**:
+The manifest text, diff, diagnostics and base version the proposal server returns to an agent for
+a person to review. It is derived, stateless and persists nothing; saving and applying it are the
+console's deliberate acts (ADR 0022).
+_Avoid_: draft, submission, pull request
+
+**Proposal server**:
+`meada workspaces mcp` (feature `proposals`): the process that answers agents over MCP with the
+console's named-workspace functions, persistence off, under a token for `[proposals] audience`.
+Neither a node nor the console, and its tools write nothing (ADR 0022).
+_Avoid_: agent API, write MCP, submission server
 
 **Provider**:
 The side of a contract that serves or defines it, such as the code handling a route or the

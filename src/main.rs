@@ -88,6 +88,107 @@ enum Command {
         #[command(subcommand)]
         command: PostgresCommand,
     },
+    #[cfg(feature = "workspaces")]
+    Workspaces {
+        #[command(subcommand)]
+        command: WorkspacesCommand,
+    },
+}
+
+/// `meada workspaces` (ADR 0021, feature `workspaces`): the named workspaces' operations as the
+/// platform administrator.
+#[cfg(feature = "workspaces")]
+#[derive(Subcommand)]
+enum WorkspacesCommand {
+    List {
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Show {
+        id: String,
+        #[arg(long)]
+        version: Option<String>,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Versions {
+        id: String,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Diff {
+        id: String,
+        version: String,
+        #[arg(long, default_value = "current")]
+        against: String,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Create {
+        file: PathBuf,
+        #[arg(long)]
+        name: String,
+        #[arg(long, default_value = "")]
+        description: String,
+        #[arg(long)]
+        message: String,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Save {
+        id: String,
+        file: PathBuf,
+        #[arg(long)]
+        message: String,
+        #[arg(long)]
+        base: i64,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Apply {
+        id: String,
+        version: String,
+        #[arg(long)]
+        base: i64,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Rename {
+        id: String,
+        name: String,
+        #[arg(long)]
+        description: Option<String>,
+        #[arg(long)]
+        base: i64,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Delete {
+        id: String,
+        #[arg(long)]
+        base: i64,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    Operators {
+        id: String,
+        #[arg(long)]
+        add: Vec<String>,
+        #[arg(long)]
+        remove: Vec<String>,
+        #[arg(long)]
+        base: i64,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+    /// The proposal server (ADR 0022, feature `proposals`).
+    #[cfg(feature = "proposals")]
+    Mcp {
+        #[arg(long)]
+        listen: String,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
 }
 
 /// `meada postgres` (ADR 0016, feature `postgres`).
@@ -218,6 +319,8 @@ fn workspace(command: WorkspaceCommand) -> ! {
                     notes.push(Msg::WorkspaceAlreadyCurrent(&id).text());
                     id
                 }
+                // No deployment version (named workspaces alone): no id on stdout.
+                versions::Pulled::Empty => return String::new(),
             };
             format!("{id}\n")
         }),
@@ -236,6 +339,69 @@ fn workspace(command: WorkspaceCommand) -> ! {
             }
             std::process::exit(1);
         }
+    }
+}
+
+/// `meada workspaces`: the named workspaces' operations as the platform administrator (#343).
+#[cfg(feature = "workspaces")]
+fn workspaces(command: WorkspacesCommand) -> meada::Result<String> {
+    use meada::workspaces::cli;
+    match command {
+        WorkspacesCommand::List { workspace } => cli::list(&workspace),
+        WorkspacesCommand::Show {
+            id,
+            version,
+            workspace,
+        } => cli::show(&workspace, &id, version.as_deref()),
+        WorkspacesCommand::Versions { id, workspace } => cli::versions(&workspace, &id),
+        WorkspacesCommand::Diff {
+            id,
+            version,
+            against,
+            workspace,
+        } => cli::diff(&workspace, &id, &version, &against),
+        WorkspacesCommand::Create {
+            file,
+            name,
+            description,
+            message,
+            workspace,
+        } => cli::create(&workspace, &file, &name, &description, &message),
+        WorkspacesCommand::Save {
+            id,
+            file,
+            message,
+            base,
+            workspace,
+        } => cli::save(&workspace, &id, &file, &message, base),
+        WorkspacesCommand::Apply {
+            id,
+            version,
+            base,
+            workspace,
+        } => cli::apply(&workspace, &id, &version, base),
+        WorkspacesCommand::Rename {
+            id,
+            name,
+            description,
+            base,
+            workspace,
+        } => cli::rename(&workspace, &id, &name, description.as_deref(), base),
+        WorkspacesCommand::Delete {
+            id,
+            base,
+            workspace,
+        } => cli::delete(&workspace, &id, base),
+        WorkspacesCommand::Operators {
+            id,
+            add,
+            remove,
+            base,
+            workspace,
+        } => cli::operators(&workspace, &id, &add, &remove, base),
+        // Served by `main` itself, as `meada ui` is.
+        #[cfg(feature = "proposals")]
+        WorkspacesCommand::Mcp { .. } => unreachable!("served by main"),
     }
 }
 
@@ -591,6 +757,93 @@ fn main() -> ExitCode {
                 .mut_arg("workspace", |a| a.help(Msg::WorkspaceBootstrapHelp.text()))
         })
     });
+    #[cfg(feature = "workspaces")]
+    let matches = matches.mut_subcommand("workspaces", |c| {
+        let bootstrap = |a: clap::Arg| a.help(Msg::WorkspaceBootstrapHelp.text());
+        let id = |a: clap::Arg| a.help(Msg::WorkspacesHelpId.text());
+        let base = |a: clap::Arg| a.help(Msg::WorkspacesHelpBase.text());
+        let file = |a: clap::Arg| a.help(Msg::WorkspaceImportFile.text());
+        let message = |a: clap::Arg| a.help(Msg::WorkspaceImportMessage.text());
+        (c.about(Msg::WorkspacesCmd.text()))
+            .mut_subcommand("list", |c| {
+                (c.about(Msg::WorkspacesCmdList.text())).mut_arg("workspace", bootstrap)
+            })
+            .mut_subcommand("show", |c| {
+                (c.about(Msg::WorkspacesCmdShow.text()))
+                    .mut_arg("id", id)
+                    .mut_arg("version", |a| a.help(Msg::WorkspaceShowVersion.text()))
+                    .mut_arg("workspace", bootstrap)
+            })
+            .mut_subcommand("versions", |c| {
+                (c.about(Msg::WorkspacesCmdVersions.text()))
+                    .mut_arg("id", id)
+                    .mut_arg("workspace", bootstrap)
+            })
+            .mut_subcommand("diff", |c| {
+                (c.about(Msg::WorkspacesCmdDiff.text()))
+                    .mut_arg("id", id)
+                    .mut_arg("version", |a| a.help(Msg::WorkspaceApplyVersion.text()))
+                    .mut_arg("against", |a| a.help(Msg::WorkspacesHelpAgainst.text()))
+                    .mut_arg("workspace", bootstrap)
+            })
+            .mut_subcommand("create", |c| {
+                (c.about(Msg::WorkspacesCmdCreate.text()))
+                    .mut_arg("file", file)
+                    .mut_arg("name", |a| a.help(Msg::WorkspacesHelpName.text()))
+                    .mut_arg("description", |a| {
+                        a.help(Msg::WorkspacesHelpDescription.text())
+                    })
+                    .mut_arg("message", message)
+                    .mut_arg("workspace", bootstrap)
+            })
+            .mut_subcommand("save", |c| {
+                (c.about(Msg::WorkspacesCmdSave.text()))
+                    .mut_arg("id", id)
+                    .mut_arg("file", file)
+                    .mut_arg("message", message)
+                    .mut_arg("base", base)
+                    .mut_arg("workspace", bootstrap)
+            })
+            .mut_subcommand("apply", |c| {
+                (c.about(Msg::WorkspacesCmdApply.text()))
+                    .mut_arg("id", id)
+                    .mut_arg("version", |a| a.help(Msg::WorkspaceApplyVersion.text()))
+                    .mut_arg("base", base)
+                    .mut_arg("workspace", bootstrap)
+            })
+            .mut_subcommand("rename", |c| {
+                (c.about(Msg::WorkspacesCmdRename.text()))
+                    .mut_arg("id", id)
+                    .mut_arg("name", |a| a.help(Msg::WorkspacesHelpName.text()))
+                    .mut_arg("description", |a| {
+                        a.help(Msg::WorkspacesHelpDescription.text())
+                    })
+                    .mut_arg("base", base)
+                    .mut_arg("workspace", bootstrap)
+            })
+            .mut_subcommand("delete", |c| {
+                (c.about(Msg::WorkspacesCmdDelete.text()))
+                    .mut_arg("id", id)
+                    .mut_arg("base", base)
+                    .mut_arg("workspace", bootstrap)
+            })
+            .mut_subcommand("operators", |c| {
+                (c.about(Msg::WorkspacesCmdOperators.text()))
+                    .mut_arg("id", id)
+                    .mut_arg("add", |a| a.help(Msg::WorkspacesHelpAdd.text()))
+                    .mut_arg("remove", |a| a.help(Msg::WorkspacesHelpRemove.text()))
+                    .mut_arg("base", base)
+                    .mut_arg("workspace", bootstrap)
+            })
+    });
+    #[cfg(feature = "proposals")]
+    let matches = matches.mut_subcommand("workspaces", |c| {
+        c.mut_subcommand("mcp", |c| {
+            (c.about(Msg::ProposalsCmd.text()))
+                .mut_arg("listen", |a| a.help(Msg::ProposalsListenHelp.text()))
+                .mut_arg("workspace", |a| a.help(Msg::ProposalsWorkspaceHelp.text()))
+        })
+    });
     #[cfg(feature = "postgres")]
     let matches = matches.mut_subcommand("postgres", |c| {
         (c.about(Msg::Postgres.text())).mut_subcommand("migrate", |c| {
@@ -705,6 +958,24 @@ fn main() -> ExitCode {
         Command::GithubApp { command } => github_app(command),
         #[cfg(feature = "generation-pointer")]
         Command::Workspace { command } => workspace(command),
+        // Every problem that refuses the start on its own line; the tools answer in English, as
+        // the MCP surface does (ADR 0008).
+        #[cfg(feature = "proposals")]
+        Command::Workspaces {
+            command: WorkspacesCommand::Mcp { listen, workspace },
+        } => {
+            msg::init(None);
+            if let Err(e) = drained(|| meada::ui::proposals(&listen, &workspace)) {
+                for line in e.to_string().lines() {
+                    eprintln!("meada: {line}");
+                }
+                std::process::exit(1);
+            }
+            Ok(())
+        }
+        // The answer is the only thing on stdout; a refusal's reason is on stderr, exit 1.
+        #[cfg(feature = "workspaces")]
+        Command::Workspaces { command } => workspaces(command).map(|text| print!("{text}")),
         // The version reached is the only line on stdout.
         #[cfg(feature = "postgres")]
         Command::Postgres {

@@ -117,6 +117,52 @@ refresh, under `meada snapshot lock`, becomes: `workspace pull`, `github-app rol
 what `show --pulled` lists, `index --workspace` and `snapshot publish`; a refresh that stops at
 the check publishes nothing.
 
+### The repository catalog
+
+With the `workspaces` feature (part of `cloud`) and `[catalog]` in the bootstrap, the same job
+also discovers the repositories a maintainer could select before any manifest exists,
+independently of the applied workspace ([#341](https://github.com/ClaudioMascaro/meada/issues/341),
+ADR 0021):
+
+```toml
+[catalog]
+allow = ["github.com/acme/*", "github.com/other/tool"]   # required; on the host of [oidc.github]
+max_repositories = 200                                    # required, 1 to 5000, no default
+```
+
+`allow` lists lowercase patterns, `<host>/<owner>/*` or `<host>/<owner>/<repo>`, compared
+exactly and without repeats; `[catalog]` needs `[oidc.github]`, and the error names both
+sections. With `[catalog]`, `meada github-app roles` lists, for every installation of the host's
+Apps whose owner some pattern names, `GET /installation/repositories?per_page=100` (every page,
+through the same installations, throttle marks and token cache), keeps what `allow` admits, adds
+the identities the workspace selects and lists each one's collaborators as before. The result is
+one permissions set in the same transaction, with `source` (`selected`, `catalog` or `both`) on
+every repository (migration 6: run `meada postgres migrate` first). The catalog is the `catalog`
+or `both` repositories GitHub showed (`listed`).
+
+A failed installation listing, a throttled installation (which stays marked, as with every REST
+call of the module), an answer that is not the documented object, more than 100 pages, or more
+candidates than `max_repositories`, not counting the workspace's own repositories, make the
+command fail with exit 1 and **write nothing**: a partial set would revoke or mix repositories,
+and the previous one keeps aging. The success line becomes `permissions set <id>: N repositories
+(M in the catalog), R rows, E exclusions`; without `[catalog]` nothing changes, byte for byte.
+
+**Cost.** On top of the role check's load, the catalog pays `ceil(covered / 100)` installation
+pages per installation listed (`covered` counts every repository the installation covers, not
+only those `allow` admits) and, per candidate, `ceil(collaborators / 100)` collaborator pages.
+That is why `max_repositories` has no default: whoever sets it accepts the cost. The real cost
+against a real GitHub organization has not been measured yet
+([#338](https://github.com/ClaudioMascaro/meada/issues/338) does not gate S5); the assumption
+that measurement would confirm is that the installations listing plus the `affiliation=all`
+collaborator listing fits one installation's hour at the cap you set, or that listing the base
+role's members once is needed first. Measure with your own organization before widening coverage.
+
+**Coverage is not entitlement.** The catalog only says what *could* be selected. A person selects
+a catalog repository only when their GitHub login holds an accepted role on it in the newest set,
+directly or through a repository group; App coverage, group names in a token and anything an
+agent claims grant nothing. The console and the nodes still never call GitHub: the catalog read
+([console](console.md#repository-catalog)) uses only the set the job wrote.
+
 ### The grant at admission
 
 Nodes and the console with `[oidc.github]` read the newest permissions set every minute, and load

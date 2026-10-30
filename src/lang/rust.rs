@@ -1,7 +1,8 @@
 //! The Rust language pack (spec #30). It reads `.rs` files and the `Cargo.toml` manifests of a
 //! workspace with no Rust toolchain: crates come from `Cargo.toml` and the module tree from
 //! `mod` declarations (`crates.rs`). Calls inside macro invocations are token trees to
-//! tree-sitter and are not indexed.
+//! tree-sitter and are not indexed, apart from the bodies of item macros (`macros.rs`), which
+//! are read as items.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -19,6 +20,7 @@ use crate::{Result, qualify};
 mod builders;
 pub(crate) mod cfg;
 pub(crate) mod crates;
+mod macros;
 mod mentions;
 mod values;
 
@@ -98,6 +100,10 @@ impl LanguagePack for Rust {
                 .map(|(_, setting)| setting.clone())
                 .unwrap_or_default()
         })
+    }
+
+    fn extend(&self, files: &BTreeMap<&str, &Facts>) -> BTreeMap<String, String> {
+        macros::extend(files)
     }
 
     fn config_files(&self) -> &'static [&'static str] {
@@ -317,7 +323,7 @@ impl Scan {
 }
 
 fn parse(src: &[u8], setting: &str) -> Result<Facts> {
-    let features: BTreeSet<String> = (setting.split(','))
+    let features: BTreeSet<String> = (super::base(setting).split(','))
         .filter(|f| !f.is_empty())
         .map(String::from)
         .collect();
@@ -326,6 +332,14 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     let tree = parser
         .parse(src, None)
         .ok_or("tree-sitter returned no tree")?;
+    let table = macros::table(super::extra(setting));
+    let bodies = macros::bodies(tree.root_node(), src, &table)?;
+    let expand = Expand {
+        roots: (bodies.iter())
+            .map(|(at, body)| (*at, body.root_node()))
+            .collect(),
+        table: &table,
+    };
     let mut facts = Facts::default();
     let mut scan = Scan::default();
     let mut paths: Vec<(Slot, Path)> = Vec::new();
@@ -911,7 +925,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 facts.unbuilt = true;
                 Vec::new()
             }
-            _ => built(node, &features, src, &mut renamed, &mut routes),
+            _ => built(node, &features, src, &mut renamed, &mut routes, &expand),
         };
         // A `let mut` String the rest of its block only reads and appends to: the statements
         // after it are the ones `kids` holds, read once (a sibling lookup costs the depth of the
@@ -1082,6 +1096,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     facts.externs = heads.externs.into_iter().collect();
     facts.macro_use = macro_use(tree.root_node(), src);
     facts.mentions = mentions::mentions(tree.root_node(), src);
+    macros::record(tree.root_node(), src, &mut facts);
     for (local, source) in heads.imports {
         facts.imports.push(Import {
             local,
@@ -1252,49 +1267,104 @@ fn declare(
 /// it, and so does an inner `#![cfg(..)]` of a module written in place. A `#[path]` value
 /// goes to `paths` under the id of the item it sits on, and the route attributes before a
 /// function to `routes`. A `#[cfg_attr(..)]` only adds attributes, so it never leaves an item out.
+/// An item macro's invocation that is built gives the items of its body instead (`expand`).
 fn built<'t>(
     node: Node<'t>,
     features: &BTreeSet<String>,
     src: &[u8],
     paths: &mut HashMap<usize, String>,
     routes: &mut HashMap<usize, Routes<'t>>,
+    expand: &Expand<'t, '_>,
 ) -> Vec<Node<'t>> {
     let mut out = Vec::new();
-    let (mut on, mut on_test, mut path) = (true, true, None);
     let kids: Vec<Node> = children(node).collect();
-    for (at, &child) in kids.iter().enumerate() {
-        match child.kind() {
-            "attribute_item" => {
-                let (plain, test) = attribute_holds(child, features, src);
-                (on, on_test) = (on && plain, on_test && test);
-                path = path_value(child, src).or(path);
-            }
-            "line_comment" | "block_comment" | "inner_attribute_item" => out.push(child),
-            _ => {
-                // A module a test build compiles is indexed; any other item is judged with `test`
-                // false.
-                // Its inner `#![cfg(..)]` is judged in the same build as its outer one.
-                let kept = (on && !inner_off(child, features, src, false))
-                    || (on_test
-                        && child.kind() == "mod_item"
-                        && !inner_off(child, features, src, true));
-                if kept {
-                    if let Some(value) = path {
-                        paths.insert(child.id(), value);
-                    }
-                    if child.kind() == "function_item" {
-                        let found = route_attributes(&kids[..at], src);
-                        if !found.is_empty() {
-                            routes.insert(child.id(), found);
-                        }
-                    }
-                    out.push(child);
+    let mut reader = Built {
+        features,
+        src,
+        paths,
+        routes,
+        expand,
+    };
+    reader.keep(&kids, (true, true), &mut out);
+    out
+}
+
+/// The bodies of the item macros a file invokes in a module (`macros::bodies`), by the start of
+/// the invocation, and what the file's setting says of each macro.
+struct Expand<'t, 's> {
+    roots: HashMap<usize, Node<'t>>,
+    table: &'s macros::Table<'s>,
+}
+
+/// What `built` reads the children of a node with.
+struct Built<'a, 't, 's> {
+    features: &'a BTreeSet<String>,
+    src: &'a [u8],
+    paths: &'a mut HashMap<usize, String>,
+    routes: &'a mut HashMap<usize, Routes<'t>>,
+    expand: &'a Expand<'t, 's>,
+}
+
+impl<'t> Built<'_, 't, '_> {
+    /// Adds the `kids` that are built to `out`, each judged by the attributes before it and by
+    /// `outer`, what the attributes an item macro's arm writes on every item make of it (with
+    /// `test` false and true). An item macro's body is read in its place, as items.
+    fn keep(&mut self, kids: &[Node<'t>], outer: (bool, bool), out: &mut Vec<Node<'t>>) {
+        let (features, src) = (self.features, self.src);
+        let (mut on, mut on_test, mut path) = (outer.0, outer.1, None);
+        for (at, &child) in kids.iter().enumerate() {
+            match child.kind() {
+                "attribute_item" => {
+                    let (plain, test) = attribute_holds(child, features, src);
+                    (on, on_test) = (on && plain, on_test && test);
+                    path = path_value(child, src).or(path);
                 }
-                (on, on_test, path) = (true, true, None);
+                "line_comment" | "block_comment" | "inner_attribute_item" => out.push(child),
+                _ => {
+                    // A module a test build compiles is indexed; any other item is judged with
+                    // `test` false. Its inner `#![cfg(..)]` is judged in the same build as its
+                    // outer one.
+                    let kept = (on && !inner_off(child, features, src, false))
+                        || (on_test
+                            && child.kind() == "mod_item"
+                            && !inner_off(child, features, src, true));
+                    let body = (child.kind() == "macro_invocation")
+                        .then(|| self.expand.roots.get(&child.start_byte()))
+                        .flatten();
+                    match body {
+                        // An item macro's items are judged by the attributes on the invocation,
+                        // then by those the arm writes on each: a module in it may be one a
+                        // test build compiles.
+                        Some(&body) if on || on_test => {
+                            let name = field(child, "macro").map(|m| text(m, src));
+                            let predicates = name.and_then(|n| self.expand.table.get(n));
+                            let holds = |test| {
+                                (predicates.into_iter().flatten())
+                                    .all(|p| cfg::holds(p, features, test))
+                            };
+                            let items: Vec<Node> = children(body).collect();
+                            let gate = (on && holds(false), on_test && holds(true));
+                            self.keep(&items, gate, out);
+                        }
+                        None if kept => {
+                            if let Some(value) = path {
+                                self.paths.insert(child.id(), value);
+                            }
+                            if child.kind() == "function_item" {
+                                let found = route_attributes(&kids[..at], src);
+                                if !found.is_empty() {
+                                    self.routes.insert(child.id(), found);
+                                }
+                            }
+                            out.push(child);
+                        }
+                        _ => {}
+                    }
+                    (on, on_test, path) = (outer.0, outer.1, None);
+                }
             }
         }
     }
-    out
 }
 
 /// Whether an attribute item is no `#[cfg(..)]`, or one that holds, with `test` false and with
@@ -2348,6 +2418,14 @@ mod tests {
         assert_eq!(setting("sub/src/lib.rs"), "b,default");
         assert_eq!(setting("subway/x.rs"), "a,default");
         assert_eq!(setting("elsewhere/x.rs"), "a,default");
+    }
+
+    #[test]
+    fn a_feature_with_a_control_character_is_no_setting() {
+        let manifest = "[package]\nname = \"p\"\n[features]\ndefault = [\"a\", \"b\\nc\"]\na = []\n\"b\\nc\" = []\n";
+        let configs: [(&str, &[u8]); 1] = [("Cargo.toml", manifest.as_bytes())];
+        // A line break would end the setting's first line (`lang::setting`).
+        assert_eq!(Rust.settings(&configs)("src/lib.rs"), "a,default");
     }
 
     #[test]

@@ -8,6 +8,128 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Validation and operation of the named-workspace flow (#347, spec S5): a failure test that forces
+  the role check, the fetch/index and the local publication to fail in turn and shows the current
+  generation stays queryable, eligibility stays fail closed and a revoked grant never revives
+  (only a later complete permissions set restores it); the upgrade procedure (migrate to schema 8,
+  upgrade every binary before the first refresh that records a context, then configure), the
+  failure table and the acceptance map on the named-workspaces page in Brazilian Portuguese,
+  English and Spanish; `[catalog]` and `[workspaces]` in the Compose bootstrap examples; and the
+  Helm values `modules.workspaces` with `values-workspaces.yaml`, which put those sections (and
+  the `[ui]` block the job needs) in the console's and the job's bootstrap and never a node's.
+  The measurement against a real GitHub organization (#338) stays open and does not gate S5. No
+  code, default dependency or golden changed.
+- The proposal server (#346, ADR 0022, feature `proposals`, enabled by `cloud`): `meada workspaces
+  mcp --listen <addr> --workspace <bootstrap>` with `[proposals]` (`public_url`, `audience`)
+  serves CLI agents four read-only MCP tools over the console's own named-workspace functions:
+  `catalog` (the repositories the caller may select), `workspaces` and `show` (the workspaces it
+  may see, with their `seq`) and `propose`, which validates manifest text as a new workspace or a
+  change and returns the canonical manifest, the diff against the base, diagnostics, each named
+  identity's eligibility, the refusals the console would give, the effective configuration,
+  `applicable` and the base, storing nothing. Identity, login, grant and role come from a bearer
+  token for `[proposals] audience`, which no node or console accepts and which accepts no
+  node's or console's token; no tool takes an argument naming an actor, a role or a grant, and
+  repository hints from an agent's own GitHub read MCP change no result. Every Postgres session
+  of the server is read-only, it calls no GitHub, node or identity provider API and writes no
+  audit record, store object or Valkey key. Inputs and answers are bounded (a body of 80 KiB, a
+  manifest of 64 KiB, an answer of 192 KiB, 32 calls in flight). The node's MCP server, the
+  console and the default build are unchanged.
+- Guided authoring of named workspaces (#345, ADR 0021 "As built (#345)", feature `workspaces`):
+  the console edits the manifest of a workspace the subject operates through form controls
+  (repositories from the catalog, serve settings, resources, peers and environment-variable
+  names) that are one document with the manifest text, both going through `meada-core`'s
+  WebAssembly. It shows each entry's eligibility, ingestion and effective configuration in text,
+  the diff against the stored version, and freezes the reviewed payload until the person
+  confirms; server refusals (`entries_refused`, `stale_base`, a lost operator role) are shown as
+  worded and the catalog is read again. `namedDiff` and `namedChanged` join the WebAssembly
+  exports. Viewers get no mutation control. No server route changes; nothing changes without
+  `[workspaces]`.
+- Context-specific configuration of named workspaces (#344, ADR 0021 contract 6, feature
+  `workspaces`): `GET /api/v1/workspaces/<id>/effective[?version=]` shows, per entry the caller
+  reads, where its configuration comes from (the repository's own `meada.toml` wins whole, else
+  the workspace's `serve`, `resource` and `peer` blocks, else nothing), the blocks that are
+  ignored, whether the repository is indexed, pending ingestion or excluded, and diagnostics
+  (`ignored_by_repository`, `unknown_until_ingested`, `excluded_no_sponsor`, `peer_missing`,
+  `documents_not_indexed`). `POST /api/v1/workspaces/effective` shows the same view for manifest
+  text before it is saved and stores nothing; creation, save and apply answers carry the same
+  `diagnostics`, so an ignored declaration never looks plainly applied. Two workspaces that
+  share a repository keep their own peers, resources and serve hosts: the configuration is applied
+  when answering and never enters a bundle, so a change of it re-indexes nothing and a pinned
+  generation keeps what it recorded. The decision is `meada_core::effective`, also exported to
+  WebAssembly (`namedEffective`). The console's workspace page shows the view in text and has a
+  text editor for the manifest of a workspace the subject operates. Nothing changes without
+  `[workspaces]`.
+- The version lifecycle of named workspaces (#343, ADR 0021 contract 4, feature `workspaces`):
+  `POST /api/v1/workspaces/<id>/versions` saves a version without moving anything (an operator
+  submits the entries it reads and the version stored keeps the ones it cannot read; the
+  platform administrator submits the whole manifest), `.../apply` applies a stored version (a
+  version that was current before is a rollback), `.../rename`, `.../delete` (versions and
+  history are kept) and `.../operators` (the platform administrator delegates; a workspace keeps
+  at least one operator). Every write carries the `base` it read: a stale base, a revoked role, a
+  refused entry or a version of another workspace is refused and changes nothing, and the
+  transaction rechecks authority, base and the eligibility of what the operation adds or changes
+  against the newest permissions set. Only an operator of the workspace or the platform
+  administrator writes; a viewer is a 403 and a caller who cannot see the workspace gets the 404
+  of an unknown id. `GET .../versions`, `.../versions/<version>?against=` (with a diff) and
+  `.../history` read them under the same discovery rule. Each operation is one audit record
+  (`workspaces.save`, `.apply`, `.rollback`, `.rename`, `.delete`, `.operators`) with the
+  workspace and base. `meada workspaces list|show|versions|diff|create|save|apply|rename|delete|operators` are
+  the command-line twins (the platform administrator, `cli` audit records). Migration 8 adds
+  `workspace_versions.entries`: run `meada postgres migrate` before upgrading the binary. Without
+  `[workspaces]` nothing changes.
+- The first named workspace of spec S5 (#342, ADR 0021 contracts 2 to 5, cargo feature
+  `workspaces`): `[workspaces]` (`mirrors`, an absolute root; `max_workspaces`, default 200, 1 to
+  2000; `max_entries`, default 100, 1 to 500) needs `[ui]` with `operations = true`,
+  `[oidc.github]`, `[catalog]` and `[workspace] source = "store"`. An admitted subject whose
+  GitHub login holds an accepted role on every selected repository, directly or through a group,
+  creates a workspace with `POST /api/v1/workspaces`; `GET /api/v1/workspaces` and
+  `GET /api/v1/workspaces/<id>` list and show it to whoever's own grant reads every one of its
+  repositories (anyone else gets the one 404 of an unknown id), with `state` (`applied` or
+  `live`) and each entry's `ingestion` (`pending`, `ready` or `excluded`), never ready before a
+  generation records it. The creator operates it; group peers only view. The
+  decision is taken in one Postgres transaction against the newest permissions set (migration 7:
+  `workspaces`, `workspace_operators`, `workspace_versions`, `workspace_history` and a `context`
+  column on `permission_exclusions`; run `meada postgres migrate`); the version document is the
+  shared store's `workspaces/<version id>.json`. `meada workspace pull` also writes the contexts
+  file, `meada github-app roles` applies the sponsor rule (an entry no operator of its workspace
+  holds an accepted role on is left out before the fetch, `no_sponsor`, which is not a failed
+  fetch), and the repositories only named workspaces select are fetched, indexed and bundled once
+  at `<mirrors>/<identity>` (`meada workspace show --pulled` lists them). A generation records them
+  as `members` and the named workspaces as `contexts` (ids and digests in the generation id; a
+  deployment without named workspaces keeps every id), and a node serves
+  `/-/workspaces/<id>/<identity>` only to a token that reads every repository of the context (the
+  first segment `-` is reserved); the console's playground gains `workspace` and
+  `GET /api/v1/workspaces/<id>/repositories/<identity>/export`. The console has the workspaces
+  page (list, detail, creation from the catalog) and WebAssembly exports for the shared
+  rules. Save, apply, rename, delete and delegation (#343), per-context configuration (#344),
+  guided authoring (#345) and proposals (#346) are not built. Without `[workspaces]` every
+  process behaves as before; upgrade every binary, nodes included, before the first refresh that
+  records a context.
+- The repository catalog of spec S5 (#341, ADR 0021 contract 1, cargo feature `workspaces`,
+  part of `cloud`): `[catalog]` (`allow` patterns on `[oidc.github] host`, `max_repositories`
+  1 to 5000 with no default) makes `meada github-app roles` list, besides the workspace's own
+  repositories, those the Apps' installations cover (`GET /installation/repositories`, every page,
+  only for owners a pattern names) and `allow` admits, into the same permissions set with a
+  `source` on each repository (Postgres migration 6; run `meada postgres migrate`). A failed or
+  throttled listing, a body that is not the documented object or a candidate set above the cap
+  fails the run and writes nothing. The console gains `GET /api/v1/catalog` (bounded, opaque
+  pagination, `limit`, `after`, `q`) and `POST /api/v1/catalog/check`, answering only the
+  repositories the caller's login holds an accepted role on, direct or group-derived alike, with
+  the states `ready` and `pending` (`no_set`, `stale_set`, `missing_login`) and `unavailable`
+  without a reason, plus the repository catalog page; App coverage, group names in a token and
+  agent metadata alone grant nothing, and discovery creates no workspace, ACL or index. Without
+  `[catalog]` every process behaves as before. The cost of expanded coverage against a real
+  organization is not measured (#338 does not gate it).
+- Spec S5 consolidated (#340, documentation only; nothing is implemented): ADR 0020 now holds
+  the accepted domain decision (platform administrator, workspace operator and inherited viewer,
+  creation eligibility from accepted repository roles, the frozen Y/A/B matrix, hidden discovery
+  for partial readers, revocation), ADR 0021 the contracts (catalog, selected entries, shared
+  ingestion membership, version lifecycle, query selection, effective configuration,
+  deterministic ids, migration and the slice graph #341 to #347) and ADR 0022 the authenticated
+  stateless proposal server. The glossary gains the terms, ADRs 0002, 0012, 0014, 0015 and 0016
+  carry dated amendments, `tests/fixtures/named-workspaces.json` is the Y/A/B table with a
+  `meada-core` test that checks it against the rules, and the named workspaces and roadmap pages
+  are updated in three languages. No serialized role, route, id, golden or default build changes.
 - Identity automation for enterprise deployments (ADR 0016, spec #319), in the entries below: the
   `postgres` and `directory` features and the `[postgres]`, `[directory]`, `[oidc] type`,
   `[oidc.entra]` and `[oidc.github]` sections; `meada postgres migrate`, `meada github-app roles`
@@ -187,6 +309,17 @@ All notable changes to Meada are recorded here. The format follows
 - `meada status --workspace` with `[postgres]` prints `postgres: reachable, schema <name>
   version <n>` or `postgres: unreachable (<reason>)`, a version refusal included, without
   changing its exit code.
+
+### Fixed
+
+- Rust item macros (#398): the braced body of a `macro_rules!` of the repository whose first arm
+  takes `$($x:item)*` and writes each item back behind outer attributes only (tokio's
+  `cfg_rt! { pub mod runtime; }`) is read as items of the module invoking it: its functions,
+  types, `impl` blocks, `use` and `mod` declarations and the calls inside them, with spans into
+  the file. A `mod` in it reaches its file, and the `#[cfg(..)]` attributes the arm writes gate
+  every item under the crate's default features. A name defined several times qualifies only when
+  all definitions agree; any other macro stays unread. A refresh parses a file again when what it
+  invokes changes elsewhere, and equals a cold index.
 
 ## [0.1.0] - 2026-10-29
 

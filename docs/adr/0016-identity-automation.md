@@ -148,7 +148,10 @@ build, and wins where the two could disagree.
   refuses to run without the file, so `meada index` reads a file, never Postgres (invariant 1).
   An excluded entry is never fetched, indexed or published: the fleet's credentials never fetch
   a repository for someone GitHub does not let read it. It is an exclusion decided before the
-  fetch from a fact GitHub states, not a failed fetch, and takes no part in #316.
+  fetch from a fact GitHub states, not a failed fetch, and takes no part in #316. (Amended
+  2026-10-30; #340: ADR 0021 applies the same rule to a named workspace's entries, with its
+  operators as sponsors: an entry no operator holds an accepted role on is excluded
+  `no_sponsor`, per workspace and identity, in the set and in the exclusions file.)
 
 ### The directory
 

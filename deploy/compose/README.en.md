@@ -181,3 +181,14 @@ runs `meada github-app roles` and fetches the mirrors that `meada workspace show
 (`fetch-pulled.sh`); without the section the fetch stays the `REPOSITORIES` one. For
 `[directory]`, export `MEADA_SCIM_TOKEN` (at least 32 characters). The Entra ID, Okta and
 Keycloak recipes are in the site's documentation.
+
+### Named workspaces
+
+Spec S5 (named workspaces over shared indexing) is opt in on top of the identity sections above:
+`[catalog]` and `[workspaces]` (commented in `job.workspace.toml` and `console.workspace.toml`, with
+the `[ui]` block the job also needs, since every process that reads `[workspaces]` reads `[ui]` with
+`operations = true`). Upgrade every image, the nodes included, before the first refresh that records
+a workspace: an older node refuses that generation and keeps its last one. `mirrors = "/srv/mirrors"`
+is the job's mirror volume, where `fetch-pulled.sh` clones each repository only named workspaces
+select. The proposal server (`meada workspaces mcp`) is not part of this example. The procedure and
+its failure modes are in the site's named-workspaces page.

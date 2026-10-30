@@ -15,3 +15,5 @@ Escolha os módulos conforme a operação. Cada um é opt-in: a feature precisa 
 - [Credenciais de GitHub App](github-app.md)
 - [Console de gerenciamento](console.md)
 - [Identidade empresarial: Postgres, auditoria, grant do GitHub e diretório](enterprise.md)
+- [Catálogo de repositórios (`workspaces`)](github-app.md#o-catalogo-de-repositorios)
+- [Workspaces nomeados (`workspaces`)](named-workspaces.md)

@@ -54,6 +54,14 @@ pub trait LanguagePack {
         Box::new(|_| String::new())
     }
 
+    /// What the facts of the pack's files add to the setting of each (`setting`), by path, from
+    /// every file of the pack as parsed: the Rust item macros a file invokes that the repository
+    /// defines (#398). It reads only facts no setting changes, so a file parsed again under
+    /// what it adds gives it the same answer, and one more parse settles every file.
+    fn extend(&self, _files: &BTreeMap<&str, &Facts>) -> BTreeMap<String, String> {
+        BTreeMap::new()
+    }
+
     /// Repository-relative files that configure how imports name files, such as
     /// `tsconfig.json`, or what the pack's contract kinds read (Java's Spring
     /// `application.properties`, through `Indexed::configs`). The shared side reads those
@@ -514,6 +522,36 @@ pub struct Facts {
     /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,
+    /// The `macro_rules!` the file writes, by name (Rust, #398), read whatever the setting: the
+    /// outer attributes the first arm writes on each item it passes through, as tokens, or
+    /// `None` for a definition that is no item macro (another first arm, a transcriber that
+    /// wraps or rewrites the items, one written inside a macro's tokens, two that disagree).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub macro_rules: BTreeMap<String, Option<Vec<String>>>,
+    /// The macros the file invokes with braces, by the name written last before the `!`
+    /// (Rust, #398), inside macro tokens too, read whatever the setting: those the repository
+    /// defines as item macros reach its setting (`LanguagePack::extend`).
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub invokes: BTreeSet<String>,
+}
+
+/// The setting a file is parsed under: what `LanguagePack::settings` answers for its path and,
+/// on the lines after it, what `LanguagePack::extend` adds, when it adds anything.
+pub fn setting(base: &str, extra: &str) -> String {
+    match extra {
+        "" => base.to_string(),
+        extra => format!("{base}\n{extra}"),
+    }
+}
+
+/// What `LanguagePack::settings` answered in a `setting`.
+pub fn base(setting: &str) -> &str {
+    setting.split_once('\n').map_or(setting, |(base, _)| base)
+}
+
+/// What `LanguagePack::extend` added to a `setting`.
+pub fn extra(setting: &str) -> &str {
+    setting.split_once('\n').map_or("", |(_, extra)| extra)
 }
 
 /// The value a name bound in `scope` holds, written in `within` (`Facts::bound`).

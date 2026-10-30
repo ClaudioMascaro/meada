@@ -1695,7 +1695,7 @@ fn every_cli_twin_is_audited_and_none_writes_without_its_record() {
     }
     // A schema version this binary does not know: exit 1, naming both versions.
     fs::write(dir.join("ops/pg-url"), &audit.url).unwrap();
-    let higher = "is at version 5, above this Meada's 1: upgrade Meada";
+    let higher = "is at version 8, above this Meada's 1: upgrade Meada";
     for args in &twins {
         let (stdout, stderr, code) = run(args, Some("1"));
         assert_eq!((code, stdout.as_str()), (Some(1), ""), "{args:?}: {stderr}");

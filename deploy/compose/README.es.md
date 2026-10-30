@@ -183,3 +183,15 @@ ejecuta `meada github-app roles` y busca los espejos que lista `meada workspace 
 (`fetch-pulled.sh`); sin la sección el fetch sigue siendo el de `REPOSITORIES`. Para `[directory]`,
 exporta `MEADA_SCIM_TOKEN` (al menos 32 caracteres). Las recetas de Entra ID, Okta y Keycloak
 están en la documentación del sitio.
+
+### Workspaces nombrados
+
+La spec S5 (workspaces nombrados sobre indexación compartida) es opt-in sobre las secciones de
+identidad anteriores: `[catalog]` y `[workspaces]` (comentadas en `job.workspace.toml` y
+`console.workspace.toml`, con el bloque `[ui]` que el job también necesita, porque todo proceso que
+lee `[workspaces]` lee `[ui]` con `operations = true`). Actualiza todas las imágenes, nodos
+incluidos, antes del primer refresh que registre un workspace: un nodo antiguo rechaza esa
+generación y conserva la última. `mirrors = "/srv/mirrors"` es el volumen de espejos del job, donde
+`fetch-pulled.sh` clona cada repositorio que solo seleccionan workspaces nombrados. El servidor de
+propuestas (`meada workspaces mcp`) no forma parte de este ejemplo. El procedimiento y sus modos de
+fallo están en la página de workspaces nombrados del sitio.

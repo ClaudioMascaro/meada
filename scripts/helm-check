@@ -207,3 +207,26 @@ for arguments, problem in [
     failed = subprocess.run(["helm", "template", "check", str(CHART), *arguments], capture_output=True, text=True)
     assert failed.returncode and problem in failed.stderr, (arguments, failed.stderr)
 print("helm-check: Postgres, migrate step, role check refresh and identity sections passed")
+
+workspaces = render("-f", str(CHART / "values-console.yaml"), "-f", str(CHART / "values-identity.yaml"),
+                    "-f", str(CHART / "values-workspaces.yaml"))
+named_console = tomllib.loads(resource(workspaces, "ConfigMap", console=True)["data"]["meada.workspace.toml"])
+named_job = tomllib.loads(resource(workspaces, "ConfigMap")["data"]["job.workspace.toml"])
+for config in [named_console, named_job]:
+    assert config["catalog"] == {"allow": ["github.com/acme/*"], "max_repositories": 200}
+    assert config["workspaces"]["mirrors"] == "/data/mirrors" and config["ui"]["operations"]
+assert "catalog" not in tomllib.loads(manifest(workspaces)) and "workspaces" not in tomllib.loads(manifest(workspaces)), \
+    "a node's bootstrap never carries the named-workspace sections"
+for profile in [identity]:
+    assert "catalog" not in tomllib.loads(resource(profile, "ConfigMap", console=True)["data"]["meada.workspace.toml"])
+for arguments, problem in [
+    (["--set", "modules.workspaces.maxRepositories=0"], "maxRepositories"),
+    (["--set", "modules.workspaces.maxRepositories=5001"], "maxRepositories"),
+    (["--set-json", "modules.workspaces.allow=[]"], "allow"),
+    (["--set", "console.operations=false"], "console.operations"),
+]:
+    failed = subprocess.run(["helm", "template", "check", str(CHART), "-f", str(CHART / "values-console.yaml"),
+                             "-f", str(CHART / "values-identity.yaml"), "-f", str(CHART / "values-workspaces.yaml"), *arguments],
+                            capture_output=True, text=True)
+    assert failed.returncode and problem in failed.stderr
+print("helm-check: named workspaces sections for the console and the job, never the nodes, passed")

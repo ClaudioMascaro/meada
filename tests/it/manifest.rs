@@ -459,6 +459,22 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
              feature\n",
         ));
     }
+    // Nor does `catalog` (#341).
+    if !cfg!(feature = "workspaces") {
+        cases.push((
+            "index_dir = \"../indexes\"\n\n[catalog]\nallow = [\"github.com/acme/*\"]\n",
+            "meada: ops/meada.workspace.toml:3: [catalog] needs a Meada built with the workspaces \
+             feature\n",
+        ));
+    }
+    // Nor does `proposals` (ADR 0022).
+    if !cfg!(feature = "proposals") {
+        cases.push((
+            "index_dir = \"../indexes\"\n\n[proposals]\npublic_url = \"https://p.example\"\n",
+            "meada: ops/meada.workspace.toml:3: [proposals] needs a Meada built with the \
+             proposals feature\n",
+        ));
+    }
     // `ui` needs no `valkey` either.
     if !cfg!(feature = "ui") {
         cases.push((
@@ -946,6 +962,117 @@ fn directory_section_errors_name_the_file_the_line_and_the_keys() {
         assert!(!ok && stdout.is_empty(), "{toml}");
         assert_eq!(stderr, expected, "{toml}");
         assert!(!stderr.contains("scim-secret-334"), "{stderr}");
+    }
+}
+
+/// The `[catalog]` section (#341): without `[oidc.github]`, with an allow list that is not
+/// patterns on its host, with a missing or out-of-range cap and with an unknown key, each error
+/// names the file, the line and the key, and never a pattern.
+#[cfg(feature = "workspaces")]
+#[test]
+fn catalog_section_errors_name_the_file_the_line_and_the_keys() {
+    let dir = mirrors("manifest_catalog_errors");
+    let at = "meada: ops/meada.workspace.toml";
+    let head = "index_dir = \"../indexes\"\n";
+    let oidc = "\n[oidc]\nissuer = \"https://id.example.com\"\npublic_url = \"https://m.example\"\n\
+                identities_claim = \"r\"\n\n[oidc.github]\nhost = \"github.com\"\nlogin_claim = \"l\"\n\
+                max_age_seconds = 600\n\n[postgres]\nschema = \"m\"\n";
+    let catalog = "\n[catalog]\nallow = [\"github.com/secret-owner/*\"]\nmax_repositories = 50\n";
+    let full = format!("{head}{oidc}{catalog}");
+    let allow = "allow = [\"github.com/secret-owner/*\"]";
+    let line = full.lines().position(|l| l == "[catalog]").unwrap() + 1;
+    let keyed = |at_line: usize, key: &str, why: &str| format!("{at}:{at_line}: `{key}`: {why}\n");
+    for (toml, expected) in [
+        (
+            format!("{head}{catalog}"),
+            format!("{at}:3: [catalog] needs [oidc.github]\n"),
+        ),
+        (
+            full.replace(allow, "allow = [\"gitlab.com/secret-owner/*\"]"),
+            keyed(
+                line + 1,
+                "catalog.allow",
+                "must be a non-empty array of distinct lowercase patterns, each \
+                 github.com/<owner>/* or github.com/<owner>/<repo>",
+            ),
+        ),
+        (
+            full.replace(allow, "allow = []"),
+            keyed(
+                line + 1,
+                "catalog.allow",
+                "must be a non-empty array of distinct lowercase patterns, each \
+                 github.com/<owner>/* or github.com/<owner>/<repo>",
+            ),
+        ),
+        (
+            full.replace("max_repositories = 50\n", ""),
+            format!("{at}:{line}: `catalog`: `catalog.max_repositories` is missing\n"),
+        ),
+        (
+            full.replace("= 50", "= 5001"),
+            keyed(line + 2, "catalog.max_repositories", "must be at most 5000"),
+        ),
+        (
+            full.replace("= 50", "= 0"),
+            keyed(line + 2, "catalog.max_repositories", "must be at least 1"),
+        ),
+        (
+            format!("{full}secret = \"x\"\n"),
+            format!(
+                "{at}:{}: `catalog.secret` is not a meada.workspace.toml key\n",
+                line + 3
+            ),
+        ),
+    ] {
+        write_manifest(&dir, &toml);
+        let (stdout, stderr, ok) = run(&dir, "status");
+        assert!(!ok && stdout.is_empty(), "{toml}");
+        assert_eq!(stderr, expected, "{toml}");
+        assert!(!stderr.contains("secret-owner"), "{stderr}");
+    }
+}
+
+/// The `[proposals]` section (ADR 0022): without `[workspaces]`, with a URL that is not `https`
+/// off loopback or has a path, with an empty audience and with an unknown key, each error names
+/// the file, the line and the key.
+#[cfg(feature = "proposals")]
+#[test]
+fn proposals_section_errors_name_the_file_the_line_and_the_keys() {
+    let dir = mirrors("manifest_proposals_errors");
+    let at = "meada: ops/meada.workspace.toml";
+    let head = "index_dir = \"../indexes\"\n\n[proposals]\n";
+    let url = "must be an https:// URL with a host and nothing after it (http:// only on loopback)";
+    for (toml, expected) in [
+        (
+            format!("{head}public_url = \"https://p.example\"\n"),
+            format!("{at}:3: [proposals] needs [workspaces]\n"),
+        ),
+        (
+            format!("{head}audience = \"agents\"\n"),
+            format!("{at}:3: `proposals`: `proposals.public_url` is missing\n"),
+        ),
+        (
+            format!("{head}public_url = \"http://p.example\"\n"),
+            format!("{at}:4: `proposals.public_url`: {url}\n"),
+        ),
+        (
+            format!("{head}public_url = \"https://p.example/mcp\"\n"),
+            format!("{at}:4: `proposals.public_url`: {url}\n"),
+        ),
+        (
+            format!("{head}public_url = \"https://p.example\"\naudience = \"\"\n"),
+            format!("{at}:5: `proposals.audience`: must not be empty\n"),
+        ),
+        (
+            format!("{head}public_url = \"https://p.example\"\ngrant = \"*\"\n"),
+            format!("{at}:5: `proposals.grant` is not a meada.workspace.toml key\n"),
+        ),
+    ] {
+        write_manifest(&dir, &toml);
+        let (stdout, stderr, ok) = run(&dir, "status");
+        assert!(!ok && stdout.is_empty(), "{toml}");
+        assert_eq!(stderr, expected, "{toml}");
     }
 }
 
@@ -1527,5 +1654,68 @@ fn a_bad_node_name_names_the_file_the_line_and_the_key() {
             assert!(!ok && stdout.is_empty(), "{command}: {name:?}");
             assert_eq!(stderr, expected, "{command}: {name:?}");
         }
+    }
+}
+
+/// `[workspaces]` (#342) needs the sections it rides on, each error naming both, and its keys
+/// are checked: the file, the line and the key are named, and the mirrors root is a path, not a
+/// value anyone may read back from an answer.
+#[cfg(feature = "workspaces")]
+#[test]
+fn workspaces_section_errors_name_the_file_the_line_and_the_sections() {
+    let dir = mirrors("manifest_workspaces_errors");
+    let at = "meada: ops/meada.workspace.toml";
+    let head = "index_dir = \"../indexes\"\n";
+    let section = "\n[workspaces]\nmirrors = \"/srv/mirrors\"\n";
+    let oidc = "\n[oidc]\nissuer = \"https://id.example.com\"\npublic_url = \"https://m.example\"\n\
+                identities_claim = \"r\"\n\n[oidc.github]\nhost = \"github.com\"\nlogin_claim = \"l\"\n\
+                max_age_seconds = 600\n\n[postgres]\nschema = \"m\"\n\n\
+                [catalog]\nallow = [\"github.com/a/*\"]\nmax_repositories = 5\n";
+    let ui = "\n[ui]\ndir = \"u\"\npublic_url = \"https://c.example\"\nclient_id = \"c\"\n\
+              operations = true\noperator_claim = \"op\"\n";
+    let full = format!("{head}{section}{oidc}{ui}");
+    let line = full.lines().position(|l| l == "[workspaces]").unwrap() + 1;
+    for (toml, expected) in [
+        (
+            format!("{head}{section}"),
+            format!("{at}:3: [workspaces] needs [ui] and [oidc.github] and [catalog]\n"),
+        ),
+        (
+            full.replace("operations = true", "operations = false"),
+            format!("{at}:{line}: `workspaces`: [workspaces] needs [ui] operations = true\n"),
+        ),
+        (
+            full.clone(),
+            format!(
+                "{at}:{line}: `workspaces`: [workspaces] needs [workspace] source = \"store\"\n"
+            ),
+        ),
+        (
+            full.replace("/srv/mirrors", "relative/mirrors"),
+            format!(
+                "{at}:{}: `workspaces.mirrors`: must be an absolute path without `..`, the root \
+                 of the mirrors named workspaces use\n",
+                line + 1
+            ),
+        ),
+        (
+            full.replace("mirrors = \"/srv/mirrors\"", "max_entries = 501"),
+            format!("{at}:{line}: `workspaces`: `workspaces.mirrors` is missing\n"),
+        ),
+        (
+            full.replace(
+                "mirrors = \"/srv/mirrors\"\n",
+                "mirrors = \"/m\"\nmax_workspaces = 2001\n",
+            ),
+            format!(
+                "{at}:{}: `workspaces.max_workspaces`: must be at most 2000\n",
+                line + 2
+            ),
+        ),
+    ] {
+        write_manifest(&dir, &toml);
+        let (stdout, stderr, ok) = run(&dir, "status");
+        assert!(!ok && stdout.is_empty(), "{toml}");
+        assert_eq!(stderr, expected, "{toml}");
     }
 }

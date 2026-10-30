@@ -48,7 +48,7 @@ use crate::workspace::Manifest;
 
 // ponytail: the most a workspace version document may hold in the store; past it the document
 // is refused, naming its key.
-const VERSION_MAX: u64 = 4 << 20;
+pub(crate) const VERSION_MAX: u64 = 4 << 20;
 
 /// The directory under `index_dir` where `pull` leaves the current version.
 pub const DIR: &str = "workspace";
@@ -73,6 +73,9 @@ struct Sections {
     snapshot: Config,
     valkey: valkey::Config,
     index_dir: PathBuf,
+    /// With `[workspaces]`, where the named workspaces are read from (#342).
+    #[cfg(feature = "workspaces")]
+    named: Option<(crate::postgres::Config, crate::workspaces::Config)>,
 }
 
 /// `manifest`'s `[snapshot]` and `[valkey]`, or the error naming it when it has no
@@ -84,6 +87,8 @@ fn sections(manifest: &Path) -> crate::Result<Sections> {
             snapshot,
             valkey,
             index_dir: read.index_dir,
+            #[cfg(feature = "workspaces")]
+            named: read.postgres.zip(read.workspaces),
         }),
         _ => Err(Msg::WorkspaceNoSections(&manifest.display().to_string())
             .text()
@@ -769,6 +774,9 @@ pub enum Pulled {
     Swapped(String),
     /// The current file already named the pointer's version and fence: nothing changed.
     Current(String),
+    /// The deployment workspace has no current version, with `[workspaces]` an empty deployment
+    /// workspace: the current file is removed and only the contexts are pulled.
+    Empty,
 }
 
 /// `meada workspace pull --workspace <manifest>`: the pointer `{<key_prefix>}:workspace` and the
@@ -780,18 +788,38 @@ pub enum Pulled {
 pub fn pull(manifest: &Path) -> crate::Result<Pulled> {
     let sections = sections(manifest)?;
     let pointer = pointer_key(&sections.valkey);
+    // With `[workspaces]` a deployment with no current version is an empty deployment workspace.
+    #[cfg(feature = "workspaces")]
+    let empty_ok = sections.named.is_some();
+    #[cfg(not(feature = "workspaces"))]
+    let empty_ok = false;
     let fetch = async {
         let valkey = Valkey::connect(&sections.valkey).await?;
         let current = current(&valkey, &sections.valkey).await?;
-        let (id, fence) = current.ok_or_else(|| Msg::WorkspaceNoCurrent(&pointer).text())?;
         let store = Store::connect(&sections.snapshot)?;
-        let key = version_key(&sections.snapshot, &id);
-        let bytes = store.get(&key, VERSION_MAX).await?;
-        let bytes = bytes.ok_or_else(|| Msg::WorkspaceNoVersion(&key).text())?;
-        checked(&key, &id, &bytes)?;
-        Ok::<_, String>((id, fence, bytes))
+        let deployment = match current {
+            Some((id, fence)) => {
+                let key = version_key(&sections.snapshot, &id);
+                let bytes = store.get(&key, VERSION_MAX).await?;
+                let bytes = bytes.ok_or_else(|| Msg::WorkspaceNoVersion(&key).text())?;
+                checked(&key, &id, &bytes)?;
+                Some((id, fence, bytes))
+            }
+            None if empty_ok => None,
+            None => return Err(Msg::WorkspaceNoCurrent(&pointer).text()),
+        };
+        #[cfg(feature = "workspaces")]
+        let contexts = match &sections.named {
+            Some((postgres, _)) => {
+                Some(named_contexts(postgres, &store, &sections.snapshot).await?)
+            }
+            None => None,
+        };
+        #[cfg(not(feature = "workspaces"))]
+        let contexts: Option<()> = None;
+        Ok::<_, String>((deployment, contexts))
     };
-    let (id, fence, bytes) = crate::modules::block_on(fetch)??;
+    let (deployment, contexts) = crate::modules::block_on(fetch)??;
 
     let dir = sections.index_dir.join(DIR);
     let at = pull::io_at(&dir);
@@ -801,6 +829,25 @@ pub fn pull(manifest: &Path) -> crate::Result<Pulled> {
         .open(dir.join("pull.lock"))
         .map_err(&at)?;
     lock.lock().map_err(&at)?;
+    // The contexts file first: a reader that sees the new version finds the contexts at least as
+    // new, and the role check reads both before it writes the exclusions that name them.
+    #[cfg(feature = "workspaces")]
+    if let Some(contexts) = &contexts {
+        crate::workspaces::write_contexts(&dir, contexts)?;
+        eprintln!("meada: {}", Msg::ContextsWritten(contexts.len()).text());
+    }
+    #[cfg(not(feature = "workspaces"))]
+    let _ = contexts;
+    let Some((id, fence, bytes)) = deployment else {
+        // The deployment workspace is empty: no current file, no document.
+        let file = dir.join(CURRENT);
+        if let Err(e) = fs::remove_file(&file)
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            return Err(pull::io_at(&file)(e).into());
+        }
+        return Ok(Pulled::Empty);
+    };
     let file = dir.join(CURRENT);
     let previous = pull::pointer_file(&file, |shown| Msg::WorkspaceCurrentBad(shown).text())?;
     let document = dir.join(format!("{id}.json"));
@@ -845,6 +892,36 @@ pub fn pull(manifest: &Path) -> crate::Result<Pulled> {
         }
     }
     Ok(Pulled::Swapped(id))
+}
+
+/// Every named workspace not deleted with the entries of its current version, read in one
+/// `REPEATABLE READ` transaction and from the store (hostile input, bounded as the deployment
+/// version is): what the contexts file holds (#342).
+#[cfg(feature = "workspaces")]
+async fn named_contexts(
+    postgres: &crate::postgres::Config,
+    store: &Store,
+    snapshot: &Config,
+) -> Result<Vec<crate::workspaces::Context>, String> {
+    let current = crate::workspaces::store::current_contexts(postgres).await?;
+    let mut contexts = Vec::new();
+    for (id, version, operators) in current {
+        let hostile = || Msg::WorkspacesDocumentBad(&id).text();
+        if !is_id(&id) || !is_id(&version) {
+            return Err(hostile());
+        }
+        let key = snapshot.key(&format!("workspaces/{version}.json"));
+        let bytes = store.get(&key, VERSION_MAX).await?;
+        let bytes = bytes.ok_or_else(|| Msg::WorkspaceNoVersion(&key).text())?;
+        let entries = crate::workspaces::store::document_entries(&key, &version, &bytes)?;
+        contexts.push(crate::workspaces::Context {
+            id,
+            version,
+            operators,
+            entries,
+        });
+    }
+    Ok(contexts)
 }
 
 /// The version the current file of `dir` (`<index_dir>/workspace/`) names, read from disk and
@@ -896,19 +973,65 @@ pub fn eligible(dir: &Path) -> Result<Option<(String, Vec<EntryFile>, String)>, 
 }
 
 /// The exclusions file in `DIR` (#331): the version id `meada github-app roles` checked on its
-/// first line, then the identities it left out, sorted, one per line.
+/// first line, then the identities it left out, sorted, one per line. With `[workspaces]` (#342)
+/// a line `# contexts <digest>` follows the version, naming the contexts file the file was
+/// decided for, and each named workspace's exclusion is `<context id>\t<identity>` after the
+/// identities.
 pub const EXCLUDED: &str = "excluded";
+
+// ponytail: the most bytes of the exclusions file: one line per excluded (workspace, identity),
+// at most `max_workspaces` of 2000 workspaces of `max_entries` of 500 entries each.
+const EXCLUDED_MAX: u64 = 128 << 20;
+
+/// The version id the exclusions file names for a deployment workspace with no current version
+/// (an empty deployment under `[workspaces]`, #342).
+pub const NO_VERSION: &str = "0000000000000000";
+
+/// The prefix of the exclusions file's line naming the contexts file it was written for (#342).
+const CONTEXTS_LINE: &str = "# contexts ";
 
 /// The identities the exclusions file of `dir` leaves out of the pulled version `version`. The
 /// file is hostile: refused, naming `meada github-app roles`, when it is missing or names another
 /// version id, and naming its line when one is not a version id or an identity.
 pub fn excluded(dir: &Path, version: &str) -> Result<BTreeSet<String>, String> {
+    parse_excluded(dir, version).map(|(deployment, _, _)| deployment)
+}
+
+/// The identities the exclusions file leaves out of each named workspace (#342), by context id:
+/// `excluded`'s checks, and the file must name the contexts file `digest` it was written for.
+#[cfg(feature = "workspaces")]
+pub fn excluded_contexts(
+    dir: &Path,
+    version: &str,
+    digest: &str,
+) -> Result<std::collections::BTreeMap<String, BTreeSet<String>>, String> {
+    let (_, contexts, named) = parse_excluded(dir, version)?;
+    match named.as_deref() == Some(digest) {
+        true => Ok(contexts),
+        false => Err(Msg::ContextsOther(&dir.join(EXCLUDED).display().to_string()).text()),
+    }
+}
+
+/// The exclusions file parsed: the deployment workspace's identities, each context's (a line
+/// `<context id>\t<identity>`) and the digest of the contexts file it names, if any.
+#[allow(clippy::type_complexity)]
+fn parse_excluded(
+    dir: &Path,
+    version: &str,
+) -> Result<
+    (
+        BTreeSet<String>,
+        std::collections::BTreeMap<String, BTreeSet<String>>,
+        Option<String>,
+    ),
+    String,
+> {
     let file = dir.join(EXCLUDED);
     let shown = file.display().to_string();
     if fs::symlink_metadata(&file).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound) {
         return Err(Msg::ExcludedMissing(&shown).text());
     }
-    let bytes = crate::config::read_bounded(&file, VERSION_MAX)?;
+    let bytes = crate::config::read_bounded(&file, EXCLUDED_MAX)?;
     let bad = |line| Msg::ExcludedBad { file: &shown, line }.text();
     let text = String::from_utf8(bytes).map_err(|_| bad(1))?;
     let mut lines = text.lines();
@@ -927,13 +1050,29 @@ pub fn excluded(dir: &Path, version: &str) -> Result<BTreeSet<String>, String> {
             && !line.chars().any(|c| c.is_control() || c.is_whitespace())
             && meada_core::manifest::identity_problem(line).is_none()
     };
-    (lines.enumerate())
-        .map(|(n, line)| {
-            identity(line)
-                .then(|| line.to_string())
-                .ok_or_else(|| bad(n + 2))
-        })
-        .collect()
+    let (mut deployment, mut contexts, mut digest) =
+        (BTreeSet::new(), std::collections::BTreeMap::new(), None);
+    for (n, line) in lines.enumerate() {
+        let at = n + 2;
+        if let Some(named) = line.strip_prefix(CONTEXTS_LINE) {
+            if !is_id(named) || digest.replace(named.to_string()).is_some() {
+                return Err(bad(at));
+            }
+        } else if let Some((context, repo)) = line.split_once('\t') {
+            if !is_id(context) || !identity(repo) {
+                return Err(bad(at));
+            }
+            contexts
+                .entry(context.to_string())
+                .or_insert_with(BTreeSet::new)
+                .insert(repo.to_string());
+        } else if identity(line) {
+            deployment.insert(line.to_string());
+        } else {
+            return Err(bad(at));
+        }
+    }
+    Ok((deployment, contexts, digest))
 }
 
 /// The refusal of a reader of `manifest` with no version pulled into `dir`, naming the pull.
@@ -974,10 +1113,31 @@ pub fn write_excluded(
     version: &str,
     identities: &BTreeSet<String>,
 ) -> Result<(), String> {
-    let text: String = std::iter::once(version)
-        .chain(identities.iter().map(String::as_str))
-        .map(|line| format!("{line}\n"))
-        .collect();
+    write_excluded_with(dir, version, identities, None)
+}
+
+/// `write_excluded` with the named workspaces' exclusions (#342): a line `# contexts <digest>`
+/// naming the contexts file they were decided for, then each `(context id, identity)` as
+/// `<context id>\t<identity>`, sorted.
+pub fn write_excluded_with(
+    dir: &Path,
+    version: &str,
+    identities: &BTreeSet<String>,
+    contexts: Option<(&str, &BTreeSet<(String, String)>)>,
+) -> Result<(), String> {
+    let mut lines = vec![version.to_string()];
+    if let Some((digest, _)) = contexts {
+        lines.push(format!("{CONTEXTS_LINE}{digest}"));
+    }
+    lines.extend(identities.iter().cloned());
+    if let Some((_, named)) = contexts {
+        lines.extend(
+            named
+                .iter()
+                .map(|(context, repo)| format!("{context}\t{repo}")),
+        );
+    }
+    let text: String = lines.into_iter().map(|line| format!("{line}\n")).collect();
     let (file, new) = (dir.join(EXCLUDED), dir.join(format!("{EXCLUDED}.new")));
     let written = (fs::write(&new, text).map_err(pull::io_at(&new)))
         .and_then(|()| fs::rename(&new, &file).map_err(pull::io_at(&file)));
@@ -998,6 +1158,32 @@ pub fn show_pulled(manifest: &Path) -> crate::Result<String> {
         true => eligible(&dir)?,
         false => pulled(&dir)?,
     };
+    #[cfg(feature = "workspaces")]
+    if let Some(section) = &read.workspaces {
+        // The repositories only named workspaces select, with the paths the fetch script
+        // provisions them at (ADR 0021): after the deployment workspace's own entries.
+        let (version, deployment, text) = match found {
+            Some((version, entries, text)) => (version, entries, text),
+            None => (String::new(), Vec::new(), String::new()),
+        };
+        let identities: Vec<String> = deployment.iter().map(|e| e.repo.clone()).collect();
+        let membership = crate::workspaces::membership(&dir, &version, &identities)?;
+        let mut text = text;
+        for identity in membership.members {
+            let path = crate::workspaces::member_path(&section.mirrors, &identity);
+            let sep = if text.is_empty() || text.ends_with("\n\n") {
+                ""
+            } else {
+                "\n"
+            };
+            text = format!(
+                "{text}{sep}[[repository]]\nrepo = {}\npath = {}\n",
+                toml::Value::String(identity),
+                toml::Value::String(path.display().to_string()),
+            );
+        }
+        return Ok(text);
+    }
     Ok(found.ok_or_else(|| not_pulled(manifest, &dir))?.2)
 }
 
@@ -1005,6 +1191,39 @@ pub fn show_pulled(manifest: &Path) -> crate::Result<String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// An exclusions file past its bound is refused unread, and a context line must name an id
+    /// and an identity.
+    #[test]
+    fn the_exclusions_file_is_bounded_and_its_context_lines_are_checked() {
+        let dir = std::env::temp_dir().join(format!("meada-excluded-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let version = "0123456789abcdef";
+        let digest = "fedcba9876543210";
+        let write = |text: String| fs::write(dir.join(EXCLUDED), text).unwrap();
+        write(format!(
+            "{version}\n{CONTEXTS_LINE}{digest}\nh/o/a\n{version}\th/o/b\n"
+        ));
+        assert_eq!(excluded(&dir, version).unwrap().len(), 1);
+        #[cfg(feature = "workspaces")]
+        {
+            let named = excluded_contexts(&dir, version, digest).unwrap();
+            assert_eq!(named[version].len(), 1);
+            assert!(excluded_contexts(&dir, version, version).is_err());
+        }
+        for bad in [
+            "nope\th/o/b\n",
+            "0123456789abcdef\t\n",
+            "0123456789abcdef\t../x\n",
+        ] {
+            write(format!("{version}\n{bad}"));
+            assert!(excluded(&dir, version).is_err(), "{bad:?}");
+        }
+        let big = fs::File::create(dir.join(EXCLUDED)).unwrap();
+        big.set_len(EXCLUDED_MAX + 1).unwrap();
+        assert!(excluded(&dir, version).is_err());
+    }
 
     /// An identity the version holds outside the grant is `outside_grant` whatever the core
     /// found, an attribution missing included, in the submitted order and before the removals.

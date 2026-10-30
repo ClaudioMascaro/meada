@@ -1,6 +1,6 @@
 # Roadmap
 
-S1, S2 and S4 are delivered. S3 and S5 remain planned. This map shows dependencies and scope boundaries without promising dates.
+S1, S2, S4 and S5 are delivered, with S5's real-organization measurement ([#338](https://github.com/ClaudioMascaro/meada/issues/338)) still open. S3 remains planned. This map shows dependencies and scope boundaries without promising dates.
 
 <!-- meada-graph:roadmap -->
 
@@ -16,6 +16,6 @@ S5 depends on both foundations, [atomic publication, #316](https://github.com/Cl
 
 ## After the foundations
 
-[S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) will introduce [named workspaces](named-workspaces.md) over shared indexing. [Contract consolidation, #340](https://github.com/ClaudioMascaro/meada/issues/340), precedes runtime work. The accepted sequence is contracts → eligible catalog → first workspace → versions and overlap → cross-repository configuration. Guided UI and MCP proposals then advance in parallel; enterprise validation depends on both.
+[S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) introduces [named workspaces](named-workspaces.md) over shared indexing. [Contract consolidation, #340](https://github.com/ClaudioMascaro/meada/issues/340), is done (ADRs 0020 to 0022) and precedes runtime work. The accepted sequence is contracts → eligible catalog → first workspace → versions and overlap → cross-repository configuration. The eligible catalog ([#341](https://github.com/ClaudioMascaro/meada/issues/341)) is delivered: discovering the selectable repositories before any manifest exists, creating no workspace and no index. The first workspace ([#342](https://github.com/ClaudioMascaro/meada/issues/342)) is delivered too: creation from the catalog, shared ingestion with the sponsor rule, and the node route `/-/workspaces/<id>/<identity>`; the version lifecycle ([#343](https://github.com/ClaudioMascaro/meada/issues/343)) is delivered as well: save, apply, rollback, rename, delete and delegation with a base that keeps overlapping workspaces and concurrent editors apart; per-workspace configuration ([#344](https://github.com/ClaudioMascaro/meada/issues/344)) is delivered as well, and so is guided authoring ([#345](https://github.com/ClaudioMascaro/meada/issues/345)): form controls for repositories, peers, serve settings, resources and environment-variable names that stay one document with the manifest text. The measurement against a real GitHub organization ([#338](https://github.com/ClaudioMascaro/meada/issues/338)) is still pending; the maintainer decided it does not gate S5. The authenticated MCP proposals ([#346](https://github.com/ClaudioMascaro/meada/issues/346)) are delivered too, and so is the end-to-end validation with the upgrade procedure ([#347](https://github.com/ClaudioMascaro/meada/issues/347)).
 
 The linked specifications own the complete contracts. A planned roadmap item is not an available configuration option.

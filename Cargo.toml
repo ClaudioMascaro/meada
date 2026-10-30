@@ -160,6 +160,19 @@ directory = ["postgres"]
 # The management console (`[ui]`, `meada ui`, ADR 0014): the node's hyper listener and
 # serde_json. No crate of its own.
 ui = []
+# Named workspaces (ADR 0020, 0021): the catalog of repositories a maintainer may select
+# (`[catalog]`, #341) and, in the slices after it, the workspaces themselves. No crate of its own.
+workspaces = [
+    "ui",
+    "oidc",
+    "postgres",
+    "github-app",
+    "generation-pointer",
+    "refresh-lock",
+]
+# The proposal server (ADR 0022, `[proposals]`, `meada workspaces mcp`): the named workspaces'
+# discovery, validation and stateless proposals over MCP, for agents. No crate of its own.
+proposals = ["workspaces"]
 # Every cloud module at once (ADR 0012). Unix only, since `refresh-lock` is.
 cloud = [
     "snapshot",
@@ -170,6 +183,8 @@ cloud = [
     "ui",
     "postgres",
     "directory",
+    "workspaces",
+    "proposals",
 ]
 
 # `cargo test` runs the example's own tests too.

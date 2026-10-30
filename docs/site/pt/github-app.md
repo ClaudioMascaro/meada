@@ -117,6 +117,54 @@ imprime a versão baixada sem as exclusões, para o script de fetch. O refresh d
 snapshot lock`, fica: `workspace pull`, `github-app roles`, o fetch do que `show --pulled` lista,
 `index --workspace` e `snapshot publish`; um refresh que para na checagem não publica nada.
 
+### O catálogo de repositórios
+
+Com a feature `workspaces` (incluída em `cloud`) e `[catalog]` no bootstrap, o mesmo job
+descobre também os repositórios que um mantenedor poderia selecionar antes de existir um
+manifesto, independentemente do workspace aplicado ([#341](https://github.com/ClaudioMascaro/meada/issues/341),
+ADR 0021):
+
+```toml
+[catalog]
+allow = ["github.com/acme/*", "github.com/outro/ferramenta"]   # obrigatório; no host de [oidc.github]
+max_repositories = 200                                           # obrigatório, de 1 a 5000, sem padrão
+```
+
+`allow` lista padrões em minúsculas, `<host>/<dono>/*` ou `<host>/<dono>/<repositório>`,
+comparados exatamente, sem repetição; `[catalog]` exige `[oidc.github]`, e o erro nomeia as duas
+seções. Com `[catalog]`, `meada github-app roles` lista, para cada instalação dos Apps do `host`
+cujo dono algum padrão nomeia, `GET /installation/repositories?per_page=100` (todas as páginas,
+com as mesmas instalações, marcas de limite e cache de tokens), mantém o que `allow` admite, soma
+as identidades que o workspace seleciona e lista os colaboradores de cada uma, como antes. O
+resultado é um único conjunto de permissões, na mesma transação, com `source` (`selected`,
+`catalog` ou `both`) em cada repositório (migração 6: rode `meada postgres migrate` antes). O
+catálogo são os repositórios `catalog` ou `both` que o GitHub mostrou (`listed`).
+
+Uma listagem de instalação que falha, uma instalação limitada (que fica marcada, como em toda
+chamada REST do módulo), uma resposta que não é o objeto documentado, mais de 100 páginas ou mais
+candidatos do que `max_repositories`, sem contar os repositórios do workspace, fazem o comando
+falhar com saída 1 e **nada é gravado**: um conjunto parcial revogaria ou misturaria
+repositórios, e o anterior continua envelhecendo. A linha de sucesso passa a ser `conjunto de
+permissões <id>: N repositórios (M no catálogo), R linhas, E exclusões`; sem `[catalog]` nada
+muda, byte a byte.
+
+**Custo.** Além da carga da checagem de papéis, o catálogo paga `ceil(cobertos / 100)` páginas
+de instalação por instalação listada (`cobertos` conta todo repositório que a instalação cobre,
+não só os que `allow` admite) e, por candidato, `ceil(colaboradores / 100)` páginas de
+colaboradores. Por isso `max_repositories` não tem padrão: quem o define aceita o custo. O custo
+real contra uma organização real do GitHub ainda não foi medido
+([#338](https://github.com/ClaudioMascaro/meada/issues/338) não bloqueia o S5); a suposição que
+essa medição confirmaria é que a listagem das instalações mais a dos colaboradores com
+`affiliation=all` cabe na hora de uma instalação no limite que você definiu, ou que antes é preciso
+listar uma vez os membros do papel-base. Meça com a sua organização antes de ampliar a cobertura.
+
+**Cobertura não é direito.** O catálogo só diz o que *poderia* ser selecionado. Uma pessoa só
+seleciona um repositório do catálogo em que o seu login do GitHub tem um papel aceito no conjunto
+mais recente, direto ou por um grupo do repositório; cobertura do App, nomes de grupo em um token
+e qualquer coisa que um agente afirme não concedem nada. A console e os nós continuam sem chamar
+o GitHub: a leitura do catálogo ([console](console.md#catalogo-de-repositorios)) usa só o conjunto
+que o job gravou.
+
 ### O grant na admissão
 
 Nós e a console com `[oidc.github]` leem, a cada minuto, o conjunto de permissões mais novo, e
