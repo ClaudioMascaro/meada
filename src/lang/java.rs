@@ -203,7 +203,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         generics: Rc::new(Vec::new()),
     }];
     // The fields by declaring scope: a local is hidden by those of its class or an enclosing one.
-    let mut fields: BTreeSet<(String, String)> = BTreeSet::new();
+    let mut fields: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut locals = Vec::new();
     // The types declared so far: a local whose scope is one sits in an initializer.
     let mut classes = BTreeSet::new();
@@ -224,7 +224,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // file assigns holds no one value, so its bound is dropped (`Facts::bound`).
     let mut initialized: Vec<Bound> = Vec::new();
     let mut reassigned: BTreeSet<String> = BTreeSet::new();
-    let mut seen = Declared::new();
+    let mut seen = Declared::new(tree.root_node());
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
         node,
@@ -689,7 +689,10 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         }
                         _ => Class::Unknown,
                     };
-                    fields.insert((scope.as_ref().clone(), text(name, src).to_string()));
+                    fields
+                        .entry(text(name, src).to_string())
+                        .or_default()
+                        .insert(scope.as_ref().clone());
                     if definitions {
                         let is_static = modifiers(node).contains(&"static");
                         for annotation in annotations(node, src, &scope) {
@@ -762,11 +765,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // names none.
     let written: BTreeSet<(String, Option<String>)> = (written.into_iter())
         .map(|(scope, name, own)| {
-            let around = (classes.iter())
-                .filter(|at| encloses(at, &scope))
-                .max_by_key(|at| at.len());
-            let owner = around.filter(|at| own && fields.contains(&((*at).clone(), name.clone())));
-            (name, owner.cloned())
+            let around = innermost(&classes, &scope);
+            let owner = around.filter(|at| own && declares_field(&fields, &name, at));
+            (name, owner.map(str::to_string))
         })
         .collect();
     for (name, class) in written {
@@ -789,7 +790,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         *declared.entry((&local.scope, &local.name)).or_default() += 1;
     }
     let field_hides = |name: &str, scope: &str| {
-        (fields.iter()).any(|(at, field)| field == name && encloses(at, scope))
+        (fields.get(name)).is_some_and(|at| at.iter().any(|at| encloses(at, scope)))
     };
     facts.bound = (initialized.into_iter())
         .filter(|b| {
@@ -940,22 +941,56 @@ fn assignments(
     }
 }
 
-/// The names the children of a node declare, each with the offset of the first child that does.
-type Declared = BTreeMap<usize, BTreeMap<String, usize>>;
+/// What the children of each node declare (the node's id to each name with the offset of the
+/// first child that declares it), and the parent of each node, both read once per file:
+/// `Node::parent()` is found from the root, so a walk up by it costs the depth squared.
+struct Declared<'t> {
+    root: Node<'t>,
+    names: BTreeMap<usize, BTreeMap<String, usize>>,
+    parents: Option<BTreeMap<usize, Node<'t>>>,
+}
+
+impl<'t> Declared<'t> {
+    fn new(root: Node<'t>) -> Self {
+        Declared {
+            root,
+            names: BTreeMap::new(),
+            parents: None,
+        }
+    }
+
+    /// The parent of `node`, from an index of every node's parent built on first use.
+    fn parent(&mut self, node: Node<'t>) -> Option<Node<'t>> {
+        let root = self.root;
+        let parents = self.parents.get_or_insert_with(|| {
+            let mut parents = BTreeMap::new();
+            let mut pending = vec![root];
+            while let Some(at) = pending.pop() {
+                for child in children(at) {
+                    parents.insert(child.id(), at);
+                    pending.push(child);
+                }
+            }
+            parents
+        });
+        parents.get(&node.id()).copied()
+    }
+}
 
 /// Whether the identifier `name` is a local or a parameter declared before it, in a block
 /// around it, a loop, a `catch`, a `try` resource, a lambda or the method. `seen` holds what
 /// each block declares, read once, so a block of thousands of statements costs its width.
 // ponytail: a pattern variable (`o instanceof Foo base`) and a local of an earlier `case` group
 // are not read, so an assignment to either counts as a write of a field of that name.
-fn declared_before(name: Node, src: &[u8], seen: &mut Declared) -> bool {
+fn declared_before<'t>(name: Node<'t>, src: &[u8], seen: &mut Declared<'t>) -> bool {
     let wanted = text(name, src);
     let mut child = name;
-    while let Some(parent) = child.parent() {
+    while let Some(parent) = seen.parent(child) {
         if parent.kind() == "class_body" {
             return false;
         }
         let names = seen
+            .names
             .entry(parent.id())
             .or_insert_with(|| declared_in(parent, src));
         if names.get(wanted).is_some_and(|&at| at < child.start_byte()) {
@@ -1400,6 +1435,23 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
     }
 }
 
+/// The innermost class of `classes` that is `scope` or encloses it, found by the prefixes of
+/// `scope` rather than a scan of the classes.
+fn innermost<'a>(classes: &'a BTreeSet<String>, scope: &str) -> Option<&'a str> {
+    let ends = scope
+        .match_indices('.')
+        .map(|(n, _)| n)
+        .chain([scope.len()]);
+    ends.rev()
+        .find_map(|end| classes.get(&scope[..end]))
+        .map(String::as_str)
+}
+
+/// Whether `class` declares a field `name`.
+fn declares_field(fields: &BTreeMap<String, BTreeSet<String>>, name: &str, class: &str) -> bool {
+    fields.get(name).is_some_and(|at| at.contains(class))
+}
+
 /// Whether the class scope `class` is `scope` or encloses it.
 fn encloses(class: &str, scope: &str) -> bool {
     scope == class
@@ -1465,6 +1517,38 @@ mod tests {
         let mut marks = writes(&src);
         marks.dedup();
         assert_eq!(marks, [".a@C"]);
+        assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
+    }
+
+    /// Thousands of fields and thousands of locals cost their sum: a local finds the fields of
+    /// its name by a lookup, not a scan of every field.
+    #[test]
+    fn many_fields_and_locals_are_read_in_linear_time() {
+        let fields = (0..5_000).fold(String::new(), |s, n| s + &format!("int f{n};\n"));
+        let locals = (0..5_000).fold(String::new(), |s, n| {
+            s + &format!("Foo f{n} = new Foo();\n")
+        });
+        let src = format!("class C {{ {fields} void f() {{ {locals} }} }}");
+        let start = std::time::Instant::now();
+        let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
+        // Every local shares its name with a field, so none is bound to its initializer.
+        assert!(facts.bound.is_empty());
+        assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
+    }
+
+    /// Writes at the bottom of deeply nested blocks cost the depth each: a node's parent is read
+    /// from an index, not found from the root.
+    #[test]
+    fn deeply_nested_writes_are_read_in_linear_time() {
+        let depth = 1_000;
+        let src = format!(
+            "class C {{ int a; void f() {{ {} {} {} }} }}",
+            "{ ".repeat(depth),
+            "a = 1; ".repeat(200),
+            "} ".repeat(depth)
+        );
+        let start = std::time::Instant::now();
+        assert_eq!(writes(&src), [".a@C"]);
         assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
     }
 

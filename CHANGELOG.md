@@ -60,6 +60,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Java and Kotlin: a file with thousands of fields and locals is read in linear time (#442, from
+  #424). The hides check indexes the fields by name instead of scanning every field per local,
+  the class around a write is found from the prefixes of its scope, and `declared_before` (and
+  Kotlin's `assigned`) read a node's parent from an index built once per file, since
+  `Node::parent()` is found from the root and made a deep file quadratic per write. Same answers;
+  no golden changed.
 - Indexing: a file a pack drops for passing a limit is named by `meada status` (#434, from
   #419). The Java, Kotlin and Swift qualified-name budget (4 MiB) now sets `Facts::budget`, as the
   C# one does, instead of `unbuilt`, which prints nothing; a C# project that gives its files more
