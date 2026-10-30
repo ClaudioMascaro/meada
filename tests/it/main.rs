@@ -24,6 +24,7 @@ mod gateway;
 mod generations;
 mod github_app;
 mod gopkg;
+mod grammar;
 mod hostile;
 mod index;
 mod items;

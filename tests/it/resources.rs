@@ -34,9 +34,9 @@ fn context_on_a_resource_lists_its_writers_and_readers() {
         "chain.context-resource.txt",
         &engine.context("resource::postgres::orders", None).unwrap(),
     );
-    assert_eq!(
-        engine.context("resource::postgres::gone", None).unwrap(),
-        "no resource matches `resource::postgres::gone`\n"
+    assert_golden(
+        "chain.context-resource-none.txt",
+        &engine.context("resource::postgres::gone", None).unwrap(),
     );
 }
 

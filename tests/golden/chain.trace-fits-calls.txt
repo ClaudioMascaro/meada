@@ -1,0 +1,5 @@
+`fetch#0` fits 4 call sites; pass one of:
+example.com/chain/gateway src/catalog.ts:3 example.com/chain/gateway::src/catalog.ts::productOf::fetch#0
+example.com/chain/web src/api/client.ts:5 example.com/chain/web::src/api/client.ts::request::fetch#0
+example.com/chain/web src/status.ts:3 example.com/chain/web::src/status.ts::health::fetch#0
+example.com/chain/web src/status.ts:8 example.com/chain/web::src/status.ts::track::fetch#0

@@ -8,6 +8,18 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The output grammar reference (#145, spec R1): `docs/reference/output-grammar.md`, in English like
+  the MCP surface, specifies every line kind of `search`, `context` and `trace`, the link notation
+  with its level and reason, the levels in order, the contract identifiers (`http::`, `http::ANY::`
+  for a provider of every method, `channel::`, `package::`, `resource::`), the `search` kinds, the
+  chain footer, the cut note and the token estimate, and tells readers to skip line kinds and
+  fields they do not know. Its tables are the grammar check's input: `tests/it/grammar.rs` matches
+  every line of every rendered-answer golden against the line kinds of its tool and fails naming
+  the golden and the line, fails on a documented line kind no golden shows, and holds the
+  document's levels, entry kinds, open item kinds and `search` kinds to the code's. The stability document links
+  it. No output changed; new goldens pin the answers only inline assertions covered (`no symbol
+  matches`, `no resource matches`, the server's `index behind the mirror`, and `trace` with no
+  start, several symbols, several call sites or a clean working tree).
 - The pt-BR user guide, second half (#147, spec #32), in `docs/user-guide.md` (sections 8 to 11):
   each contract kind (HTTP routes, declared resources and gateway prefixes, OpenAPI and AsyncAPI
   documents, channels with the limit that broker clusters are not modelled, packages), each 1.0

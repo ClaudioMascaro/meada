@@ -353,6 +353,7 @@ async fn serves_each_repository_over_http_as_the_stdio_server_answers_it() {
         1,
         "{behind}"
     );
+    assert_golden("chain-web.context-behind.txt", &behind);
     assert!(contents(&indexes) == indexed, "a call wrote an index");
     assert!(run(&dir, "index").2);
     assert_eq!(text(&context().await.unwrap()), fresh);

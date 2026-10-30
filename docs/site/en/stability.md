@@ -30,7 +30,7 @@ Three tools, always with these names. None of them writes.
 
 ### Output grammar
 
-The output of the three tools is line-oriented text, and its grammar is specified in the output grammar reference document (in English, like the MCP surface, [ADR 0008](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0008-mcp-surface-and-output-languages.md)). Frozen are:
+The output of the three tools is line-oriented text, and its grammar is specified in the [output grammar reference document](https://github.com/ClaudioMascaro/meada/blob/main/docs/reference/output-grammar.md) (in English, like the MCP surface, [ADR 0008](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0008-mcp-surface-and-output-languages.md)). Frozen are:
 
 - every line kind of each tool and the meaning of each of its fields;
 - the link notation `→[level: reason]`, with the levels `exact`, `declared`, `inferred`, `decided` and `ambiguous`;

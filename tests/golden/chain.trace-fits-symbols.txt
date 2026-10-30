@@ -1,0 +1,3 @@
+`GET` fits 2 symbols; pass one of:
+example.com/chain/catalog app/api/health/route.ts:1 GET example.com/chain/catalog::app/api/health/route.ts::GET
+example.com/chain/catalog app/api/products/[id]/route.ts:3 GET example.com/chain/catalog::app/api/products/[id]/route.ts::GET

@@ -30,7 +30,7 @@ Três ferramentas, sempre com estes nomes. Nenhuma escreve.
 
 ### Gramática da saída
 
-A saída das três ferramentas é texto em linhas, e sua gramática é especificada no documento de referência da gramática de saída (em inglês, como a superfície MCP, [ADR 0008](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0008-mcp-surface-and-output-languages.md)). Estão congelados:
+A saída das três ferramentas é texto em linhas, e sua gramática é especificada no [documento de referência da gramática de saída](https://github.com/ClaudioMascaro/meada/blob/main/docs/reference/output-grammar.md) (em inglês, como a superfície MCP, [ADR 0008](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0008-mcp-surface-and-output-languages.md)). Estão congelados:
 
 - cada tipo de linha de cada ferramenta e o significado de cada um dos seus campos;
 - a notação de link `→[nível: motivo]`, com os níveis `exact`, `declared`, `inferred`, `decided` e `ambiguous`;
