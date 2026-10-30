@@ -254,6 +254,21 @@ enum Holds {
     Generations(std::result::Result<crate::snapshot::serve::Current, String>),
 }
 
+impl Holds {
+    /// What a console of the bootstrap `read` (at `file`) answers from.
+    fn of(file: &Path, read: &Manifest) -> Self {
+        #[cfg(feature = "snapshot")]
+        if let Some(snapshot) = &read.snapshot {
+            return Holds::Generations(match &snapshot.local_dir {
+                Some(local) => Ok(crate::snapshot::serve::Current::new(local.clone())),
+                None => Err(Msg::SnapshotNoLocalDir(&file.display().to_string()).text()),
+            });
+        }
+        let _ = file;
+        Holds::Listed(Box::new(read.clone()))
+    }
+}
+
 /// Who asks: the admitted subject (none behind the proxy), its role and what it may read.
 #[derive(Clone)]
 struct Session {
@@ -276,6 +291,25 @@ struct Session {
 }
 
 impl Session {
+    /// The session of a token `oidc` admitted, with a team operator's `teams`: the console's,
+    /// and the proposal server's with none (ADR 0022).
+    #[cfg(feature = "oidc")]
+    fn admitted(
+        admitted: crate::oidc::Admitted,
+        teams: Vec<String>,
+        oidc: &crate::oidc::Oidc,
+    ) -> Self {
+        Session {
+            subject: admitted.subject,
+            grant: Some(admitted.grant),
+            operator: admitted.operator,
+            groups: admitted.groups,
+            teams,
+            login: admitted.login,
+            github: oidc.github().map(|(host, state)| (host.to_string(), state)),
+        }
+    }
+
     /// Whether the session may read `identity`. Every view that lists or answers about a
     /// repository asks it (the manifest's entries here; the read routes and the playground of
     /// #304 and #305 through the same call), as a node bounds its answers (#290).
@@ -413,6 +447,13 @@ pub fn listen(listen: &str, manifest: &Path) -> Result<()> {
     })
 }
 
+/// `meada workspaces mcp` (ADR 0022, feature `proposals`): the proposal server, the console's
+/// named-workspace functions answered over MCP to agents with persistence off.
+#[cfg(feature = "proposals")]
+pub fn proposals(listen: &str, manifest: &Path) -> Result<()> {
+    workspaces::proposals::listen(listen, manifest)
+}
+
 /// Bounded POST bodies for token checks, playground queries and already-authorized operations.
 /// Other bodies stay unread. Tokens and raw uploads are never printed or forwarded.
 async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
@@ -515,13 +556,7 @@ impl Console {
             _ => None,
         };
         #[cfg(feature = "directory")]
-        let directory = match (&read.directory, &read.postgres) {
-            (Some(directory), Some(postgres)) => Some(crate::directory::read::Directory::new(
-                directory,
-                postgres.clone(),
-            )),
-            _ => None,
-        };
+        let directory = Self::directory_of(&read);
         #[cfg(feature = "postgres")]
         let audit = crate::audit::Audit::new(read.postgres.clone());
         #[cfg(not(feature = "postgres"))]
@@ -544,16 +579,7 @@ impl Console {
         {
             (directory.entry("token_env")).or_insert(crate::directory::TOKEN_ENV.into());
         }
-        #[cfg(feature = "snapshot")]
-        let holds = match &read.snapshot {
-            Some(snapshot) => Holds::Generations(match &snapshot.local_dir {
-                Some(local) => Ok(crate::snapshot::serve::Current::new(local.clone())),
-                None => Err(Msg::SnapshotNoLocalDir(&file.display().to_string()).text()),
-            }),
-            None => Holds::Listed(Box::new(read.clone())),
-        };
-        #[cfg(not(feature = "snapshot"))]
-        let holds = Holds::Listed(Box::new(read.clone()));
+        let holds = Holds::of(file, &read);
         Ok(Self {
             file: file.to_path_buf(),
             bootstrap: read.clone(),
@@ -575,6 +601,16 @@ impl Console {
             #[cfg(feature = "directory")]
             directory,
         })
+    }
+
+    /// What the console reads of the directory, with `[directory]` and `[postgres]` (#335).
+    #[cfg(feature = "directory")]
+    fn directory_of(read: &Manifest) -> Option<crate::directory::read::Directory> {
+        let (directory, postgres) = (read.directory.as_ref()?, read.postgres.as_ref()?);
+        Some(crate::directory::read::Directory::new(
+            directory,
+            postgres.clone(),
+        ))
     }
 
     /// A request under `/scim/v2/` (#334), in order: the `Host` check, a 403 for any request
@@ -831,16 +867,7 @@ impl Console {
                         true => Vec::new(),
                         false => self.teams(&admitted.groups, &admitted.grant),
                     };
-                    let github = oidc.github().map(|(host, state)| (host.to_string(), state));
-                    Ok(Session {
-                        subject: admitted.subject,
-                        grant: Some(admitted.grant),
-                        operator: admitted.operator,
-                        groups: admitted.groups,
-                        teams,
-                        login: admitted.login,
-                        github,
-                    })
+                    Ok(Session::admitted(admitted, teams, oidc))
                 }
                 Err((status, challenge)) => {
                     let (code, message) = match status {

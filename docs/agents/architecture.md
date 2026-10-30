@@ -254,13 +254,30 @@ checks its tests; Rust/default stages gain no frontend input.
 Vitest exercises the built WASM and the public client, view-model and DOM
 seams, without a browser end-to-end suite.
 
-## Named workspaces (spec S5): the catalog, the first workspace, its lifecycle, its configuration and the guided controls are built, the rest is planned
+## Named workspaces (spec S5): the catalog, the first workspace, its lifecycle, its configuration, the guided controls and the proposal server are built, the rest is planned
 
 ADR 0020 holds the domain decision, ADR 0021 the contracts (catalog, selected entries, shared
 ingestion membership, version lifecycle in Postgres, query selection through the generation
 document's `members` and `contexts` and the route `/-/workspaces/<id>/<identity>`, effective
 configuration, ids) and ADR 0022 the proposal server. Slices #341 to #347 build them in that
 order and each updates this map with what it delivers.
+
+Delivered by #346 (ADR 0022's proposal server; ADR 0022 "As built (#346)"), feature `proposals`
+(implies `workspaces`, enabled by `cloud`): `proposals.rs` is `[proposals]` (`public_url`,
+`audience`), which needs `[workspaces]`; `ui/workspaces/proposals.rs` is `meada workspaces mcp`
+(`ui::proposals`, a `WorkspacesCommand::Mcp` that `main` serves as it serves `meada ui`): a
+`Console` started for it (`for_proposals`: every Postgres session read-only through
+`Manifest::read_only` and `postgres::Config::read_only`, the audit off, no SCIM, front end or
+GitHub App; `Holds::of`, `directory_of` and `Session::admitted` are the console's own), the hyper
+listener of `mcp::serve_http` with its own route (`Origin` 403, the protected resource metadata,
+`Oidc::admit_console` with `[proposals] audience` and the directory's block, `/` only, a semaphore
+of calls in flight, the body bound) and an rmcp `StreamableHttpService` of four read-only tools,
+`catalog`, `workspaces`, `show` and `propose`, each calling the console's own functions
+(`catalog` and `ui/catalog.rs` `checked`, `page` and `summary` of the list, `show`,
+`visible_records`, `precheck`, `named::compose`, `changed`, `diff`, the effective view, and
+`workspaces/store.rs` `creation_conflict`, the read of what a creation's transaction would refuse)
+with the session in the request's extensions; a console answer becomes a tool's through
+`from_console`. The node's `mcp.rs` and the console's routes are unchanged.
 
 Delivered by #345 (the guided controls; ADR 0021 "As built (#345)"), front end only plus two
 WebAssembly exports (`namedDiff` and `namedChanged` in `meada-core/src/wasm.rs`, over `named::diff`
@@ -275,8 +292,8 @@ the session may select and the `catalog/check` results, and is shared by the cre
 editor; `EffectiveList.tsx` is #344's view, extracted. The editor marks each changed entry
 (`namedChanged`) with `namedAuthorize`, shows the diff (`namedDiff`) and freezes the reviewed
 payload until the confirmation. Tests: `ui/tests/guided.test.ts` (actual WebAssembly) and
-`ui/tests/GuidedWorkspace.test.tsx` (DOM). Not built: the page over versions with rollback, and
-proposals (#346).
+`ui/tests/GuidedWorkspace.test.tsx` (DOM). Not built: the page over versions with rollback; proposals are
+#346 (above).
 
 Delivered by #344 (contract 6, the effective configuration; ADR 0021 "As built (#344)"), same feature:
 `meada-core/src/effective.rs` is the pure decision (`effective(entries, facts)`: per entry the
@@ -292,7 +309,8 @@ a bundle id or the generation id: the ingestion-blocks rule of #342 already keep
 peers, resources and serve hosts query-time, so a configuration change is a new generation of the
 same bundles. The front end's `NamedWorkspacesPage.tsx` shows the view in text and has the
 manifest text editor (`EditWorkspace`: validate with the core, preview, confirm, save and apply at
-the base read). Not built by #344: guided authoring (#345, above), proposals (#346), acceptance (#347).
+the base read). Not built by #344: guided authoring (#345, above), proposals (#346, above),
+acceptance (#347).
 
 Delivered by #343 (contract 4's lifecycle; ADR 0021 "As built (#343)"), same feature:
 `workspaces/lifecycle.rs` is the atomic boundary of every other write (`transact`: one
@@ -2734,6 +2752,12 @@ one for the area a change touches.
 
 ## Known ceilings
 
+- `ui/workspaces/proposals.rs` (#346, ADR 0022): `BODY_MAX` (80 KiB) bounds a request's body
+  (413), `OUTPUT_MAX` (192 KiB) a tool's answer (`too_large` with its counts, never cut),
+  `CALLS_MAX` (32) the calls in flight (503 `busy`; `MEADA_PROPOSALS_CALLS` lowers it in a debug
+  build for a test), `HINTS_MAX` (50) and `NOTE_MAX` (256 characters) a proposal's hints; the
+  catalog tool takes the console's `PREFIX_MAX`, `CURSOR_MAX` and `LIMIT_MAX` (`ui/catalog.rs`),
+  and a manifest is `named::TEXT_MAX`.
 - `ui/workspaces.rs`, `workspaces.rs`, `snapshot/versions.rs`, `meada-core/src/named.rs` (#342):
   `CREATE_MAX` (80 KiB) bounds a creation's body (413), `TEXT_MAX` (64 KiB) a named manifest's
   text, `NAME_MAX` (80) and `DESCRIPTION_MAX` (500) their characters, `LIST_LIMIT_MAX` (100) and

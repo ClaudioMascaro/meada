@@ -12,6 +12,8 @@ use meada_core::named;
 
 mod effective;
 mod lifecycle;
+#[cfg(feature = "proposals")]
+pub(super) mod proposals;
 
 use super::write::{PendingRecord, finish, refused};
 use super::*;
@@ -389,17 +391,10 @@ impl Console {
             }
         }
         let limit = limit.flatten().unwrap_or(LIST_LIMIT);
-        let after = after.flatten();
-        let records = match self.visible_records(session, None) {
-            Ok(records) => records,
+        let (page, next) = match self.page(session, limit, after.flatten().as_deref()) {
+            Ok(page) => page,
             Err(answer) => return *answer,
         };
-        let mut page: Vec<Record> = (records.into_iter())
-            .filter(|r| after.as_deref().is_none_or(|a| r.id.as_str() > a))
-            .take(limit + 1)
-            .collect();
-        let next = (page.len() > limit).then(|| page[limit - 1].id.clone());
-        page.truncate(limit);
         let held = self.held_generation();
         let workspaces: Vec<Value> = (page.iter())
             .map(|r| self.summary(r, held.as_deref(), session))
@@ -408,6 +403,24 @@ impl Console {
             StatusCode::OK,
             &json!({"workspaces": workspaces, "next": next}),
         )
+    }
+
+    /// The records of the workspaces `session` sees after the id `after`, at most `limit`, and
+    /// the cursor of the next page: the list's page, and the proposal server's (ADR 0022).
+    fn page(
+        &self,
+        session: &Session,
+        limit: usize,
+        after: Option<&str>,
+    ) -> std::result::Result<(Vec<Record>, Option<String>), Box<Answer>> {
+        let records = self.visible_records(session, None)?;
+        let mut page: Vec<Record> = (records.into_iter())
+            .filter(|r| after.is_none_or(|a| r.id.as_str() > a))
+            .take(limit + 1)
+            .collect();
+        let next = (page.len() > limit).then(|| page[limit - 1].id.clone());
+        page.truncate(limit);
+        Ok((page, next))
     }
 
     /// The generation the console holds now, when it keeps generations and one is servable.

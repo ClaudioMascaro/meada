@@ -59,7 +59,7 @@ impl Case {
     /// Removes the role `caller` holds on `short` at the fake GitHub, runs the role check and
     /// waits until the console reads the new set. `revoked` is every (caller, repository) pair
     /// removed so far in the case, this one included.
-    fn revoke(&self, revoked: &[(&str, &str)]) {
+    pub(super) fn revoke(&self, revoked: &[(&str, &str)]) {
         let (caller, short) = revoked.last().copied().unwrap();
         for (short, identity) in self.table["identities"].as_object().unwrap() {
             let repo = identity

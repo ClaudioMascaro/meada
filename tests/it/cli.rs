@@ -106,6 +106,31 @@ fn the_console_subcommand_is_absent_without_its_feature() {
     assert!(stderr.contains("unrecognized subcommand 'ui'"), "{stderr}");
 }
 
+/// `meada workspaces mcp` exists only in a build with the `proposals` feature (ADR 0022): the
+/// default build has no `workspaces` at all, and a build with `workspaces` alone has no `mcp`.
+#[cfg(not(feature = "proposals"))]
+#[test]
+fn the_proposal_server_is_absent_without_its_feature() {
+    let out = Command::new(env!("CARGO_BIN_EXE_meada"))
+        .args([
+            "workspaces",
+            "mcp",
+            "--listen",
+            "0",
+            "--workspace",
+            "m.toml",
+        ])
+        .output()
+        .expect("meada runs");
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let missing = match cfg!(feature = "workspaces") {
+        true => "unrecognized subcommand 'mcp'",
+        false => "unrecognized subcommand 'workspaces'",
+    };
+    assert!(stderr.contains(missing), "{stderr}");
+}
+
 /// Without the `refresh-lock` feature, `meada snapshot pointer` and `meada snapshot fence` do
 /// not exist.
 #[cfg(not(feature = "refresh-lock"))]

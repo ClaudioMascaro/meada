@@ -897,6 +897,28 @@ pub enum Msg<'a> {
     /// An apply of the version that is current (#343).
     #[cfg(feature = "workspaces")]
     WorkspacesAlreadyCurrent,
+    /// `meada workspaces mcp` and its arguments' help (ADR 0022).
+    #[cfg(feature = "proposals")]
+    ProposalsCmd,
+    #[cfg(feature = "proposals")]
+    ProposalsListenHelp,
+    #[cfg(feature = "proposals")]
+    ProposalsWorkspaceHelp,
+    /// A bootstrap manifest without `[proposals]` given to `meada workspaces mcp` (ADR 0022).
+    #[cfg(feature = "proposals")]
+    ProposalsNoSection,
+    /// A tool's argument past its bound (ADR 0022): what the argument takes, never its value.
+    #[cfg(feature = "proposals")]
+    ProposalsArgument(&'a str),
+    /// A tool's answer past the output cap (ADR 0022): the cap in bytes.
+    #[cfg(feature = "proposals")]
+    ProposalsTooLarge(usize),
+    /// A call while the most calls are in flight (ADR 0022).
+    #[cfg(feature = "proposals")]
+    ProposalsBusy,
+    /// A call that reached a tool without the admission the listener gives (ADR 0022).
+    #[cfg(feature = "proposals")]
+    ProposalsNotAdmitted,
     /// An operator list that would hold none or too many (#343): the reason.
     #[cfg(feature = "workspaces")]
     WorkspacesOperators(&'a str),
@@ -3088,6 +3110,56 @@ impl Msg<'_> {
             Msg::WorkspacesAlreadyCurrent => pick(
                 "that version is already the current one; nothing changed".into(),
                 "essa versão já é a atual; nada mudou".into(),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsCmd => pick(
+                "Serve the named workspaces' catalog, validation and stateless proposals to \
+                 agents over MCP at host:port, :port or port (loopback without a host); it \
+                 writes nothing"
+                    .into(),
+                "Serve o catálogo, a validação e as propostas sem estado dos workspaces nomeados \
+                 a agentes via MCP em host:porta, :porta ou porta (loopback sem host); não grava \
+                 nada"
+                    .into(),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsListenHelp => pick(
+                "Where the proposal server listens: host:port, :port or port (loopback without a \
+                 host)"
+                    .into(),
+                "Onde o servidor de propostas escuta: host:porta, :porta ou porta (loopback sem \
+                 host)"
+                    .into(),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsWorkspaceHelp => pick(
+                "The bootstrap manifest, with its [proposals] and [workspaces] sections".into(),
+                "O manifesto de bootstrap, com as seções [proposals] e [workspaces]".into(),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsNoSection => pick(
+                "the bootstrap manifest has no [proposals] section".into(),
+                "o manifesto de bootstrap não tem seção [proposals]".into(),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsArgument(what) => pick(
+                format!("invalid arguments: {what}"),
+                format!("argumentos inválidos: {what}"),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsTooLarge(max) => pick(
+                format!("the answer would exceed {max} bytes; ask for fewer entries or a page"),
+                format!("a resposta passaria de {max} bytes; peça menos entradas ou uma página"),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsBusy => pick(
+                "too many calls in flight; retry shortly".into(),
+                "chamadas demais em andamento; tente de novo em instantes".into(),
+            ),
+            #[cfg(feature = "proposals")]
+            Msg::ProposalsNotAdmitted => pick(
+                "the call was not admitted".into(),
+                "a chamada não foi admitida".into(),
             ),
             #[cfg(feature = "workspaces")]
             Msg::WorkspacesOperators(reason) => pick(

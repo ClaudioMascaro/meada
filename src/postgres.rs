@@ -251,6 +251,20 @@ pub struct Config {
     pool_size: u64,
     connect_timeout: Duration,
     statement_timeout: Duration,
+    /// Every transaction read-only (`default_transaction_read_only`): the proposal server's
+    /// connections (ADR 0022), where a write is refused by Postgres itself.
+    read_only: bool,
+}
+
+impl Config {
+    /// This configuration with every session it opens read-only.
+    #[cfg(feature = "proposals")]
+    pub fn read_only(self) -> Self {
+        Self {
+            read_only: true,
+            ..self
+        }
+    }
 }
 
 impl File {
@@ -281,6 +295,7 @@ impl File {
                 }
                 bound => bound,
             },
+            read_only: false,
         })
     }
 }
@@ -520,8 +535,11 @@ async fn handshake(config: &Config) -> Result<Opened, String> {
         pg.dbname(dbname);
     }
     let statement = config.statement_timeout.as_millis();
-    pg.application_name("meada")
-        .options(format!("-c statement_timeout={statement}"));
+    let mut options = format!("-c statement_timeout={statement}");
+    if config.read_only {
+        options.push_str(" -c default_transaction_read_only=on");
+    }
+    pg.application_name("meada").options(options);
     let tls = over_tls(&url.host, config.ca_file.is_some());
     let ca_file = config.ca_file.clone();
     let connected: Result<_, String> = async {

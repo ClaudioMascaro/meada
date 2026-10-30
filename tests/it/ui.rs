@@ -214,7 +214,8 @@ fn serves_config_session_and_manifest() {
             "postgres",
             "directory",
             "catalog",
-            "workspaces"
+            "workspaces",
+            "proposals"
         ]
     );
     for module in modules {
@@ -229,6 +230,7 @@ fn serves_config_session_and_manifest() {
             "postgres" => cfg!(feature = "postgres"),
             "directory" => cfg!(feature = "directory"),
             "workspaces" => cfg!(feature = "workspaces"),
+            "proposals" => cfg!(feature = "proposals"),
             other => panic!("{other}"),
         };
         assert_eq!(module["built"], json!(built), "{module}");

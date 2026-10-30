@@ -366,6 +366,12 @@ a person to review. It is derived, stateless and persists nothing; saving and ap
 console's deliberate acts (ADR 0022).
 _Avoid_: draft, submission, pull request
 
+**Proposal server**:
+`meada workspaces mcp` (feature `proposals`): the process that answers agents over MCP with the
+console's named-workspace functions, persistence off, under a token for `[proposals] audience`.
+Neither a node nor the console, and its tools write nothing (ADR 0022).
+_Avoid_: agent API, write MCP, submission server
+
 **Provider**:
 The side of a contract that serves or defines it, such as the code handling a route or the
 manifest of a package.

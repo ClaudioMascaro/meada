@@ -18,6 +18,8 @@ use super::{PUBLIC, VERSION, claims, console_dir, oidc, ui_oidc};
 
 mod configuration;
 mod lifecycle;
+#[cfg(feature = "proposals")]
+mod proposals;
 use crate::manifest::MANIFEST;
 use crate::oidc::github::{Github, LOGIN_CLAIM, POLL_MS};
 use crate::oidc::{Issuer, key, set, sign};
@@ -63,6 +65,11 @@ impl Case {
 
     /// The case, with the SCIM `[directory]` in the console's manifest when `directory`.
     fn start(name: &str, directory: bool) -> Option<Self> {
+        Self::aged(name, directory, 3600)
+    }
+
+    /// `start`, a permissions set granting for `max_age` seconds.
+    fn aged(name: &str, directory: bool, max_age: u64) -> Option<Self> {
         let github = Github::new(name)?;
         let endpoint = service()?;
         let bucket_id = bucket_name(name);
@@ -103,7 +110,7 @@ impl Case {
         let head = format!(
             "{}{}{}",
             oidc(&issuer.base),
-            github.sections(HOST, roles, 3600),
+            github.sections(HOST, roles, max_age),
             github.job(HOST),
         );
         let head = format!(
@@ -192,8 +199,14 @@ impl Case {
 
     /// A console token of the table's caller `name`.
     fn token(&self, name: &str) -> String {
+        self.token_for(name, PUBLIC)
+    }
+
+    /// A token of the table's caller `name` for `audience`, with the console token's claims.
+    fn token_for(&self, name: &str, audience: &str) -> String {
         let caller = &self.table["callers"][name];
         let mut claims = claims(&self.issuer.base, &[]);
+        claims["aud"] = json!(audience);
         claims["sub"] = json!(name);
         if let Some(login) = caller["login"].as_str() {
             claims[LOGIN_CLAIM] = json!(login);

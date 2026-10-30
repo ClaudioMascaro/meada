@@ -8,6 +8,21 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The proposal server (#346, ADR 0022, feature `proposals`, enabled by `cloud`): `meada workspaces
+  mcp --listen <addr> --workspace <bootstrap>` with `[proposals]` (`public_url`, `audience`)
+  serves CLI agents four read-only MCP tools over the console's own named-workspace functions:
+  `catalog` (the repositories the caller may select), `workspaces` and `show` (the workspaces it
+  may see, with their `seq`) and `propose`, which validates manifest text as a new workspace or a
+  change and returns the canonical manifest, the diff against the base, diagnostics, each named
+  identity's eligibility, the refusals the console would give, the effective configuration,
+  `applicable` and the base, storing nothing. Identity, login, grant and role come from a bearer
+  token for `[proposals] audience`, which no node or console accepts and which accepts no
+  node's or console's token; no tool takes an argument naming an actor, a role or a grant, and
+  repository hints from an agent's own GitHub read MCP change no result. Every Postgres session
+  of the server is read-only, it calls no GitHub, node or identity provider API and writes no
+  audit record, store object or Valkey key. Inputs and answers are bounded (a body of 80 KiB, a
+  manifest of 64 KiB, an answer of 192 KiB, 32 calls in flight). The node's MCP server, the
+  console and the default build are unchanged.
 - Guided authoring of named workspaces (#345, ADR 0021 "As built (#345)", feature `workspaces`):
   the console edits the manifest of a workspace the subject operates through form controls
   (repositories from the catalog, serve settings, resources, peers and environment-variable

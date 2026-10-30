@@ -467,6 +467,14 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
              feature\n",
         ));
     }
+    // Nor does `proposals` (ADR 0022).
+    if !cfg!(feature = "proposals") {
+        cases.push((
+            "index_dir = \"../indexes\"\n\n[proposals]\npublic_url = \"https://p.example\"\n",
+            "meada: ops/meada.workspace.toml:3: [proposals] needs a Meada built with the \
+             proposals feature\n",
+        ));
+    }
     // `ui` needs no `valkey` either.
     if !cfg!(feature = "ui") {
         cases.push((
@@ -1022,6 +1030,49 @@ fn catalog_section_errors_name_the_file_the_line_and_the_keys() {
         assert!(!ok && stdout.is_empty(), "{toml}");
         assert_eq!(stderr, expected, "{toml}");
         assert!(!stderr.contains("secret-owner"), "{stderr}");
+    }
+}
+
+/// The `[proposals]` section (ADR 0022): without `[workspaces]`, with a URL that is not `https`
+/// off loopback or has a path, with an empty audience and with an unknown key, each error names
+/// the file, the line and the key.
+#[cfg(feature = "proposals")]
+#[test]
+fn proposals_section_errors_name_the_file_the_line_and_the_keys() {
+    let dir = mirrors("manifest_proposals_errors");
+    let at = "meada: ops/meada.workspace.toml";
+    let head = "index_dir = \"../indexes\"\n\n[proposals]\n";
+    let url = "must be an https:// URL with a host and nothing after it (http:// only on loopback)";
+    for (toml, expected) in [
+        (
+            format!("{head}public_url = \"https://p.example\"\n"),
+            format!("{at}:3: [proposals] needs [workspaces]\n"),
+        ),
+        (
+            format!("{head}audience = \"agents\"\n"),
+            format!("{at}:3: `proposals`: `proposals.public_url` is missing\n"),
+        ),
+        (
+            format!("{head}public_url = \"http://p.example\"\n"),
+            format!("{at}:4: `proposals.public_url`: {url}\n"),
+        ),
+        (
+            format!("{head}public_url = \"https://p.example/mcp\"\n"),
+            format!("{at}:4: `proposals.public_url`: {url}\n"),
+        ),
+        (
+            format!("{head}public_url = \"https://p.example\"\naudience = \"\"\n"),
+            format!("{at}:5: `proposals.audience`: must not be empty\n"),
+        ),
+        (
+            format!("{head}public_url = \"https://p.example\"\ngrant = \"*\"\n"),
+            format!("{at}:5: `proposals.grant` is not a meada.workspace.toml key\n"),
+        ),
+    ] {
+        write_manifest(&dir, &toml);
+        let (stdout, stderr, ok) = run(&dir, "status");
+        assert!(!ok && stdout.is_empty(), "{toml}");
+        assert_eq!(stderr, expected, "{toml}");
     }
 }
 

@@ -181,6 +181,14 @@ enum WorkspacesCommand {
         #[arg(long)]
         workspace: PathBuf,
     },
+    /// The proposal server (ADR 0022, feature `proposals`).
+    #[cfg(feature = "proposals")]
+    Mcp {
+        #[arg(long)]
+        listen: String,
+        #[arg(long)]
+        workspace: PathBuf,
+    },
 }
 
 /// `meada postgres` (ADR 0016, feature `postgres`).
@@ -391,6 +399,9 @@ fn workspaces(command: WorkspacesCommand) -> meada::Result<String> {
             base,
             workspace,
         } => cli::operators(&workspace, &id, &add, &remove, base),
+        // Served by `main` itself, as `meada ui` is.
+        #[cfg(feature = "proposals")]
+        WorkspacesCommand::Mcp { .. } => unreachable!("served by main"),
     }
 }
 
@@ -825,6 +836,14 @@ fn main() -> ExitCode {
                     .mut_arg("workspace", bootstrap)
             })
     });
+    #[cfg(feature = "proposals")]
+    let matches = matches.mut_subcommand("workspaces", |c| {
+        c.mut_subcommand("mcp", |c| {
+            (c.about(Msg::ProposalsCmd.text()))
+                .mut_arg("listen", |a| a.help(Msg::ProposalsListenHelp.text()))
+                .mut_arg("workspace", |a| a.help(Msg::ProposalsWorkspaceHelp.text()))
+        })
+    });
     #[cfg(feature = "postgres")]
     let matches = matches.mut_subcommand("postgres", |c| {
         (c.about(Msg::Postgres.text())).mut_subcommand("migrate", |c| {
@@ -939,6 +958,21 @@ fn main() -> ExitCode {
         Command::GithubApp { command } => github_app(command),
         #[cfg(feature = "generation-pointer")]
         Command::Workspace { command } => workspace(command),
+        // Every problem that refuses the start on its own line; the tools answer in English, as
+        // the MCP surface does (ADR 0008).
+        #[cfg(feature = "proposals")]
+        Command::Workspaces {
+            command: WorkspacesCommand::Mcp { listen, workspace },
+        } => {
+            msg::init(None);
+            if let Err(e) = drained(|| meada::ui::proposals(&listen, &workspace)) {
+                for line in e.to_string().lines() {
+                    eprintln!("meada: {line}");
+                }
+                std::process::exit(1);
+            }
+            Ok(())
+        }
         // The answer is the only thing on stdout; a refusal's reason is on stderr, exit 1.
         #[cfg(feature = "workspaces")]
         Command::Workspaces { command } => workspaces(command).map(|text| print!("{text}")),

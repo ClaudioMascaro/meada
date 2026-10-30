@@ -38,7 +38,7 @@ impl Console {
     }
 
     /// The view of `entries` as the caller reads them.
-    fn view(
+    pub(super) fn view(
         entries: &[Value],
         held: Option<&crate::snapshot::serve::Held>,
         excluded: &BTreeSet<String>,
@@ -84,7 +84,7 @@ impl Console {
 
     /// The identities the newest permissions set excludes from workspace `id`, for whoever
     /// operates it.
-    fn excluded_for(&self, id: &str, operates: bool) -> BTreeSet<String> {
+    pub(super) fn excluded_for(&self, id: &str, operates: bool) -> BTreeSet<String> {
         match (&self.oidc, operates) {
             (Some(oidc), true) => oidc.excluded_in(id),
             _ => BTreeSet::new(),

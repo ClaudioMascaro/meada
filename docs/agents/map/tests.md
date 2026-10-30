@@ -888,3 +888,24 @@ anonymous call (401). `ui/tests/NamedWorkspaces.test.tsx` drives the editor: the
 the effective configuration shown in text before any POST of a save, the frozen reviewed payload
 at the base read, the findings beside an applied change, a stale base in words, and no editor for
 a viewer.
+
+`tests/it/ui/oidc/workspaces/proposals.rs` (feature `proposals`) runs on the same case and adds the
+proposal server (`meada workspaces mcp`, `[proposals]` appended to the bootstrap the console
+read), called over MCP with tokens for its own audience: no token, a forged one, a console's and a
+node's are a 401 naming the metadata, a browser a 403, and its token opens nothing on the
+console; `tools/list` gives four read-only tools with closed schemas naming no authority; every
+creation row of the Y/A/B table through `propose` is the console's decision, each refusal the
+console's own error byte for byte; a hidden repository is counted and never named, hints and
+`_meta` or headers asserting a role change nothing, a forged argument and every bound are
+refused as invalid arguments, a body past 80 KiB is a 413; the catalog is the console's, empty
+for a claims grant and pending for a missing login; the fake GitHub counts no request and stderr
+holds no token, note or manifest. Over existing workspaces it lists and shows under the discovery
+rule, proposes a change with its base, diff and effective view, refuses B and a peer, gives
+equal bytes for equal calls, leaves the console's records, versions, history and audit as they
+were, and the manifest is then saved and applied by a person in the console, after which the old
+base is stale; the table's discovery rows go through `show`; once the creator loses A, its
+proposals and `show` compose over A without naming it, even when it names A; a creation of a
+workspace created and deleted is refused `workspace_deleted`. A set past `max_age_seconds` makes
+every proposal pending `stale_set`; a server allowed no call in flight (`MEADA_PROPOSALS_CALLS`)
+answers 503 `busy`; with `[directory]`, a deleted user is a 403 `deprovisioned` until it is
+provisioned active again.

@@ -220,6 +220,10 @@ pub struct Manifest {
     /// while one is left: what `snapshot publish` records as contexts.
     #[cfg(feature = "workspaces")]
     pub contexts: Vec<crate::workspaces::Context>,
+    /// The `[proposals]` section, when the build has the module (ADR 0022); `read` checks that
+    /// `[workspaces]` is there too.
+    #[cfg(feature = "proposals")]
+    pub proposals: Option<crate::proposals::Config>,
     /// `[workspace] source = "store"` (ADR 0014): the repositories come from the current
     /// workspace version: `entries` is empty, or with `read_listed` the pulled version's.
     #[cfg(feature = "generation-pointer")]
@@ -279,6 +283,8 @@ struct ManifestFile {
     catalog: Option<crate::catalog::File>,
     #[cfg(feature = "workspaces")]
     workspaces: Option<crate::workspaces::File>,
+    #[cfg(feature = "proposals")]
+    proposals: Option<crate::proposals::File>,
     #[cfg(feature = "github-app")]
     #[serde(default, rename = "github_app")]
     github_apps: Vec<crate::github_app::File>,
@@ -485,6 +491,15 @@ impl Manifest {
             }
             section
         };
+        // `[proposals]` (ADR 0022) answers over the named workspaces and nothing else.
+        #[cfg(feature = "proposals")]
+        let proposals = {
+            let section = modules::validated(file, &src, parsed.proposals, |p| p.validate())?;
+            if section.is_some() && workspaces.is_none() {
+                modules::needs(file, &src, "proposals", &["workspaces"])?;
+            }
+            section
+        };
         // Only a workspace version has owners (ADR 0015): a static manifest has no editor.
         if parsed.repositories.iter().any(|e| e.owner.is_some()) {
             let owner = Msg::WorkspaceOwnerStatic.text();
@@ -652,11 +667,32 @@ impl Manifest {
             workspaces,
             #[cfg(feature = "workspaces")]
             contexts,
+            #[cfg(feature = "proposals")]
+            proposals,
             #[cfg(feature = "generation-pointer")]
             store,
             #[cfg(feature = "generation-pointer")]
             version,
         })
+    }
+
+    /// This manifest with every Postgres connection it configures read-only: `[postgres]` and
+    /// the copies `read` gives the GitHub grant provider and the overage lookup. The proposal
+    /// server's (ADR 0022), where Postgres itself refuses a write.
+    #[cfg(feature = "proposals")]
+    pub fn read_only(mut self) -> Self {
+        use crate::postgres::Config;
+        self.postgres = self.postgres.map(Config::read_only);
+        if let Some(oidc) = &mut self.oidc {
+            if let Some(github) = &mut oidc.github {
+                github.postgres = github.postgres.take().map(Config::read_only);
+            }
+            #[cfg(feature = "directory")]
+            if let Some((_, postgres)) = (oidc.overage.as_mut()).and_then(|o| o.lookup.as_mut()) {
+                *postgres = postgres.clone().read_only();
+            }
+        }
+        self
     }
 
     /// `read` for a command that reads the repositories (`index`, `status`, `export` and
@@ -824,6 +860,8 @@ impl Manifest {
             workspaces: None,
             #[cfg(feature = "workspaces")]
             contexts: Vec::new(),
+            #[cfg(feature = "proposals")]
+            proposals: None,
             #[cfg(feature = "generation-pointer")]
             store: false,
             #[cfg(feature = "generation-pointer")]

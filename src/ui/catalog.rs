@@ -15,14 +15,14 @@ use crate::oidc::Catalog;
 const CHECK_IDENTITIES: usize = 50;
 
 /// The most records `GET catalog` answers at once, and how many without `limit`.
-const LIMIT_MAX: usize = 100;
+pub(super) const LIMIT_MAX: usize = 100;
 const LIMIT: usize = 50;
 
 /// The most characters of `q`, a prefix of an identity.
-const PREFIX_MAX: usize = 128;
+pub(super) const PREFIX_MAX: usize = 128;
 
 /// The most characters of `after`, the opaque cursor.
-const CURSOR_MAX: usize = 256;
+pub(super) const CURSOR_MAX: usize = 256;
 
 /// The cursor's alphabet: base64url, no padding.
 const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
@@ -72,7 +72,7 @@ fn cursor(text: &str) -> Option<String> {
 }
 
 /// Whether `identity` is one a caller may name: an identity with no control character or space.
-fn identity_ok(identity: &str) -> bool {
+pub(super) fn identity_ok(identity: &str) -> bool {
     identity_problem(identity).is_none()
         && !identity
             .chars()
@@ -128,7 +128,7 @@ impl Query {
 }
 
 /// The answer's `state`, `reason` and, when the set is known, `set`.
-fn header(catalog: &Catalog) -> Value {
+pub(super) fn header(catalog: &Catalog) -> Value {
     let state = if catalog.reason.is_some() {
         "pending"
     } else {
@@ -147,7 +147,7 @@ fn header(catalog: &Catalog) -> Value {
 impl Console {
     /// The catalog `session` may select from: none unless `[catalog]` is configured and the
     /// OIDC module keeps the permissions cache.
-    fn catalog_of(&self, session: &Session) -> Option<Catalog> {
+    pub(super) fn catalog_of(&self, session: &Session) -> Option<Catalog> {
         self.bootstrap.catalog.as_ref()?;
         let oidc = self.oidc.as_ref()?;
         oidc.catalog(session.login.as_deref(), session.operator)
@@ -212,23 +212,30 @@ impl Console {
             let message = Msg::CatalogCheckBody(CHECK_IDENTITIES).text();
             return error(StatusCode::BAD_REQUEST, "bad_request", &message);
         };
-        let mut seen = std::collections::HashSet::new();
-        let results: Vec<Value> = (asked.identities.iter())
-            .filter(|i| seen.insert(i.as_str()))
-            .map(|identity| {
-                let state = match (catalog.reason, catalog.selectable.contains(identity)) {
-                    (Some(_), _) => "pending",
-                    (None, true) => "selectable",
-                    (None, false) => "unavailable",
-                };
-                json!({"identity": identity, "state": state})
-            })
-            .collect();
-        let mut document = header(&catalog);
-        document.as_object_mut().map(|o| o.remove("set"));
-        document["results"] = json!(results);
-        json_answer(StatusCode::OK, &document)
+        json_answer(StatusCode::OK, &checked(&catalog, &asked.identities))
     }
+}
+
+/// The check of `identities` against `catalog`: `{"state", "reason", "results": [{"identity",
+/// "state"}]}` in the order given, each once, `selectable` or `unavailable`, or `pending` for all
+/// of them while the catalog is. The console's check and a proposal's eligibility (ADR 0022).
+pub(super) fn checked(catalog: &Catalog, identities: &[String]) -> Value {
+    let mut seen = std::collections::HashSet::new();
+    let results: Vec<Value> = (identities.iter())
+        .filter(|i| seen.insert(i.as_str()))
+        .map(|identity| {
+            let state = match (catalog.reason, catalog.selectable.contains(identity)) {
+                (Some(_), _) => "pending",
+                (None, true) => "selectable",
+                (None, false) => "unavailable",
+            };
+            json!({"identity": identity, "state": state})
+        })
+        .collect();
+    let mut document = header(catalog);
+    document.as_object_mut().map(|o| o.remove("set"));
+    document["results"] = json!(results);
+    document
 }
 
 #[cfg(test)]

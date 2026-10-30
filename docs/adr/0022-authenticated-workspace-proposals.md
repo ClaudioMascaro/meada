@@ -146,6 +146,63 @@ own ADR, which must decide: the write capability and its name, an audience or sc
 from this read-only one, human confirmation, ADR 0016's fail-closed audit record per call, and
 how a stale base is refused. Automatic save or apply by an agent is out of scope for S5.
 
+## As built (#346)
+
+The interface is built as decided above; where a line differs or settles what the decision left
+open, it says so.
+
+- **Where it lives.** The section is `src/proposals.rs` and the server `src/ui/workspaces/
+  proposals.rs`, a child of the console's workspaces module: the tools call the console's own
+  functions (`catalog`, `page` and `summary` of the list, `show`, `visible_records`, `precheck`,
+  `named::compose`, `named::changed`, `named::diff`, the effective view) on a `Console` started
+  for the proposal server, so parity is the same code, not a second implementation of it.
+- **Statelessness, structurally.** That `Console` opens every Postgres session with
+  `default_transaction_read_only = on` (the permissions cache, the directory and the workspace
+  reads included), so a write would be refused by Postgres itself; its audit is off, it has no
+  SCIM endpoint, no front end and no GitHub App, and no tool path calls the store's or Valkey's
+  write functions. The tests observe it at the public seam: the console's records, versions,
+  history and audit page are byte for byte the same after a session of proposals, and the fake
+  GitHub counts no request.
+- **Admission.** `Oidc::admit_console` with `[proposals] audience` and `[ui]`'s operator rule,
+  then the directory's block of a deprovisioned subject (a read: an unreachable directory does
+  not refuse). The `WWW-Authenticate` of a 401 or 403 names `resource_metadata` at
+  `<public_url>/.well-known/oauth-protected-resource`, which answers without a token with
+  `resource` the `public_url`. The endpoint is `/` alone (another path is a 404 after
+  admission); the order is `Origin` (403), metadata, admission (401 or 403), path, calls in flight
+  (503 `busy`), body (413).
+- **Argument refusals are tool errors.** rmcp answers an undeclared or mistyped property with a
+  tool result (`isError: true`, the text `failed to deserialize parameters: ...`), as the current
+  MCP specification asks for input validation, rather than a JSON-RPC `-32602`; the tools' own
+  bounds answer the same way, with `{"error": {"code": "invalid_params", "message"}}`. Either way
+  the tool did not run on the argument and nothing is trusted.
+- **Shapes.** `refusals` is the list of the console's error objects in its order (`not_operator`,
+  or `forbidden` for a creation without a subject; then `pending` with `reason` or
+  `entries_refused` with `refused` and `hidden`), so an agent reads the same refusal the console
+  would answer. `eligibility` is the catalog check's answer (`{state, reason, results}`) over
+  the identities of the entries, then the hints, each once. `effective` is `{workspace,
+  generation, entries}` over the base, null for a new workspace. `diagnostics` carry `code`
+  (`invalid_entries` or `invalid_workspace`), the CLI's `message` and, when the problem names
+  them, `line`, `entry` and `key`. `show` is the console's show plus `manifest` and `seq`;
+  `workspaces` is the console's list summary plus `seq`. No proposed version id is returned: for
+  an operator it would hash the entries it cannot read and so be an oracle on them.
+- **`applicable`** is every check the console makes before and inside a write's transaction that
+  a read can make: the body, the discovery rule, authority, the admission cache's eligibility
+  and, for a creation, the same workspace created and deleted (`workspace_deleted`) or the limit
+  of workspaces (`limit`), read without a lock (`store::creation_conflict`). The transaction reads
+  the newest set again, so a set written between the proposal and the save can still refuse it.
+- **Name and description** belong to a new workspace: with `workspace` they are refused as an
+  invalid argument, since a rename is the console's own operation and a proposal would carry it
+  nowhere.
+- **Log line.** `proposals: <subject> <tool> <workspace or ->: <outcome>`, the outcome `ok`, the
+  error code, or for a proposal the console would not accept its first refusal or diagnostic.
+  A workspace id that fails its pattern is printed as `-`. A store or Postgres failure is the
+  outcome `unavailable` on that line, its reason unprinted.
+- **Calls in flight.** A semaphore of `CALLS_MAX` permits, taken after admission and before the
+  body is read; in a debug build `MEADA_PROPOSALS_CALLS` lowers it so a test reaches the 503
+  (no option or setting does, as `MEADA_DRAIN_MS` for the drain).
+- **Not built.** No per-subject quota (as decided), no save, apply or draft tool, and no CLI
+  twin: `meada workspaces create|save|apply` remain the platform administrator's.
+
 ## Considered options
 
 - **Tools on the console's listener.** One process fewer, and it makes the console an MCP server

@@ -277,6 +277,29 @@ pub(crate) async fn records(
     Ok(records)
 }
 
+/// What creating workspace `id` would meet after eligibility, read without the creation lock (the
+/// proposal server's, ADR 0022): `Deleted` when the same creator, name and entries were created
+/// and deleted, `Limit` when `max` workspaces exist and `id` is none of them, else `None` (a new
+/// workspace, or the creator's own existing one, which the console answers as already created).
+/// The transaction of `create` decides again.
+#[cfg(feature = "proposals")]
+pub(crate) async fn creation_conflict(
+    postgres: &postgres::Config,
+    id: &str,
+    max: usize,
+) -> Result<Option<CreateError>, String> {
+    let opened = postgres::connected(postgres).await?;
+    let q = postgres.quoted();
+    let existing = format!("SELECT deleted IS NOT NULL FROM {q}.workspaces WHERE id = $1");
+    let found = (opened.client.query_opt(&existing, &[&id]).await).map_err(|e| opened.scrub(e))?;
+    if let Some(row) = found {
+        return Ok(row.get::<_, bool>(0).then_some(CreateError::Deleted));
+    }
+    let count = format!("SELECT count(*) FROM {q}.workspaces WHERE deleted IS NULL");
+    let held = (opened.client.query_one(&count, &[]).await).map_err(|e| opened.scrub(e))?;
+    Ok((held.get::<_, i64>(0) >= max as i64).then_some(CreateError::Limit))
+}
+
 /// What `meada workspace pull` reads: every workspace not deleted, its id, current version and
 /// the logins of its operators, in one `REPEATABLE READ` transaction, ordered by id.
 pub(crate) async fn current_contexts(

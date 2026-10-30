@@ -170,6 +170,9 @@ workspaces = [
     "generation-pointer",
     "refresh-lock",
 ]
+# The proposal server (ADR 0022, `[proposals]`, `meada workspaces mcp`): the named workspaces'
+# discovery, validation and stateless proposals over MCP, for agents. No crate of its own.
+proposals = ["workspaces"]
 # Every cloud module at once (ADR 0012). Unix only, since `refresh-lock` is.
 cloud = [
     "snapshot",
@@ -181,6 +184,7 @@ cloud = [
     "postgres",
     "directory",
     "workspaces",
+    "proposals",
 ]
 
 # `cargo test` runs the example's own tests too.
