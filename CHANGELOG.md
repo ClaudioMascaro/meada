@@ -379,6 +379,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Console GitHub grant (#496): a session's GitHub grant and its state (`unread`, `current`,
+  `expired`) are read from the same permissions set at the same instant, so a session never shows
+  `expired` with a grant read while the set was fresh.
 - Rust item macros (#398): the braced body of a `macro_rules!` of the repository whose first arm
   takes `$($x:item)*` and writes each item back behind outer attributes only (tokio's
   `cfg_rt! { pub mod runtime; }`) is read as items of the module invoking it: its functions,
