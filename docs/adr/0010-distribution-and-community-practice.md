@@ -16,8 +16,10 @@ what the repository has in place for contributors.
 
 - From v0.1: `cargo install meada`, prebuilt binaries on GitHub Releases built with cargo-dist
   (Linux, macOS and Windows, on x86_64 and arm64), and a shell installer.
-- An npm wrapper (`npx meada`) ships before 1.0, because agent MCP configurations often launch
-  servers with `npx`.
+- An npm wrapper ships before 1.0, because agent MCP configurations often launch servers with
+  `npx`. (Amended 2026-10-30.) The package is `@meada/meada`, under the project's npm
+  organization: npm would not create the unscoped `meada`, which sits next to `mead` and `meda`,
+  and the registry rejects names too similar to existing packages.
 - (Amended 2026-10-22; #279.) Releases also publish the OCI image
   `ghcr.io/claudiomascaro/meada`, for Linux amd64 and arm64, as `<version>` and `latest`
   (default build), and `<version>-cloud` and `latest-cloud` (`--features cloud`). Prereleases
