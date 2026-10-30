@@ -74,6 +74,7 @@ plugins:
             Capacidades e limites: Capabilities and limits
             Estabilidade: Stability
             Operar: Operate
+            Implantar: Deploy
             Modo servidor: Server mode
             Vários nós: Multiple nodes
             Módulos de nuvem: Cloud modules
@@ -107,6 +108,7 @@ plugins:
             Capacidades e limites: Capacidades y límites
             Estabilidade: Estabilidad
             Operar: Operar
+            Implantar: Desplegar
             Modo servidor: Modo servidor
             Vários nós: Varios nodos
             Módulos de nuvem: Módulos de nube
@@ -154,6 +156,7 @@ nav:
       - Capacidades e limites: capabilities.md
       - Estabilidade: stability.md
   - Operar:
+      - Implantar: deploy.md
       - Modo servidor: server.md
       - Vários nós: scaling.md
       - Módulos de nuvem: cloud.md

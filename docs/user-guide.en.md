@@ -53,18 +53,18 @@ For Linux and macOS:
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ClaudioMascaro/meada/releases/latest/download/meada-installer.sh | sh
 ```
 
-### npm (`npx meada`)
+### npm (`npx @meada/meada`)
 
 ```sh
-npx meada --version
-npx meada index
+npx @meada/meada --version
+npx @meada/meada index
 ```
 
 The `meada` npm package holds only the installer: it downloads the binary for your platform from
 the GitHub release and runs it with the arguments you passed. The package's version is always the
 release's. The install downloads the binary on the spot, so it needs a network (there is no
 offline install through npm). It is the channel that matters most to whoever configures an agent,
-because `npx meada mcp` is the launch line of the MCP server (section 2).
+because `npx -y @meada/meada mcp` is the launch line of the MCP server (section 2).
 
 ### Container
 
@@ -89,7 +89,7 @@ their own installation, described in
 ## 2. Connect an agent (MCP)
 
 `meada mcp` speaks MCP over stdio. The client (the agent) runs the command and talks to it. The
-documented launch line is `npx meada mcp`, which needs no separate install.
+documented launch line is `npx -y @meada/meada mcp`, which needs no separate install.
 
 ### Client configuration
 
@@ -98,12 +98,12 @@ In Claude Code's `.mcp.json`, or your client's equivalent file:
 ```json
 {
   "mcpServers": {
-    "meada": { "command": "npx", "args": ["meada", "mcp"] }
+    "meada": { "command": "npx", "args": ["-y", "@meada/meada", "mcp"] }
   }
 }
 ```
 
-In Claude Code, the same in one command: `claude mcp add meada -- npx meada mcp`.
+In Claude Code, the same in one command: `claude mcp add meada -- npx -y @meada/meada mcp`.
 
 With `meada` already on your `PATH` (through Cargo, the binary or the installer), swap the command
 for `"command": "meada", "args": ["mcp"]`, which avoids the npm lookup on every start.
@@ -544,7 +544,7 @@ No provider code and no other file leaves the machine. To see exactly what would
 #### Privacy
 
 - Without `--decider`, no code leaves the machine. Indexing, querying over MCP and deciding as a
-  person use no network. Two things escape that and are not decisions: `npx meada` downloads the
+  person use no network. Two things escape that and are not decisions: `npx @meada/meada` downloads the
   binary, and `mcp --listen` opens an HTTP server (see server mode).
 - With `--decider`, the code above goes to the endpoint you configured. To keep everything on the
   machine, use the `chat` protocol with a local model (`http://localhost:...`).

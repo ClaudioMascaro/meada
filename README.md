@@ -9,26 +9,25 @@ LLM.
 
 ## Instalação
 
-Escolha o canal que combina com o seu ambiente. Todos entregam o mesmo binário `meada`.
+Escolha a linha que combina com o que você já tem. Todos os canais entregam o mesmo binário
+`meada`, e a última coluna é o comando que a configuração MCP do seu agente executa.
+
+| Você tem | Instalação | Comando do servidor MCP |
+| --- | --- | --- |
+| Node.js | nada: `npx -y @meada/meada --version` | `npx -y @meada/meada mcp` |
+| Rust | `cargo install meada` | `meada mcp` |
+| Linux ou macOS | o instalador de shell abaixo | `meada mcp` |
+| Qualquer sistema | o arquivo do seu sistema nas [releases do GitHub](https://github.com/ClaudioMascaro/meada/releases), com `meada` no `PATH` | `meada mcp` |
+| Docker | `docker pull ghcr.io/claudiomascaro/meada:1.0.0` | a linha `docker run` em [Conectar um agente](#conectar-um-agente-mcp) |
 
 ```sh
-# Cargo (compila com o toolchain Rust)
-cargo install meada
-
 # Instalador de shell (Linux e macOS)
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ClaudioMascaro/meada/releases/latest/download/meada-installer.sh | sh
-
-# npm: baixa o binário da sua plataforma e o executa, sem instalar nada antes
-npx meada --version
 ```
 
-- **Binário pronto**: baixe o arquivo do seu sistema (Linux, macOS ou Windows, em x86_64 ou
-  arm64) nas [releases do GitHub](https://github.com/ClaudioMascaro/meada/releases) e ponha
-  `meada` no `PATH`.
-- **Contêiner**: `ghcr.io/claudiomascaro/meada:<versão>`, para Linux amd64 e arm64.
-
-A versão do pacote npm é sempre a da release. Para indexar, o Meada só precisa do binário e do
-git. Os detalhes de cada canal, da console e do contêiner estão em
+Os arquivos prontos cobrem Linux, macOS e Windows, em x86_64 e arm64; a imagem cobre Linux amd64
+e arm64. A versão do pacote npm é sempre a da release. Para indexar, o Meada só precisa do
+binário e do git. Os detalhes de cada canal, da console e do contêiner estão em
 [Instalação](https://claudiomascaro.github.io/meada/installation/) e no
 [guia do usuário](docs/user-guide.md) (seção 1, Instalação).
 
@@ -54,23 +53,54 @@ A referência completa do `meada.toml` está no
 
 ## Conectar um agente (MCP)
 
-`npx meada mcp` é a linha de lançamento do servidor MCP: o cliente a executa e fala com o Meada
-por stdio. Na configuração do seu agente (por exemplo o `.mcp.json` do Claude Code):
+O cliente executa o comando do servidor MCP e fala com o Meada por stdio. Na configuração do seu
+agente (por exemplo o `.mcp.json` do Claude Code), com npx:
 
 ```json
 {
   "mcpServers": {
-    "meada": { "command": "npx", "args": ["meada", "mcp"] }
+    "meada": { "command": "npx", "args": ["-y", "@meada/meada", "mcp"] }
   }
 }
 ```
 
-No Claude Code, o mesmo em uma linha: `claude mcp add meada -- npx meada mcp`. Com `meada` já no
-`PATH`, use `"command": "meada", "args": ["mcp"]`.
+No Claude Code, o mesmo em uma linha: `claude mcp add meada -- npx -y @meada/meada mcp`. Com
+`meada` já no `PATH` (Cargo, instalador ou arquivo pronto), use
+`"command": "meada", "args": ["mcp"]`.
+
+Com Docker (Linux e macOS):
+
+```json
+{
+  "mcpServers": {
+    "meada": {
+      "command": "sh",
+      "args": ["-c", "exec docker run -i --rm --network none --user \"$(id -u):$(id -g)\" -v \"${PWD%/*}:${PWD%/*}\" -w \"$PWD\" ghcr.io/claudiomascaro/meada:1.0.0 mcp"]
+    }
+  }
+}
+```
+
+O cliente inicia o servidor no seu repositório. O Meada responde sobre o caminho que o cliente
+envia como raiz, então o contêiner monta a pasta que contém o repositório, e os pares vizinhos,
+nesse mesmo caminho; roda com o seu usuário, para o `.meada/` continuar seu, e sem rede, que nem
+a indexação nem o stdio usam.
 
 O agente ganha três ferramentas, `search`, `context` e `trace`, que só leem. Veja
 [Agentes e MCP](https://claudiomascaro.github.io/meada/mcp/) e o
 [guia do usuário](docs/user-guide.md) (seção 2, Conectar um agente).
+
+### Skill para agentes
+
+[`skills/meada/SKILL.md`](skills/meada/SKILL.md) ensina o agente a escolher cada ferramenta e a
+ler os níveis de uma resposta. No Claude Code:
+
+```sh
+mkdir -p ~/.claude/skills/meada
+curl -fsSL https://raw.githubusercontent.com/ClaudioMascaro/meada/v1.0.0/skills/meada/SKILL.md -o ~/.claude/skills/meada/SKILL.md
+```
+
+Outros agentes: veja [Agentes e MCP](https://claudiomascaro.github.io/meada/mcp/#skill-para-agentes).
 
 ## Status
 
@@ -153,6 +183,7 @@ Meada (invariante 1, [ADR 0002](docs/adr/0002-product-invariants.md)).
 - [Configuração](https://claudiomascaro.github.io/meada/configuration/)
 - [Agentes e MCP](https://claudiomascaro.github.io/meada/mcp/)
 - [Modo servidor](https://claudiomascaro.github.io/meada/server/)
+- [Implantar com Docker, Compose ou Helm](https://claudiomascaro.github.io/meada/deploy/)
 - [Console](https://claudiomascaro.github.io/meada/console/)
 - [Capacidades e limites](https://claudiomascaro.github.io/meada/capabilities/)
 - [Estabilidade](https://claudiomascaro.github.io/meada/stability/)

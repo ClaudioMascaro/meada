@@ -1,7 +1,7 @@
 name: meada
 
 x-server: &server
-  image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}
+  image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-1.0.0}
   command: [mcp, --listen, "0.0.0.0:7333", --workspace, /etc/meada/meada.workspace.toml]
   read_only: true
   restart: unless-stopped
@@ -15,7 +15,7 @@ x-server: &server
     retries: 12
 
 x-indexer: &indexer
-  image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}
+  image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-1.0.0}
   profiles: [local]
   entrypoint: [sh, /etc/meada/refresh.sh]
   environment:
@@ -27,7 +27,7 @@ x-indexer: &indexer
       condition: service_completed_successfully
 
 x-cloud: &cloud
-  image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}-cloud
+  image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-1.0.0}-cloud
   profiles: [generations]
   environment: &cloud-env
     AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in .env}
@@ -38,7 +38,7 @@ x-cloud: &cloud
 
 x-cloud-node: &cloud-node
   <<: [*server, *cloud]
-  image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}-cloud
+  image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-1.0.0}-cloud
   profiles: [generations]
   environment: *cloud-env
   command: [mcp, --listen, "0.0.0.0:7333", --generations, --workspace, /etc/meada/meada.workspace.toml]
@@ -63,7 +63,7 @@ services:
     mem_limit: 128m
 
   init-local:
-    image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}
+    image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-1.0.0}
     profiles: [local]
     user: "0:0"
     entrypoint: [sh, -ec]
@@ -122,7 +122,7 @@ services:
         aliases: [backend-two]
 
   certificates:
-    image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}
+    image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-1.0.0}
     profiles: [generations]
     user: "0:0"
     entrypoint: [sh, /etc/meada/certificates.sh]

@@ -4,6 +4,7 @@
 import argparse
 import json
 import os
+import signal
 from pathlib import Path
 import subprocess
 import tarfile
@@ -63,7 +64,9 @@ with tempfile.TemporaryDirectory(prefix="meada-container-") as name:
     data.chmod(0o755)
     mirror = data / "mirror"
     mirror.mkdir()
-    (mirror / "lib.rs").write_text("pub fn container_search_marker() {}\n")
+    (mirror / "Cargo.toml").write_text('[package]\nname = "smoke"\nversion = "0.1.0"\n')
+    (mirror / "src").mkdir()
+    (mirror / "src/lib.rs").write_text("pub fn container_search_marker() {}\n")
     run("git", "init", "--initial-branch", "main", str(mirror))
     run("git", "-C", str(mirror), "remote", "add", "origin",
         "https://example.com/container/smoke.git")
@@ -113,6 +116,41 @@ with tempfile.TemporaryDirectory(prefix="meada-container-") as name:
     finally:
         subprocess.run(["docker", "logs", container], check=False)
         run("docker", "rm", "--force", container)
+
+    # The Docker MCP line of README*.md ("Conectar um agente") and docs/site/*/mcp.md, run as a
+    # client would: from the repository, which answers the roots request with its host path.
+    line = ('exec docker run -i --rm --network none --user "$(id -u):$(id -g)" '
+            f'-v "${{PWD%/*}}:${{PWD%/*}}" -w "$PWD" {image} mcp')
+    server = subprocess.Popen(["sh", "-c", line], cwd=mirror, text=True,
+                              stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    signal.alarm(120)
+    try:
+        def send(message):
+            server.stdin.write(json.dumps({"jsonrpc": "2.0", **message}) + "\n")
+            server.stdin.flush()
+
+        def answer(id):
+            while message := json.loads(server.stdout.readline()):
+                if message.get("method") == "roots/list":
+                    send({"id": message["id"], "result": {"roots": [{"uri": mirror.as_uri()}]}})
+                elif message.get("id") == id:
+                    assert "error" not in message, message
+                    return message["result"]
+
+        send({"id": 1, "method": "initialize", "params": {
+            "protocolVersion": "2025-06-18", "capabilities": {"roots": {}},
+            "clientInfo": {"name": "container-smoke", "version": version}}})
+        answer(1)
+        send({"method": "notifications/initialized"})
+        send({"id": 2, "method": "tools/call", "params": {
+            "name": "search", "arguments": {"query": "container_search_marker"}}})
+        result = answer(2)
+        assert not result.get("isError") and "lib.rs" in result["content"][0]["text"], result
+        print(f"{image}: stdio MCP with the documented Docker line passed")
+    finally:
+        signal.alarm(0)
+        server.kill()
+        server.wait()
 
     if args.cloud:
         public_url = "http://127.0.0.1:7334"

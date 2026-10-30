@@ -5,7 +5,7 @@ members = [".", "meada-core"]
 default-members = [".", "meada-core"]
 
 [workspace.package]
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/ClaudioMascaro/meada"
@@ -37,7 +37,7 @@ hyper = { version = "1.9.0", features = ["server", "http1"] }
 hyper-util = { version = "0.1.21", features = ["tokio"] }
 ignore = "0.4.33"
 # At the workspace's version, exactly: bump both together.
-meada-core = { path = "meada-core", version = "=0.1.0" }
+meada-core = { path = "meada-core", version = "=1.0.0" }
 # The OIDC module's JWT validation (ADR 0012), only behind `oidc`, and the GitHub App module's
 # JWT signing (ADR 0013), only behind `github-app`: RustCrypto as its backend, since the other,
 # aws-lc-rs, would be a second rustls provider beside ring. PEM reading (`use_pem`) only with

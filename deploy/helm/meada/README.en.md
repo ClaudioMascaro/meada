@@ -18,6 +18,9 @@ and Meada versions:
 helm upgrade --install meada oci://ghcr.io/claudiomascaro/charts/meada --version <version> -f my-values.yaml
 ```
 
+`values-minimal.yaml` is the smallest starting point: one node and one public repository
+([Deploy](https://claudiomascaro.github.io/meada/en/deploy/)).
+
 From a checkout, replace the OCI reference with `deploy/helm/meada`. Default values create
 two nodes without cloud modules. Each pod fetches its own mirrors and indexes into its own
 `emptyDir` in an init container before the server starts. Set `workspace.repositories` (TOML)

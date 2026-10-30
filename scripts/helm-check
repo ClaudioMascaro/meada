@@ -48,6 +48,10 @@ assert not any(item["kind"] == "CronJob" for item in default)
 assert "[snapshot]" not in manifest(default)
 assert "[oidc]" not in manifest(default)
 assert tomllib.loads(manifest(default))["repository"][0]["repo"] == "github.com/claudiomascaro/meada"
+minimal = render("-f", str(CHART / "values-minimal.yaml"))
+assert resource(minimal, "Deployment")["spec"]["replicas"] == 1
+assert not any(item["kind"] in ("CronJob", "Ingress") for item in minimal)
+assert [r["path"] for r in tomllib.loads(manifest(minimal))["repository"]] == ["/data/mirrors/meada"]
 
 generations = render("-f", str(CHART / "values-generations.yaml"))
 spec = pod(generations)
