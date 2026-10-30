@@ -6,6 +6,22 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-30
+
+The tree declares `1.0.0`: this release raises the workspace, the `meada-core` pin, the Dockerfile,
+the compose defaults and the Helm chart from `0.1.0`, and the `v1.0.0` tag follows its merge on
+main. Publication is still ahead and belongs to the maintainer under
+[#154](https://github.com/ClaudioMascaro/meada/issues/154): `cargo publish` of the crates (core
+first), approval of the staged npm package with 2FA, and publication of the GitHub draft release,
+which triggers the OCI image and Helm chart workflow.
+Release notes and the scope evidence checklist are available in
+[pt-BR](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.0.0.md),
+[English](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.0.0.en.md) and
+[Spanish](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.0.0.es.md).
+The [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md)
+starts at publication. The [#32 tracking checklist](https://github.com/ClaudioMascaro/meada/issues/32)
+still needs the post-publication evidence.
+
 ### Added
 
 - Public fixture benchmark (issue #149): release-profile index/reindex timings, root and
@@ -80,19 +96,6 @@ All notable changes to Meada are recorded here. The format follows
   A pinned cargo-dist regeneration helper compares the entire workflow after the explicit
   draft policy; OCI publication follows the human `release: published` event.
 
-## [1.0.0] - Unreleased
-
-Preparation only: the workspace still declares `0.1.0`; the maintainer raises both crates to
-`1.0.0` while performing [#154](https://github.com/ClaudioMascaro/meada/issues/154), right before
-the tag. No 1.0 tag or publication is claimed.
-Release notes and the scope evidence checklist are available in
-[pt-BR](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.0.0.md),
-[English](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.0.0.en.md) and
-[Spanish](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.0.0.es.md).
-The [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md)
-starts at publication. The [#32 tracking checklist](https://github.com/ClaudioMascaro/meada/issues/32)
-still needs final acceptance and human signoff.
-
 ### Prepared
 
 - The v1 scope: HTTP, declared resources and gateway paths, OpenAPI/AsyncAPI, channels and
@@ -103,7 +106,7 @@ still needs final acceptance and human signoff.
 - Configured Cargo, binary, shell, npm and OCI distribution. Configuration is not evidence
   of actual publication or a successful published-installer smoke check.
 
-### Acceptance pending
+### Acceptance
 
 The [public #152 receipt](https://github.com/ClaudioMascaro/meada/issues/152#issuecomment-6379316350)
 retains both complete runs on AMD Ryzen 7 5825U, 16 logical CPUs, 7.16 GiB RAM,
@@ -120,14 +123,19 @@ Ubuntu 24.04.5 LTS, x86_64. The measured build was
 
 MB means 10^6 bytes; tokens are ceil(UTF-8 bytes / 4). Public fixture peers supplement the
 private workload; the receipt does not claim every feature naturally occurs in the private root.
-A [rerun on 2026-10-30](https://github.com/ClaudioMascaro/meada/issues/152#issuecomment-6531862493) with main
-`1d648ad6` on a reconstructed workspace (not directly comparable) meets every target in its
-quietest run (cold index 5.586 s, 31.883266 MB, reindex 0.931 s, 643 and 1,999 tokens) and
-misses the reindex target under load (1.068 and 1.123 s, met in 2 of 4 runs). Acceptance remains
-pending under [#350](https://github.com/ClaudioMascaro/meada/issues/350), which stays open until the
-single-file reindex meets 1 s with headroom. Published-installation checks,
-community setup and final-head validation remain pending; the maintainer performs tagging and
-publication separately under [#154](https://github.com/ClaudioMascaro/meada/issues/154).
+The [rerun of 2026-10-30](https://github.com/ClaudioMascaro/meada/issues/152#issuecomment-6531862493)
+on main `1d648ad6` uses a reconstructed workspace (not directly comparable) and meets four of the
+five targets: cold index (medians 5.586 to 6.625 s, <= 7 s), root index size (31.883266 MB,
+<= 37 MB), `tools/list` (643 tokens, <= 1,000) and largest default answer (1,999 tokens,
+<= 2,000). The single-file reindex (<= 1 s) met the target in the two quieter runs (0.99 and
+0.931 s) and missed it in the two runs at a load average near 3 (1.068 and 1.123 s). The
+maintainer [waived the reindex target for 1.0.0](https://github.com/ClaudioMascaro/meada/issues/350#issuecomment-6532716065),
+recorded on [#350](https://github.com/ClaudioMascaro/meada/issues/350).
+
+Known limit: the single-file reindex sits near 1 s and exceeds it under load. #350 stays open for
+1.x, with the goal of 1 s with headroom under ordinary load; a speedup changes no output, so it
+ships as a patch or minor release. Publication is done separately by the maintainer under
+[#154](https://github.com/ClaudioMascaro/meada/issues/154).
 
 ## [0.1.0] - 2026-10-30
 
@@ -678,6 +686,6 @@ and `trace` from the two longest processes. The spec adds about 0.3 MB and 0.03 
 The rise of the single-file reindex since 2026-10-14 predates it (specs #22 and #23), and at
 692 files it is close to its target.
 
-[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v0.1.0...HEAD
-[1.0.0]: docs/releases/1.0.0.md
+[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.0.0
 [0.1.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v0.1.0
