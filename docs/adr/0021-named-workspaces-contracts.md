@@ -782,6 +782,10 @@ predecessors merge; #345 and #346 run in parallel.
   base-role upgrade is needed first. The check against a real organization is a follow-up that
   gates enterprise acceptance in #347, not these slices.
 - **Per-key merge of repository and context configuration**, if teams need a context to extend a
-  repository's own declarations.
+  repository's own declarations. (Amended 2026-10-30; #509: declined, as ADR 0011 declined it for
+  the manifest; `.out-of-scope/per-key-configuration-merge.md`.)
 - **A directory-backed operator picker** for delegation (the SCIM directory already holds users).
+  (Amended 2026-10-30; #509: deferred until a team asks. The directory stores each user's
+  `userName` and `externalId`, not the OIDC subject and GitHub login a delegation records, so a
+  picker needs a contract that maps one to the other first.)
 - **Provenance display of group-derived roles**, which no contract here needs.
