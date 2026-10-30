@@ -125,12 +125,10 @@ pub fn read(
         .filter(|p| !p.is_empty() || (fields.is_empty() && open.is_empty()))
         .cloned()
         .collect();
-    let shape = Shape {
-        scalars,
-        fields: reader.fields,
-        open: reader.open,
-        ..Shape::new(source)
-    };
+    let mut shape = Shape::new(source);
+    shape.scalars = scalars;
+    shape.fields = reader.fields;
+    shape.open = reader.open;
     (shape, reader.external)
 }
 

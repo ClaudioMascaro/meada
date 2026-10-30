@@ -71,10 +71,10 @@ pub(crate) fn communities<'a>(
                     .unwrap(),
             };
             taken.insert(name.clone());
-            Community {
-                name,
-                members: members.into_iter().map(|m| ids[m].to_string()).collect(),
-            }
+            let mut community = Community::default();
+            community.name = name;
+            community.members = members.into_iter().map(|m| ids[m].to_string()).collect();
+            community
         })
         .collect();
     named.sort_by(|a, b| a.name.cmp(&b.name));
@@ -404,21 +404,18 @@ mod tests {
             // A tie between `lib` and `app`: `app` by lexical order.
             ("lib/p", "app/q"),
         ];
+        let community = |name: &str, members: &[&str]| {
+            let mut community = Community::default();
+            community.name = name.into();
+            community.members = members.iter().map(|m| m.to_string()).collect();
+            community
+        };
         assert_eq!(
             communities(calls.iter().copied(), dir),
             vec![
-                Community {
-                    name: "app".into(),
-                    members: vec!["app/q".into(), "lib/p".into()],
-                },
-                Community {
-                    name: "src".into(),
-                    members: vec!["root".into(), "src/a".into(), "src/b".into()],
-                },
-                Community {
-                    name: "src#2".into(),
-                    members: vec!["src/x".into(), "src/y".into()],
-                },
+                community("app", &["app/q", "lib/p"]),
+                community("src", &["root", "src/a", "src/b"]),
+                community("src#2", &["src/x", "src/y"]),
             ]
         );
     }

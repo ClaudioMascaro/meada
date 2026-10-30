@@ -64,6 +64,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- For `meada-core` crate users: the export's structs (`Export` and each of its pieces, with
+  `Shape` and `Drift`) are `#[non_exhaustive]`, so a field added in 1.x is a minor change. Build
+  one with `T::default()` and named field assignments, or, for a struct with a field that has no
+  default (`Document`, `Import`, `Link`, `Process`, `Step`, `Stale`), with `T::new` taking every
+  field in declaration order (`Shape::new` takes the source, the rest set after it). A struct
+  literal or an exhaustive pattern of these types outside `meada-core` no longer compiles. No
+  output, golden or exported byte changed.
 - The stability promise (spec #32) lets 1.x grow the MCP surface. In
   `docs/site/{pt,en,es}/stability.md` and the three READMEs, these are minor changes: adding an MCP
   tool while the tool list stays within its 1,000-token budget, adding an accepted value to an

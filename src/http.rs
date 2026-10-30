@@ -776,20 +776,21 @@ impl ContractKind for Http {
                 if route(&provider.contract).is_some_and(|(method, _)| method == ANY) {
                     reason.push_str("; any method");
                 }
-                Link {
-                    consumer: consumer.site.clone(),
-                    provider: provider.site.clone(),
-                    contract: contract.clone(),
-                    level: match (ambiguous, gateway) {
-                        (true, _) => Level::Ambiguous,
-                        (_, Some(_)) => Level::Inferred,
-                        _ => level,
-                    },
+                let level = match (ambiguous, gateway) {
+                    (true, _) => Level::Ambiguous,
+                    (_, Some(_)) => Level::Inferred,
+                    _ => level,
+                };
+                Link::new(
+                    consumer.site.clone(),
+                    provider.site.clone(),
+                    contract.clone(),
+                    level,
                     reason,
-                    by: None,
-                    p: None,
-                    drift: None,
-                }
+                    None,
+                    None,
+                    None,
+                )
             })
             .collect()
     }
