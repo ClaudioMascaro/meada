@@ -29,7 +29,7 @@ npx meada --version
 The npm package's version is always the release's. To index, Meada needs only the binary and git.
 The details of each channel, the console and the container are in
 [Installation](https://claudiomascaro.github.io/meada/en/installation/) and in the
-[user guide](docs/user-guide.md) (in Portuguese for now; section 1, Instalação).
+[user guide](docs/user-guide.en.md) (section 1, Installation).
 
 ## First steps
 
@@ -49,7 +49,7 @@ base_url_env = ["API_URL"]          # variable the client reads the base URL fro
 ```
 
 The full `meada.toml` reference is in the
-[user guide](docs/user-guide.md) (in Portuguese for now; section 4, `meada.toml` reference).
+[user guide](docs/user-guide.en.md) (section 4, `meada.toml` reference).
 
 ## Connect an agent (MCP)
 
@@ -69,7 +69,7 @@ already on your `PATH`, use `"command": "meada", "args": ["mcp"]`.
 
 The agent gets three tools, `search`, `context` and `trace`, which only read. See
 [Agents and MCP](https://claudiomascaro.github.io/meada/en/mcp/) and the
-[user guide](docs/user-guide.md) (in Portuguese for now; section 2, Conectar um agente).
+[user guide](docs/user-guide.en.md) (section 2, Connect an agent).
 
 ## Status
 
@@ -145,7 +145,7 @@ results by symbol identity. Embeddings and any model step live downstream, outsi
 
 ## Documentation
 
-- [User guide](docs/user-guide.md) (in Portuguese for now)
+- [User guide](docs/user-guide.en.md)
 - [Configuration](https://claudiomascaro.github.io/meada/en/configuration/)
 - [Agents and MCP](https://claudiomascaro.github.io/meada/en/mcp/)
 - [Server mode](https://claudiomascaro.github.io/meada/en/server/)

@@ -8,6 +8,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The English user guide and README (#150, spec #32): `docs/user-guide.en.md` translates both
+  halves of the pt-BR guide section by section (sections 1 to 11) with the same neutral examples
+  and links the English stability page; `README.en.md` now links it instead of the pt-BR guide.
+  No code, default dependency or golden changed.
 - The Spanish user guide (#151, spec #32): `docs/user-guide.es.md`, sections 1 to 11 of the pt-BR
   guide with the same structure and neutral names, linking the Spanish stability page. The Spanish
   README links it instead of the Portuguese guide, and the three READMEs link the stability page
