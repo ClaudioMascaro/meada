@@ -93,6 +93,8 @@ still needs the post-publication evidence.
   existing parameter (a new value of `changes`) and adding a field at the end of an existing line
   kind. Removing or renaming a tool or parameter and changing what an existing one means stay
   breaking. ADR 0008 is amended: three tools is where the surface started, not a ceiling.
+- `SECURITY` (pt-BR, English and Spanish): the latest published 1.x version receives security
+  fixes, which ship as a patch or minor release.
 
 ### Fixed
 
