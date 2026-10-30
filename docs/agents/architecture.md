@@ -49,8 +49,26 @@ read in a generation names the generation and its fix (`msg::Fix`), not `meada i
 publish from this build for another schema version, else removing `<local_dir>/<id>` before
 `meada snapshot pull` (a pull of the generation already current changes nothing) or a new
 generation. Every query (`export`, `search`, `context`, `trace`) calls `refresh()` first, then
-reads each index through `index::export`, adds the contracts each `meada.toml` declares
-(`ContractKind::declare`), derives **links** from both, and renders.
+reads each index, adds the contracts each `meada.toml` declares (`ContractKind::declare`),
+derives **links** from both, and renders. `export` (and `status`) read every row
+(`Engine::exports`, `index::export`); `search`, `context`, `trace` and the open items read a
+**partial export** (#396, `Engine::partial`, `partial.rs`): each index's contract rows whole
+(`index::contracts`, what links derive from), and of its code rows (symbols, calls with their
+candidates, communities) only those of the answer, through SQL filters on the indexes
+`symbols_id`, `calls_id`, `calls_caller`, `calls_target`, `candidates_target`, `symbols_hash`
+and `communities_member`. Before declaring, a partial export reads the symbols each kind looks
+up (`ContractKind::symbols_read`: a resource's `via` symbols, and every symbol of a repository
+with a named manifest, which an import resolves into through `package::Provided`) and the calls
+its decisions name. Then the query reads its rows: `search` scans the symbols one row at a time
+(`index::each_symbol`) and looks a contract's site up by id; `context` reads the symbol, the
+calls that reach it and that it makes, the symbols at their ends, what `ContractKind::
+context_reads` names and what is upstream of it for its processes (`trace::read_processes`);
+`trace` reads its start (`trace::starts`) and every node a walk may reach from it
+(`trace::read`, a superset of the edges `Walk` and `Graph::edges` follow). The code that renders
+then looks rows up in the partial export as in a whole one; nothing is kept between queries, so
+memory follows the answer and an MCP call pays a few SQL statements per step of its walk.
+`engine::with_every_row` makes a query read every row instead, and `tests/it/partial.rs` checks
+that both give the same bytes over the fixtures.
 Nothing outside the index's directory (`.meada/`, or `index_dir` in server mode) is written.
 Server mode also runs on `index_dir` and mirrors mounted read-only, possibly owned by another
 user: the open creates no file there (no `index.db.lock`, only a rebuild takes it; no
@@ -415,6 +433,9 @@ one for the area a change touches.
   `Graph`, the walk and the process walk (`Graph::process`, the step list `trace` renders and the
   export carries); `meada-core`'s `trace.rs` closes the chain with its footer.
   `entry.rs`: entry points (spec #31), found when an index is written.
+  `partial.rs`: the partial export a query reads (#396): the contract rows whole, and the code
+  rows the query asks for, read through `index`'s filtered readers and kept in `index::export`'s
+  order.
   `drift_view.rs`: places the links `context`, `search` and `status` show with their drift
   (`entries`); it reads no kind (the stored links, the exports' consumer shapes, the calls and the
   seam's `parts`), and `meada-core`'s `drift.rs` turns them into lines.
@@ -1506,6 +1527,7 @@ one for the area a change touches.
   |---|---|
   | `entry` | which entry point kind a side of a contract makes (a pure function of the contract: entry points are stored) |
   | `declare` | the sides `meada.toml` declares, run at query time (a config edit needs no reindex) |
+  | `symbols_read` | the symbols `declare`, `workspace_step`, `link` and `status` look up, which a partial export reads before declaring (resources: their `via` symbols; packages: every symbol of a repository with a named manifest) |
   | `workspace_step` | a step over every repository after every `declare` (the package provider index, dependency entries, imports, shapes) |
   | `after_links` | a pass over the links after the decisions replay (HTTP: drift) |
   | `unresolved`, `label`, `parts` | whether an identifier is an unresolved side, how it is labelled, the parts `search` ranks |
@@ -1513,6 +1535,7 @@ one for the area a change touches.
   | `search_word`, `own_search` | the word of `search`'s `kind` and, for an own renderer, its hits |
   | `sides`, `view`, `related_sides` | the role words and the carried word of `context` on a contract, and the sides that reach it by another name; a contract listed by its providers alone is followed by the linked consumers that read fields, with their drift (the engine's rule: `View::follows_drift`) |
   | `at_call`, `context_sections` | the lines a call adds to a symbol's `contracts:`, and the sections `context` adds after the callees (packages: `consumers:`) |
+  | `context_reads` | the call sites `context_sections` looks up, which `context` reads first (packages: the consumers of the links into the symbol) |
   | `starts` | the providers a `trace` start text names |
   | `calls_from_definition` | whether a consumer at a symbol (a Feign or Retrofit interface method) calls on its provider, so `trace` follows from the method to it (HTTP; a channel handler is where a link ends) |
   | `status` | the lines `meada status` prints |
@@ -3095,6 +3118,13 @@ qualification budget does (ADR 0017).
   regular file of at most `SOURCE_MAX` (16 MiB); anything else renders as unavailable, the path
   without its line, as a missing file does. An answer keeps each file it reads, so several
   large files add up.
+- `partial.rs` (#396): a query reads every symbol of a repository with a named manifest, since
+  an import resolves into it through any of them (`package::Provided`, `ContractKind::
+  symbols_read`), and every contract row of every repository, links deriving from them at each
+  query; `trace` reads every node its walk may reach, as the walk visits them all before the
+  budget cuts the chain, and `context` every node upstream of the symbol for its processes. On
+  junit5 (96k calls), a `trace` up that reaches a fifth of the calls reads them through
+  indexed lookups and takes longer than a whole read did (no marker).
 - `engine.rs`: `search` scans every symbol. Kind `duplicate` folds no nested groups (a duplicated
   class and each of its methods are groups of their own) and has no minimum span size (#254).
 - `index.rs`: every contract is extracted again and every call resolved again on any change
@@ -3994,8 +4024,8 @@ qualification budget does (ADR 0017).
   `BUDGET` (10,000 schemas per shape, no marker). `openapi.rs`: a path item reference behind
   another one that is external is dropped without a status line (no marker).
 - `drift_view.rs`: `context`, `search` and `status` find each shown link's consumer call by
-  scanning the calls of every repository, once per link (no marker); an index by call id waits
-  for a workspace that makes this slow.
+  scanning the calls of every repository, once per link (no marker); a query has read only those
+  calls (`drift_view::sites`), `status` every call.
 - `lang/python.rs`: `VALUE_DEPTH` (64): a list, tuple, dict literal, parenthesized expression or
   `await` nested deeper in a value is `Value::Unknown`, so a hostile file cannot overflow the
   stack. `FOLD_DEPTH` (256): a `+` or `or` chain, a chain of string methods or `getenv`

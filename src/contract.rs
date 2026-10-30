@@ -192,6 +192,14 @@ pub trait ContractKind {
     /// derive at query time, so an edit to `meada.toml` needs no reindex.
     fn declare(&self, _repo: &Repository, _export: &mut Export) {}
 
+    /// The symbols of `repo` that `declare`, `workspace_step`, `link` and `status` look up in
+    /// its export, given the export's contract rows: a query reads only some code rows of an
+    /// index (#396, `partial.rs`), these before any kind declares. `None` is every symbol of
+    /// the repository; none by default.
+    fn symbols_read(&self, _repo: &Repository, _export: &Export) -> Option<Vec<String>> {
+        Some(Vec::new())
+    }
+
     /// Runs once over the index content of every repository of the workspace (in workspace
     /// order), after every kind's `declare` has run on every repository: a step that needs
     /// all of them, such as an index of the providers of the whole workspace.
@@ -306,6 +314,13 @@ pub trait ContractKind {
         _links: &[Link],
         _symbol: &str,
     ) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The call sites `context_sections` looks up for `symbol` among `links` (the
+    /// workspace's): a query reads them, and the symbols making them, first (#396). None by
+    /// default.
+    fn context_reads(&self, _links: &[Link], _symbol: &str) -> Vec<String> {
         Vec::new()
     }
 

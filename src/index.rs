@@ -99,14 +99,20 @@ CREATE TABLE files (
 );
 CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, hash TEXT NOT NULL);
 CREATE INDEX symbols_path ON symbols (path);
+CREATE INDEX symbols_id ON symbols (id);
+CREATE INDEX symbols_hash ON symbols (hash);
 CREATE TABLE calls (
     id TEXT NOT NULL, caller TEXT NOT NULL, target TEXT, level TEXT,
     path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, narrowed INTEGER NOT NULL,
     decorates TEXT
 );
 CREATE INDEX calls_path ON calls (path);
+CREATE INDEX calls_id ON calls (id);
+CREATE INDEX calls_caller ON calls (caller);
+CREATE INDEX calls_target ON calls (target);
 CREATE TABLE candidates (call TEXT NOT NULL, target TEXT NOT NULL);
 CREATE INDEX candidates_call ON candidates (call);
+CREATE INDEX candidates_target ON candidates (target);
 CREATE TABLE contracts (
     role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
     method TEXT, fragments TEXT, shape TEXT
@@ -125,6 +131,7 @@ CREATE TABLE families (path TEXT NOT NULL, class TEXT NOT NULL, ancestors TEXT);
 CREATE TABLE flexible (path TEXT NOT NULL, name TEXT NOT NULL, least INTEGER NOT NULL, most INTEGER);
 CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL, site TEXT NOT NULL);
 CREATE TABLE communities (name TEXT NOT NULL, member TEXT NOT NULL);
+CREATE INDEX communities_member ON communities (member);
 CREATE TABLE valued (path TEXT PRIMARY KEY);
 ";
 
@@ -1937,6 +1944,31 @@ fn stored_shape(json: Option<String>) -> Option<Shape> {
 /// The index content of the repository `db` holds, every list sorted. Links are
 /// left empty: they span repositories, so the engine adds them.
 pub fn export(db: &Connection, identity: &str) -> Result<Export> {
+    let mut export = contracts(db, identity)?;
+    export.symbols = symbols_where(db, "", "[]")?;
+    export.calls = calls_where(db, "", "[]", &|_| false)?;
+    let mut communities: Vec<Community> = Vec::new();
+    for row in db
+        .prepare("SELECT name, member FROM communities ORDER BY name, member")?
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get(1)?)))?
+    {
+        let (name, member) = row?;
+        match communities.last_mut() {
+            Some(c) if c.name == name => c.members.push(member),
+            _ => communities.push(Community {
+                name,
+                members: vec![member],
+            }),
+        }
+    }
+    export.communities = communities;
+    Ok(export)
+}
+
+/// `export` without the code rows (`symbols`, `calls` with their candidates, `communities`),
+/// which grow with the calls of the repository: what a query reads whole (#396), every other
+/// row it reads being filtered (`symbols_of`, `calls_by`, `calls_to` and the others below).
+pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
     let files = db
         .prepare("SELECT path, hash FROM files WHERE resolved != '' ORDER BY path")?
         .query_map([], |r| {
@@ -1961,46 +1993,6 @@ pub fn export(db: &Connection, identity: &str) -> Result<Export> {
             Some((path, facts.budget?))
         })
         .collect();
-    let symbols = db
-        .prepare("SELECT id, path, start, end, hash FROM symbols ORDER BY id, path, start, end")?
-        .query_map([], |r| {
-            Ok(Symbol {
-                id: r.get(0)?,
-                span: span(r, 1)?,
-                hash: r.get(4)?,
-            })
-        })?
-        .collect::<rusqlite::Result<_>>()?;
-    let mut candidates: HashMap<String, Vec<String>> = HashMap::new();
-    for row in db
-        .prepare("SELECT call, target FROM candidates ORDER BY call, target")?
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
-    {
-        let (call, target) = row?;
-        candidates.entry(call).or_default().push(target);
-    }
-    let calls = db
-        .prepare(
-            "SELECT id, caller, target, level, path, start, end, narrowed, decorates FROM calls \
-             ORDER BY id, path, start, end",
-        )?
-        .query_map([], |r| {
-            let id: String = r.get(0)?;
-            Ok(CallSite {
-                candidates: candidates.remove(&id).unwrap_or_default(),
-                id,
-                caller: r.get(1)?,
-                target: r.get(2)?,
-                level: r
-                    .get::<_, Option<String>>(3)?
-                    .as_deref()
-                    .and_then(Level::parse),
-                span: span(r, 4)?,
-                narrowed: r.get(7)?,
-                decorates: r.get(8)?,
-            })
-        })?
-        .collect::<rusqlite::Result<_>>()?;
     let providers = db
         .prepare(
             "SELECT contract, site, shape FROM contracts WHERE role = 'provider' \
@@ -2173,20 +2165,6 @@ pub fn export(db: &Connection, identity: &str) -> Result<Export> {
             })
             .collect(),
     };
-    let mut communities: Vec<Community> = Vec::new();
-    for row in db
-        .prepare("SELECT name, member FROM communities ORDER BY name, member")?
-        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get(1)?)))?
-    {
-        let (name, member) = row?;
-        match communities.last_mut() {
-            Some(c) if c.name == name => c.members.push(member),
-            _ => communities.push(Community {
-                name,
-                members: vec![member],
-            }),
-        }
-    }
     let entry_points = db
         .prepare("SELECT identity, kind, label, site FROM entry_points ORDER BY identity")?
         .query_map([], |r| {
@@ -2210,8 +2188,8 @@ pub fn export(db: &Connection, identity: &str) -> Result<Export> {
         root: PathBuf::new(),
         files,
         dropped,
-        symbols,
-        calls,
+        symbols: Vec::new(),
+        calls: Vec::new(),
         providers,
         consumers,
         bindings,
@@ -2226,7 +2204,7 @@ pub fn export(db: &Connection, identity: &str) -> Result<Export> {
         flexible,
         shapes,
         imports: Vec::new(),
-        communities,
+        communities: Vec::new(),
         links: Vec::new(),
         entry_points,
         processes: Vec::new(),
@@ -2263,6 +2241,213 @@ fn span(row: &rusqlite::Row, at: usize) -> rusqlite::Result<Span> {
         start: row.get(at + 1)?,
         end: row.get(at + 2)?,
     })
+}
+
+/// A JSON array of `values`, for `json_each(?1)`: one statement takes any number of them.
+fn listed<S: AsRef<str>>(values: &[S]) -> String {
+    let values: Vec<&str> = values.iter().map(AsRef::as_ref).collect();
+    serde_json::to_string(&values).unwrap_or_else(|_| "[]".into())
+}
+
+/// The `symbols` rows `filter` keeps (a `WHERE` clause, `?1` being `list`, a JSON array), as
+/// `export` sorts them.
+fn symbols_where(db: &Connection, filter: &str, list: &str) -> Result<Vec<Symbol>> {
+    let sql = format!(
+        "SELECT id, path, start, end, hash FROM symbols {filter} ORDER BY id, path, start, end"
+    );
+    let mut statement = db.prepare(&sql)?;
+    let bound = statement.parameter_count();
+    let rows = match bound {
+        0 => statement.query([])?,
+        _ => statement.query(params![list])?,
+    };
+    Ok(rows.mapped(symbol).collect::<rusqlite::Result<_>>()?)
+}
+
+/// A `symbols` row, `id, path, start, end, hash`.
+fn symbol(r: &rusqlite::Row) -> rusqlite::Result<Symbol> {
+    Ok(Symbol {
+        id: r.get(0)?,
+        span: span(r, 1)?,
+        hash: r.get(4)?,
+    })
+}
+
+/// The `calls` rows `filter` keeps (as `symbols_where`), as `export` sorts them, each with its
+/// candidates but those `held` (a call the reader holds already, candidates and all): when
+/// several rows share an identity, the first holds them, as in `export`.
+fn calls_where(
+    db: &Connection,
+    filter: &str,
+    list: &str,
+    held: &dyn Fn(&str) -> bool,
+) -> Result<Vec<CallSite>> {
+    let sql = format!(
+        "SELECT id, caller, target, level, path, start, end, narrowed, decorates FROM calls \
+         {filter} ORDER BY id, path, start, end"
+    );
+    let mut statement = db.prepare(&sql)?;
+    let rows = match statement.parameter_count() {
+        0 => statement.query([])?,
+        _ => statement.query(params![list])?,
+    };
+    let calls: Vec<CallSite> = rows
+        .mapped(|r| {
+            Ok(CallSite {
+                id: r.get(0)?,
+                caller: r.get(1)?,
+                target: r.get(2)?,
+                level: r
+                    .get::<_, Option<String>>(3)?
+                    .as_deref()
+                    .and_then(Level::parse),
+                span: span(r, 4)?,
+                narrowed: r.get(7)?,
+                decorates: r.get(8)?,
+                candidates: Vec::new(),
+            })
+        })
+        .collect::<rusqlite::Result<_>>()?;
+    let candidates = match filter.is_empty() {
+        true => db.prepare("SELECT call, target FROM candidates ORDER BY call, target")?,
+        false => db.prepare(
+            "SELECT call, target FROM candidates WHERE call IN (SELECT value FROM json_each(?1)) \
+             ORDER BY call, target",
+        )?,
+    };
+    let mut candidates = candidates;
+    let ids: Vec<&str> = (calls.iter().map(|c| c.id.as_str()))
+        .filter(|id| !held(id))
+        .collect();
+    let ids = listed(&ids);
+    let rows = match filter.is_empty() {
+        true => candidates.query([])?,
+        false => candidates.query(params![ids])?,
+    };
+    let mut by_call: HashMap<String, Vec<String>> = HashMap::new();
+    for row in rows.mapped(|r| Ok((r.get::<_, String>(0)?, r.get(1)?))) {
+        let (call, target) = row?;
+        by_call.entry(call).or_default().push(target);
+    }
+    Ok(calls
+        .into_iter()
+        .map(|mut call| {
+            call.candidates = by_call.remove(&call.id).unwrap_or_default();
+            call
+        })
+        .collect())
+}
+
+/// The rows of the symbols `ids` names (several when overloads share an identity).
+pub(crate) fn symbols_of<S: AsRef<str>>(db: &Connection, ids: &[S]) -> Result<Vec<Symbol>> {
+    let filter = "WHERE id IN (SELECT value FROM json_each(?1))";
+    symbols_where(db, filter, &listed(ids))
+}
+
+/// The symbols defined in the files `paths`.
+pub(crate) fn symbols_in<S: AsRef<str>>(db: &Connection, paths: &[S]) -> Result<Vec<Symbol>> {
+    let filter = "WHERE path IN (SELECT value FROM json_each(?1))";
+    symbols_where(db, filter, &listed(paths))
+}
+
+/// The symbols whose span has one of the BLAKE3 `hashes`.
+pub(crate) fn symbols_hashed<S: AsRef<str>>(db: &Connection, hashes: &[S]) -> Result<Vec<Symbol>> {
+    let filter = "WHERE hash IN (SELECT value FROM json_each(?1))";
+    symbols_where(db, filter, &listed(hashes))
+}
+
+/// The filter and its list for the rows whose `id` is `name` or ends in `::<name>`.
+fn named(name: &str) -> (String, String) {
+    // `substr` with a negative start counts characters from the end, as `ends_with` compares
+    // a whole suffix.
+    let suffix = format!("::{name}");
+    let filter = format!(
+        "WHERE id = json_extract(?1, '$[0]') OR substr(id, -{}) = json_extract(?1, '$[1]')",
+        suffix.chars().count()
+    );
+    (filter, listed(&[name, suffix.as_str()]))
+}
+
+/// The symbols `name` names: its identity, or any identity ending in `::<name>`.
+pub(crate) fn symbols_named(db: &Connection, name: &str) -> Result<Vec<Symbol>> {
+    let (filter, list) = named(name);
+    symbols_where(db, &filter, &list)
+}
+
+/// The calls `name` names, as `symbols_named` does.
+pub(crate) fn calls_named(db: &Connection, name: &str) -> Result<Vec<CallSite>> {
+    let (filter, list) = named(name);
+    calls_where(db, &filter, &list, &|_| false)
+}
+
+/// Every symbol row, one at a time, as `export` sorts them: a scan that holds one row.
+pub(crate) fn each_symbol(db: &Connection, mut f: impl FnMut(Symbol)) -> Result<()> {
+    let mut statement =
+        db.prepare("SELECT id, path, start, end, hash FROM symbols ORDER BY id, path, start, end")?;
+    for row in statement.query([])?.mapped(symbol) {
+        f(row?);
+    }
+    Ok(())
+}
+
+/// The call sites `ids` names; `held` as `calls_where` takes it.
+pub(crate) fn calls_of<S: AsRef<str>>(
+    db: &Connection,
+    ids: &[S],
+    held: &dyn Fn(&str) -> bool,
+) -> Result<Vec<CallSite>> {
+    let filter = "WHERE id IN (SELECT value FROM json_each(?1))";
+    calls_where(db, filter, &listed(ids), held)
+}
+
+/// The calls the symbols or files `callers` make; `held` as `calls_where` takes it.
+pub(crate) fn calls_by<S: AsRef<str>>(
+    db: &Connection,
+    callers: &[S],
+    held: &dyn Fn(&str) -> bool,
+) -> Result<Vec<CallSite>> {
+    let filter = "WHERE caller IN (SELECT value FROM json_each(?1))";
+    calls_where(db, filter, &listed(callers), held)
+}
+
+/// The calls that may reach one of `targets`: their target, and, with `candidates`, one of
+/// the candidates of an ambiguous call; `held` as `calls_where` takes it.
+pub(crate) fn calls_to<S: AsRef<str>>(
+    db: &Connection,
+    targets: &[S],
+    candidates: bool,
+    held: &dyn Fn(&str) -> bool,
+) -> Result<Vec<CallSite>> {
+    let filter = match candidates {
+        false => "WHERE target IN (SELECT value FROM json_each(?1))",
+        true => {
+            "WHERE rowid IN (SELECT rowid FROM calls WHERE target IN \
+             (SELECT value FROM json_each(?1)) UNION SELECT c.rowid FROM candidates k \
+             JOIN calls c ON c.id = k.call WHERE k.target IN (SELECT value FROM json_each(?1)))"
+        }
+    };
+    calls_where(db, filter, &listed(targets), held)
+}
+
+/// The name of the community `member` belongs to, the first by name.
+pub(crate) fn community_of(db: &Connection, member: &str) -> Result<Option<String>> {
+    Ok(db
+        .query_row(
+            "SELECT name FROM communities WHERE member = ?1 ORDER BY name LIMIT 1",
+            [member],
+            |r| r.get(0),
+        )
+        .optional()?)
+}
+
+/// Every community by name, with its number of members.
+pub(crate) fn community_sizes(db: &Connection) -> Result<Vec<(String, usize)>> {
+    let mut statement =
+        db.prepare("SELECT name, count(*) FROM communities GROUP BY name ORDER BY name")?;
+    let rows = statement
+        .query([])?
+        .mapped(|r| Ok((r.get(0)?, r.get::<_, i64>(1)? as usize)));
+    Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
 #[cfg(test)]

@@ -14,6 +14,8 @@ use crate::render::{
 use meada_core::export::{Mark, Process, Step as ProcessStep, Via as StepVia};
 use meada_core::trace::{Chain, Row, arrow, level_mark};
 
+use crate::Result;
+use crate::partial::Partial;
 use crate::repo::Change;
 use crate::workspace::{Missing, Workspace};
 
@@ -312,6 +314,153 @@ impl<'a> Graph<'a> {
     fn ends(&self, id: &str) -> bool {
         self.is_repo(id) || self.documented.contains_key(id)
     }
+}
+
+/// The nodes `start` names, as `Graph::find` and `Graph::changed` find them, read into
+/// `partial` with every row `find` looks up (#396): the providers a kind starts from, else the
+/// symbols the name fits, else the call sites it fits. Empty when it names none, or several
+/// (the answer lists them, and nothing is walked), or a process `direction` up.
+pub(crate) fn starts(
+    partial: &mut Partial,
+    start: Start,
+    changes: Option<&[(String, Change)]>,
+    direction: Direction,
+) -> Result<Vec<String>> {
+    let from = match start {
+        Start::Uncommitted => {
+            let changed = changes.unwrap_or_default().iter();
+            let paths: Vec<&str> = changed.map(|(p, _)| p.as_str()).collect();
+            let found = crate::index::symbols_in(partial.db(0), &paths)?;
+            let ids = found.iter().map(|s| s.id.clone()).collect();
+            partial.add_symbols(0, found);
+            return Ok(ids);
+        }
+        Start::From(from) => from,
+    };
+    if let Some(identity) = from.strip_prefix("process::") {
+        let entries = partial.exports.iter().flat_map(|e| &e.entry_points);
+        let sites = entries
+            .filter(|e| e.identity == identity)
+            .map(|e| e.site.clone());
+        return Ok(match direction {
+            Direction::Down => sites.collect(),
+            Direction::Up => Vec::new(),
+        });
+    }
+    if contract::kind_of(from).is_some_and(|kind| kind.sides().is_some()) {
+        return Ok(Vec::new());
+    }
+    let providers: Vec<(&str, &str)> = (partial.exports.iter())
+        .flat_map(|e| &e.providers)
+        .map(|p| (p.contract.as_str(), p.site.as_str()))
+        .collect();
+    let sites: Vec<String> = (contract::KINDS.iter())
+        .flat_map(|kind| kind.starts(from, &providers))
+        .map(String::from)
+        .collect();
+    if !sites.is_empty() {
+        return Ok(sites);
+    }
+    let mut symbols = HashSet::new();
+    for n in 0..partial.exports.len() {
+        let found = crate::index::symbols_named(partial.db(n), from)?;
+        symbols.extend(found.iter().map(|s| s.id.clone()));
+        partial.add_symbols(n, found);
+    }
+    if !symbols.is_empty() {
+        return Ok(match symbols.len() {
+            1 => symbols.into_iter().collect(),
+            _ => Vec::new(),
+        });
+    }
+    let mut calls = HashSet::new();
+    for n in 0..partial.exports.len() {
+        let found = crate::index::calls_named(partial.db(n), from)?;
+        calls.extend(found.iter().map(|c| c.id.clone()));
+        partial.add_calls(n, found);
+    }
+    Ok(match calls.len() {
+        1 => calls.into_iter().collect(),
+        _ => Vec::new(),
+    })
+}
+
+/// Reads into `partial` every code row a walk `direction` from `starts` may read (#396), and
+/// returns the nodes reached. From each node: its own rows (a symbol, or a call site named by
+/// its identity), then down the calls it makes, the targets and candidates of each and what
+/// the links at those calls and at the node lead to, or up its call site's caller, the calls
+/// whose target is the node (or, with `candidates`, that list it among theirs) and what the
+/// links at the node lead to; until nothing new is reached. That is every edge `Walk::enter`
+/// and `Graph::edges` may follow and some they do not (an overload set, a link of another
+/// contract), so a `Graph` over `partial` answers from the reached nodes as the one over every
+/// row does. `links` are the workspace's.
+pub(crate) fn read(
+    partial: &mut Partial,
+    links: &[Link],
+    starts: Vec<String>,
+    direction: Direction,
+    candidates: bool,
+) -> Result<HashSet<String>> {
+    let mut by_consumer: HashMap<&str, Vec<&Link>> = HashMap::new();
+    let mut by_provider: HashMap<&str, Vec<&Link>> = HashMap::new();
+    for l in links {
+        by_consumer.entry(&l.consumer).or_default().push(l);
+        by_provider.entry(&l.provider).or_default().push(l);
+    }
+    // The far end of each link at `id`, either way: a link is crossed both ways, by its kind.
+    let across = |id: &str, next: &mut Vec<String>| {
+        let out = by_consumer.get(id).into_iter().flatten();
+        next.extend(out.map(|l| l.provider.clone()));
+        let inward = by_provider.get(id).into_iter().flatten();
+        next.extend(inward.map(|l| l.consumer.clone()));
+    };
+    let mut reached: HashSet<String> = HashSet::new();
+    let mut frontier = starts;
+    while !frontier.is_empty() {
+        let new: Vec<String> = (frontier.into_iter())
+            .filter(|id| reached.insert(id.clone()))
+            .collect();
+        partial.symbols(None, &new)?;
+        let sites = partial.calls(None, &new)?;
+        let mut next = Vec::new();
+        for id in &new {
+            across(id, &mut next);
+        }
+        match direction {
+            Direction::Down => {
+                let mut calls = sites;
+                calls.extend(partial.callees(None, &new)?);
+                for (_, c) in &calls {
+                    next.extend(c.target.iter().chain(&c.candidates).cloned());
+                    across(&c.id, &mut next);
+                }
+            }
+            Direction::Up => {
+                let mut calls = sites;
+                calls.extend(partial.callers(None, &new, candidates)?);
+                next.extend(calls.into_iter().map(|(_, c)| c.caller));
+            }
+        }
+        frontier = next;
+    }
+    Ok(reached)
+}
+
+/// Reads into `partial` what `Graph::processes_of(id)` reads (#396): the nodes upstream of
+/// `id` through the edges a process follows (calls by their target, links), with the calls of
+/// those that are no symbol (a file making top-level calls), whose edges come from their calls
+/// alone. `links` are the workspace's.
+pub(crate) fn read_processes(partial: &mut Partial, links: &[Link], id: &str) -> Result<()> {
+    let reached = read(partial, links, vec![id.to_string()], Direction::Up, false)?;
+    let symbols: HashSet<&str> = (partial.exports.iter())
+        .flat_map(|e| &e.symbols)
+        .map(|s| s.id.as_str())
+        .collect();
+    let files: Vec<String> = (reached.into_iter())
+        .filter(|id| !symbols.contains(id.as_str()))
+        .collect();
+    partial.callees(None, &files)?;
+    Ok(())
 }
 
 /// Whether the consumer of `link` calls its provider, so the provider is not a writer that goes

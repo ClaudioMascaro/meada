@@ -1640,20 +1640,22 @@ struct Reach<'e> {
     pub flag: Option<Flag>,
 }
 
+/// The package links of `links` into `symbol` or one of its members (`Ecosystem::member_of`).
+fn into<'l>(links: &'l [Link], symbol: &str) -> impl Iterator<Item = &'l Link> {
+    let into = move |l: &Link| {
+        l.provider == symbol
+            || of_contract(&l.contract).is_some_and(|e| e.member_of(&l.provider, symbol))
+    };
+    (links.iter()).filter(move |l| l.contract.starts_with(PREFIX) && into(l))
+}
+
 /// The calls that reach `symbol` through a package import, from `links` (the workspace's): each
 /// with the link's level and the range flag of the dependency entry it went through. A class is
 /// reached by the calls that reach its members (`Ecosystem::member_of`), once per call at the
 /// best level of its links into the class.
 fn reached<'e>(exports: &'e [Export], links: &[Link], symbol: &str) -> Vec<Reach<'e>> {
     let mut found: Vec<Reach> = Vec::new();
-    let into = |l: &Link| {
-        l.provider == symbol
-            || of_contract(&l.contract).is_some_and(|e| e.member_of(&l.provider, symbol))
-    };
-    for link in links
-        .iter()
-        .filter(|l| l.contract.starts_with(PREFIX) && into(l))
-    {
+    for link in into(links, symbol) {
         let Some((repository, consumer)) = (exports.iter().enumerate())
             .flat_map(|(n, e)| e.consumers.iter().map(move |c| (n, c)))
             .find(|(_, c)| c.site == link.consumer && c.contract.as_ref() == Some(&link.contract))
@@ -1840,6 +1842,22 @@ impl ContractKind for Packages {
             entry::drop_imported_exports(&mut export.entry_points, &imported);
         }
         shapes(exports, &providers);
+    }
+
+    /// A repository with a named manifest provides a package, and an import resolves into it
+    /// through every symbol it has (`Provided`).
+    fn symbols_read(&self, _repo: &Repository, export: &Export) -> Option<Vec<String>> {
+        let provides =
+            (export.manifests.iter()).any(|m| m.summary.name.is_some() && of(&m.path).is_some());
+        match provides {
+            true => None,
+            false => Some(Vec::new()),
+        }
+    }
+
+    /// The consumers of the links `reached` follows into `symbol`: calls.
+    fn context_reads(&self, links: &[Link], symbol: &str) -> Vec<String> {
+        into(links, symbol).map(|l| l.consumer.clone()).collect()
     }
 
     /// `consumers:` with the calls that reach `symbol` through a package import (spec #22),
