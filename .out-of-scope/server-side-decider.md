@@ -15,7 +15,9 @@ ADR 0006 and ADR 0011 say the server never runs `decide`, and only `decide` writ
 suggest-only module would keep the second rule and break the first.
 
 ADR 0008 fixes the surface at three tools. A suggestion costs either a fourth tool or a field in
-every `trace` or `context` answer, paid in tool-description tokens by every client.
+every `trace` or `context` answer, paid in tool-description tokens by every client. (Amended
+2026-10-30: ADR 0008 no longer fixes the count, but a tool still costs those tokens, and the
+reasons above stand on their own.)
 
 The recipe that already works gives the same outcome as a reviewable diff: `meada decide
 --decider` runs as a step on a clone, against the operator's gateway, and the resulting

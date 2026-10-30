@@ -58,6 +58,15 @@ All notable changes to Meada are recorded here. The format follows
   seven lookup indexes (about 40% larger on junit5) and its schema version changes, so existing
   indexes are rebuilt. `meada export`, `status` and the decision report still read every row.
 
+### Changed
+
+- The stability promise (spec #32) lets 1.x grow the MCP surface. In
+  `docs/site/{pt,en,es}/stability.md` and the three READMEs, these are minor changes: adding an MCP
+  tool while the tool list stays within its 1,000-token budget, adding an accepted value to an
+  existing parameter (a new value of `changes`) and adding a field at the end of an existing line
+  kind. Removing or renaming a tool or parameter and changing what an existing one means stay
+  breaking. ADR 0008 is amended: three tools is where the surface started, not a ceiling.
+
 ### Fixed
 
 - Console GitHub grant (#496): a session's GitHub grant and its state (`unread`, `current`,

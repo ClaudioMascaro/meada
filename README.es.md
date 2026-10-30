@@ -87,12 +87,14 @@ Meada 1.0 entrega todo el alcance de la v1 del [ADR 0003](docs/adr/0003-v1-scope
 **Promesa de estabilidad.** Desde 1.0 rige semver: un cambio incompatible en alguno de estos
 elementos exige una versión major.
 
-- los nombres, los parámetros y la gramática de salida de `search`, `context` y `trace`;
+- los nombres, los parámetros y la gramática de salida de las herramientas MCP (`search`,
+  `context` y `trace` hoy);
 - los comandos y las flags de la CLI;
 - los esquemas de `meada.toml` y de `meada.decisions.toml`;
 - el formato de `meada export`.
 
-Añadir un parámetro opcional, un tipo de búsqueda, una clave de configuración, un campo del
+Añadir una herramienta MCP, un parámetro opcional, un valor aceptado a un parámetro, un tipo de
+búsqueda, un campo al final de una línea de la salida, una clave de configuración, un campo del
 export o un lenguaje es un cambio menor. No entran en la promesa el texto de los mensajes de la
 CLI, el texto de las descripciones de las herramientas, el archivo de índice y el layout de
 `.meada/` (reconstruidos cuando cambia el esquema) y qué enlaces encuentra Meada en un código
