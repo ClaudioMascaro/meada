@@ -184,6 +184,7 @@ impl Permissions {
         self.read_at(state.set.as_ref(), login, Instant::now())
     }
 
+    /// `grant_and_state` for `set` at `now`.
     fn read_at(
         &self,
         set: Option<&Set>,
@@ -200,7 +201,6 @@ impl Permissions {
         (grant, state)
     }
 
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
     fn state_of(&self, set: Option<&Set>, now: Instant) -> &'static str {
         match set {
             None => "unread",

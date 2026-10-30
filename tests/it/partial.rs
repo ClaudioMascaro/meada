@@ -100,8 +100,10 @@ fn answers_alike(repo: &Path) {
         let ask = || format!("{:?}", engine.trace(start, direction, BUDGET));
         alike(&format!("trace {start:?} {direction:?}"), &ask);
     };
+    // Short names too: `trace::starts` finds them by suffix, and lists several fits.
     let starts = (symbols
         .iter()
+        .chain(&names)
         .chain(&calls)
         .chain(&contracts)
         .chain(&processes))
@@ -110,6 +112,35 @@ fn answers_alike(repo: &Path) {
         trace(start, Direction::Down);
         trace(start, Direction::Up);
     }
+    // An uncommitted edit inside a symbol, so the trace from the changes starts somewhere.
+    let Some((path, start)) = first_span(&export) else {
+        return;
+    };
+    let file = repo.join(&path);
+    let Ok(source) = fs::read_to_string(&file) else {
+        return;
+    };
+    if !source.is_char_boundary(start) {
+        return;
+    }
+    // A space at the end of the symbol's first line.
+    let end = source[start..]
+        .find('\n')
+        .map_or(source.len(), |at| start + at);
+    fs::write(&file, format!("{} {}", &source[..end], &source[end..])).unwrap();
+    trace(Start::Uncommitted, Direction::Down);
+    trace(Start::Uncommitted, Direction::Up);
+    fs::write(&file, source).unwrap();
+}
+
+/// The path and start offset (in bytes) of the first symbol of `export`.
+fn first_span(export: &Value) -> Option<(String, usize)> {
+    let symbols = export["symbols"].as_array()?;
+    symbols.iter().find_map(|s| {
+        let path = s["span"]["path"].as_str()?;
+        let start = usize::try_from(s["span"]["start"].as_i64()?).ok()?;
+        Some((path.to_string(), start))
+    })
 }
 
 #[test]

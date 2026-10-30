@@ -678,9 +678,9 @@ fn every_operation_is_refused_while_a_lock_holds_naming_the_holder() {
 /// milliseconds after the lock's.
 const HOLDER_SKEW_MS: i64 = 5;
 
-/// The holder lives with the lock: its four fields and a TTL no longer than the lock's while
-/// `lock` runs, renewed past one TTL, gone once the child exits. An operation leaves neither
-/// the lock nor the holder, after success and after failure.
+/// The holder lives with the lock: its four fields and a TTL no longer than the lock's (give or
+/// take `HOLDER_SKEW_MS`) while `lock` runs, renewed past one TTL, gone once the child exits. An
+/// operation leaves neither the lock nor the holder, after success and after failure.
 #[test]
 fn the_holder_lives_with_the_lock_and_an_operation_leaves_none() {
     let Some(fleet) = fleet("ops_holder") else {

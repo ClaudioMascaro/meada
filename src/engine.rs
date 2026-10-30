@@ -10,7 +10,7 @@ pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
 use crate::index::{CallSite, Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::{Fix, Msg};
-use crate::partial::Partial;
+use crate::partial::{self, Partial};
 use crate::render::{
     DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, mark, rank, section, unresolved,
 };
@@ -20,25 +20,8 @@ use crate::{Result, decisions, document, drift_view, index, items, render, repo,
 use meada_core::context::{self, shape_lines};
 use meada_core::search;
 
-thread_local! {
-    static EVERY_ROW: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-}
-
-/// Runs `f` with this thread's queries (`search`, `context`, `trace`, open items) reading every
-/// row of the indexes, as `meada export` does, instead of the rows of their answer (#396): the
-/// test that compares both answers runs them under it. Test-only: no command, option or setting
-/// reaches it.
 #[doc(hidden)]
-pub fn with_every_row<T>(f: impl FnOnce() -> T) -> T {
-    struct Restore(bool);
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            EVERY_ROW.set(self.0);
-        }
-    }
-    let _restore = Restore(EVERY_ROW.replace(true));
-    f()
-}
+pub use crate::partial::with_every_row;
 
 pub struct Engine {
     /// The index of each repository of the workspace, one connection each (SQLite attaches at
@@ -231,21 +214,7 @@ impl Engine {
     /// name, declared and stepped as `exports` does. The query reads the code rows of its
     /// answer into it before it looks them up.
     fn partial(&self) -> Result<Partial<'_>> {
-        let every_row = EVERY_ROW.get();
-        let contracts = (self.dbs.iter().zip(&self.workspace.repos))
-            .map(|(db, m)| {
-                let mut export = match every_row {
-                    true => index::export(db, &m.identity)?,
-                    false => index::contracts(db, &m.identity)?,
-                };
-                export.root = m.root.clone();
-                Ok(export)
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let mut partial = match every_row {
-            true => Partial::whole(&self.dbs, contracts),
-            false => Partial::new(&self.dbs, contracts),
-        };
+        let mut partial = Partial::open(&self.dbs, &self.workspace.repos)?;
         for (n, repo) in self.workspace.repos.iter().enumerate() {
             for kind in contract::KINDS {
                 match kind.symbols_read(repo, &partial.exports[n]) {
@@ -265,29 +234,6 @@ impl Engine {
             kind.workspace_step(&mut partial.exports);
         }
         Ok(partial)
-    }
-
-    /// Reads into `partial` the call sites and symbols `sites` names in the repository at
-    /// each position, and the symbols making those calls: what places a side or an item.
-    fn read_sites(partial: &mut Partial, sites: Vec<(usize, String)>) -> Result<()> {
-        for n in 0..partial.exports.len() {
-            let ids: Vec<&str> = (sites.iter())
-                .filter(|(m, _)| *m == n)
-                .map(|(_, id)| id.as_str())
-                .collect();
-            partial.symbols(Some(n), &ids)?;
-            let calls = partial.calls(Some(n), &ids)?;
-            partial.callers_of(&calls)?;
-        }
-        Ok(())
-    }
-
-    /// Reads into `partial` the calls `drift_view::entries` places for `links`, and the symbols
-    /// making them.
-    fn read_drift(partial: &mut Partial, links: &[Link]) -> Result<()> {
-        let sites = drift_view::sites(&partial.exports, links);
-        let calls = partial.calls(None, &sites)?;
-        partial.callers_of(&calls)
     }
 
     /// Every link of the workspace, sorted.
@@ -425,7 +371,7 @@ impl Engine {
         let mut partial = self.partial()?;
         let core = self.core_links(&partial.exports);
         let sites = items::sites(&partial.exports, &core);
-        Self::read_sites(&mut partial, sites)?;
+        partial.sites(sites)?;
         let exports = partial.exports;
         let items = items::list(&self.workspace.repos, &exports, &core);
         let (links, _) = decisions::replay(core, &self.workspace, &exports);
@@ -529,7 +475,7 @@ impl Engine {
             if symbols {
                 // ponytail: scans every symbol, one row at a time; an indexed lookup waits for
                 // a workspace that makes this slow.
-                index::each_symbol(db, |symbol| {
+                partial::each_symbol(db, |symbol| {
                     let name = label(&symbol.id).to_lowercase();
                     let last = name.rsplit('.').next().unwrap_or(&name);
                     if let Some(r) = [name.as_str(), last]
@@ -554,6 +500,7 @@ impl Engine {
                 let contract = c.contract.clone();
                 (contract.unwrap_or_else(|| unresolved(&c.site)), &c.site)
             });
+            let mut ranked = Vec::new();
             for (contract, site) in provided.chain(consumed) {
                 if !contract.starts_with(prefix) {
                     continue;
@@ -570,13 +517,12 @@ impl Engine {
                 else {
                     continue;
                 };
-                let span = match index::symbols_of(db, &[site])?.into_iter().next() {
-                    Some(s) => Some(s.span),
-                    // Only the span is placed: no candidate is read.
-                    None => (index::calls_of(db, &[site], &|_| true)?.into_iter().next())
-                        .map(|c| c.span),
-                };
-                let location = match &span {
+                ranked.push((r, contract, site));
+            }
+            let sites: Vec<&str> = ranked.iter().map(|(_, _, s)| s.as_str()).collect();
+            let spans = partial::spans(db, &sites)?;
+            for (r, contract, site) in ranked {
+                let location = match spans.get(site.as_str()) {
                     Some(span) => files.at(&span.path, span.start),
                     None if *site == repo.identity => REPOSITORY_LEVEL.into(),
                     None => match export.document_of(site) {
@@ -639,7 +585,7 @@ impl Engine {
         self.refresh()?;
         let mut partial = self.partial()?;
         let links = self.links(&partial.exports);
-        Self::read_drift(&mut partial, &links)?;
+        partial.drift(&links)?;
         let exports = partial.exports;
         let entries = drift_view::entries(&self.workspace.repos, &exports, &links);
         let hits = drift_view::matches(&entries, &query.to_lowercase());
@@ -654,7 +600,7 @@ impl Engine {
         // (rank, repository and name to break ties, line)
         let mut hits: Vec<Hit> = Vec::new();
         for (repo, db) in self.workspace.repos.iter().zip(&self.dbs) {
-            for (name, n) in index::community_sizes(db)? {
+            for (name, n) in partial::community_sizes(db)? {
                 let Some(r) = rank(&name.to_lowercase(), &needle) else {
                     continue;
                 };
@@ -705,7 +651,7 @@ impl Engine {
         // a match belongs to, whatever repository holds the other members.
         let mut hashes = HashSet::new();
         for db in &self.dbs {
-            index::each_symbol(db, |symbol| {
+            partial::each_symbol(db, |symbol| {
                 if matches(&symbol) {
                     hashes.insert(symbol.hash);
                 }
@@ -713,7 +659,7 @@ impl Engine {
         }
         let hashes: Vec<String> = hashes.into_iter().collect();
         let exports = (self.dbs.iter())
-            .map(|db| index::symbols_hashed(db, &hashes))
+            .map(|db| partial::symbols_hashed(db, &hashes))
             .collect::<Result<Vec<_>>>()?;
         // Symbols by hash, as (repository position, symbol); lines are built for the groups
         // that survive, so a query reads only the files of the answer.
@@ -890,11 +836,11 @@ impl Engine {
                     sides.into_iter().map(move |side| (n, side.0.to_string()))
                 })
                 .collect();
-            Self::read_sites(&mut partial, sites)?;
+            partial.sites(sites)?;
             let links = match view.follows_drift() {
                 true => {
                     let links = self.links(&partial.exports);
-                    Self::read_drift(&mut partial, &links)?;
+                    partial.drift(&links)?;
                     links
                 }
                 false => Vec::new(),
@@ -985,7 +931,7 @@ impl Engine {
         trace::read_processes(&mut partial, &links, id)?;
         let exports = partial.exports;
         let export = &exports[n];
-        let community = index::community_of(&self.dbs[n], &symbol_found.id)?;
+        let community = partial::community_of(&self.dbs[n], &symbol_found.id)?;
         let community = format!("community: {}", community.as_deref().unwrap_or("none"));
         // Without the span text there is no span: the note is a line of the tail, kept in its
         // output position and ahead of the callers, so the cut never rewrites it.

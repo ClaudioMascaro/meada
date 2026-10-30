@@ -359,6 +359,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- `search`, `context` and `trace` read from each index its contract rows and only the symbols,
+  calls and communities of their answer (#396, **Partial export**), instead of every row of every
+  repository. Answers are the same bytes; on junit5 a `search` or `context` peaks at about 40 MB
+  instead of 170 to 190 MB and answers in about 0.3 s instead of 1 to 1.4 s. The index gains
+  seven lookup indexes (about 40% larger on junit5) and its schema version changes, so existing
+  indexes are rebuilt. `meada export`, `status` and the decision report still read every row.
 - A refresh publishes the whole workspace or nothing (ADR 0012, #316): a failed fetch or index
   stops it before publication and the current generation stays served. `meada index --workspace`
   ends its failures with `index failed for <n> repositories`, and the Compose `fetch.sh` names

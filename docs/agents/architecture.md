@@ -67,8 +67,11 @@ context_reads` names and what is upstream of it for its processes (`trace::read_
 (`trace::read`, a superset of the edges `Walk` and `Graph::edges` follow). The code that renders
 then looks rows up in the partial export as in a whole one; nothing is kept between queries, so
 memory follows the answer and an MCP call pays a few SQL statements per step of its walk.
-`engine::with_every_row` makes a query read every row instead, and `tests/it/partial.rs` checks
-that both give the same bytes over the fixtures.
+`engine::with_every_row` (the one switch, in `partial.rs`) makes a query read every row instead:
+`Partial::open` reads whole exports, and the readers that count or place rows without holding
+them (`partial::each_symbol`, `symbols_hashed`, `spans`, `community_sizes`, `community_of`)
+answer from the whole export as before #396. `tests/it/partial.rs` checks that both give the same
+bytes over the fixtures, including traces from short names and from an uncommitted edit.
 Nothing outside the index's directory (`.meada/`, or `index_dir` in server mode) is written.
 Server mode also runs on `index_dir` and mirrors mounted read-only, possibly owned by another
 user: the open creates no file there (no `index.db.lock`, only a rebuild takes it; no

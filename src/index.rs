@@ -2308,21 +2308,23 @@ fn calls_where(
             })
         })
         .collect::<rusqlite::Result<_>>()?;
-    let candidates = match filter.is_empty() {
-        true => db.prepare("SELECT call, target FROM candidates ORDER BY call, target")?,
-        false => db.prepare(
-            "SELECT call, target FROM candidates WHERE call IN (SELECT value FROM json_each(?1)) \
-             ORDER BY call, target",
-        )?,
-    };
-    let mut candidates = candidates;
-    let ids: Vec<&str> = (calls.iter().map(|c| c.id.as_str()))
-        .filter(|id| !held(id))
-        .collect();
-    let ids = listed(&ids);
+    // Unfiltered, every candidate row is read; filtered, those of the calls read and not held.
+    let mut candidates;
     let rows = match filter.is_empty() {
-        true => candidates.query([])?,
-        false => candidates.query(params![ids])?,
+        true => {
+            candidates = db.prepare("SELECT call, target FROM candidates ORDER BY call, target")?;
+            candidates.query([])?
+        }
+        false => {
+            candidates = db.prepare(
+                "SELECT call, target FROM candidates \
+                 WHERE call IN (SELECT value FROM json_each(?1)) ORDER BY call, target",
+            )?;
+            let ids: Vec<&str> = (calls.iter().map(|c| c.id.as_str()))
+                .filter(|id| !held(id))
+                .collect();
+            candidates.query(params![listed(&ids)])?
+        }
     };
     let mut by_call: HashMap<String, Vec<String>> = HashMap::new();
     for row in rows.mapped(|r| Ok((r.get::<_, String>(0)?, r.get(1)?))) {
