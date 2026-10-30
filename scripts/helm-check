@@ -49,6 +49,16 @@ assert "[snapshot]" not in manifest(default)
 assert "[oidc]" not in manifest(default)
 assert tomllib.loads(manifest(default))["repository"][0]["repo"] == "github.com/claudiomascaro/meada"
 
+
+def assert_fetch(items):
+    script = resource(items, "ConfigMap")["data"]["fetch.sh"]
+    assert "list=${1:-" in script, "the fetch reads the list in $1 when given"
+    assert "refresh: fetch failed for $identity; the refresh stops before publication" in script
+    assert "REPOSITORIES takes URLs without credentials; give git a credential helper" in script and "*@*)" in script
+    assert "https://$identity.git" in script and "set -eu" in script
+
+
+assert_fetch(default)
 generations = render("-f", str(CHART / "values-generations.yaml"))
 spec = pod(generations)
 assert spec["initContainers"][0]["args"][:2] == ["snapshot", "pull"]
@@ -179,6 +189,7 @@ assert [step.split()[:3] for step in steps] == [["meada", "workspace", "pull"], 
     ["meada", "workspace", "show"], ["/bin/sh", "/etc/meada/fetch.sh", "/data/pulled.toml"],
     ["meada", "index", "--workspace"], ["meada", "snapshot", "publish"]]
 assert "--pulled" in steps[2]
+assert_fetch(identity)
 identity_nodes = manifest(identity)
 node_config = tomllib.loads(identity_nodes)
 assert node_config["postgres"]["url_env"] == "MEADA_POSTGRES_URL" and node_config["oidc"]["github"]["login_claim"] == "github_login"

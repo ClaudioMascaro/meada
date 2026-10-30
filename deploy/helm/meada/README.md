@@ -23,7 +23,11 @@ Os valores padrão criam dois nós sem módulos cloud. Cada pod faz o fetch de s
 mirrors e a indexação em um init container, usando seu próprio `emptyDir`; só então o servidor
 inicia. Ajuste `workspace.repositories` (TOML) e `workspace.fetch` (script executado fora da
 Meada). `workspace.gitCredentialsSecret` permite passar variáveis de um Secret ao fetch.
-Nada executa fetch ou acessa a rede dentro de `meada index`.
+Nada executa fetch ou acessa a rede dentro de `meada index`. O `workspace.fetch` padrão lê os
+repositórios de `$1` quando recebido (o arquivo de `meada workspace show --pulled`, que o refresh
+passa com `modules.oidc.github`), senão do manifesto de bootstrap; recusa um repositório com
+credencial na URL; e, se um fetch falha, imprime `refresh: fetch failed for <identidade>; the
+refresh stops before publication` (sem URL nem token) e sai com erro, antes de `index` e `publish`.
 
 ## Gerações
 
