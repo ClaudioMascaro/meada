@@ -23,6 +23,12 @@ The MCP server has three tools, and none of them writes (ADR 0002, invariant 4).
   `changes: uncommitted`, it starts from the diff of the working tree, which covers impact
   analysis.
 
+(Amended 2026-10-30: three is where the surface started, not a ceiling. A 1.x minor version may
+add a tool, an optional parameter or an accepted value of a parameter, as the stability document
+lists. A new tool writes nothing (ADR 0002, invariant 4), and the tool list stays within its
+1,000-token budget (ADR 0003). Removing or renaming a tool or a parameter, or changing what an
+existing one means, still needs a major version.)
+
 ### Output
 
 - Output is compact, line-oriented text, not indented JSON.
