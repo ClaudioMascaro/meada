@@ -8,8 +8,8 @@ Escolha uma das cinco formas.
   Windows, em x86_64 e arm64) e ponha `meada` no `PATH`.
 - **Instalador** (Linux e macOS):
   `curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ClaudioMascaro/meada/releases/latest/download/meada-installer.sh | sh`.
-- **npm**: `npx meada <comando>` baixa o binário pronto da sua plataforma e o executa, sem
-  instalar nada antes.
+- **npm**: `npx @meada/meada <comando>` baixa o binário pronto da sua plataforma e o executa,
+  sem instalar nada antes.
 - **Contêiner**: `ghcr.io/claudiomascaro/meada:<versão>` para o build padrão, ou
   `<versão>-cloud` com todos os módulos cloud, ambos para Linux amd64 e arm64. `latest` e
   `latest-cloud` acompanham a última release estável; pré-releases só têm tags de versão.

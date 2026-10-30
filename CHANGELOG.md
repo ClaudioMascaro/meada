@@ -446,10 +446,10 @@ x86_64; Windows arm64 waits for a toolchain that builds it.
   each entry and its reason. The editor marks refused changes as they are typed, and the
   console documentation gains a Teams section. The whole is additive, a minor change.
 - Distribution: a cargo-dist release workflow building binaries for Linux, macOS and Windows on
-  x86_64 and arm64 with a shell installer, and an npm package `meada` (spec #32) staged with
-  each release for `npx meada`; multi-arch OCI images, default and `-cloud` (issue #279), with
-  the console's static files in the cloud image (issue #313); a Helm chart (#281); Docker
-  Compose examples (#280); and opt-in console profiles for both (issue #314).
+  x86_64 and arm64 with a shell installer, and an npm package `@meada/meada` (spec #32) staged
+  with each release for `npx @meada/meada`; multi-arch OCI images, default and `-cloud` (issue
+  #279), with the console's static files in the cloud image (issue #313); a Helm chart (#281);
+  Docker Compose examples (#280); and opt-in console profiles for both (issue #314).
 - Documentation and community: README, CONTRIBUTING, code of conduct, security policy and issue
   and PR templates in Portuguese, English and Spanish; a CI workflow; a multilingual
   documentation site (issue #320); ADR 0020, recording the direction of spec S5.
