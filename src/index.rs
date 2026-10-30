@@ -1817,50 +1817,51 @@ impl Export {
     /// What `meada export` writes of it: the documents read, each with its contracts, and every
     /// side and package without what only the build needs.
     pub(crate) fn written(self) -> written::Export {
-        written::Export {
-            repository: self.repository,
-            files: self.files,
-            symbols: self.symbols,
-            calls: self.calls,
-            providers: (self.providers.into_iter())
-                .map(|p| written::Provider {
-                    contract: p.contract,
-                    site: p.site,
-                    gateway: p.gateway,
-                    shape: p.shape,
-                })
-                .collect(),
-            consumers: (self.consumers.into_iter())
-                .map(|c| written::Consumer {
-                    contract: c.contract,
-                    site: c.site,
-                    via: c.via,
-                    shape: c.shape,
-                })
-                .collect(),
-            bindings: self.bindings,
-            documents: (self.documents.into_iter())
-                .filter_map(|d| {
-                    let contracts = (d.summary.routes.iter().map(|r| r.contract()))
-                        .chain(d.summary.channels.iter().map(|s| s.contract()))
-                        .collect();
-                    Some(written::Document {
-                        path: d.path,
-                        format: d.summary.format?,
-                        version: d.summary.version,
-                        contracts,
-                    })
-                })
-                .collect(),
-            publishes: self.publishes,
-            packages: self.packages.into_iter().map(Package::written).collect(),
-            dependencies: self.dependencies,
-            imports: self.imports,
-            communities: self.communities,
-            links: self.links,
-            processes: self.processes,
-            stale_decisions: self.stale_decisions,
-        }
+        let mut out = written::Export::default();
+        out.repository = self.repository;
+        out.files = self.files;
+        out.symbols = self.symbols;
+        out.calls = self.calls;
+        out.providers = (self.providers.into_iter())
+            .map(|p| {
+                let mut provider = written::Provider::default();
+                provider.contract = p.contract;
+                provider.site = p.site;
+                provider.gateway = p.gateway;
+                provider.shape = p.shape;
+                provider
+            })
+            .collect();
+        out.consumers = (self.consumers.into_iter())
+            .map(|c| {
+                let mut consumer = written::Consumer::default();
+                consumer.contract = c.contract;
+                consumer.site = c.site;
+                consumer.via = c.via;
+                consumer.shape = c.shape;
+                consumer
+            })
+            .collect();
+        out.bindings = self.bindings;
+        out.documents = (self.documents.into_iter())
+            .filter_map(|d| {
+                let contracts = (d.summary.routes.iter().map(|r| r.contract()))
+                    .chain(d.summary.channels.iter().map(|s| s.contract()))
+                    .collect();
+                let format = d.summary.format?;
+                let (path, version) = (d.path, d.summary.version);
+                Some(written::Document::new(path, format, version, contracts))
+            })
+            .collect();
+        out.publishes = self.publishes;
+        out.packages = self.packages.into_iter().map(Package::written).collect();
+        out.dependencies = self.dependencies;
+        out.imports = self.imports;
+        out.communities = self.communities;
+        out.links = self.links;
+        out.processes = self.processes;
+        out.stale_decisions = self.stale_decisions;
+        out
     }
 
     /// The repository by identity and root, as `Ecosystem::reaches` takes it.
@@ -1955,10 +1956,12 @@ pub fn export(db: &Connection, identity: &str) -> Result<Export> {
         let (name, member) = row?;
         match communities.last_mut() {
             Some(c) if c.name == name => c.members.push(member),
-            _ => communities.push(Community {
-                name,
-                members: vec![member],
-            }),
+            _ => {
+                let mut community = Community::default();
+                community.name = name;
+                community.members = vec![member];
+                communities.push(community);
+            }
         }
     }
     export.communities = communities;
@@ -1972,10 +1975,10 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
     let files = db
         .prepare("SELECT path, hash FROM files WHERE resolved != '' ORDER BY path")?
         .query_map([], |r| {
-            Ok(File {
-                path: r.get(0)?,
-                hash: r.get(1)?,
-            })
+            let mut file = File::default();
+            file.path = r.get(0)?;
+            file.hash = r.get(1)?;
+            Ok(file)
         })?
         .collect::<rusqlite::Result<_>>()?;
     // A dropped file has no symbols, so only those files' (small) facts are searched.
@@ -2034,12 +2037,12 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
              WHERE role = 'binding' ORDER BY contract, via, method, site",
         )?
         .query_map([], |r| {
-            Ok(Binding {
-                contract: r.get(0)?,
-                exchange: r.get(1)?,
-                pattern: r.get(2)?,
-                site: r.get(3)?,
-            })
+            let mut binding = Binding::default();
+            binding.contract = r.get(0)?;
+            binding.exchange = r.get(1)?;
+            binding.pattern = r.get(2)?;
+            binding.site = r.get(3)?;
+            Ok(binding)
         })?
         .collect::<rusqlite::Result<_>>()?;
     let rows: Vec<(String, String)> = db
@@ -2060,11 +2063,11 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
              WHERE role = 'publish' ORDER BY via, method, site",
         )?
         .query_map([], |r| {
-            Ok(Publish {
-                exchange: r.get(0)?,
-                key: r.get(1)?,
-                site: r.get(2)?,
-            })
+            let mut publish = Publish::default();
+            publish.exchange = r.get(0)?;
+            publish.key = r.get(1)?;
+            publish.site = r.get(2)?;
+            Ok(publish)
         })?
         .collect::<rusqlite::Result<_>>()?;
     let rows: Vec<(String, String)> = db
@@ -2236,11 +2239,11 @@ fn read_manifests(rows: Vec<(String, String)>) -> Result<(Vec<Manifest>, Vec<Con
 }
 
 fn span(row: &rusqlite::Row, at: usize) -> rusqlite::Result<Span> {
-    Ok(Span {
-        path: row.get(at)?,
-        start: row.get(at + 1)?,
-        end: row.get(at + 2)?,
-    })
+    let mut span = Span::default();
+    span.path = row.get(at)?;
+    span.start = row.get(at + 1)?;
+    span.end = row.get(at + 2)?;
+    Ok(span)
 }
 
 /// A JSON array of `values`, for `json_each(?1)`: one statement takes any number of them.
@@ -2266,11 +2269,11 @@ fn symbols_where(db: &Connection, filter: &str, list: &str) -> Result<Vec<Symbol
 
 /// A `symbols` row, `id, path, start, end, hash`.
 fn symbol(r: &rusqlite::Row) -> rusqlite::Result<Symbol> {
-    Ok(Symbol {
-        id: r.get(0)?,
-        span: span(r, 1)?,
-        hash: r.get(4)?,
-    })
+    let mut symbol = Symbol::default();
+    symbol.id = r.get(0)?;
+    symbol.span = span(r, 1)?;
+    symbol.hash = r.get(4)?;
+    Ok(symbol)
 }
 
 /// The `calls` rows `filter` keeps (as `symbols_where`), as `export` sorts them, each with its
@@ -2293,19 +2296,18 @@ fn calls_where(
     };
     let calls: Vec<CallSite> = rows
         .mapped(|r| {
-            Ok(CallSite {
-                id: r.get(0)?,
-                caller: r.get(1)?,
-                target: r.get(2)?,
-                level: r
-                    .get::<_, Option<String>>(3)?
-                    .as_deref()
-                    .and_then(Level::parse),
-                span: span(r, 4)?,
-                narrowed: r.get(7)?,
-                decorates: r.get(8)?,
-                candidates: Vec::new(),
-            })
+            let mut call = CallSite::default();
+            call.id = r.get(0)?;
+            call.caller = r.get(1)?;
+            call.target = r.get(2)?;
+            call.level = r
+                .get::<_, Option<String>>(3)?
+                .as_deref()
+                .and_then(Level::parse);
+            call.span = span(r, 4)?;
+            call.narrowed = r.get(7)?;
+            call.decorates = r.get(8)?;
+            Ok(call)
         })
         .collect::<rusqlite::Result<_>>()?;
     // Unfiltered, every candidate row is read; filtered, those of the calls read and not held.

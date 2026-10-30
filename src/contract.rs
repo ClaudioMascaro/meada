@@ -663,16 +663,16 @@ mod tests {
     /// leaves the links alone.
     #[test]
     fn the_pass_after_links_leaves_a_link_without_shapes_alone() {
-        let mut links = vec![Link {
-            consumer: "r::a.ts::c".into(),
-            provider: "s::b.ts::p".into(),
-            contract: "http::GET::/x".into(),
-            level: Level::Exact,
-            reason: "x".into(),
-            by: None,
-            p: None,
-            drift: None,
-        }];
+        let mut links = vec![Link::new(
+            "r::a.ts::c".into(),
+            "s::b.ts::p".into(),
+            "http::GET::/x".into(),
+            Level::Exact,
+            "x".into(),
+            None,
+            None,
+            None,
+        )];
         Http.after_links(&mut links, &[]);
         Channel.after_links(&mut links, &[]);
         assert!(links[0].drift.is_none());

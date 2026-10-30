@@ -220,25 +220,23 @@ mod tests {
     use super::*;
 
     fn ambiguous(contract: &str) -> Link {
-        Link {
-            consumer: "r::src/a.ts::f::g#0".into(),
-            provider: "r::src/b.ts::h".into(),
-            contract: contract.into(),
-            level: Level::Ambiguous,
-            reason: String::new(),
-            by: None,
-            p: None,
-            drift: None,
-        }
+        Link::new(
+            "r::src/a.ts::f::g#0".into(),
+            "r::src/b.ts::h".into(),
+            contract.into(),
+            Level::Ambiguous,
+            String::new(),
+            None,
+            None,
+            None,
+        )
     }
 
     #[test]
     fn only_an_ambiguous_link_of_a_decidable_kind_is_an_item() {
         assert!(decidable(&ambiguous("http::GET::/users")));
-        let exact = Link {
-            level: Level::Exact,
-            ..ambiguous("http::GET::/users")
-        };
+        let mut exact = ambiguous("http::GET::/users");
+        exact.level = Level::Exact;
         assert!(!decidable(&exact));
     }
 }

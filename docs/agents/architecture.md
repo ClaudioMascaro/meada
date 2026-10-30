@@ -191,7 +191,11 @@ other Kotlin grammar may enter the dependency tree: they all export `tree_sitter
   re-exports the shared pieces where they lived (`index`, `contract`, `package`, `decisions`,
   `community`, `entry`, `document`) and keeps its own `Export`, `Provider`, `Consumer`,
   `Document` and `Package` with what only the build needs, turned into these by
-  `index::Export::written`.
+  `index::Export::written`. Its structs, with `Shape` and `Drift`, are `#[non_exhaustive]`, so a
+  new field is a minor change for crate users, the binary included: one whose fields all have a
+  default derives `Default` and is built with `T::default()` and field assignments; one with a
+  field that has none has `new` taking every field in declaration order, a later field starting
+  empty and set after it (`Shape::new` takes the source alone).
 - `meada-core/src/shape.rs`: shapes and shape drift (ADR 0009: `Drift`, `{missing, unchecked}`,
   `shape::drift`), which the binary reaches as `crate::shape`. `drift.rs`: how `context`,
   `search` and `status` show a link's drift (`consumers`, `matches`, `counts`, over the `Entry`s

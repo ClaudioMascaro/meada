@@ -51,7 +51,8 @@ impl Level {
 
 /// One repository's index content with the links from its consumers and to its providers, every
 /// list sorted. A list that is empty is left out, but for the first six and `links`.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[non_exhaustive]
 pub struct Export {
     pub repository: String,
     pub files: Vec<File>,
@@ -97,20 +98,23 @@ impl Export {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[non_exhaustive]
 pub struct File {
     pub path: String,
     pub hash: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[non_exhaustive]
 pub struct Span {
     pub path: String,
     pub start: i64,
     pub end: i64,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[non_exhaustive]
 pub struct Symbol {
     pub id: String,
     pub span: Span,
@@ -119,7 +123,8 @@ pub struct Symbol {
     pub hash: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[non_exhaustive]
 pub struct CallSite {
     pub id: String,
     pub caller: String,
@@ -140,7 +145,8 @@ pub struct CallSite {
 /// The provider side of a contract: a symbol that serves it, a file, a repository, the call
 /// that produces to a channel, or a route or channel side only a document lists
 /// (`<repository>::<document>::<METHOD> <path>`, or `... <broker> send <name>`).
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[non_exhaustive]
 pub struct Provider {
     pub contract: String,
     pub site: String,
@@ -156,7 +162,8 @@ pub struct Provider {
 /// The consumer side of a contract: a call site that uses it, or the symbol that reads a
 /// resource or handles a channel; `contract` is `None` while an HTTP call is unresolved. `via` says
 /// how it names the provider's repository, such as `host:api.example.com` or `env:API_URL`.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[non_exhaustive]
 pub struct Consumer {
     pub contract: Option<String>,
     pub site: String,
@@ -170,7 +177,8 @@ pub struct Consumer {
 /// A queue bound to an exchange by a pattern: the call `site` (a call site) that binds the
 /// queue channel `contract`. A publish to the exchange reaches the queue when the pattern
 /// matches its routing key.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[non_exhaustive]
 pub struct Binding {
     pub contract: String,
     pub exchange: String,
@@ -179,7 +187,8 @@ pub struct Binding {
 }
 
 /// A publish to the named exchange `exchange` with the routing key `key`, at the call `site`.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[non_exhaustive]
 pub struct Publish {
     pub exchange: String,
     pub key: String,
@@ -205,6 +214,7 @@ impl Format {
 
 /// A provider document read: its path, format, version and contracts, sorted.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Document {
     pub path: String,
     pub format: Format,
@@ -212,8 +222,27 @@ pub struct Document {
     pub contracts: BTreeSet<String>,
 }
 
+impl Document {
+    /// Every current field, in declaration order. A field added later is optional: it starts
+    /// empty and is set after `new`.
+    pub fn new(
+        path: String,
+        format: Format,
+        version: Option<String>,
+        contracts: BTreeSet<String>,
+    ) -> Self {
+        Self {
+            path,
+            format,
+            version,
+            contracts,
+        }
+    }
+}
+
 /// A package a repository provides.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[non_exhaustive]
 pub struct Package {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -227,7 +256,8 @@ pub struct Package {
 }
 
 /// A dependency entry that names a package of the workspace.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[non_exhaustive]
 pub struct Dependency {
     /// The path of the manifest holding the entry.
     pub manifest: String,
@@ -285,6 +315,7 @@ impl How {
 
 /// An import resolved into a package of the workspace.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Import {
     /// The call through the imported binding.
     pub site: String,
@@ -296,8 +327,31 @@ pub struct Import {
     pub target: String,
 }
 
+impl Import {
+    /// Every current field, in declaration order. A field added later is optional: it starts
+    /// empty and is set after `new`.
+    pub fn new(
+        site: String,
+        specifier: String,
+        name: String,
+        level: Level,
+        how: How,
+        target: String,
+    ) -> Self {
+        Self {
+            site,
+            specifier,
+            name,
+            level,
+            how,
+            target,
+        }
+    }
+}
+
 /// A community of one repository: its name and its members, sorted.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub struct Community {
     pub name: String,
     pub members: Vec<String>,
@@ -307,6 +361,7 @@ pub struct Community {
 /// file or a whole repository, as its kind places it: an HTTP consumer is a call and its
 /// provider a symbol; a channel consumer is its handler and its producer a call.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Link {
     pub consumer: String,
     pub provider: String,
@@ -322,6 +377,33 @@ pub struct Link {
     /// The shape drift of an HTTP link with a shape on both sides (spec #23, ADR 0009).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drift: Option<Drift>,
+}
+
+impl Link {
+    /// Every current field, in declaration order. A field added later is optional: it starts
+    /// empty and is set after `new`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        consumer: String,
+        provider: String,
+        contract: String,
+        level: Level,
+        reason: String,
+        by: Option<String>,
+        p: Option<f64>,
+        drift: Option<Drift>,
+    ) -> Self {
+        Self {
+            consumer,
+            provider,
+            contract,
+            level,
+            reason,
+            by,
+            p,
+            drift,
+        }
+    }
 }
 
 /// What kind of door an entry point is (spec #31).
@@ -364,6 +446,7 @@ impl EntryKind {
 
 /// The process of one entry point: the steps `trace` shows for it, depth first.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Process {
     pub entry_point: String,
     pub kind: EntryKind,
@@ -371,8 +454,22 @@ pub struct Process {
     pub steps: Vec<Step>,
 }
 
+impl Process {
+    /// Every current field, in declaration order. A field added later is optional: it starts
+    /// empty and is set after `new`.
+    pub fn new(entry_point: String, kind: EntryKind, label: String, steps: Vec<Step>) -> Self {
+        Self {
+            entry_point,
+            kind,
+            label,
+            steps,
+        }
+    }
+}
+
 /// One step of a process.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Step {
     pub depth: usize,
     pub repository: String,
@@ -392,6 +489,35 @@ pub struct Step {
     pub candidates: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contract: Option<String>,
+}
+
+impl Step {
+    /// Every current field, in declaration order. A field added later is optional: it starts
+    /// empty and is set after `new`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        depth: usize,
+        repository: String,
+        level: Option<Level>,
+        via: Via,
+        node: String,
+        reason: Option<String>,
+        mark: Option<Mark>,
+        candidates: Vec<String>,
+        contract: Option<String>,
+    ) -> Self {
+        Self {
+            depth,
+            repository,
+            level,
+            via,
+            node,
+            reason,
+            mark,
+            candidates,
+            contract,
+        }
+    }
 }
 
 /// How a step of a process was reached.
@@ -454,10 +580,23 @@ pub enum Cause {
 
 /// A decision that does not apply.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Stale {
     pub call: String,
     pub target: String,
     pub cause: Cause,
+}
+
+impl Stale {
+    /// Every current field, in declaration order. A field added later is optional: it starts
+    /// empty and is set after `new`.
+    pub fn new(call: String, target: String, cause: Cause) -> Self {
+        Self {
+            call,
+            target,
+            cause,
+        }
+    }
 }
 
 /// The export written as `text`, or why it does not fit the export types: where in the document,

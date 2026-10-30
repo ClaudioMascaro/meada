@@ -160,15 +160,17 @@ impl ContractKind for Resource {
         providers
             .iter()
             .filter(|(repo, p)| p.contract == *contract && repo.identity != from.identity)
-            .map(|(_, p)| Link {
-                consumer: consumer.site.clone(),
-                provider: p.site.clone(),
-                contract: contract.clone(),
-                level: Level::Declared,
-                reason: contract.clone(),
-                by: None,
-                p: None,
-                drift: None,
+            .map(|(_, p)| {
+                Link::new(
+                    consumer.site.clone(),
+                    p.site.clone(),
+                    contract.clone(),
+                    Level::Declared,
+                    contract.clone(),
+                    None,
+                    None,
+                    None,
+                )
             })
             .collect()
     }
