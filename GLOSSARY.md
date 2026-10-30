@@ -21,6 +21,18 @@ and calls only those of the answer. `meada export` reads the whole index instead
 alike.
 _Avoid_: slice, cache
 
+**Export format**:
+The integer `format` at the top of the canonical export, naming its shape. It rises when a reader
+of the previous shape would misread the new one, not when an optional field is added. It is not
+the index schema version.
+_Avoid_: export version, schema version
+
+**Indexed commit**:
+The commit `HEAD` named when an index's content was read. The canonical export carries it as
+`commit`, with `dirty` when the checkout differed from it; neither is written outside git or
+when nothing trustworthy was recorded.
+_Avoid_: provenance (an origin), revision
+
 **Span**:
 A range in a source file, stored as a location. The file's content hash (for freshness and before
 showing the text) and, for a symbol's span, the hash of its exact bytes (for duplicates) are
@@ -323,10 +335,10 @@ listing, the `source` column of the permissions set and `GET /api/v1/catalog`.
 _Avoid_: repository list, inventory, discovery index
 
 **Context**:
-A named workspace as a generation records it: its id, the version it was at and its non-excluded
-entries with their blocks, and nothing else (no name, description or operator, which exist only in
-Postgres). A pinned generation reproduces it exactly; the node answers it at
-`/-/workspaces/<id>/<identity>` (ADR 0021, #342).
+A named workspace as a generation records it: its id, the version it was at, its non-excluded
+entries with their blocks and the identities that version excludes, and nothing else (no name,
+description or operator, which exist only in Postgres). A pinned generation reproduces it
+exactly; the node answers it at `/-/workspaces/<id>/<identity>` (ADR 0021, #342).
 _Avoid_: view, scope, tenant
 
 **Member**:

@@ -86,13 +86,15 @@ Meada 1.0 delivers the whole v1 scope of [ADR 0003](docs/adr/0003-v1-scope-and-r
 **Stability promise.** From 1.0 on, semver holds: a breaking change to any of these items needs
 a major version.
 
-- the names, parameters and output grammar of `search`, `context` and `trace`;
+- the names, parameters and output grammar of the MCP tools (`search`, `context` and `trace`
+  today);
 - the CLI commands and flags;
 - the schemas of `meada.toml` and `meada.decisions.toml`;
 - the format of `meada export`.
 
-Adding an optional parameter, a search kind, a configuration key, an export field or a language
-is a minor change. Not covered: the wording of CLI messages, the text of tool descriptions, the
+Adding an MCP tool, an optional parameter, an accepted value to a parameter, a search kind, a
+field at the end of an output line, a configuration key, an export field or a language is a minor
+change. Not covered: the wording of CLI messages, the text of tool descriptions, the
 index file and the layout of `.meada/` (rebuilt when the schema changes), and which links Meada
 finds in a code base (improving resolution is a fix, not a break). What 1.x freezes, and what it
 does not, is detailed in [Stability](https://claudiomascaro.github.io/meada/en/stability/).

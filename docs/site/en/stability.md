@@ -10,7 +10,7 @@ This document describes the default build (`cargo install meada`). The [cloud mo
 
 ### MCP tools
 
-Three tools, always with these names. None of them writes.
+These tools, always with these names. None of them writes. A minor version may add others, which do not write either.
 
 | Tool | Parameter | Type | Default | Meaning |
 | --- | --- | --- | --- | --- |
@@ -20,7 +20,7 @@ Three tools, always with these names. None of them writes.
 | `context` | `symbol` | string, required | | Symbol name, `<path>::<name>` or full identity; a resource (`resource::<kind>::<id>`) or a channel (`channel::<broker>::<name>`). |
 | `context` | `budget` | unsigned 32-bit integer, optional | 2,000 | Token budget of the answer. |
 | `trace` | `from` | string, optional | | Start: a symbol, a route (`GET /users/{}` or its contract), a call site or a process (`process::<entry point identity>`, `down` only). |
-| `trace` | `changes` | string, optional | | `uncommitted`: start from the symbols the working-tree diff touches. It is the only accepted value. |
+| `trace` | `changes` | string, optional | | `uncommitted`: start from the symbols the working-tree diff touches. It is the only accepted value today. |
 | `trace` | `direction` | string, optional | `down` | `down` (what it reaches) or `up` (what reaches it). |
 | `trace` | `budget` | unsigned 32-bit integer, optional | 2,000 | Token budget of the answer. |
 
@@ -30,7 +30,7 @@ Three tools, always with these names. None of them writes.
 
 ### Output grammar
 
-The output of the three tools is line-oriented text, and its grammar is specified in the [output grammar reference document](https://github.com/ClaudioMascaro/meada/blob/main/docs/reference/output-grammar.md) (in English, like the MCP surface, [ADR 0008](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0008-mcp-surface-and-output-languages.md)). Frozen are:
+The output of the tools is line-oriented text, and its grammar is specified in the [output grammar reference document](https://github.com/ClaudioMascaro/meada/blob/main/docs/reference/output-grammar.md) (in English, like the MCP surface, [ADR 0008](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0008-mcp-surface-and-output-languages.md)). Frozen are:
 
 - every line kind of each tool and the meaning of each of its fields;
 - the link notation `→[level: reason]`, with the levels `exact`, `declared`, `inferred`, `decided` and `ambiguous`;
@@ -149,7 +149,7 @@ The fields of `shape` (`source`, `fields`, `open`, `scalars`, `declared`, `optio
 After 1.0, a break in any frozen item needs a major version. Breaking means:
 
 - removing or renaming an item (tool, parameter, command, flag, table, key, export field);
-- changing a parameter's type, default or meaning, including the default budget of 2,000 tokens;
+- changing the type, default or meaning of a parameter or of a value it already accepts, including the default budget of 2,000 tokens;
 - changing the grammar or meaning of an existing line kind, field or key;
 - turning valid configuration invalid.
 
@@ -157,9 +157,12 @@ After 1.0, a break in any frozen item needs a major version. Breaking means:
 
 These changes ship in a minor version:
 
+- adding an MCP tool, as long as the tool list stays within its 1,000-token budget;
 - adding an optional parameter;
+- adding an accepted value to an existing parameter, such as a new value of `changes`;
 - adding a `search` kind;
 - adding a line kind to the output;
+- adding a field at the end of an existing line kind;
 - adding an export field;
 - adding a configuration key;
 - adding a contract kind;

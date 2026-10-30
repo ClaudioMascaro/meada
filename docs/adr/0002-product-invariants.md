@@ -57,7 +57,11 @@ amended for it (2 and 4) and one was added (6).
 5. Each repository keeps its own index; cross-repo context links indexes without merging them.
 6. Determinism: the same inputs (the source tree, `meada.toml` and `meada.decisions.toml`) give
    the same answers and the same canonical export (`meada export`, sorted JSON). The index file
-   does not need to be byte-identical.
+   does not need to be byte-identical. (Amended 2026-10-30; #512: the export records its
+   indexed commit, so the commit `HEAD` names and whether the checkout differs from it join the
+   inputs of the export, not of the answers. The same tree at another commit gives an export
+   that differs in `commit` and `dirty` alone. Both are read from local git state, with no
+   network and no clock.)
 
 ## Consequences
 
