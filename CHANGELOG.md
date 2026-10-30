@@ -8,6 +8,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The pt-BR user guide, second half (#147, spec #32), in `docs/user-guide.md` (sections 8 to 11):
+  each contract kind (HTTP routes, declared resources and gateway prefixes, OpenAPI and AsyncAPI
+  documents, channels with the limit that broker clusters are not modelled, packages), each 1.0
+  language pack (TypeScript and JavaScript, Python, Go, Rust) with its frameworks, clients,
+  environment reads, manifests, channel clients and known limits (including that Rust calls inside
+  macros are not indexed), shape drift, and communities and processes. Java, Kotlin, C# and Swift
+  are named only as planned Release 2 work. No code, default dependency or golden changed.
 - The pt-BR user guide, first half (#146, spec #32), in `docs/user-guide.md`: installation through
   every channel (Cargo, prebuilt binary, shell installer, `npx meada`, container), MCP setup with
   `npx meada mcp` and the three tools with their parameters, the `meada.toml` reference (every
