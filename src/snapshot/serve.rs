@@ -508,4 +508,57 @@ mod tests {
             assert!(held(&local).is_ok(), "{name}");
         }
     }
+
+    /// A mirror's `meada.toml` or `meada.decisions.toml` that is a symbolic link to a file on
+    /// the node fails the generation naming the file, and the target is never read: its content
+    /// would parse.
+    #[cfg(unix)]
+    #[test]
+    fn a_mirror_config_through_a_symbolic_link_fails_the_generation_naming_the_file() {
+        for name in ["meada.toml", "meada.decisions.toml"] {
+            let local = scratch(&format!("linked-{name}"));
+            let mirror = generation(&local, A, &[("a.ts", "export function alpha() {}\n")]);
+            point(&local, A);
+            let outside = local.join("outside.toml");
+            let parsed = match name {
+                "meada.toml" => "[serve]\nhosts = [\"leak.example\"]\n",
+                _ => {
+                    "[[decision]]\nkind = \"ambiguous-link\"\ncall = \"leak.example\"\n\
+                      target = \"x::http::GET::/\"\nby = \"human\"\n"
+                }
+            };
+            fs::write(&outside, parsed).unwrap();
+            let file = mirror.join(name);
+            std::os::unix::fs::symlink(&outside, &file).unwrap();
+            let e = refused(&local);
+            assert!(
+                e.contains(&format!("{}: a symbolic link", file.display())),
+                "{e}"
+            );
+            assert!(!e.contains("leak.example"), "{e}");
+            fs::remove_file(&file).unwrap();
+            fs::copy(&outside, &file).unwrap();
+            assert!(held(&local).is_ok(), "{name}");
+        }
+    }
+
+    /// The view's facts read a linked `meada.toml` as a file of its own that cannot be read,
+    /// never as the target's `[serve]`.
+    #[cfg(unix)]
+    #[test]
+    fn the_facts_of_a_linked_mirror_config_declare_no_documents() {
+        let local = scratch("linked-facts");
+        let mirror = generation(&local, A, &[("a.ts", "export function alpha() {}\n")]);
+        point(&local, A);
+        let outside = local.join("outside.toml");
+        fs::write(&outside, "[serve]\n").unwrap();
+        fs::copy(&outside, mirror.join("meada.toml")).unwrap();
+        // `facts` reads the mirror's file at each call, not once with the generation.
+        let loaded = held(&local).unwrap();
+        assert!(loaded.facts(REPO).unwrap().documents);
+        fs::remove_file(mirror.join("meada.toml")).unwrap();
+        std::os::unix::fs::symlink(&outside, mirror.join("meada.toml")).unwrap();
+        let facts = loaded.facts(REPO).unwrap();
+        assert!(facts.own && !facts.documents);
+    }
 }

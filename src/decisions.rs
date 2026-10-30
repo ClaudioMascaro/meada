@@ -102,7 +102,8 @@ pub fn load(root: &Path) -> Result<Decisions> {
     load_up_to(root, None)
 }
 
-/// `load`, reading at most `max` bytes of the file when it is set (`config::read_own_up_to`).
+/// `load`, reading at most `max` bytes of the file, through no symbolic link, when it is set
+/// (`config::read_own_up_to`, a pulled generation's mirror).
 pub(crate) fn load_up_to(root: &Path, max: Option<u64>) -> Result<Decisions> {
     let decisions: Decisions = config::read_own_up_to(root, FILE, max)?.unwrap_or_default();
     let mut seen = HashSet::new();

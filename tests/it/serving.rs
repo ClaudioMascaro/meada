@@ -463,3 +463,75 @@ fn an_index_naming_files_outside_its_mirror_answers_without_reading_them() {
         client.cancel().await.unwrap();
     });
 }
+
+/// A mirror's `meada.toml` or `meada.decisions.toml` that is a symbolic link to a file on the
+/// node (#506): the probe, the start and `export` fail naming the file, and what the target
+/// holds (which would parse) is in none of their output. The file itself, copied in its place,
+/// serves.
+#[cfg(unix)]
+#[test]
+fn a_mirror_config_through_a_symbolic_link_is_refused_and_never_read() {
+    let (dir, manifest, local) = hand_node("serving_linked_config");
+    let mirror = local.join(HAND).join(format!("{:016x}", 0)).join("mirror");
+    let own = fs::read_to_string(mirror.join("meada.toml")).unwrap();
+    let marker = "example.com/leak/host-secret";
+    let targets = [
+        (
+            "meada.toml",
+            format!("{own}\n[[peer]]\nrepo = \"{marker}\"\n"),
+        ),
+        (
+            "meada.decisions.toml",
+            format!(
+                "[[decision]]\nkind = \"ambiguous-link\"\ncall = \"{marker}\"\n\
+                 target = \"{CATALOG}::http::GET::/\"\nby = \"human\"\n"
+            ),
+        ),
+    ];
+    let export = [
+        "export",
+        "--workspace",
+        &manifest,
+        "--repo",
+        WEB,
+        "--generations",
+    ];
+    for (name, target) in targets {
+        let file = mirror.join(name);
+        let kept = fs::read(&file).ok();
+        let outside = dir.join(format!("outside-{name}"));
+        fs::write(&outside, &target).unwrap();
+        let _ = fs::remove_file(&file);
+        std::os::unix::fs::symlink(&outside, &file).unwrap();
+        // The manifest names `local_dir` relative to it, as every path it reports.
+        let why = format!(
+            "hand/generations/{HAND}/{:016x}/mirror/{name}: a symbolic link",
+            0
+        );
+        let (status, stderr, code) = probe(&dir, &manifest);
+        assert_eq!(code, Some(1), "{name}: {stderr}");
+        assert!(stderr.contains(&why), "{stderr}");
+        assert!(
+            !status.contains(marker) && !stderr.contains(marker),
+            "{status}{stderr}"
+        );
+        let (code, stderr) = refused(&dir, &manifest);
+        assert_eq!(code, Some(1), "{name}: {stderr}");
+        assert!(stderr.contains(&why), "{stderr}");
+        assert!(!stderr.contains(marker), "{stderr}");
+        let (stdout, stderr, code) = run_args(&dir, &export);
+        assert_eq!((code, stdout.as_str()), (Some(1), ""), "{name}: {stderr}");
+        assert!(stderr.contains(&why), "{stderr}");
+        assert!(!stderr.contains(marker), "{stderr}");
+        // The same bytes as the mirror's own file are read.
+        fs::remove_file(&file).unwrap();
+        fs::write(&file, &target).unwrap();
+        let (stdout, stderr, code) = run_args(&dir, &export);
+        assert_eq!((code, stderr.as_str()), (Some(0), ""), "{name}");
+        assert!(stdout.starts_with('{'), "{stdout}");
+        match kept {
+            Some(bytes) => fs::write(&file, bytes).unwrap(),
+            None => fs::remove_file(&file).unwrap(),
+        }
+    }
+}

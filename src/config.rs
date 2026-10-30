@@ -67,7 +67,8 @@ fn read_own<T: DeserializeOwned>(root: &Path, name: &str) -> Result<Option<T>> {
 // ponytail: a flat 1 MiB, as `lang::MAX_BYTES`; real ones are a few kilobytes.
 pub(crate) const GENERATION_CONFIG_MAX: u64 = 1 << 20;
 
-/// `read_own`, reading at most `max` bytes (`read_bounded`) when it is set.
+/// `read_own`, reading at most `max` bytes through no symbolic link (`read_unlinked`) when it
+/// is set: a mirror's file in a pulled generation.
 pub(crate) fn read_own_up_to<T: DeserializeOwned>(
     root: &Path,
     name: &str,
@@ -80,8 +81,9 @@ pub(crate) fn read_own_up_to<T: DeserializeOwned>(
     }
 }
 
-/// The text of `file`, `None` when it does not exist; with `max`, read as `read_bounded` reads,
-/// a regular file of at most `max` bytes.
+/// The text of `file`, `None` when it does not exist; with `max`, the file is a mirror's in a
+/// pulled generation (hostile, ADR 0012), read as `read_unlinked` reads: a regular file of at
+/// most `max` bytes, and a symbolic link refused unopened.
 pub(crate) fn text(file: &Path, max: Option<u64>) -> Result<Option<String>> {
     let missing = |e: &std::io::Error| e.kind() == std::io::ErrorKind::NotFound;
     let Some(max) = max else {
@@ -91,10 +93,10 @@ pub(crate) fn text(file: &Path, max: Option<u64>) -> Result<Option<String>> {
             Err(e) => Err(format!("{}: {e}", file.display()).into()),
         };
     };
-    if fs::metadata(file).is_err_and(|e| missing(&e)) {
+    if fs::symlink_metadata(file).is_err_and(|e| missing(&e)) {
         return Ok(None);
     }
-    let bytes = read_bounded(file, max)?;
+    let bytes = read_unlinked(file, max)?;
     let src = String::from_utf8(bytes)
         .map_err(|_| format!("{}: {}", file.display(), std::io::ErrorKind::InvalidData))?;
     Ok(Some(src))
@@ -123,18 +125,68 @@ pub(crate) fn error_at(
 
 /// The content of the regular file `path` a cloud module's section names (a secret, a CA), at
 /// most `max` bytes. What is not a regular file is refused before it is opened: a FIFO would
-/// block the open for ever.
+/// block the open for ever. A symbolic link is followed: Kubernetes mounts a secret through one.
+#[cfg(any(
+    feature = "ui",
+    feature = "valkey",
+    feature = "snapshot",
+    feature = "postgres"
+))]
 pub(crate) fn read_bounded(path: &Path, max: u64) -> std::result::Result<Vec<u8>, String> {
-    use std::io::Read;
-    let problem = |e: std::io::Error| format!("{}: {}", path.display(), e.kind());
+    let problem = io_problem(path);
     if !fs::metadata(path).map_err(problem)?.is_file() {
         return Err(format!("{}: not a regular file", path.display()));
     }
-    let mut bytes = Vec::new();
     let file = fs::File::open(path).map_err(problem)?;
+    read_up_to(path, file, max)
+}
+
+/// `read_bounded` for a file the repository holds (a mirror's `meada.toml` or
+/// `meada.decisions.toml` in a pulled generation), which goes through no symbolic link: one
+/// at `path` is refused unopened, naming the file. On Unix the file opened must be the one
+/// checked, so a link put in its place between the check and the open is refused too.
+fn read_unlinked(path: &Path, max: u64) -> std::result::Result<Vec<u8>, String> {
+    let problem = io_problem(path);
+    let checked = fs::symlink_metadata(path).map_err(problem)?;
+    if checked.file_type().is_symlink() {
+        return Err(format!("{}: a symbolic link", path.display()));
+    }
+    if !checked.is_file() {
+        return Err(format!("{}: not a regular file", path.display()));
+    }
+    let file = fs::File::open(path).map_err(problem)?;
+    if !same_file(&checked, &file.metadata().map_err(problem)?) {
+        return Err(format!("{}: replaced while read", path.display()));
+    }
+    read_up_to(path, file, max)
+}
+
+/// Whether `a` and `b` are the metadata of the same file: its device and inode on Unix.
+#[cfg(unix)]
+fn same_file(a: &fs::Metadata, b: &fs::Metadata) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    (a.dev(), a.ino()) == (b.dev(), b.ino())
+}
+
+/// Elsewhere std tells no file's identity, so only the check before the open stands.
+#[cfg(not(unix))]
+fn same_file(_: &fs::Metadata, _: &fs::Metadata) -> bool {
+    true
+}
+
+/// An I/O error at `path` as the readers word it: the file and the error's kind, never what
+/// the file holds.
+fn io_problem(path: &Path) -> impl Fn(std::io::Error) -> String + Copy + '_ {
+    move |e| format!("{}: {}", path.display(), e.kind())
+}
+
+/// The content of `file`, opened at `path`, when it holds at most `max` bytes.
+fn read_up_to(path: &Path, file: fs::File, max: u64) -> std::result::Result<Vec<u8>, String> {
+    use std::io::Read;
+    let mut bytes = Vec::new();
     file.take(max + 1)
         .read_to_end(&mut bytes)
-        .map_err(problem)?;
+        .map_err(io_problem(path))?;
     match bytes.len() as u64 > max {
         true => Err(format!("{}: larger than {max} bytes", path.display())),
         false => Ok(bytes),
@@ -143,7 +195,70 @@ pub(crate) fn read_bounded(path: &Path, max: u64) -> std::result::Result<Vec<u8>
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    use std::{fs, path::PathBuf};
+
     use super::Serve;
+
+    /// `<temp>/meada-config-<case>-<pid>/`, empty, holding `outside` with `host secret` and
+    /// `meada.toml`, a symbolic link to it. Returns the directory, the link and its target.
+    #[cfg(unix)]
+    fn linked(case: &str) -> (PathBuf, PathBuf, PathBuf) {
+        let dir = std::env::temp_dir().join(format!("meada-config-{case}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let target = dir.join("outside");
+        fs::write(&target, "host secret\n").unwrap();
+        let link = dir.join("meada.toml");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        (dir, link, target)
+    }
+
+    /// An operator's file (a secret Kubernetes mounts through `..data`) is read through a
+    /// symbolic link.
+    #[cfg(all(
+        unix,
+        any(
+            feature = "ui",
+            feature = "valkey",
+            feature = "snapshot",
+            feature = "postgres"
+        )
+    ))]
+    #[test]
+    fn an_operator_file_through_a_symbolic_link_is_read() {
+        let (dir, link, _) = linked("operator");
+        assert_eq!(super::read_bounded(&link, 64).unwrap(), b"host secret\n");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A file the repository holds goes through no symbolic link: one is refused unopened, so
+    /// the bytes behind it are never in the error.
+    #[cfg(unix)]
+    #[test]
+    fn a_mirror_file_through_a_symbolic_link_is_refused() {
+        let (dir, link, target) = linked("mirror");
+        let e = super::read_unlinked(&link, 64).unwrap_err();
+        assert_eq!(e, format!("{}: a symbolic link", link.display()));
+        let e = super::text(&link, Some(64)).unwrap_err().to_string();
+        assert_eq!(e, format!("{}: a symbolic link", link.display()));
+        // A dangling link is still a link, not a missing file.
+        fs::remove_file(&target).unwrap();
+        let e = super::text(&link, Some(64)).unwrap_err().to_string();
+        assert_eq!(e, format!("{}: a symbolic link", link.display()));
+        // The file itself reads, and only up to `max`.
+        fs::remove_file(&link).unwrap();
+        fs::write(&link, "[serve]\n").unwrap();
+        assert_eq!(super::read_unlinked(&link, 8).unwrap(), b"[serve]\n");
+        let e = super::read_unlinked(&link, 7).unwrap_err();
+        assert_eq!(e, format!("{}: larger than 7 bytes", link.display()));
+        // What is opened is checked to be the file checked, not one put in its place.
+        fs::write(&target, "").unwrap();
+        let meta = |path: &PathBuf| fs::symlink_metadata(path).unwrap();
+        assert!(super::same_file(&meta(&link), &meta(&link)));
+        assert!(!super::same_file(&meta(&link), &meta(&target)));
+        fs::remove_dir_all(&dir).unwrap();
+    }
 
     fn serve(prefix: Option<&str>, strip: Option<&str>) -> Serve {
         Serve {

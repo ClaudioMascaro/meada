@@ -31,9 +31,10 @@ builds the workspace from a generation the node holds instead
 (`snapshot::serve::held` reads the pointer file and the generation document, and
 `Manifest::of_generation` turns it into the same `Manifest`: per entry the mirror at
 `<generation id>/<bundle id>/mirror`, the index beside it, the mirror's own `meada.toml` whole or
-else the blocks the document recorded, each read up to `config::GENERATION_CONFIG_MAX`; no
-`git` runs, the pull checked each mirror) and opens it read-only as `open_manifest` does, one
-engine per call. The server keeps the last generation read (`serve::Current`, one `Arc<Held>`:
+else the blocks the document recorded, each read up to `config::GENERATION_CONFIG_MAX` and
+through no symbolic link; no `git` runs, the pull checked each mirror) and opens it read-only
+as `open_manifest` does, one engine per call. The server keeps the last generation read
+(`serve::Current`, one `Arc<Held>`:
 a generation's directory never changes once renamed into place), so a request reads only the
 pointer file until it names another id, and the request's route hands the `Held` it routed by
 to the call (`Source::Generation`): a swap between two calls changes the generation and one
@@ -3147,8 +3148,11 @@ qualification budget does (ADR 0017).
   a `replace` to an absolute directory leaves the module outside.
 - `workspace.rs`: a sibling with an invalid `meada.toml` or `meada.decisions.toml` is skipped
   silently. In a pulled generation, a mirror's `meada.toml` and `meada.decisions.toml` are read
-  only as regular files of at most `GENERATION_CONFIG_MAX` (1 MiB, `config.rs`); past it the
-  generation is not servable, the error naming the file.
+  only as regular files of at most `GENERATION_CONFIG_MAX` (1 MiB, `config.rs`), through no
+  symbolic link (`config::read_unlinked`, refused unopened, then the opened file checked against
+  the one checked); past it, or through a link, the generation is not servable, the error naming
+  the file. An operator's file (a secret, a CA, `config::read_bounded`) follows links, as
+  Kubernetes mounts secrets through one.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the
   first by site; the target names no site.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is

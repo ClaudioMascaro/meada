@@ -64,6 +64,12 @@ All notable changes to Meada are recorded here. The format follows
   with an invalid value, reports the key and the expected kind (`` `oidc.entra`: has the wrong
   type (a table was expected) ``) instead of serde's message, which echoed the written value, so a
   secret pasted under the wrong key no longer reaches stderr.
+- Pulled generations (#506): a mirror's `meada.toml` or `meada.decisions.toml` that is a symbolic
+  link is refused unopened, the error naming the file, so a repository can no longer make a node
+  read and parse a file of the host. A link into the mirror (`meada.toml -> conf/meada.toml`) is
+  refused too, as the index refuses a linked pack config. The file opened is checked to be the one
+  checked. Secrets and CAs a manifest names still follow links (Kubernetes mounts them through
+  one). The snapshots page says so in its three languages.
 - Console GitHub grant (#496): a session's GitHub grant and its state (`unread`, `current`,
   `expired`) are read from the same permissions set at the same instant, so a session never shows
   `expired` with a grant read while the set was fresh.
