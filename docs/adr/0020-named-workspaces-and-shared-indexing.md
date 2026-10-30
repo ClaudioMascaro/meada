@@ -163,8 +163,11 @@ The decision, and its reasons:
 
 - A non-operator subject sees a workspace (its existence, name, description, entries, versions,
   diagnostics and graph answers) only when its grant reads **every** entry of the workspace's
-  current version, excluded entries aside (ADR 0021). Otherwise the workspace does not exist for
-  it: a list omits it and a show or a query gets the same 404 an unknown id gets.
+  current version, excluded entries included (ADR 0021). Otherwise the workspace does not exist
+  for it: a list omits it and a show or a query gets the same 404 an unknown id gets. (Amended
+  2026-10-30; #510. The first version said "excluded entries aside", which let a subject that
+  reads Y alone see a Y+A workspace once A lost its sponsor, against the reasons below and the
+  revocation table. An excluded entry is not fetched, but the workspace still names it.)
 - Filtering was rejected because a name or description is not bounded by repository grants: a
   title such as "payments-and-fraud-core" discloses repositories the caller cannot read, and a
   filtered entry list still discloses their count. Hiding the whole is the only rule that

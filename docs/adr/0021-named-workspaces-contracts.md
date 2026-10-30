@@ -280,9 +280,12 @@ or `current`.
     hashed as today).
   - `members`: the bundles of repositories only named workspaces select, in the shape of an
     entry of `repositories`.
-  - `contexts`: per workspace, sorted by `id`: `{id, version, repositories: [{repo, blocks}]}`,
-    the non-excluded entries in manifest order with their blocks as `entry_blocks` gives them.
-    No name or description is ever written to the store.
+  - `contexts`: per workspace, sorted by `id`: `{id, version, repositories: [{repo, blocks}],
+    excluded}`, the non-excluded entries in manifest order with their blocks as `entry_blocks`
+    gives them, and `excluded`, the identities the sponsor rule excluded from that version,
+    sorted, absent when there is none (so a context with no exclusion records and hashes as
+    before). No name or description is ever written to the store. (Amended 2026-10-30; #510:
+    `excluded` added, so that a node applies ADR 0020's discovery rule over every entry.)
 - **Ids.** `generation_id` hashes, besides today's sorted lines, the lines `# member <identity>
   <bundle id>` and `# context <id> <digest>` (the digest: the first 16 hex of the BLAKE3 hash
   of the context's canonical JSON as recorded). A deployment with no named workspaces adds no
@@ -295,12 +298,14 @@ or `current`.
   there, so a named workspace never widens another route. Protected resource metadata is served
   at `/.well-known/oauth-protected-resource/-/workspaces/<id>/<identity>` and its pinned form.
 - **Admission.** Unchanged and in this order: `Origin`, then OIDC (401 before any 404), then the
-  gate. The gate admits a workspace route only when the held generation has the context and
-  the token's grant reads **every** repository the context records (nodes apply the viewer rule
-  alone; the operator exemption belongs to the console, which knows operators). Otherwise the
-  answer is the 404 an unknown id gets; its body lists only the workspace ids the token may
-  view in that generation. (The plain route answers 403 for an identity the token may not read,
-  as today; a workspace route answers 404, since a 403 would confirm the id exists.)
+  gate. The gate admits a workspace route only when the held generation has the context, the
+  route's identity is one of its `repositories`, and the token's grant reads **every** identity
+  the context records, its `excluded` ones included (nodes apply the viewer rule alone; the
+  operator exemption belongs to the console, which knows operators). Otherwise the answer is the
+  404 an unknown id gets; its body lists only the workspace ids the token may view in that
+  generation, by the same rule. (The plain route answers 403 for an identity the token may not
+  read, as today; a workspace route answers 404, since a 403 would confirm the id exists.)
+  (Amended 2026-10-30; #510: `excluded` included.)
 - **The workspace of a query** is the context's recorded repositories, the named one first, then
   recorded order, bounded by the grant as today; links need both endpoints in it and in the
   grant. Tools, parameters, descriptions and text are unchanged (ADR 0008). Each answer names
@@ -658,7 +663,7 @@ canonical manifest, and **computed view annotations never enter canonical text o
 | version id | the entries (`path` absent for named entries) | the entries change |
 | workspace id | creator subject, name, first version id | never after creation |
 | generation id | sorted bundle lines, `# member` lines, `# context` lines | a member, a bundle or a recorded context changes |
-| context digest | the context as recorded in the generation | its entries, order or blocks change |
+| context digest | the context as recorded in the generation | its entries, order, blocks or exclusions change |
 
 None reads a clock, host, address, name, description or operator list. Names and descriptions
 exist only in Postgres.
