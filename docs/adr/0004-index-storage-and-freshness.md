@@ -59,6 +59,30 @@ orphan them.
 `meada export` writes the index's content as sorted JSON. It is the artifact that determinism
 (ADR 0002, invariant 6) is checked against. The `.db` file does not need to be byte-identical.
 
+(Amended 2026-10-30; #512.) Three top-level fields say which shape the export has and which
+state of the repository it describes:
+
+- `format`: an integer naming the export's shape, 1 for the first versioned one. It rises when
+  a reader of the previous shape would misread the new one: a field renamed or removed, a
+  meaning changed. An added optional field does not raise it. It is not the index schema
+  version. It is always written, and an export without it predates it: `meada_core::export`
+  refuses to parse one.
+- `commit`: the indexed commit, the commit `HEAD` named when the index's content was read. It
+  is left out outside git, before the first commit, and when nothing trustworthy is known.
+- `dirty`: `true` when the checkout differed from that commit (changed, deleted or untracked
+  files; ignored files do not count, so `.meada/` never does). It is left out with `commit`.
+
+Where they are read:
+
+- Locally, `meada export` refreshes the index before reading it, so indexing and export are one
+  call: it reads `HEAD` before and after the refresh and the checkout's status after it. A
+  `HEAD` that moves, or files that change under the refresh, leave both fields out. A query
+  never reads git for this.
+- In server mode the index may lag its mirror, and the console exports past generations, so the
+  fields come from what indexing recorded (the indexed commit kept beside the index, or a
+  generation's `head`), never from the mirror's live `HEAD`. Server-mode indexing records a
+  commit only for a clean checkout, so there `dirty` is `false` whenever `commit` is present.
+
 ## Considered options
 
 - **An index in the user's cache directory.** Keyed by path, orphaned when a repository moves,
