@@ -8,6 +8,49 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The English user guide and README (#150, spec #32): `docs/user-guide.en.md` translates both
+  halves of the pt-BR guide section by section (sections 1 to 11) with the same neutral examples
+  and links the English stability page; `README.en.md` now links it instead of the pt-BR guide.
+  No code, default dependency or golden changed.
+- The Spanish user guide (#151, spec #32): `docs/user-guide.es.md`, sections 1 to 11 of the pt-BR
+  guide with the same structure and neutral names, linking the Spanish stability page. The Spanish
+  README links it instead of the Portuguese guide, and the three READMEs link the stability page
+  from the Status section. No code, default dependency or golden changed.
+- The output grammar reference (#145, spec R1): `docs/reference/output-grammar.md`, in English like
+  the MCP surface, specifies every line kind of `search`, `context` and `trace`, the link notation
+  with its level and reason, the levels in order, the contract identifiers (`http::`, `http::ANY::`
+  for a provider of every method, `channel::`, `package::`, `resource::`), the `search` kinds, the
+  chain footer, the cut note and the token estimate, and tells readers to skip line kinds and
+  fields they do not know. Its tables are the grammar check's input: `tests/it/grammar.rs` matches
+  every line of every rendered-answer golden against the line kinds of its tool and fails naming
+  the golden and the line, fails on a documented line kind no golden shows, and holds the
+  document's levels, entry kinds, open item kinds and `search` kinds to the code's. The stability
+  document links it. No output changed; new goldens pin the answers only inline assertions covered (`no symbol
+  matches`, `no resource matches`, the server's `index behind the mirror`, and `trace` with no
+  start, several symbols, several call sites or a clean working tree).
+- The pt-BR user guide, second half (#147, spec #32), in `docs/user-guide.md` (sections 8 to 11):
+  each contract kind (HTTP routes, declared resources and gateway prefixes, OpenAPI and AsyncAPI
+  documents, channels with the limit that broker clusters are not modelled, packages), each 1.0
+  language pack (TypeScript and JavaScript, Python, Go, Rust) with its frameworks, clients,
+  environment reads, manifests, channel clients and known limits (including that Rust calls inside
+  macros are not indexed), shape drift, and communities and processes. Java, Kotlin, C# and Swift
+  are named only as planned Release 2 work. No code, default dependency or golden changed.
+- The pt-BR user guide, first half (#146, spec #32), in `docs/user-guide.md`: installation through
+  every channel (Cargo, prebuilt binary, shell installer, `npx meada`, container), MCP setup with
+  `npx meada mcp` and the three tools with their parameters, the `meada.toml` reference (every
+  table and key), decisions and deciders (protocols, environment variables, what is sent,
+  privacy), every CLI command and the export. The READMEs in all three languages gain the
+  installation channels, first steps, MCP setup and a 1.0 status section with the stability
+  promise. No code, default dependency or golden changed.
+- Surface goldens (#144, spec #32): `tests/golden/mcp.tools.json` holds the MCP tool list (names,
+  descriptions and parameter schemas of `search`, `context` and `trace`), checked beside the
+  1,000-token limit of the descriptions, and `tests/golden/cli.help-all.en.txt` the English help of
+  every command of the default build. A test pins the default token budget of 2,000. Both
+  goldens change only with `MEADA_BLESS=1`.
+- The stability document (#148, spec #32), `docs/site/{pt,en,es}/stability.md`: the surface 1.x
+  freezes (the MCP tools, the output grammar, CLI commands and flags, the `meada.toml`,
+  `meada.decisions.toml` and `meada.workspace.toml` schemas, the export), what is breaking, what is
+  minor, what is not frozen, and the review gate. The READMEs and the site home pages link it.
 - `search`, `context` and `trace` read from each index its contract rows and only the symbols,
   calls and communities of their answer (#396, **Partial export**), instead of every row of every
   repository. Answers are the same bytes; on junit5 a `search` or `context` peaks at about 40 MB

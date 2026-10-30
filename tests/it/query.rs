@@ -77,9 +77,9 @@ fn context_lists_candidates_instead_of_guessing() {
         "ts-basic.context-ambiguous.txt",
         &engine.context("add", None).unwrap(),
     );
-    assert_eq!(
-        engine.context("nothing", None).unwrap(),
-        "no symbol matches `nothing`\n"
+    assert_golden(
+        "ts-basic.context-none.txt",
+        &engine.context("nothing", None).unwrap(),
     );
 }
 

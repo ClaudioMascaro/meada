@@ -1,0 +1,9 @@
+example.com/chain/web src/dashboard.ts:4 dashboard
+community: src#3
+processes: 1 (1 export; 1 repository): dashboard (example.com/chain/web)
+index behind the mirror: run meada index --workspace
+callers: none
+callees:
+example.com/chain/web src/status.ts:2 health
+example.com/chain/web src/orders.ts:5 listOrders
+example.com/chain/web src/status.ts:7 track

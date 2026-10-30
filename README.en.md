@@ -8,13 +8,94 @@ agents, and people too, query that map over MCP. No step of indexing uses an LLM
 
 ## Installation
 
+Pick the channel that fits your environment. All of them deliver the same `meada` binary.
+
 ```sh
+# Cargo (builds with the Rust toolchain)
 cargo install meada
+
+# Shell installer (Linux and macOS)
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ClaudioMascaro/meada/releases/latest/download/meada-installer.sh | sh
+
+# npm: downloads the binary for your platform and runs it, with nothing installed first
+npx meada --version
 ```
 
-Choose Cargo, a binary, the installer, npm or a container in the complete installation guide.
+- **Prebuilt binary**: download the archive for your system (Linux, macOS or Windows, on x86_64
+  or arm64) from the [GitHub releases](https://github.com/ClaudioMascaro/meada/releases) and put
+  `meada` on your `PATH`.
+- **Container**: `ghcr.io/claudiomascaro/meada:<version>`, for Linux amd64 and arm64.
 
-[Installation](https://claudiomascaro.github.io/meada/en/installation/) · [GitHub releases](https://github.com/ClaudioMascaro/meada/releases)
+The npm package's version is always the release's. To index, Meada needs only the binary and git.
+The details of each channel, the console and the container are in
+[Installation](https://claudiomascaro.github.io/meada/en/installation/) and in the
+[user guide](docs/user-guide.en.md) (section 1, Installation).
+
+## First steps
+
+In the root of a repository (here `web`, which consumes a route of `api`):
+
+```sh
+meada index     # builds the index in .meada/, for the repository and its peers
+meada status    # the state of each index and the peers not found
+```
+
+For Meada to link `web` to `api`, the `meada.toml` of `web` names the peer:
+
+```toml
+[[peer]]
+repo = "example.com/acme/api"       # origin's git remote, without scheme or .git
+base_url_env = ["API_URL"]          # variable the client reads the base URL from
+```
+
+The full `meada.toml` reference is in the
+[user guide](docs/user-guide.en.md) (section 4, `meada.toml` reference).
+
+## Connect an agent (MCP)
+
+`npx meada mcp` is the launch line of the MCP server: the client runs it and talks to Meada over
+stdio. In your agent's configuration (for example Claude Code's `.mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "meada": { "command": "npx", "args": ["meada", "mcp"] }
+  }
+}
+```
+
+In Claude Code, the same in one line: `claude mcp add meada -- npx meada mcp`. With `meada`
+already on your `PATH`, use `"command": "meada", "args": ["mcp"]`.
+
+The agent gets three tools, `search`, `context` and `trace`, which only read. See
+[Agents and MCP](https://claudiomascaro.github.io/meada/en/mcp/) and the
+[user guide](docs/user-guide.en.md) (section 2, Connect an agent).
+
+## Status
+
+Meada 1.0 delivers the whole v1 scope of [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md):
+
+- **Contracts**: HTTP routes, declared resources, OpenAPI and AsyncAPI documents, queues and
+  topics, packages.
+- **Levels**: a level on every link, chains that cross repositories and decisions with an
+  optional decider (`meada decide`).
+- **Analyses**: shape drift, communities and processes.
+- **Languages in 1.0**: TypeScript and JavaScript, Python, Go and Rust. Java, Kotlin, C# and
+  Swift are planned Release 2 work and arrive later as 1.x versions (#26 to #29, ADR 0003).
+
+**Stability promise.** From 1.0 on, semver holds: a breaking change to any of these items needs
+a major version.
+
+- the names, parameters and output grammar of `search`, `context` and `trace`;
+- the CLI commands and flags;
+- the schemas of `meada.toml` and `meada.decisions.toml`;
+- the format of `meada export`.
+
+Adding an optional parameter, a search kind, a configuration key, an export field or a language
+is a minor change. Not covered: the wording of CLI messages, the text of tool descriptions, the
+index file and the layout of `.meada/` (rebuilt when the schema changes), and which links Meada
+finds in a code base (improving resolution is a fix, not a break). What 1.x freezes, and what it
+does not, is detailed in [Stability](https://claudiomascaro.github.io/meada/en/stability/).
 
 ## Feed a knowledge base
 
@@ -64,11 +145,13 @@ results by symbol identity. Embeddings and any model step live downstream, outsi
 
 ## Documentation
 
+- [User guide](docs/user-guide.en.md)
 - [Configuration](https://claudiomascaro.github.io/meada/en/configuration/)
 - [Agents and MCP](https://claudiomascaro.github.io/meada/en/mcp/)
 - [Server mode](https://claudiomascaro.github.io/meada/en/server/)
 - [Console](https://claudiomascaro.github.io/meada/en/console/)
 - [Capabilities and limits](https://claudiomascaro.github.io/meada/en/capabilities/)
+- [Stability](https://claudiomascaro.github.io/meada/en/stability/)
 - [Contribute](https://claudiomascaro.github.io/meada/en/contributing/)
 
 [Apache-2.0](LICENSE).

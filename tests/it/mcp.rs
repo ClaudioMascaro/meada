@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use common::fixture_repo;
+use common::{assert_golden, fixture_repo};
 use rmcp::{
     ClientHandler, ClientLifecycleMode, ClientServiceExt, ServiceExt,
     model::{
@@ -62,7 +62,8 @@ fn roots_config(version: ProtocolVersion) -> ClientConfig {
 }
 
 /// `meada mcp` in a fixture repository: the tools it lists stay within 1,000 tokens (one per
-/// four bytes of description and parameter schema, ADR 0008), and `trace` answers.
+/// four bytes of description and parameter schema, ADR 0008), the list matches its golden
+/// (names, parameter schemas and descriptions: the surface 1.0 freezes), and `trace` answers.
 #[tokio::test]
 async fn serves_three_tools_over_stdio_within_the_description_budget() {
     let repo = fixture_repo(
@@ -82,6 +83,12 @@ async fn serves_three_tools_over_stdio_within_the_description_budget() {
     let mut names: Vec<&str> = tools.iter().map(|t| &*t.name).collect();
     names.sort();
     assert_eq!(names, ["context", "search", "trace"]);
+    let mut listed = tools.clone();
+    listed.sort_by(|a, b| a.name.cmp(&b.name));
+    assert_golden(
+        "mcp.tools.json",
+        &format!("{}\n", serde_json::to_string_pretty(&listed).unwrap()),
+    );
     let bytes: usize = tools
         .iter()
         .map(|t| {
@@ -94,11 +101,14 @@ async fn serves_three_tools_over_stdio_within_the_description_budget() {
         "tool list costs {} tokens",
         bytes.div_ceil(4)
     );
+    // The defaults 1.0 freezes, which the tool list only states in its descriptions.
+    assert_eq!(meada_core::render::DEFAULT_BUDGET, 2_000);
 
+    // No `direction`: the default walks down.
     let answer = client
         .call_tool(
             CallToolRequestParams::new("trace").with_arguments(
-                serde_json::json!({"from": "sum", "direction": "down"})
+                serde_json::json!({"from": "sum"})
                     .as_object()
                     .unwrap()
                     .clone(),

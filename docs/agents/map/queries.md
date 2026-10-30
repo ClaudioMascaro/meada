@@ -183,6 +183,9 @@ modules updates it.
   followed like a call: `Walk::consumers_down` crosses it from the method into the provider (down
   from the callers, after the callees), and up the provider reaches the method and its callers;
   the `calls_on_link` filters keep a reader-style crossing from looping back.
+- `docs/reference/output-grammar.md`: the output grammar of `search`, `context` and `trace`, every
+  line kind and field. Its tables are the grammar `tests/it/grammar.rs` checks every rendered-answer
+  golden against, so a renderer that adds or changes a line kind changes it in the same change.
 - `meada-core`'s `render.rs`: token budget (`budgeted`, `cut`, `tokens`; 1 token = 4 bytes;
   `DEFAULT_BUDGET` 2000) and the line helpers `label`, `callee`, `unresolved`, `mark` (` [<level>:
   <reason>]` after a call that is not exact, in `trace` and in `context`'s callers and callees;

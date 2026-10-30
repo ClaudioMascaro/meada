@@ -60,4 +60,4 @@ Siga a cadeia entre repositórios.
 
 Modo servidor ([S1, #259](https://github.com/ClaudioMascaro/meada/issues/259)), console ([S2, #293](https://github.com/ClaudioMascaro/meada/issues/293)) e automação de identidade ([S4, #319](https://github.com/ClaudioMascaro/meada/issues/319)) estão entregues. Os workspaces nomeados ([S5, #339](https://github.com/ClaudioMascaro/meada/issues/339)) estão entregues; o ownership por equipe (S3) está planejado. Cada página separa o comportamento disponível da proposta.
 
-[Consulte as capacidades e os limites](capabilities.md) · [S3](workspaces.md) · [S4](enterprise.md) · [S5](named-workspaces.md)
+[Consulte as capacidades e os limites](capabilities.md) · [Estabilidade](stability.md) · [S3](workspaces.md) · [S4](enterprise.md) · [S5](named-workspaces.md)

@@ -325,3 +325,22 @@ fn in_a_repository_with_no_commits_every_file_is_uncommitted() {
         "{answer}"
     );
 }
+
+#[test]
+fn a_trace_with_no_single_start_says_why() {
+    let (web, _, _) = chain("trace_no_start");
+    let engine = Engine::open(&web).unwrap();
+    let trace = |from| {
+        engine
+            .trace(Start::From(from), Direction::Down, None)
+            .unwrap()
+    };
+
+    assert_golden("chain.trace-none.txt", &trace("nothing"));
+    // Two route files of the catalog export a `GET`.
+    assert_golden("chain.trace-fits-symbols.txt", &trace("GET"));
+    // Four functions of the workspace each make a first `fetch`.
+    assert_golden("chain.trace-fits-calls.txt", &trace("fetch#0"));
+    let clean = engine.trace(Start::Uncommitted, Direction::Down, None);
+    assert_golden("chain.trace-clean.txt", &clean.unwrap());
+}
