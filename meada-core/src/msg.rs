@@ -17,11 +17,42 @@ pub fn pt() -> bool {
     PT.load(Ordering::Relaxed)
 }
 
+/// The kind of value a key expects, worded without the value written under it.
+#[derive(Clone, Copy)]
+pub enum Kind {
+    Table,
+    Array,
+    String,
+    Integer,
+    Float,
+    Boolean,
+    Other,
+}
+
+impl Kind {
+    fn words(self) -> (&'static str, &'static str) {
+        match self {
+            Kind::Table => ("a table", "uma tabela"),
+            Kind::Array => ("an array", "uma lista"),
+            Kind::String => ("a string", "um texto"),
+            Kind::Integer => ("an integer", "um inteiro"),
+            Kind::Float => ("a float", "um decimal"),
+            Kind::Boolean => ("a boolean", "um booleano"),
+            Kind::Other => ("another type", "outro tipo"),
+        }
+    }
+}
+
 pub enum Msg<'a> {
     UnsafeIdentity,
     LocalIdentity,
     ListedTwice,
     KeyMissing(&'a str),
+    WrongType {
+        key: &'a str,
+        expected: Kind,
+    },
+    InvalidValue(&'a str),
     NotInRepository(&'a str),
     KeyUnknown {
         key: &'a str,
@@ -71,6 +102,17 @@ impl Msg<'_> {
             ),
             Msg::ListedTwice => pick("listed twice".into(), "listado duas vezes".into()),
             Msg::KeyMissing(key) => pick(format!("`{key}` is missing"), format!("falta `{key}`")),
+            Msg::WrongType { key, expected } => {
+                let (en, pt) = expected.words();
+                pick(
+                    format!("`{key}`: has the wrong type ({en} was expected)"),
+                    format!("`{key}`: tem o tipo errado (era esperado {pt})"),
+                )
+            }
+            Msg::InvalidValue(key) => pick(
+                format!("`{key}`: has an invalid value"),
+                format!("`{key}`: tem um valor inválido"),
+            ),
             Msg::NotInRepository(path) => pick(
                 format!("`{path}` is not a path inside the repository"),
                 format!("`{path}` não é um caminho dentro do repositório"),

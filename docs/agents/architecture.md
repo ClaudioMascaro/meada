@@ -123,7 +123,7 @@ other Kotlin grammar may enter the dependency tree: they all export `tree_sitter
 - `meada-core/src/manifest.rs`: a workspace manifest's `[[repository]]` (`EntryFile`,
   `EntryPeer`) and the `[serve]` and `[[resource]]` shapes `meada.toml` shares (`Serve`,
   `Resource`, `Role`, `declared`, `gateway_path`); `parse` and `error_at`, the errors naming
-  the file, the line and the dotted key (`line_of`); `identity_problem` and `entry_problems`
+  the file, the line and the dotted key, never the value written there (`line_of`); `identity_problem` and `entry_problems`
   (an identity listed twice); `validate`, a workspace text's entries or its problems as the CLI
   prints them (a text holding only `[[repository]]` entries). `EntryFile::owner` is an entry's
   optional `owner` (ADR 0015), checked where the entry is read (`owner_problem`: one string, not

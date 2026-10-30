@@ -10,7 +10,7 @@ use serde::de::{DeserializeOwned, Error as _};
 use serde::{Deserialize, Deserializer};
 use toml::de::{DeTable, DeValue};
 
-use crate::msg::Msg;
+use crate::msg::{Kind, Msg};
 use crate::{parent, qualify};
 
 #[derive(Deserialize, Default, Clone)]
@@ -526,8 +526,36 @@ fn describe(src: &str, at: usize, message: &str, file: &str) -> String {
             Msg::KeyMissing(&qualify(parent.unwrap_or(""), field)).text()
         }
         (Some(_), Some(key)) => Msg::KeyUnknown { key, file }.text(),
+        // Serde quotes the written value in these two; a secret pasted under the wrong key
+        // must not reach a log.
+        (_, Some(key)) if message.starts_with("invalid type") => Msg::WrongType {
+            key,
+            expected: expected_kind(message),
+        }
+        .text(),
+        (_, Some(key)) if message.starts_with("invalid value") => Msg::InvalidValue(key).text(),
         (_, Some(key)) => format!("`{key}`: {message}"),
         (_, None) => message.to_string(),
+    }
+}
+
+/// The kind of value serde's `invalid type` message expected, in words that carry no value.
+fn expected_kind(message: &str) -> Kind {
+    let expected = message.rsplit_once(", expected ").map_or("", |(_, e)| e);
+    let number = |prefix: char| {
+        expected
+            .strip_prefix(prefix)
+            .is_some_and(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
+    };
+    match expected {
+        e if e.starts_with("struct") || e.starts_with("a map") || e == "map" => Kind::Table,
+        e if e.contains("sequence") || e.starts_with("a tuple") => Kind::Array,
+        "a string" | "a borrowed string" | "a character" => Kind::String,
+        "a boolean" => Kind::Boolean,
+        "f32" | "f64" => Kind::Float,
+        "usize" | "isize" => Kind::Integer,
+        _ if number('i') || number('u') => Kind::Integer,
+        _ => Kind::Other,
     }
 }
 

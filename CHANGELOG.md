@@ -60,6 +60,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Manifest type errors (#449): a `meada.toml` or workspace manifest key of the wrong type, or
+  with an invalid value, reports the key and the expected kind (`` `oidc.entra`: has the wrong
+  type (a table was expected) ``) instead of serde's message, which echoed the written value, so a
+  secret pasted under the wrong key no longer reaches stderr.
 - Console GitHub grant (#496): a session's GitHub grant and its state (`unread`, `current`,
   `expired`) are read from the same permissions set at the same instant, so a session never shows
   `expired` with a grant read while the set was fresh.
