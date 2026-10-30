@@ -111,9 +111,12 @@ Ubuntu 24.04.5 LTS, x86_64. The measured build was
 
 MB means 10^6 bytes; tokens are ceil(UTF-8 bytes / 4). Public fixture peers supplement the
 private workload; the receipt does not claim every feature naturally occurs in the private root.
-Reindexing still misses its target, so acceptance remains pending under
-[#350](https://github.com/ClaudioMascaro/meada/issues/350): fixing the reindex or waiving that
-target is the maintainer's decision, not yet taken. Published-installation checks,
+A [rerun on 2026-10-30](https://github.com/ClaudioMascaro/meada/issues/152#issuecomment-6531862493) with main
+`1d648ad6` on a reconstructed workspace (not directly comparable) meets every target in its
+quietest run (cold index 5.586 s, 31.883266 MB, reindex 0.931 s, 643 and 1,999 tokens) and
+misses the reindex target under load (1.068 and 1.123 s, met in 2 of 4 runs). Acceptance remains
+pending under [#350](https://github.com/ClaudioMascaro/meada/issues/350), which stays open until the
+single-file reindex meets 1 s with headroom. Published-installation checks,
 community setup and final-head validation remain pending; the maintainer performs tagging and
 publication separately under [#154](https://github.com/ClaudioMascaro/meada/issues/154).
 
