@@ -89,7 +89,9 @@ share. Both take one version from the workspace, and `meada` depends on `meada-c
 it. `meada-core` has no rusqlite, tree-sitter, filesystem, process or network code and no async
 runtime; it builds for `wasm32-unknown-unknown`, its `wasm-bindgen` feature (never the binary's)
 exporting `init`, `validate`, `workspaceVersionId`, `workspaceDiff`, `entriesText`,
-`entriesJson`, `authorizeEntries`, `composeEntries` and `parseExport`. CI's `core` job builds it
+`entriesJson`, `authorizeEntries`, `composeEntries`, `parseExport` and the named-workspace set
+(`namedEntriesJson`, `namedEntriesText`, `namedVersionId`, `namedAuthorize`, `namedVisible`,
+`namedEffective`, `namedDiff`, `namedChanged`). CI's `core` job builds it
 with wasm-pack and checks both trees.
 
 Every tree-sitter grammar is a crate except Kotlin's: `vendor/tree-sitter-kotlin-ng/` holds
@@ -252,13 +254,29 @@ checks its tests; Rust/default stages gain no frontend input.
 Vitest exercises the built WASM and the public client, view-model and DOM
 seams, without a browser end-to-end suite.
 
-## Named workspaces (spec S5): the catalog, the first workspace, its lifecycle and its configuration are built, the rest is planned
+## Named workspaces (spec S5): the catalog, the first workspace, its lifecycle, its configuration and the guided controls are built, the rest is planned
 
 ADR 0020 holds the domain decision, ADR 0021 the contracts (catalog, selected entries, shared
 ingestion membership, version lifecycle in Postgres, query selection through the generation
 document's `members` and `contexts` and the route `/-/workspaces/<id>/<identity>`, effective
 configuration, ids) and ADR 0022 the proposal server. Slices #341 to #347 build them in that
 order and each updates this map with what it delivers.
+
+Delivered by #345 (the guided controls; ADR 0021 "As built (#345)"), front end only plus two
+WebAssembly exports (`namedDiff` and `namedChanged` in `meada-core/src/wasm.rs`, over `named::diff`
+and `named::changed`): `EditWorkspace.tsx` is the operator's editor (it replaces #344's text-only
+`EditWorkspace` in `NamedWorkspacesPage.tsx`), holding the manifest text and a model of its entries
+that rewrite each other through `namedEntriesText` and `namedEntriesJson`, so the form and the text
+are one canonical document; `GuidedForm.tsx` is the form (repositories from the catalog, per entry
+serve settings, resources and peers with environment-variable names) and decides nothing;
+`guided.ts` only reshapes entries (`normalize`) and words a diff, `guided-i18n.ts` is its pt-BR/en
+copy; `useCatalog.ts` reads the catalog page by page, remembers the identities the server said
+the session may select and the `catalog/check` results, and is shared by the creation form and the
+editor; `EffectiveList.tsx` is #344's view, extracted. The editor marks each changed entry
+(`namedChanged`) with `namedAuthorize`, shows the diff (`namedDiff`) and freezes the reviewed
+payload until the confirmation. Tests: `ui/tests/guided.test.ts` (actual WebAssembly) and
+`ui/tests/GuidedWorkspace.test.tsx` (DOM). Not built: the page over versions with rollback, and
+proposals (#346).
 
 Delivered by #344 (contract 6, the effective configuration; ADR 0021 "As built (#344)"), same feature:
 `meada-core/src/effective.rs` is the pure decision (`effective(entries, facts)`: per entry the
@@ -274,7 +292,7 @@ a bundle id or the generation id: the ingestion-blocks rule of #342 already keep
 peers, resources and serve hosts query-time, so a configuration change is a new generation of the
 same bundles. The front end's `NamedWorkspacesPage.tsx` shows the view in text and has the
 manifest text editor (`EditWorkspace`: validate with the core, preview, confirm, save and apply at
-the base read). Not built: guided authoring (#345), proposals (#346), acceptance (#347).
+the base read). Not built by #344: guided authoring (#345, above), proposals (#346), acceptance (#347).
 
 Delivered by #343 (contract 4's lifecycle; ADR 0021 "As built (#343)"), same feature:
 `workspaces/lifecycle.rs` is the atomic boundary of every other write (`transact`: one

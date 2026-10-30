@@ -8,6 +8,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Guided authoring of named workspaces (#345, ADR 0021 "As built (#345)", feature `workspaces`):
+  the console edits the manifest of a workspace the subject operates through form controls
+  (repositories from the catalog, serve settings, resources, peers and environment-variable
+  names) that are one document with the manifest text, both going through `meada-core`'s
+  WebAssembly. It shows each entry's eligibility, ingestion and effective configuration in text,
+  the diff against the stored version, and freezes the reviewed payload until the person
+  confirms; server refusals (`entries_refused`, `stale_base`, a lost operator role) are shown as
+  worded and the catalog is read again. `namedDiff` and `namedChanged` join the WebAssembly
+  exports. Viewers get no mutation control. No server route changes; nothing changes without
+  `[workspaces]`.
 - Context-specific configuration of named workspaces (#344, ADR 0021 contract 6, feature
   `workspaces`): `GET /api/v1/workspaces/<id>/effective[?version=]` shows, per entry the caller
   reads, where its configuration comes from (the repository's own `meada.toml` wins whole, else

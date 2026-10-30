@@ -150,6 +150,29 @@ pub fn named_entries_text(entries: &str) -> Result<String, String> {
     crate::workspace::entries_text(&entries).ok_or_else(|| "not repository entries".to_string())
 }
 
+/// What differs between two named versions (ADR 0021): JSON `{added, removed, changed}` over the
+/// entries `namedEntriesJson` gives, the diff the server computes for a save. Pure over the
+/// entries the caller reads, so it names nothing the caller's grant does not read.
+#[wasm_bindgen(js_name = namedDiff)]
+pub fn named_diff(before: &str, after: &str) -> Result<String, String> {
+    let diff = crate::named::diff(
+        &from_json::<Vec<serde_json::Value>>(before)?,
+        &from_json::<Vec<serde_json::Value>>(after)?,
+    );
+    serde_json::to_string(&diff).map_err(|e| e.to_string())
+}
+
+/// The identities `next` adds to `current` or changes, as a JSON array in `next` order: what
+/// the server finds eligible for the actor again when the change is saved or applied.
+#[wasm_bindgen(js_name = namedChanged)]
+pub fn named_changed(current: &str, next: &str) -> Result<String, String> {
+    let changed = crate::named::changed(
+        &from_json::<Vec<serde_json::Value>>(current)?,
+        &from_json::<Vec<serde_json::Value>>(next)?,
+    );
+    serde_json::to_string(&changed).map_err(|e| e.to_string())
+}
+
 /// Whether a selection may be made (ADR 0020): JSON `{allowed, named, hidden}`. `eligible` is
 /// the array of identities the login holds an accepted role on (the session's `github_grant`),
 /// `grant` `"*"` or an array of identities the session reads.

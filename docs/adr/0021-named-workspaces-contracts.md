@@ -27,9 +27,9 @@ Implementation status: #341 built contract 1 (the catalog, below), #342 the crea
 query of the first workspace (contracts 2 to 5 as far as create, list, show, the shared ingestion
 and the node route go, "As built (#342)" below) and #343 the rest of contract 4's lifecycle
 (save, apply, rollback, rename, delete, delegation, versions and history, "As built (#343)"
-below) and #344 contract 6 (the effective configuration, "As built (#344)" below); the cargo feature
-`workspaces` has `[catalog]` and `[workspaces]`. Guided authoring (#345) and proposals (#346) are
-not built. Current behavior without `[workspaces]` is ADR 0014's one workspace per deployment.
+below), #344 contract 6 (the effective configuration, "As built (#344)" below) and #345 the guided
+controls ("As built (#345)" below); the cargo feature `workspaces` has `[catalog]` and
+`[workspaces]`. Proposals (#346) are not built. Current behavior without `[workspaces]` is ADR 0014's one workspace per deployment.
 
 ## Decision
 
@@ -537,6 +537,61 @@ manifest text to query. Where a line differs from contract 6 above it says so.
   member, the same bundles across a configuration change, a pinned generation keeping its
   configuration, a stale base, the discovery rule, refusals and the preview);
   `ui/tests/NamedWorkspaces.test.tsx` drives the editor.
+
+**As built (#345).** The guided controls over #341 and #344. No route, migration, table, id or
+dependency is added, and the server is unchanged: the form uses the catalog, the effective
+preview and the lifecycle routes as they are.
+
+- **One document.** The editor keeps the manifest text and a model of its entries, and an edit in
+  either rewrites the other: the form's model goes to text through `namedEntriesText`, the text to
+  the model through `namedEntriesJson`, so the saved text is the one canonical text `meada-core`
+  writes and a form state reads back unchanged. The model is only a reshaping (`ui/src/guided.ts`:
+  an emptied field is an absent key; `serve: {}` stays an explicit `[repository.serve]`); every
+  value is validated by the core on the text it produces and a refusal is shown as the core's
+  message. While the text does not parse, the form is read-only over the last model that did. The
+  form cannot write what the text editor cannot: `path`, `owner`, `added_by` and
+  `serve.documents` are reserved, and a peer's `base_url_env` is names.
+- **WebAssembly additions** (`meada-core/src/wasm.rs`): `namedDiff(before, after)`, the diff of
+  `named::diff` over the entries the caller reads, and `namedChanged(current, next)`, the
+  identities `named::changed` says a save or apply rechecks. They complete the exports this ADR
+  named for the guided form; `named::compose` is not exported, because the server composes the
+  hidden entries a partial operator never sees and the form submits only what it reads.
+- **Eligibility** is displayed per changed entry from the core: the entries `namedChanged` returns
+  are checked with `namedAuthorize` against the identities the server said the session may select
+  (the catalog pages read, a search never forgets one, plus the `selectable` results of
+  `POST /api/v1/catalog/check`, which the form asks for only on request, for the changed entries
+  the catalog did not list). A changed entry is *selectable*, *unavailable*, *pending
+  verification* or *not verified yet*; an unchanged one is *already in the workspace* because the
+  server rechecks only what a change adds or changes. A change that touches an ineligible entry
+  cannot be saved and names the identities the session's grant reads and counts the rest.
+- **Scope and state in text.** Whether the subject operates the workspace, the entries it edits,
+  the hidden ones kept as they are, each entry's ingestion (`pending`, `ready`, `excluded`, or
+  new) and the effective configuration of the saved version or of the last preview (source,
+  coverage and the diagnostics, inside the entry). An entry's owner is not shown: a named entry
+  holds none, and an owner is not a workspace ACL.
+- **Review and refusals.** The page shows the diff of the draft against the stored version and
+  *Save and apply* freezes the reviewed payload (text, message and `base`): the confirmation sends
+  exactly it, whatever happens to the draft meanwhile, and applies the version it stored at the
+  same base. `entries_refused` (at save or at apply) shows the server's identities and `hidden`,
+  closes the confirmation, keeps the draft and reads the catalog again; a version stored whose
+  apply was refused is said so; `stale_base` keeps the draft, says so and offers a reload;
+  a 403 `not_operator` (a lost operator role) closes the editor and reloads the workspace as a viewer
+  with the reason. A viewer's page renders no control that changes anything; the API refuses
+  what the front end hides.
+- **Decisions this slice takes.** The catalog is read once for the page and shared by the
+  creation form and the editor (`ui/src/useCatalog.ts`), which now pages it (the creation form
+  read only the first page). A resource's `via` and a peer's environment names are one value per
+  line; no manifest field has a length or pattern attribute (the catalog search prefix is bounded as the catalog page bounds it), so the core is the only rule on a manifest. A page over the
+  versions with rollback is not built (the routes exist); it is listed as a follow-up. Per the
+  maintainer decision of 2026-10-29, #338 is not a gate: the slice is built on the merged S3/S4
+  code and fixtures and assumes the real-organization measurement will confirm that the catalog
+  coverage and the per-login role rows behave as the fakes do. That check, and the rate cost of
+  paging the catalog from the editor, stay an open follow-up.
+- **Evidence.** `ui/tests/guided.test.ts` (the actual WebAssembly: form states read back from
+  their text, the core's refusals, the diff and the rechecked identities, the Y/A/B rows through
+  the edit path) and `ui/tests/GuidedWorkspace.test.tsx` (the DOM seam: text and form parity, no
+  request while computing, verification, diff, frozen payload, grant loss, lost operator role,
+  stale base, viewer, labels and focus, pt-BR).
 
 ### Contract 6: effective configuration
 
