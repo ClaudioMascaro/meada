@@ -9,13 +9,94 @@ indexación usa un LLM.
 
 ## Instalación
 
+Elija el canal que encaje con su entorno. Todos entregan el mismo binario `meada`.
+
 ```sh
+# Cargo (compila con el toolchain de Rust)
 cargo install meada
+
+# Instalador de shell (Linux y macOS)
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ClaudioMascaro/meada/releases/latest/download/meada-installer.sh | sh
+
+# npm: descarga el binario de su plataforma y lo ejecuta, sin instalar nada antes
+npx meada --version
 ```
 
-Elija Cargo, un binario, el instalador, npm o un contenedor en la guía completa de instalación.
+- **Binario listo**: descargue el archivo de su sistema (Linux, macOS o Windows, en x86_64 o
+  arm64) de los [releases de GitHub](https://github.com/ClaudioMascaro/meada/releases) y ponga
+  `meada` en el `PATH`.
+- **Contenedor**: `ghcr.io/claudiomascaro/meada:<versión>`, para Linux amd64 y arm64.
 
-[Instalación](https://claudiomascaro.github.io/meada/es/installation/) · [GitHub releases](https://github.com/ClaudioMascaro/meada/releases)
+La versión del paquete npm es siempre la del release. Para indexar, Meada solo necesita el
+binario y git. Los detalles de cada canal, de la consola y del contenedor están en
+[Instalación](https://claudiomascaro.github.io/meada/es/installation/) y en la
+[guía del usuario](docs/user-guide.md) (por ahora en portugués; sección 1, Instalação).
+
+## Primeros pasos
+
+En la raíz de un repositorio (aquí `web`, que consume una ruta de `api`):
+
+```sh
+meada index     # monta el índice en .meada/, del repositorio y de sus pares
+meada status    # el estado de cada índice y los pares no encontrados
+```
+
+Para que Meada una `web` con `api`, el `meada.toml` de `web` nombra al par:
+
+```toml
+[[peer]]
+repo = "example.com/acme/api"       # remoto git de origin, sin esquema ni .git
+base_url_env = ["API_URL"]          # variable de donde el cliente lee la URL base
+```
+
+La referencia completa de `meada.toml` está en la
+[guía del usuario](docs/user-guide.md) (por ahora en portugués; sección 4, referencia de `meada.toml`).
+
+## Conectar un agente (MCP)
+
+`npx meada mcp` es la línea de lanzamiento del servidor MCP: el cliente la ejecuta y habla con
+Meada por stdio. En la configuración de su agente (por ejemplo el `.mcp.json` de Claude Code):
+
+```json
+{
+  "mcpServers": {
+    "meada": { "command": "npx", "args": ["meada", "mcp"] }
+  }
+}
+```
+
+En Claude Code, lo mismo en una línea: `claude mcp add meada -- npx meada mcp`. Con `meada` ya en
+el `PATH`, use `"command": "meada", "args": ["mcp"]`.
+
+El agente recibe tres herramientas, `search`, `context` y `trace`, que solo leen. Vea
+[Agentes y MCP](https://claudiomascaro.github.io/meada/es/mcp/) y la
+[guía del usuario](docs/user-guide.md) (por ahora en portugués; sección 2, Conectar um agente).
+
+## Estado
+
+Meada 1.0 entrega todo el alcance de la v1 del [ADR 0003](docs/adr/0003-v1-scope-and-roadmap.md):
+
+- **Contratos**: rutas HTTP, recursos declarados, documentos OpenAPI y AsyncAPI, colas y
+  tópicos, paquetes.
+- **Niveles**: un nivel en cada enlace, cadenas que atraviesan repositorios y decisiones con
+  decisor opcional (`meada decide`).
+- **Análisis**: drift de forma, comunidades y procesos.
+- **Lenguajes en 1.0**: TypeScript y JavaScript, Python, Go y Rust. Java, Kotlin, C# y Swift son
+  trabajo planificado de la Release 2 y llegan después como versiones 1.x (#26 a #29, ADR 0003).
+
+**Promesa de estabilidad.** Desde 1.0 rige semver: un cambio incompatible en alguno de estos
+elementos exige una versión major.
+
+- los nombres, los parámetros y la gramática de salida de `search`, `context` y `trace`;
+- los comandos y las flags de la CLI;
+- los esquemas de `meada.toml` y de `meada.decisions.toml`;
+- el formato de `meada export`.
+
+Añadir un parámetro opcional, un tipo de búsqueda, una clave de configuración, un campo del
+export o un lenguaje es un cambio menor. No entran en la promesa el texto de los mensajes de la
+CLI, el texto de las descripciones de las herramientas, el archivo de índice y el layout de
+`.meada/` (reconstruidos cuando cambia el esquema) y qué enlaces encuentra Meada en un código
+(mejorar la resolución es una corrección, no una ruptura).
 
 ## Alimentar una base de conocimiento
 
@@ -66,6 +147,7 @@ aguas abajo, fuera de Meada (invariante 1, [ADR 0002](docs/adr/0002-product-inva
 
 ## Documentación
 
+- [Guía del usuario](docs/user-guide.md) (por ahora en portugués)
 - [Configuración](https://claudiomascaro.github.io/meada/es/configuration/)
 - [Agentes y MCP](https://claudiomascaro.github.io/meada/es/mcp/)
 - [Modo servidor](https://claudiomascaro.github.io/meada/es/server/)

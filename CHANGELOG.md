@@ -8,6 +8,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The pt-BR user guide, first half (#146, spec #32), in `docs/user-guide.md`: installation through
+  every channel (Cargo, prebuilt binary, shell installer, `npx meada`, container), MCP setup with
+  `npx meada mcp` and the three tools with their parameters, the `meada.toml` reference (every
+  table and key), decisions and deciders (protocols, environment variables, what is sent,
+  privacy), every CLI command and the export. The READMEs in all three languages gain the
+  installation channels, first steps, MCP setup and a 1.0 status section with the stability
+  promise; the guide's English and Spanish translations are still to come. No code, default
+  dependency or golden changed.
 - Validation and operation of the named-workspace flow (#347, spec S5): a failure test that forces
   the role check, the fetch/index and the local publication to fail in turn and shows the current
   generation stays queryable, eligibility stays fail closed and a revoked grant never revives
