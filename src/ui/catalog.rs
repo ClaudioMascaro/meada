@@ -11,17 +11,18 @@ use meada_core::manifest::identity_problem;
 use super::*;
 use crate::oidc::Catalog;
 
-/// The most identities `POST catalog/check` takes.
+// ponytail: the most identities `POST catalog/check` takes, and the most bytes of its body.
 const CHECK_IDENTITIES: usize = 50;
+pub(super) const CHECK_BODY_MAX: usize = 16 << 10;
 
-/// The most records `GET catalog` answers at once, and how many without `limit`.
+// ponytail: the most records `GET catalog` answers at once, and how many without `limit`.
 pub(super) const LIMIT_MAX: usize = 100;
 const LIMIT: usize = 50;
 
-/// The most characters of `q`, a prefix of an identity.
+// ponytail: the most characters of `q`, a prefix of an identity.
 pub(super) const PREFIX_MAX: usize = 128;
 
-/// The most characters of `after`, the opaque cursor.
+// ponytail: the most characters of `after`, the opaque cursor.
 pub(super) const CURSOR_MAX: usize = 256;
 
 /// The cursor's alphabet: base64url, no padding.
@@ -196,7 +197,7 @@ impl Console {
         let body = match body {
             Ok(body) => body,
             Err(StatusCode::PAYLOAD_TOO_LARGE) => {
-                let message = Msg::UiTooLarge(CHECK_MAX).text();
+                let message = Msg::UiTooLarge(CHECK_BODY_MAX).text();
                 return error(StatusCode::PAYLOAD_TOO_LARGE, "too_large", &message);
             }
             Err(status) => {

@@ -39,9 +39,12 @@ export function createBody(name: string, description: string, entries: string, m
   return JSON.stringify({ name, description, entries, message });
 }
 
-/** Whether a text is a valid name or description: bounded, no control character, no space at either end. */
+/**
+ * Whether a text is a valid name, description or message: bounded, no control character, no space at either end.
+ * `White_Space` is Rust's `char::is_whitespace`, so the browser and `meada-core` agree (`trim()` also strips U+FEFF).
+ */
 export function plain(text: string, min: number, max: number): boolean {
-  return [...text].length >= min && [...text].length <= max && text === text.trim() && !/\p{Cc}/u.test(text);
+  return [...text].length >= min && [...text].length <= max && !/^\p{White_Space}|\p{White_Space}$/u.test(text) && !/\p{Cc}/u.test(text);
 }
 
 export function stateText(state: WorkspaceState, t: NamedCopy): string { return t[state]; }

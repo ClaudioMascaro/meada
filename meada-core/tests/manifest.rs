@@ -1,7 +1,7 @@
 //! A workspace text's validation at the crate's public seam: the errors the CLI prints for the
 //! same text, naming the file, the line and the dotted key, or the entry.
 
-use meada_core::manifest::{validate, validate_entries};
+use meada_core::manifest::{validate, validate_entries, validate_named};
 
 const FILE: &str = "ops/meada.workspace.toml";
 
@@ -178,4 +178,22 @@ fn an_added_by_is_one_lowercase_login_and_each_error_names_its_line_and_key() {
         assert_eq!(entries[0].added_by.as_deref(), Some(login.as_str()));
     }
     assert_eq!(validate(FILE, OWNED).unwrap()[0].added_by, None);
+}
+
+#[test]
+fn a_named_peer_takes_an_environment_name_of_at_most_128_bytes() {
+    let text = |name: &str| {
+        format!(
+            "[[repository]]\nrepo = \"example.com/acme/api\"\n\
+             [[repository.peer]]\nrepo = \"example.com/acme/web\"\nbase_url_env = [\"{name}\"]\n"
+        )
+    };
+    let longest = format!("W{}", "_".repeat(127));
+    assert!(validate_named(FILE, &text(&longest), 10).is_ok());
+    let past = format!("{longest}_");
+    let problems = validate_named(FILE, &text(&past), 10)
+        .err()
+        .unwrap_or_default();
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(problems[0].contains(&past), "{problems:?}");
 }

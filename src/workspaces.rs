@@ -18,9 +18,9 @@ pub mod cli;
 pub(crate) mod lifecycle;
 pub(crate) mod store;
 
-// ponytail: the most workspaces `max_workspaces` may allow, and its default; the most operators
-// one workspace holds (ADR 0021).
-const OPERATORS_MAX: usize = 20;
+use lifecycle::OPERATORS_MAX;
+
+// ponytail: the most workspaces `max_workspaces` may allow, and its default (ADR 0021).
 const WORKSPACES_MAX: i64 = 2000;
 const WORKSPACES_DEFAULT: i64 = 200;
 // ponytail: the most entries `max_entries` may allow, and its default; also what a reader of

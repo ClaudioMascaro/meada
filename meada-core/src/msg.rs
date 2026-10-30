@@ -51,6 +51,8 @@ pub enum Msg<'a> {
     NamedNameBad(usize),
     /// A description that is too long, padded or holding a control character.
     NamedDescriptionBad(usize),
+    /// A version message that is too long, padded or holding a control character.
+    NamedMessageBad(usize),
 }
 
 impl Msg<'_> {
@@ -161,6 +163,16 @@ impl Msg<'_> {
                 ),
                 format!(
                     "uma descrição tem no máximo {max} caracteres, sem caractere de controle e sem \
+                     espaço nas pontas"
+                ),
+            ),
+            Msg::NamedMessageBad(max) => pick(
+                format!(
+                    "a message is at most {max} characters, with no control character and no \
+                     whitespace at either end"
+                ),
+                format!(
+                    "uma mensagem tem no máximo {max} caracteres, sem caractere de controle e sem \
                      espaço nas pontas"
                 ),
             ),

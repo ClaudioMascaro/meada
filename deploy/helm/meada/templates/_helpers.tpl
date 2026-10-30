@@ -91,7 +91,8 @@ app.kubernetes.io/component: server
 {{- if not .Values.modules.workspaces.allow -}}
 {{- fail "modules.workspaces.allow must list at least one pattern" -}}
 {{- end -}}
-{{- if lt (int .Values.modules.workspaces.maxRepositories) 1 -}}
+{{- $max := int .Values.modules.workspaces.maxRepositories -}}
+{{- if or (lt $max 1) (gt $max 5000) -}}
 {{- fail "modules.workspaces.maxRepositories must be set (1 to 5000): it has no default" -}}
 {{- end -}}
 {{- end -}}

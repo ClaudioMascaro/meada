@@ -66,6 +66,9 @@ test('the routes and bodies are the bounded ones the server takes', () => {
   expect(JSON.parse(createBody('n', '', '[[repository]]\nrepo = "x"\n', 'm'))).toEqual({ name: 'n', description: '', entries: '[[repository]]\nrepo = "x"\n', message: 'm' });
   expect(plain('Payments', 1, 80)).toBe(true);
   for (const bad of ['', ' x', 'x ', 'a\nb', 'x'.repeat(81)]) expect(plain(bad, 1, 80)).toBe(false);
+  // The core's rule exactly: U+FEFF is no whitespace to Rust, U+3000 is.
+  expect(plain('\uFEFFx', 1, 80)).toBe(true);
+  expect(plain('\u3000x', 1, 80)).toBe(false);
 });
 
 test.each(['en', 'pt-BR'] as const)('every state is text in %s, and both languages say the same things', locale => {

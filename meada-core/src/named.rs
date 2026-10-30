@@ -40,6 +40,11 @@ pub fn description_problem(description: &str) -> Option<String> {
         .then(|| Msg::NamedDescriptionBad(DESCRIPTION_MAX).text())
 }
 
+/// The problem with a version's `message` (at most `DESCRIPTION_MAX` characters), if any.
+pub fn message_problem(message: &str) -> Option<String> {
+    (!text_ok(message, 0, DESCRIPTION_MAX)).then(|| Msg::NamedMessageBad(DESCRIPTION_MAX).text())
+}
+
 /// One entry of a named version document: `repo` and then the entry's blocks (`entry_blocks`),
 /// with no `path`, `owner` or `added_by`.
 pub fn entry(e: &EntryFile, blocks: Json) -> Json {

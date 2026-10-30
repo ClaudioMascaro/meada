@@ -2786,7 +2786,13 @@ one for the area a change touches.
   (#335).
 - `meada-core/src/manifest.rs`: an entry's `owner` holds at most `OWNER_MAX` (256) characters
   (ADR 0015); a longer name is an error naming its line and key, wherever the entry is read
-  (import, a stored version, a pull, the browser).
+  (import, a stored version, a pull, the browser). A named entry's peer names environment
+  variables of at most `ENV_NAME_MAX` (128) bytes in `base_url_env` (#342).
+- `ui/catalog.rs` and `catalog.rs` (#341): `GET catalog` answers at most `LIMIT_MAX` (100)
+  records a page, takes a `q` of at most `PREFIX_MAX` (128) characters and an `after` of at most
+  `CURSOR_MAX` (256); `POST catalog/check` takes at most `CHECK_IDENTITIES` (50) identities in a body of at most
+  `CHECK_BODY_MAX` (16 KiB);
+  `[catalog] max_repositories` may allow at most `MAX_REPOSITORIES` (5000).
 - `meada-core/src/authorize.rs`: a refusal's `refused` list (ADR 0015) holds one `Refusal` per
   changed entry, so it is bounded by the version's entries, which `VERSION_MAX` in `src/snapshot/versions.rs` (4 MiB, S2's
   document size cap) bounds; it is not truncated.

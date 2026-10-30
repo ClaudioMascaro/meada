@@ -237,7 +237,7 @@ pub fn create(
     let env = Env::read(manifest)?;
     if let Some(problem) = named::name_problem(name)
         .or_else(|| named::description_problem(description))
-        .or_else(|| named::description_problem(message))
+        .or_else(|| named::message_problem(message))
         .or_else(|| message.is_empty().then(|| Msg::WorkspacesBody.text()))
     {
         return Err(problem.into());
@@ -334,7 +334,7 @@ pub fn save(
     base: i64,
 ) -> crate::Result<String> {
     let env = Env::read(manifest)?;
-    if let Some(problem) = named::description_problem(message)
+    if let Some(problem) = named::message_problem(message)
         .or_else(|| message.is_empty().then(|| Msg::WorkspacesBody.text()))
     {
         return Err(problem.into());

@@ -163,7 +163,7 @@ impl Console {
         if let Some(problem) = named::name_problem(&create.name)
             .or_else(|| named::description_problem(&create.description))
             .or_else(|| (create.message.is_empty()).then(|| Msg::WorkspacesBody.text()))
-            .or_else(|| named::description_problem(&create.message))
+            .or_else(|| named::message_problem(&create.message))
         {
             return unprocessable("invalid_workspace", &problem);
         }
@@ -202,6 +202,7 @@ impl Console {
         // The version document is the shared store's, immutable and content-addressed: written
         // before the rows that name it, so no row ever names a document that is not there.
         if let Err(why) = self.store_version(&version, &entries) {
+            let why = Msg::SnapshotStoreUnreachable(&why).text();
             return self.failed(record, session, CREATE, &id, &why);
         }
         let creator = Creator {
@@ -219,7 +220,10 @@ impl Console {
         let created = crate::modules::block_on(store::create(&policy, &creator, &grant, &new));
         let created = match created {
             Ok(created) => created,
-            Err(e) => return self.failed(record, session, CREATE, &id, &e.to_string()),
+            Err(e) => {
+                let why = Msg::PostgresUnreachable(&e.to_string()).text();
+                return self.failed(record, session, CREATE, &id, &why);
+            }
         };
         match created {
             Ok(created) => {
@@ -269,6 +273,8 @@ impl Console {
         store::put_document(snapshot, version, entries)
     }
 
+    /// A write that could not finish: `why` is the whole log line, naming the service that
+    /// failed (Postgres or the store); the caller is told only that it is unavailable.
     fn failed(
         &self,
         record: PendingRecord,
@@ -277,12 +283,7 @@ impl Console {
         id: &str,
         why: &str,
     ) -> Answer {
-        eprintln!(
-            "ui: {}",
-            Msg::PostgresUnreachable(why).text().escape_debug()
-        );
-        let message = Msg::AuditUnavailable.text();
-        let _ = message;
+        eprintln!("ui: {}", why.escape_debug());
         super::write::audit(session.subject.as_deref(), None, action, id, "failed");
         finish(record, Outcome::Failed, "failed", None);
         error(
@@ -319,7 +320,10 @@ impl Console {
                     message,
                 )
             }
-            CreateError::Failed(why) => return self.failed(record, session, CREATE, id, &why),
+            CreateError::Failed(why) => {
+                let why = Msg::PostgresUnreachable(&why).text();
+                return self.failed(record, session, CREATE, id, &why);
+            }
         };
         super::write::audit(session.subject.as_deref(), None, CREATE, id, &outcome);
         finish(record, Outcome::Refused, &outcome, None);

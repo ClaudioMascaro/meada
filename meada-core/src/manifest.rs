@@ -336,7 +336,8 @@ const NAMED_RESERVED: [&str; 4] = [
     "repository.serve.documents",
 ];
 
-/// The longest environment-variable reference a peer's `base_url_env` may hold.
+// ponytail: the longest environment-variable reference a peer's `base_url_env` may hold, in
+// bytes.
 const ENV_NAME_MAX: usize = 128;
 
 fn env_name_ok(name: &str) -> bool {

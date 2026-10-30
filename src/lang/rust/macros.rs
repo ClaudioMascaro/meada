@@ -189,8 +189,9 @@ fn only<'t>(tree: Node<'t>, kind: &str) -> Option<Node<'t>> {
 }
 
 /// An attribute's `[..]` as its tokens joined by spaces, without the brackets: `cfg ( feature =
-/// "rt" )`. `None` for one the items would be read wrong under: `#[path]`, a metavariable (the
-/// arm rewrites the attribute) or a control character (it would break the setting's lines).
+/// "rt" )`. `None` for one the items would be read wrong under: `#[path]` or a `#[cfg_attr]`
+/// that may write one, a metavariable (the arm rewrites the attribute) or a control character (it
+/// would break the setting's lines).
 fn attribute(tree: Node, src: &[u8]) -> Option<String> {
     let mut tokens = Vec::new();
     let mut stack: Vec<Node> = children(tree).collect();
@@ -213,7 +214,12 @@ fn attribute(tree: Node, src: &[u8]) -> Option<String> {
         stack.extend(children(node).collect::<Vec<_>>().into_iter().rev());
     }
     let unread = |t: &&str| t.starts_with('$') || t.chars().any(char::is_control);
-    if tokens.first() == Some(&"path") || tokens.iter().any(unread) {
+    let path = match tokens.first() {
+        Some(&"path") => true,
+        Some(&"cfg_attr") => tokens.contains(&"path"),
+        _ => false,
+    };
+    if path || tokens.iter().any(unread) {
         return None;
     }
     Some(tokens.join(" "))
@@ -422,6 +428,7 @@ mod tests {
             "macro_rules! m { ($($i:item)*) => { mod w { $($i)* } } }",
             "macro_rules! m { ($($i:item)*) => { $($i)* fn more() {} } }",
             "macro_rules! m { ($($i:item)*) => { $( #[path = \"x.rs\"] $i )* } }",
+            "macro_rules! m { ($($i:item)*) => { $( #[cfg_attr(unix, path = \"x.rs\")] $i )* } }",
             "macro_rules! m { ($($i:item)*) => { $( #![allow(x)] $i )* } }",
             "macro_rules! m { ($($i:item)*) => { $($i)+ } }",
             "macro_rules! m { ($($i:item)*) => { $( pub $i )* } }",

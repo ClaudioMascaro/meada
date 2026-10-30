@@ -241,9 +241,11 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base() {
     // refusal names the current base.
     let stale = case.apply("alice", &ya, &v2, 2);
     assert_eq!((stale.status, code(&stale)), (409, "stale_base".into()));
+    assert_eq!(stale.json()["error"]["base"], 3);
     assert_eq!(case.at("alice", &ya), (v1.clone(), 3));
     let stale = case.save("alice", &ya, &text, 1);
     assert_eq!((stale.status, code(&stale)), (409, "stale_base".into()));
+    assert_eq!(stale.json()["error"]["base"], 3);
 
     // Rename changes the name and keeps the description when none is sent; the id, the routes
     // and the versions stay.

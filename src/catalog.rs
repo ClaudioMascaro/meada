@@ -10,7 +10,7 @@ use serde::Deserialize;
 use crate::modules::Problem;
 use crate::msg::Msg;
 
-/// The most repositories `max_repositories` may allow.
+// ponytail: the most repositories `max_repositories` may allow.
 const MAX_REPOSITORIES: i64 = 5000;
 
 /// `[catalog]` as written.

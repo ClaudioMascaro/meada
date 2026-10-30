@@ -460,7 +460,7 @@ async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
     let max = match parts.uri.path() {
         CHECK => CHECK_MAX,
         #[cfg(feature = "workspaces")]
-        "/api/v1/catalog/check" => CHECK_MAX,
+        "/api/v1/catalog/check" => catalog::CHECK_BODY_MAX,
         #[cfg(feature = "workspaces")]
         "/api/v1/workspaces" | "/api/v1/workspaces/effective" => workspaces::CREATE_MAX,
         QUERY => QUERY_MAX,

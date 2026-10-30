@@ -137,10 +137,31 @@ impl Console {
         id: &str,
         (status, code, message): (StatusCode, &str, String),
     ) -> Answer {
-        super::super::write::audit(session.subject.as_deref(), None, action, id, &message);
-        let actor = super::super::write::actor(session, None);
-        self.audit.refused(&actor, action, arguments, &message);
+        self.refused_once(session, action, arguments, id, &message);
         error(status, code, &message)
+    }
+
+    /// Records a refusal decided before the pending record: the log line and the audit row.
+    fn refused_once(
+        &self,
+        session: &Session,
+        action: &str,
+        arguments: &Value,
+        id: &str,
+        message: &str,
+    ) {
+        super::super::write::audit(session.subject.as_deref(), None, action, id, message);
+        let actor = super::super::write::actor(session, None);
+        self.audit.refused(&actor, action, arguments, message);
+    }
+
+    /// The 409 `stale_base`, naming the current `base` whichever check found it.
+    fn stale_base(seq: i64) -> (Answer, String) {
+        let message = Msg::WorkspacesStale(seq).text();
+        let body = json!({"error": {
+            "code": "stale_base", "message": message, "base": seq,
+        }});
+        (json_answer(StatusCode::CONFLICT, &body), message)
     }
 
     /// `POST workspaces/<id>/<op>`: the lifecycle writes. `None` when `rest` is no such route.
@@ -293,9 +314,9 @@ impl Console {
             return self.turned_away(session, action, &arguments(None), id, answer);
         }
         if record.seq != base {
-            let message = Msg::WorkspacesStale(record.seq).text();
-            let answer = (StatusCode::CONFLICT, "stale_base", message);
-            return self.turned_away(session, action, &arguments(None), id, answer);
+            let (answer, message) = Self::stale_base(record.seq);
+            self.refused_once(session, action, &arguments(None), id, &message);
+            return answer;
         }
         // Resolve the operation against the stored current version.
         let mut plan = Plan::new(action);
@@ -309,7 +330,7 @@ impl Console {
         };
         match &request {
             Decoded::Save(save) => {
-                if let Some(problem) = named::description_problem(&save.message).or_else(|| {
+                if let Some(problem) = named::message_problem(&save.message).or_else(|| {
                     (save.message.is_empty())
                         .then(|| Msg::WorkspacesOpBody(Self::shape("versions")).text())
                 }) {
@@ -437,6 +458,7 @@ impl Console {
         if let (Some(version), Some(document)) = (&plan.version, &plan.document)
             && let Err(why) = self.store_version(version, document)
         {
+            let why = Msg::SnapshotStoreUnreachable(&why).text();
             return self.failed(record_pending, session, recorded, id, &why);
         }
         let actor = store::Creator {
@@ -505,7 +527,10 @@ impl Console {
                 json_answer(status, &body)
             }
             Ok(Err(e)) => self.refused_by(record_pending, session, recorded, id, e),
-            Err(e) => self.failed(record_pending, session, recorded, id, &e.to_string()),
+            Err(e) => {
+                let why = Msg::PostgresUnreachable(&e.to_string()).text();
+                self.failed(record_pending, session, recorded, id, &why)
+            }
         }
     }
 
@@ -540,8 +565,14 @@ impl Console {
         error_: Error,
     ) -> Answer {
         let (answer, outcome) = match error_ {
-            Error::Failed(why) => return self.failed(record, session, action, id, &why),
-            Error::Db(_) => return self.failed(record, session, action, id, "database"),
+            Error::Failed(why) => {
+                let why = Msg::PostgresUnreachable(&why).text();
+                return self.failed(record, session, action, id, &why);
+            }
+            Error::Db(_) => {
+                let why = Msg::PostgresUnreachable("database").text();
+                return self.failed(record, session, action, id, &why);
+            }
             Error::Pending(reason) => (super::pending(reason), format!("pending ({reason})")),
             Error::Refused(decided) => (
                 super::entries_refused(&decided),
@@ -551,13 +582,7 @@ impl Console {
                 let message = Msg::WorkspacesNotFound.text();
                 (Self::no_workspace(), message)
             }
-            Error::Stale(seq) => {
-                let message = Msg::WorkspacesStale(seq).text();
-                let body = json!({"error": {
-                    "code": "stale_base", "message": message, "base": seq,
-                }});
-                (json_answer(StatusCode::CONFLICT, &body), message)
-            }
+            Error::Stale(seq) => Self::stale_base(seq),
             Error::NotOperator => {
                 let message = Msg::WorkspacesNotOperator.text();
                 let answer = error(StatusCode::FORBIDDEN, "not_operator", &message);
