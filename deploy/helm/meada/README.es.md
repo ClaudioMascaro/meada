@@ -18,6 +18,9 @@ versión del chart y de Meada:
 helm upgrade --install meada oci://ghcr.io/claudiomascaro/charts/meada --version <versión> -f mis-valores.yaml
 ```
 
+`values-minimal.yaml` es el punto de partida más pequeño: un nodo y un repositorio público
+([Desplegar](https://claudiomascaro.github.io/meada/es/deploy/)).
+
 Desde el checkout, sustituya la referencia OCI por `deploy/helm/meada`. Los valores por defecto
 crean dos nodos sin módulos cloud. Cada pod obtiene sus propios mirrors e indexa en su propio
 `emptyDir` mediante un init container antes de iniciar el servidor. Ajuste

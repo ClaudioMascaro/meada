@@ -1,0 +1,14 @@
+# The smallest install: one node, no cloud module, one public repository fetched and indexed
+# in its init container. Replace both blocks with your repositories (identity without scheme
+# or .git, a path under /data/mirrors) and configure admission before exposing the Service.
+replicaCount: 1
+workspace:
+  repositories: |
+    [[repository]]
+    repo = "github.com/claudiomascaro/meada"
+    path = "/data/mirrors/meada"
+  # Runs outside Meada, on the pod's own emptyDir, before the server starts.
+  fetch: |
+    set -eu
+    mkdir -p /data/mirrors
+    git clone --depth 1 https://github.com/ClaudioMascaro/meada.git /data/mirrors/meada
