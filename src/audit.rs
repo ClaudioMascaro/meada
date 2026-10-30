@@ -26,7 +26,7 @@ use crate::msg::Msg;
 
 /// The actions a record names: the operations, and `pointer`, the route-level action of a
 /// pointer request refused before its body is read.
-pub const ACTIONS: [&str; 9] = [
+pub const ACTIONS: [&str; 15] = [
     "workspace.save",
     "workspace.import",
     "workspace.apply",
@@ -36,6 +36,12 @@ pub const ACTIONS: [&str; 9] = [
     "fence.recover",
     "pointer",
     "workspaces.create",
+    "workspaces.save",
+    "workspaces.apply",
+    "workspaces.rollback",
+    "workspaces.rename",
+    "workspaces.delete",
+    "workspaces.operators",
 ];
 
 /// The outcome a finished write records.
@@ -304,6 +310,7 @@ fn record(row: &tokio_postgres::Row) -> Option<Value> {
         "at_least",
         "workspace",
         "authority",
+        "base",
     ];
     if !(arguments.iter()).all(|(k, v)| known.contains(&k.as_str()) && v.is_string()) {
         return None;

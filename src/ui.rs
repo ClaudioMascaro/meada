@@ -427,6 +427,12 @@ async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
         "/api/v1/fence/recover" => write::FENCE_MAX,
         "/api/v1/workspace/versions" => write::SAVE_MAX,
         "/api/v1/workspace/apply" => write::APPLY_MAX,
+        #[cfg(feature = "workspaces")]
+        path => match workspaces::body_max(path) {
+            Some(max) => max,
+            None => return Ok(Bytes::new()),
+        },
+        #[cfg(not(feature = "workspaces"))]
         _ => return Ok(Bytes::new()),
     };
     if parts.method != Method::POST {

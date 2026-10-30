@@ -210,5 +210,72 @@
     "named": ["w_ya", "w_yb", "w_yab"],
     "members": ["A", "B", "Y"],
     "bundles": { "Y": 1, "A": 1, "B": 1 }
-  }
+  },
+  "lifecycle": [
+    {
+      "name": "the creator edits the entries it reads: nothing changes for a plain resave",
+      "caller": "alice",
+      "workspace": "w_ya",
+      "submit": ["Y", "A"],
+      "stored": ["Y", "A"],
+      "rechecked": [],
+      "allowed": true
+    },
+    {
+      "name": "the creator cannot add B: Y and A are its grants only",
+      "caller": "alice",
+      "workspace": "w_ya",
+      "submit": ["Y", "A", "B"],
+      "stored": ["Y", "A", "B"],
+      "rechecked": ["B"],
+      "allowed": false,
+      "hidden": 1
+    },
+    {
+      "name": "after losing A the creator saves what it reads and A stays in place",
+      "caller": "alice",
+      "workspace": "w_ya",
+      "revoke": { "caller": "alice", "identity": "A" },
+      "submit": ["Y"],
+      "stored": ["Y", "A"],
+      "rechecked": [],
+      "allowed": true
+    },
+    {
+      "name": "after losing A the creator cannot overwrite A by naming it",
+      "caller": "alice",
+      "workspace": "w_ya",
+      "revoke": { "caller": "alice", "identity": "A" },
+      "submit": ["Y", "A"],
+      "stored": ["Y", "A"],
+      "rechecked": [],
+      "allowed": true
+    },
+    {
+      "name": "after losing Y the creator cannot re-add or change Y, which it no longer reads",
+      "caller": "alice",
+      "workspace": "w_ya",
+      "revoke": { "caller": "alice", "identity": "Y" },
+      "submit": ["A"],
+      "stored": ["Y", "A"],
+      "rechecked": [],
+      "allowed": true
+    },
+    {
+      "name": "the platform administrator adds B to a workspace it does not operate by creation",
+      "caller": "root",
+      "workspace": "w_ya",
+      "submit": ["Y", "A", "B"],
+      "stored": ["Y", "A", "B"],
+      "rechecked": ["B"],
+      "allowed": true
+    },
+    {
+      "name": "bob shares Y with alice's workspace but cannot extend it with his B: he operates nothing there",
+      "caller": "bob",
+      "workspace": "w_ya",
+      "submit": ["Y", "A", "B"],
+      "operates": false
+    }
+  ]
 }

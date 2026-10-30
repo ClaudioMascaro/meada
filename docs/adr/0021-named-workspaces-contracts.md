@@ -23,10 +23,11 @@ The maintainer's decision of 2026-10-29 applies: the real-organization measureme
 github-app roles` (#338) does not gate S5. This ADR consolidates against the merged code and
 the existing fakes, and the assumption real evidence would confirm is named under Open.
 
-Implementation status: #341 built contract 1 (the catalog, below) and #342 the creation and the
+Implementation status: #341 built contract 1 (the catalog, below), #342 the creation and the
 query of the first workspace (contracts 2 to 5 as far as create, list, show, the shared ingestion
-and the node route go, "As built (#342)" below); the cargo feature `workspaces` has `[catalog]`
-and `[workspaces]`. Save, apply, rollback, rename, delete and delegation (#343), the effective
+and the node route go, "As built (#342)" below) and #343 the rest of contract 4's lifecycle
+(save, apply, rollback, rename, delete, delegation, versions and history, "As built (#343)"
+below); the cargo feature `workspaces` has `[catalog]` and `[workspaces]`. The effective
 configuration (#344), guided authoring (#345) and proposals (#346) are not built. Current behavior
 without `[workspaces]` is ADR 0014's one workspace per deployment.
 
@@ -367,7 +368,104 @@ as follows; where a line differs from the contract above it says so.
 - The console writes an audit record for a creation refused by the admission cache too
   (`refused`), and shows an entry `excluded` to the workspace's operators alone.
 - Not built here: the CLI twins `meada workspaces ...`, the `versions`, `effective` and
-  `operators` routes, and every other row of the lifecycle table.
+  `operators` routes, and every other row of the lifecycle table (built by #343, below, except
+  `effective`, which is #344's).
+
+**As built (#343).** The lifecycle table's other rows, the reads of versions and history, and the
+CLI twins. Where a line differs from contract 4 above it says so.
+
+- **Routes.** `POST /api/v1/workspaces/<id>/versions` `{entries, message, base}` (save; the
+  ticket's "import" is a save from a file, so the CLI's `save` reads a file), `.../apply`
+  `{version, base}` (apply and rollback), `.../rename` `{name, description?, base}` (a missing
+  description keeps the current one), `.../delete` `{base}` and `.../operators` `{add: [{subject,
+  login}], remove: [subject], base}`. Bodies are capped at 80 KiB, 1 KiB, 4 KiB, 1 KiB and 16 KiB;
+  an unknown key is a 400, and a body that fails its checks (400, 413, 422) is never recorded in
+  the audit, as for every write. `base` is the `base` of `GET /api/v1/workspaces/<id>` (its
+  `seq`).
+- **Order of refusals.** The console decides, before the pending audit record, in this order: the
+  body; the discovery rule (a workspace the caller neither operates nor reads whole, an unknown
+  id and a deleted one are one 404 whatever the body); authority (403 `not_operator`, or
+  `not_administrator` for the operators route); the base (409 `stale_base`, whose answer names
+  the current `base`). The transaction decides all of them again under the row lock in contract
+  4's order (deleted, base, authority, eligibility): the console's check only keeps a viewer from
+  learning anything beyond what it already reads (`base` is in the show it can read) and keeps a
+  hidden workspace one 404. A refusal found before the pending record is recorded `refused` all
+  the same (when Postgres answers); a refusal in the transaction finishes the pending record.
+- **Save.** The platform administrator submits the whole manifest and the version stored is the
+  submitted one. An operator submits the entries it reads and `meada_core::named::compose` (ADR
+  0015's composition without owners or attribution) keeps every entry it cannot read in place, in
+  order, ignores an attempt to name one, and appends the entries new to the workspace. A version
+  that would hold no entry is a 422 (delete the workspace instead). Only the entries the stored
+  version adds or changes against the current one (`named::changed`) are checked for eligibility
+  at the boundary, so a hidden entry, an unchanged one and a removal are not. The document is
+  written to the store (create-if-absent) after the console's admission-cache check and before
+  the transaction, which stores the `workspace_versions` row and moves neither `current` nor
+  `seq`; the same version saved again is a 200 `saved: false`. A refusal found inside the
+  transaction after the document was written leaves an unreferenced, content-addressed document
+  in the store: shared, immutable and harmless, never a row.
+- **Apply and rollback.** The version must be one of the workspace's (404 `unknown_version`) and
+  not the current one (409 `already_current`, nothing changes). An apply of a version that was
+  ever current (`workspace_history` holds it as `create`, `apply` or `rollback`) is a
+  `rollback` in the answer, the history and the audit action (`workspaces.rollback`); any other
+  stored version is an `apply`. Only the entries the version adds or changes against the current
+  one are rechecked; a version that drops an entry the operator cannot read drops it (the
+  operator never learns its identity: this is how contract 4's rollback removes one, "a version it
+  reads" being any version of the workspace, read through the operator's filter, since a version
+  the operator saved itself keeps entries it cannot read). `current`,
+  `entries` and `seq` move together. Eligibility is read from the newest permissions set in the
+  transaction (`store::eligible`, shared with creation); it is needed only when entries are added
+  or changed, so a rename, a delete and a rollback that only removes entries work while the set
+  is stale.
+- **Delegation.** Only the platform administrator, with `{subject, login}` pairs: the subject is
+  the OIDC subject the console records authors by, the login the one the sponsor rule reads. An
+  existing operator's login is updated; a workspace keeps at least one operator
+  (`last_operator`) and at most 20 (`too_many_operators`), both 422. The creator is not fixed:
+  the administrator may replace it. Delegation moves `seq` and is a history row, `operators`,
+  whose message holds counts and no subject.
+- **Versions and history (reads).** `GET .../versions[?after=]` (50 per page, newest first, an
+  opaque 36-character cursor) lists a workspace's own versions with `saved`, `message` and
+  `current`; operators and the administrator also get `author`. `GET .../versions/<version>
+  [?against=<version>|current]` shows one version's entries (`repo` and blocks), its manifest
+  `text`, and with `against` a `diff` (`added`, `removed`, `changed` with the blocks that
+  differ, computed by `named::diff`). `GET .../history[?after=<seq>]` (operators and the
+  administrator only; 403 for a viewer) lists the append-only rows: `seq`, `action`, `version`,
+  `actor`, `authority`, `time`, `message`. Every one follows the discovery rule. A viewer that
+  sees the workspace sees only the versions its grant reads whole (migration 8 keeps the
+  identities of each version beside its row, so no list reads a store document per row); an
+  operator sees every version with the entries it reads and the count of the others (`hidden`),
+  and the diff names only entries the caller reads. The administrator's management view is
+  unfiltered. A deleted workspace answers none of them: its versions and history stay in
+  Postgres, immutable.
+- **Audit.** Each operation is one record, `workspaces.save`, `.apply`, `.rollback`, `.rename`,
+  `.delete` or `.operators`, with `workspace`, `base`, `version` (when there is one) and
+  `authority`, by the session's subject and login; the rollback action is classified before the
+  record is inserted. Refusals are recorded once, and an audit that cannot insert refuses the
+  write (503 `audit_unavailable`) before anything is stored. The SCIM block holds for every
+  `POST` under `workspaces/` and for the reads: a deleted user is a 403 `deprovisioned`, its
+  operator rows remain, and a user never provisioned keeps normal admission.
+- **Migration 8** adds `workspace_versions.entries text[]` (the identities of the version's
+  document, in manifest order) and backfills the rows #342 wrote (each is a creation's version,
+  still current); the column is then `NOT NULL` without a default, so a row the backfill missed
+  fails the migration instead of reading as an empty set that every grant contains. `meada postgres migrate` brings the schema to version 8 and older processes
+  refuse it as ADR 0016 says; creation fills the column.
+- **CLI twins.** `meada workspaces list|show|versions|diff|create|save|apply|rename|delete|
+  operators --workspace <bootstrap manifest>` act as the platform administrator with `cli:<login>@<host>`
+  as the actor, through the same boundary and the same audit (`via` `cli`, role `operator`).
+  Every write takes the `--base` it read; a stale one is refused naming the current one. `show`
+  prints the header (name, base, version, operators) as comments and the version's entries; a
+  `save` takes a file. The commands exist in a build with the feature `workspaces` and need
+  `[workspaces]`, `[postgres]`, `[snapshot]` and `[oidc.github]` in the bootstrap.
+- **Overlap.** Two workspaces over Y are two rows with their own versions, bases and operators:
+  an edit, a rollback, a rename or a delete of one moves nothing in the other. Deleting a
+  workspace drops it from the next refresh's membership; a repository another active workspace
+  or the deployment workspace selects stays a member and keeps its single bundle. The partial
+  revocation of ADR 0020 applies to every read above: a peer that loses a repository sees the
+  workspace, its versions and its history as one 404, an operator that loses one keeps the
+  workspace, reads the entries it reads, and its graph answers (the console's export through a
+  context) stay bounded by its grant.
+- **Not built.** `GET .../effective` (#344), and WebAssembly exports of `named::compose`,
+  `changed` and `diff` for the guided form (#345): the console's pages for versions and the diff
+  are #345's.
 
 ### Contract 6: effective configuration
 
@@ -440,9 +538,9 @@ exist only in Postgres.
 
 ### Migration and upgrade
 
-1. `meada postgres migrate` brings the schema to version 7 (migration 6: `source` on
+1. `meada postgres migrate` brings the schema to version 8 (migration 6: `source` on
    `permission_repositories`; migration 7: the four tables and the changed key of
-   `permission_exclusions`). Processes at the old version refuse the new schema as ADR 0016
+   `permission_exclusions`; migration 8, #343: the identities of each `workspace_versions` row). Processes at the old version refuse the new schema as ADR 0016
    says.
 2. Upgrade every binary, nodes included, before the first refresh that records a context. A
    node checks a pulled document by recomputing its generation id from `repositories`

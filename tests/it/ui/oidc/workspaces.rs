@@ -15,6 +15,8 @@ use jsonwebtoken::{Algorithm, EncodingKey};
 use serde_json::{Value, json};
 
 use super::{PUBLIC, VERSION, claims, console_dir, oidc, ui_oidc};
+
+mod lifecycle;
 use crate::manifest::MANIFEST;
 use crate::oidc::github::{Github, LOGIN_CLAIM, POLL_MS};
 use crate::oidc::{Issuer, key, set, sign};
@@ -28,6 +30,8 @@ const EN: &str = "en_US.UTF-8";
 const NODE: &str = "https://meada.example";
 const INSTALLATION: u64 = 15;
 const NODE_MANIFEST: &str = "node/meada.workspace.toml";
+/// The SCIM token of the console of a case that has a `[directory]`.
+const SCIM_TOKEN: &str = "scim-334-token-0123456789abcdefghijklmno";
 
 fn table() -> Value {
     serde_json::from_str(include_str!("../../../fixtures/named-workspaces.json")).unwrap()
@@ -53,6 +57,11 @@ struct Case {
 
 impl Case {
     fn new(name: &str) -> Option<Self> {
+        Self::start(name, false)
+    }
+
+    /// The case, with the SCIM `[directory]` in the console's manifest when `directory`.
+    fn start(name: &str, directory: bool) -> Option<Self> {
         let github = Github::new(name)?;
         let endpoint = service()?;
         let bucket_id = bucket_name(name);
@@ -103,6 +112,12 @@ impl Case {
             crate::snapshot::section(&endpoint, &bucket_id),
             dir.join("mirrors").display(),
         );
+        let head = match directory {
+            true => format!(
+                "{head}\n[directory]\nuser_claim = \"sub\"\nuser_attribute = \"userName\"\n"
+            ),
+            false => head,
+        };
         let ui = format!(
             "{}operations = true\noperator_groups = [\"admins\"]\n",
             ui_oidc()
@@ -127,6 +142,7 @@ impl Case {
             &[
                 ("MEADA_PERMISSIONS_POLL_MS", POLL_MS),
                 ("MEADA_TEST_S3_KEY", KEY_ID),
+                ("MEADA_SCIM_TOKEN", SCIM_TOKEN),
             ],
         );
         Some(Self {
@@ -517,13 +533,22 @@ fn peers_view_a_workspace_through_their_own_grants_and_operate_nothing() {
         let reply = case.get(&format!("/api/v1/workspaces?{bad}"), &case.token("root"));
         assert_eq!(reply.status, 400, "{bad}");
     }
-    // The creator's workspace gives a peer no write.
+    // The creator's workspace gives a peer no write: a viewer is refused as a non-operator, and
+    // a caller who cannot see the workspace gets the answer of an unknown id.
+    let save = json!({"entries": case.entries(&["Y", "A"]), "message": "x", "base": 1});
     let write = case.post(
         &format!("/api/v1/workspaces/{ya}/versions"),
         &case.token("dave"),
-        &json!({}),
+        &save,
     );
-    assert_eq!(write.status, 404, "{}", write.body);
+    assert_eq!(write.status, 403, "{}", write.body);
+    assert_eq!(write.json()["error"]["code"], "not_operator");
+    let write = case.post(
+        &format!("/api/v1/workspaces/{ya}/versions"),
+        &case.token("bob"),
+        &save,
+    );
+    assert_eq!((write.status, &write.body), (404, &unknown.body));
     case.github.clean(&case.console.stderr(), &[]);
 }
 

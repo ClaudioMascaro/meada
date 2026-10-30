@@ -329,6 +329,18 @@ A repository only named workspaces select: it is fetched, indexed and bundled on
 workspace's repositories (#342). The plain route never serves it.
 _Avoid_: shared repository, extra repository
 
+**Base**:
+The `seq` of a named workspace a client read: the fact a write must still find. Every row of its
+history moves it by one (apply, rollback, rename, delete, delegation); saving a version does not.
+A write whose base is not the workspace's `seq` is `stale_base` and changes nothing (ADR 0021,
+#343).
+_Avoid_: etag, revision, version number
+
+**Rollback**:
+An apply of a version of a named workspace that was current before. Checked like any apply: only
+the entries it adds or changes against the current version need eligibility (#343).
+_Avoid_: undo, revert
+
 **Eligible**:
 Said of a repository for a subject: the catalog holds it, the newest permissions set is fresh and
 the subject's login holds an accepted role on it, directly or through a repository group. Creation

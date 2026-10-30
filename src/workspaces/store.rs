@@ -63,6 +63,57 @@ pub(crate) enum CreateError {
     Failed(String),
 }
 
+/// Why the permissions set cannot decide eligibility.
+pub(super) enum Gate {
+    /// A condition of the platform or the caller, the same for every identity: `no_set`,
+    /// `stale_set` or `missing_login`. Nothing can be selected (fail closed).
+    Pending(&'static str),
+    Db(tokio_postgres::Error),
+}
+
+/// The identities of `selected` that `actor` may select, decided in `tx` from the newest
+/// permissions set on Postgres's clock (not the admission cache): the catalog holds the
+/// identity, and a login holds an accepted role on it; for the platform administrator, the
+/// catalog alone. Pending when no set exists, the set is older than `max_age` or a subject
+/// other than the administrator has no login.
+pub(super) async fn eligible(
+    tx: &tokio_postgres::Transaction<'_>,
+    q: &str,
+    policy: &Policy<'_>,
+    actor: &Creator<'_>,
+    selected: &[String],
+) -> Result<BTreeSet<String>, Gate> {
+    let newest = format!(
+        "SELECT id, extract(epoch FROM clock_timestamp() - finished)::float8 \
+         FROM {q}.permission_sets ORDER BY fence DESC, finished DESC LIMIT 1"
+    );
+    let Some(row) = tx.query_opt(&newest, &[]).await.map_err(Gate::Db)? else {
+        return Err(Gate::Pending("no_set"));
+    };
+    let (set, age): (String, f64) = (row.get(0), row.get(1));
+    if !age.is_finite() || age < 0.0 || age > policy.max_age.as_secs_f64() {
+        return Err(Gate::Pending("stale_set"));
+    }
+    let login = actor.login;
+    if !actor.administrator && login.is_none() {
+        return Err(Gate::Pending("missing_login"));
+    }
+    // The catalog holds the identity; a login is eligible when it holds an accepted role on it.
+    let catalog = format!(
+        "SELECT p.identity FROM {q}.permission_repositories p \
+         WHERE p.set_id = $1 AND p.coverage = 'listed' AND p.source IN ('catalog', 'both') \
+         AND p.identity = ANY($2) AND ($3::text IS NULL OR EXISTS ( \
+           SELECT 1 FROM {q}.permission_rows r WHERE r.set_id = p.set_id \
+           AND r.identity = p.identity AND r.login = $3 AND r.role = ANY($4)))"
+    );
+    let only = (!actor.administrator).then_some(login).flatten();
+    let rows = tx
+        .query(&catalog, &[&set, &selected, &only, &policy.roles])
+        .await
+        .map_err(Gate::Db)?;
+    Ok(rows.iter().map(|r| r.get(0)).collect())
+}
+
 /// A created workspace, or the one the same creator and entries already made.
 pub(crate) struct Created {
     pub id: String,
@@ -70,7 +121,7 @@ pub(crate) struct Created {
 }
 
 /// `to_char` for a time column at UTC, to the second.
-const TIME: &str = "'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'";
+pub(super) const TIME: &str = "'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'";
 
 /// Creates the workspace `new` for `creator` (ADR 0021): the checks and the inserts in one
 /// transaction under the creation lock. `grant` is what the caller reads, to word a refusal.
@@ -89,37 +140,13 @@ pub(crate) async fn create(
     tx.execute("SELECT pg_advisory_xact_lock($1)", &[&CREATE_LOCK])
         .await
         .map_err(failed)?;
-    // The newest set, on Postgres's clock: what decides, not the admission cache.
-    let newest = format!(
-        "SELECT id, extract(epoch FROM clock_timestamp() - finished)::float8 \
-         FROM {q}.permission_sets ORDER BY fence DESC, finished DESC LIMIT 1"
-    );
-    let Some(row) = tx.query_opt(&newest, &[]).await.map_err(failed)? else {
-        return Err(CreateError::Pending("no_set"));
-    };
-    let (set, age): (String, f64) = (row.get(0), row.get(1));
-    if !age.is_finite() || age < 0.0 || age > policy.max_age.as_secs_f64() {
-        return Err(CreateError::Pending("stale_set"));
-    }
     let login = creator.login;
-    if !creator.administrator && login.is_none() {
-        return Err(CreateError::Pending("missing_login"));
-    }
     let selected = named::identities(new.entries);
-    // The catalog holds the identity; a login is eligible when it holds an accepted role on it.
-    let catalog = format!(
-        "SELECT p.identity FROM {q}.permission_repositories p \
-         WHERE p.set_id = $1 AND p.coverage = 'listed' AND p.source IN ('catalog', 'both') \
-         AND p.identity = ANY($2) AND ($3::text IS NULL OR EXISTS ( \
-           SELECT 1 FROM {q}.permission_rows r WHERE r.set_id = p.set_id \
-           AND r.identity = p.identity AND r.login = $3 AND r.role = ANY($4)))"
-    );
-    let only = (!creator.administrator).then_some(login).flatten();
-    let rows = tx
-        .query(&catalog, &[&set, &selected, &only, &policy.roles])
-        .await
-        .map_err(failed)?;
-    let eligible: BTreeSet<String> = rows.iter().map(|r| r.get(0)).collect();
+    let eligible = match eligible(&tx, &q, policy, creator, &selected).await {
+        Ok(eligible) => eligible,
+        Err(Gate::Pending(reason)) => return Err(CreateError::Pending(reason)),
+        Err(Gate::Db(e)) => return Err(failed(e)),
+    };
     let decided = named::creation(&selected, &eligible, grant);
     if !decided.allowed {
         return Err(CreateError::Refused(decided));
@@ -163,11 +190,11 @@ pub(crate) async fn create(
         .await
         .map_err(failed)?;
     let version = format!(
-        "INSERT INTO {q}.workspace_versions (workspace_id, version, author, message) \
-         VALUES ($1, $2, $3, $4)"
+        "INSERT INTO {q}.workspace_versions (workspace_id, version, author, message, entries) \
+         VALUES ($1, $2, $3, $4, $5)"
     );
-    let params: [&(dyn tokio_postgres::types::ToSql + Sync); 4] =
-        [&id, &new.version, &creator.subject, &new.message];
+    let params: [&(dyn tokio_postgres::types::ToSql + Sync); 5] =
+        [&id, &new.version, &creator.subject, &new.message, &selected];
     tx.execute(&version, &params).await.map_err(failed)?;
     let history = format!(
         "INSERT INTO {q}.workspace_history (workspace_id, seq, action, version, actor, \
@@ -319,4 +346,38 @@ pub(crate) fn document_entries(
         true => Ok(checked),
         false => Err(bad()),
     }
+}
+
+/// Stores the version document `entries` is in the shared store, unless it holds it already:
+/// content-addressed and immutable, so a second writer of the same entries changes nothing.
+pub(crate) fn put_document(
+    snapshot: &crate::snapshot::Config,
+    version: &str,
+    entries: &[Json],
+) -> Result<(), String> {
+    let key = crate::snapshot::versions::version_key(snapshot, version);
+    let bytes = document_text(version, entries);
+    let put = async {
+        let store = crate::snapshot::store::Store::connect(snapshot)?;
+        store.create(&key, bytes).await.map(drop)
+    };
+    crate::modules::block_on(put).map_err(|e| e.to_string())??;
+    Ok(())
+}
+
+/// The entries of the named version document `version` from the shared store, checked.
+pub(crate) fn get_document(
+    snapshot: &crate::snapshot::Config,
+    version: &str,
+) -> Result<Vec<Json>, String> {
+    let key = crate::snapshot::versions::version_key(snapshot, version);
+    let get = async {
+        let store = crate::snapshot::store::Store::connect(snapshot)?;
+        store
+            .get(&key, crate::snapshot::versions::VERSION_MAX)
+            .await
+    };
+    let bytes = crate::modules::block_on(get).map_err(|e| e.to_string())??;
+    let bytes = bytes.ok_or_else(|| Msg::WorkspaceNoVersion(&key).text())?;
+    document_entries(&key, version, &bytes)
 }

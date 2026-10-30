@@ -10,10 +10,13 @@ use std::collections::BTreeSet;
 use meada_core::authorize::Grant;
 use meada_core::named;
 
+mod lifecycle;
+
 use super::write::{PendingRecord, finish, refused};
 use super::*;
 use crate::audit::Outcome;
 use crate::workspaces::store::{self, Creator, New, Policy, Record};
+pub(super) use lifecycle::body_max;
 
 // ponytail: a creation carries a manifest text of at most 64 KiB, a name, a description and a
 // message, with room for JSON's escapes.
@@ -45,12 +48,16 @@ impl Console {
         match rest.strip_prefix('/') {
             None if rest.is_empty() && post => Some(self.create(request.body(), session)),
             None if rest.is_empty() && read => Some(self.list(request.uri().query(), session)),
+            Some(rest) if post => self.operate(rest, request.body(), session),
             Some(rest) if read => {
                 // An identity holds slashes: everything between `repositories/` and `/export`.
                 if let Some((id, tail)) = rest.split_once("/repositories/")
                     && let Some(identity) = tail.strip_suffix("/export")
                 {
                     return Some(self.export_through(id, identity, request.uri().query(), session));
+                }
+                if let Some(answer) = self.inspect(rest, request.uri().query(), session) {
+                    return Some(answer);
                 }
                 (!rest.contains('/')).then(|| self.show(rest, session))
             }
@@ -191,7 +198,7 @@ impl Console {
         // The version document is the shared store's, immutable and content-addressed: written
         // before the rows that name it, so no row ever names a document that is not there.
         if let Err(why) = self.store_version(&version, &entries) {
-            return self.failed(record, session, &id, &why);
+            return self.failed(record, session, CREATE, &id, &why);
         }
         let creator = Creator {
             subject,
@@ -208,7 +215,7 @@ impl Console {
         let created = crate::modules::block_on(store::create(&policy, &creator, &grant, &new));
         let created = match created {
             Ok(created) => created,
-            Err(e) => return self.failed(record, session, &id, &e.to_string()),
+            Err(e) => return self.failed(record, session, CREATE, &id, &e.to_string()),
         };
         match created {
             Ok(created) => {
@@ -251,23 +258,24 @@ impl Console {
         let Some(snapshot) = &self.bootstrap.snapshot else {
             return Err(Msg::SnapshotNoSection(&self.file.display().to_string()).text());
         };
-        let key = crate::snapshot::versions::version_key(snapshot, version);
-        let bytes = store::document_text(version, entries);
-        let put = async {
-            let store = crate::snapshot::store::Store::connect(snapshot)?;
-            store.create(&key, bytes).await.map(drop)
-        };
-        crate::modules::block_on(put).map_err(|e| e.to_string())?
+        store::put_document(snapshot, version, entries)
     }
 
-    fn failed(&self, record: PendingRecord, session: &Session, id: &str, why: &str) -> Answer {
+    fn failed(
+        &self,
+        record: PendingRecord,
+        session: &Session,
+        action: &str,
+        id: &str,
+        why: &str,
+    ) -> Answer {
         eprintln!(
             "ui: {}",
             Msg::PostgresUnreachable(why).text().escape_debug()
         );
         let message = Msg::AuditUnavailable.text();
         let _ = message;
-        super::write::audit(session.subject.as_deref(), None, CREATE, id, "failed");
+        super::write::audit(session.subject.as_deref(), None, action, id, "failed");
         finish(record, Outcome::Failed, "failed", None);
         error(
             StatusCode::SERVICE_UNAVAILABLE,
@@ -303,7 +311,7 @@ impl Console {
                     message,
                 )
             }
-            CreateError::Failed(why) => return self.failed(record, session, id, &why),
+            CreateError::Failed(why) => return self.failed(record, session, CREATE, id, &why),
         };
         super::write::audit(session.subject.as_deref(), None, CREATE, id, &outcome);
         finish(record, Outcome::Refused, &outcome, None);
@@ -525,19 +533,15 @@ impl Console {
 
     /// The entries of the workspace's current version from the shared store, checked.
     fn version_entries(&self, record: &Record) -> std::result::Result<Vec<Value>, String> {
+        self.document(&record.current)
+    }
+
+    /// The entries of the named version document `version` from the shared store, checked.
+    fn document(&self, version: &str) -> std::result::Result<Vec<Value>, String> {
         let Some(snapshot) = &self.bootstrap.snapshot else {
             return Err(Msg::SnapshotNoSection(&self.file.display().to_string()).text());
         };
-        let key = crate::snapshot::versions::version_key(snapshot, &record.current);
-        let get = async {
-            let store = crate::snapshot::store::Store::connect(snapshot)?;
-            store
-                .get(&key, crate::snapshot::versions::VERSION_MAX)
-                .await
-        };
-        let bytes = crate::modules::block_on(get).map_err(|e| e.to_string())??;
-        let bytes = bytes.ok_or_else(|| Msg::WorkspaceNoVersion(&key).text())?;
-        store::document_entries(&key, &record.current, &bytes)
+        store::get_document(snapshot, version)
     }
 
     /// The playground's and the export's workspace check: whether `session` may ask through
@@ -598,7 +602,7 @@ impl Console {
 }
 
 /// The 409 of a platform or caller condition that stops every selection (fail closed).
-fn pending(reason: &str) -> Answer {
+pub(super) fn pending(reason: &str) -> Answer {
     json_answer(
         StatusCode::CONFLICT,
         &json!({"error": {
@@ -610,7 +614,7 @@ fn pending(reason: &str) -> Answer {
 }
 
 /// The audit message of a refused selection: how many, the identities named, the count hidden.
-fn refusal_line(decided: &named::Creation) -> String {
+pub(super) fn refusal_line(decided: &named::Creation) -> String {
     format!(
         "{} ({}; hidden {})",
         Msg::WorkspacesRefused(decided.named.len() + decided.hidden).text(),
@@ -621,7 +625,7 @@ fn refusal_line(decided: &named::Creation) -> String {
 
 /// The 403 `entries_refused`: the refused identities the caller's grant reads, and the count of
 /// the others, which are never named.
-fn entries_refused(decided: &named::Creation) -> Answer {
+pub(super) fn entries_refused(decided: &named::Creation) -> Answer {
     let refused: Vec<Value> = (decided.named.iter())
         .map(|identity| json!({"identity": identity, "change": "add", "reason": "not_eligible"}))
         .collect();

@@ -8,6 +8,24 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The version lifecycle of named workspaces (#343, ADR 0021 contract 4, feature `workspaces`):
+  `POST /api/v1/workspaces/<id>/versions` saves a version without moving anything (an operator
+  submits the entries it reads and the version stored keeps the ones it cannot read; the
+  platform administrator submits the whole manifest), `.../apply` applies a stored version (a
+  version that was current before is a rollback), `.../rename`, `.../delete` (versions and
+  history are kept) and `.../operators` (the platform administrator delegates; a workspace keeps
+  at least one operator). Every write carries the `base` it read: a stale base, a revoked role, a
+  refused entry or a version of another workspace is refused and changes nothing, and the
+  transaction rechecks authority, base and the eligibility of what the operation adds or changes
+  against the newest permissions set. Only an operator of the workspace or the platform
+  administrator writes; a viewer is a 403 and a caller who cannot see the workspace gets the 404
+  of an unknown id. `GET .../versions`, `.../versions/<version>?against=` (with a diff) and
+  `.../history` read them under the same discovery rule. Each operation is one audit record
+  (`workspaces.save`, `.apply`, `.rollback`, `.rename`, `.delete`, `.operators`) with the
+  workspace and base. `meada workspaces list|show|versions|diff|create|save|apply|rename|delete|operators` are
+  the command-line twins (the platform administrator, `cli` audit records). Migration 8 adds
+  `workspace_versions.entries`: run `meada postgres migrate` before upgrading the binary. Without
+  `[workspaces]` nothing changes.
 - The first named workspace of spec S5 (#342, ADR 0021 contracts 2 to 5, cargo feature
   `workspaces`): `[workspaces]` (`mirrors`, an absolute root; `max_workspaces`, default 200, 1 to
   2000; `max_entries`, default 100, 1 to 500) needs `[ui]` with `operations = true`,

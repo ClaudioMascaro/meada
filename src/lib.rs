@@ -53,7 +53,7 @@ pub mod ui;
 mod valkey;
 mod workspace;
 #[cfg(feature = "workspaces")]
-mod workspaces;
+pub mod workspaces;
 mod xml;
 mod zod;
 

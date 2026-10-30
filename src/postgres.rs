@@ -214,6 +214,16 @@ const MIGRATIONS: &[&str] = &[
      ALTER TABLE {schema}.permission_exclusions ADD COLUMN context text NOT NULL DEFAULT '';
      ALTER TABLE {schema}.permission_exclusions ALTER COLUMN added_by DROP NOT NULL;
      ALTER TABLE {schema}.permission_exclusions ADD PRIMARY KEY (set_id, context, identity);",
+    // 8: the version lifecycle of named workspaces (#343, ADR 0021 contract 4). A version row
+    // keeps the identities of its document, in manifest order, so that a list of versions
+    // filters by the reader's grant without reading a store document per row, as `workspaces
+    // .entries` does for the current one. Every row so far is a creation's version, which is
+    // still the workspace's current one. The column is NOT NULL once filled: a row the backfill
+    // missed fails the migration instead of reading as an empty set, which every grant contains.
+    "ALTER TABLE {schema}.workspace_versions ADD COLUMN entries text[];
+     UPDATE {schema}.workspace_versions v SET entries = w.entries
+       FROM {schema}.workspaces w WHERE w.id = v.workspace_id AND w.current = v.version;
+     ALTER TABLE {schema}.workspace_versions ALTER COLUMN entries SET NOT NULL;",
 ];
 
 /// The `[postgres]` section as written.

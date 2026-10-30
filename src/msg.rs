@@ -842,6 +842,70 @@ pub enum Msg<'a> {
     /// A named workspace's entry names an identity outside the catalog (#342).
     #[cfg(feature = "workspaces")]
     WorkspacesReservedSegment(&'a str),
+    /// `meada workspaces` and its subcommands' descriptions (#343).
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmd,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdList,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdShow,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdVersions,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdDiff,
+    #[cfg(feature = "workspaces")]
+    WorkspacesHelpAgainst,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdCreate,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdSave,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdApply,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdRename,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdDelete,
+    #[cfg(feature = "workspaces")]
+    WorkspacesCmdOperators,
+    #[cfg(feature = "workspaces")]
+    WorkspacesHelpId,
+    #[cfg(feature = "workspaces")]
+    WorkspacesHelpBase,
+    #[cfg(feature = "workspaces")]
+    WorkspacesHelpName,
+    #[cfg(feature = "workspaces")]
+    WorkspacesHelpDescription,
+    #[cfg(feature = "workspaces")]
+    WorkspacesHelpAdd,
+    #[cfg(feature = "workspaces")]
+    WorkspacesHelpRemove,
+    /// A lifecycle body that is not the shape its route takes (#343): the shape.
+    #[cfg(feature = "workspaces")]
+    WorkspacesOpBody(&'a str),
+    /// A write whose `base` is not the workspace's `seq` any more (#343): the current one.
+    #[cfg(feature = "workspaces")]
+    WorkspacesStale(i64),
+    /// A write by someone who neither operates the workspace nor administers the platform (#343).
+    #[cfg(feature = "workspaces")]
+    WorkspacesNotOperator,
+    /// The operators' route, which only the platform administrator may use (#343).
+    #[cfg(feature = "workspaces")]
+    WorkspacesNotAdministrator,
+    /// A version that is not one of the workspace's (#343).
+    #[cfg(feature = "workspaces")]
+    WorkspacesUnknownVersion,
+    /// An apply of the version that is current (#343).
+    #[cfg(feature = "workspaces")]
+    WorkspacesAlreadyCurrent,
+    /// An operator list that would hold none or too many (#343): the reason.
+    #[cfg(feature = "workspaces")]
+    WorkspacesOperators(&'a str),
+    /// A versions or history query the console refuses (#343): its cursor bound, never echoed.
+    #[cfg(feature = "workspaces")]
+    WorkspacesPageQuery(usize),
+    /// A save whose stored version would hold no entry (#343).
+    #[cfg(feature = "workspaces")]
+    WorkspacesEmptyVersion,
     /// The exclusions file a reader of the pulled version needs (#331).
     #[cfg(feature = "generation-pointer")]
     ExcludedMissing(&'a str),
@@ -2878,6 +2942,175 @@ impl Msg<'_> {
             Msg::ContextsWritten(count) => pick(
                 format!("contexts: {count} named workspaces"),
                 format!("contextos: {count} workspaces nomeados"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmd => pick(
+                "Manage the named workspaces as the platform administrator (feature workspaces)"
+                    .into(),
+                "Gerencia os workspaces nomeados como administrador da plataforma (feature \
+                 workspaces)"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdList => pick(
+                "List the named workspaces: id, current version, base and name".into(),
+                "Lista os workspaces nomeados: id, versão atual, base e nome".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdShow => pick(
+                "Print a named workspace's current version (or another) as [[repository]] entries"
+                    .into(),
+                "Imprime a versão atual (ou outra) de um workspace nomeado como entradas \
+                 [[repository]]"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdVersions => pick(
+                "List the versions of a named workspace, newest first, the current one marked"
+                    .into(),
+                "Lista as versões de um workspace nomeado, da mais nova à mais antiga, marcando \
+                 a atual"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdDiff => pick(
+                "Print what a version of a named workspace adds, drops and changes against \
+                 another"
+                    .into(),
+                "Imprime o que uma versão de um workspace nomeado adiciona, remove e altera em \
+                 relação a outra"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesHelpAgainst => pick(
+                "The version to compare with, or `current` (the default)".into(),
+                "A versão com a qual comparar, ou `current` (o padrão)".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdCreate => pick(
+                "Create a named workspace from the [[repository]] entries of a manifest file and \
+                 print its id"
+                    .into(),
+                "Cria um workspace nomeado com as entradas [[repository]] de um manifesto e \
+                 imprime seu id"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdSave => pick(
+                "Store the [[repository]] entries of a manifest file as a version of a named \
+                 workspace, moving nothing, and print the version id"
+                    .into(),
+                "Guarda as entradas [[repository]] de um manifesto como uma versão de um \
+                 workspace nomeado, sem mover nada, e imprime o id da versão"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdApply => pick(
+                "Make a stored version the current one of a named workspace (a version that was \
+                 current before is a rollback)"
+                    .into(),
+                "Torna uma versão guardada a atual de um workspace nomeado (uma versão que já \
+                 foi a atual é um rollback)"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdRename => pick(
+                "Rename a named workspace".into(),
+                "Renomeia um workspace nomeado".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdDelete => pick(
+                "Delete a named workspace, keeping its versions and history".into(),
+                "Apaga um workspace nomeado, mantendo suas versões e seu histórico".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesCmdOperators => pick(
+                "Add or remove the operators of a named workspace".into(),
+                "Adiciona ou remove os operadores de um workspace nomeado".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesHelpId => pick(
+                "The workspace id".into(),
+                "O id do workspace".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesHelpBase => pick(
+                "The base the change was made against (the base `show` and `list` print)".into(),
+                "A base sobre a qual a mudança foi feita (a base que `show` e `list` imprimem)"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesHelpName => pick(
+                "The workspace's name (1 to 80 characters)".into(),
+                "O nome do workspace (1 a 80 caracteres)".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesHelpDescription => pick(
+                "The workspace's description (0 to 500 characters)".into(),
+                "A descrição do workspace (0 a 500 caracteres)".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesHelpAdd => pick(
+                "An operator to add, as <subject>=<github login> (repeatable)".into(),
+                "Um operador a adicionar, como <sujeito>=<login do github> (repetível)".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesHelpRemove => pick(
+                "The subject of an operator to remove (repeatable)".into(),
+                "O sujeito de um operador a remover (repetível)".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesOpBody(shape) => pick(
+                format!("the body must be {shape}"),
+                format!("o corpo deve ser {shape}"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesStale(seq) => pick(
+                format!("the workspace changed since you read it (it is at base {seq} now): reload it and review the change"),
+                format!("o workspace mudou desde a sua leitura (está na base {seq} agora): recarregue e revise a mudança"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesNotOperator => pick(
+                "only an operator of this workspace or the platform administrator may change it".into(),
+                "só um operador deste workspace ou o administrador da plataforma pode alterá-lo".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesNotAdministrator => pick(
+                "only the platform administrator changes a workspace's operators".into(),
+                "só o administrador da plataforma altera os operadores de um workspace".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesUnknownVersion => pick(
+                "no such version of this workspace".into(),
+                "não há tal versão deste workspace".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesAlreadyCurrent => pick(
+                "that version is already the current one; nothing changed".into(),
+                "essa versão já é a atual; nada mudou".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesOperators(reason) => pick(
+                match *reason {
+                    "last_operator" => "a workspace keeps at least one operator".to_string(),
+                    "too_many_operators" => "a workspace holds at most 20 operators".to_string(),
+                    _ => "the operator list is not valid".to_string(),
+                },
+                match *reason {
+                    "last_operator" => "um workspace mantém pelo menos um operador".to_string(),
+                    "too_many_operators" => "um workspace tem no máximo 20 operadores".to_string(),
+                    _ => "a lista de operadores não é válida".to_string(),
+                },
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesPageQuery(max) => pick(
+                format!("the query takes after (at most {max} characters), once"),
+                format!("a consulta aceita after (no máximo {max} caracteres), uma vez"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesEmptyVersion => pick(
+                "the version would hold no entry: delete the workspace instead".into(),
+                "a versão ficaria sem nenhuma entrada: apague o workspace".into(),
             ),
             #[cfg(feature = "workspaces")]
             Msg::WorkspacesReservedSegment(identity) => pick(

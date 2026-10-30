@@ -26,6 +26,7 @@ struct Table {
     revocation: Vec<Revocation>,
     sponsor: Vec<Sponsor>,
     membership: Membership,
+    lifecycle: Vec<Lifecycle>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -124,6 +125,20 @@ struct Sponsor {
     operators: Option<Vec<String>>,
     revoke: Revoke,
     excluded: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct Lifecycle {
+    name: String,
+    caller: String,
+    workspace: String,
+    revoke: Option<Revoke>,
+    submit: Vec<String>,
+    stored: Option<Vec<String>>,
+    rechecked: Option<Vec<String>>,
+    allowed: Option<bool>,
+    hidden: Option<usize>,
+    operates: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -531,4 +546,72 @@ fn the_table_covers_what_the_spec_requires() {
                 && table.workspaces.contains_key(&row.workspace)
         );
     }
+}
+
+fn entries(items: &[String]) -> Vec<serde_json::Value> {
+    items
+        .iter()
+        .map(|i| serde_json::json!({"repo": i}))
+        .collect()
+}
+
+#[test]
+fn a_save_keeps_hidden_entries_and_rechecks_only_what_it_adds_or_changes() {
+    let table = table();
+    let before = World::new(&table, true);
+    for row in &table.lifecycle {
+        let world = match &row.revoke {
+            Some(revoke) => before.without(revoke),
+            None => before.clone(),
+        };
+        let workspace = &table.workspaces[&row.workspace];
+        let caller = world.caller(&row.caller);
+        let operates = world.operates(&row.caller, workspace);
+        if let Some(expected) = row.operates {
+            assert_eq!(operates, expected, "{}", row.name);
+            continue;
+        }
+        let current = entries(&workspace.entries);
+        let submitted = entries(&row.submit);
+        // The administrator submits the whole manifest; an operator submits what it reads and
+        // the version stored keeps the rest in place.
+        let (grant, stored) = match caller.platform_administrator {
+            true => (Grant::All, submitted.clone()),
+            false => {
+                let grant = Grant::Only(world.grant(caller));
+                let stored = named::compose(&grant, &current, &submitted);
+                (grant, stored)
+            }
+        };
+        let identities = named::identities(&stored);
+        assert_eq!(
+            Some(&identities),
+            row.stored.as_ref(),
+            "{}: stored",
+            row.name
+        );
+        let rechecked = named::changed(&current, &stored);
+        assert_eq!(
+            Some(&rechecked),
+            row.rechecked.as_ref(),
+            "{}: rechecked",
+            row.name
+        );
+        // The catalog holds every table repository: the administrator's eligible set.
+        let eligible: BTreeSet<String> = match caller.platform_administrator {
+            true => table_identities(&table),
+            false => world.eligible(caller),
+        };
+        let decided = named::creation(&rechecked, &eligible, &grant);
+        assert_eq!(Some(decided.allowed), row.allowed, "{}: allowed", row.name);
+        if let Some(hidden) = row.hidden {
+            assert_eq!(decided.hidden, hidden, "{}: hidden", row.name);
+        }
+    }
+}
+
+fn table_identities(table: &Table) -> BTreeSet<String> {
+    (table.workspaces.values())
+        .flat_map(|w| w.entries.iter().cloned())
+        .collect()
 }

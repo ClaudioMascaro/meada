@@ -252,13 +252,31 @@ checks its tests; Rust/default stages gain no frontend input.
 Vitest exercises the built WASM and the public client, view-model and DOM
 seams, without a browser end-to-end suite.
 
-## Named workspaces (spec S5): the catalog and the first workspace are built, the rest is planned
+## Named workspaces (spec S5): the catalog, the first workspace and its lifecycle are built, the rest is planned
 
 ADR 0020 holds the domain decision, ADR 0021 the contracts (catalog, selected entries, shared
 ingestion membership, version lifecycle in Postgres, query selection through the generation
 document's `members` and `contexts` and the route `/-/workspaces/<id>/<identity>`, effective
 configuration, ids) and ADR 0022 the proposal server. Slices #341 to #347 build them in that
 order and each updates this map with what it delivers.
+
+Delivered by #343 (contract 4's lifecycle; ADR 0021 "As built (#343)"), same feature:
+`workspaces/lifecycle.rs` is the atomic boundary of every other write (`transact`: one
+transaction, `SELECT ... FOR UPDATE` on the workspace row, then deleted, base, authority and the
+eligibility of the entries an operation adds or changes from the newest set via
+`store::eligible`, then the move and the history row) for `Op::Save`, `Apply` (a rollback when
+the version was ever current), `Rename`, `Delete` and `Operators`, and the reads of versions and
+history (`versions`, `version`, `histories`; the opaque cursor is a version's UTC microsecond time
+and its id); `workspaces/store.rs` gained `eligible` (shared with `create`) and the store's
+`put_document` and `get_document`; `ui/workspaces/lifecycle.rs` is the console's routes
+(`POST /api/v1/workspaces/<id>/versions|apply|rename|delete|operators`, `GET .../versions[/<v>]`
+and `.../history`, the body caps in `body_max` that `ui.rs`'s `read` asks for), which resolve the
+operation against the stored current version (`named::compose` keeps the entries an operator
+cannot read, `named::changed` is what is rechecked, `named::diff` the diff of a version read)
+before the pending audit record; `workspaces/cli.rs` is `meada workspaces list|show|versions|diff|
+create|save|apply|rename|delete|operators` (the platform administrator, `audit::cli`); migration 8 is
+`workspace_versions.entries`; `audit.rs` knows the six new actions and the `base` argument. Not
+built: `effective` (#344) and the guided pages over versions and the diff (#345).
 
 Delivered by #342 (contracts 2 to 5 as far as create, list, show, shared ingestion and the node
 route go; ADR 0021 "As built (#342)"), same feature: `workspaces.rs` is `[workspaces]` (`mirrors`,
@@ -282,9 +300,9 @@ from `membership`, and `Manifest::of_context` builds a recorded context; `snapsh
 `unsponsored`, names, named entries and their version id) that the Rust table test, the console
 and the front end's WebAssembly (`namedAuthorize`, `namedVisible`, `namedEntriesJson`,
 `namedEntriesText`, `namedVersionId`) share, with `validate_named` in `manifest.rs`; the front
-end's `NamedWorkspacesPage.tsx` lists, shows and creates. Not built: save, apply, rollback,
-rename, delete and delegation (#343), the effective configuration (#344), guided authoring
-(#345) and proposals (#346).
+end's `NamedWorkspacesPage.tsx` lists, shows and creates. Not built by #342: save, apply,
+rollback, rename, delete and delegation (#343, above), the effective configuration (#344), guided
+authoring (#345) and proposals (#346).
 
 Delivered by #341 (contract 1, the catalog), behind the cargo feature `workspaces` (it implies
 `ui`, `oidc`, `postgres`, `github-app`, `generation-pointer` and `refresh-lock`; `cloud` turns it
@@ -445,7 +463,8 @@ one for the area a change touches.
   `gen_random_uuid`, `fence`, `version`, `started`, `finished` from Postgres's clock,
   `repositories`), `<schema>.permission_rows` (`identity`, `login` lowercase, `role` as GitHub
   spells it) and `<schema>.permission_exclusions` (`identity`, `added_by`), both cascading from
-  their set; migration 6 `permission_repositories.source` (#341).
+  their set; migration 6 `permission_repositories.source` (#341); migration 7 the named
+  workspaces' tables (#342); migration 8 `workspace_versions.entries` (#343).
   `connected` is `connect` keeping the password for scrubbing a later statement's
   error (`Opened::scrubber` a copy of it for a transaction, which borrows the client), and `probe` is the console's start check (a version refusal refuses the start, Postgres
   unreachable does not). `migrate` (`meada postgres migrate --workspace
@@ -2687,7 +2706,10 @@ one for the area a change touches.
   `AFTER_MAX` (256) a list page and its cursor, `WORKSPACES_MAX` (2000) and `ENTRIES_MAX` (500)
   what `max_workspaces` and `max_entries` may allow and what a reader of the contexts file or a
   version document accepts whatever they say now (a version document is also bounded by the
-  deployment version's `VERSION_MAX`), `OPERATORS_MAX` (20) a workspace's operators,
+  deployment version's `VERSION_MAX`), `OPERATORS_MAX` (20) a workspace's operators (the
+  console's lifecycle bodies are capped by `APPLY_BODY_MAX` (1 KiB), `RENAME_BODY_MAX` (4 KiB),
+  `DELETE_BODY_MAX` (1 KiB) and `OPERATORS_BODY_MAX` (16 KiB), a delegated subject holds at most `SUBJECT_MAX` (256) bytes and `PAGE_MAX` (50)
+  bounds a page of versions or history, #343),
   `CONTEXTS_MAX` (256 MiB) the contexts file `meada workspace pull` writes and `EXCLUDED_MAX`
   (128 MiB) the exclusions file; past one the file counts as hostile. Their product is what a
   refresh pulls and publishes: the single failure domain of one fleet (ADR 0021).

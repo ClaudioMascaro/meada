@@ -14,6 +14,8 @@ use serde_json::{Value as Json, json};
 use crate::modules::Problem;
 use crate::msg::Msg;
 
+pub mod cli;
+pub(crate) mod lifecycle;
 pub(crate) mod store;
 
 // ponytail: the most workspaces `max_workspaces` may allow, and its default; the most operators

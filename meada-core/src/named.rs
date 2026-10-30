@@ -110,6 +110,77 @@ pub fn creation(selected: &[String], eligible: &BTreeSet<String>, grant: &Grant)
     }
 }
 
+/// The version an operator's save stores (ADR 0021, contract 4): `current` in its order, each
+/// entry `grant` reads replaced by its form in `submitted` or dropped when `submitted` omits it,
+/// each entry outside the grant kept as it is, then the entries new to the workspace in
+/// `submitted` order. A save never drops what its author cannot read, and an operator cannot
+/// overwrite an entry it does not read by submitting its identity. It is ADR 0015's composition
+/// without owners or attribution: a named entry holds neither.
+pub fn compose(grant: &Grant, current: &[Json], submitted: &[Json]) -> Vec<Json> {
+    crate::authorize::compose_entries(grant, None, None, current, submitted)
+}
+
+/// The identities `next` adds to `current` or changes (an entry whose blocks differ), in `next`
+/// order: what an apply or a save must find eligible for the actor. Entries both hold unchanged
+/// are not rechecked, nor is a removal.
+pub fn changed(current: &[Json], next: &[Json]) -> Vec<String> {
+    let held: std::collections::BTreeMap<&str, &Json> = (current.iter())
+        .filter_map(|e| Some((e["repo"].as_str()?, e)))
+        .collect();
+    (next.iter())
+        .filter_map(|e| {
+            let repo = e["repo"].as_str()?;
+            (held.get(repo) != Some(&e)).then(|| repo.to_string())
+        })
+        .collect()
+}
+
+/// What differs between two named versions: the identities `after` adds, the ones it drops and,
+/// for the ones both hold, the blocks that differ (`serve`, `resource`, `peer`) and `repository`
+/// when their order among the shared entries changed. Pure over the entries a caller reads, so a
+/// diff names nothing its grant does not read.
+pub fn diff(before: &[Json], after: &[Json]) -> crate::workspace::Diff {
+    use crate::workspace::{Change, Diff};
+    let identity = |e: &Json| e["repo"].as_str().unwrap_or_default().to_string();
+    let old: std::collections::BTreeMap<String, &Json> =
+        before.iter().map(|e| (identity(e), e)).collect();
+    let new: std::collections::BTreeSet<String> = after.iter().map(identity).collect();
+    let shared_before: Vec<String> = (before.iter().map(identity))
+        .filter(|r| new.contains(r))
+        .collect();
+    let mut shared_after = 0;
+    let mut diff = Diff::default();
+    for entry in after {
+        let repo = identity(entry);
+        let Some(previous) = old.get(&repo) else {
+            diff.added.push(repo);
+            continue;
+        };
+        let mut keys = Vec::new();
+        if shared_before.get(shared_after) != Some(&repo) {
+            keys.push("repository".to_string());
+        }
+        shared_after += 1;
+        let blocks = |e: &Json| e.as_object().cloned().unwrap_or_default();
+        let (now, was) = (blocks(entry), blocks(previous));
+        let mut names: Vec<&String> = now.keys().chain(was.keys()).collect();
+        names.sort();
+        names.dedup();
+        for name in names.into_iter().filter(|n| n.as_str() != "repo") {
+            if now.get(name) != was.get(name) {
+                keys.push(name.clone());
+            }
+        }
+        if !keys.is_empty() {
+            diff.changed.push(Change { repo, keys });
+        }
+    }
+    diff.removed = (before.iter().map(identity))
+        .filter(|r| !new.contains(r))
+        .collect();
+    diff
+}
+
 /// Whether a caller sees a workspace of `entries` at all (the discovery rule of ADR 0020): its
 /// operators and the platform administrator always, anyone else only when its grant reads every
 /// entry. Names, descriptions and counts are not bounded by repository grants, so a partly
@@ -194,6 +265,57 @@ mod tests {
         assert_eq!(readable(&list(&["y", "a", "b"]), &grant), list(&["y", "a"]));
         assert!(!answers(true, &list(&["y", "b"]), &grant, "b"));
         assert!(!shown(false, &list(&["y", "a"]), &grant, "y", "b"));
+    }
+
+    fn entry(repo: &str, hosts: &[&str]) -> Json {
+        match hosts.is_empty() {
+            true => serde_json::json!({"repo": repo}),
+            false => serde_json::json!({"repo": repo, "serve": {"hosts": hosts}}),
+        }
+    }
+
+    #[test]
+    fn a_composed_save_keeps_the_entries_its_author_cannot_read() {
+        let current = [entry("y", &[]), entry("a", &[]), entry("b", &[])];
+        let grant = Grant::Only(set(&["y", "a"]));
+        // The author submits only what it reads, edits y and drops a; b stays in place and an
+        // attempt to overwrite b is ignored.
+        let submitted = [
+            entry("y", &["y.example"]),
+            entry("b", &["x"]),
+            entry("n", &[]),
+        ];
+        let stored = compose(&grant, &current, &submitted);
+        assert_eq!(identities(&stored), ["y", "b", "n"]);
+        assert_eq!(stored[0], entry("y", &["y.example"]));
+        assert_eq!(stored[1], entry("b", &[]));
+        // Only the edited and the new entries are rechecked: b and a removal are not.
+        assert_eq!(changed(&current, &stored), ["y", "n"]);
+        assert!(changed(&current, &current).is_empty());
+    }
+
+    #[test]
+    fn a_diff_names_added_removed_and_changed_blocks() {
+        let before = [entry("y", &[]), entry("a", &[]), entry("b", &["b.example"])];
+        let after = [
+            entry("b", &["other"]),
+            entry("n", &[]),
+            entry("y", &["y.example"]),
+        ];
+        let got = diff(&before, &after);
+        assert_eq!(got.added, ["n"]);
+        assert_eq!(got.removed, ["a"]);
+        let changed: Vec<(&str, Vec<&str>)> = (got.changed.iter())
+            .map(|c| (c.repo.as_str(), c.keys.iter().map(String::as_str).collect()))
+            .collect();
+        assert_eq!(
+            changed,
+            [
+                ("b", vec!["repository", "serve"]),
+                ("y", vec!["repository", "serve"])
+            ]
+        );
+        assert_eq!(diff(&before, &before), Default::default());
     }
 
     #[test]

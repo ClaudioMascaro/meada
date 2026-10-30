@@ -788,7 +788,7 @@ fn the_role_check_refuses_a_schema_version_it_does_not_know() {
     );
     case.clean(&stderr);
     assert_eq!((stdout.as_str(), code), ("", Some(1)));
-    assert!(stderr.contains('7') && stderr.contains('4'), "{stderr}");
+    assert!(stderr.contains('8') && stderr.contains('4'), "{stderr}");
     assert!(case.listings().is_empty());
 }
 
