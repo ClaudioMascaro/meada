@@ -50,7 +50,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 --user-group meada
 COPY --from=build /build/target/release/meada /usr/local/bin/meada
-ARG VERSION="0.1.0"
+ARG VERSION="1.0.0"
 LABEL org.opencontainers.image.source="https://github.com/ClaudioMascaro/meada" \
       org.opencontainers.image.version="$VERSION" \
       org.opencontainers.image.licenses="Apache-2.0"

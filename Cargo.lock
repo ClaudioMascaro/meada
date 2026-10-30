@@ -1463,7 +1463,7 @@ dependencies = [
 
 [[package]]
 name = "meada"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "blake3",
@@ -1512,7 +1512,7 @@ dependencies = [
 
 [[package]]
 name = "meada-core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "blake3",
  "serde",
