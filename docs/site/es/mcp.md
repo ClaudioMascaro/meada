@@ -6,17 +6,44 @@ entonces debe estar dentro del repositorio. Si el cliente falla o no responde a 
 la llamada usa la última raíz que envió en esa conexión, o devuelve un error que lo dice; nunca
 recurre a la carpeta del servidor por eso (que, en una sesión en un worktree, sería otro
 checkout). Una respuesta sin raíz local vale como sin raíces (la carpeta del servidor). En la
-configuración de tu agente (por ejemplo el `.mcp.json` de Claude Code), con `npx`:
+configuración de tu agente (por ejemplo el `.mcp.json` de Claude Code), en la forma de tu canal:
 
-```json
-{
-  "mcpServers": {
-    "meada": { "command": "npx", "args": ["@meada/meada", "mcp"] }
-  }
-}
-```
+=== "npx"
 
-Con `meada` ya en el `PATH`, usa `"command": "meada", "args": ["mcp"]`.
+    ```json
+    {
+      "mcpServers": {
+        "meada": { "command": "npx", "args": ["-y", "@meada/meada", "mcp"] }
+      }
+    }
+    ```
+
+=== "meada en el PATH"
+
+    ```json
+    {
+      "mcpServers": {
+        "meada": { "command": "meada", "args": ["mcp"] }
+      }
+    }
+    ```
+
+=== "Docker"
+
+    ```json
+    {
+      "mcpServers": {
+        "meada": {
+          "command": "sh",
+          "args": ["-c", "exec docker run -i --rm --network none --user \"$(id -u):$(id -g)\" -v \"${PWD%/*}:${PWD%/*}\" -w \"$PWD\" ghcr.io/claudiomascaro/meada:1.0.0 mcp"]
+        }
+      }
+    }
+    ```
+
+    El cliente inicia el servidor en el repositorio; el contenedor monta la carpeta que lo contiene,
+    y sus pares vecinos, en la misma ruta de la raíz que envía el cliente, y corre con tu usuario y
+    sin red. Solo Linux y macOS.
 
 Son tres herramientas, siempre en inglés, y ninguna escribe:
 
@@ -45,3 +72,23 @@ Las respuestas son líneas compactas dentro de un presupuesto de tokens (2.000 p
 ajustable en cada llamada). Cada enlace entre repositorios lleva el nivel y el motivo
 (`→[level: reason]`), y `trace` termina con un pie: el nivel más débil de la cadena, el número
 de saltos, los repositorios involucrados y los tokens usados.
+
+## Skill para agentes
+
+La skill [`skills/meada/SKILL.md`](https://github.com/ClaudioMascaro/meada/blob/main/skills/meada/SKILL.md)
+le enseña al agente a elegir entre `search`, `context` y `trace` y a leer los niveles de una
+respuesta: `inferred` y `ambiguous` son coincidencias de nombre, y un llamador ausente no está
+probado. Vale para la versión con la que se publicó; descarga la de tu versión.
+
+- **Claude Code**: cópiala a `~/.claude/skills/meada/` (todas las sesiones) o a
+  `.claude/skills/meada/` de un proyecto:
+
+    ```sh
+    mkdir -p ~/.claude/skills/meada
+    curl -fsSL https://raw.githubusercontent.com/ClaudioMascaro/meada/v1.0.0/skills/meada/SKILL.md -o ~/.claude/skills/meada/SKILL.md
+    ```
+
+- **Otro agente que lee carpetas de skills** (`SKILL.md` con frontmatter): copia la carpeta
+  `skills/meada/` a su carpeta de skills.
+- **Un agente sin skills**: pega el cuerpo de `SKILL.md`, sin el frontmatter, en el `AGENTS.md`
+  del proyecto.

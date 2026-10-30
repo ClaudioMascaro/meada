@@ -61,7 +61,7 @@ O pacote `meada` do npm contém só o instalador: ele baixa da release do GitHub
 plataforma e o executa com os argumentos que você passou. A versão do pacote é sempre a da
 release. A instalação baixa o binário na hora, então ela precisa de rede (não há instalação
 offline pelo npm). É o canal que mais interessa a quem configura um agente, porque
-`npx @meada/meada mcp` é a linha de lançamento do servidor MCP (seção 2).
+`npx -y @meada/meada mcp` é a linha de lançamento do servidor MCP (seção 2).
 
 ### Contêiner
 
@@ -87,7 +87,7 @@ instalação própria, descrita em
 ## 2. Conectar um agente (MCP)
 
 `meada mcp` fala MCP por stdio. O cliente (o agente) executa o comando e conversa com ele. A
-linha de lançamento documentada é `npx @meada/meada mcp`, que dispensa uma instalação separada.
+linha de lançamento documentada é `npx -y @meada/meada mcp`, que dispensa uma instalação separada.
 
 ### Configuração do cliente
 
@@ -96,12 +96,12 @@ No `.mcp.json` do Claude Code, ou no arquivo equivalente do seu cliente:
 ```json
 {
   "mcpServers": {
-    "meada": { "command": "npx", "args": ["@meada/meada", "mcp"] }
+    "meada": { "command": "npx", "args": ["-y", "@meada/meada", "mcp"] }
   }
 }
 ```
 
-No Claude Code, o mesmo em um comando: `claude mcp add meada -- npx @meada/meada mcp`.
+No Claude Code, o mesmo em um comando: `claude mcp add meada -- npx -y @meada/meada mcp`.
 
 Com `meada` já no `PATH` (por Cargo, binário ou instalador), troque o comando por
 `"command": "meada", "args": ["mcp"]`, que evita a consulta ao npm a cada início.

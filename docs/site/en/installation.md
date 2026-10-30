@@ -2,14 +2,14 @@
 
 Pick one of five ways.
 
+- **npm**: `npx -y @meada/meada <command>` downloads the prebuilt binary for your platform and runs
+  it, with nothing to install first.
 - **Cargo**: `cargo install meada`.
 - **Prebuilt binary**: download the file for your system from the
   [GitHub releases](https://github.com/ClaudioMascaro/meada/releases) (Linux, macOS and
   Windows, on x86_64 and arm64) and put `meada` on your `PATH`.
 - **Installer** (Linux and macOS):
   `curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ClaudioMascaro/meada/releases/latest/download/meada-installer.sh | sh`.
-- **npm**: `npx @meada/meada <command>` downloads the prebuilt binary for your platform and runs
-  it, with nothing to install first.
 - **Container**: `ghcr.io/claudiomascaro/meada:<version>` for the default build, or
   `<version>-cloud` with every cloud module, both for Linux amd64 and arm64. `latest` and
   `latest-cloud` follow the latest stable release; prereleases get version tags only.
@@ -19,6 +19,15 @@ Pick one of five ways.
   the manifest, mirrors and indexes, and pass
   `mcp --listen 0.0.0.0:7333 --workspace /etc/meada/meada.workspace.toml`, following
   [Server mode](server.md) and its admission configuration.
+
+To index the repository you are in with the container (Linux and macOS):
+
+```sh
+docker run --rm --network none --user "$(id -u):$(id -g)" -v "${PWD%/*}:${PWD%/*}" -w "$PWD" ghcr.io/claudiomascaro/meada:1.0.0 index
+```
+
+Replacing `index` with `status` shows the result; the MCP server is the same line with `-i` and
+`mcp`, in [Agents and MCP](mcp.md). The deployment examples are in [Deploy](deploy.md).
 
 For the console, run `cargo install meada --features ui`, download
 `meada-ui-<version>.tar.gz` from the same release and unpack it. Point `[ui] dir` in the
