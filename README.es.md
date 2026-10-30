@@ -71,6 +71,7 @@ aguas abajo, fuera de Meada (invariante 1, [ADR 0002](docs/adr/0002-product-inva
 - [Modo servidor](https://claudiomascaro.github.io/meada/es/server/)
 - [Consola](https://claudiomascaro.github.io/meada/es/console/)
 - [Capacidades y límites](https://claudiomascaro.github.io/meada/es/capabilities/)
+- [Estabilidad](https://claudiomascaro.github.io/meada/es/stability/)
 - [Participar](https://claudiomascaro.github.io/meada/es/contributing/)
 
 [Apache-2.0](LICENSE).

@@ -60,4 +60,4 @@ Follow the chain across repositories.
 
 Server mode ([S1, #259](https://github.com/ClaudioMascaro/meada/issues/259)), the console ([S2, #293](https://github.com/ClaudioMascaro/meada/issues/293)) and identity automation ([S4, #319](https://github.com/ClaudioMascaro/meada/issues/319)) are delivered. Named workspaces ([S5, #339](https://github.com/ClaudioMascaro/meada/issues/339)) are delivered; team ownership (S3) is planned. Each page distinguishes available behavior from the proposal.
 
-[Read the capabilities and limits](capabilities.md) · [S3](workspaces.md) · [S4](enterprise.md) · [S5](named-workspaces.md)
+[Read the capabilities and limits](capabilities.md) · [Stability](stability.md) · [S3](workspaces.md) · [S4](enterprise.md) · [S5](named-workspaces.md)

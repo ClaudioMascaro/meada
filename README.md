@@ -70,6 +70,7 @@ Meada (invariante 1, [ADR 0002](docs/adr/0002-product-invariants.md)).
 - [Modo servidor](https://claudiomascaro.github.io/meada/server/)
 - [Console](https://claudiomascaro.github.io/meada/console/)
 - [Capacidades e limites](https://claudiomascaro.github.io/meada/capabilities/)
+- [Estabilidade](https://claudiomascaro.github.io/meada/stability/)
 - [Participar](https://claudiomascaro.github.io/meada/contributing/)
 
 [Apache-2.0](LICENSE).

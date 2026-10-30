@@ -69,6 +69,7 @@ results by symbol identity. Embeddings and any model step live downstream, outsi
 - [Server mode](https://claudiomascaro.github.io/meada/en/server/)
 - [Console](https://claudiomascaro.github.io/meada/en/console/)
 - [Capabilities and limits](https://claudiomascaro.github.io/meada/en/capabilities/)
+- [Stability](https://claudiomascaro.github.io/meada/en/stability/)
 - [Contribute](https://claudiomascaro.github.io/meada/en/contributing/)
 
 [Apache-2.0](LICENSE).
