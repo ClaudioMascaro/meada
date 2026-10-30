@@ -1,7 +1,7 @@
 # Workspaces con nombre
 
-!!! warning "Parcialmente entregado: S5, contratos decididos; el catálogo, el primer workspace, sus versiones, la configuración de contexto, la autoría guiada y las propuestas MCP ya existen"
-    [S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) es alcance secuencial aceptado después de S3 y S4. La [consolidación de contratos, #340](https://github.com/ClaudioMascaro/meada/issues/340), está terminada: los ADR 0020, 0021 y 0022 fijan los contratos descritos aquí. Del runtime se entregaron dos porciones: el **catálogo** ([#341](https://github.com/ClaudioMascaro/meada/issues/341)), descrito en [el catálogo](github-app.md#el-catalogo-de-repositorios) y en la [consola](console.md#catalogo-de-repositorios), y el **primer workspace** ([#342](https://github.com/ClaudioMascaro/meada/issues/342)): `[workspaces]`, creación, listado y consulta, ingestión compartida con la regla del patrocinador y la ruta del nodo, descritos en la [consola](console.md#workspaces-con-nombre). El **ciclo de vida de las versiones** ([#343](https://github.com/ClaudioMascaro/meada/issues/343)) también está entregado: guardar, aplicar, revertir, renombrar, borrar y delegar, con la lectura de versiones e historial, descrito en la [consola](console.md#workspaces-con-nombre) y a continuación. La **configuración de contexto** ([#344](https://github.com/ClaudioMascaro/meada/issues/344)) también está entregada: peers, referencias a variables de entorno, recursos y ajustes de serve por workspace, con la vista de la configuración efectiva y un editor de texto en la consola, descritos en [configuración efectiva](#configuracion-efectiva). La **autoría guiada** ([#345](https://github.com/ClaudioMascaro/meada/issues/345)) también está entregada: controles de formulario sobre el mismo manifiesto, descritos en [autoría guiada](#autoria-guiada). Las **propuestas MCP** ([#346](https://github.com/ClaudioMascaro/meada/issues/346)) también están entregadas, descritas en [autoría asistida por MCP](#autoria-asistida-por-mcp). El resto de lo siguiente no es todavía una opción de configuración. Sin `[workspaces]` la consola sigue operando con un workspace por deployment.
+!!! success "Entregado: S5, validado de extremo a extremo"
+    [S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) está entregado en ocho porciones ([#340](https://github.com/ClaudioMascaro/meada/issues/340) a [#347](https://github.com/ClaudioMascaro/meada/issues/347)): los contratos (ADR 0020 a 0022), el [catálogo](github-app.md#el-catalogo-de-repositorios), el primer workspace, el ciclo de vida de las versiones, la configuración por workspace, la autoría guiada, las propuestas MCP y esta validación. Todo lo siguiente se construye detrás de la feature de cargo `workspaces` (y `proposals` para el servidor de propuestas), ambas habilitadas por `cloud`. Sin `[workspaces]` la consola sigue operando con un workspace por deployment. Una verificación sigue abierta: [#338](https://github.com/ClaudioMascaro/meada/issues/338), la medición contra una organización real de GitHub, que el mantenedor decidió que no condiciona S5 ([evidencia de descubrimiento](#evidencia-de-descubrimiento)).
 
 ## Componer sin duplicar la indexación
 
@@ -66,7 +66,7 @@ La página de workspaces de la consola edita un workspace que operas mediante **
 - **Alcance y configuración efectiva** se muestran en texto, nunca solo por color: si operas el workspace, cuántas entradas editas y cuántas no puedes leer (se mantienen como están al guardar), la ingesta de cada entrada (`pending`, `ready`, `excluded` o nueva) y, tras *Mostrar la configuración efectiva*, qué origen gana y qué ignora el `meada.toml` del propio repositorio.
 - **Revisar y guardar.** La página lista el diff (entradas agregadas, quitadas y cambiadas, con las partes cambiadas) y *Guardar y aplicar* abre una confirmación que **congela** el contenido revisado: el texto del manifiesto, el mensaje y la base. No se envía nada más al confirmar, pase lo que pase con el borrador. Un rechazo se muestra como lo redacta el servidor: `entries_refused` nombra los repositorios (y cuenta los ocultos) y lee de nuevo tus roles para que la elegibilidad mostrada sea la actual, `stale_base` ofrece recargar el workspace (una versión guardada cuya aplicación fue rechazada se dice como tal), y perder el rol de operador retira el editor. Quien solo ve el workspace ve las entradas y su estado, pero ningún control que cambie algo.
 
-Calcular estas reglas locales no abre ninguna conexión. Los dos idiomas de la consola (inglés y portugués de Brasil) tienen los mismos controles. Aún no construido: una página de las versiones de un workspace con reversión (las rutas `versions` e `history` existen); la interfaz de propuestas es la [autoría asistida por MCP](#autoria-asistida-por-mcp), a continuación.
+Calcular estas reglas locales no abre ninguna conexión. Los dos idiomas de la consola (inglés y portugués de Brasil) tienen los mismos controles. No construido: una página de las versiones de un workspace con reversión (las rutas `versions` e `history` existen); la interfaz de propuestas es la [autoría asistida por MCP](#autoria-asistida-por-mcp), a continuación.
 
 <!-- meada-graph:mcp-proposal -->
 
@@ -106,6 +106,43 @@ Una propuesta es `{base, manifest, diff, diagnostics, eligibility, refusals, eff
 
 La distinción entre [versión de workspace y generación](workspaces.md), y entre [admisión y grant](admission.md), sigue siendo esencial para este diseño.
 
+## Desplegar y actualizar
+
+El orden importa, porque los nodos verifican lo que descargan.
+
+1. **Haga una copia de seguridad de Postgres y luego migre.** `meada postgres migrate --workspace <bootstrap>` lleva el esquema a la versión 8 (6: el `source` de las filas del catálogo; 7: las cuatro tablas de workspace y el contexto de las exclusiones; 8: las identidades de cada versión). Un proceso todavía en una versión anterior rechaza el esquema nuevo, como dice [la ventana de actualización de la capa de datos](enterprise.md#limites-conocidos). Las migraciones solo avanzan: para volver atrás, restaure la copia.
+2. **Actualice todos los binarios, nodos incluidos, antes del primer refresh que registre un contexto.** Un nodo recalcula el id de la generación que descarga; un nodo más antiguo rechaza una generación cuyo id también hashea los nuevos `members` y `contexts`, conserva su última generación y su disponibilidad, y nunca sirve el repositorio de un workspace con nombre en ninguna ruta (falla cerrado). Una generación sin workspace con nombre la leen todos los nodos.
+3. **Configure el job y la consola** con `[catalog]` (`allow`, `max_repositories`) y `[workspaces]` (`mirrors`), que requieren `[ui]` con `operations = true`, `[oidc.github]` y `[workspace] source = "store"`. Provisione la raíz de `mirrors` donde escribe el paso de fetch del job: `meada workspace show --pulled` lista cada miembro y su ruta. Los ejemplos de [Compose](https://github.com/ClaudioMascaro/meada/tree/main/deploy/compose) y [Helm](https://github.com/ClaudioMascaro/meada/tree/main/deploy/helm/meada) incluyen estas secciones.
+4. **Ejecute un refresh** (`workspace pull`, `github-app roles`, fetch, `index`, `snapshot publish`). El comando de roles escribe el catálogo en el mismo conjunto que los roles; la consola muestra el catálogo como `ready` cuando lo lee.
+5. **Deje que las personas creen workspaces.** Los nodos sirven un contexto desde la primera generación que lo registra. Opcionalmente, ejecute el [servidor de propuestas](#ejecutar-el-servidor-de-propuestas) en un proceso propio.
+6. **Apagarlo.** Quitar `[workspaces]` hace que las nuevas generaciones dejen de registrar contextos; las generaciones retenidas conservan los suyos para los binarios que los entienden, y las tablas permanecen.
+
+### Cuando falla un refresh
+
+| Etapa que falla | Lo que conserva el deployment | Recuperación |
+| --- | --- | --- |
+| `github-app roles` (5xx de GitHub, throttle, Postgres) | El conjunto de permisos anterior decide y envejece; no se escribe ningún conjunto; el puntero no se mueve. Un grant que GitHub ya muestra restaurado no vuelve. | Ejecute `roles` de nuevo; solo un conjunto completo posterior cambia un grant. |
+| fetch o `index` de cualquier miembro | Todo workspace sigue respondiendo desde la última generación completa. Una revocación que el job confirmó antes sigue vigente. | Arregle el espejo y ejecute el refresh. Una entrada excluida por falta de patrocinador es una decisión previa al fetch, no un fallo, y no necesita espejo. |
+| `snapshot publish` (publicación local) | El puntero no se mueve; nada se publica parcialmente. | Reconstruya el índice y publique de nuevo. |
+
+## Validado de extremo a extremo
+
+El flujo se acepta mediante pruebas que accionan los binarios y transportes públicos (la consola, los comandos del job, un nodo y el servidor de propuestas sobre el emisor de loopback, una API REST falsa de GitHub y servicios locales de Valkey, Postgres y compatibles con S3) y mediante la misma tabla Y/A/B en Rust y WebAssembly. Se ejecutan en CI con los servicios requeridos.
+
+| Qué se muestra | Dónde |
+| --- | --- |
+| Administrador de la plataforma, un operador de A creando Y+A, un operador de B creando Y+B, un llamador en ambos, roles directos y por grupo, peers que ven sin inscripción, sin operar nada | `tests/it/ui/oidc/workspaces.rs` (`creation_follows_the_shared_table...`, `peers_view_a_workspace...`, `a_created_workspace_becomes_queryable...`), `meada-core/tests/named_workspaces.rs`, `ui/tests/named-core.test.ts` |
+| Revocación tras la creación, privacidad del lector parcial, sin ampliación por Y | `workspaces/lifecycle.rs` (`a_partial_revocation_hides...`), `catalog.rs` |
+| Ciclo de vida superpuesto | `workspaces/lifecycle.rs` (`overlapping_workspaces_live_and_end_independently...`, `concurrent_edits_of_one_base...`), `workspaces/configuration.rs` |
+| SCIM desactiva, borra y reprovisiona; limpiar el owner es `owner_change` | `deprovision.rs`, `directory.rs`, `workspaces/lifecycle.rs` (`a_deleted_user_is_blocked...`), `workspaces/proposals.rs` (`a_deleted_user_is_refused...`) |
+| UI guiada y propuestas sin estado con resultados iguales; solo un guardado deliberado cambia el estado, y queda auditado | `workspaces/proposals.rs` (`proposals_follow_the_shared_table...`, `a_proposal_changes_nothing...`), `ui/tests/GuidedWorkspace.test.tsx` |
+| Fallo de roles, de fetch/index y de la publicación local | `workspaces/acceptance.rs` (`every_failed_stage_keeps_the_generation...`), `workspaces.rs` (fallo de index, exclusión por patrocinador), `github_app/roles.rs` |
+| Build por defecto sin cambios | `cargo tree` de las features por defecto y los goldens de CLI, MCP, export y trace, sin cambios en todas las porciones de S5 |
+
+## Evidencia de descubrimiento
+
+Lo que establecen las pruebas: el catálogo y la verificación de roles contra un GitHub falso (páginas, throttling, el tope, un fallo que no escribe nada) y la fórmula de costo en [el catálogo](github-app.md#el-catalogo-de-repositorios): `ceil(covered / 100)` páginas de instalación por instalación y `ceil(collaborators / 100)` páginas de colaboradores por candidato. Lo que no pueden establecer es la cobertura de instalaciones y el costo de tasa de una organización real, y el resultado no lo sustituye el falso. [#338](https://github.com/ClaudioMascaro/meada/issues/338) sigue abierto como esa evidencia: la hipótesis que confirmaría es que el listado de instalaciones más el listado de colaboradores con `affiliation=all` cabe en la hora de una instalación con su `max_repositories`, o bien que antes hace falta listar una vez los miembros del rol base ([límites conocidos](enterprise.md#limites-conocidos)). Hasta que se mida, aumente `max_repositories` por pasos y observe si `roles` termina dentro de la programación del job.
+
 ## Orden de entrega
 
-Contratos, después el catálogo elegible, el primer workspace, versiones y superposición, y la configuración por contexto. La autoría guiada y las propuestas por MCP avanzan entonces en paralelo, y la validación empresarial depende de ambas. La [hoja de ruta](roadmap.md) sigue cada etapa.
+Contratos, después el catálogo elegible, el primer workspace, versiones y superposición, configuración por contexto, autoría guiada y propuestas por MCP, y por último esta validación. La [hoja de ruta](roadmap.md) sigue cada etapa.

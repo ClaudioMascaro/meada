@@ -130,6 +130,20 @@ modules:
     userClaim: ""
     userAttribute: externalId   # or userName
     groupAttribute: displayName # or externalId
+  # Named workspaces over shared indexing (ADR 0020 to 0022, spec S5): the [catalog] and [workspaces]
+  # sections of the console and of the refresh job (never the nodes'). It needs modules.oidc.github,
+  # console.enabled with console.operations, and a Postgres at schema version 8 (the migrate step).
+  # `allow` lists patterns `<host>/<owner>/*` or `<host>/<owner>/<repo>`; `maxRepositories` has no
+  # default because the cost of expanded coverage is yours (docs: discovery evidence). `mirrors` is
+  # the root where workspace.fetch clones the repositories only named workspaces select: it receives
+  # `meada workspace show --pulled` as $1 and must place each member at the path listed there.
+  workspaces:
+    enabled: false
+    allow: []
+    maxRepositories: 0
+    mirrors: /data/mirrors
+    maxWorkspaces: 200
+    maxEntries: 100
 # An example Postgres for evaluation, off by default and not for production: a single replica.
 # Use your own Postgres 15 or later in production. It needs modules.postgres and the Secrets:
 # passwordsSecret (keys postgres-password, migrate-password, write-password, read-password) and

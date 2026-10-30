@@ -48,3 +48,24 @@ ttl_seconds = 300
 # api = "https://api.github.com"
 # app_id = 123456
 # private_key_env = "MEADA_GITHUB_APP_KEY"
+
+# Named workspaces (spec S5, ADR 0020 to 0022), on top of the identity sections above and
+# `meada postgres migrate`. Upgrade every image, the nodes included, before the first refresh that
+# records a workspace. Every process that reads [workspaces] also reads [ui] with operations = true,
+# the refresh job included: copy the console's [ui] block here, and the same [catalog] and
+# [workspaces] to console.workspace.toml. fetch-pulled.sh clones each repository only named
+# workspaces select at /srv/mirrors/<identity>, as `meada workspace show --pulled` lists it.
+# [catalog]
+# allow = ["github.com/acme/*"]
+# max_repositories = 200      # no default: the cost of expanded coverage is yours
+#
+# [workspaces]
+# mirrors = "/srv/mirrors"
+#
+# [ui]
+# dir = "/usr/share/meada/ui"
+# public_url = "https://localhost:8444"
+# client_id = "meada-console"
+# audience = "https://localhost:8444"
+# operations = true
+# operator_groups = ["meada-operators"]

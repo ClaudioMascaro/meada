@@ -16,6 +16,7 @@ use serde_json::{Value, json};
 
 use super::{PUBLIC, VERSION, claims, console_dir, oidc, ui_oidc};
 
+mod acceptance;
 mod configuration;
 mod lifecycle;
 #[cfg(feature = "proposals")]

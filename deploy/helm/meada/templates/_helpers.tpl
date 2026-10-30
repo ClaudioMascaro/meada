@@ -84,6 +84,17 @@ app.kubernetes.io/component: server
 {{- if and .Values.postgres.enabled (not .Values.modules.postgres.enabled) -}}
 {{- fail "postgres.enabled requires modules.postgres" -}}
 {{- end -}}
+{{- if .Values.modules.workspaces.enabled -}}
+{{- if not (and .Values.console.enabled .Values.console.operations .Values.modules.oidc.github.enabled) -}}
+{{- fail "modules.workspaces requires console.enabled, console.operations and modules.oidc.github" -}}
+{{- end -}}
+{{- if not .Values.modules.workspaces.allow -}}
+{{- fail "modules.workspaces.allow must list at least one pattern" -}}
+{{- end -}}
+{{- if lt (int .Values.modules.workspaces.maxRepositories) 1 -}}
+{{- fail "modules.workspaces.maxRepositories must be set (1 to 5000): it has no default" -}}
+{{- end -}}
+{{- end -}}
 {{- if .Values.console.enabled -}}
 {{- if not (and .Values.image.cloud .Values.modules.snapshot.enabled .Values.modules.generations.enabled .Values.modules.valkey.enabled) -}}
 {{- fail "console requires image.cloud and snapshot, valkey and generations" -}}

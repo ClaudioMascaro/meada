@@ -160,3 +160,14 @@ banco não existe antes do release, o hook de migração passa a `post-install,p
 console espera o schema: `helm install --wait` esperaria a console antes de o hook rodar, então
 instale sem `--wait` nesse caso. Em produção, use o seu próprio Postgres 15 ou mais novo, com TLS e os três
 papéis, e a mesma `tls.caSecret` valida o certificado (`ca_file`).
+
+### Workspaces nomeados
+
+`values-workspaces.yaml` (sobre `values-console.yaml` e `values-identity.yaml`) habilita
+`modules.workspaces`: as seções `[catalog]` e `[workspaces]` entram no bootstrap da console e no
+`job.workspace.toml` do job de refresh, com o bloco `[ui]` de que o job passa a precisar, e nunca no
+de um nó. O chart a recusa sem `console.operations`, `modules.oidc.github`, um `allow` não vazio e um
+`maxRepositories` definido por você (não tem padrão). Atualize todas as imagens, nós incluídos, antes
+do primeiro refresh que registre um workspace. Seu `workspace.fetch` deve clonar os repositórios que
+só workspaces nomeados selecionam sob `modules.workspaces.mirrors`, nos caminhos que `meada workspace
+show --pulled` lista. O servidor de propostas não faz parte do chart.

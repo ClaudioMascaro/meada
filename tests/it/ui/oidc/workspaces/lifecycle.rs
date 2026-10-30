@@ -61,6 +61,13 @@ impl Case {
     /// removed so far in the case, this one included.
     pub(super) fn revoke(&self, revoked: &[(&str, &str)]) {
         let (caller, short) = revoked.last().copied().unwrap();
+        self.grant_all_but(revoked);
+        self.roles();
+        self.await_check(caller, short, "unavailable");
+    }
+
+    /// Writes the table's roles to the fake GitHub, leaving out `revoked`.
+    pub(super) fn grant_all_but(&self, revoked: &[(&str, &str)]) {
         for (short, identity) in self.table["identities"].as_object().unwrap() {
             let repo = identity
                 .as_str()
@@ -82,8 +89,11 @@ impl Case {
                 .collect();
             self.github.list(repo, &rows);
         }
-        self.roles();
-        // The console has read the set when it no longer lets the caller select the repository.
+    }
+
+    /// Waits until the console reads a set in which the catalog gives `caller` the `state` for
+    /// `short`.
+    pub(super) fn await_check(&self, caller: &str, short: &str, state: &str) {
         let token = self.token(caller);
         let identity = self.identity(short);
         let start = Instant::now();
@@ -93,7 +103,7 @@ impl Case {
                 &token,
                 &json!({"identities": [identity]}),
             );
-            if reply.json()["results"][0]["state"] == json!("unavailable") {
+            if reply.json()["results"][0]["state"] == json!(state) {
                 return;
             }
             assert!(start.elapsed() < Duration::from_secs(30), "{}", reply.body);

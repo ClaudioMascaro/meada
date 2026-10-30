@@ -159,3 +159,14 @@ database does not exist before the release, the migrate hook becomes `post-insta
 and the console waits for the schema: `helm install --wait` would wait for the console before the
 hook runs, so install without `--wait` there. In production use your own Postgres 15 or later, with TLS and the
 three roles; the same `tls.caSecret` verifies its certificate (`ca_file`).
+
+### Named workspaces
+
+`values-workspaces.yaml` (on top of `values-console.yaml` and `values-identity.yaml`) enables
+`modules.workspaces`: the `[catalog]` and `[workspaces]` sections go into the console's bootstrap and
+the refresh job's `job.workspace.toml`, with the `[ui]` block the job then needs, and never into a
+node's. The chart refuses it without `console.operations`, `modules.oidc.github`, a non-empty `allow`
+and a `maxRepositories` you set (it has no default). Upgrade every image, the nodes included, before
+the first refresh that records a workspace. Your `workspace.fetch` must clone the repositories only
+named workspaces select under `modules.workspaces.mirrors`, at the paths `meada workspace show
+--pulled` lists. The proposal server is not part of the chart.

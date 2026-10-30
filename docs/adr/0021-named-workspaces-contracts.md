@@ -29,7 +29,7 @@ and the node route go, "As built (#342)" below) and #343 the rest of contract 4'
 (save, apply, rollback, rename, delete, delegation, versions and history, "As built (#343)"
 below), #344 contract 6 (the effective configuration, "As built (#344)" below) and #345 the guided
 controls ("As built (#345)" below); the cargo feature `workspaces` has `[catalog]` and
-`[workspaces]`. #346 built ADR 0022's proposal server (feature `proposals`, `[proposals]`).
+`[workspaces]`. #346 built ADR 0022's proposal server (feature `proposals`, `[proposals]`). #347 validated the flow end to end (`workspaces/acceptance.rs`, the Compose and Helm sections, the upgrade procedure and failure table on the named-workspaces page); the real-organization measurement (#338) stays open and does not gate S5.
 Current behavior without `[workspaces]` is ADR 0014's one workspace per deployment.
 
 ## Decision

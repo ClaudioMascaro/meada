@@ -254,7 +254,7 @@ checks its tests; Rust/default stages gain no frontend input.
 Vitest exercises the built WASM and the public client, view-model and DOM
 seams, without a browser end-to-end suite.
 
-## Named workspaces (spec S5): the catalog, the first workspace, its lifecycle, its configuration, the guided controls and the proposal server are built, the rest is planned
+## Named workspaces (spec S5): built and validated end to end (#347)
 
 ADR 0020 holds the domain decision, ADR 0021 the contracts (catalog, selected entries, shared
 ingestion membership, version lifecycle in Postgres, query selection through the generation
@@ -374,6 +374,16 @@ picker. Nothing else of S5 exists yet: no workspace record, route, table beyond 
 manifest, and discovery creates no ACL and no index. Until #342 a reader of the code finds one
 workspace per deployment (ADR 0014); `tests/fixtures/named-workspaces.json` is the shared Y/A/B
 table the catalog's tests read.
+
+Delivered by #347 (acceptance and operations; no new module): `tests/it/ui/oidc/workspaces/acceptance.rs`
+forces the roles, fetch/index and local-publication failures of one refresh in turn and shows the
+pointer stays, the previous permissions set keeps deciding, a revocation the job committed stays
+effective whatever happens to the publication and a grant returns only through a later complete
+set. The Compose and Helm profiles carry the sections (`[catalog]`, `[workspaces]` and the `[ui]`
+block the job then needs, never a node's: `deploy/helm/meada/values-workspaces.yaml`,
+`templates/_workspaces.tpl`, checked by `scripts/helm-check`), and the site's named-workspaces page
+holds the upgrade procedure, the failure table and the acceptance map. The proposal server is not
+packaged in either profile. The real-organization measurement (#338) stays open and does not gate S5.
 
 ## Deployment profiles
 

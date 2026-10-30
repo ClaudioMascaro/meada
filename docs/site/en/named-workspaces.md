@@ -1,7 +1,7 @@
 # Named workspaces
 
-!!! warning "Partly delivered: S5, contracts decided; the catalog, the first workspace, its versions, context configuration, guided authoring and MCP proposals exist"
-    [S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) is accepted sequential scope after S3 and S4. [Contract consolidation, #340](https://github.com/ClaudioMascaro/meada/issues/340), is done: ADRs 0020, 0021 and 0022 fix the contracts described here. Of the runtime two slices are delivered: the **catalog** ([#341](https://github.com/ClaudioMascaro/meada/issues/341)), described in [the catalog](github-app.md#the-repository-catalog) and the [console](console.md#repository-catalog), and the **first workspace** ([#342](https://github.com/ClaudioMascaro/meada/issues/342)): `[workspaces]`, creation, list and show, shared ingestion with the sponsor rule, and the node route, described in [the console](console.md#named-workspaces). The **version lifecycle** ([#343](https://github.com/ClaudioMascaro/meada/issues/343)) is delivered too: save, apply, rollback, rename, delete and delegation, with the versions and history reads, described in [the console](console.md#named-workspaces) and below. The **context configuration** ([#344](https://github.com/ClaudioMascaro/meada/issues/344)) is delivered as well: peers, environment-variable references, resources and serve settings per workspace, with the effective-configuration view and a text editor in the console, described in [effective configuration](#effective-configuration). **Guided authoring** ([#345](https://github.com/ClaudioMascaro/meada/issues/345)) is delivered too: form controls over the same manifest, described in [guided authoring](#guided-authoring). The **MCP proposals** ([#346](https://github.com/ClaudioMascaro/meada/issues/346)) are delivered too, described in [MCP-assisted authoring](#mcp-assisted-authoring). The rest below is not a configuration option yet. Without `[workspaces]` the console still operates with one workspace per deployment.
+!!! success "Delivered: S5, validated end to end"
+    [S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) is delivered in eight slices ([#340](https://github.com/ClaudioMascaro/meada/issues/340) to [#347](https://github.com/ClaudioMascaro/meada/issues/347)): the contracts (ADRs 0020 to 0022), the [catalog](github-app.md#the-repository-catalog), the first workspace, the version lifecycle, per-workspace configuration, guided authoring, MCP proposals and this validation. Everything below is built behind the cargo feature `workspaces` (and `proposals` for the proposal server), both enabled by `cloud`. Without `[workspaces]` the console still operates with one workspace per deployment. One check is still open: [#338](https://github.com/ClaudioMascaro/meada/issues/338), the measurement against a real GitHub organization, which the maintainer decided does not gate S5 ([discovery evidence](#discovery-evidence)).
 
 ## Compose without duplicating indexing
 
@@ -66,7 +66,7 @@ The console's workspace page edits a workspace you operate through **form contro
 - **Scope and effective configuration** are shown in text, never by color alone: whether you operate the workspace, how many entries you edit and how many you cannot read (kept as they are when you save), each entry's ingestion (`pending`, `ready`, `excluded`, or new), and, after *Show effective configuration*, which source wins and what the repository's own `meada.toml` ignores.
 - **Review and save.** The page lists the diff (added, removed and changed entries, with the changed parts) and *Save and apply* opens a confirmation that **freezes** the reviewed payload: the manifest text, the message and the base. Nothing else is sent when you confirm, whatever happens to the draft meanwhile. A refusal is shown as the server words it: `entries_refused` names the repositories (and counts the hidden ones) and reads your roles again so the eligibility shown is current, `stale_base` offers to reload the workspace (a version stored whose apply was refused is said so), and losing the operator role removes the editor. A viewer sees the entries and their state but no control that changes anything.
 
-Computing these local rules opens no connection. Both console languages (English and Brazilian Portuguese) have the same controls. Not yet built: a page over a workspace's versions with rollback (the `versions` and `history` routes exist); the proposal interface is [MCP-assisted authoring](#mcp-assisted-authoring), below.
+Computing these local rules opens no connection. Both console languages (English and Brazilian Portuguese) have the same controls. Not built: a page over a workspace's versions with rollback (the `versions` and `history` routes exist); the proposal interface is [MCP-assisted authoring](#mcp-assisted-authoring), below.
 
 <!-- meada-graph:mcp-proposal -->
 
@@ -106,6 +106,43 @@ A proposal is `{base, manifest, diff, diagnostics, eligibility, refusals, effect
 
 The distinction between a [workspace version and generation](workspaces.md), and between [admission and grant](admission.md), remains essential to this design.
 
+## Deploying and upgrading
+
+The order matters because nodes verify what they pull.
+
+1. **Back up Postgres, then migrate.** `meada postgres migrate --workspace <bootstrap>` brings the schema to version 8 (6: the `source` of the catalog's rows; 7: the four workspace tables and the context of the exclusions; 8: the identities of each version). A process still at an older version refuses the new schema, as [the data layer's upgrade window](enterprise.md#known-ceilings) says. Migrations only move forward: to go back, restore the backup.
+2. **Upgrade every binary, nodes included, before the first refresh that records a context.** A node recomputes the generation id of what it pulls; an older node refuses a generation whose id also hashes the new `members` and `contexts`, keeps its last generation and its readiness, and never serves a named workspace's repository on any route (it fails closed). A generation with no named workspace is read by every node.
+3. **Configure the job and the console** with `[catalog]` (`allow`, `max_repositories`) and `[workspaces]` (`mirrors`), which need `[ui]` with `operations = true`, `[oidc.github]` and `[workspace] source = "store"`. Provision the `mirrors` root where the job's fetch step writes: `meada workspace show --pulled` lists each member and its path. The [Compose](https://github.com/ClaudioMascaro/meada/tree/main/deploy/compose) and [Helm](https://github.com/ClaudioMascaro/meada/tree/main/deploy/helm/meada) examples carry these sections.
+4. **Run a refresh** (`workspace pull`, `github-app roles`, fetch, `index`, `snapshot publish`). The roles command writes the catalog in the same set as the roles; the console shows the catalog `ready` once it reads it.
+5. **Let people create workspaces.** Nodes serve a context from the first generation that records it. Optionally run the [proposal server](#running-the-proposal-server) in a process of its own.
+6. **Turning it off.** Removing `[workspaces]` stops new generations from recording contexts; retained generations keep theirs for binaries that understand them, and the tables stay.
+
+### When a refresh fails
+
+| Stage that fails | What the deployment keeps | Recovery |
+| --- | --- | --- |
+| `github-app roles` (GitHub 5xx, throttle, Postgres) | The previous permissions set decides and ages; no set is written; the pointer does not move. A grant GitHub already shows restored does not come back. | Run `roles` again; a later complete set is the only thing that changes a grant. |
+| fetch or `index` of any member | Every workspace keeps answering from the last complete generation. A revocation the job committed earlier stays effective. | Fix the mirror and refresh. An entry excluded for lack of a sponsor is a decision before the fetch, not a failure, and needs no mirror. |
+| `snapshot publish` (local publication) | The pointer does not move; nothing is partially published. | Rebuild the index and publish again. |
+
+## Validated end to end
+
+The flow is accepted by tests that drive the public binaries and transports (the console, the job's commands, a node and the proposal server over the loopback issuer, a fake GitHub REST API and local Valkey, Postgres and S3-compatible services) and by the same Y/A/B table in Rust and WebAssembly. They run in CI with the services required.
+
+| What is shown | Where |
+| --- | --- |
+| Platform administrator, an A operator creating Y+A, a B operator creating Y+B, a caller in both, direct and group-derived roles, peers viewing without enrollment, operating nothing | `tests/it/ui/oidc/workspaces.rs` (`creation_follows_the_shared_table...`, `peers_view_a_workspace...`, `a_created_workspace_becomes_queryable...`), `meada-core/tests/named_workspaces.rs`, `ui/tests/named-core.test.ts` |
+| Revocation after creation, partial-reader privacy, no widening through Y | `workspaces/lifecycle.rs` (`a_partial_revocation_hides...`), `catalog.rs` |
+| Overlapping lifecycle | `workspaces/lifecycle.rs` (`overlapping_workspaces_live_and_end_independently...`, `concurrent_edits_of_one_base...`), `workspaces/configuration.rs` |
+| SCIM deactivate, delete and reprovision; owner-clear is `owner_change` | `deprovision.rs`, `directory.rs`, `workspaces/lifecycle.rs` (`a_deleted_user_is_blocked...`), `workspaces/proposals.rs` (`a_deleted_user_is_refused...`) |
+| Guided UI and stateless proposals with equal results; only a deliberate save changes state, and it is audited | `workspaces/proposals.rs` (`proposals_follow_the_shared_table...`, `a_proposal_changes_nothing...`), `ui/tests/GuidedWorkspace.test.tsx` |
+| Failure of roles, fetch/index and local publication | `workspaces/acceptance.rs` (`every_failed_stage_keeps_the_generation...`), `workspaces.rs` (index failure, sponsor exclusion), `github_app/roles.rs` |
+| Default build unchanged | `cargo tree` of the default features and the CLI, MCP, export and trace goldens, unchanged by every S5 slice |
+
+## Discovery evidence
+
+What the tests establish: the catalog and the role check against a fake GitHub (pages, throttling, the cap, failure writing nothing) and the cost formula in [the catalog](github-app.md#the-repository-catalog): `ceil(covered / 100)` installation pages per installation and `ceil(collaborators / 100)` collaborator pages per candidate. What they cannot establish is the installation coverage and the rate cost of a real organization, and the result is not substituted by the fake. [#338](https://github.com/ClaudioMascaro/meada/issues/338) stays open as that evidence: the assumption it would confirm is that the installations listing plus the `affiliation=all` collaborator listing fits one installation's hour at your `max_repositories`, or else that listing the base role's members once is needed first ([known ceilings](enterprise.md#known-ceilings)). Until it is measured, raise `max_repositories` in steps and watch whether `roles` finishes within the job's schedule.
+
 ## Delivery order
 
-Contracts, then the eligible catalog, the first workspace, versions and overlap, and context configuration. Guided authoring and MCP proposals then advance in parallel, and enterprise validation depends on both. The [roadmap](roadmap.md) tracks each step.
+Contracts, then the eligible catalog, the first workspace, versions and overlap, context configuration, guided authoring and MCP proposals, and finally this validation. The [roadmap](roadmap.md) tracks each step.

@@ -8,6 +8,17 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Validation and operation of the named-workspace flow (#347, spec S5): a failure test that forces
+  the role check, the fetch/index and the local publication to fail in turn and shows the current
+  generation stays queryable, eligibility stays fail closed and a revoked grant never revives
+  (only a later complete permissions set restores it); the upgrade procedure (migrate to schema 8,
+  upgrade every binary before the first refresh that records a context, then configure), the
+  failure table and the acceptance map on the named-workspaces page in Brazilian Portuguese,
+  English and Spanish; `[catalog]` and `[workspaces]` in the Compose bootstrap examples; and the
+  Helm values `modules.workspaces` with `values-workspaces.yaml`, which put those sections (and
+  the `[ui]` block the job needs) in the console's and the job's bootstrap and never a node's.
+  The measurement against a real GitHub organization (#338) stays open and does not gate S5. No
+  code, default dependency or golden changed.
 - The proposal server (#346, ADR 0022, feature `proposals`, enabled by `cloud`): `meada workspaces
   mcp --listen <addr> --workspace <bootstrap>` with `[proposals]` (`public_url`, `audience`)
   serves CLI agents four read-only MCP tools over the console's own named-workspace functions:

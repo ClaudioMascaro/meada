@@ -64,6 +64,17 @@ ttl_seconds = 300
 # [oidc.entra]
 # overage = "directory"      # needs [directory] and groups_claim
 
+# Named workspaces (spec S5, ADR 0020 to 0022): the same [catalog] and [workspaces] as the job's
+# (job.workspace.toml), with [ui] operations = true below and [oidc.github] above. The proposal
+# server (`meada workspaces mcp`, feature proposals) is not part of this example: run it beside the
+# console, behind your own TLS, with its own audience in the identity provider.
+# [catalog]
+# allow = ["github.com/acme/*"]
+# max_repositories = 200
+#
+# [workspaces]
+# mirrors = "/srv/mirrors"
+
 [ui]
 dir = "/usr/share/meada/ui"
 public_url = "https://localhost:8444"
