@@ -94,7 +94,8 @@ a major version.
 Adding an optional parameter, a search kind, a configuration key, an export field or a language
 is a minor change. Not covered: the wording of CLI messages, the text of tool descriptions, the
 index file and the layout of `.meada/` (rebuilt when the schema changes), and which links Meada
-finds in a code base (improving resolution is a fix, not a break).
+finds in a code base (improving resolution is a fix, not a break). What 1.x freezes, and what it does not,
+is detailed in [Stability](https://claudiomascaro.github.io/meada/en/stability/).
 
 ## Feed a knowledge base
 

@@ -30,7 +30,7 @@ npx meada --version
 La versión del paquete npm es siempre la del release. Para indexar, Meada solo necesita el
 binario y git. Los detalles de cada canal, de la consola y del contenedor están en
 [Instalación](https://claudiomascaro.github.io/meada/es/installation/) y en la
-[guía del usuario](docs/user-guide.md) (por ahora en portugués; sección 1, Instalação).
+[guía del usuario](docs/user-guide.es.md) (sección 1, Instalación).
 
 ## Primeros pasos
 
@@ -50,7 +50,7 @@ base_url_env = ["API_URL"]          # variable de donde el cliente lee la URL ba
 ```
 
 La referencia completa de `meada.toml` está en la
-[guía del usuario](docs/user-guide.md) (por ahora en portugués; sección 4, referencia de `meada.toml`).
+[guía del usuario](docs/user-guide.es.md) (sección 4, referencia de `meada.toml`).
 
 ## Conectar un agente (MCP)
 
@@ -70,7 +70,7 @@ el `PATH`, use `"command": "meada", "args": ["mcp"]`.
 
 El agente recibe tres herramientas, `search`, `context` y `trace`, que solo leen. Vea
 [Agentes y MCP](https://claudiomascaro.github.io/meada/es/mcp/) y la
-[guía del usuario](docs/user-guide.md) (por ahora en portugués; sección 2, Conectar um agente).
+[guía del usuario](docs/user-guide.es.md) (sección 2, Conectar un agente).
 
 ## Estado
 
@@ -96,7 +96,8 @@ Añadir un parámetro opcional, un tipo de búsqueda, una clave de configuració
 export o un lenguaje es un cambio menor. No entran en la promesa el texto de los mensajes de la
 CLI, el texto de las descripciones de las herramientas, el archivo de índice y el layout de
 `.meada/` (reconstruidos cuando cambia el esquema) y qué enlaces encuentra Meada en un código
-(mejorar la resolución es una corrección, no una ruptura).
+(mejorar la resolución es una corrección, no una ruptura). El detalle de lo que se congela y de
+lo que no está en [Estabilidad](https://claudiomascaro.github.io/meada/es/stability/).
 
 ## Alimentar una base de conocimiento
 
@@ -147,7 +148,7 @@ aguas abajo, fuera de Meada (invariante 1, [ADR 0002](docs/adr/0002-product-inva
 
 ## Documentación
 
-- [Guía del usuario](docs/user-guide.md) (por ahora en portugués)
+- [Guía del usuario](docs/user-guide.es.md)
 - [Configuración](https://claudiomascaro.github.io/meada/es/configuration/)
 - [Agentes y MCP](https://claudiomascaro.github.io/meada/es/mcp/)
 - [Modo servidor](https://claudiomascaro.github.io/meada/es/server/)

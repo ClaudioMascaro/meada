@@ -8,6 +8,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The Spanish user guide (#151, spec #32): `docs/user-guide.es.md`, sections 1 to 11 of the pt-BR
+  guide with the same structure and neutral names, linking the Spanish stability page. The Spanish
+  README links it instead of the Portuguese guide, and the three READMEs link the stability page
+  from the Status section. No code, default dependency or golden changed.
 - The output grammar reference (#145, spec R1): `docs/reference/output-grammar.md`, in English like
   the MCP surface, specifies every line kind of `search`, `context` and `trace`, the link notation
   with its level and reason, the levels in order, the contract identifiers (`http::`, `http::ANY::`

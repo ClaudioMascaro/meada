@@ -96,7 +96,8 @@ Acrescentar um parâmetro opcional, um tipo de busca, uma chave de configuraçã
 export ou uma linguagem é mudança menor. Não entram na promessa o texto das mensagens da CLI, o
 texto das descrições das ferramentas, o arquivo de índice e o layout de `.meada/` (reconstruídos
 quando o esquema muda) e quais ligações o Meada encontra num código (melhorar a resolução é
-correção, não quebra).
+correção, não quebra). O detalhe do que é congelado e do que não é está em
+[Estabilidade](https://claudiomascaro.github.io/meada/stability/).
 
 ## Alimentar uma base de conhecimento
 
