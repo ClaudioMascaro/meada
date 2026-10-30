@@ -75,7 +75,8 @@ modules updates it.
   `search` and `status` show it, with no drift computed of its own: `entries` (binary) takes
   every link with a `Link::drift` or, but for an ambiguous one, whose consumer has a shape in the
   exports (`drift::shown_link`), and finds its consumer call by scanning every repository's calls
-  (Known ceilings); `consumers`, `matches` and `counts` (core) render. `Drift` and
+  (Known ceilings), which a query reads first (`sites`, #396); `consumers`, `matches` and
+  `counts` (core) render. `Drift` and
   `shape::drift` live in `meada-core`'s `shape.rs`. `search` kind `drift` ranks against the route path the seam's `parts` gives (its
   second part). `context` on a contract its kind lists by its providers alone (`View::consumer`
   is `None`, as an HTTP route) appends, after the providers, one
@@ -123,7 +124,9 @@ modules updates it.
   from `Export::communities`) and `processes: <summary>: <label> (<repository>), ...` (the
   summary below, or `none`), sorted by entry point identity.
   `Graph::processes_of` finds them by walking upstream, inverting `Graph::edges` over every
-  node, so membership is the reachability the process walk follows. `processes_line`
+  node read, so membership is the reachability the process walk follows; `trace::read_processes`
+  reads first the nodes upstream of the symbol (calls by their target, links) and the calls of
+  those that are no symbol, every node an inverted edge can come from (#396). `processes_line`
   (`meada-core`'s `context.rs`) opens
   with a summary whenever the symbol belongs to a process, `<n> (<k> route, <k> export; <r>
   repositories)` (kinds in `EntryKind::ALL` order, only those with a count), then the entries
@@ -150,7 +153,9 @@ modules updates it.
   call reaches); an ambiguous call or link is one step listing its candidates; a symbol is expanded at its first
   occurrence (`(see above)` after), a step already on the branch is `(cycle)`. The entry
   points themselves are in `entry.rs`.
-- `trace.rs`: `Graph` over all exports and links, depth-first `Walk`; `meada-core`'s `trace.rs`
+- `trace.rs`: `Graph` over the exports and links a query read (`starts` and `read` read the
+  start and every node a walk may reach, #396; `export` builds it over every row), depth-first
+  `Walk`; `meada-core`'s `trace.rs`
   holds the result (`Row`, `Chain`) and its answer (`Chain::answer`: the rows that fit, the cut
   note, the chain footer, the missing peers), with `level_mark` and `arrow`. A link
   whose consumer is a symbol (a resource reader) is crossed from provider to consumer going

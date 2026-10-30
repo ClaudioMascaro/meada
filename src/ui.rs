@@ -306,7 +306,10 @@ impl Session {
             groups: admitted.groups,
             teams,
             login: admitted.login,
-            github: oidc.github().map(|(host, state)| (host.to_string(), state)),
+            github: oidc
+                .github()
+                .zip(admitted.github_state)
+                .map(|(host, state)| (host.to_string(), state)),
         }
     }
 

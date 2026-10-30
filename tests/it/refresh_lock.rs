@@ -674,9 +674,13 @@ fn every_operation_is_refused_while_a_lock_holds_naming_the_holder() {
     assert!(released(&fleet));
 }
 
-/// The holder lives with the lock: its four fields and a TTL no longer than the lock's while
-/// `lock` runs, renewed past one TTL, gone once the child exits. An operation leaves neither
-/// the lock nor the holder, after success and after failure.
+/// The take script writes the holder just after the lock, so its expiry may fall a few
+/// milliseconds after the lock's.
+const HOLDER_SKEW_MS: i64 = 5;
+
+/// The holder lives with the lock: its four fields and a TTL no longer than the lock's (give or
+/// take `HOLDER_SKEW_MS`) while `lock` runs, renewed past one TTL, gone once the child exits. An
+/// operation leaves neither the lock nor the holder, after success and after failure.
 #[test]
 fn the_holder_lives_with_the_lock_and_an_operation_leaves_none() {
     let Some(fleet) = fleet("ops_holder") else {
@@ -685,19 +689,26 @@ fn the_holder_lives_with_the_lock_and_an_operation_leaves_none() {
     let dir = &fleet.dir;
     let child = lock(dir, MANIFEST, "touch ops/started; sleep 13");
     wait_for(&dir.join("ops/started"));
-    let pttl = |name: &str| -> i64 {
-        let pttl = redis::cmd("PTTL").arg(key(&fleet, name)).clone();
-        pttl.query(&mut admin(&fleet.valkey)).unwrap()
+    // One MULTI/EXEC, so a renewal cannot fall between the two reads.
+    let ttls = || -> (i64, i64) {
+        redis::pipe()
+            .atomic()
+            .cmd("PTTL")
+            .arg(key(&fleet, "lock"))
+            .cmd("PTTL")
+            .arg(key(&fleet, "holder"))
+            .query(&mut admin(&fleet.valkey))
+            .unwrap()
     };
-    let (lock_ttl, holder_ttl) = (pttl("lock"), pttl("holder"));
+    let (lock_ttl, holder_ttl) = ttls();
     assert!(
-        0 < holder_ttl && holder_ttl <= lock_ttl && lock_ttl <= 10_000,
+        0 < holder_ttl && holder_ttl <= lock_ttl + HOLDER_SKEW_MS && lock_ttl <= 10_000,
         "{holder_ttl} {lock_ttl}"
     );
     held_by(&fleet, child.id());
     std::thread::sleep(Duration::from_secs(11));
     held_by(&fleet, child.id());
-    assert!(pttl("holder") > 0);
+    assert!(ttls().1 > 0);
     let (_, stderr, code) = child.wait();
     assert_eq!(code, Some(0), "{stderr}");
     assert!(released(&fleet));

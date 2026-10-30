@@ -37,6 +37,7 @@ mod names;
 #[cfg(feature = "oidc")]
 mod oidc;
 mod package;
+mod partial;
 #[cfg(feature = "postgres")]
 pub mod postgres;
 #[cfg(feature = "proposals")]

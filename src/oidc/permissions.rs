@@ -175,27 +175,32 @@ impl Permissions {
         &self.github.host
     }
 
-    /// The identities `login` reads through GitHub while the set is at most `max_age_seconds`
-    /// old; none otherwise, and never `*` (a row's identity is on `host`).
-    pub(super) fn grant(&self, login: &str) -> Vec<String> {
+    /// The identities `login` reads through GitHub and the grant's state, both from one read
+    /// of the set at one instant: `current` with the set's rows while it is at most
+    /// `max_age_seconds` old, `expired` with none past it, `unread` with none while no set is
+    /// loaded. Never `*` (a row's identity is on `host`).
+    pub(super) fn grant_and_state(&self, login: Option<&str>) -> (Vec<String>, &'static str) {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
-        match &state.set {
-            Some(set) if set.age(Instant::now()) <= self.github.max_age => {
+        self.read_at(state.set.as_ref(), login, Instant::now())
+    }
+
+    /// `grant_and_state` for `set` at `now`.
+    fn read_at(
+        &self,
+        set: Option<&Set>,
+        login: Option<&str>,
+        now: Instant,
+    ) -> (Vec<String>, &'static str) {
+        let state = self.state_of(set, now);
+        let grant = match (set, login) {
+            (Some(set), Some(login)) if state == "current" => {
                 set.logins.get(login).cloned().unwrap_or_default()
             }
             _ => Vec::new(),
-        }
+        };
+        (grant, state)
     }
 
-    /// The GitHub grant's state: `unread` while no set is loaded, `current` while the set is at
-    /// most `max_age_seconds` old, `expired` past it.
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
-    pub(super) fn state(&self) -> &'static str {
-        let state = self.state.read().unwrap_or_else(|e| e.into_inner());
-        self.state_of(state.set.as_ref(), Instant::now())
-    }
-
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
     fn state_of(&self, set: Option<&Set>, now: Instant) -> &'static str {
         match set {
             None => "unread",
@@ -578,17 +583,40 @@ mod tests {
         let cache = cache(60);
         let now = Instant::now();
         assert_eq!(cache.state_of(None, now), "unread");
-        assert!(cache.grant("ana").is_empty());
+        assert!(cache.grant_and_state(Some("ana")).0.is_empty());
         let fresh = set(60, now);
         assert_eq!(cache.state_of(Some(&fresh), now), "current");
         let later = now + Duration::from_millis(1);
         assert_eq!(cache.state_of(Some(&fresh), later), "expired");
         cache.state.write().unwrap().set = Some(set(59, Instant::now()));
-        assert_eq!(cache.grant("ana"), ["github.com/acme/api"]);
-        assert!(cache.grant("bia").is_empty());
+        let (rows, state) = cache.grant_and_state(Some("ana"));
+        assert_eq!(
+            (rows.as_slice(), state),
+            (&["github.com/acme/api".to_string()][..], "current")
+        );
+        assert!(cache.grant_and_state(Some("bia")).0.is_empty());
         cache.state.write().unwrap().set = Some(set(61, Instant::now()));
-        assert!(cache.grant("ana").is_empty());
-        assert_eq!(cache.state(), "expired");
+        assert_eq!(cache.grant_and_state(Some("ana")), (Vec::new(), "expired"));
+    }
+
+    #[test]
+    fn the_grant_and_its_state_never_disagree_across_the_max_age_boundary() {
+        let cache = cache(60);
+        let now = Instant::now();
+        let fresh = set(60, now);
+        let at = cache.read_at(Some(&fresh), Some("ana"), now);
+        assert_eq!(at, (vec!["github.com/acme/api".to_string()], "current"));
+        let past = now + Duration::from_millis(1);
+        let after = cache.read_at(Some(&fresh), Some("ana"), past);
+        assert_eq!(after, (Vec::new(), "expired"));
+        assert_eq!(
+            cache.read_at(None, Some("ana"), now),
+            (Vec::new(), "unread")
+        );
+        assert_eq!(
+            cache.read_at(Some(&fresh), None, now),
+            (Vec::new(), "current")
+        );
     }
 
     #[test]

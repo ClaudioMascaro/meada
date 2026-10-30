@@ -15,6 +15,12 @@ _Avoid_: project, codebase, service
 What Meada builds for one repository: its symbols, calls and contracts, with no source text.
 _Avoid_: database, cache
 
+**Partial export**:
+What `search`, `context` and `trace` read of the indexes: every contract row, and of the symbols
+and calls only those of the answer. `meada export` reads the whole index instead; both answer
+alike.
+_Avoid_: slice, cache
+
 **Span**:
 A range in a source file, stored as a location. The file's content hash (for freshness and before
 showing the text) and, for a symbol's span, the hash of its exact bytes (for duplicates) are

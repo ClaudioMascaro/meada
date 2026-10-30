@@ -5,14 +5,20 @@ CREATE TABLE files (
 );
 CREATE TABLE symbols (id TEXT NOT NULL, path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, hash TEXT NOT NULL);
 CREATE INDEX symbols_path ON symbols (path);
+CREATE INDEX symbols_id ON symbols (id);
+CREATE INDEX symbols_hash ON symbols (hash);
 CREATE TABLE calls (
     id TEXT NOT NULL, caller TEXT NOT NULL, target TEXT, level TEXT,
     path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, narrowed INTEGER NOT NULL,
     decorates TEXT
 );
 CREATE INDEX calls_path ON calls (path);
+CREATE INDEX calls_id ON calls (id);
+CREATE INDEX calls_caller ON calls (caller);
+CREATE INDEX calls_target ON calls (target);
 CREATE TABLE candidates (call TEXT NOT NULL, target TEXT NOT NULL);
 CREATE INDEX candidates_call ON candidates (call);
+CREATE INDEX candidates_target ON candidates (target);
 CREATE TABLE contracts (
     role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
     method TEXT, fragments TEXT, shape TEXT
@@ -31,6 +37,7 @@ CREATE TABLE families (path TEXT NOT NULL, class TEXT NOT NULL, ancestors TEXT);
 CREATE TABLE flexible (path TEXT NOT NULL, name TEXT NOT NULL, least INTEGER NOT NULL, most INTEGER);
 CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL, site TEXT NOT NULL);
 CREATE TABLE communities (name TEXT NOT NULL, member TEXT NOT NULL);
+CREATE INDEX communities_member ON communities (member);
 CREATE TABLE valued (path TEXT PRIMARY KEY);
 
 sample.ts

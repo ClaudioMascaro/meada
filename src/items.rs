@@ -2,11 +2,11 @@
 //! candidates a decision may pick (spec #18). `search` lists them and `meada decide` resolves
 //! them.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
 use crate::contract::{self, Level, Link, kind_of};
-use crate::index::{Export, Provider};
+use crate::index::{Consumer, Export, Provider};
 use crate::render::{Files, callee};
 use crate::workspace::Repository;
 
@@ -98,6 +98,20 @@ impl OpenItem {
 /// Whether `link` is an ambiguous link a person can decide, as its kind says.
 fn decidable(link: &Link) -> bool {
     link.level == Level::Ambiguous && kind_of(&link.contract).is_none_or(|k| k.decidable())
+}
+
+/// The sites `list` places, each with the position of its repository: the unresolved
+/// consumers and those an ambiguous link of `links` leaves from (a call, or a definition).
+pub(crate) fn sites(exports: &[Export], links: &[Link]) -> Vec<(usize, String)> {
+    let ambiguous: HashSet<&str> = (links.iter())
+        .filter(|l| decidable(l))
+        .map(|l| l.consumer.as_str())
+        .collect();
+    let items = exports.iter().enumerate().flat_map(|(n, e)| {
+        let open = |c: &&Consumer| c.contract.is_none() || ambiguous.contains(c.site.as_str());
+        (e.consumers.iter().filter(open)).map(move |c| (n, c.site.clone()))
+    });
+    items.collect()
 }
 
 /// The items of every repository as the core sees them, in id order: `links` are the links

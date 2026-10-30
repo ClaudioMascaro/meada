@@ -8,6 +8,20 @@ use crate::index::Export;
 use crate::render::{Files, label};
 use crate::workspace::Repository;
 
+/// Every link of a consumer that read fields (a shape), or has drift.
+fn shown<'a>(exports: &[Export], links: &'a [Link]) -> impl Iterator<Item = &'a Link> {
+    let reads = |link: &Link| {
+        let mut consumers = exports.iter().flat_map(|e| &e.consumers);
+        consumers.any(|c| c.site == link.consumer && c.shape.is_some())
+    };
+    (links.iter()).filter(move |l| meada_core::drift::shown_link(l, reads))
+}
+
+/// The call sites `entries` places: the consumers of the links it shows.
+pub(crate) fn sites<'a>(exports: &[Export], links: &'a [Link]) -> Vec<&'a str> {
+    shown(exports, links).map(|l| l.consumer.as_str()).collect()
+}
+
 /// Every link of a consumer that read fields (a shape), or has drift, with where it calls.
 pub(crate) fn entries<'a>(
     repos: &[Repository],
@@ -15,13 +29,7 @@ pub(crate) fn entries<'a>(
     links: &'a [Link],
 ) -> Vec<Entry<'a>> {
     let mut files: Vec<Files> = repos.iter().map(|r| Files::new(&r.root)).collect();
-    let reads = |link: &Link| {
-        let mut consumers = exports.iter().flat_map(|e| &e.consumers);
-        consumers.any(|c| c.site == link.consumer && c.shape.is_some())
-    };
-    links
-        .iter()
-        .filter(|l| meada_core::drift::shown_link(l, reads))
+    shown(exports, links)
         .filter_map(|link| {
             // Scans the calls of every repository per link (Known ceilings).
             let (repo, export, call) = exports

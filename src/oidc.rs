@@ -420,6 +420,9 @@ struct Granted {
     #[cfg_attr(not(feature = "ui"), allow(dead_code))]
     login: Option<String>,
     github: Option<Vec<String>>,
+    /// The GitHub grant's state read with `github`, from the same set and instant.
+    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    github_state: Option<&'static str>,
 }
 
 impl Granted {
@@ -514,6 +517,9 @@ pub struct Admitted {
     pub user: Option<String>,
     /// With `[oidc.github]`, the token's login when `login_claim` holds a valid one (#332).
     pub login: Option<String>,
+    /// With `[oidc.github]`, the grant's state read with the grant itself (`unread`, `current`
+    /// or `expired`), so a session never pairs a grant with another instant's state.
+    pub github_state: Option<&'static str>,
 }
 
 /// Each check of a pasted token (ADR 0014): `None` where it could not be made, since the
@@ -783,12 +789,13 @@ impl Oidc {
         #[cfg(feature = "postgres")]
         if let (Some(github), Some(cache)) = (&self.config.github, &self.permissions) {
             let login = permissions::login(claims.get(&github.login_claim));
-            let read = login.as_deref().map(|l| cache.grant(l)).unwrap_or_default();
+            let (read, state) = cache.grant_and_state(login.as_deref());
             return Granted {
                 claims: claims_grant,
                 groups,
                 login,
                 github: Some(read),
+                github_state: Some(state),
             };
         }
         Granted {
@@ -796,6 +803,7 @@ impl Oidc {
             groups,
             login: None,
             github: None,
+            github_state: None,
         }
     }
 
@@ -826,13 +834,13 @@ impl Oidc {
         false
     }
 
-    /// With `[oidc.github]`, its host and the GitHub grant's state (`current`, `expired` or
-    /// `unread`), whatever a token's login (#332).
+    /// With `[oidc.github]`, its host, whatever a token's login (#332). The grant's state travels
+    /// with the admission (`Admitted::github_state`), read with the grant.
     #[cfg(feature = "ui")]
-    pub fn github(&self) -> Option<(&str, &'static str)> {
+    pub fn github(&self) -> Option<&str> {
         #[cfg(feature = "postgres")]
         if let Some(cache) = &self.permissions {
-            return Some((cache.host(), cache.state()));
+            return Some(cache.host());
         }
         None
     }
@@ -1081,6 +1089,7 @@ impl Oidc {
                             .and_then(Value::as_str)
                             .map(str::to_string),
                         login: granted.login,
+                        github_state: granted.github_state,
                     });
                 }
                 Err(refusal) => refusal,

@@ -35,6 +35,7 @@ mod nugetpkg;
 mod oidc;
 mod overloads;
 mod packages;
+mod partial;
 mod postgres;
 mod processes;
 mod pypi;

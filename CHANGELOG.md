@@ -6,6 +6,21 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `search`, `context` and `trace` read from each index its contract rows and only the symbols,
+  calls and communities of their answer (#396, **Partial export**), instead of every row of every
+  repository. Answers are the same bytes; on junit5 a `search` or `context` peaks at about 40 MB
+  instead of 170 to 190 MB and answers in about 0.3 s instead of 1 to 1.4 s. The index gains
+  seven lookup indexes (about 40% larger on junit5) and its schema version changes, so existing
+  indexes are rebuilt. `meada export`, `status` and the decision report still read every row.
+
+### Fixed
+
+- Console GitHub grant (#496): a session's GitHub grant and its state (`unread`, `current`,
+  `expired`) are read from the same permissions set at the same instant, so a session never shows
+  `expired` with a grant read while the set was fresh.
+
 ## [0.1.0] - 2026-10-30
 
 The first release: the trunk of the roadmap (ADR 0003) and every spec merged since, with

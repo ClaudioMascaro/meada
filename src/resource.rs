@@ -131,6 +131,17 @@ impl ContractKind for Resource {
         consumers.dedup_by(|a, b| key(a) == key(b));
     }
 
+    /// The `via` symbols of every resource the repository declares (`matched`).
+    fn symbols_read(&self, repo: &Repository, _export: &Export) -> Option<Vec<String>> {
+        let resources = repo.config.resources.iter();
+        Some(
+            resources
+                .flat_map(|r| &r.via)
+                .map(|via| site(repo, via))
+                .collect(),
+        )
+    }
+
     fn status(&self, repository: &Repository, export: &Export, links: &[Link]) -> Vec<String> {
         report(repository, export, links)
     }
