@@ -27,6 +27,7 @@ COPY examples/golden_diff.rs examples/golden_diff.rs
 COPY tests/golden/schema.txt tests/golden/schema.txt
 COPY tests/fixtures/workspace-validation.json tests/fixtures/workspace-validation.json
 COPY tests/fixtures/named-workspaces.json tests/fixtures/named-workspaces.json
+COPY tests/fixtures/effective-configuration.json tests/fixtures/effective-configuration.json
 COPY ui/ ui/
 RUN cd ui && npm run wasm && npm run build && npm run check:version
 
