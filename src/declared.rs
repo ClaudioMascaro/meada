@@ -96,11 +96,9 @@ impl Types {
         let (file, constant, ty) = code.declared_type(path, "", name)?;
         let within = scope_of(constant);
         let read = self.read(code, file, within, ty)?;
-        let mut shape = Shape {
-            open: read.open,
-            imports: read.imports,
-            ..Shape::new(Source::Reads(path.to_string()))
-        };
+        let mut shape = Shape::new(Source::Reads(path.to_string()));
+        shape.open = read.open;
+        shape.imports = read.imports;
         for (field, optional) in read.fields {
             shape.list(field, optional, true);
         }

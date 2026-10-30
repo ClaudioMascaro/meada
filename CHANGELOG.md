@@ -58,6 +58,16 @@ All notable changes to Meada are recorded here. The format follows
   seven lookup indexes (about 40% larger on junit5) and its schema version changes, so existing
   indexes are rebuilt. `meada export`, `status` and the decision report still read every row.
 
+### Changed
+
+- For `meada-core` crate users: the export's structs (`Export` and each of its pieces, with
+  `Shape` and `Drift`) are `#[non_exhaustive]`, so a field added in 1.x is a minor change. Build
+  one with `T::default()` and named field assignments, or, for a struct with a field that has no
+  default (`Document`, `Import`, `Link`, `Process`, `Step`, `Stale`), with `T::new` taking every
+  field in declaration order (`Shape::new` takes the source, the rest set after it). A struct
+  literal or an exhaustive pattern of these types outside `meada-core` no longer compiles. No
+  output, golden or exported byte changed.
+
 ### Fixed
 
 - Console GitHub grant (#496): a session's GitHub grant and its state (`unread`, `current`,

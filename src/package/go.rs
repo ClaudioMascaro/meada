@@ -296,9 +296,10 @@ mod tests {
         Export {
             repository: name.into(),
             files: (files.iter())
-                .map(|f| crate::index::File {
-                    path: f.to_string(),
-                    hash: String::new(),
+                .map(|f| {
+                    let mut file = crate::index::File::default();
+                    file.path = f.to_string();
+                    file
                 })
                 .collect(),
             exported: (files.iter())
