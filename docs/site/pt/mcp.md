@@ -11,7 +11,7 @@ configuração do seu agente (por exemplo o `.mcp.json` do Claude Code), com `np
 ```json
 {
   "mcpServers": {
-    "meada": { "command": "npx", "args": ["meada", "mcp"] }
+    "meada": { "command": "npx", "args": ["@meada/meada", "mcp"] }
   }
 }
 ```

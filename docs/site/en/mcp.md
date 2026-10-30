@@ -11,7 +11,7 @@ directory). In your agent's configuration (for example Claude Code's `.mcp.json`
 ```json
 {
   "mcpServers": {
-    "meada": { "command": "npx", "args": ["meada", "mcp"] }
+    "meada": { "command": "npx", "args": ["@meada/meada", "mcp"] }
   }
 }
 ```

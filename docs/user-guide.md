@@ -50,18 +50,18 @@ Para Linux e macOS:
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ClaudioMascaro/meada/releases/latest/download/meada-installer.sh | sh
 ```
 
-### npm (`npx meada`)
+### npm (`npx @meada/meada`)
 
 ```sh
-npx meada --version
-npx meada index
+npx @meada/meada --version
+npx @meada/meada index
 ```
 
 O pacote `meada` do npm contém só o instalador: ele baixa da release do GitHub o binário da sua
 plataforma e o executa com os argumentos que você passou. A versão do pacote é sempre a da
 release. A instalação baixa o binário na hora, então ela precisa de rede (não há instalação
 offline pelo npm). É o canal que mais interessa a quem configura um agente, porque
-`npx meada mcp` é a linha de lançamento do servidor MCP (seção 2).
+`npx @meada/meada mcp` é a linha de lançamento do servidor MCP (seção 2).
 
 ### Contêiner
 
@@ -87,7 +87,7 @@ instalação própria, descrita em
 ## 2. Conectar um agente (MCP)
 
 `meada mcp` fala MCP por stdio. O cliente (o agente) executa o comando e conversa com ele. A
-linha de lançamento documentada é `npx meada mcp`, que dispensa uma instalação separada.
+linha de lançamento documentada é `npx @meada/meada mcp`, que dispensa uma instalação separada.
 
 ### Configuração do cliente
 
@@ -96,12 +96,12 @@ No `.mcp.json` do Claude Code, ou no arquivo equivalente do seu cliente:
 ```json
 {
   "mcpServers": {
-    "meada": { "command": "npx", "args": ["meada", "mcp"] }
+    "meada": { "command": "npx", "args": ["@meada/meada", "mcp"] }
   }
 }
 ```
 
-No Claude Code, o mesmo em um comando: `claude mcp add meada -- npx meada mcp`.
+No Claude Code, o mesmo em um comando: `claude mcp add meada -- npx @meada/meada mcp`.
 
 Com `meada` já no `PATH` (por Cargo, binário ou instalador), troque o comando por
 `"command": "meada", "args": ["mcp"]`, que evita a consulta ao npm a cada início.
@@ -544,7 +544,7 @@ trocada por `<hidden>`, e não envia nenhuma.
 #### Privacidade
 
 - Sem `--decider`, nenhum código sai da máquina. Indexar, consultar por MCP e decidir como pessoa
-  não usam rede. Duas coisas fogem a isso e não são decisão: o `npx meada` baixa o binário, e o
+  não usam rede. Duas coisas fogem a isso e não são decisão: o `npx @meada/meada` baixa o binário, e o
   `mcp --listen` abre um servidor HTTP (veja o modo servidor).
 - Com `--decider`, o código de cima sai para o endpoint que você configurou. Para manter tudo na
   máquina, use o protocolo `chat` com um modelo local (`http://localhost:...`).

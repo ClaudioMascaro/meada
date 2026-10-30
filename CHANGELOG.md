@@ -56,8 +56,8 @@ still needs the post-publication evidence.
   macros are not indexed), shape drift, and communities and processes. Java, Kotlin, C# and Swift
   are named only as planned Release 2 work. No code, default dependency or golden changed.
 - The pt-BR user guide, first half (#146, spec #32), in `docs/user-guide.md`: installation through
-  every channel (Cargo, prebuilt binary, shell installer, `npx meada`, container), MCP setup with
-  `npx meada mcp` and the three tools with their parameters, the `meada.toml` reference (every
+  every channel (Cargo, prebuilt binary, shell installer, `npx @meada/meada`, container), MCP setup with
+  `npx @meada/meada mcp` and the three tools with their parameters, the `meada.toml` reference (every
   table and key), decisions and deciders (protocols, environment variables, what is sent,
   privacy), every CLI command and the export. The READMEs in all three languages gain the
   installation channels, first steps, MCP setup and a 1.0 status section with the stability

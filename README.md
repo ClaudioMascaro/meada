@@ -19,7 +19,7 @@ cargo install meada
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ClaudioMascaro/meada/releases/latest/download/meada-installer.sh | sh
 
 # npm: baixa o binário da sua plataforma e o executa, sem instalar nada antes
-npx meada --version
+npx @meada/meada --version
 ```
 
 - **Binário pronto**: baixe o arquivo do seu sistema (Linux, macOS ou Windows, em x86_64 ou
@@ -54,18 +54,18 @@ A referência completa do `meada.toml` está no
 
 ## Conectar um agente (MCP)
 
-`npx meada mcp` é a linha de lançamento do servidor MCP: o cliente a executa e fala com o Meada
+`npx @meada/meada mcp` é a linha de lançamento do servidor MCP: o cliente a executa e fala com o Meada
 por stdio. Na configuração do seu agente (por exemplo o `.mcp.json` do Claude Code):
 
 ```json
 {
   "mcpServers": {
-    "meada": { "command": "npx", "args": ["meada", "mcp"] }
+    "meada": { "command": "npx", "args": ["@meada/meada", "mcp"] }
   }
 }
 ```
 
-No Claude Code, o mesmo em uma linha: `claude mcp add meada -- npx meada mcp`. Com `meada` já no
+No Claude Code, o mesmo em uma linha: `claude mcp add meada -- npx @meada/meada mcp`. Com `meada` já no
 `PATH`, use `"command": "meada", "args": ["mcp"]`.
 
 O agente ganha três ferramentas, `search`, `context` e `trace`, que só leem. Veja
