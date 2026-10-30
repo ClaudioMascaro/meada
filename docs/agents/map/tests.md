@@ -828,3 +828,15 @@ chains and `var` through the overload called, `super`, initializer locals, `Obje
 members, and receivers left unknown: a type parameter, a local named like a field, same-named
 locals of different types, an anonymous class and a cyclic family. `java_static_imports_an_outside_base_may_shadow_are_name_matches` keeps a static import `exact` in a plain class and
 `inferred` under an outside base.
+
+## Named workspaces: creation to query (#342)
+
+`tests/it/ui/oidc/workspaces.rs` drives the console, the job and a node as processes over the
+shared Y/A/B table (`tests/fixtures/named-workspaces.json`), the loopback issuer, the fake GitHub
+API and the local Valkey, Postgres and S3-compatible store: the creation rows (allowed, refused
+with `hidden`, pending, forged keys), peers listing and showing through their own grants, the
+whole pipeline (pull, roles, index, publish, node pull, `/-/workspaces/<id>/<identity>` per
+caller, one bundle of Y, `members` and `contexts` in the document, `state` `applied` then `live`)
+and the sponsor rule (`excluded`, not a failure). `meada-core/tests/named_workspaces.rs` reads
+the same table through `meada_core::named`, and `ui/tests/named-core.test.ts` through the built
+WebAssembly; `ui/tests/NamedWorkspaces.test.tsx` drives the page.

@@ -451,7 +451,7 @@ fn a_viewer_s_grant_bounds_every_view() {
         manifest["manifest"]["ui"]["client_id"],
         json!("meada-console")
     );
-    assert_eq!(manifest["modules"].as_array().unwrap().len(), 10);
+    assert_eq!(manifest["modules"].as_array().unwrap().len(), 11);
     assert!(!manifest.to_string().contains("../gateway"));
     assert!(!manifest.to_string().contains(GATEWAY), "{manifest}");
     assert_eq!(
@@ -1104,5 +1104,7 @@ mod github;
 mod overage;
 #[cfg(feature = "refresh-lock")]
 mod team;
+#[cfg(feature = "workspaces")]
+mod workspaces;
 #[cfg(feature = "refresh-lock")]
 mod writes;

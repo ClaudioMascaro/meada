@@ -1,11 +1,15 @@
 //! The Y/A/B matrix of ADR 0020 and the contracts of ADR 0021 as an executable table
 //! (`tests/fixtures/named-workspaces.json`, #340). No runtime exists yet, so this file holds a
 //! small reference of the rules the ADRs state and checks every row of the table against it, and
-//! that the table covers what the spec requires. When the runtime lands (#341 to #346) its Rust,
-//! public-process and WebAssembly tests read the same rows and this reference goes away.
+//! that the table covers what the spec requires. The pure rules of the creation, discovery,
+//! answer and sponsor rows are `meada_core::named`'s since #342, the functions the console and the
+//! browser call; the binary's public-process tests and the front end's WebAssembly tests read the
+//! same rows.
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use meada_core::authorize::Grant;
+use meada_core::named;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -216,17 +220,12 @@ impl<'a> World<'a> {
             return Outcome::pending("missing_login");
         }
         let (eligible, grant) = (self.eligible(caller), self.grant(caller));
-        let refused: Vec<&String> = select.iter().filter(|i| !eligible.contains(*i)).collect();
-        let named = refused
-            .iter()
-            .filter(|i| grant.contains(**i))
-            .map(|i| (*i).clone());
-        let hidden = refused.iter().filter(|i| !grant.contains(**i)).count();
+        let got = named::creation(select, &eligible, &Grant::Only(grant));
         Outcome {
-            allowed: refused.is_empty(),
+            allowed: got.allowed,
             pending: None,
-            named: named.collect(),
-            hidden,
+            named: got.named,
+            hidden: got.hidden,
         }
     }
 
@@ -236,43 +235,33 @@ impl<'a> World<'a> {
 
     /// ADR 0020: a non-operator sees a workspace only when its grant reads every entry.
     fn visible(&self, name: &str, workspace: &Workspace) -> bool {
-        let grant = self.grant(self.caller(name));
-        self.operates(name, workspace) || workspace.entries.iter().all(|e| grant.contains(e))
+        let grant = Grant::Only(self.grant(self.caller(name)));
+        named::visible(self.operates(name, workspace), &workspace.entries, &grant)
     }
 
     fn readable(&self, name: &str, workspace: &Workspace) -> Vec<String> {
-        let grant = self.grant(self.caller(name));
-        workspace
-            .entries
-            .iter()
-            .filter(|e| grant.contains(*e))
-            .cloned()
-            .collect()
+        let grant = Grant::Only(self.grant(self.caller(name)));
+        named::readable(&workspace.entries, &grant)
     }
 
     fn answers(&self, name: &str, workspace: &Workspace, identity: &str) -> bool {
-        let grant = self.grant(self.caller(name));
-        self.visible(name, workspace)
-            && workspace.entries.iter().any(|e| e == identity)
-            && grant.contains(identity)
+        let grant = Grant::Only(self.grant(self.caller(name)));
+        let operates = self.operates(name, workspace);
+        named::answers(operates, &workspace.entries, &grant, identity)
     }
 
     fn shown(&self, name: &str, workspace: &Workspace, from: &str, to: &str) -> bool {
-        self.answers(name, workspace, from) && self.answers(name, workspace, to)
+        let grant = Grant::Only(self.grant(self.caller(name)));
+        let operates = self.operates(name, workspace);
+        named::shown(operates, &workspace.entries, &grant, from, to)
     }
 
     /// The entries no operator holds an accepted role on.
     fn excluded(&self, workspace: &Workspace, operators: &[String]) -> Vec<String> {
-        let sponsored = |entry: &String| {
-            let holds = |op: &String| self.eligible(self.caller(op)).contains(entry);
-            operators.iter().any(holds)
-        };
-        workspace
-            .entries
-            .iter()
-            .filter(|e| !sponsored(e))
-            .cloned()
-            .collect()
+        let eligible: Vec<BTreeSet<String>> = (operators.iter())
+            .map(|op| self.eligible(self.caller(op)))
+            .collect();
+        named::unsponsored(&workspace.entries, &eligible)
     }
 
     fn without(&self, revoke: &Revoke) -> World<'a> {

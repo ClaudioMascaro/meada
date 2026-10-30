@@ -27,7 +27,7 @@ use std::io::{self, BufReader, BufWriter, Read, Seek, Write};
 use std::path::{Component, Path, PathBuf};
 
 use super::store::{Store, Stored};
-use super::{CURRENT_MAX, Config, DOCUMENT_MAX, Document, Entry, bundle_of, generation_id, is_id};
+use super::{CURRENT_MAX, Config, DOCUMENT_MAX, Document, Entry, bundle_of, is_id};
 use crate::msg::Msg;
 use crate::workspace::{Manifest, identity_problem};
 use crate::{Result, repo};
@@ -277,7 +277,7 @@ pub(super) fn swap(local: &Path, id: &str, fence: u64) -> std::result::Result<()
     fs::rename(&new, local.join(POINTER)).map_err(at)
 }
 
-pub(super) fn io_at(path: &Path) -> impl Fn(io::Error) -> String + use<> {
+pub(crate) fn io_at(path: &Path) -> impl Fn(io::Error) -> String + use<> {
     let shown = path.display().to_string();
     move |e| format!("{shown}: {e}")
 }
@@ -298,7 +298,7 @@ async fn fetch(
         bytes: GENERATION_BYTES_MAX,
         entries: GENERATION_ENTRIES_MAX,
     };
-    for entry in &document.repositories {
+    for entry in document.repositories.iter().chain(&document.members) {
         let bundle = bundle_of(&entry.bundle);
         let tar = partial.join(format!("{bundle}.tar"));
         let at = io_at(&tar);
@@ -378,7 +378,7 @@ fn checked(
         lens.contains(&text.len()) && text.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
     };
     let (mut identities, mut bundles, mut total) = (HashSet::new(), HashSet::new(), 0u64);
-    for entry in &document.repositories {
+    for entry in document.repositories.iter().chain(&document.members) {
         let identity = entry.identity.as_str();
         let unsafe_char = |c: char| c.is_whitespace() || c.is_control() || matches!(c, '"' | '\\');
         let problem = identity_problem(identity)
@@ -428,13 +428,53 @@ fn checked(
                 )
             })?;
     }
-    let ids: Vec<(&str, &str)> = (document.repositories.iter())
-        .map(|e| (e.identity.as_str(), bundle_of(&e.bundle)))
+    let ids_of = |entries: &[Entry]| -> Vec<(String, String)> {
+        (entries.iter())
+            .map(|e| (e.identity.clone(), bundle_of(&e.bundle).to_string()))
+            .collect()
+    };
+    let (own, members) = (ids_of(&document.repositories), ids_of(&document.members));
+    // Each context names repositories the document holds, once, with blocks that read as an
+    // entry's; its digest is hashed into the generation id.
+    let held: HashSet<&str> = (document.repositories.iter().chain(&document.members))
+        .map(|e| e.identity.as_str())
         .collect();
-    if generation_id(&ids) != id {
+    let mut digests = Vec::new();
+    for (at, context) in document.contexts.iter().enumerate() {
+        let ordered = at == 0 || document.contexts[at - 1].id < context.id;
+        if !is_id(&context.id) || !is_id(&context.version) || !ordered {
+            return Err(not());
+        }
+        let mut seen = HashSet::new();
+        for entry in &context.repositories {
+            let mut fields = entry.blocks.as_object().cloned().ok_or_else(not)?;
+            if ["repo", "path", "owner", "added_by"]
+                .iter()
+                .any(|k| fields.contains_key(*k))
+                || !held.contains(entry.repo.as_str())
+                || !seen.insert(entry.repo.as_str())
+            {
+                return Err(not());
+            }
+            fields.insert("repo".into(), entry.repo.as_str().into());
+            fields.insert("path".into(), "".into());
+            serde_json::from_value::<meada_core::manifest::EntryFile>(fields.into())
+                .map_err(|_| not())?;
+        }
+        digests.push((context.id.as_str(), context.digest()));
+    }
+    let digests: Vec<(&str, &str)> = digests.iter().map(|(i, d)| (*i, d.as_str())).collect();
+    let expected =
+        meada_core::ids::generation_id_of(&borrowed(&own), &borrowed(&members), &digests);
+    if expected != id {
         return Err(not());
     }
     Ok(document)
+}
+
+/// `ids` as the pairs `generation_id_of` takes.
+fn borrowed(ids: &[(String, String)]) -> Vec<(&str, &str)> {
+    ids.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect()
 }
 
 /// The extracted mirror made safe for `git`, then checked against the document's entry: `.git`
@@ -741,6 +781,8 @@ fn extensions_bounded(file: &mut File) -> io::Result<bool> {
 
 #[cfg(test)]
 mod tests {
+    use meada_core::ids::generation_id;
+
     use super::super::Credentials;
     use super::*;
     use tar::EntryType;

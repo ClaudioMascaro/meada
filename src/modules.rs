@@ -19,7 +19,7 @@ pub struct Module {
     pub built: bool,
 }
 
-pub const MODULES: [Module; 10] = [
+pub const MODULES: [Module; 11] = [
     Module {
         section: "valkey",
         feature: "valkey",
@@ -67,6 +67,11 @@ pub const MODULES: [Module; 10] = [
     },
     Module {
         section: "catalog",
+        feature: "workspaces",
+        built: cfg!(feature = "workspaces"),
+    },
+    Module {
+        section: "workspaces",
         feature: "workspaces",
         built: cfg!(feature = "workspaces"),
     },

@@ -1605,3 +1605,66 @@ fn a_bad_node_name_names_the_file_the_line_and_the_key() {
         }
     }
 }
+
+/// `[workspaces]` (#342) needs the sections it rides on, each error naming both, and its keys
+/// are checked: the file, the line and the key are named, and the mirrors root is a path, not a
+/// value anyone may read back from an answer.
+#[cfg(feature = "workspaces")]
+#[test]
+fn workspaces_section_errors_name_the_file_the_line_and_the_sections() {
+    let dir = mirrors("manifest_workspaces_errors");
+    let at = "meada: ops/meada.workspace.toml";
+    let head = "index_dir = \"../indexes\"\n";
+    let section = "\n[workspaces]\nmirrors = \"/srv/mirrors\"\n";
+    let oidc = "\n[oidc]\nissuer = \"https://id.example.com\"\npublic_url = \"https://m.example\"\n\
+                identities_claim = \"r\"\n\n[oidc.github]\nhost = \"github.com\"\nlogin_claim = \"l\"\n\
+                max_age_seconds = 600\n\n[postgres]\nschema = \"m\"\n\n\
+                [catalog]\nallow = [\"github.com/a/*\"]\nmax_repositories = 5\n";
+    let ui = "\n[ui]\ndir = \"u\"\npublic_url = \"https://c.example\"\nclient_id = \"c\"\n\
+              operations = true\noperator_claim = \"op\"\n";
+    let full = format!("{head}{section}{oidc}{ui}");
+    let line = full.lines().position(|l| l == "[workspaces]").unwrap() + 1;
+    for (toml, expected) in [
+        (
+            format!("{head}{section}"),
+            format!("{at}:3: [workspaces] needs [ui] and [oidc.github] and [catalog]\n"),
+        ),
+        (
+            full.replace("operations = true", "operations = false"),
+            format!("{at}:{line}: `workspaces`: [workspaces] needs [ui] operations = true\n"),
+        ),
+        (
+            full.clone(),
+            format!(
+                "{at}:{line}: `workspaces`: [workspaces] needs [workspace] source = \"store\"\n"
+            ),
+        ),
+        (
+            full.replace("/srv/mirrors", "relative/mirrors"),
+            format!(
+                "{at}:{}: `workspaces.mirrors`: must be an absolute path without `..`, the root \
+                 of the mirrors named workspaces use\n",
+                line + 1
+            ),
+        ),
+        (
+            full.replace("mirrors = \"/srv/mirrors\"", "max_entries = 501"),
+            format!("{at}:{line}: `workspaces`: `workspaces.mirrors` is missing\n"),
+        ),
+        (
+            full.replace(
+                "mirrors = \"/srv/mirrors\"\n",
+                "mirrors = \"/m\"\nmax_workspaces = 2001\n",
+            ),
+            format!(
+                "{at}:{}: `workspaces.max_workspaces`: must be at most 2000\n",
+                line + 2
+            ),
+        ),
+    ] {
+        write_manifest(&dir, &toml);
+        let (stdout, stderr, ok) = run(&dir, "status");
+        assert!(!ok && stdout.is_empty(), "{toml}");
+        assert_eq!(stderr, expected, "{toml}");
+    }
+}

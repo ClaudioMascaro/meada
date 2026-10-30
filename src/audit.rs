@@ -26,7 +26,7 @@ use crate::msg::Msg;
 
 /// The actions a record names: the operations, and `pointer`, the route-level action of a
 /// pointer request refused before its body is read.
-pub const ACTIONS: [&str; 8] = [
+pub const ACTIONS: [&str; 9] = [
     "workspace.save",
     "workspace.import",
     "workspace.apply",
@@ -35,6 +35,7 @@ pub const ACTIONS: [&str; 8] = [
     "pointer.drop",
     "fence.recover",
     "pointer",
+    "workspaces.create",
 ];
 
 /// The outcome a finished write records.
@@ -296,7 +297,14 @@ fn record(row: &tokio_postgres::Row) -> Option<Value> {
     };
     let action = one_of(7, &ACTIONS)?;
     let arguments: serde_json::Map<String, Value> = serde_json::from_str(&text(8)??).ok()?;
-    let known = ["version", "message", "generation", "at_least"];
+    let known = [
+        "version",
+        "message",
+        "generation",
+        "at_least",
+        "workspace",
+        "authority",
+    ];
     if !(arguments.iter()).all(|(k, v)| known.contains(&k.as_str()) && v.is_string()) {
         return None;
     }

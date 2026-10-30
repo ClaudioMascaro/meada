@@ -259,3 +259,48 @@ fn an_added_by_joins_the_canonical_text_and_changes_the_workspace_version_id() {
     assert_ne!(of(None, Some("ana-souza")), of(None, Some("ana-souza2")));
     assert_ne!(of(None, Some("ana-souza")), of(Some("ana-souza"), None));
 }
+
+#[test]
+fn named_workspaces_change_the_generation_id_and_their_absence_changes_nothing() {
+    use meada_core::ids::{generation_id, generation_id_of};
+    let bundles = [
+        ("h/o/web", "0123456789abcdef"),
+        ("h/o/api", "fedcba9876543210"),
+    ];
+    // Without members and contexts the id is the one every earlier generation has.
+    assert_eq!(
+        generation_id_of(&bundles, &[], &[]),
+        generation_id(&bundles)
+    );
+    let member = [("h/o/lib", "1111111111111111")];
+    let context = [("aaaaaaaaaaaaaaaa", "2222222222222222")];
+    let with_member = generation_id_of(&bundles, &member, &[]);
+    let with_context = generation_id_of(&bundles, &member, &context);
+    assert_ne!(with_member, generation_id(&bundles));
+    assert_ne!(with_context, with_member);
+    // A repository listed as a member is not the same fact as one the deployment lists.
+    assert_ne!(
+        generation_id_of(&bundles, &member, &[]),
+        generation_id_of(&[bundles[0], bundles[1], member[0]], &[], &[])
+    );
+    // Order never matters.
+    assert_eq!(
+        generation_id_of(&[bundles[1], bundles[0]], &member, &context),
+        generation_id_of(&bundles, &member, &context)
+    );
+}
+
+#[test]
+fn a_workspace_id_hashes_its_creator_name_and_first_version_only() {
+    use meada_core::ids::{is_id, workspace_id};
+    let id = workspace_id("alice", "Payments", "0123456789abcdef");
+    assert!(is_id(&id));
+    assert_eq!(id, workspace_id("alice", "Payments", "0123456789abcdef"));
+    for other in [
+        workspace_id("bob", "Payments", "0123456789abcdef"),
+        workspace_id("alice", "Payment", "0123456789abcdef"),
+        workspace_id("alice", "Payments", "fedcba9876543210"),
+    ] {
+        assert_ne!(id, other);
+    }
+}

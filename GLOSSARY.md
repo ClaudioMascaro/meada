@@ -316,6 +316,19 @@ accepted role is selectable (ADR 0021). Built by #341: `[catalog]`, the job's in
 listing, the `source` column of the permissions set and `GET /api/v1/catalog`.
 _Avoid_: repository list, inventory, discovery index
 
+**Context**:
+A named workspace as a generation records it: its id, the version it was at and its non-excluded
+entries with their blocks, and nothing else (no name, description or operator, which exist only in
+Postgres). A pinned generation reproduces it exactly; the node answers it at
+`/-/workspaces/<id>/<identity>` (ADR 0021, #342).
+_Avoid_: view, scope, tenant
+
+**Member**:
+A repository only named workspaces select: it is fetched, indexed and bundled once, at
+`<[workspaces] mirrors>/<identity>`, and a generation lists it apart from the deployment
+workspace's repositories (#342). The plain route never serves it.
+_Avoid_: shared repository, extra repository
+
 **Eligible**:
 Said of a repository for a subject: the catalog holds it, the newest permissions set is fresh and
 the subject's login holds an accepted role on it, directly or through a repository group. Creation

@@ -8,6 +8,34 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The first named workspace of spec S5 (#342, ADR 0021 contracts 2 to 5, cargo feature
+  `workspaces`): `[workspaces]` (`mirrors`, an absolute root; `max_workspaces`, default 200, 1 to
+  2000; `max_entries`, default 100, 1 to 500) needs `[ui]` with `operations = true`,
+  `[oidc.github]`, `[catalog]` and `[workspace] source = "store"`. An admitted subject whose
+  GitHub login holds an accepted role on every selected repository, directly or through a group,
+  creates a workspace with `POST /api/v1/workspaces`; `GET /api/v1/workspaces` and
+  `GET /api/v1/workspaces/<id>` list and show it to whoever's own grant reads every one of its
+  repositories (anyone else gets the one 404 of an unknown id), with `state` (`applied` or
+  `live`) and each entry's `ingestion` (`pending`, `ready` or `excluded`), never ready before a
+  generation records it. The creator operates it; group peers only view. The
+  decision is taken in one Postgres transaction against the newest permissions set (migration 7:
+  `workspaces`, `workspace_operators`, `workspace_versions`, `workspace_history` and a `context`
+  column on `permission_exclusions`; run `meada postgres migrate`); the version document is the
+  shared store's `workspaces/<version id>.json`. `meada workspace pull` also writes the contexts
+  file, `meada github-app roles` applies the sponsor rule (an entry no operator of its workspace
+  holds an accepted role on is left out before the fetch, `no_sponsor`, which is not a failed
+  fetch), and the repositories only named workspaces select are fetched, indexed and bundled once
+  at `<mirrors>/<identity>` (`meada workspace show --pulled` lists them). A generation records them
+  as `members` and the named workspaces as `contexts` (ids and digests in the generation id; a
+  deployment without named workspaces keeps every id), and a node serves
+  `/-/workspaces/<id>/<identity>` only to a token that reads every repository of the context (the
+  first segment `-` is reserved); the console's playground gains `workspace` and
+  `GET /api/v1/workspaces/<id>/repositories/<identity>/export`. The console has the workspaces
+  page (list, detail, creation from the catalog) and WebAssembly exports for the shared
+  rules. Save, apply, rename, delete and delegation (#343), per-context configuration (#344),
+  guided authoring (#345) and proposals (#346) are not built. Without `[workspaces]` every
+  process behaves as before; upgrade every binary, nodes included, before the first refresh that
+  records a context.
 - The repository catalog of spec S5 (#341, ADR 0021 contract 1, cargo feature `workspaces`,
   part of `cloud`): `[catalog]` (`allow` patterns on `[oidc.github] host`, `max_repositories`
   1 to 5000 with no default) makes `meada github-app roles` list, besides the workspace's own

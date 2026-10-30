@@ -1,7 +1,7 @@
 # Workspaces con nombre
 
-!!! warning "Planificado: S5, contratos decididos; el catálogo ya existe"
-    [S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) es alcance secuencial aceptado después de S3 y S4. La [consolidación de contratos, #340](https://github.com/ClaudioMascaro/meada/issues/340), está terminada: los ADR 0020, 0021 y 0022 fijan los contratos descritos aquí. Del runtime solo se entregó el **catálogo** ([#341](https://github.com/ClaudioMascaro/meada/issues/341)): `[catalog]`, el listado del job, `GET /api/v1/catalog`, `POST /api/v1/catalog/check` y el selector de la consola, descritos en [el catálogo](github-app.md#el-catalogo-de-repositorios) y en la [consola](console.md#catalogo-de-repositorios). La consola que puedes ejecutar hoy aún opera con un workspace por deployment, y el resto de lo siguiente no es todavía una opción de configuración.
+!!! warning "Parcialmente entregado: S5, contratos decididos; el catálogo y el primer workspace ya existen"
+    [S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) es alcance secuencial aceptado después de S3 y S4. La [consolidación de contratos, #340](https://github.com/ClaudioMascaro/meada/issues/340), está terminada: los ADR 0020, 0021 y 0022 fijan los contratos descritos aquí. Del runtime se entregaron dos porciones: el **catálogo** ([#341](https://github.com/ClaudioMascaro/meada/issues/341)), descrito en [el catálogo](github-app.md#el-catalogo-de-repositorios) y en la [consola](console.md#catalogo-de-repositorios), y el **primer workspace** ([#342](https://github.com/ClaudioMascaro/meada/issues/342)): `[workspaces]`, creación, listado y consulta, ingestión compartida con la regla del patrocinador y la ruta del nodo, descritos en la [consola](console.md#workspaces-con-nombre). Guardar versiones, revertir, renombrar, borrar y delegar, la configuración por workspace, la autoría guiada y las propuestas MCP no están construidos, y el resto de lo siguiente no es todavía una opción de configuración. Sin `[workspaces]` la consola sigue operando con un workspace por deployment.
 
 ## Componer sin duplicar la indexación
 
@@ -10,6 +10,12 @@ Los workspaces con nombre se superponen sobre indexación compartida. Un reposit
 El grant efectivo por repositorio sigue siendo la autoridad. Con Y legible por los grupos A y B, el repositorio A solo por el grupo A y el repositorio B solo por el grupo B, un operador solo en A puede componer Y+A y se le rechaza Y+B; un operador solo en B puede componer Y+B y se le rechaza Y+A; quien está en ambos puede componer los tres. Compartir Y no concede A ni B a nadie, y un enlace de Y a B no aparece en el workspace de Y+A.
 
 <!-- meada-graph:workspace-overlap -->
+
+## El primer workspace
+
+Un mantenedor admitido, sin ninguna entrada propia, abre **Workspaces con nombre** en la consola, elige repositorios del catálogo, da nombre al workspace y confirma el manifiesto que muestra la página. El servidor decide de nuevo en una transacción contra el conjunto de permisos más nuevo: todo repositorio seleccionado debe estar en el catálogo y el login de GitHub de la persona debe tener un rol aceptado en él, directo o por un grupo. Un rechazo nombra los repositorios que la concesión de la persona lee y solo cuenta los demás. El workspace se guarda a nombre de la persona, que lo opera; los colegas cuyas concesiones propias leen los mismos repositorios lo ven sin invitación alguna y no pueden modificarlo.
+
+El workspace pasa a poder consultarse por el job compartido: `meada workspace pull` lo lee, `meada github-app roles` deja fuera, antes del fetch, toda entrada en la que ninguno de sus operadores tiene un rol aceptado (una decisión de política, no un fetch fallido) y los repositorios que solo seleccionan workspaces con nombre se descargan, indexan y publican una vez, en `<[workspaces] mirrors>/<identity>`. Hasta que una generación registra el workspace, la consola lo muestra como `applied` con sus entradas `pending`; una vez registrado es `live` y sus entradas `ready`. Un fetch o una indexación fallidos siguen abortando toda la publicación y manteniendo la generación actual.
 
 ## Quién puede qué
 

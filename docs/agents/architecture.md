@@ -252,13 +252,39 @@ checks its tests; Rust/default stages gain no frontend input.
 Vitest exercises the built WASM and the public client, view-model and DOM
 seams, without a browser end-to-end suite.
 
-## Named workspaces (spec S5): the catalog is built, the rest is planned
+## Named workspaces (spec S5): the catalog and the first workspace are built, the rest is planned
 
 ADR 0020 holds the domain decision, ADR 0021 the contracts (catalog, selected entries, shared
 ingestion membership, version lifecycle in Postgres, query selection through the generation
 document's `members` and `contexts` and the route `/-/workspaces/<id>/<identity>`, effective
 configuration, ids) and ADR 0022 the proposal server. Slices #341 to #347 build them in that
 order and each updates this map with what it delivers.
+
+Delivered by #342 (contracts 2 to 5 as far as create, list, show, shared ingestion and the node
+route go; ADR 0021 "As built (#342)"), same feature: `workspaces.rs` is `[workspaces]` (`mirrors`,
+`max_workspaces`, `max_entries`), the contexts file (`Context`, `read_contexts`, `write_contexts`,
+checked as hostile input) and `membership` (the contexts the sponsor rule left entries in, and the
+repositories only they select); `workspaces/store.rs` is the Postgres side (`create`, the one
+transaction that decides eligibility from the newest set; `records`; `current_contexts` for the
+pull; the version document's text and check); migration 7 adds the four tables, `workspaces.entries`
+and the `context` column of `permission_exclusions`; `ui/workspaces.rs` is `POST` and `GET
+/api/v1/workspaces[/<id>]` and the export through a context, and `Console::open` takes the
+optional workspace the playground and the export ask through; `snapshot/versions.rs` pulls the
+contexts beside the deployment version (`Pulled::Empty`), reads and writes the exclusions file
+with its context lines and digest (`excluded_contexts`, `write_excluded_with`); `github_app.rs`
+lists the contexts' identities and applies the sponsor rule (`no_sponsor`);
+`workspace.rs` gives `Listed` its `member` flag, builds the members after the deployment entries
+from `membership`, and `Manifest::of_context` builds a recorded context; `snapshot.rs` records
+`members` and `contexts` in the document (`Context::digest`) and `generation_id_of` hashes them;
+`snapshot/pull.rs` checks them; `snapshot/serve.rs` `Held::context` builds a context once;
+`mcp.rs` routes `/-/workspaces/<id>/<identity>` and `Engine::open_context` opens it;
+`meada-core/src/named.rs` holds the pure rules (`creation`, `visible`, `answers`, `shown`,
+`unsponsored`, names, named entries and their version id) that the Rust table test, the console
+and the front end's WebAssembly (`namedAuthorize`, `namedVisible`, `namedEntriesJson`,
+`namedEntriesText`, `namedVersionId`) share, with `validate_named` in `manifest.rs`; the front
+end's `NamedWorkspacesPage.tsx` lists, shows and creates. Not built: save, apply, rollback,
+rename, delete and delegation (#343), the effective configuration (#344), guided authoring
+(#345) and proposals (#346).
 
 Delivered by #341 (contract 1, the catalog), behind the cargo feature `workspaces` (it implies
 `ui`, `oidc`, `postgres`, `github-app`, `generation-pointer` and `refresh-lock`; `cloud` turns it
@@ -2655,6 +2681,16 @@ one for the area a change touches.
 
 ## Known ceilings
 
+- `ui/workspaces.rs`, `workspaces.rs`, `snapshot/versions.rs`, `meada-core/src/named.rs` (#342):
+  `CREATE_MAX` (80 KiB) bounds a creation's body (413), `TEXT_MAX` (64 KiB) a named manifest's
+  text, `NAME_MAX` (80) and `DESCRIPTION_MAX` (500) their characters, `LIST_LIMIT_MAX` (100) and
+  `AFTER_MAX` (256) a list page and its cursor, `WORKSPACES_MAX` (2000) and `ENTRIES_MAX` (500)
+  what `max_workspaces` and `max_entries` may allow and what a reader of the contexts file or a
+  version document accepts whatever they say now (a version document is also bounded by the
+  deployment version's `VERSION_MAX`), `OPERATORS_MAX` (20) a workspace's operators,
+  `CONTEXTS_MAX` (256 MiB) the contexts file `meada workspace pull` writes and `EXCLUDED_MAX`
+  (128 MiB) the exclusions file; past one the file counts as hostile. Their product is what a
+  refresh pulls and publishes: the single failure domain of one fleet (ADR 0021).
 - `directory/read.rs`: the owner picker lists at most `PICKER_MAX` (100) group names and says
   nothing when it cut the list; the global operator narrows it by typing more of the prefix
   (#335).

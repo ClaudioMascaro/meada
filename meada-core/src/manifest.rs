@@ -306,6 +306,111 @@ pub fn entry_problems<'a>(repos: impl IntoIterator<Item = &'a str>) -> Vec<Optio
         .collect()
 }
 
+/// A named workspace's `[[repository]]` (ADR 0021): the blocks of an entry and nothing the platform
+/// owns, so no `path`, `owner` or `added_by`.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NamedEntry {
+    repo: String,
+    #[serde(default, deserialize_with = "declared")]
+    serve: Serve,
+    #[serde(default, rename = "resource")]
+    resources: Vec<Resource>,
+    #[serde(default, rename = "peer")]
+    peers: Vec<EntryPeer>,
+}
+
+/// The text of a named workspace: its `[[repository]]` entries and nothing else.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NamedEntries {
+    #[serde(default, rename = "repository")]
+    repositories: Vec<NamedEntry>,
+}
+
+/// The keys a named workspace's entry may not set (ADR 0021), as dotted keys of the text.
+const NAMED_RESERVED: [&str; 4] = [
+    "repository.path",
+    "repository.owner",
+    "repository.added_by",
+    "repository.serve.documents",
+];
+
+/// The longest environment-variable reference a peer's `base_url_env` may hold.
+const ENV_NAME_MAX: usize = 128;
+
+fn env_name_ok(name: &str) -> bool {
+    let mut chars = name.chars();
+    chars
+        .next()
+        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && name.len() <= ENV_NAME_MAX
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// The entries of a named workspace's text `src`, shown as `file` (ADR 0021), at most
+/// `max_entries` and `TEXT_MAX` bytes: every problem as the CLI prints them. Each entry's `path`
+/// is empty and its `owner` and `added_by` none: a named entry holds neither. `path`, `owner`,
+/// `added_by` and `serve.documents` are refused, a peer's `base_url_env` holds names of
+/// variables and never a value.
+pub fn validate_named(
+    file: &str,
+    src: &str,
+    max_entries: usize,
+) -> Result<Vec<EntryFile>, Vec<String>> {
+    if src.len() > crate::named::TEXT_MAX {
+        let what = Msg::NamedTextTooLong(crate::named::TEXT_MAX).text();
+        return Err(vec![format!("{file}: {what}")]);
+    }
+    if let Ok(table) = DeTable::parse(src) {
+        let mut keys = Vec::new();
+        flatten(table.get_ref(), "", &mut keys);
+        let reserved: Vec<String> = (keys.iter())
+            .filter(|(name, _, _)| NAMED_RESERVED.contains(&name.as_str()))
+            .map(|(name, _, _)| {
+                let key = name.rsplit('.').next().unwrap_or(name);
+                error_at(file, src, name, &Msg::NamedReserved(key).text())
+            })
+            .collect();
+        if !reserved.is_empty() {
+            return Err(reserved);
+        }
+    }
+    let parsed: NamedEntries = parse(file, src, "meada.workspace.toml").map_err(|e| vec![e])?;
+    if parsed.repositories.len() > max_entries {
+        let what = Msg::NamedTooMany(max_entries).text();
+        return Err(vec![format!("{file}: {what}")]);
+    }
+    let mut problems = Vec::new();
+    for entry in &parsed.repositories {
+        if entry.repo.split('/').next() == Some("-") {
+            let what = Msg::NamedDashSegment.text();
+            problems.push(format!("{file}: {}: {what}", entry.repo));
+        }
+        for peer in &entry.peers {
+            for name in peer.base_url_env.iter().filter(|n| !env_name_ok(n)) {
+                let what = Msg::NamedEnvName(name).text();
+                problems.push(format!("{file}: {}: {what}", entry.repo));
+            }
+        }
+    }
+    if !problems.is_empty() {
+        return Err(problems);
+    }
+    let entries = (parsed.repositories.into_iter())
+        .map(|e| EntryFile {
+            repo: e.repo,
+            path: String::new(),
+            owner: None,
+            added_by: None,
+            serve: e.serve,
+            resources: e.resources,
+            peers: e.peers,
+        })
+        .collect();
+    checked(entries)
+}
+
 /// The text of a workspace: its `[[repository]]` entries and nothing else.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]

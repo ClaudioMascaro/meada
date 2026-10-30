@@ -164,6 +164,56 @@ const MIGRATIONS: &[&str] = &[
     // The catalog is the `catalog` and `both` rows whose coverage is `listed`.
     "ALTER TABLE {schema}.permission_repositories
        ADD COLUMN source text NOT NULL DEFAULT 'selected';",
+    // 7: named workspaces (#342, ADR 0021). A workspace is a stable id with a name, a current
+    // version and a `seq`, the base every write must still find; `entries` is the identities of
+    // the current version in manifest order, a copy that moves with `current` so that a list
+    // reads no store document. Operators are (workspace, subject) pairs; a version row says who
+    // stored a document of the shared store and when; the history is append only. An exclusion
+    // belongs to the deployment workspace (`context` empty) or to one named workspace, and a
+    // named entry has no `added_by`.
+    "CREATE TABLE {schema}.workspaces (
+       id text PRIMARY KEY,
+       name text NOT NULL,
+       description text NOT NULL DEFAULT '',
+       creator text NOT NULL,
+       creator_login text,
+       created timestamptz NOT NULL DEFAULT now(),
+       deleted timestamptz,
+       seq bigint NOT NULL,
+       current text NOT NULL,
+       entries text[] NOT NULL DEFAULT '{}'
+     );
+     CREATE TABLE {schema}.workspace_operators (
+       workspace_id text NOT NULL REFERENCES {schema}.workspaces (id),
+       subject text NOT NULL,
+       login text,
+       added_by text NOT NULL,
+       added timestamptz NOT NULL DEFAULT now(),
+       PRIMARY KEY (workspace_id, subject)
+     );
+     CREATE TABLE {schema}.workspace_versions (
+       workspace_id text NOT NULL REFERENCES {schema}.workspaces (id),
+       version text NOT NULL,
+       author text NOT NULL,
+       saved timestamptz NOT NULL DEFAULT now(),
+       message text NOT NULL,
+       PRIMARY KEY (workspace_id, version)
+     );
+     CREATE TABLE {schema}.workspace_history (
+       workspace_id text NOT NULL REFERENCES {schema}.workspaces (id),
+       seq bigint NOT NULL,
+       action text NOT NULL,
+       version text,
+       actor text NOT NULL,
+       authority text NOT NULL,
+       \"time\" timestamptz NOT NULL DEFAULT now(),
+       message text,
+       PRIMARY KEY (workspace_id, seq)
+     );
+     ALTER TABLE {schema}.permission_exclusions DROP CONSTRAINT permission_exclusions_pkey;
+     ALTER TABLE {schema}.permission_exclusions ADD COLUMN context text NOT NULL DEFAULT '';
+     ALTER TABLE {schema}.permission_exclusions ALTER COLUMN added_by DROP NOT NULL;
+     ALTER TABLE {schema}.permission_exclusions ADD PRIMARY KEY (set_id, context, identity);",
 ];
 
 /// The `[postgres]` section as written.

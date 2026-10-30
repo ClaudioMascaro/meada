@@ -23,9 +23,12 @@ The maintainer's decision of 2026-10-29 applies: the real-organization measureme
 github-app roles` (#338) does not gate S5. This ADR consolidates against the merged code and
 the existing fakes, and the assumption real evidence would confirm is named under Open.
 
-Implementation status: #341 built contract 1 (the catalog, below) and, as of 2026-10-30, nothing
-else here; the cargo feature `workspaces` exists with `[catalog]` as its only section. Current
-behavior otherwise is ADR 0014's one workspace per deployment.
+Implementation status: #341 built contract 1 (the catalog, below) and #342 the creation and the
+query of the first workspace (contracts 2 to 5 as far as create, list, show, the shared ingestion
+and the node route go, "As built (#342)" below); the cargo feature `workspaces` has `[catalog]`
+and `[workspaces]`. Save, apply, rollback, rename, delete and delegation (#343), the effective
+configuration (#344), guided authoring (#345) and proposals (#346) are not built. Current behavior
+without `[workspaces]` is ADR 0014's one workspace per deployment.
 
 ## Decision
 
@@ -311,6 +314,60 @@ or `current`.
   exemptions: management views (metadata, entries, versions) are unfiltered for the platform
   administrator, while every graph answer, the administrator's included, is bounded by the
   caller's grant.
+
+**As built (#342).** The record, the lifecycle's first row and the query selection are built
+as follows; where a line differs from the contract above it says so.
+
+- `[workspaces]` is read by `Manifest::read`; its errors name both sections. A deployment with no
+  current version is an empty deployment workspace under it (`meada workspace pull` does not
+  fail, removes the current file, and the exclusions file names the version `0000000000000000`).
+- Migration 7 adds `workspaces.entries text[]`, the identities of the current version in manifest
+  order, a copy that moves with `current` so that a list reads no store document; the document
+  stays the authority. `permission_exclusions` gains `context` as contract 3 says.
+- **Create** (`POST /api/v1/workspaces` `{name, description?, entries, message}`, `entries` the
+  manifest text) checks the admission cache before anything is stored (a refusal stores nothing),
+  writes `workspaces/<version id>.json` to the store with create-if-absent, and then runs the
+  atomic boundary: one transaction under an advisory lock that reads the newest set on Postgres's
+  clock (pending `no_set`, `stale_set` or `missing_login` is a 409 `pending` with `reason`), keeps
+  the selected identities that are in the catalog and, for anyone but the administrator, on which
+  the login holds an accepted role, refuses the rest with 403 `entries_refused` (`refused` names
+  the identities the caller's grant reads, `hidden` counts the others), and inserts the
+  workspace (`seq` 1), its first operator, the version row and the `create` history row. The same
+  creator, name and entries are the same workspace (200, `created: false`); a deleted one is 409
+  `workspace_deleted`. The audit record is `workspaces.create` with `workspace`, `version` and
+  `authority`. A manifest with `path`, `owner`, `added_by` or `serve.documents` is a 422
+  `invalid_entries`.
+- **List and show** apply `meada_core::named::visible` to the identities of the current version:
+  a workspace the caller neither operates nor reads whole is absent, and `show` answers it as it
+  answers an unknown id. `state` is `live` when the console's held generation records the
+  context at the current version, else `applied`; an entry is `excluded` when the newest set
+  excludes it for that workspace, `ready` when the live generation records it, else `pending`.
+- **Pull and membership.** `meada workspace pull` writes `<index_dir>/workspace/contexts` (sorted
+  by id, with the operators' logins) and `meada github-app roles` reads it, lists the context
+  identities as `selected` rows, applies the sponsor rule and writes the exclusions file with a
+  `# contexts <digest>` line naming the contexts file it decided for; a reader that finds another
+  digest refuses, so the order is pull, roles, then fetch, index and publish. `meada workspace
+  show --pulled` lists the members after the deployment entries with their paths.
+- **Generation.** `members` and `contexts` are in `Document` in every `snapshot` build; `Context`
+  is `{id, version, repositories: [{repo, blocks}]}` and its digest is
+  `context_digest` of that JSON. A context left with no entry is not recorded. The node start
+  check also vets the contexts' repositories, and a generation with contexts and no deployment
+  repositories is servable.
+- **Route and admission** are as contract 5 says: the pass must read every repository the context
+  records, a pin of a generation that has no such context is a 404, and a result's `_meta` names
+  `meada/workspace`. The console's playground takes `workspace`, and `GET
+  /api/v1/workspaces/<id>/repositories/<identity>/export` returns the context's export; an operator
+  that cannot read every repository asks through its workspace with every answer bounded by its
+  grant.
+- The version id of a named entry is `meada_core::ids::named_version_id`, a function beside
+  `workspace_version_id` rather than an optional path in it; the hash is the one the contract
+  describes (`{"blocks","repo"}`), and no deployment version id changes.
+- A pin of a held generation that records no such workspace for the caller answers a 404 naming
+  that generation and the current one; an unpinned miss lists the workspaces the token may view.
+- The console writes an audit record for a creation refused by the admission cache too
+  (`refused`), and shows an entry `excluded` to the workspace's operators alone.
+- Not built here: the CLI twins `meada workspaces ...`, the `versions`, `effective` and
+  `operators` routes, and every other row of the lifecycle table.
 
 ### Contract 6: effective configuration
 

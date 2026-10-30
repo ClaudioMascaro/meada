@@ -8,6 +8,8 @@ export interface Config {
   audit?: boolean;
   /** With `[catalog]` (#341): the catalog and its picker have their routes. */
   catalog?: boolean;
+  /** With `[workspaces]` (#342): the named workspaces pages have their routes, and a selection holds at most `max_entries` repositories. */
+  workspaces?: { max_entries: number };
   issuer?: string;
   client_id?: string;
   scopes?: string[];

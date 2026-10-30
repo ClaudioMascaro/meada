@@ -27,8 +27,59 @@ pub struct Held {
     /// `<local_dir>/<id>`.
     pub dir: PathBuf,
     /// Its repositories, in the document's order, each mirror and index inside the generation's
-    /// directory.
+    /// directory. The repositories only named workspaces select are not here: the plain route
+    /// serves the deployment workspace alone.
     pub listed: Manifest,
+    /// The document, for the named workspaces it records (#342, ADR 0021).
+    document: Document,
+    /// The workspace of each context read so far, by id: built when a request first names the
+    /// context and kept with the generation, which never changes.
+    built: Mutex<HashMap<String, Arc<Manifest>>>,
+}
+
+impl Held {
+    /// The ids of the contexts the generation records, sorted.
+    pub fn context_ids(&self) -> Vec<&str> {
+        self.document
+            .contexts
+            .iter()
+            .map(|c| c.id.as_str())
+            .collect()
+    }
+
+    /// The identities context `id` records, in its order; `None` when the generation has no such
+    /// context.
+    pub fn context_repositories(&self, id: &str) -> Option<Vec<&str>> {
+        let context = self.document.contexts.iter().find(|c| c.id == id)?;
+        Some(
+            context
+                .repositories
+                .iter()
+                .map(|r| r.repo.as_str())
+                .collect(),
+        )
+    }
+
+    /// The workspace version context `id` was recorded at.
+    pub fn context_version(&self, id: &str) -> Option<&str> {
+        let context = self.document.contexts.iter().find(|c| c.id == id)?;
+        Some(context.version.as_str())
+    }
+
+    /// The workspace of context `id` as the generation recorded it (`Manifest::of_context`),
+    /// built once; `None` when the generation has no such context.
+    pub fn context(&self, id: &str) -> Result<Option<Arc<Manifest>>> {
+        let Some(context) = self.document.contexts.iter().find(|c| c.id == id) else {
+            return Ok(None);
+        };
+        let mut built = self.built.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(manifest) = built.get(id) {
+            return Ok(Some(manifest.clone()));
+        }
+        let manifest = Arc::new(Manifest::of_context(&self.dir, &self.document, context)?);
+        built.insert(id.to_string(), manifest.clone());
+        Ok(Some(manifest))
+    }
 }
 
 /// The generation `<local_dir>/current` names, read once per generation: a generation's
@@ -138,7 +189,13 @@ fn load(local: &Path, id: String) -> Result<Held> {
         return Err(not().into());
     }
     let listed = Manifest::of_generation(&dir, &document)?;
-    Ok(Held { id, dir, listed })
+    Ok(Held {
+        id,
+        dir,
+        listed,
+        document,
+        built: Mutex::new(HashMap::new()),
+    })
 }
 
 /// The ids of the generations `local` holds, sorted: its directories named by an id. A pull in

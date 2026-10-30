@@ -52,6 +52,8 @@ pub mod ui;
 #[cfg(feature = "valkey")]
 mod valkey;
 mod workspace;
+#[cfg(feature = "workspaces")]
+mod workspaces;
 mod xml;
 mod zod;
 

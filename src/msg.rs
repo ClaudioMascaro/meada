@@ -531,6 +531,9 @@ pub enum Msg<'a> {
     SnapshotLockCommand,
     #[cfg(feature = "snapshot")]
     GenerationNotHeld(&'a str),
+    /// A pinned generation that records no such workspace for the caller (#342).
+    #[cfg(feature = "snapshot")]
+    GenerationNoContext(&'a str),
     /// An `[oidc]` URL, or `[ui] public_url`, that is not `https` (or `http` on loopback) with
     /// a host and no user, query or fragment; with `bare`, no path either.
     #[cfg(any(feature = "oidc", feature = "ui"))]
@@ -781,6 +784,64 @@ pub enum Msg<'a> {
     /// A catalog check whose body is not `{"identities": [...]}` of identities.
     #[cfg(feature = "workspaces")]
     CatalogCheckBody(usize),
+    /// An entry of a named workspace left out before the fetch because no operator of the
+    /// workspace holds an accepted role on it (#342): the workspace and the identity.
+    #[cfg(feature = "workspaces")]
+    RolesNoSponsor {
+        context: &'a str,
+        identity: &'a str,
+    },
+    /// `[workspaces] mirrors` that is not an absolute path without `..` (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesMirrors,
+    /// `[workspaces]` without `[ui] operations = true` (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesNeedsOperations,
+    /// `[workspaces]` without `[workspace] source = "store"` (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesNeedsStore,
+    /// The contexts file a reader needs, missing (#342): the pull that writes it.
+    #[cfg(feature = "workspaces")]
+    ContextsMissing(&'a str),
+    /// A contexts file that does not check (#342).
+    #[cfg(feature = "workspaces")]
+    ContextsBad(&'a str),
+    /// The contexts file the exclusions file was not written for (#342).
+    #[cfg(feature = "workspaces")]
+    ContextsOther(&'a str),
+    /// A named version document that does not check (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesDocumentBad(&'a str),
+    /// A creation body that is not `{name, description?, entries, message}` (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesBody,
+    /// A workspace that is not found, hidden or deleted: one answer for all (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesNotFound,
+    /// The store or Postgres did not answer a workspace write or read (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesUnavailable,
+    /// A creation refused because some selected repository is not eligible (#342): how many.
+    #[cfg(feature = "workspaces")]
+    WorkspacesRefused(usize),
+    /// A creation or selection while the permissions set cannot decide (#342): the reason.
+    #[cfg(feature = "workspaces")]
+    WorkspacesPending(&'a str),
+    /// More workspaces than `[workspaces] max_workspaces` (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesLimit(usize),
+    /// The same triple created and then deleted (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspaceDeleted,
+    /// A list query the console refuses (#342): its parameters, never echoed.
+    #[cfg(feature = "workspaces")]
+    WorkspacesQuery(usize),
+    /// The line `meada workspace pull` prints for the contexts it wrote (#342).
+    #[cfg(feature = "workspaces")]
+    ContextsWritten(usize),
+    /// A named workspace's entry names an identity outside the catalog (#342).
+    #[cfg(feature = "workspaces")]
+    WorkspacesReservedSegment(&'a str),
     /// The exclusions file a reader of the pulled version needs (#331).
     #[cfg(feature = "generation-pointer")]
     ExcludedMissing(&'a str),
@@ -2192,6 +2253,11 @@ impl Msg<'_> {
                     .into(),
             ),
             #[cfg(feature = "snapshot")]
+            Msg::GenerationNoContext(id) => pick(
+                format!("generation {id} records no such workspace"),
+                format!("a geração {id} não registra tal workspace"),
+            ),
+            #[cfg(feature = "snapshot")]
             Msg::GenerationNotHeld(id) => pick(
                 format!("generation {id} is not held here"),
                 format!("a geração {id} não está retida aqui"),
@@ -2717,6 +2783,106 @@ impl Msg<'_> {
             Msg::CatalogCheckBody(max) => pick(
                 format!("the body must be {{\"identities\": [...]}} with at most {max} identities"),
                 format!("o corpo deve ser {{\"identities\": [...]}} com no máximo {max} identidades"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::RolesNoSponsor { context, identity } => pick(
+                format!("{context}: {identity}: excluded: no operator of the workspace holds an accepted role on it"),
+                format!("{context}: {identity}: excluído: nenhum operador do workspace tem papel aceito nele"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesMirrors => pick(
+                "must be an absolute path without `..`, the root of the mirrors named workspaces use"
+                    .into(),
+                "deve ser um caminho absoluto sem `..`, a raiz dos espelhos que os workspaces nomeados usam"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesNeedsOperations => pick(
+                "[workspaces] needs [ui] operations = true".into(),
+                "[workspaces] precisa de [ui] operations = true".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesNeedsStore => pick(
+                "[workspaces] needs [workspace] source = \"store\"".into(),
+                "[workspaces] precisa de [workspace] source = \"store\"".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::ContextsMissing(file) => pick(
+                format!("{file} is missing: run `meada workspace pull` first"),
+                format!("{file} não existe: rode `meada workspace pull` antes"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::ContextsBad(file) => pick(
+                format!("{file} is not a contexts file `meada workspace pull` wrote"),
+                format!("{file} não é um arquivo de contextos que `meada workspace pull` gravou"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::ContextsOther(file) => pick(
+                format!(
+                    "{file} names other contexts than the contexts file holds: run `meada \
+                     github-app roles` after `meada workspace pull`"
+                ),
+                format!(
+                    "{file} nomeia outros contextos que os do arquivo de contextos: rode `meada \
+                     github-app roles` depois de `meada workspace pull`"
+                ),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesDocumentBad(key) => pick(
+                format!("{key} is not a named workspace version document"),
+                format!("{key} não é um documento de versão de workspace nomeado"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesBody => pick(
+                "the body must be {\"name\", \"description\"?, \"entries\", \"message\"}".into(),
+                "o corpo deve ser {\"name\", \"description\"?, \"entries\", \"message\"}".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesNotFound => pick(
+                "no such workspace".into(),
+                "não há tal workspace".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesUnavailable => pick(
+                "the workspaces cannot be read or written now (Postgres or the store did not answer)"
+                    .into(),
+                "os workspaces não podem ser lidos nem gravados agora (o Postgres ou o store não respondeu)"
+                    .into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesRefused(count) => pick(
+                format!("{count} selected repositories are not eligible for you; nothing was created"),
+                format!("{count} repositórios selecionados não são elegíveis para você; nada foi criado"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesPending(reason) => pick(
+                format!("the permissions set cannot decide now ({reason}); nothing can be selected"),
+                format!("o conjunto de permissões não pode decidir agora ({reason}); nada pode ser selecionado"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesLimit(max) => pick(
+                format!("there are already {max} workspaces ([workspaces] max_workspaces)"),
+                format!("já existem {max} workspaces ([workspaces] max_workspaces)"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspaceDeleted => pick(
+                "that workspace was created and deleted: use another name or other entries".into(),
+                "esse workspace foi criado e apagado: use outro nome ou outras entradas".into(),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesQuery(max) => pick(
+                format!("the list takes limit (1 to 100) and after (at most {max} characters), each once"),
+                format!("a lista aceita limit (1 a 100) e after (no máximo {max} caracteres), cada um uma vez"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::ContextsWritten(count) => pick(
+                format!("contexts: {count} named workspaces"),
+                format!("contextos: {count} workspaces nomeados"),
+            ),
+            #[cfg(feature = "workspaces")]
+            Msg::WorkspacesReservedSegment(identity) => pick(
+                format!("{identity}: the first segment `-` is reserved for named workspaces' routes"),
+                format!("{identity}: o primeiro segmento `-` é reservado às rotas de workspaces nomeados"),
             ),
             #[cfg(feature = "generation-pointer")]
             Msg::ExcludedMissing(file) => pick(

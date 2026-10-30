@@ -269,11 +269,12 @@ fn migrate_creates_the_schema_once_and_a_second_run_changes_nothing() {
     };
     let before = outside();
     let (stdout, stderr, code) = migrate(&dir, &url, None);
-    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("6\n", "", 0));
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("7\n", "", 0));
     assert_eq!(outside(), before);
     let first = admin.snapshot(&schema);
     // Migration 2: the audit's table (#328); 3: the directory's (#334); 4: its state (#335);
-    // 5: the permissions set (#331); 6: where a repository came from (#341).
+    // 5: the permissions set (#331); 6: where a repository came from (#341); 7: the named
+    // workspaces and the context of an exclusion (#342).
     let columns = [
         "audit.action text",
         "audit.arguments jsonb",
@@ -308,6 +309,7 @@ fn migrate_creates_the_schema_once_and_a_second_run_changes_nothing() {
         "directory_users.resource jsonb",
         "directory_users.user_name text",
         "permission_exclusions.added_by text",
+        "permission_exclusions.context text",
         "permission_exclusions.identity text",
         "permission_exclusions.reason text",
         "permission_exclusions.set_id text",
@@ -326,18 +328,46 @@ fn migrate_creates_the_schema_once_and_a_second_run_changes_nothing() {
         "permission_sets.started timestamp with time zone",
         "permission_sets.version text",
         "schema_version.version integer",
+        "workspace_history.action text",
+        "workspace_history.actor text",
+        "workspace_history.authority text",
+        "workspace_history.message text",
+        "workspace_history.seq bigint",
+        "workspace_history.time timestamp with time zone",
+        "workspace_history.version text",
+        "workspace_history.workspace_id text",
+        "workspace_operators.added timestamp with time zone",
+        "workspace_operators.added_by text",
+        "workspace_operators.login text",
+        "workspace_operators.subject text",
+        "workspace_operators.workspace_id text",
+        "workspace_versions.author text",
+        "workspace_versions.message text",
+        "workspace_versions.saved timestamp with time zone",
+        "workspace_versions.version text",
+        "workspace_versions.workspace_id text",
+        "workspaces.created timestamp with time zone",
+        "workspaces.creator text",
+        "workspaces.creator_login text",
+        "workspaces.current text",
+        "workspaces.deleted timestamp with time zone",
+        "workspaces.description text",
+        "workspaces.entries ARRAY",
+        "workspaces.id text",
+        "workspaces.name text",
+        "workspaces.seq bigint",
     ];
     assert_eq!(first[..columns.len()], columns);
-    assert!(first[columns.len()].starts_with("6 "), "{first:?}");
+    assert!(first[columns.len()].starts_with("7 "), "{first:?}");
     let (stdout, stderr, code) = migrate(&dir, &url, None);
-    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("6\n", "", 0));
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("7\n", "", 0));
     assert_eq!(admin.snapshot(&schema), first);
     // A schema the operator created beforehand, empty, is kept and migrated.
     admin.run(&format!(
         "DROP SCHEMA \"{schema}\" CASCADE; CREATE SCHEMA \"{schema}\""
     ));
     let (stdout, _, code) = migrate(&dir, &url, None);
-    assert_eq!((stdout.as_str(), code), ("6\n", 0));
+    assert_eq!((stdout.as_str(), code), ("7\n", 0));
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
 }
 
@@ -388,7 +418,7 @@ fn two_migrations_serialize_on_the_advisory_lock() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert_eq!(out.stdout, b"6\n");
+    assert_eq!(out.stdout, b"7\n");
 
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
     // The default statement bound: two migrations' DDL on a loaded machine may outlast a second.
@@ -408,7 +438,7 @@ fn two_migrations_serialize_on_the_advisory_lock() {
             "{}",
             String::from_utf8_lossy(&out.stderr)
         );
-        assert_eq!(out.stdout, b"6\n");
+        assert_eq!(out.stdout, b"7\n");
     }
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
 }
@@ -429,13 +459,13 @@ fn a_version_this_binary_does_not_know_is_refused() {
     assert_eq!(
         status_line(&dir, &url, None),
         format!(
-            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 6: \
+            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 7: \
              run meada postgres migrate)"
         )
     );
-    assert_eq!(migrate(&dir, &url, None).0, "6\n");
+    assert_eq!(migrate(&dir, &url, None).0, "7\n");
     let higher =
-        format!("the schema {schema} is at version 6, above this Meada's 0: upgrade Meada");
+        format!("the schema {schema} is at version 7, above this Meada's 0: upgrade Meada");
     assert_eq!(
         status_line(&dir, &url, Some("0")),
         format!("postgres: unreachable ({higher})")
@@ -482,11 +512,11 @@ fn status_names_whether_postgres_is_reachable_and_its_exit_code_ignores_it() {
     let admin = Admin::new(&url);
     admin.run(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"));
     with(&format!("schema = \"{schema}\"\n"));
-    assert_eq!(migrate(&dir, &url, None).0, "6\n");
+    assert_eq!(migrate(&dir, &url, None).0, "7\n");
     let env = [("MEADA_POSTGRES_URL", url.as_str())];
     let (status, stderr, code) = meada(&dir, EN, &env, &STATUS);
     assert!(code == 0 && stderr.is_empty(), "{stderr}");
-    let line = format!("\npostgres: reachable, schema {schema} version 6\n");
+    let line = format!("\npostgres: reachable, schema {schema} version 7\n");
     assert!(status.ends_with(&line), "{status}");
     // A `ca_file` on loopback is never ignored: the plain test server refuses the TLS it asks.
     let roots = "/etc/ssl/certs/ca-certificates.crt";
@@ -627,7 +657,7 @@ pub(crate) fn audited(dir: &Path, case: &str) -> Option<Audited> {
     fs::write(dir.join("ops/postgres.toml"), toml).unwrap();
     let migrate = ["postgres", "migrate", "--workspace", "ops/postgres.toml"];
     let (stdout, stderr, code) = meada(dir, EN, &[], &migrate);
-    assert_eq!((stdout.as_str(), code), ("6\n", 0), "{stderr}");
+    assert_eq!((stdout.as_str(), code), ("7\n", 0), "{stderr}");
     Some(Audited {
         admin,
         schema,

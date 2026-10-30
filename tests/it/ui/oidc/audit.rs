@@ -539,7 +539,7 @@ fn without_postgres_no_write_runs_and_reads_still_answer() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(1), "{stderr}");
     let higher = format!(
-        "the schema {} is at version 6, above this Meada's 1: upgrade Meada",
+        "the schema {} is at version 7, above this Meada's 1: upgrade Meada",
         audit.schema
     );
     assert!(stderr.contains(&higher), "{stderr}");

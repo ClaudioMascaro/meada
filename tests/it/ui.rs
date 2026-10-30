@@ -213,7 +213,8 @@ fn serves_config_session_and_manifest() {
             "ui",
             "postgres",
             "directory",
-            "catalog"
+            "catalog",
+            "workspaces"
         ]
     );
     for module in modules {

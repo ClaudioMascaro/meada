@@ -44,6 +44,8 @@ mod catalog;
 #[cfg(feature = "directory")]
 mod directory;
 mod read;
+#[cfg(feature = "workspaces")]
+mod workspaces;
 mod write;
 
 type Answer = Response<BoxBody<Bytes, Infallible>>;
@@ -418,6 +420,8 @@ async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
         CHECK => CHECK_MAX,
         #[cfg(feature = "workspaces")]
         "/api/v1/catalog/check" => CHECK_MAX,
+        #[cfg(feature = "workspaces")]
+        "/api/v1/workspaces" => workspaces::CREATE_MAX,
         QUERY => QUERY_MAX,
         "/api/v1/pointer" => write::POINTER_MAX,
         "/api/v1/fence/recover" => write::FENCE_MAX,
@@ -725,7 +729,14 @@ impl Console {
                 &message,
             )));
         }
-        let session = match self.admit(headers, route, operation.is_some()) {
+        // A named workspace's creation (#342) is a write too: a directory that cannot say whether
+        // the subject was deprovisioned refuses it as it refuses an operation.
+        #[cfg(feature = "workspaces")]
+        let writes =
+            operation.is_some() || (write && route.is_some_and(|r| r.starts_with("workspaces")));
+        #[cfg(not(feature = "workspaces"))]
+        let writes = operation.is_some();
+        let session = match self.admit(headers, route, writes) {
             Ok(session) => session,
             Err((refused, message)) => {
                 audit(None, &message);
@@ -877,6 +888,10 @@ impl Console {
         if !read && write::operation(route).is_some() {
             return self.write(route, method, request.body(), session);
         }
+        #[cfg(feature = "workspaces")]
+        if let Some(answer) = self.workspaces(request, route, session) {
+            return answer;
+        }
         // An identity holds slashes: everything between `repositories/` and the last `/export`.
         if read
             && let Some(identity) =
@@ -949,6 +964,12 @@ impl Console {
         if self.bootstrap.catalog.is_some() && self.oidc.is_some() {
             config["catalog"] = true.into();
         }
+        // With `[workspaces]` (#342), the workspaces pages have their routes and the bound the
+        // form checks a selection against.
+        #[cfg(feature = "workspaces")]
+        if let Some(section) = &self.bootstrap.workspaces {
+            config["workspaces"] = json!({"max_entries": section.max_entries});
+        }
         #[cfg(feature = "oidc")]
         if let Some(oidc) = &self.oidc {
             let (issuer, scopes) = oidc.login();
@@ -974,10 +995,14 @@ impl Console {
         // The allow list names owners and repositories nobody may have been granted: only the
         // global operator reads it (#341).
         #[cfg(feature = "workspaces")]
-        if !session.operator
-            && let Some(catalog) = loaded.get_mut("catalog").and_then(Value::as_object_mut)
-        {
-            catalog.remove("allow");
+        if !session.operator {
+            if let Some(catalog) = loaded.get_mut("catalog").and_then(Value::as_object_mut) {
+                catalog.remove("allow");
+            }
+            // The mirrors' root is a physical path of the platform (#342).
+            if let Some(section) = loaded.get_mut("workspaces").and_then(Value::as_object_mut) {
+                section.remove("mirrors");
+            }
         }
         if !session.whole() {
             if let Some(Value::Array(entries)) = loaded.get_mut("repository") {
@@ -1106,6 +1131,9 @@ impl Console {
             repository: String,
             #[serde(default)]
             generation: Option<String>,
+            /// A named workspace to ask through (#342), under the discovery rule.
+            #[serde(default)]
+            workspace: Option<String>,
             tool: String,
             arguments: Value,
         }
@@ -1126,11 +1154,15 @@ impl Console {
             Err(None) => return bad(&Msg::UiQueryBody.text()),
             Err(Some(refused)) => return bad(&refused),
         };
-        let (engine, generation) =
-            match self.open(&query.repository, query.generation.as_deref(), session) {
-                Ok(opened) => opened,
-                Err(refused) => return *refused,
-            };
+        let (engine, generation) = match self.open(
+            &query.repository,
+            query.generation.as_deref(),
+            query.workspace.as_deref(),
+            session,
+        ) {
+            Ok(opened) => opened,
+            Err(refused) => return *refused,
+        };
         match ask(&engine) {
             Ok(text) => json_answer(
                 StatusCode::OK,
@@ -1216,7 +1248,7 @@ impl Console {
         let generation = (query.into_iter().flat_map(|q| q.split('&')))
             .find_map(|pair| pair.strip_prefix("generation="))
             .map(|id| percent_decode_str(id).decode_utf8_lossy());
-        let engine = match self.open(&identity, generation.as_deref(), session) {
+        let engine = match self.open(&identity, generation.as_deref(), None, session) {
             Ok((engine, _)) => engine,
             Err(refused) => return *refused,
         };
@@ -1244,6 +1276,7 @@ impl Console {
         &self,
         repository: &str,
         generation: Option<&str>,
+        workspace: Option<&str>,
         session: &Session,
     ) -> std::result::Result<(Engine, Option<String>), Box<Answer>> {
         let unknown = || {
@@ -1265,8 +1298,20 @@ impl Console {
         if !session.reads(repository) {
             return Err(unknown());
         }
+        // A named workspace (#342): the one 404 of an unknown id for anything the caller may not
+        // ask through, without `[workspaces]` as before.
+        #[cfg(feature = "workspaces")]
+        let through = workspace.filter(|_| self.bootstrap.workspaces.is_some());
+        #[cfg(not(feature = "workspaces"))]
+        let through: Option<&str> = None;
+        if workspace.is_some() && through.is_none() {
+            return Err(unknown());
+        }
         match &self.holds {
             Holds::Listed(listed) => {
+                if through.is_some() {
+                    return Err(unknown());
+                }
                 if let Some(id) = generation {
                     return Err(not_held(id, &[]));
                 }
@@ -1291,6 +1336,22 @@ impl Console {
                     },
                 };
                 let held = held.map_err(|e| unavailable(e.to_string()))?;
+                #[cfg(feature = "workspaces")]
+                if let Some(id) = through {
+                    if !self.through_workspace(id, repository, &held, session) {
+                        let message = Msg::WorkspacesNotFound.text();
+                        return Err(Box::new(error(
+                            StatusCode::NOT_FOUND,
+                            "not_found",
+                            &message,
+                        )));
+                    }
+                    let listed = held.context(id).map_err(|e| unavailable(e.to_string()))?;
+                    let listed = listed.ok_or_else(unknown)?;
+                    return Engine::open_context(&held, &listed, repository, &reads)
+                        .map(|engine| (engine, Some(held.id.clone())))
+                        .map_err(|e| unavailable(e.to_string()));
+                }
                 if !held.listed.entries.iter().any(|l| l.repo == repository) {
                     return Err(unknown());
                 }

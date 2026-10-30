@@ -1,7 +1,7 @@
 # Named workspaces
 
-!!! warning "Planned: S5, contracts decided; the catalog exists"
-    [S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) is accepted sequential scope after S3 and S4. [Contract consolidation, #340](https://github.com/ClaudioMascaro/meada/issues/340), is done: ADRs 0020, 0021 and 0022 fix the contracts described here. Of the runtime only the **catalog** is delivered ([#341](https://github.com/ClaudioMascaro/meada/issues/341)): `[catalog]`, the job's listing, `GET /api/v1/catalog`, `POST /api/v1/catalog/check` and the console picker, described in [the catalog](github-app.md#the-repository-catalog) and the [console](console.md#repository-catalog). The console you can run today still operates with one workspace per deployment, and the rest below is not a configuration option yet.
+!!! warning "Partly delivered: S5, contracts decided; the catalog and the first workspace exist"
+    [S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) is accepted sequential scope after S3 and S4. [Contract consolidation, #340](https://github.com/ClaudioMascaro/meada/issues/340), is done: ADRs 0020, 0021 and 0022 fix the contracts described here. Of the runtime two slices are delivered: the **catalog** ([#341](https://github.com/ClaudioMascaro/meada/issues/341)), described in [the catalog](github-app.md#the-repository-catalog) and the [console](console.md#repository-catalog), and the **first workspace** ([#342](https://github.com/ClaudioMascaro/meada/issues/342)): `[workspaces]`, creation, list and show, shared ingestion with the sponsor rule, and the node route, described in [the console](console.md#named-workspaces). Saving versions, rollback, rename, delete and delegation, per-workspace configuration, guided authoring and MCP proposals are not built, and the rest below is not a configuration option yet. Without `[workspaces]` the console still operates with one workspace per deployment.
 
 ## Compose without duplicating indexing
 
@@ -10,6 +10,12 @@ Named workspaces overlap over shared indexing. A repository does not gain anothe
 The effective repository grant remains authoritative. With Y readable by groups A and B, repository A only by group A and repository B only by group B, an operator in A alone can compose Y+A and is refused Y+B; an operator in B alone can compose Y+B and is refused Y+A; someone in both can compose all three. Sharing Y grants A to nobody and B to nobody, and a link from Y to B does not appear in the workspace of Y+A.
 
 <!-- meada-graph:workspace-overlap -->
+
+## The first workspace
+
+An admitted maintainer with no owned entry opens **Named workspaces** in the console, picks repositories from the catalog, names the workspace and confirms the manifest the page shows. The server decides again in one transaction against the newest permissions set: every selected repository must be in the catalog and the person's GitHub login must hold an accepted role on it, directly or through a group. A refusal names the repositories the person's grant reads and only counts the others. The workspace is stored under the person's identity, who operates it; colleagues whose own grants read the same repositories see it without any invitation and cannot change it.
+
+The workspace becomes queryable through the shared job: `meada workspace pull` reads it, `meada github-app roles` leaves out, before the fetch, any entry that none of its operators holds an accepted role on (that is a policy decision, not a failed fetch), and the repositories only named workspaces select are fetched, indexed and published once, at `<[workspaces] mirrors>/<identity>`. Until a generation records the workspace, the console shows it as `applied` with its entries `pending`; once recorded it is `live` and its entries `ready`. A failed fetch or index still aborts the whole publication and keeps the current generation.
 
 ## Who can do what
 

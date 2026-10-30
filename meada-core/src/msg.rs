@@ -23,7 +23,10 @@ pub enum Msg<'a> {
     ListedTwice,
     KeyMissing(&'a str),
     NotInRepository(&'a str),
-    KeyUnknown { key: &'a str, file: &'a str },
+    KeyUnknown {
+        key: &'a str,
+        file: &'a str,
+    },
     NotLowercase(&'a str),
     NoLeadingSlash(&'a str),
     Empty,
@@ -34,6 +37,20 @@ pub enum Msg<'a> {
     AddedByNotString,
     AddedByTooLong,
     AddedByChars,
+    /// A key a named workspace's entry may not hold (ADR 0021): the platform's, not the context's.
+    NamedReserved(&'a str),
+    /// A named workspace's text past its bound, in bytes.
+    NamedTextTooLong(usize),
+    /// A named workspace with more entries than its bound.
+    NamedTooMany(usize),
+    /// An environment-variable reference that is not a variable name.
+    NamedEnvName(&'a str),
+    /// An identity whose first segment is `-`, which the node's workspace route reserves.
+    NamedDashSegment,
+    /// A name that is empty, too long, padded or holding a control character.
+    NamedNameBad(usize),
+    /// A description that is too long, padded or holding a control character.
+    NamedDescriptionBad(usize),
 }
 
 impl Msg<'_> {
@@ -102,6 +119,50 @@ impl Msg<'_> {
             Msg::AddedByChars => pick(
                 "holds a character other than lowercase ASCII letters, digits, `-` and `_`".into(),
                 "contém um caractere além de letras ASCII minúsculas, dígitos, `-` e `_`".into(),
+            ),
+            Msg::NamedReserved(key) => pick(
+                format!("`{key}` is reserved: a named workspace's entry does not set it"),
+                format!("`{key}` é reservada: a entrada de um workspace nomeado não a define"),
+            ),
+            Msg::NamedTextTooLong(max) => pick(
+                format!("the text is longer than {max} bytes"),
+                format!("o texto tem mais de {max} bytes"),
+            ),
+            Msg::NamedTooMany(max) => pick(
+                format!("more than {max} entries"),
+                format!("mais de {max} entradas"),
+            ),
+            Msg::NamedEnvName(name) => pick(
+                format!(
+                    "`{name}` is not an environment variable name (a reference, never a value)"
+                ),
+                format!(
+                    "`{name}` não é um nome de variável de ambiente (uma referência, nunca um valor)"
+                ),
+            ),
+            Msg::NamedDashSegment => pick(
+                "the first segment `-` is reserved for named workspaces' routes".into(),
+                "o primeiro segmento `-` é reservado às rotas de workspaces nomeados".into(),
+            ),
+            Msg::NamedNameBad(max) => pick(
+                format!(
+                    "a name is 1 to {max} characters, with no control character and no \
+                     whitespace at either end"
+                ),
+                format!(
+                    "um nome tem de 1 a {max} caracteres, sem caractere de controle e sem \
+                     espaço nas pontas"
+                ),
+            ),
+            Msg::NamedDescriptionBad(max) => pick(
+                format!(
+                    "a description is at most {max} characters, with no control character and no \
+                     whitespace at either end"
+                ),
+                format!(
+                    "uma descrição tem no máximo {max} caracteres, sem caractere de controle e sem \
+                     espaço nas pontas"
+                ),
             ),
         }
     }

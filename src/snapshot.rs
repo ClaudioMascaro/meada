@@ -272,6 +272,40 @@ pub struct Document {
     pub workspace: Option<String>,
     /// In manifest order.
     pub repositories: Vec<Entry>,
+    /// The repositories only named workspaces select (#342, ADR 0021), sorted by identity, each
+    /// in the shape of a `repositories` entry. A generation without named workspaces holds none
+    /// and its document has no such field, so every earlier document reads as before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub members: Vec<Entry>,
+    /// The named workspaces the generation answers about, sorted by id.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub contexts: Vec<Context>,
+}
+
+/// A named workspace as a generation records it (ADR 0021): no name, description or operator,
+/// which exist only in Postgres. A pinned generation reproduces the context from this alone.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Context {
+    pub id: String,
+    /// The workspace version that produced it.
+    pub version: String,
+    /// The non-excluded entries in manifest order.
+    pub repositories: Vec<ContextEntry>,
+}
+
+/// One repository of a context: its identity and its blocks as `entry_blocks` gives them.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct ContextEntry {
+    pub repo: String,
+    pub blocks: serde_json::Value,
+}
+
+impl Context {
+    /// The digest the generation id hashes: the context as recorded, canonical JSON.
+    pub fn digest(&self) -> String {
+        let recorded = serde_json::to_value(self).unwrap_or_default();
+        meada_core::ids::context_digest(&recorded)
+    }
 }
 
 /// One repository of a generation.
@@ -290,6 +324,8 @@ pub struct Entry {
 
 /// A repository ready to publish.
 struct Bundle {
+    /// Only named workspaces select it (#342).
+    member: bool,
     identity: String,
     head: String,
     key: String,
@@ -377,6 +413,7 @@ pub fn publish(manifest: &Path) -> Result<String> {
         let binary = env!("CARGO_PKG_VERSION");
         let bundle = bundle_id(repo_id, &head, index::schema_version(), binary, &blocks);
         bundles.push(Bundle {
+            member: entry.member,
             key: config.key(&format!("repos/{repo_id}/{bundle}.tar")),
             identity: r.identity.clone(),
             head,
@@ -390,10 +427,20 @@ pub fn publish(manifest: &Path) -> Result<String> {
     if !problems.is_empty() {
         return Err(problems.join("\n").into());
     }
-    let ids: Vec<(&str, &str)> = (bundles.iter())
-        .map(|b| (b.identity.as_str(), bundle_of(&b.key)))
+    let ids_of = |member: bool| -> Vec<(&str, &str)> {
+        (bundles.iter())
+            .filter(|b| b.member == member)
+            .map(|b| (b.identity.as_str(), bundle_of(&b.key)))
+            .collect()
+    };
+    // The named workspaces (#342): one recorded context each, whose digest the id hashes.
+    let contexts = recorded_contexts(&listed);
+    let digests: Vec<(&str, String)> = contexts
+        .iter()
+        .map(|c| (c.id.as_str(), c.digest()))
         .collect();
-    let generation = generation_id(&ids);
+    let digests: Vec<(&str, &str)> = digests.iter().map(|(id, d)| (*id, d.as_str())).collect();
+    let generation = meada_core::ids::generation_id_of(&ids_of(false), &ids_of(true), &digests);
     let pointer = Pointer {
         #[cfg(feature = "generation-pointer")]
         generations: (listed.generations.clone()).zip(listed.valkey.clone()),
@@ -405,9 +452,37 @@ pub fn publish(manifest: &Path) -> Result<String> {
     let workspace = listed.version.clone();
     #[cfg(not(feature = "generation-pointer"))]
     let workspace = None;
-    let stored = store_generation(&config, &generation, workspace, bundles, pointer);
+    let stored = store_generation(&config, &generation, workspace, bundles, contexts, pointer);
     crate::modules::block_on(stored)??;
     Ok(generation)
+}
+
+/// The contexts `listed` records (#342): its named workspaces, sorted by id, with the entries
+/// the role check left in and their blocks as the workspace version holds them. Empty without
+/// `[workspaces]`.
+fn recorded_contexts(listed: &Manifest) -> Vec<Context> {
+    #[cfg(feature = "workspaces")]
+    {
+        let mut contexts: Vec<Context> = (listed.contexts.iter())
+            .map(|c| Context {
+                id: c.id.clone(),
+                version: c.version.clone(),
+                repositories: (c.entries.iter())
+                    .map(|e| ContextEntry {
+                        repo: e["repo"].as_str().unwrap_or_default().to_string(),
+                        blocks: crate::workspaces::Context::blocks(e),
+                    })
+                    .collect(),
+            })
+            .collect();
+        contexts.sort_by(|a, b| a.id.cmp(&b.id));
+        contexts
+    }
+    #[cfg(not(feature = "workspaces"))]
+    {
+        let _ = listed;
+        Vec::new()
+    }
 }
 
 /// The bundle id of a bundle key, `<...>/<bundle id>.tar`.
@@ -435,6 +510,7 @@ async fn store_generation(
     generation: &str,
     workspace: Option<String>,
     bundles: Vec<Bundle>,
+    contexts: Vec<Context>,
     #[cfg_attr(not(feature = "generation-pointer"), allow(unused_variables))] pointer: Pointer,
 ) -> std::result::Result<(), String> {
     let store = Store::connect(config)?;
@@ -464,6 +540,7 @@ async fn store_generation(
         Some(bytes) => verify(&store, &document, &bytes, generation, &bundles).await?,
         None => {
             let mut repositories = Vec::new();
+            let mut members = Vec::new();
             for bundle in bundles {
                 let stored = match store.stored(&bundle.key).await? {
                     Some(stored) => stored,
@@ -475,19 +552,25 @@ async fn store_generation(
                         stored.ok_or_else(|| Msg::SnapshotObjectBad(&bundle.key).text())?
                     }
                 };
-                repositories.push(Entry {
+                let entry = Entry {
                     identity: bundle.identity,
                     head: bundle.head,
                     bundle: bundle.key,
                     blocks: bundle.blocks,
                     size: stored.size,
                     blake3: stored.blake3,
-                });
+                };
+                match bundle.member {
+                    true => members.push(entry),
+                    false => repositories.push(entry),
+                }
             }
             let document_text = Document {
                 generation: generation.to_string(),
                 workspace,
                 repositories,
+                members,
+                contexts,
             };
             let mut text = serde_json::to_vec_pretty(&document_text).map_err(|e| e.to_string())?;
             text.push(b'\n');
@@ -528,7 +611,7 @@ async fn verify(
 ) -> std::result::Result<(), String> {
     let bad = |key: &str| Msg::SnapshotObjectBad(key).text();
     let document: Document = serde_json::from_slice(bytes).map_err(|_| bad(key))?;
-    let mut listed: Vec<&str> = (document.repositories.iter())
+    let mut listed: Vec<&str> = (document.repositories.iter().chain(&document.members))
         .map(|e| e.bundle.as_str())
         .collect();
     let mut expected: Vec<&str> = bundles.iter().map(|b| b.key.as_str()).collect();
@@ -537,7 +620,7 @@ async fn verify(
     if document.generation != generation || listed != expected {
         return Err(bad(key));
     }
-    for entry in &document.repositories {
+    for entry in document.repositories.iter().chain(&document.members) {
         let recorded = Stored {
             size: entry.size,
             blake3: entry.blake3.clone(),

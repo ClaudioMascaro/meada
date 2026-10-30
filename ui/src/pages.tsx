@@ -18,16 +18,17 @@ export const routes = [
   { path: '/admission', label: 'admission' },
   { path: '/audit', label: 'audit' },
   { path: '/catalog', label: 'catalog' },
+  { path: '/workspaces', label: 'workspaces' },
 ] as const;
 
-/** The pages `session` is offered: the audit, when the console has one, is the global operator's alone, and the catalog (#341) is every admitted subject's when the console has one. */
-export function offered(session?: Session, audit = false, catalog = false) {
-  return routes.filter(route => (route.path !== '/audit' || (audit && session?.role === 'operator')) && (route.path !== '/catalog' || catalog));
+/** The pages `session` is offered: the audit, when the console has one, is the global operator's alone, and the catalog (#341) and the named workspaces (#342) are every admitted subject's when the console has them. */
+export function offered(session?: Session, audit = false, catalog = false, workspaces = false) {
+  return routes.filter(route => (route.path !== '/audit' || (audit && session?.role === 'operator')) && (route.path !== '/catalog' || catalog) && (route.path !== '/workspaces' || workspaces));
 }
 
-export function Shell({ path, locale, onLanguage, session, t, children, onNavigate, audit, catalog }: {
+export function Shell({ path, locale, onLanguage, session, t, children, onNavigate, audit, catalog, workspaces }: {
   path: string; locale: Language; onLanguage: (language: Language) => void;
-  session?: Session; t: Copy; children: ReactNode; onNavigate?: (path: string) => void; audit?: boolean; catalog?: boolean;
+  session?: Session; t: Copy; children: ReactNode; onNavigate?: (path: string) => void; audit?: boolean; catalog?: boolean; workspaces?: boolean;
 }) {
   function follow(event: MouseEvent<HTMLAnchorElement>, target: string) {
     if (!onNavigate || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
@@ -46,7 +47,7 @@ export function Shell({ path, locale, onLanguage, session, t, children, onNaviga
     </header>
     <aside className="sidebar">
       <nav aria-label={t.navigation}>
-        {offered(session, audit, catalog).map(route => <a key={route.path} href={route.path} onClick={event => follow(event, route.path)} aria-current={path === route.path ? 'page' : undefined}>
+        {offered(session, audit, catalog, workspaces).map(route => <a key={route.path} href={route.path} onClick={event => follow(event, route.path)} aria-current={path === route.path ? 'page' : undefined}>
           {t[route.label]}
         </a>)}
       </nav>

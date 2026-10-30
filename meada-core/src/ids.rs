@@ -35,11 +35,58 @@ pub fn bundle_id(identity: &str, head: &str, schema: i32, binary: &str, blocks: 
 
 /// The generation id of a workspace: the sorted lines `<identity> <bundle id>`.
 pub fn generation_id(bundles: &[(&str, &str)]) -> String {
-    let mut lines: Vec<String> = (bundles.iter())
-        .map(|(identity, bundle)| format!("{identity} {bundle}\n"))
-        .collect();
+    generation_id_of(bundles, &[], &[])
+}
+
+/// The generation id with named workspaces (ADR 0021): besides `bundles`' lines, one
+/// `# member <identity> <bundle id>` for each repository only named workspaces select and one
+/// `# context <id> <digest>` for each context, all sorted together. Without members and contexts
+/// it is `generation_id`'s, byte for byte.
+pub fn generation_id_of(
+    bundles: &[(&str, &str)],
+    members: &[(&str, &str)],
+    contexts: &[(&str, &str)],
+) -> String {
+    let plain = (bundles.iter()).map(|(identity, bundle)| format!("{identity} {bundle}\n"));
+    let members =
+        (members.iter()).map(|(identity, bundle)| format!("# member {identity} {bundle}\n"));
+    let contexts = (contexts.iter()).map(|(id, digest)| format!("# context {id} {digest}\n"));
+    let mut lines: Vec<String> = plain.chain(members).chain(contexts).collect();
     lines.sort();
     id(&lines.concat())
+}
+
+/// A context's digest as the generation id hashes it (ADR 0021): the first 16 hex characters of
+/// the BLAKE3 hash of its canonical JSON `{"id","repositories","version"}` as recorded.
+pub fn context_digest(context: &Json) -> String {
+    id(&context.to_string())
+}
+
+/// The id of a named workspace (ADR 0021): the first 16 hex characters of the BLAKE3 hash of the
+/// canonical JSON array `["meada workspace", <creator subject>, <name>, <first version id>]`.
+/// Deterministic and immutable after creation: a rename, a delegation or a deletion does not
+/// change it, and it reads no clock, host or address.
+pub fn workspace_id(creator: &str, name: &str, first_version: &str) -> String {
+    let parts = Json::Array(vec![
+        "meada workspace".into(),
+        creator.into(),
+        name.into(),
+        first_version.into(),
+    ]);
+    id(&parts.to_string())
+}
+
+/// The version id of a named workspace's entries (ADR 0021), in manifest order: `{"blocks",
+/// "repo"}` for each, with no `path`, `owner` or `added_by`, so a named version never equals a
+/// deployment version and the same entries in two workspaces are one version.
+pub fn named_version_id(entries: &[(&str, &Json)]) -> String {
+    let entries: Vec<Json> = (entries.iter())
+        .map(|(repo, blocks)| {
+            let fields = [("blocks", (*blocks).clone()), ("repo", (*repo).into())];
+            Json::Object(fields.into_iter().map(|(k, v)| (k.into(), v)).collect())
+        })
+        .collect();
+    id(&Json::Array(entries).to_string())
 }
 
 /// One entry as `workspace_version_id` hashes it: identity, path, blocks, owner, `added_by`.

@@ -447,7 +447,7 @@ fn with_postgres_stopped_a_cached_subject_keeps_its_groups_until_expiry() {
     let lines: Vec<&str> = overage_lines(&stderr);
     assert_eq!(lines.len(), 1, "{stderr}");
     assert!(
-        lines[0].contains("is at version 7, above this Meada's 6"),
+        lines[0].contains("is at version 8, above this Meada's 7"),
         "{stderr}"
     );
     case.clean(&stderr, &[ana_token, bia_token]);

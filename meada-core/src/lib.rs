@@ -15,6 +15,7 @@ pub mod http;
 pub mod ids;
 pub mod manifest;
 pub mod msg;
+pub mod named;
 pub mod render;
 pub mod search;
 pub mod shape;

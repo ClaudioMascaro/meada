@@ -218,6 +218,8 @@ fn workspace(command: WorkspaceCommand) -> ! {
                     notes.push(Msg::WorkspaceAlreadyCurrent(&id).text());
                     id
                 }
+                // No deployment version (named workspaces alone): no id on stdout.
+                versions::Pulled::Empty => return String::new(),
             };
             format!("{id}\n")
         }),

@@ -150,6 +150,14 @@ Both routes need an admitted, non-deprovisioned subject (the SCIM block applies 
 answers them from the set it already holds in memory, calling neither GitHub nor Postgres. `GET /api/v1/manifest` shows
 `catalog.allow` to the global operator alone.
 
+## Named workspaces
+
+With `[workspaces]` in the bootstrap (feature `workspaces`, beside `[ui] operations = true`, `[oidc.github]`, `[catalog]` and `[workspace] source = "store"`; `mirrors` is the absolute root where the repositories only named workspaces select are mirrored, `max_workspaces` defaults to 200 and `max_entries` to 100), `GET /api/v1/config` carries `"workspaces": {"max_entries": n}` and the console offers the **Named workspaces** page to every admitted subject.
+
+- `POST /api/v1/workspaces` takes `{"name", "description"?, "entries", "message"}` (80 KiB), `entries` being the manifest text of `[[repository]]` entries with a `repo` and, at most, `serve`, `resource` and `peer` blocks (`path`, `owner`, `added_by` and `serve.documents` are refused, 422 `invalid_entries`). The creator is the authenticated subject: an `actor`, `role` or any other key in the body is a 400. It answers 201 `{"id", "version", "created": true}`, or 200 with `created: false` when the same creator, name and entries made it already. A selection with a repository outside the person's eligibility is a 403 `entries_refused` (`refused`: the identities the person's grant reads, `hidden`: how many others) and stores nothing; a set that cannot decide is a 409 `pending` with `reason` (`no_set`, `stale_set`, `missing_login`). Creation is recorded in the audit as `workspaces.create`, refusals included.
+- `GET /api/v1/workspaces?limit=&after=` lists the workspaces the subject sees, ordered by id (`limit` 1 to 100, 25 by default), and `GET /api/v1/workspaces/<id>` shows one with its `base`, its `state` (`applied`: stored, ingestion pending; `live`: the current generation records it) and each entry's `ingestion` (`pending`, `ready` or `excluded`, the last shown to the operators). A workspace is visible to its operators, the platform administrator, and whoever's grant reads every one of its repositories; for anyone else it answers the same 404 as an id that does not exist. Operators also get the operator list.
+- The playground accepts `"workspace": "<id>"` and `GET /api/v1/workspaces/<id>/repositories/<identity>/export` returns the export through that workspace, under the same rule and always bounded by the caller's grant.
+
 ## Directory (SCIM)
 
 With the `directory` feature (part of `cloud`), `[directory]` in the bootstrap, beside `[postgres]` and `[oidc]`, makes the console serve a SCIM 2.0 endpoint under `/scim/v2/`, which Entra ID's or Okta's provisioning pushes users and groups into:

@@ -846,6 +846,15 @@ impl Oidc {
             .map(|cache| cache.catalog(login, administrator))
     }
 
+    /// With `[oidc.github]`, the identities the newest set left out of the named workspace
+    /// `context` (#342).
+    #[cfg(feature = "workspaces")]
+    pub fn excluded_in(&self, context: &str) -> std::collections::BTreeSet<String> {
+        (self.permissions.as_ref())
+            .map(|cache| cache.excluded_in(context))
+            .unwrap_or_default()
+    }
+
     /// With `[oidc.github]`, the newest permissions set's workspace version and the identities it
     /// excluded from it (#333), for the console's `excluded` flag.
     #[cfg(feature = "ui")]

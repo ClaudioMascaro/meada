@@ -1,7 +1,7 @@
 # Workspaces nomeados
 
-!!! warning "Planejado: S5, contratos decididos; o catálogo já existe"
-    [S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) é escopo sequencial aceito após S3 e S4. A [consolidação dos contratos, #340](https://github.com/ClaudioMascaro/meada/issues/340), está concluída: os ADRs 0020, 0021 e 0022 fixam os contratos descritos aqui. Do runtime, só o **catálogo** foi entregue ([#341](https://github.com/ClaudioMascaro/meada/issues/341)): `[catalog]`, a listagem do job, `GET /api/v1/catalog`, `POST /api/v1/catalog/check` e o seletor da console, descritos em [o catálogo](github-app.md#o-catalogo-de-repositorios) e no [console](console.md#catalogo-de-repositorios). O console que você pode executar hoje ainda opera com um workspace por deployment, e o restante abaixo não é uma opção de configuração por enquanto.
+!!! warning "Parcialmente entregue: S5, contratos decididos; o catálogo e o primeiro workspace já existem"
+    [S5, #339](https://github.com/ClaudioMascaro/meada/issues/339) é escopo sequencial aceito após S3 e S4. A [consolidação dos contratos, #340](https://github.com/ClaudioMascaro/meada/issues/340), está concluída: os ADRs 0020, 0021 e 0022 fixam os contratos descritos aqui. Do runtime, duas fatias estão entregues: o **catálogo** ([#341](https://github.com/ClaudioMascaro/meada/issues/341)), descrito em [o catálogo](github-app.md#o-catalogo-de-repositorios) e no [console](console.md#catalogo-de-repositorios), e o **primeiro workspace** ([#342](https://github.com/ClaudioMascaro/meada/issues/342)): `[workspaces]`, criação, listagem e consulta, ingestão compartilhada com a regra do patrocinador e a rota do nó, descritos no [console](console.md#workspaces-nomeados). Salvar versões, reverter, renomear, apagar e delegar, a configuração por workspace, a autoria guiada e as propostas MCP não foram construídos, e o restante abaixo não é uma opção de configuração por enquanto. Sem `[workspaces]` o console continua operando com um workspace por deployment.
 
 ## Compor sem duplicar a indexação
 
@@ -10,6 +10,12 @@ Workspaces nomeados se sobrepõem sobre a indexação compartilhada. Um reposit�
 O grant efetivo por repositório continua sendo a autoridade. Com Y legível pelos grupos A e B, o repositório A só pelo grupo A e o repositório B só pelo grupo B, um operador apenas em A pode compor Y+A e tem Y+B recusado; um operador apenas em B pode compor Y+B e tem Y+A recusado; quem está nos dois pode compor os três. Compartilhar Y não concede A nem B a ninguém, e um link de Y para B não aparece no workspace de Y+A.
 
 <!-- meada-graph:workspace-overlap -->
+
+## O primeiro workspace
+
+Um mantenedor admitido, sem nenhuma entrada própria, abre **Workspaces nomeados** no console, escolhe repositórios do catálogo, dá um nome ao workspace e confirma o manifesto que a página mostra. O servidor decide de novo em uma transação contra o conjunto de permissões mais novo: todo repositório selecionado precisa estar no catálogo e o login do GitHub da pessoa precisa ter um papel aceito nele, direto ou por um grupo. Uma recusa nomeia os repositórios que a concessão da pessoa lê e apenas conta os demais. O workspace é gravado na identidade da pessoa, que o opera; colegas cujas concessões próprias leem os mesmos repositórios o veem sem convite algum e não podem alterá-lo.
+
+O workspace passa a poder ser consultado pelo job compartilhado: `meada workspace pull` o lê, `meada github-app roles` deixa de fora, antes da busca, toda entrada em que nenhum de seus operadores tem um papel aceito (uma decisão de política, não uma busca que falhou) e os repositórios que só workspaces nomeados selecionam são buscados, indexados e publicados uma vez, em `<[workspaces] mirrors>/<identity>`. Até uma geração registrar o workspace, o console o mostra como `applied` com as entradas `pending`; depois de registrado ele é `live` e as entradas `ready`. Uma busca ou indexação que falha continua abortando toda a publicação e mantendo a geração atual.
 
 ## Quem pode o quê
 

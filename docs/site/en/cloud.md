@@ -16,3 +16,4 @@ Choose modules for your deployment. Each is opt-in: both the binary feature and 
 - [Management console](console.md)
 - [Enterprise identity: Postgres, audit, GitHub grant and directory](enterprise.md)
 - [Repository catalog (`workspaces`)](github-app.md#the-repository-catalog)
+- [Named workspaces (`workspaces`)](named-workspaces.md)

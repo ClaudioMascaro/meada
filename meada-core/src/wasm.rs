@@ -125,3 +125,51 @@ pub fn compose_entries(
 fn from_json<T: serde::de::DeserializeOwned>(text: &str) -> Result<T, String> {
     serde_json::from_str(text).map_err(|e| e.to_string())
 }
+
+/// The entries of the named workspace text `src` (ADR 0021) as the JSON a version document
+/// holds them, with no `path`, `owner` or `added_by`; throws the problems when it is not valid.
+/// `max` is `[workspaces] max_entries`.
+#[wasm_bindgen(js_name = namedEntriesJson)]
+pub fn named_entries_json(src: &str, max: usize) -> Result<String, String> {
+    let entries = crate::named::version_entries("entries", src, max).map_err(|e| e.join("\n"))?;
+    serde_json::to_string(&entries).map_err(|error| error.to_string())
+}
+
+/// The version id of the named workspace text `src`; `undefined` when it is not valid.
+#[wasm_bindgen(js_name = namedVersionId)]
+pub fn named_version_id(src: &str, max: usize) -> Option<String> {
+    let entries = crate::named::version_entries("entries", src, max).ok()?;
+    Some(crate::named::version_id(&entries))
+}
+
+/// A named workspace text from the JSON entries of a version document, in the form
+/// `namedEntriesJson` reads back.
+#[wasm_bindgen(js_name = namedEntriesText)]
+pub fn named_entries_text(entries: &str) -> Result<String, String> {
+    let entries: Vec<serde_json::Value> = from_json(entries)?;
+    crate::workspace::entries_text(&entries).ok_or_else(|| "not repository entries".to_string())
+}
+
+/// Whether a selection may be made (ADR 0020): JSON `{allowed, named, hidden}`. `eligible` is
+/// the array of identities the login holds an accepted role on (the session's `github_grant`),
+/// `grant` `"*"` or an array of identities the session reads.
+#[wasm_bindgen(js_name = namedAuthorize)]
+pub fn named_authorize(selected: &str, eligible: &str, grant: &str) -> Result<String, String> {
+    let creation = crate::named::creation(
+        &from_json::<Vec<String>>(selected)?,
+        &from_json(eligible)?,
+        &from_json(grant)?,
+    );
+    serde_json::to_string(&creation).map_err(|e| e.to_string())
+}
+
+/// Whether a caller sees a workspace of `entries` (a JSON array of identities): its operators
+/// always, anyone else only when `grant` reads every entry.
+#[wasm_bindgen(js_name = namedVisible)]
+pub fn named_visible(operates: bool, entries: &str, grant: &str) -> Result<bool, String> {
+    Ok(crate::named::visible(
+        operates,
+        &from_json::<Vec<String>>(entries)?,
+        &from_json(grant)?,
+    ))
+}

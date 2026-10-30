@@ -211,6 +211,15 @@ pub struct Manifest {
     /// that `[oidc.github]` is there too.
     #[cfg(feature = "workspaces")]
     pub catalog: Option<crate::catalog::Config>,
+    /// The `[workspaces]` section, when the build has the module (#342, ADR 0021); `read` checks
+    /// the sections it needs.
+    #[cfg(feature = "workspaces")]
+    pub workspaces: Option<crate::workspaces::Config>,
+    /// With `[workspaces]` and a pulled version (`read_listed`), the named workspaces the last
+    /// `meada workspace pull` read, each without the entries the role check excluded and only
+    /// while one is left: what `snapshot publish` records as contexts.
+    #[cfg(feature = "workspaces")]
+    pub contexts: Vec<crate::workspaces::Context>,
     /// `[workspace] source = "store"` (ADR 0014): the repositories come from the current
     /// workspace version: `entries` is empty, or with `read_listed` the pulled version's.
     #[cfg(feature = "generation-pointer")]
@@ -237,6 +246,10 @@ pub struct Listed {
     /// (`snapshot::blocks`): what a bundle id hashes, and what a generation records.
     #[cfg(feature = "snapshot")]
     pub blocks: serde_json::Value,
+    /// Whether only named workspaces select it (#342): a member is fetched, indexed and bundled
+    /// once for all of them, at `<[workspaces] mirrors>/<identity>`, and a generation records it
+    /// apart from the deployment workspace's repositories.
+    pub member: bool,
 }
 
 #[derive(Deserialize)]
@@ -264,6 +277,8 @@ struct ManifestFile {
     directory: Option<crate::directory::File>,
     #[cfg(feature = "workspaces")]
     catalog: Option<crate::catalog::File>,
+    #[cfg(feature = "workspaces")]
+    workspaces: Option<crate::workspaces::File>,
     #[cfg(feature = "github-app")]
     #[serde(default, rename = "github_app")]
     github_apps: Vec<crate::github_app::File>,
@@ -439,6 +454,37 @@ impl Manifest {
                 return Err(config::error_at(file, &src, "repository", &beside));
             }
         }
+        // `[workspaces]` (#342) rides on the console's writes, the GitHub grant, the catalog and
+        // the managed workspace; each missing piece is an error naming both sections.
+        #[cfg(feature = "workspaces")]
+        let workspaces = {
+            let section = modules::validated(file, &src, parsed.workspaces, |w| w.validate())?;
+            if section.is_some() {
+                let missing = [
+                    ("ui", ui.is_none()),
+                    ("oidc.github", !github),
+                    ("catalog", catalog.is_none()),
+                ];
+                let missing: Vec<&str> = (missing.iter()).filter(|m| m.1).map(|m| m.0).collect();
+                modules::needs(file, &src, "workspaces", &missing)?;
+                if ui.as_ref().is_some_and(|u| !u.operations) {
+                    let why = Msg::WorkspacesNeedsOperations.text();
+                    return Err(config::error_at(file, &src, "workspaces", &why));
+                }
+                if !store {
+                    let why = Msg::WorkspacesNeedsStore.text();
+                    return Err(config::error_at(file, &src, "workspaces", &why));
+                }
+                // The first segment `-` is the named workspaces' route (ADR 0021).
+                if let Some(entry) =
+                    (parsed.repositories.iter()).find(|e| e.repo.split('/').next() == Some("-"))
+                {
+                    let why = Msg::WorkspacesReservedSegment(&entry.repo).text();
+                    return Err(config::error_at(file, &src, "repository.repo", &why));
+                }
+            }
+            section
+        };
         // Only a workspace version has owners (ADR 0015): a static manifest has no editor.
         if parsed.repositories.iter().any(|e| e.owner.is_some()) {
             let owner = Msg::WorkspaceOwnerStatic.text();
@@ -459,6 +505,8 @@ impl Manifest {
         let mut entries_src = src;
         #[cfg(feature = "generation-pointer")]
         let mut version = None;
+        #[cfg(feature = "workspaces")]
+        let mut deployment_version = String::new();
         #[cfg(feature = "generation-pointer")]
         if store && pulled {
             let dir = index_dir.join(crate::snapshot::versions::DIR);
@@ -468,10 +516,55 @@ impl Manifest {
                 false => crate::snapshot::versions::pulled(&dir)?,
             };
             let not_pulled = || crate::snapshot::versions::not_pulled(file, &dir);
+            // With `[workspaces]` a deployment with no current version is an empty deployment
+            // workspace, so a deployment may start from named workspaces alone (ADR 0021).
+            #[cfg(feature = "workspaces")]
+            let read = match (read, workspaces.is_some()) {
+                (None, true) => Some((String::new(), Vec::new(), String::new())),
+                (read, _) => read,
+            };
             let (id, repositories, text) = read.ok_or_else(not_pulled)?;
+            #[cfg(feature = "workspaces")]
+            if workspaces.is_some()
+                && let Some(entry) =
+                    (repositories.iter()).find(|e| e.repo.split('/').next() == Some("-"))
+            {
+                return Err(Msg::WorkspacesReservedSegment(&entry.repo).text().into());
+            }
+            #[cfg(feature = "workspaces")]
+            {
+                deployment_version = id.clone();
+            }
             parsed.repositories = repositories;
             entries_src = text;
-            version = Some(id);
+            version = Some(id).filter(|id| !id.is_empty());
+        }
+        // The named workspaces the last pull read, and the repositories only they select
+        // (`member`): after the deployment's own, sorted by identity (ADR 0021).
+        #[cfg(feature = "workspaces")]
+        let mut contexts = Vec::new();
+        #[cfg(feature = "workspaces")]
+        let deployed = parsed.repositories.len();
+        #[cfg(feature = "workspaces")]
+        if let (Some(section), true, true) = (&workspaces, store, pulled) {
+            let dir = index_dir.join(crate::snapshot::versions::DIR);
+            let deployment: Vec<String> =
+                parsed.repositories.iter().map(|e| e.repo.clone()).collect();
+            let found = crate::workspaces::membership(&dir, &deployment_version, &deployment)?;
+            contexts = found.contexts;
+            let members = found.members;
+            for identity in members {
+                let path = crate::workspaces::member_path(&section.mirrors, &identity);
+                parsed.repositories.push(EntryFile {
+                    repo: identity,
+                    path: path.display().to_string(),
+                    owner: None,
+                    added_by: None,
+                    serve: Default::default(),
+                    resources: Vec::new(),
+                    peers: Vec::new(),
+                });
+            }
         }
         #[cfg(not(feature = "generation-pointer"))]
         let _ = (pulled, github);
@@ -481,8 +574,13 @@ impl Manifest {
         // Before any `git` call: a mirror another user owns is read all the same (ADR 0011).
         (parsed.repositories.iter()).for_each(|e| repo::trust(&base.join(&e.path)));
         let problems = entry_problems(parsed.repositories.iter().map(|e| e.repo.as_str()));
+        #[cfg(feature = "workspaces")]
+        let is_member = |at: usize| at >= deployed;
+        #[cfg(not(feature = "workspaces"))]
+        let is_member = |_: usize| false;
         let mut entries: Vec<Listed> = (parsed.repositories.into_iter().zip(problems))
-            .map(|(e, problem)| {
+            .enumerate()
+            .map(|(at, (e, problem))| {
                 let (repo, path, blocks) = (e.repo.clone(), e.path.clone(), e.blocks());
                 let (repository, ignored) =
                     match mirror(&index_dir, &base.join(&path), &repo, problem, config_of(e)) {
@@ -496,7 +594,11 @@ impl Manifest {
                     repository,
                     ignored,
                     #[cfg(feature = "snapshot")]
-                    blocks: written.next().unwrap_or_default(),
+                    blocks: match is_member(at) {
+                        true => serde_json::json!({}),
+                        false => written.next().unwrap_or_default(),
+                    },
+                    member: is_member(at),
                 }
             })
             .collect();
@@ -546,6 +648,10 @@ impl Manifest {
             directory,
             #[cfg(feature = "workspaces")]
             catalog,
+            #[cfg(feature = "workspaces")]
+            workspaces,
+            #[cfg(feature = "workspaces")]
+            contexts,
             #[cfg(feature = "generation-pointer")]
             store,
             #[cfg(feature = "generation-pointer")]
@@ -611,13 +717,49 @@ impl Manifest {
     /// checked here, since the document came from a store.
     #[cfg(feature = "snapshot")]
     pub(crate) fn of_generation(dir: &Path, document: &crate::snapshot::Document) -> Result<Self> {
+        let entries = (document.repositories.iter())
+            .map(|entry| (entry, entry.blocks.clone()))
+            .collect();
+        Self::of_entries(dir, entries)
+    }
+
+    /// The workspace of one named workspace of a pulled generation (#342, ADR 0021): the
+    /// repositories the context records, in its order, each with the blocks the context recorded
+    /// (a mirror's own `meada.toml` still wins whole). The generation holds every mirror once, so
+    /// two contexts read the same ones and differ only in these blocks.
+    #[cfg(feature = "snapshot")]
+    pub(crate) fn of_context(
+        dir: &Path,
+        document: &crate::snapshot::Document,
+        context: &crate::snapshot::Context,
+    ) -> Result<Self> {
+        let held = document.repositories.iter().chain(&document.members);
+        let mut entries = Vec::new();
+        for recorded in &context.repositories {
+            let found = held.clone().find(|e| e.identity == recorded.repo);
+            let shown = dir
+                .join(crate::snapshot::pull::DOCUMENT)
+                .display()
+                .to_string();
+            let found = found.ok_or_else(|| Msg::SnapshotNotDocument(&shown).text())?;
+            entries.push((found, recorded.blocks.clone()));
+        }
+        Self::of_entries(dir, entries)
+    }
+
+    /// `entries`, each a document entry with the blocks to read it with.
+    #[cfg(feature = "snapshot")]
+    fn of_entries(
+        dir: &Path,
+        entries: Vec<(&crate::snapshot::Entry, serde_json::Value)>,
+    ) -> Result<Self> {
         let shown = dir
             .join(crate::snapshot::pull::DOCUMENT)
             .display()
             .to_string();
         let not = || Msg::SnapshotNotDocument(&shown).text();
-        let mut entries = Vec::new();
-        for entry in &document.repositories {
+        let mut listed_entries = Vec::new();
+        for (entry, recorded) in entries {
             let repo = entry.identity.as_str();
             let bad = |problem: String| format!("{shown}: {repo}: {problem}");
             if let Some(problem) = identity_problem(repo) {
@@ -628,7 +770,7 @@ impl Manifest {
                 return Err(not().into());
             }
             let root = dir.join(bundle).join("mirror");
-            let serde_json::Value::Object(mut written) = entry.blocks.clone() else {
+            let serde_json::Value::Object(mut written) = recorded.clone() else {
                 return Err(not().into());
             };
             written.insert("repo".into(), repo.into());
@@ -642,7 +784,7 @@ impl Manifest {
                 Some(own) => (own, blocks),
                 None => (config_of(file), Vec::new()),
             };
-            entries.push(Listed {
+            listed_entries.push(Listed {
                 repo: repo.to_string(),
                 path: root.display().to_string(),
                 repository: Ok(Repository {
@@ -654,11 +796,12 @@ impl Manifest {
                     identity: repo.to_string(),
                 }),
                 ignored,
-                blocks: entry.blocks.clone(),
+                blocks: recorded,
+                member: false,
             });
         }
         Ok(Self {
-            entries,
+            entries: listed_entries,
             index_dir: dir.to_path_buf(),
             #[cfg(feature = "valkey")]
             valkey: None,
@@ -677,6 +820,10 @@ impl Manifest {
             directory: None,
             #[cfg(feature = "workspaces")]
             catalog: None,
+            #[cfg(feature = "workspaces")]
+            workspaces: None,
+            #[cfg(feature = "workspaces")]
+            contexts: Vec::new(),
             #[cfg(feature = "generation-pointer")]
             store: false,
             #[cfg(feature = "generation-pointer")]

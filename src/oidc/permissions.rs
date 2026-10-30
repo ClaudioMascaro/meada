@@ -88,6 +88,10 @@ struct Set {
     /// the set left out (`excluded`).
     version: Option<String>,
     excluded: BTreeSet<String>,
+    /// The identities the set left out of each named workspace, by workspace id (#342): the
+    /// sponsor rule's exclusions.
+    #[cfg(feature = "workspaces")]
+    context_excluded: HashMap<String, BTreeSet<String>>,
     /// With `[catalog]` (#341), the identities the catalog holds: the set's `catalog` and `both`
     /// repositories GitHub showed (`listed`). Coverage, not entitlement.
     #[cfg(feature = "workspaces")]
@@ -141,7 +145,7 @@ impl Catalog {
 enum Read {
     None,
     Same(Duration, Instant),
-    New(Set),
+    New(Box<Set>),
 }
 
 /// Why a read failed: why, and whether it is the version refusal; `None` for a set row that
@@ -208,6 +212,17 @@ impl Permissions {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
         let set = state.set.as_ref()?;
         Some((set.version.clone()?, set.excluded.clone()))
+    }
+
+    /// The identities the newest set left out of the named workspace `context` (#342): the sponsor
+    /// rule's exclusions, whatever the set's age. Empty before a set is loaded.
+    #[cfg(feature = "workspaces")]
+    pub(super) fn excluded_in(&self, context: &str) -> BTreeSet<String> {
+        let state = self.state.read().unwrap_or_else(|e| e.into_inner());
+        (state.set.as_ref())
+            .and_then(|set| set.context_excluded.get(context))
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// The admission view's `github` (#332): the grant provider's settings, the grant's state and
@@ -304,7 +319,7 @@ impl Permissions {
                     set.seen(age, at);
                 }
             }
-            Ok(Read::New(set)) => state.set = Some(set),
+            Ok(Read::New(set)) => state.set = Some(*set),
             Err(None) => {}
             Err(Some((why, true))) => {
                 if !state.version_said {
@@ -396,18 +411,33 @@ impl Permissions {
         #[cfg(feature = "workspaces")]
         let catalog = self.read_catalog(&tx, &q, &id).await.map_err(failed)?;
         let exclusions =
-            format!("SELECT identity FROM {q}.permission_exclusions WHERE set_id = $1");
+            format!("SELECT context, identity FROM {q}.permission_exclusions WHERE set_id = $1");
         let table = format!("{q}.permission_exclusions");
         let mut excluded = BTreeSet::new();
+        #[cfg(feature = "workspaces")]
+        let mut context_excluded: HashMap<String, BTreeSet<String>> = HashMap::new();
         for row in tx.query(&exclusions, &[&id]).await.map_err(failed)? {
-            match row.try_get::<_, String>(0).ok() {
-                Some(identity) if self.identity_ok(&identity) => {
-                    excluded.insert(identity);
+            match (
+                row.try_get::<_, String>(0).ok(),
+                row.try_get::<_, String>(1).ok(),
+            ) {
+                (Some(context), Some(identity)) if self.identity_ok(&identity) => {
+                    if context.is_empty() {
+                        excluded.insert(identity);
+                    } else if cfg!(feature = "workspaces") && meada_core::ids::is_id(&context) {
+                        #[cfg(feature = "workspaces")]
+                        context_excluded
+                            .entry(context)
+                            .or_default()
+                            .insert(identity);
+                    } else {
+                        eprintln!("{}", Msg::PermissionsBadRow(&table).text());
+                    }
                 }
                 _ => eprintln!("{}", Msg::PermissionsBadRow(&table).text()),
             }
         }
-        Ok(Read::New(Set {
+        Ok(Read::New(Box::new(Set {
             id,
             finished,
             age,
@@ -419,8 +449,10 @@ impl Permissions {
             version,
             excluded,
             #[cfg(feature = "workspaces")]
+            context_excluded,
+            #[cfg(feature = "workspaces")]
             catalog,
-        }))
+        })))
     }
 
     /// The identities of the set's catalog, with `[catalog]` only: its `catalog` and `both`
@@ -534,6 +566,8 @@ mod tests {
             logins: HashMap::from([("ana".into(), vec!["github.com/acme/api".into()])]),
             version: None,
             excluded: BTreeSet::new(),
+            #[cfg(feature = "workspaces")]
+            context_excluded: HashMap::new(),
             #[cfg(feature = "workspaces")]
             catalog: BTreeSet::new(),
         }
