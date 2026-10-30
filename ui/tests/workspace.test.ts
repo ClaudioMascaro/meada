@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, expect, test, vi } from 'vitest';
 import { initSync } from '../wasm/meada_core';
 import { entriesText, workspaceVersionId } from '../wasm/meada_core';
-import { applyAction, editorModel, entryRows, plainEntries, saveAction, teamApplyAction, teamEditorModel, versionText } from '../src/workspace';
+import { applyAction, editorModel, entryRows, plainEntries, saveAction, teamApplyAction, teamEditorModel, tomlEscaped, versionText, ownerAt } from '../src/workspace';
 import type { Authority, Entry } from '../src/workspace';
 
 beforeAll(() => { initSync({ module: readFileSync(new URL('../wasm/meada_core_bg.wasm', import.meta.url)) }); });
@@ -56,6 +56,15 @@ test('view annotations never enter a text, an id or the diff keys', () => {
   expect(owned.diff?.changed).toEqual([{ repo: 'a.com/z', keys: ['repository.owner'] }]);
 });
 
+test('the role check\'s mark is response metadata: never in a text, an id or a payload (#333)', () => {
+  const marked = [{ ...x, added_by: 'ana-souza', excluded: true }, y];
+  const plain = [{ ...x, added_by: 'ana-souza' }, y];
+  expect(plainEntries(marked)).toEqual(plain);
+  expect(versionText(marked)).toBe(text(plain));
+  expect(workspaceVersionId(versionText(marked))).toBe(workspaceVersionId(text(plain)));
+  expect(saveAction(versionText(marked), 'm', 'ops.toml').body.entries).not.toContain('excluded');
+});
+
 test('each entry is shown with the refusal of changing it alone', () => {
   expect(entryRows([x, y, z], who).map(({ repo, may_change, refusal }) => ({ repo, may_change, refusal }))).toEqual([
     { repo: 'a.com/x', may_change: true }, { repo: 'a.com/y', may_change: false, refusal: 'not_your_team' },
@@ -98,4 +107,14 @@ test('an apply is offered when nothing is refused over the entries the session r
   expect(teamApplyAction(versions[0]!, versions[1]!.id, versions, held, held, who, 'en')).toMatchObject({ rollback: false, teams: [] });
   expect(teamApplyAction(versions[1]!, versions[0]!.id, versions, held, [x, { ...y, path: 'changed' }, z], who, 'en')).toBeUndefined();
   expect(teamApplyAction(versions[1]!, versions[0]!.id, versions, held, [x, { ...y, owner: 'team-c' }, z], who, 'en')).toBeUndefined();
+});
+
+test('the owner picker reads the string being typed and escapes what it inserts', () => {
+  const text = 'owner = "a\\"b';
+  expect(ownerAt(text, text.length)).toEqual({ prefix: 'a"b', start: 9 });
+  expect(ownerAt('owner = "a\\\\', 12)).toEqual({ prefix: 'a\\', start: 9 });
+  expect(ownerAt('owner = "x"', 11)).toBeUndefined();
+  expect(ownerAt('path = "x', 9)).toBeUndefined();
+  expect(ownerAt('repo = "r"\nowner = "te', 22)).toEqual({ prefix: 'te', start: 20 });
+  expect(tomlEscaped('a"b\\c')).toBe('a\\"b\\\\c');
 });

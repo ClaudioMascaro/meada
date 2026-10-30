@@ -184,14 +184,16 @@ return redis.call('GET', KEYS[2])
 
 /// Takes the refresh lock for `ttl` as `meada snapshot lock` does, its holder saying what
 /// `holds` it, then `INCR`s the fence up to `max_fence`: the token and the fence, or an error
-/// naming the key (a lock already held names its holder). Whoever gets `Ok` calls `release`.
+/// naming the key (a lock already held names its holder), an `OpError::Refused` when the lock is
+/// held or lost or the fence at `max_fence`. Whoever gets `Ok` calls `release`.
 pub async fn acquire(
     valkey: &Valkey,
     config: &valkey::Config,
     ttl: Duration,
     holds: &str,
     max_fence: u64,
-) -> Result<Held, String> {
+) -> Result<Held, super::generations::OpError> {
+    use super::generations::OpError::Refused;
     let (lock, fence_key, holder) = keys(config);
     let token = token()?;
     let mut take = cmd("EVAL");
@@ -203,7 +205,7 @@ pub async fn acquire(
         // The server may have taken the lock and the answer been lost: release ours, if it is.
         Err(e) => {
             release(valkey, config, &token).await;
-            return Err(format!("{lock}: {e}"));
+            return Err(format!("{lock}: {e}").into());
         }
     };
     if let Some(fields) = held {
@@ -212,22 +214,24 @@ pub async fn acquire(
             [host, pid, started, holds] => Some([host.as_str(), pid, started, holds]),
             _ => None,
         };
-        return Err(Msg::LockHeld { key: &lock, holder }.text());
+        return Err(Refused(Msg::LockHeld { key: &lock, holder }.text()));
     }
     let mut incr = cmd("EVAL");
     incr.arg(INCREMENT).arg(2).arg(&lock).arg(&fence_key);
     incr.arg(&token).arg(max_fence);
     let acquired = match valkey.query::<Option<String>>(&incr).await {
-        Ok(None) => Err(Msg::LockNotHeld(&lock).text()),
-        Ok(Some(text)) if text.is_empty() => Err(Msg::FenceLimit {
-            key: &fence_key,
-            max: max_fence,
-        }
-        .text()),
+        Ok(None) => Err(Refused(Msg::LockNotHeld(&lock).text())),
+        Ok(Some(text)) if text.is_empty() => Err(Refused(
+            Msg::FenceLimit {
+                key: &fence_key,
+                max: max_fence,
+            }
+            .text(),
+        )),
         Ok(Some(text)) => super::fence(&text)
             .filter(|f| *f > 0)
-            .ok_or_else(|| Msg::LockBadFence(&fence_key).text()),
-        Err(e) => Err(format!("{fence_key}: {e}")),
+            .ok_or_else(|| Msg::LockBadFence(&fence_key).text().into()),
+        Err(e) => Err(format!("{fence_key}: {e}").into()),
     };
     match acquired {
         Ok(fence) => Ok(Held { token, fence }),

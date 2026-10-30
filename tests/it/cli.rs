@@ -75,8 +75,13 @@ fn config_errors_follow_lang() {
 }
 
 /// The default build's help: a feature's subcommand (`meada snapshot`, `meada github-app`,
-/// `meada ui`) is absent from it.
-#[cfg(not(any(feature = "snapshot", feature = "github-app", feature = "ui")))]
+/// `meada ui`, `meada postgres`) is absent from it.
+#[cfg(not(any(
+    feature = "snapshot",
+    feature = "github-app",
+    feature = "ui",
+    feature = "postgres"
+)))]
 #[test]
 fn help_follows_lang() {
     let repo = fixture_repo("cli_help", "ts-basic", None);
@@ -163,6 +168,205 @@ fn workspace_section_errors_follow_lang() {
     }
 }
 
+/// The identity provider's `[oidc]` errors (ADR 0016) under `pt_BR` and `en_US`: a `type` it
+/// does not know, `[oidc.entra]` under another `type`, and an `overage` it does not take.
+#[cfg(feature = "oidc")]
+#[test]
+fn oidc_type_errors_follow_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_oidc_type");
+    let head = "index_dir = \"../indexes\"\n\n[oidc]\nissuer = \"https://id.example\"\npublic_url = \
+                \"https://meada.example\"\nidentities_claim = \"r\"\n";
+    let at = "meada: ops/meada.workspace.toml";
+    for (body, en, pt) in [
+        (
+            "type = \"azure\"\n",
+            "7: `oidc.type`: must be one of `generic`, `entra`, `okta` or `keycloak`",
+            "7: `oidc.type`: deve ser um de `generic`, `entra`, `okta` ou `keycloak`",
+        ),
+        (
+            "type = \"okta\"\n[oidc.entra]\n",
+            "8: `oidc.entra`: needs `oidc.type = \"entra\"`",
+            "8: `oidc.entra`: exige `oidc.type = \"entra\"`",
+        ),
+        (
+            "type = \"entra\"\n[oidc.entra]\noverage = \"always\"\n",
+            "9: `oidc.entra.overage`: must be one of `ignore` or `directory`",
+            "9: `oidc.entra.overage`: deve ser um de `ignore` ou `directory`",
+        ),
+    ] {
+        fs::write(dir.join(MANIFEST), format!("{head}{body}")).unwrap();
+        for (lang, what) in [("en_US.UTF-8", en), ("pt_BR.UTF-8", pt)] {
+            let refused = (String::new(), format!("{at}:{what}\n"), Some(1));
+            let args = ["index", "--workspace", MANIFEST];
+            assert_eq!(run_lang(&dir, lang, &args), refused, "{lang} {body}");
+        }
+    }
+}
+
+/// `overage = "directory"` (#336) under `pt_BR` and `en_US`: without `groups_claim` and without
+/// `[directory]`.
+#[cfg(all(feature = "oidc", feature = "directory"))]
+#[test]
+fn oidc_overage_directory_errors_follow_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_oidc_overage");
+    let head = "index_dir = \"../indexes\"\n\n[oidc]\nissuer = \"https://id.example\"\npublic_url = \
+                \"https://meada.example\"\nidentities_claim = \"r\"\ntype = \"entra\"\n";
+    let groups = "groups_claim = \"groups\"\n[oidc.groups]\n\"g\" = [\"a\"]\n";
+    let overage = "[oidc.entra]\noverage = \"directory\"\n";
+    for (body, en, pt) in [
+        (
+            overage.to_string(),
+            "9: `oidc.entra.overage`: `oidc.groups_claim` is missing",
+            "9: `oidc.entra.overage`: falta `oidc.groups_claim`",
+        ),
+        (
+            format!("{groups}{overage}"),
+            "12: `oidc.entra.overage`: [oidc.entra] needs [directory]",
+            "12: `oidc.entra.overage`: [oidc.entra] exige [directory]",
+        ),
+    ] {
+        fs::write(dir.join(MANIFEST), format!("{head}{body}")).unwrap();
+        for (lang, what) in [("en_US.UTF-8", en), ("pt_BR.UTF-8", pt)] {
+            let at = "meada: ops/meada.workspace.toml";
+            let refused = (String::new(), format!("{at}:{what}\n"), Some(1));
+            let args = ["index", "--workspace", MANIFEST];
+            assert_eq!(run_lang(&dir, lang, &args), refused, "{lang} {body}");
+        }
+    }
+}
+
+/// The GitHub grant provider and the role check (#331) under `pt_BR` and `en_US`:
+/// `[oidc.github]` without `[postgres]`, a key error, the role check without `[oidc.github]`,
+/// without a `[[github_app]]` block for its host and, under `[refresh_lock]`, without
+/// `MEADA_REFRESH_FENCE`; and a reader of the pulled version without the exclusions file.
+#[cfg(all(feature = "oidc", feature = "postgres"))]
+#[test]
+fn oidc_github_and_role_check_refusals_follow_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_oidc_github");
+    let oidc = "index_dir = \"../indexes\"\n\n[oidc]\nissuer = \"https://id.example\"\npublic_url = \
+                \"https://meada.example\"\n";
+    let table = "[oidc.github]\nlogin_claim = \"github_login\"\nmax_age_seconds = 5400\n";
+    let postgres = "\n[postgres]\nschema = \"m\"\n";
+    let at = "meada: ops/meada.workspace.toml";
+    let index: &[&str] = &["index", "--workspace", MANIFEST];
+    let mut cases: Vec<(String, &[&str], String, String)> = vec![
+        (
+            format!("{oidc}{table}"),
+            index,
+            format!("{at}:6: `oidc.github`: [oidc.github] needs [postgres]\n"),
+            format!("{at}:6: `oidc.github`: [oidc.github] exige [postgres]\n"),
+        ),
+        (
+            format!(
+                "{oidc}{}{postgres}",
+                table.replace("login_claim", "host = \"A\"\nlogin_claim")
+            ),
+            index,
+            format!("{at}:7: `oidc.github.host`: must be a lowercase host name\n"),
+            format!("{at}:7: `oidc.github.host`: deve ser um nome de host em minúsculas\n"),
+        ),
+        (
+            format!(
+                "{oidc}{}{postgres}",
+                table.replace("max_age", "roles = []\nmax_age")
+            ),
+            index,
+            format!(
+                "{at}:8: `oidc.github.roles`: must be a non-empty array of distinct role names of 1 \
+                 to 100 characters with no control character\n"
+            ),
+            format!(
+                "{at}:8: `oidc.github.roles`: deve ser um array não vazio de nomes de papel \
+                 distintos, de 1 a 100 caracteres e sem caractere de controle\n"
+            ),
+        ),
+    ];
+    let roles: &[&str] = &["github-app", "roles", "--workspace", MANIFEST];
+    if cfg!(feature = "github-app") {
+        cases.push((
+            format!("{oidc}identities_claim = \"r\"\n{postgres}"),
+            roles,
+            "meada: ops/meada.workspace.toml: meada github-app roles needs [oidc.github]\n".into(),
+            "meada: ops/meada.workspace.toml: meada github-app roles exige [oidc.github]\n".into(),
+        ));
+        cases.push((
+            format!("{oidc}{table}{postgres}"),
+            roles,
+            format!(
+                "{at}:6: `oidc.github`: meada github-app roles needs a [[github_app]] block for \
+                 host github.com\n"
+            ),
+            format!(
+                "{at}:6: `oidc.github`: meada github-app roles exige um bloco [[github_app]] para \
+                 o host github.com\n"
+            ),
+        ));
+    }
+    #[cfg(all(feature = "github-app", feature = "refresh-lock"))]
+    {
+        fs::write(dir.join("ops/s3-secret"), "x\n").unwrap();
+        let fenced = format!(
+            "{oidc}{table}{postgres}{}\n[valkey]\nurl = \"redis://127.0.0.1:9\"\n\n\
+             [generations]\nkeep = 3\n\n[refresh_lock]\nttl_seconds = 10\n\n[[github_app]]\n\
+             host = \"github.com\"\napi = \"https://api.github.com\"\napp_id = 1\n\
+             private_key_env = \"K\"\n",
+            crate::snapshot::section("http://127.0.0.1:9", "unused")
+        );
+        cases.push((
+            fenced,
+            roles,
+            "meada: [refresh_lock] needs MEADA_REFRESH_FENCE: run meada github-app roles under \
+             meada snapshot lock\n"
+                .into(),
+            "meada: [refresh_lock] exige MEADA_REFRESH_FENCE: rode o meada github-app roles sob \
+             meada snapshot lock\n"
+                .into(),
+        ));
+    }
+    #[cfg(feature = "generation-pointer")]
+    {
+        fs::write(dir.join("ops/s3-secret"), "x\n").unwrap();
+        let pulled = dir.join("indexes/workspace");
+        let _ = fs::remove_dir_all(&pulled);
+        fs::create_dir_all(&pulled).unwrap();
+        let id = meada_core::ids::workspace_version_id(&[]);
+        let document = format!(
+            "{{\"id\":\"{id}\",\"author\":\"a\",\"time\":\"2026-10-29T00:00:00Z\",\"message\":\"m\",\
+             \"repositories\":[]}}"
+        );
+        fs::write(pulled.join(format!("{id}.json")), document).unwrap();
+        fs::write(pulled.join("current"), format!("{id} 1\n")).unwrap();
+        let store = format!(
+            "{oidc}{table}{postgres}{}\n[valkey]\nurl = \"redis://127.0.0.1:9\"\n\n\
+             [generations]\nkeep = 3\n\n[workspace]\nsource = \"store\"\n",
+            crate::snapshot::section("http://127.0.0.1:9", "unused")
+        );
+        let file = "ops/../indexes/workspace/excluded";
+        cases.push((
+            store,
+            index,
+            format!(
+                "meada: {file} is missing: run `meada github-app roles` after `meada workspace \
+                 pull`\n"
+            ),
+            format!(
+                "meada: {file} não existe: rode `meada github-app roles` depois de `meada \
+                 workspace pull`\n"
+            ),
+        ));
+    }
+    for (toml, args, en, pt) in cases {
+        fs::write(dir.join(MANIFEST), &toml).unwrap();
+        for (lang, expected) in [("en_US.UTF-8", en.clone()), ("pt_BR.UTF-8", pt)] {
+            let refused = (String::new(), expected, Some(1));
+            assert_eq!(run_lang(&dir, lang, args), refused, "{lang}: {toml}");
+        }
+    }
+}
+
 /// An entry's `owner` (ADR 0015) under `pt_BR` and `en_US`: each rule it breaks, and the static
 /// manifest that holds one at all.
 #[test]
@@ -214,6 +418,51 @@ fn owner_errors_follow_lang() {
             let refused = (String::new(), format!("{manifest}: {what}\n"), Some(1));
             let args = ["index", "--workspace", MANIFEST];
             assert_eq!(run_lang(&dir, lang, &args), refused, "{lang} {owner}");
+        }
+    }
+}
+
+/// An entry's `added_by` (#330) under `pt_BR` and `en_US`: each rule it breaks, and the static
+/// manifest that holds one at all.
+#[test]
+fn added_by_errors_follow_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_added_by");
+    let head = "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
+                path = \"../chain-web\"\n";
+    let manifest = "meada: ops/meada.workspace.toml:6: `repository.added_by`";
+    let chars = (
+        "holds a character other than lowercase ASCII letters, digits, `-` and `_`",
+        "contém um caractere além de letras ASCII minúsculas, dígitos, `-` e `_`",
+    );
+    let cases = [
+        (
+            "added_by = 1\n".to_string(),
+            "must be one string, a GitHub login",
+            "deve ser uma única string, um login do GitHub",
+        ),
+        ("added_by = \"\"\n".into(), "is empty", "está vazio"),
+        (
+            format!("added_by = \"{}\"\n", "a".repeat(40)),
+            "is longer than 39 characters",
+            "tem mais de 39 caracteres",
+        ),
+        ("added_by = \"Ana\"\n".into(), chars.0, chars.1),
+        ("added_by = \"ana.souza\"\n".into(), chars.0, chars.1),
+        (
+            "added_by = \"ana\"\n".into(),
+            "an `added_by` belongs to the entries of a workspace version, which a static \
+             manifest has none of: use [workspace] source = \"store\" and `meada workspace import`",
+            "um `added_by` pertence às entradas de uma versão do workspace, que um manifest \
+             estático não tem: use [workspace] source = \"store\" e `meada workspace import`",
+        ),
+    ];
+    for (added_by, en, pt) in cases {
+        fs::write(dir.join(MANIFEST), format!("{head}{added_by}")).unwrap();
+        for (lang, what) in [("en_US.UTF-8", en), ("pt_BR.UTF-8", pt)] {
+            let refused = (String::new(), format!("{manifest}: {what}\n"), Some(1));
+            let args = ["index", "--workspace", MANIFEST];
+            assert_eq!(run_lang(&dir, lang, &args), refused, "{lang} {added_by}");
         }
     }
 }
@@ -690,5 +939,271 @@ fn workspace_apply_and_pull_refusals_follow_lang() {
         ),
     ] {
         assert_eq!(run_in(dir, lang, &pull), refused(expected), "{lang}");
+    }
+}
+
+/// `[postgres]` in a build without its feature, under `pt_BR` and `en_US`.
+#[cfg(not(feature = "postgres"))]
+#[test]
+fn the_postgres_section_without_its_feature_follows_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_postgres_feature");
+    let toml = "index_dir = \"../indexes\"\n\n[postgres]\nschema = \"meada\"\n";
+    fs::write(dir.join(MANIFEST), toml).unwrap();
+    for (lang, expected) in [
+        (
+            "en_US.UTF-8",
+            "meada: ops/meada.workspace.toml:3: [postgres] needs a Meada built with the postgres \
+             feature\n",
+        ),
+        (
+            "pt_BR.UTF-8",
+            "meada: ops/meada.workspace.toml:3: [postgres] exige um Meada compilado com a feature \
+             postgres\n",
+        ),
+    ] {
+        let refused = (String::new(), expected.to_string(), Some(1));
+        let args = ["status", "--workspace", MANIFEST];
+        assert_eq!(run_lang(&dir, lang, &args), refused, "{lang}");
+    }
+    let (_, stderr, code) = run_lang(&dir, "en_US.UTF-8", &["postgres", "migrate"]);
+    assert_eq!(code, Some(2));
+    assert!(stderr.contains("unrecognized subcommand"), "{stderr}");
+}
+
+/// `[directory]` in a build without its feature, under `pt_BR` and `en_US` (#334).
+#[cfg(not(feature = "directory"))]
+#[test]
+fn the_directory_section_without_its_feature_follows_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_directory_feature");
+    let toml = "index_dir = \"../indexes\"\n\n[directory]\nuser_claim = \"oid\"\n";
+    fs::write(dir.join(MANIFEST), toml).unwrap();
+    for (lang, expected) in [
+        (
+            "en_US.UTF-8",
+            "meada: ops/meada.workspace.toml:3: [directory] needs a Meada built with the \
+             directory feature\n",
+        ),
+        (
+            "pt_BR.UTF-8",
+            "meada: ops/meada.workspace.toml:3: [directory] exige um Meada compilado com a \
+             feature directory\n",
+        ),
+    ] {
+        let refused = (String::new(), expected.to_string(), Some(1));
+        let args = ["status", "--workspace", MANIFEST];
+        assert_eq!(run_lang(&dir, lang, &args), refused, "{lang}");
+    }
+}
+
+/// With `directory` (#334), under `pt_BR` and `en_US`: `[directory]` without the sections it
+/// needs, with both token keys and with a `user_attribute` it does not accept.
+#[cfg(all(feature = "directory", feature = "oidc"))]
+#[test]
+fn directory_refusals_follow_lang() {
+    use crate::manifest::{MANIFEST, chain_manifest};
+    let dir = chain_manifest("cli_directory");
+    let head = "index_dir = \"../indexes\"\n";
+    let postgres = "\n[postgres]\nschema = \"m\"\n";
+    let oidc = "\n[oidc]\nissuer = \"https://id.example.com\"\npublic_url = \"https://m.example\"\n\
+                identities_claim = \"r\"\n";
+    let directory = "\n[directory]\nuser_claim = \"oid\"\nuser_attribute = \"userName\"\n";
+    let full = format!("{head}{postgres}{oidc}{directory}");
+    let at = "meada: ops/meada.workspace.toml";
+    for (toml, en, pt) in [
+        (
+            format!("{head}{directory}"),
+            format!("{at}:3: [directory] needs [postgres] and [oidc]\n"),
+            format!("{at}:3: [directory] exige [postgres] e [oidc]\n"),
+        ),
+        (
+            format!("{full}token_env = \"SCIM\"\ntoken_file = \"scim-token\"\n"),
+            format!(
+                "{at}:15: `directory.token_file`: is set together with token_env: use one of the \
+                 two\n"
+            ),
+            format!("{at}:15: `directory.token_file`: está junto de token_env: use um dos dois\n"),
+        ),
+        (
+            full.replace("\"userName\"", "\"email\""),
+            format!(
+                "{at}:13: `directory.user_attribute`: must be one of `userName` or `externalId`\n"
+            ),
+            format!(
+                "{at}:13: `directory.user_attribute`: deve ser um de `userName` ou `externalId`\n"
+            ),
+        ),
+    ] {
+        fs::write(dir.join(MANIFEST), &toml).unwrap();
+        let args = ["status", "--workspace", MANIFEST];
+        for (lang, expected) in [("en_US.UTF-8", en), ("pt_BR.UTF-8", pt)] {
+            let refused = (String::new(), expected, Some(1));
+            assert_eq!(run_lang(&dir, lang, &args), refused, "{lang}: {toml}");
+        }
+    }
+}
+
+/// With `postgres`, under `pt_BR` and `en_US`: a `[postgres]` key error, the URL refusals and,
+/// against the local Postgres, both version refusals.
+#[cfg(feature = "postgres")]
+#[test]
+fn postgres_refusals_follow_lang() {
+    use crate::postgres::{Admin, MIGRATE, manifest, meada, schema, service};
+    let (en, pt) = ("en_US.UTF-8", "pt_BR.UTF-8");
+    let dir = manifest("cli_postgres_key", "schema = \"Meada\"\n");
+    for (lang, expected) in [
+        (
+            en,
+            "meada: ops/meada.workspace.toml:4: `postgres.schema`: must be 1 to 63 lowercase \
+             letters, digits or `_`, starting with a letter\n",
+        ),
+        (
+            pt,
+            "meada: ops/meada.workspace.toml:4: `postgres.schema`: deve ter de 1 a 63 letras \
+             minúsculas, dígitos ou `_`, começando por uma letra\n",
+        ),
+    ] {
+        assert_eq!(meada(&dir, lang, &[], &MIGRATE).1, expected, "{lang}");
+    }
+    let dir = manifest("cli_postgres_url", "schema = \"meada\"\n");
+    let query = [(
+        "MEADA_POSTGRES_URL",
+        "postgres://db.example.internal/m?sslmode=disable",
+    )];
+    let socket = [("MEADA_POSTGRES_URL", "postgres://%2Fvar%2Frun/m")];
+    for (env, lang, expected) in [
+        (
+            &[][..],
+            en,
+            "`postgres.url_env`: the variable MEADA_POSTGRES_URL is not set",
+        ),
+        (
+            &[][..],
+            pt,
+            "`postgres.url_env`: a variável MEADA_POSTGRES_URL não está definida",
+        ),
+        (
+            &query[..],
+            en,
+            "`postgres.url_env`: holds a URL with a query: no parameter is accepted, TLS is \
+             decided by the host",
+        ),
+        (
+            &query[..],
+            pt,
+            "`postgres.url_env`: traz uma URL com query: nenhum parâmetro é aceito, o TLS é \
+             decidido pelo host",
+        ),
+        (
+            &socket[..],
+            en,
+            "`postgres.url_env`: does not hold a postgres:// or postgresql:// URL with a TCP host",
+        ),
+        (
+            &socket[..],
+            pt,
+            "`postgres.url_env`: não traz uma URL postgres:// ou postgresql:// com um host TCP",
+        ),
+    ] {
+        let (_, stderr, code) = meada(&dir, lang, env, &MIGRATE);
+        assert_eq!(
+            (stderr, code),
+            (format!("meada: {expected}\n"), 1),
+            "{lang}"
+        );
+    }
+
+    let Some(url) = service() else { return };
+    let schema = schema("cli_version");
+    let admin = Admin::new(&url);
+    admin.run(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"));
+    let dir = manifest("cli_postgres_version", &format!("schema = \"{schema}\"\n"));
+    let at = |cap| {
+        vec![
+            ("MEADA_POSTGRES_URL", url.as_str()),
+            ("MEADA_POSTGRES_VERSION_MAX", cap),
+        ]
+    };
+    let status = ["status", "--workspace", crate::manifest::MANIFEST];
+    let line = |lang, cap| {
+        let (status, _, _) = meada(&dir, lang, &at(cap), &status);
+        status
+            .lines()
+            .find(|l| l.starts_with("postgres: "))
+            .unwrap()
+            .to_string()
+    };
+    assert_eq!(
+        line(en, "9"),
+        format!(
+            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 5: \
+             run meada postgres migrate)"
+        )
+    );
+    assert_eq!(
+        line(pt, "9"),
+        format!(
+            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da 5 deste Meada: \
+             rode meada postgres migrate)"
+        )
+    );
+    assert_eq!(meada(&dir, en, &at("9"), &MIGRATE).0, "5\n");
+    for (lang, expected) in [
+        (
+            en,
+            format!("the schema {schema} is at version 5, above this Meada's 0: upgrade Meada"),
+        ),
+        (
+            pt,
+            format!("o schema {schema} está na versão 5, acima da 0 deste Meada: atualize o Meada"),
+        ),
+    ] {
+        let (_, stderr, code) = meada(&dir, lang, &at("0"), &MIGRATE);
+        assert_eq!(
+            (stderr, code),
+            (format!("meada: {expected}\n"), 1),
+            "{lang}"
+        );
+    }
+    admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
+}
+
+/// The audit's refusal (#328) under `pt_BR` and `en_US`: with `[postgres]` and Postgres
+/// unreachable, a CLI twin of a console write exits 1 naming Postgres and stores nothing.
+#[cfg(all(feature = "generation-pointer", feature = "postgres"))]
+#[test]
+fn the_audit_refusal_follows_lang() {
+    use crate::postgres::{manifest, meada};
+    let dir = manifest("cli_audit_refusal", "schema = \"meada\"\n");
+    let entries = "[[repository]]\nrepo = \"e.test/a\"\npath = \"../a\"\n";
+    fs::write(dir.join("ops/entries.toml"), entries).unwrap();
+    let env = [("MEADA_POSTGRES_URL", "postgres://meada@127.0.0.1:1/meada")];
+    let import = [
+        "workspace",
+        "import",
+        "ops/entries.toml",
+        "--message",
+        "m",
+        "--workspace",
+        crate::manifest::MANIFEST,
+    ];
+    for (lang, expected) in [
+        (
+            "en_US.UTF-8",
+            "meada: the audit record cannot be written to Postgres, so nothing was changed: ",
+        ),
+        (
+            "pt_BR.UTF-8",
+            "meada: o registro de auditoria não pode ser gravado no Postgres, então nada foi \
+             alterado: ",
+        ),
+    ] {
+        let (stdout, stderr, code) = meada(&dir, lang, &env, &import);
+        assert_eq!((stdout.as_str(), code), ("", 1), "{stderr}");
+        assert!(
+            stderr.starts_with(expected) && stderr.lines().count() == 1,
+            "{lang}: {stderr}"
+        );
     }
 }

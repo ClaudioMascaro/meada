@@ -390,8 +390,9 @@ fn checked(
             return Err(format!("{key}: {}: {problem}", identity.escape_debug()));
         }
         let mut fields = entry.blocks.as_object().cloned().ok_or_else(not)?;
-        // `owner` is an entry's metadata in a workspace version, never a block of a bundle.
-        if ["repo", "path", "owner"]
+        // `owner` and `added_by` are an entry's metadata in a workspace version, never a block of a
+        // bundle.
+        if ["repo", "path", "owner", "added_by"]
             .iter()
             .any(|k| fields.contains_key(*k))
         {

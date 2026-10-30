@@ -16,11 +16,17 @@ export const routes = [
   { path: '/repositories', label: 'repositories' },
   { path: '/credentials', label: 'credentials' },
   { path: '/admission', label: 'admission' },
+  { path: '/audit', label: 'audit' },
 ] as const;
 
-export function Shell({ path, locale, onLanguage, session, t, children, onNavigate }: {
+/** The pages `session` is offered: the audit, when the console has one, is the global operator's alone. */
+export function offered(session?: Session, audit = false) {
+  return routes.filter(route => route.path !== '/audit' || (audit && session?.role === 'operator'));
+}
+
+export function Shell({ path, locale, onLanguage, session, t, children, onNavigate, audit }: {
   path: string; locale: Language; onLanguage: (language: Language) => void;
-  session?: Session; t: Copy; children: ReactNode; onNavigate?: (path: string) => void;
+  session?: Session; t: Copy; children: ReactNode; onNavigate?: (path: string) => void; audit?: boolean;
 }) {
   function follow(event: MouseEvent<HTMLAnchorElement>, target: string) {
     if (!onNavigate || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
@@ -39,7 +45,7 @@ export function Shell({ path, locale, onLanguage, session, t, children, onNaviga
     </header>
     <aside className="sidebar">
       <nav aria-label={t.navigation}>
-        {routes.map(route => <a key={route.path} href={route.path} onClick={event => follow(event, route.path)} aria-current={path === route.path ? 'page' : undefined}>
+        {offered(session, audit).map(route => <a key={route.path} href={route.path} onClick={event => follow(event, route.path)} aria-current={path === route.path ? 'page' : undefined}>
           {t[route.label]}
         </a>)}
       </nav>

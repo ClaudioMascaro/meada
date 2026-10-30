@@ -57,9 +57,17 @@ jobs:
         env:
           RUSTFS_ACCESS_KEY: meada-test
           RUSTFS_SECRET_KEY: meada-test-secret
+      postgres:
+        # 15 is the oldest Postgres ADR 0016 supports.
+        image: postgres:15-alpine
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_PASSWORD: meada-test
     env:
       MEADA_TEST_VALKEY_URL: redis://127.0.0.1:6379
       MEADA_TEST_S3_ENDPOINT: http://127.0.0.1:9000
+      MEADA_TEST_POSTGRES_URL: postgres://postgres:meada-test@127.0.0.1:5432/postgres
       MEADA_TEST_SERVICES_REQUIRED: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -71,7 +79,7 @@ jobs:
           # Each module ticket adds the crates its feature brings, space-separated. The list
           # holds canaries: crates specific to a module's client. Generic ones its feature also
           # pulls (fastrand, ryu, parking) may enter the default build for other reasons.
-          forbidden="redis arc-swap backon crc16 tokio-rustls rustls-native-certs arcstr combine xxhash-rust async-lock object_store reqwest tar aws-lc-rs aws-lc-sys quick-xml crc-fast hyper-rustls rustls-platform-verifier filetime nix jsonwebtoken rsa p256 p384 ed25519-dalek pem simple_asn1"
+          forbidden="redis arc-swap backon crc16 tokio-rustls rustls-native-certs arcstr combine xxhash-rust async-lock object_store reqwest tar aws-lc-rs aws-lc-sys quick-xml crc-fast hyper-rustls rustls-platform-verifier filetime nix jsonwebtoken rsa p256 p384 ed25519-dalek pem simple_asn1 tokio-postgres postgres-protocol postgres-types stringprep whoami phf"
           crates=$(cargo tree --locked -e normal --prefix none --format '{p}' | cut -d' ' -f1 | sort -u)
           status=0
           for c in $forbidden; do
@@ -84,7 +92,7 @@ jobs:
         run: "! grep -q '^name = \"tree-sitter-kotlin' Cargo.lock"
       - name: Wait for the services
         run: |
-          for port in 6379 9000; do
+          for port in 6379 9000 5432; do
             timeout 60 bash -c "until (echo > /dev/tcp/127.0.0.1/$port) 2>/dev/null; do sleep 1; done"
           done
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings

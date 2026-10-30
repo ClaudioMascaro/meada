@@ -1083,6 +1083,45 @@ fn apply_moves_the_workspace_pointer_for_versions_that_set_change_and_clear_owne
     }
 }
 
+/// `apply` of a version that sets `added_by`, one that changes and clears it, and the first
+/// again, moves the pointer as for any version (#330): `added_by` is entry metadata and no team
+/// rule applies to the CLI.
+#[test]
+fn apply_moves_the_workspace_pointer_for_versions_that_set_change_and_clear_added_by() {
+    let Some(fleet) = fleet("ws_apply_added_by") else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let text = fs::read_to_string(dir.join(MANIFEST)).unwrap();
+    let owners = [Some("team-a"), None, None, None];
+    let set = [Some("ana"), Some("bia"), None, None];
+    let changed = [Some("ana-souza"), None, Some("caio_acme"), None];
+    let mut ids = Vec::new();
+    for (name, logins) in [("set", set), ("changed", changed)] {
+        let file = format!("ops/{name}.toml");
+        let version =
+            crate::generations::added(&crate::generations::owned(&text, &owners), &logins);
+        fs::write(dir.join(&file), version).unwrap();
+        ids.push(crate::generations::import(dir, &file, name, "alice").0);
+    }
+    let (plain, _) = crate::generations::import(dir, MANIFEST, "plain", "alice");
+    let mut last = 0u64;
+    for id in [&ids[0], &ids[1], &plain, &ids[0]] {
+        let (stdout, stderr, code) = apply(dir, id);
+        assert_eq!((code, stderr.as_str()), (Some(0), ""), "{id}");
+        let (shown, fence) = stdout.trim().split_once(' ').unwrap();
+        let fence: u64 = fence.parse().unwrap();
+        assert_eq!(shown, id.as_str());
+        assert!(fence > last, "{fence} {last}");
+        assert_eq!(
+            workspace_hash(&fleet),
+            [Some(id.clone()), Some(fence.to_string())]
+        );
+        assert!(released(&fleet));
+        last = fence;
+    }
+}
+
 /// `apply` is refused, leaving the pointer as it was: for a version the store does not hold,
 /// naming its key; while a job holds the lock, naming the holder; and with
 /// `{<prefix>}:fence` lowered, by the fence. `fence recover` counts the workspace pointer's
@@ -1484,4 +1523,193 @@ fn a_failed_fetch_or_index_publishes_nothing_and_keeps_the_current_generation() 
     let g2 = g2.trim().to_string();
     assert_ne!(g2, g1);
     assert_eq!(current(&fleet).0, g2);
+}
+
+// The audit of the CLI twins (#328): one record each with `[postgres]`, none run without it.
+
+/// With `[postgres]`, `workspace import` and `apply`, `snapshot pointer set`, `retain` and
+/// `drop` and `snapshot fence recover` each print what they print without it and leave one
+/// record: `via = "cli"`, the author as subject, the global operator's role, the operation's
+/// arguments and its outcome (`refused` for a drop of the current generation or a held lock).
+/// With Postgres stopped each exits 1 naming Postgres and changes nothing in Valkey or the
+/// store; on a schema version it does not know each exits 1 naming the versions.
+#[cfg(feature = "postgres")]
+#[test]
+fn every_cli_twin_is_audited_and_none_writes_without_its_record() {
+    use serde_json::json;
+    let Some(fleet) = fleet("ops_audit") else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let Some(audit) = crate::postgres::audited(dir, "ops_audit") else {
+        return;
+    };
+    let g1 = locked_publish(dir);
+    next_commit(dir, "chain-web", "audit-second");
+    let g2 = locked_publish(dir);
+    append_section(dir, &audit.section);
+    let at = |args: &[&str]| -> Vec<String> {
+        let tail = ["--workspace", MANIFEST];
+        args.iter().chain(&tail).map(|a| a.to_string()).collect()
+    };
+    let run = |args: &[String], version_max: Option<&str>| {
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        let mut command = meada(dir, &args);
+        if let Some(max) = version_max {
+            command.env("MEADA_POSTGRES_VERSION_MAX", max);
+        }
+        text(&command.output().unwrap())
+    };
+    let entries = "[[repository]]\nrepo = \"example.com/chain/web\"\npath = \"../chain-web\"\n";
+    fs::write(dir.join("ops/entries.toml"), entries).unwrap();
+    let import = at(&[
+        "workspace",
+        "import",
+        "ops/entries.toml",
+        "--message",
+        "one",
+        "--author",
+        "alice",
+    ]);
+    let (stdout, stderr, code) = run(&import, None);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""), "{stderr}");
+    let version = stdout.trim().to_string();
+    let writes = [
+        at(&["workspace", "apply", &version]),
+        at(&["snapshot", "pointer", "retain", &g1]),
+        at(&["snapshot", "pointer", "set", &g1]),
+        at(&["snapshot", "pointer", "drop", &g2]),
+        at(&["snapshot", "fence", "recover", "--at-least", "0040"]),
+    ];
+    let mut printed = vec![version.clone()];
+    for args in &writes {
+        let (stdout, stderr, code) = run(args, None);
+        assert_eq!((code, stderr.as_str()), (Some(0), ""), "{args:?}");
+        printed.push(stdout.trim().to_string());
+    }
+    assert_eq!(printed[5], "40");
+    // The current generation cannot be dropped: refused, as before.
+    let (_, refusal, code) = run(&at(&["snapshot", "pointer", "drop", &g1]), None);
+    assert_eq!(code, Some(1), "{refusal}");
+    // A held lock: refused, naming its holder, as before.
+    let child = lock(dir, MANIFEST, "touch ops/started; exec sleep 60");
+    wait_for(&dir.join("ops/started"));
+    let (_, held, code) = run(&at(&["snapshot", "pointer", "set", &g2]), None);
+    assert_eq!((code, held.clone()), (Some(1), held_by(&fleet, child.id())));
+    let pid = nix::unistd::Pid::from_raw(child.id() as i32);
+    nix::sys::signal::kill(pid, nix::sys::signal::Signal::SIGTERM).unwrap();
+    child.wait();
+
+    let records = audit.records();
+    assert_eq!(records.len(), 8, "{records:#?}");
+    let author = records[1]["subject"].as_str().unwrap().to_string();
+    assert!(
+        author.starts_with("cli:") && author.contains('@'),
+        "{author}"
+    );
+    let expected = [
+        (
+            "workspace.import",
+            json!({"version": version, "message": "one"}),
+        ),
+        ("workspace.apply", json!({"version": version})),
+        ("pointer.retain", json!({"generation": g1})),
+        ("pointer.set", json!({"generation": g1})),
+        ("pointer.drop", json!({"generation": g2})),
+        ("fence.recover", json!({"at_least": "40"})),
+        ("pointer.drop", json!({"generation": g1})),
+        ("pointer.set", json!({"generation": g2})),
+    ];
+    let line = |stderr: &str| stderr.trim_end().trim_start_matches("meada: ").to_string();
+    for (n, record) in records.iter().enumerate() {
+        let subject = if n == 0 { "alice" } else { author.as_str() };
+        let (outcome, message) = match n {
+            0..=5 => ("accepted", printed[n].clone()),
+            6 => ("refused", line(&refusal)),
+            _ => ("refused", line(&held)),
+        };
+        let (action, arguments) = &expected[n];
+        let fields = [
+            "via",
+            "subject",
+            "login",
+            "role",
+            "owners",
+            "action",
+            "arguments",
+        ];
+        let found: Vec<_> = fields.iter().map(|f| record[f].clone()).collect();
+        assert_eq!(
+            found,
+            [
+                json!("cli"),
+                json!(subject),
+                json!(null),
+                json!("operator"),
+                json!(null),
+                json!(action),
+                arguments.clone()
+            ],
+            "{record}"
+        );
+        assert_eq!(
+            (&record["outcome"], &record["message"]),
+            (&json!(outcome), &json!(message))
+        );
+    }
+
+    // Postgres stopped: every twin exits 1 naming Postgres and writes nothing.
+    let state = |fleet: &Fleet| {
+        let pointer = pointer(&mut admin(&fleet.valkey), fleet.case);
+        (
+            pointer,
+            kept(fleet),
+            get(fleet, "fence"),
+            workspace_hash(fleet),
+        )
+    };
+    let before = state(&fleet);
+    let other = "[[repository]]\nrepo = \"e.test/x\"\npath = \"../x\"\n";
+    fs::write(dir.join("ops/other.toml"), other).unwrap();
+    let twins = [
+        vec![at(&[
+            "workspace",
+            "import",
+            "ops/other.toml",
+            "--message",
+            "two",
+        ])],
+        writes.to_vec(),
+    ]
+    .concat();
+    let refused = "meada: the audit record cannot be written to Postgres, so nothing was changed: ";
+    audit.relay.close();
+    for args in &twins {
+        let (stdout, stderr, code) = run(args, None);
+        assert_eq!((code, stdout.as_str()), (Some(1), ""), "{args:?}: {stderr}");
+        assert!(
+            stderr.starts_with(refused) && stderr.lines().count() == 1,
+            "{stderr}"
+        );
+        audit.assert_no_url(&stderr);
+    }
+    // A schema version this binary does not know: exit 1, naming both versions.
+    fs::write(dir.join("ops/pg-url"), &audit.url).unwrap();
+    let higher = "is at version 5, above this Meada's 1: upgrade Meada";
+    for args in &twins {
+        let (stdout, stderr, code) = run(args, Some("1"));
+        assert_eq!((code, stdout.as_str()), (Some(1), ""), "{args:?}: {stderr}");
+        assert!(
+            stderr.starts_with(refused) && stderr.trim_end().ends_with(higher),
+            "{stderr}"
+        );
+        audit.assert_no_url(&stderr);
+    }
+    assert_eq!(state(&fleet), before);
+    assert_eq!(audit.records().len(), 8);
+    let (listed, _, _) = run(&at(&["workspace", "list"]), None);
+    assert!(
+        listed.contains(": one") && !listed.contains(": two"),
+        "{listed}"
+    );
 }

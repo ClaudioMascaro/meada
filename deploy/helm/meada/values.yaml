@@ -93,6 +93,54 @@ modules:
     groupsClaim: ""
     groups: {}
     scopes: []
+    # generic (the default), entra, okta or keycloak: names the identity provider (ADR 0016).
+    type: generic
+    # Entra ID only (type: entra): "directory" gives a token in groups overage its groups from the
+    # directory below; it needs modules.directory and groupsClaim.
+    entra:
+      overage: ignore
+    # The GitHub grant provider: a subject reads what its GitHub login reads on GitHub. It needs
+    # modules.postgres, modules.githubApp and modules.oidc. The refresh then runs
+    # `meada github-app roles` and fetches from `meada workspace show --pulled`: workspace.fetch
+    # receives that file as $1.
+    github:
+      enabled: false
+      host: github.com
+      loginClaim: ""
+      roles: []                 # empty keeps Meada's default, the five built-in roles
+      maxAgeSeconds: 5400       # the refresh schedule plus its longest run; at least 60
+  # The data layer (ADR 0016). The URLs, which hold passwords, come only from the Secret: keys
+  # migrate-url (the migrate step), write-url (the console and the refresh) and read-url (the nodes).
+  postgres:
+    enabled: false
+    credentialsSecret: meada-postgres
+    schema: meada
+  # Needed by modules.oidc.github, for the refresh only: the App's private key, from the Secret.
+  githubApp:
+    enabled: false
+    host: github.com
+    api: https://api.github.com
+    appId: 0
+    privateKeySecret: meada-github-app   # key private-key
+  # The SCIM directory on the console (needs modules.postgres and modules.oidc). The token comes
+  # from the Secret (key token, at least 32 characters) and only the console reads it.
+  directory:
+    enabled: false
+    tokenSecret: meada-scim
+    userClaim: ""
+    userAttribute: externalId   # or userName
+    groupAttribute: displayName # or externalId
+# An example Postgres for evaluation, off by default and not for production: a single replica.
+# Use your own Postgres 15 or later in production. It needs modules.postgres and the Secrets:
+# passwordsSecret (keys postgres-password, migrate-password, write-password, read-password) and
+# tlsSecret (tls.crt and tls.key, a certificate naming the Service <release>-meada-postgres).
+postgres:
+  enabled: false
+  image: postgres:15-alpine
+  storage: 10Gi
+  passwordsSecret: meada-postgres-server
+  tlsSecret: meada-postgres-tls
+  resources: {}
 cronJob:
   schedule: "*/10 * * * *"
   resources: {}

@@ -191,12 +191,43 @@ check and the CLI twins that write connect to it; nodes only read it; `meada ind
 connects (ADR 0016).
 _Avoid_: database, persistence layer, state store
 
+**Permissions set**:
+What the job's role check (`meada github-app roles`) writes to the data layer at every refresh,
+one kept and replaced in one transaction: each GitHub repository of the workspace's coverage
+(listed, not found, uncovered), every collaborator GitHub listed with its role, and the additions
+left out, under the refresh lock's fence so a stalled job cannot replace a newer one (ADR 0016,
+#331).
+_Avoid_: permissions table, role cache, ACL
+
+**Exclusions file**:
+`<index_dir>/workspace/excluded`, which the role check writes beside the pulled version: its
+version id, then the additions whose `added_by` holds no accepted role. Every reader of the
+pulled version treats them as absent from the workspace and refuses without a file of the pulled
+version (#331).
+_Avoid_: blocklist, deny list, skip list
+
+**Audit record**:
+One row of the data layer's audit: who (the subject, its role and a team operator's owners), what
+(the action and its arguments), when (Postgres's clock) and the outcome (`pending`, `accepted`,
+`refused`, `failed`) of a console write or a CLI twin of one. It is written as `pending` before
+the write touches Valkey or the store, so no write happens without it; the console's stderr line
+is not one (ADR 0016, #328).
+_Avoid_: audit log entry, audit event, audit line
+
 **Directory**:
 The users and groups the identity provider pushes into the data layer through the console's
 SCIM 2.0 endpoint (`[directory]`). It feeds the owner picker, flags an owner that names no group,
 deprovisions a user the identity provider deactivated and gives an Entra ID overage token its
 groups. Meada never pulls it: inbound only (ADR 0016).
 _Avoid_: user store, LDAP, address book, IdP sync
+
+**Revocation marker**:
+What deleting a provisioned user through the directory leaves: its `userName` and `externalId`,
+kept apart from the deleted SCIM resource, so that `GET` and `filter` show the user absent while
+the console can still refuse its live tokens. A write naming `active` true for a user matching it by
+`[directory] user_attribute` clears it; deactivating a user leaves none, and nodes never read it
+(ADR 0016, #334).
+_Avoid_: tombstone, soft delete
 
 ### Across repositories
 

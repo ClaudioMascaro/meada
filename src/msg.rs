@@ -219,6 +219,57 @@ pub enum Msg<'a> {
     ValkeyReachable,
     #[cfg(feature = "valkey")]
     ValkeyUnreachable(&'a str),
+    #[cfg(feature = "postgres")]
+    AtMost(u64),
+    #[cfg(feature = "postgres")]
+    PostgresBoth,
+    #[cfg(feature = "postgres")]
+    PostgresSchema,
+    /// A connection URL that is no `postgres://` URL with a TCP host.
+    #[cfg(feature = "postgres")]
+    PostgresUrlInvalid,
+    #[cfg(feature = "postgres")]
+    PostgresUrlQuery,
+    #[cfg(feature = "postgres")]
+    PostgresUrlUnset(&'a str),
+    #[cfg(feature = "postgres")]
+    PostgresTimeout(u64),
+    /// A schema below the binary's version, or absent.
+    #[cfg(feature = "postgres")]
+    PostgresVersionLower {
+        schema: &'a str,
+        stored: i32,
+        known: i32,
+    },
+    /// A schema above the binary's version.
+    #[cfg(feature = "postgres")]
+    PostgresVersionHigher {
+        schema: &'a str,
+        stored: i32,
+        known: i32,
+    },
+    #[cfg(feature = "postgres")]
+    PostgresReachable {
+        schema: &'a str,
+        version: i32,
+    },
+    #[cfg(any(feature = "postgres", feature = "ui"))]
+    PostgresUnreachable(&'a str),
+    /// `meada postgres migrate` with a manifest that has no `[postgres]`.
+    #[cfg(feature = "postgres")]
+    PostgresMissing(&'a str),
+    #[cfg(feature = "postgres")]
+    Postgres,
+    #[cfg(feature = "postgres")]
+    PostgresMigrate,
+    #[cfg(feature = "postgres")]
+    PostgresWorkspaceHelp,
+    /// `[directory]` naming both `token_env` and `token_file`.
+    #[cfg(feature = "directory")]
+    DirectoryBoth,
+    /// A SCIM token shorter than the least it may be, never echoing it.
+    #[cfg(feature = "directory")]
+    DirectoryTokenShort(usize),
     #[cfg(feature = "snapshot")]
     SnapshotEndpointInvalid,
     #[cfg(feature = "snapshot")]
@@ -326,7 +377,12 @@ pub enum Msg<'a> {
     SnapshotStoreReachable(&'a str),
     #[cfg(feature = "snapshot")]
     SnapshotStoreUnreachable(&'a str),
-    #[cfg(any(feature = "generation-pointer", feature = "github-app"))]
+    #[cfg(any(
+        feature = "generation-pointer",
+        feature = "github-app",
+        feature = "directory",
+        all(feature = "oidc", feature = "postgres")
+    ))]
     NeedsSections {
         section: &'a str,
         needed: &'a [&'a str],
@@ -334,7 +390,8 @@ pub enum Msg<'a> {
     #[cfg(any(
         feature = "generation-pointer",
         feature = "oidc",
-        feature = "github-app"
+        feature = "github-app",
+        feature = "postgres"
     ))]
     AtLeast(i64),
     #[cfg(feature = "generation-pointer")]
@@ -484,11 +541,17 @@ pub enum Msg<'a> {
     /// fragment.
     #[cfg(feature = "oidc")]
     OidcJwksUrl,
-    #[cfg(feature = "oidc")]
+    #[cfg(any(feature = "oidc", feature = "directory"))]
     OidcEmpty,
     /// An `[oidc]` section with neither `identities_claim` nor `groups_claim`.
     #[cfg(feature = "oidc")]
     OidcNoClaim,
+    /// An `[oidc]` key whose value is none of these, never echoing it (`type`, `overage`).
+    #[cfg(any(feature = "oidc", feature = "directory"))]
+    OidcOneOf(&'a [&'a str]),
+    /// The table of an identity provider `type` under another `type`: the one it belongs to.
+    #[cfg(feature = "oidc")]
+    OidcTypeTable(&'a str),
     /// A configured scope holding a character no RFC 6749 scope-token carries.
     #[cfg(feature = "oidc")]
     OidcScope {
@@ -517,6 +580,19 @@ pub enum Msg<'a> {
     },
     #[cfg(feature = "oidc")]
     OidcRefreshFailed(&'a str),
+    /// A poll of the newest permissions set that failed (#332): why, never the URL.
+    #[cfg(all(feature = "oidc", feature = "postgres"))]
+    PermissionsUnreadable(&'a str),
+    /// A schema version this binary does not know, found by a poll: written once.
+    #[cfg(all(feature = "oidc", feature = "postgres"))]
+    PermissionsVersion(&'a str),
+    /// A permissions or directory row or set that fails its checks, naming the table and never
+    /// its values.
+    #[cfg(all(feature = "oidc", feature = "postgres"))]
+    PermissionsBadRow(&'a str),
+    /// A lookup of an overage token's groups that failed (#336): why, never the URL or a claim.
+    #[cfg(all(feature = "oidc", feature = "directory"))]
+    OverageUnreadable(&'a str),
     #[cfg(feature = "snapshot")]
     SnapshotRetainedSkipped {
         id: &'a str,
@@ -590,6 +666,88 @@ pub enum Msg<'a> {
     GithubAppNotAnswered(&'a str),
     #[cfg(feature = "github-app")]
     GithubAppRepositoryUrl,
+    /// `meada github-app roles` (#331).
+    #[cfg(feature = "github-app")]
+    GithubAppRoles,
+    /// A `[oidc.github] host` that is not a lowercase host name.
+    #[cfg(feature = "oidc")]
+    OidcGithubHost,
+    /// `[oidc.github] roles` that is not a non-empty array of distinct names of 1 to this many
+    /// characters with no control character.
+    #[cfg(feature = "oidc")]
+    OidcGithubRoles(usize),
+    /// `[oidc.github]` without a `[[github_app]]` block for its host, for the role check.
+    #[cfg(feature = "github-app")]
+    RolesNoApp(&'a str),
+    /// A manifest without `[oidc.github]` given to the role check.
+    #[cfg(feature = "github-app")]
+    RolesNoGithub(&'a str),
+    /// `[refresh_lock]` without a positive `MEADA_REFRESH_FENCE` for the role check.
+    #[cfg(feature = "github-app")]
+    RolesFenceEnv,
+    /// A permissions set with a higher fence than this run's.
+    #[cfg(feature = "github-app")]
+    RolesFenceBelow {
+        fence: u64,
+        held: i64,
+    },
+    /// The run's set was replaced before the exclusions file was written.
+    #[cfg(feature = "github-app")]
+    RolesReplaced,
+    /// An identity on the host that is not `<host>/<owner>/<repo>`.
+    #[cfg(feature = "github-app")]
+    RolesNotRepository(&'a str),
+    #[cfg(feature = "github-app")]
+    RolesUncovered(&'a str),
+    #[cfg(feature = "github-app")]
+    RolesNotFound(&'a str),
+    /// A collaborator listed without a valid login or role, never echoing either.
+    #[cfg(feature = "github-app")]
+    RolesSkipped(&'a str),
+    /// A listing that fails the run: the identity and why (a status, a timeout, a bad page).
+    #[cfg(feature = "github-app")]
+    RolesFailed {
+        identity: &'a str,
+        why: &'a str,
+    },
+    /// Every installation covering an owner throttled, with the last status answered, if any.
+    #[cfg(feature = "github-app")]
+    RolesThrottled(Option<u16>),
+    /// A `Link` header's next page off the repository's collaborators listing, never echoed.
+    #[cfg(feature = "github-app")]
+    RolesLinkForeign,
+    #[cfg(feature = "github-app")]
+    RolesLinkCycle,
+    #[cfg(feature = "github-app")]
+    RolesPages(u32),
+    /// An addition left out, with the reason and never the login.
+    #[cfg(feature = "github-app")]
+    RolesExcluded {
+        identity: &'a str,
+        listed: bool,
+    },
+    /// The role check's line on success.
+    #[cfg(feature = "github-app")]
+    RolesSet {
+        id: &'a str,
+        repositories: usize,
+        rows: usize,
+        exclusions: usize,
+    },
+    /// The exclusions file a reader of the pulled version needs (#331).
+    #[cfg(feature = "generation-pointer")]
+    ExcludedMissing(&'a str),
+    #[cfg(feature = "generation-pointer")]
+    ExcludedOther {
+        file: &'a str,
+        named: &'a str,
+        pulled: &'a str,
+    },
+    #[cfg(feature = "generation-pointer")]
+    ExcludedBad {
+        file: &'a str,
+        line: usize,
+    },
     /// `meada ui` (feature `ui`, ADR 0014).
     #[cfg(feature = "ui")]
     Ui,
@@ -665,6 +823,34 @@ pub enum Msg<'a> {
     /// A fixed body error that never echoes untrusted JSON.
     #[cfg(feature = "ui")]
     UiWriteBody,
+    /// A CLI twin of a console write whose audit record cannot be written (#328).
+    #[cfg(any(feature = "ui", feature = "generation-pointer"))]
+    AuditCli(&'a str),
+    /// The console's 503 `audit_unavailable`: no write without its record (#328).
+    #[cfg(feature = "ui")]
+    AuditUnavailable,
+    /// An audit row that fails its checks, naming the table and never its values.
+    #[cfg(feature = "ui")]
+    AuditBadRecord(&'a str),
+    /// `GET audit` with a query other than `before=<id>` and `limit=<1 to 100>`.
+    #[cfg(feature = "ui")]
+    UiAuditQuery,
+    /// A subject the identity provider deactivated (#335): the 403 `deprovisioned`.
+    #[cfg(all(feature = "ui", feature = "directory"))]
+    UiDeprovisioned,
+    /// The directory could not be read: the stderr line, naming the directory and never a claim.
+    #[cfg(all(feature = "ui", feature = "directory"))]
+    DirectoryUnreadable(&'a str),
+    /// The 503 of a route that answers from the directory alone.
+    #[cfg(all(feature = "ui", feature = "directory"))]
+    DirectoryUnavailable,
+    /// The directory's state row (migration 4) is missing: why the directory cannot be read.
+    #[cfg(all(feature = "ui", feature = "directory"))]
+    DirectoryStateMissing,
+    /// `GET directory/groups` with a query other than one `prefix` of at most `OWNER_MAX`
+    /// characters.
+    #[cfg(all(feature = "ui", feature = "directory"))]
+    UiDirectoryQuery(usize),
     About,
     Index,
     Status,
@@ -746,6 +932,8 @@ pub enum Msg<'a> {
     WorkspaceStoreBeside,
     /// `owner` in the `[[repository]]` entries of a bootstrap manifest (`source = "file"`).
     WorkspaceOwnerStatic,
+    /// `added_by` in the `[[repository]]` entries of a bootstrap manifest (`source = "file"`).
+    WorkspaceAddedByStatic,
     /// `meada mcp --listen` without `--generations`, given a `source = "store"` manifest.
     #[cfg(feature = "generation-pointer")]
     WorkspaceStoreRefused(&'a str),
@@ -793,6 +981,8 @@ pub enum Msg<'a> {
     WorkspaceImportAuthor,
     #[cfg(feature = "generation-pointer")]
     WorkspaceShowVersion,
+    #[cfg(feature = "generation-pointer")]
+    WorkspaceShowPulled,
     #[cfg(feature = "generation-pointer")]
     WorkspaceBootstrapHelp,
     /// A bootstrap manifest given to `meada workspace` without `[generations]`.
@@ -1217,6 +1407,114 @@ impl Msg<'_> {
                 format!("valkey: unreachable ({reason})"),
                 format!("valkey: inalcançável ({reason})"),
             ),
+            #[cfg(feature = "postgres")]
+            Msg::AtMost(max) => pick(
+                format!("must be at most {max}"),
+                format!("deve ser no máximo {max}"),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresBoth => pick(
+                "is set together with url_env: use one of the two".into(),
+                "está junto de url_env: use um dos dois".into(),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresSchema => pick(
+                "must be 1 to 63 lowercase letters, digits or `_`, starting with a letter".into(),
+                "deve ter de 1 a 63 letras minúsculas, dígitos ou `_`, começando por uma letra"
+                    .into(),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresUrlInvalid => pick(
+                "does not hold a postgres:// or postgresql:// URL with a TCP host".into(),
+                "não traz uma URL postgres:// ou postgresql:// com um host TCP".into(),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresUrlQuery => pick(
+                "holds a URL with a query: no parameter is accepted, TLS is decided by the host"
+                    .into(),
+                "traz uma URL com query: nenhum parâmetro é aceito, o TLS é decidido pelo host"
+                    .into(),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresUrlUnset(var) => pick(
+                format!("the variable {var} is not set"),
+                format!("a variável {var} não está definida"),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresTimeout(ms) => pick(
+                format!("no answer within {ms} ms"),
+                format!("sem resposta em {ms} ms"),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresVersionLower {
+                schema,
+                stored,
+                known,
+            } => pick(
+                format!(
+                    "the schema {schema} is at version {stored}, below this Meada's {known}: run \
+                     meada postgres migrate"
+                ),
+                format!(
+                    "o schema {schema} está na versão {stored}, abaixo da {known} deste Meada: \
+                     rode meada postgres migrate"
+                ),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresVersionHigher {
+                schema,
+                stored,
+                known,
+            } => pick(
+                format!(
+                    "the schema {schema} is at version {stored}, above this Meada's {known}: \
+                     upgrade Meada"
+                ),
+                format!(
+                    "o schema {schema} está na versão {stored}, acima da {known} deste Meada: \
+                     atualize o Meada"
+                ),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresReachable { schema, version } => pick(
+                format!("postgres: reachable, schema {schema} version {version}"),
+                format!("postgres: alcançável, schema {schema} versão {version}"),
+            ),
+            #[cfg(any(feature = "postgres", feature = "ui"))]
+            Msg::PostgresUnreachable(reason) => pick(
+                format!("postgres: unreachable ({reason})"),
+                format!("postgres: inalcançável ({reason})"),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresMissing(manifest) => pick(
+                format!("{manifest}: no [postgres] section: meada postgres migrate needs one"),
+                format!("{manifest}: sem seção [postgres]: meada postgres migrate precisa de uma"),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::Postgres => pick(
+                "The data layer in Postgres (the [postgres] section).".into(),
+                "A camada de dados no Postgres (a seção [postgres]).".into(),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresMigrate => pick(
+                "Create the schema [postgres] names, or bring it to this Meada's version.".into(),
+                "Cria o schema que [postgres] nomeia, ou o leva à versão deste Meada.".into(),
+            ),
+            #[cfg(feature = "postgres")]
+            Msg::PostgresWorkspaceHelp => pick(
+                "The bootstrap manifest, with its [postgres] section".into(),
+                "O manifesto de bootstrap, com a seção [postgres]".into(),
+            ),
+            #[cfg(feature = "directory")]
+            Msg::DirectoryBoth => pick(
+                "is set together with token_env: use one of the two".into(),
+                "está junto de token_env: use um dos dois".into(),
+            ),
+            #[cfg(feature = "directory")]
+            Msg::DirectoryTokenShort(min) => pick(
+                format!("holds a token shorter than {min} characters"),
+                format!("traz um token com menos de {min} caracteres"),
+            ),
             #[cfg(feature = "snapshot")]
             Msg::SnapshotEndpointInvalid => pick(
                 "is not an http:// or https:// URL with a host and nothing after it".into(),
@@ -1512,7 +1810,12 @@ impl Msg<'_> {
                 format!("store: unreachable ({reason})"),
                 format!("store: inalcançável ({reason})"),
             ),
-            #[cfg(any(feature = "generation-pointer", feature = "github-app"))]
+            #[cfg(any(
+                feature = "generation-pointer",
+                feature = "github-app",
+                feature = "directory",
+                                       all(feature = "oidc", feature = "postgres")
+            ))]
             Msg::NeedsSections { section, needed } => {
                 let needed: Vec<String> = needed.iter().map(|s| format!("[{s}]")).collect();
                 pick(
@@ -1520,7 +1823,12 @@ impl Msg<'_> {
                     format!("[{section}] exige {}", needed.join(" e ")),
                 )
             }
-            #[cfg(any(feature = "generation-pointer", feature = "oidc", feature = "github-app"))]
+            #[cfg(any(
+                feature = "generation-pointer",
+                feature = "oidc",
+                feature = "github-app",
+                feature = "postgres"
+            ))]
             Msg::AtLeast(min) => pick(
                 format!("must be at least {min}"),
                 format!("deve ser pelo menos {min}"),
@@ -1868,12 +2176,30 @@ impl Msg<'_> {
                  em loopback)"
                     .into(),
             ),
-            #[cfg(feature = "oidc")]
+            #[cfg(any(feature = "oidc", feature = "directory"))]
             Msg::OidcEmpty => pick("must not be empty".into(), "não pode ser vazio".into()),
             #[cfg(feature = "oidc")]
             Msg::OidcNoClaim => pick(
                 "set `identities_claim`, `groups_claim` or both".into(),
                 "defina `identities_claim`, `groups_claim` ou os dois".into(),
+            ),
+            #[cfg(any(feature = "oidc", feature = "directory"))]
+            Msg::OidcOneOf(accepted) => {
+                let mut quoted: Vec<String> = accepted.iter().map(|a| format!("`{a}`")).collect();
+                let last = quoted.pop().unwrap_or_default();
+                let rest = quoted.join(", ");
+                match rest.is_empty() {
+                    true => pick(format!("must be {last}"), format!("deve ser {last}")),
+                    false => pick(
+                        format!("must be one of {rest} or {last}"),
+                        format!("deve ser um de {rest} ou {last}"),
+                    ),
+                }
+            }
+            #[cfg(feature = "oidc")]
+            Msg::OidcTypeTable(kind) => pick(
+                format!("needs `oidc.type = \"{kind}\"`"),
+                format!("exige `oidc.type = \"{kind}\"`"),
             ),
             #[cfg(feature = "oidc")]
             Msg::OidcScope { scope, bad } => pick(
@@ -1916,6 +2242,35 @@ impl Msg<'_> {
             Msg::OidcRefreshFailed(why) => pick(
                 format!("meada: {why}; keeping the cached keys"),
                 format!("meada: {why}; as chaves em cache continuam"),
+            ),
+            #[cfg(all(feature = "oidc", feature = "postgres"))]
+            Msg::PermissionsUnreadable(why) => pick(
+                format!("meada: the permissions set cannot be read ({why}); the GitHub grant ages"),
+                format!(
+                    "meada: o conjunto de permissões não pode ser lido ({why}); o grant do \
+                     GitHub envelhece"
+                ),
+            ),
+            #[cfg(all(feature = "oidc", feature = "postgres"))]
+            Msg::PermissionsVersion(why) => pick(
+                format!("meada: {why}; Postgres counts as unreachable and the GitHub grant ages"),
+                format!(
+                    "meada: {why}; o Postgres conta como inalcançável e o grant do GitHub \
+                     envelhece"
+                ),
+            ),
+            #[cfg(all(feature = "oidc", feature = "postgres"))]
+            Msg::PermissionsBadRow(table) => pick(
+                format!("{table}: a row fails its checks and is skipped"),
+                format!("{table}: uma linha falha nas verificações e é ignorada"),
+            ),
+            #[cfg(all(feature = "oidc", feature = "directory"))]
+            Msg::OverageUnreadable(why) => pick(
+                format!("meada: the directory cannot be read for a token in overage ({why}); it has no groups"),
+                format!(
+                    "meada: o diretório não pode ser lido para um token em overage ({why}); ele \
+                     fica sem grupos"
+                ),
             ),
             #[cfg(feature = "snapshot")]
             Msg::GenerationsHelp => pick(
@@ -2064,6 +2419,194 @@ impl Msg<'_> {
             Msg::GithubAppRepositoryUrl => pick(
                 "the repository URL is not https://<host>/<owner>/<repo>".into(),
                 "a URL do repositório não é https://<host>/<owner>/<repo>".into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::GithubAppRoles => pick(
+                "List each GitHub repository's collaborators with their roles into the \
+                 permissions set in Postgres, and write the exclusions file of the pulled version."
+                    .into(),
+                "Lista os colaboradores de cada repositório do GitHub com seus papéis no conjunto \
+                 de permissões no Postgres, e grava o arquivo de exclusões da versão baixada."
+                    .into(),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcGithubHost => pick(
+                "must be a lowercase host name".into(),
+                "deve ser um nome de host em minúsculas".into(),
+            ),
+            #[cfg(feature = "oidc")]
+            Msg::OidcGithubRoles(max) => pick(
+                format!(
+                    "must be a non-empty array of distinct role names of 1 to {max} characters \
+                     with no control character"
+                ),
+                format!(
+                    "deve ser um array não vazio de nomes de papel distintos, de 1 a {max} \
+                     caracteres e sem caractere de controle"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesNoApp(host) => pick(
+                format!("meada github-app roles needs a [[github_app]] block for host {host}"),
+                format!("meada github-app roles exige um bloco [[github_app]] para o host {host}"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesNoGithub(manifest) => pick(
+                format!("{manifest}: meada github-app roles needs [oidc.github]"),
+                format!("{manifest}: meada github-app roles exige [oidc.github]"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesFenceEnv => pick(
+                "[refresh_lock] needs MEADA_REFRESH_FENCE: run meada github-app roles under meada \
+                 snapshot lock"
+                    .into(),
+                "[refresh_lock] exige MEADA_REFRESH_FENCE: rode o meada github-app roles sob meada \
+                 snapshot lock"
+                    .into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesFenceBelow { fence, held } => pick(
+                format!(
+                    "the newest permissions set has fence {held}, above this run's {fence}: a \
+                     newer refresh wrote it; nothing was written"
+                ),
+                format!(
+                    "o conjunto de permissões mais novo tem fence {held}, acima do {fence} desta \
+                     execução: um refresh mais novo o gravou; nada foi gravado"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesReplaced => pick(
+                "a newer permissions set replaced this run's before the exclusions file was \
+                 written; run meada github-app roles again"
+                    .into(),
+                "um conjunto de permissões mais novo substituiu o desta execução antes de o \
+                 arquivo de exclusões ser gravado; rode o meada github-app roles de novo"
+                    .into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesNotRepository(identity) => pick(
+                format!("{identity}: not <host>/<owner>/<repo> on GitHub; it gets no rows"),
+                format!("{identity}: não é <host>/<owner>/<repo> no GitHub; não recebe linhas"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesUncovered(identity) => pick(
+                format!("{identity}: no GitHub App installation covers its owner; it gets no rows"),
+                format!(
+                    "{identity}: nenhuma instalação de GitHub App cobre o dono; não recebe linhas"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesNotFound(identity) => pick(
+                format!("{identity}: GitHub answers 404 for its collaborators; it gets no rows"),
+                format!(
+                    "{identity}: o GitHub responde 404 para os colaboradores; não recebe linhas"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesSkipped(identity) => pick(
+                format!("{identity}: a collaborator GitHub listed has no valid login or role; skipped"),
+                format!(
+                    "{identity}: um colaborador que o GitHub listou não tem login ou papel \
+                     válido; ignorado"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesFailed { identity, why } => pick(
+                format!("{identity}: the role check failed: {why}; nothing was written"),
+                format!("{identity}: a checagem de papéis falhou: {why}; nada foi gravado"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesThrottled(None) => pick(
+                "every installation covering its owner is throttled".into(),
+                "toda instalação que cobre o dono está limitada".into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesThrottled(Some(status)) => pick(
+                format!("every installation covering its owner is throttled (http status {status})"),
+                format!("toda instalação que cobre o dono está limitada (status http {status})"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesLinkForeign => pick(
+                "a Link header's next page is not this repository's collaborators listing".into(),
+                "a próxima página de um cabeçalho Link não é a listagem de colaboradores deste \
+                 repositório"
+                    .into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesLinkCycle => pick(
+                "a Link header's next page was listed already".into(),
+                "a próxima página de um cabeçalho Link já foi listada".into(),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesPages(max) => pick(
+                format!("more than {max} pages of collaborators"),
+                format!("mais de {max} páginas de colaboradores"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesExcluded {
+                identity,
+                listed: false,
+            } => pick(
+                format!("{identity}: excluded: GitHub lists no role for its added_by"),
+                format!("{identity}: excluído: o GitHub não lista papel para o seu added_by"),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesExcluded {
+                identity,
+                listed: true,
+            } => pick(
+                format!("{identity}: excluded: its added_by holds no role in [oidc.github] roles"),
+                format!(
+                    "{identity}: excluído: o seu added_by não tem papel em [oidc.github] roles"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesSet {
+                id,
+                repositories,
+                rows,
+                exclusions,
+            } => pick(
+                format!(
+                    "permissions set {id}: {repositories} repositories, {rows} rows, \
+                     {exclusions} exclusions"
+                ),
+                format!(
+                    "conjunto de permissões {id}: {repositories} repositórios, {rows} linhas, \
+                     {exclusions} exclusões"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::ExcludedMissing(file) => pick(
+                format!("{file} is missing: run `meada github-app roles` after `meada workspace pull`"),
+                format!(
+                    "{file} não existe: rode `meada github-app roles` depois de `meada workspace \
+                     pull`"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::ExcludedOther {
+                file,
+                named,
+                pulled,
+            } => pick(
+                format!(
+                    "{file} names version {named}, not the pulled version {pulled}: run `meada \
+                     github-app roles`"
+                ),
+                format!(
+                    "{file} nomeia a versão {named}, não a versão baixada {pulled}: rode `meada \
+                     github-app roles`"
+                ),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::ExcludedBad { file, line } => pick(
+                format!("{file}:{line}: not a version id or an identity: run `meada github-app roles`"),
+                format!(
+                    "{file}:{line}: não é um id de versão nem uma identidade: rode `meada \
+                     github-app roles`"
+                ),
             ),
             #[cfg(feature = "ui")]
             Msg::Ui => pick(
@@ -2220,6 +2763,59 @@ impl Msg<'_> {
             Msg::UiWriteBody => pick(
                 "not a valid console operation body".into(),
                 "body inválido para uma operação da console".into(),
+            ),
+            #[cfg(any(feature = "ui", feature = "generation-pointer"))]
+            Msg::AuditCli(reason) => pick(
+                format!(
+                    "the audit record cannot be written to Postgres, so nothing was changed: \
+                     {reason}"
+                ),
+                format!(
+                    "o registro de auditoria não pode ser gravado no Postgres, então nada foi \
+                     alterado: {reason}"
+                ),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::AuditUnavailable => pick(
+                "the audit in Postgres is unavailable: no write is made without its record".into(),
+                "a auditoria no Postgres está indisponível: nenhuma escrita é feita sem o seu \
+                 registro"
+                    .into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "directory"))]
+            Msg::UiDeprovisioned => pick(
+                "the identity provider deactivated this account".into(),
+                "o provedor de identidade desativou esta conta".into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "directory"))]
+            Msg::DirectoryUnreadable(reason) => pick(
+                format!("directory: unreadable ({reason})"),
+                format!("directory: ilegível ({reason})"),
+            ),
+            #[cfg(all(feature = "ui", feature = "directory"))]
+            Msg::DirectoryUnavailable => pick(
+                "the directory in Postgres is unavailable".into(),
+                "o diretório no Postgres está indisponível".into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "directory"))]
+            Msg::DirectoryStateMissing => pick(
+                "the directory's state is missing".into(),
+                "o estado do diretório está ausente".into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "directory"))]
+            Msg::UiDirectoryQuery(max) => pick(
+                format!("the owner picker takes one `prefix=<text>` of at most {max} characters"),
+                format!("o seletor de owner aceita um `prefix=<texto>` de até {max} caracteres"),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::UiAuditQuery => pick(
+                "the audit takes `before=<id>` and `limit=<1 to 100>`, nothing else".into(),
+                "a auditoria aceita `before=<id>` e `limit=<1 a 100>`, nada mais".into(),
+            ),
+            #[cfg(feature = "ui")]
+            Msg::AuditBadRecord(table) => pick(
+                format!("{table}: a record fails its checks and is left out"),
+                format!("{table}: um registro falha nas verificações e fica de fora"),
             ),
             Msg::About => pick(
                 "LLM-free code graph for agents and people".into(),
@@ -2484,6 +3080,14 @@ impl Msg<'_> {
                  estático não tem: use [workspace] source = \"store\" e `meada workspace import`"
                     .into(),
             ),
+            Msg::WorkspaceAddedByStatic => pick(
+                "an `added_by` belongs to the entries of a workspace version, which a static \
+                 manifest has none of: use [workspace] source = \"store\" and `meada workspace import`"
+                    .into(),
+                "um `added_by` pertence às entradas de uma versão do workspace, que um manifest \
+                 estático não tem: use [workspace] source = \"store\" e `meada workspace import`"
+                    .into(),
+            ),
             #[cfg(feature = "generation-pointer")]
             Msg::WorkspaceStoreBeside => pick(
                 "[[repository]] entries beside [workspace] source = \"store\": the repositories \
@@ -2610,6 +3214,15 @@ impl Msg<'_> {
             Msg::WorkspaceShowVersion => pick(
                 "The workspace version id (the current one by default)".into(),
                 "O id da versão do workspace (a atual por padrão)".into(),
+            ),
+            #[cfg(feature = "generation-pointer")]
+            Msg::WorkspaceShowPulled => pick(
+                "Print the version meada workspace pull left on disk, without the entries the \
+                 role check excluded"
+                    .into(),
+                "Imprime a versão que o meada workspace pull deixou no disco, sem as entradas \
+                 que a checagem de papéis excluiu"
+                    .into(),
             ),
             #[cfg(feature = "generation-pointer")]
             Msg::WorkspaceBootstrapHelp => pick(

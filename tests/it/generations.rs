@@ -847,8 +847,8 @@ fn import_stores_a_version_once_and_answers_its_id() {
         .map(|(repo, path)| (*repo, format!("../{path}")))
         .collect();
     let blocks = serde_json::json!({});
-    let hashed: Vec<(&str, &str, &serde_json::Value, Option<&str>)> = (entries.iter())
-        .map(|(repo, path)| (*repo, path.as_str(), &blocks, None))
+    let hashed: Vec<meada_core::ids::VersionEntry> = (entries.iter())
+        .map(|(repo, path)| (*repo, path.as_str(), &blocks, None, None))
         .collect();
     assert_eq!(id, meada_core::ids::workspace_version_id(&hashed));
     let s3 = bucket(&fleet.endpoint, &fleet.bucket);
@@ -969,6 +969,20 @@ pub(crate) fn owned(text: &str, owners: &[Option<&str>]) -> String {
         .collect()
 }
 
+/// `text`'s `[[repository]]` entries with `logins[n]`, when it is `Some`, as the `added_by` right
+/// after the `path` of its n-th entry (the key order of a source text is free).
+pub(crate) fn added(text: &str, logins: &[Option<&str>]) -> String {
+    let mut logins = logins.iter();
+    (text.lines())
+        .map(
+            |line| match line.starts_with("path = ").then(|| logins.next()) {
+                Some(Some(Some(login))) => format!("{line}\nadded_by = \"{login}\"\n"),
+                _ => format!("{line}\n"),
+            },
+        )
+        .collect()
+}
+
 /// An entry's `owner` is imported, stored, shown and pulled like its other keys: the document
 /// holds it, `show` prints it right after `path` and importing that output gives the same id,
 /// and `pull` writes the document as stored. A stored document whose owner breaks a rule (empty,
@@ -1026,11 +1040,104 @@ fn an_owner_is_stored_shown_and_pulled_and_a_malformed_one_is_refused() {
     for owner in bad {
         let mut other = document.clone();
         other["repositories"][0]["owner"] = owner.into();
-        let hashed: Vec<(&str, &str, &serde_json::Value, Option<&str>)> =
+        let hashed: Vec<meada_core::ids::VersionEntry> =
             (other["repositories"].as_array().unwrap().iter())
                 .map(|e| {
                     let (repo, path) = (e["repo"].as_str().unwrap(), e["path"].as_str().unwrap());
-                    (repo, path, &blocks, e["owner"].as_str())
+                    (repo, path, &blocks, e["owner"].as_str(), None)
+                })
+                .collect();
+        let id = meada_core::ids::workspace_version_id(&hashed);
+        other["id"] = id.clone().into();
+        let bytes = serde_json::to_vec_pretty(&other).unwrap();
+        crate::snapshot::put_stored(&s3, &version_key(&id), &bytes);
+        forged.push(id);
+    }
+    let not_version = |id: &str| {
+        let key = version_key(id);
+        format!("{key}: malformed: not the workspace version document of its id")
+    };
+    let (listed, stderr, code) = workspace(dir, &["list"]);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    for id in &forged {
+        assert!(
+            listed.contains(&format!("! {}\n", not_version(id))),
+            "{listed}"
+        );
+    }
+    for id in &forged {
+        let (stdout, stderr, code) = workspace(dir, &["show", id]);
+        assert_eq!((stdout.as_str(), code), ("", Some(1)), "{id}");
+        assert_eq!(stderr, format!("meada: {}\n", not_version(id)));
+        send(&mut valkey, &["HSET", &key, "id", id, "fence", "5"]);
+        let (stdout, stderr, code) = workspace(dir, &["pull"]);
+        assert_eq!((stdout.as_str(), code), ("", Some(1)), "{id}");
+        assert_eq!(stderr, format!("meada: {}\n", not_version(id)));
+        assert_eq!(pulled_files(dir), before, "{id}");
+    }
+}
+
+/// An entry's `added_by` (#330) is imported, stored, shown and pulled like `owner`: the document
+/// holds it, `show` prints it right after `owner` and importing that output gives the same id,
+/// and `pull` writes the document as stored. A stored document whose `added_by` breaks a rule is
+/// listed as malformed, refused by `show` and by `pull`, which leaves the index directory's
+/// workspace state as it was.
+#[test]
+fn an_added_by_is_stored_shown_and_pulled_and_a_malformed_one_is_refused() {
+    let Some(fleet) = Fleet::new("workspace_added_by", 3) else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let key = workspace_pointer(fleet.case);
+    let mut valkey = admin(&fleet.valkey);
+    let text = fs::read_to_string(dir.join(MANIFEST)).unwrap();
+    let logins = [Some("ana-souza"), None, Some("ana_acme"), Some("a1")];
+    let owners = [Some("team-web"), None, None, Some("team-x")];
+    let with_logins = added(&owned(&text, &owners), &logins);
+    fs::write(dir.join("ops/added.toml"), with_logins).unwrap();
+    let (id, _) = import(dir, "ops/added.toml", "added", "alice");
+    fs::write(dir.join("ops/owned.toml"), owned(&text, &owners)).unwrap();
+    let (without, _) = import(dir, "ops/owned.toml", "owned", "alice");
+    assert_ne!(id, without, "an added_by changes the version id");
+
+    let s3 = bucket(&fleet.endpoint, &fleet.bucket);
+    let stored = crate::snapshot::get(&s3, &version_key(&id));
+    let document: serde_json::Value = serde_json::from_slice(&stored).unwrap();
+    let entries = document["repositories"].as_array().unwrap();
+    let stored_logins: Vec<Option<&str>> = entries.iter().map(|e| e["added_by"].as_str()).collect();
+    assert_eq!(stored_logins, logins);
+
+    let (shown, stderr, code) = workspace(dir, &["show", &id]);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    let after_owner = "owner = \"team-web\"\nadded_by = \"ana-souza\"\nrepo =";
+    assert!(shown.contains(after_owner), "{shown}");
+    assert_eq!(shown.matches("added_by = ").count(), 3, "{shown}");
+    fs::write(dir.join("ops/shown.toml"), &shown).unwrap();
+    let (again, _) = import(dir, "ops/shown.toml", "again", "bob");
+    assert_eq!(again, id);
+
+    send(&mut valkey, &["HSET", &key, "id", &id, "fence", "1"]);
+    let (stdout, stderr, code) = workspace(dir, &["pull"]);
+    assert_eq!((code, stderr.as_str()), (Some(0), ""));
+    assert_eq!(stdout, format!("{id}\n"));
+    let pulled = fs::read(dir.join(format!("indexes/workspace/{id}.json"))).unwrap();
+    assert_eq!(pulled, stored);
+    let before = pulled_files(dir);
+
+    // Each forged document carries the id its entries derive, so only the check refuses it.
+    let long = "a".repeat(40);
+    let bad = ["", "Ana", "ana.souza", "ana souza", long.as_str()];
+    let blocks = serde_json::json!({});
+    let mut forged = Vec::new();
+    for login in bad {
+        let mut other = document.clone();
+        other["repositories"][0]["added_by"] = login.into();
+        let hashed: Vec<meada_core::ids::VersionEntry> =
+            (other["repositories"].as_array().unwrap().iter())
+                .map(|e| {
+                    let (repo, path) = (e["repo"].as_str().unwrap(), e["path"].as_str().unwrap());
+                    let (owner, added_by) = (e["owner"].as_str(), e["added_by"].as_str());
+                    (repo, path, &blocks, owner, added_by)
                 })
                 .collect();
         let id = meada_core::ids::workspace_version_id(&hashed);
@@ -1861,28 +1968,37 @@ fn workspace_pull_refuses_hostile_input_and_changes_nothing() {
     }
 }
 
-/// The chain's entries, three of them owned, as a workspace version pulled into `dir`
+/// The chain's entries, three of them owned and three attributed, as a workspace version pulled into `dir`
 /// (`<index_dir>/workspace/`), as `meada workspace pull` leaves it at fence 1.
 fn write_pulled(dir: &Path) {
     let blocks = serde_json::json!({});
     let entries: Vec<(&str, String)> = (crate::manifest::CHAIN.iter())
         .map(|(repo, path)| (*repo, format!("../{path}")))
         .collect();
-    // The owners the version holds: the pulled version is read with them and ignores them.
+    // The owners and logins the version holds: the pulled version is read with them and ignores
+    // them.
     let owners = [
         Some("team-web"),
         None,
         Some("team-catalog"),
         Some("team-worker"),
     ];
-    let hashed: Vec<(&str, &str, &serde_json::Value, Option<&str>)> = (entries.iter().zip(owners))
-        .map(|((repo, path), owner)| (*repo, path.as_str(), &blocks, owner))
-        .collect();
+    let logins = [Some("ana-souza"), Some("bia_acme"), None, Some("caio")];
+    let hashed: Vec<meada_core::ids::VersionEntry> =
+        (entries.iter().zip(owners.into_iter().zip(logins)))
+            .map(|((repo, path), (owner, login))| (*repo, path.as_str(), &blocks, owner, login))
+            .collect();
     let id = meada_core::ids::workspace_version_id(&hashed);
-    let repositories: Vec<serde_json::Value> = (entries.iter().zip(owners))
-        .map(|((repo, path), owner)| match owner {
-            Some(owner) => serde_json::json!({"repo": repo, "path": path, "owner": owner}),
-            None => serde_json::json!({"repo": repo, "path": path}),
+    let repositories: Vec<serde_json::Value> = (entries.iter().zip(owners.into_iter().zip(logins)))
+        .map(|((repo, path), (owner, login))| {
+            let mut entry = serde_json::json!({"repo": repo, "path": path});
+            if let Some(owner) = owner {
+                entry["owner"] = owner.into();
+            }
+            if let Some(login) = login {
+                entry["added_by"] = login.into();
+            }
+            entry
         })
         .collect();
     let document = serde_json::json!({
@@ -1950,7 +2066,9 @@ fn the_job_s_commands_read_the_pulled_version_and_publish_records_it() {
         None,
         Some("team-worker"),
     ];
-    fs::write(dir.join("ops/owned.toml"), owned(&text, &owners)).unwrap();
+    let logins = [Some("ana-souza"), None, Some("bia_acme"), Some("caio")];
+    let attributed = added(&owned(&text, &owners), &logins);
+    fs::write(dir.join("ops/owned.toml"), attributed).unwrap();
     let (v1, _) = import(dir, "ops/owned.toml", "chain", "alice");
     send(&mut valkey, &["HSET", &key, "id", &v1, "fence", "1"]);
     let (stdout, stderr, code) = on_bootstrap(dir, &["workspace", "pull"]);
@@ -2028,6 +2146,19 @@ fn the_job_s_commands_read_the_pulled_version_and_publish_records_it() {
     let (v3, _) = import(dir, "ops/reowned.toml", "reowned", "carol");
     assert_ne!(v3, v1);
     send(&mut valkey, &["HSET", &key, "id", &v3, "fence", "3"]);
+    assert_eq!(on_bootstrap(dir, &["workspace", "pull"]).2, Some(0));
+    let (g, stderr, code) = on_bootstrap(dir, &["snapshot", "publish"]);
+    assert_eq!((g.trim(), code), (g1.as_str(), Some(0)), "{stderr}");
+    assert_eq!(document(&g1), first);
+    assert_eq!(field(&document(&g1)), Some(v1.clone().into()));
+    // The same entries with only `added_by` changed, cleared and set: no new generation either,
+    // the stored document unchanged and still naming the version that first produced it.
+    let relogged = [None, Some("dani"), Some("bia_acme"), Some("ana-souza")];
+    let relogged = added(&owned(&text, &owners), &relogged);
+    fs::write(dir.join("ops/relogged.toml"), relogged).unwrap();
+    let (v4, _) = import(dir, "ops/relogged.toml", "relogged", "dave");
+    assert_ne!(v4, v1);
+    send(&mut valkey, &["HSET", &key, "id", &v4, "fence", "4"]);
     assert_eq!(on_bootstrap(dir, &["workspace", "pull"]).2, Some(0));
     let (g, stderr, code) = on_bootstrap(dir, &["snapshot", "publish"]);
     assert_eq!((g.trim(), code), (g1.as_str(), Some(0)), "{stderr}");

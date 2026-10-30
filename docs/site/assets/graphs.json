@@ -712,9 +712,9 @@
         "es": "Identidad y datos, por capas"
       },
       "summary": {
-        "pt": "Arquitetura planejada no S4: o provedor de identidade emite tokens, o job mantém permissões e cada camada guarda um tipo de estado.",
-        "en": "Planned S4 architecture: the identity provider issues tokens, the job maintains permissions and each layer stores a distinct kind of state.",
-        "es": "Arquitectura planeada en S4: el proveedor de identidad emite tokens, el job mantiene permisos y cada capa guarda un tipo de estado."
+        "pt": "Arquitetura da identidade empresarial (S4): o provedor de identidade emite tokens, o job mantém permissões e cada camada guarda um tipo de estado.",
+        "en": "Enterprise identity architecture (S4): the identity provider issues tokens, the job maintains permissions and each layer stores a distinct kind of state.",
+        "es": "Arquitectura de la identidad empresarial (S4): el proveedor de identidad emite tokens, el job mantiene permisos y cada capa guarda un tipo de estado."
       },
       "start": "idp",
       "nodes": [
@@ -734,18 +734,18 @@
             "x": 0,
             "y": 0
           },
-          "kind": "planned",
+          "kind": "delivered",
           "stage": "S4",
           "issue": 319,
           "detail": {
-            "pt": "O provedor de identidade continuará emitindo o token. O grant efetivo reunirá as identidades permitidas pelas claims e, quando configurado, pelas permissões do GitHub. A consulta de papéis no GitHub caberá ao job de refresh, nunca ao console ou à indexação.",
-            "en": "The identity provider will keep issuing the token. The effective grant will combine identities allowed by claims and, when configured, by GitHub permissions. The refresh job will check GitHub roles, never the console or indexing.",
-            "es": "El proveedor de identidad seguirá emitiendo el token. El grant efectivo reunirá las identidades permitidas por claims y, cuando se configure, por permisos de GitHub. El job de refresh consultará los roles de GitHub, nunca la consola ni la indexación."
+            "pt": "O provedor de identidade emite o token e empurra usuários e grupos ao diretório por SCIM. O grant efetivo reúne as identidades permitidas pelas claims e pelas permissões do GitHub. A consulta de papéis cabe ao job de refresh, nunca ao console, aos nós ou à indexação.",
+            "en": "The identity provider issues the token and pushes users and groups to the directory through SCIM. The effective grant combines identities allowed by claims and by GitHub permissions. The refresh job checks roles, never the console, the nodes or indexing.",
+            "es": "El proveedor de identidad emite el token y empuja usuarios y grupos al directorio por SCIM. El grant efectivo reúne las identidades permitidas por claims y por permisos de GitHub. El job de refresh consulta los roles, nunca la consola, los nodos ni la indexación."
           },
           "reference": {
-            "pt": "#autenticar-conceder-acesso-e-registrar",
-            "en": "#authenticate-grant-access-and-record",
-            "es": "#autenticar-conceder-acceso-y-registrar"
+            "pt": "#grant-do-github",
+            "en": "#github-grant",
+            "es": "#grant-de-github"
           }
         },
         {
@@ -764,17 +764,17 @@
             "x": 300,
             "y": 0
           },
-          "kind": "planned",
+          "kind": "delivered",
           "stage": "S4",
           "detail": {
-            "pt": "Postgres será um módulo opt-in para estado mutável durável: auditoria, diretório e permissões. O snapshot store continuará guardando documentos e bundles imutáveis; Valkey continuará guardando ponteiros, locks, fences e caches. meada index continuará sem rede.",
-            "en": "Postgres will be an opt-in module for durable mutable state: audit, directory and permissions. The snapshot store will keep immutable documents and bundles; Valkey will keep pointers, locks, fences and caches. meada index will remain network-free.",
-            "es": "Postgres será un módulo opt-in para estado mutable duradero: auditoría, directorio y permisos. El snapshot store conservará documentos y bundles inmutables; Valkey mantendrá punteros, locks, fences y cachés. meada index seguirá sin red."
+            "pt": "Postgres é um módulo opt-in para estado mutável durável: auditoria, diretório e permissões. O store guarda documentos e bundles imutáveis; o Valkey, ponteiros, travas, fences e caches. meada index continua sem rede.",
+            "en": "Postgres is an opt-in module for durable mutable state: audit, directory and permissions. The store keeps immutable documents and bundles; Valkey keeps pointers, locks, fences and caches. meada index remains network-free.",
+            "es": "Postgres es un módulo opt-in para estado mutable duradero: auditoría, directorio y permisos. El store guarda documentos y bundles inmutables; Valkey, punteros, locks, fences y cachés. meada index sigue sin red."
           },
           "reference": {
-            "pt": "#autenticar-conceder-acesso-e-registrar",
-            "en": "#authenticate-grant-access-and-record",
-            "es": "#autenticar-conceder-acceso-y-registrar"
+            "pt": "#camada-de-dados",
+            "en": "#data-layer",
+            "es": "#capa-de-datos"
           }
         },
         {
@@ -793,17 +793,17 @@
             "x": 600,
             "y": 0
           },
-          "kind": "planned",
+          "kind": "delivered",
           "stage": "S4",
           "detail": {
-            "pt": "O provedor de identidade continuará emitindo o token. O grant efetivo reunirá as identidades permitidas pelas claims e, quando configurado, pelas permissões do GitHub. A consulta de papéis no GitHub caberá ao job de refresh, nunca ao console ou à indexação.",
-            "en": "The identity provider will keep issuing the token. The effective grant will combine identities allowed by claims and, when configured, by GitHub permissions. The refresh job will check GitHub roles, never the console or indexing.",
-            "es": "El proveedor de identidad seguirá emitiendo el token. El grant efectivo reunirá las identidades permitidas por claims y, cuando se configure, por permisos de GitHub. El job de refresh consultará los roles de GitHub, nunca la consola ni la indexación."
+            "pt": "A console e os nós leem a cada minuto o conjunto de permissões mais novo e honram o grant do GitHub por no máximo max_age_seconds. A admissão nunca espera pelo Postgres; só a console verifica o desprovisionamento.",
+            "en": "The console and nodes read the newest permissions set every minute and honor the GitHub grant for at most max_age_seconds. Admission never waits on Postgres; only the console checks deprovisioning.",
+            "es": "La consola y los nodos leen cada minuto el conjunto de permisos más nuevo y honran el grant de GitHub como máximo max_age_seconds. La admisión nunca espera a Postgres; solo la consola verifica el desaprovisionamiento."
           },
           "reference": {
-            "pt": "#autenticar-conceder-acesso-e-registrar",
-            "en": "#authenticate-grant-access-and-record",
-            "es": "#autenticar-conceder-acceso-y-registrar"
+            "pt": "#grant-do-github",
+            "en": "#github-grant",
+            "es": "#grant-de-github"
           }
         },
         {
@@ -822,17 +822,17 @@
             "x": 300,
             "y": 230
           },
-          "kind": "planned",
+          "kind": "delivered",
           "stage": "S4",
           "detail": {
-            "pt": "O provedor de identidade continuará emitindo o token. O grant efetivo reunirá as identidades permitidas pelas claims e, quando configurado, pelas permissões do GitHub. A consulta de papéis no GitHub caberá ao job de refresh, nunca ao console ou à indexação.",
-            "en": "The identity provider will keep issuing the token. The effective grant will combine identities allowed by claims and, when configured, by GitHub permissions. The refresh job will check GitHub roles, never the console or indexing.",
-            "es": "El proveedor de identidad seguirá emitiendo el token. El grant efectivo reunirá las identidades permitidas por claims y, cuando se configure, por permisos de GitHub. El job de refresh consultará los roles de GitHub, nunca la consola ni la indexación."
+            "pt": "No refresh, meada github-app roles lista os colaboradores de cada repositório e substitui o conjunto de permissões numa transação. Se a checagem falhar, o refresh para e nada é publicado.",
+            "en": "In the refresh, meada github-app roles lists each repository's collaborators and replaces the permissions set in one transaction. If the check fails, the refresh stops and nothing is published.",
+            "es": "En el refresh, meada github-app roles lista los colaboradores de cada repositorio y reemplaza el conjunto de permisos en una transacción. Si la verificación falla, el refresh se detiene y no se publica nada."
           },
           "reference": {
-            "pt": "#autenticar-conceder-acesso-e-registrar",
-            "en": "#authenticate-grant-access-and-record",
-            "es": "#autenticar-conceder-acceso-y-registrar"
+            "pt": "#grant-do-github",
+            "en": "#github-grant",
+            "es": "#grant-de-github"
           }
         },
         {
@@ -853,14 +853,14 @@
           },
           "kind": "process",
           "detail": {
-            "pt": "Postgres será um módulo opt-in para estado mutável durável: auditoria, diretório e permissões. O snapshot store continuará guardando documentos e bundles imutáveis; Valkey continuará guardando ponteiros, locks, fences e caches. meada index continuará sem rede.",
-            "en": "Postgres will be an opt-in module for durable mutable state: audit, directory and permissions. The snapshot store will keep immutable documents and bundles; Valkey will keep pointers, locks, fences and caches. meada index will remain network-free.",
-            "es": "Postgres será un módulo opt-in para estado mutable duradero: auditoría, directorio y permisos. El snapshot store conservará documentos y bundles inmutables; Valkey mantendrá punteros, locks, fences y cachés. meada index seguirá sin red."
+            "pt": "Postgres é um módulo opt-in para estado mutável durável: auditoria, diretório e permissões. O store guarda documentos e bundles imutáveis; o Valkey, ponteiros, travas, fences e caches. meada index continua sem rede.",
+            "en": "Postgres is an opt-in module for durable mutable state: audit, directory and permissions. The store keeps immutable documents and bundles; Valkey keeps pointers, locks, fences and caches. meada index remains network-free.",
+            "es": "Postgres es un módulo opt-in para estado mutable duradero: auditoría, directorio y permisos. El store guarda documentos y bundles inmutables; Valkey, punteros, locks, fences y cachés. meada index sigue sin red."
           },
           "reference": {
-            "pt": "#autenticar-conceder-acesso-e-registrar",
-            "en": "#authenticate-grant-access-and-record",
-            "es": "#autenticar-conceder-acceso-y-registrar"
+            "pt": "#camada-de-dados",
+            "en": "#data-layer",
+            "es": "#capa-de-datos"
           }
         },
         {
@@ -881,14 +881,14 @@
           },
           "kind": "process",
           "detail": {
-            "pt": "Postgres será um módulo opt-in para estado mutável durável: auditoria, diretório e permissões. O snapshot store continuará guardando documentos e bundles imutáveis; Valkey continuará guardando ponteiros, locks, fences e caches. meada index continuará sem rede.",
-            "en": "Postgres will be an opt-in module for durable mutable state: audit, directory and permissions. The snapshot store will keep immutable documents and bundles; Valkey will keep pointers, locks, fences and caches. meada index will remain network-free.",
-            "es": "Postgres será un módulo opt-in para estado mutable duradero: auditoría, directorio y permisos. El snapshot store conservará documentos y bundles inmutables; Valkey mantendrá punteros, locks, fences y cachés. meada index seguirá sin red."
+            "pt": "Postgres é um módulo opt-in para estado mutável durável: auditoria, diretório e permissões. O store guarda documentos e bundles imutáveis; o Valkey, ponteiros, travas, fences e caches. meada index continua sem rede.",
+            "en": "Postgres is an opt-in module for durable mutable state: audit, directory and permissions. The store keeps immutable documents and bundles; Valkey keeps pointers, locks, fences and caches. meada index remains network-free.",
+            "es": "Postgres es un módulo opt-in para estado mutable duradero: auditoría, directorio y permisos. El store guarda documentos y bundles inmutables; Valkey, punteros, locks, fences y cachés. meada index sigue sin red."
           },
           "reference": {
-            "pt": "#autenticar-conceder-acesso-e-registrar",
-            "en": "#authenticate-grant-access-and-record",
-            "es": "#autenticar-conceder-acceso-y-registrar"
+            "pt": "#camada-de-dados",
+            "en": "#data-layer",
+            "es": "#capa-de-datos"
           }
         }
       ],
@@ -899,7 +899,7 @@
           "target": "postgres",
           "sourceHandle": "right",
           "targetHandle": "left",
-          "kind": "planned",
+          "kind": "normal",
           "label": {
             "pt": "SCIM",
             "en": "SCIM",
@@ -912,7 +912,7 @@
           "target": "admission",
           "sourceHandle": "right",
           "targetHandle": "left",
-          "kind": "planned"
+          "kind": "normal"
         },
         {
           "id": "idp-admission",
@@ -920,7 +920,7 @@
           "target": "admission",
           "sourceHandle": "top",
           "targetHandle": "top",
-          "kind": "planned",
+          "kind": "normal",
           "label": {
             "pt": "JWT",
             "en": "JWT",
@@ -933,7 +933,7 @@
           "target": "postgres",
           "sourceHandle": "top",
           "targetHandle": "bottom",
-          "kind": "planned",
+          "kind": "normal",
           "label": {
             "pt": "roles",
             "en": "roles",
@@ -965,9 +965,9 @@
         "es": "De las bases a los contextos con nombre"
       },
       "summary": {
-        "pt": "S1 e S2 estão entregues. S3, S4 e S5 estão planejados; as setas mostram dependência, não datas.",
-        "en": "S1 and S2 are delivered. S3, S4 and S5 are planned; arrows show dependency, not dates.",
-        "es": "S1 y S2 están entregados. S3, S4 y S5 están planeados; las flechas muestran dependencia, no fechas."
+        "pt": "S1, S2 e S4 estão entregues. S3 e S5 estão planejados; as setas mostram dependência, não datas.",
+        "en": "S1, S2 and S4 are delivered. S3 and S5 are planned; arrows show dependency, not dates.",
+        "es": "S1, S2 y S4 están entregados. S3 y S5 están planeados; las flechas muestran dependencia, no fechas."
       },
       "start": "s1",
       "nodes": [
@@ -1077,13 +1077,13 @@
             "x": 600,
             "y": 460
           },
-          "kind": "planned",
+          "kind": "delivered",
           "stage": "S4",
           "issue": 319,
           "detail": {
-            "pt": "S3, #294 trata de owners e autorização das entradas. S4, #319 trata de identidade, grants, diretório e auditoria. Partes dessas bases podem avançar em paralelo; o grafo dos tickets determina os bloqueios reais.",
-            "en": "S3, #294 covers owners and entry authorization. S4, #319 covers identity, grants, directory and audit. Parts of these foundations can advance in parallel; the ticket graph determines the actual blockers.",
-            "es": "S3, #294 trata owners y autorización de entradas. S4, #319 trata identidad, grants, directorio y auditoría. Partes de estas bases pueden avanzar en paralelo; el grafo de tickets determina los bloqueos reales."
+            "pt": "S4, #319 entregou identidade, grants, diretório e auditoria; veja a página de identidade empresarial. S3, #294 trata de owners e autorização das entradas.",
+            "en": "S4, #319 delivered identity, grants, directory and audit; see the enterprise identity page. S3, #294 covers owners and entry authorization.",
+            "es": "S4, #319 entregó identidad, grants, directorio y auditoría; véase la página de identidad empresarial. S3, #294 trata owners y autorización de entradas."
           },
           "reference": {
             "pt": "#bases-em-construcao",
@@ -1203,7 +1203,7 @@
           "target": "s4",
           "sourceHandle": "right",
           "targetHandle": "top",
-          "kind": "planned"
+          "kind": "normal"
         },
         {
           "id": "s3-s5",
@@ -2353,9 +2353,9 @@
         "es": "Ausencia no es eliminación"
       },
       "summary": {
-        "pt": "No S4 planejado, exclusão SCIM deixa um bloqueio durável na console para sujeitos provisionados.",
-        "en": "In planned S4, SCIM deletion leaves a durable console block for provisioned subjects.",
-        "es": "En el S4 planeado, la eliminación SCIM deja un bloqueo duradero en la consola para sujetos aprovisionados."
+        "pt": "Na console, a exclusão SCIM deixa um bloqueio durável para sujeitos provisionados.",
+        "en": "In the console, SCIM deletion leaves a durable block for provisioned subjects.",
+        "es": "En la consola, la eliminación SCIM deja un bloqueo duradero para sujetos aprovisionados."
       },
       "nodes": [
         {
@@ -2374,17 +2374,17 @@
             "x": 0,
             "y": 0
           },
-          "kind": "planned",
+          "kind": "delivered",
           "issue": 319,
           "detail": {
-            "pt": "SCIM manterá um diretório de usuários e grupos para a identidade empresarial. O fato de um sujeito ter sido provisionado é distinto de sua presença atual e da política de admissão normal.",
-            "en": "SCIM will maintain a user and group directory for enterprise identity. Having been provisioned is distinct from current presence and normal admission policy.",
-            "es": "SCIM mantendrá un directorio de usuarios y grupos para identidad empresarial. Haber sido aprovisionado es distinto de la presencia actual y de la política normal de admisión."
+            "pt": "O diretório SCIM guarda usuários e grupos que o provedor de identidade empurra. Ter sido provisionado é distinto da presença atual e da admissão normal.",
+            "en": "The SCIM directory holds the users and groups the identity provider pushes. Having been provisioned is distinct from current presence and normal admission.",
+            "es": "El directorio SCIM guarda los usuarios y grupos que empuja el proveedor de identidad. Haber sido aprovisionado es distinto de la presencia actual y de la admisión normal."
           },
           "reference": {
-            "pt": "#diretorio-e-revogacao",
-            "en": "#directory-and-revocation",
-            "es": "#directorio-y-revocacion"
+            "pt": "#diretorio",
+            "en": "#directory",
+            "es": "#directorio"
           }
         },
         {
@@ -2403,16 +2403,16 @@
             "x": 300,
             "y": 0
           },
-          "kind": "planned",
+          "kind": "delivered",
           "detail": {
-            "pt": "Excluir um sujeito provisionado pelo SCIM deixará um bloqueio durável na console. Remover a linha do diretório não poderá apagar a evidência de que a identidade foi revogada.",
-            "en": "Deleting a provisioned subject through SCIM will leave a durable console block. Removing a directory row must not erase evidence that the identity was revoked.",
-            "es": "Eliminar un sujeto aprovisionado mediante SCIM dejará un bloqueo duradero en la consola. Borrar una fila del directorio no podrá borrar la evidencia de que la identidad fue revocada."
+            "pt": "Excluir um sujeito provisionado pelo SCIM deixa um bloqueio durável na console. Remover a linha do diretório não apaga a evidência de que a identidade foi revogada.",
+            "en": "Deleting a provisioned subject through SCIM leaves a durable console block. Removing a directory row does not erase evidence that the identity was revoked.",
+            "es": "Eliminar un sujeto aprovisionado mediante SCIM deja un bloqueo duradero en la consola. Borrar una fila del directorio no borra la evidencia de que la identidad fue revocada."
           },
           "reference": {
-            "pt": "#diretorio-e-revogacao",
-            "en": "#directory-and-revocation",
-            "es": "#directorio-y-revocacion"
+            "pt": "#diretorio",
+            "en": "#directory",
+            "es": "#directorio"
           }
         },
         {
@@ -2431,16 +2431,16 @@
             "x": 600,
             "y": 0
           },
-          "kind": "planned",
+          "kind": "delivered",
           "detail": {
-            "pt": "O bloqueio continuará até um reprovisionamento ativo explícito. Esse é o contrato planejado da console; a política específica dos nós permanece na especificação S4.",
-            "en": "The block will remain until explicit active reprovisioning. This is the planned console contract; the nodes’ specific policy remains in the S4 specification.",
-            "es": "El bloqueo continuará hasta un reaprovisionamiento activo explícito. Es el contrato planeado de la consola; la política específica de los nodos permanece en la especificación S4."
+            "pt": "O bloqueio dura até um reprovisionamento ativo explícito (active verdadeiro). A console responde 403 deprovisioned; os nós não verificam isso, e o token vivo lê até expirar.",
+            "en": "The block lasts until explicit active reprovisioning (active true). The console answers 403 deprovisioned; nodes do not check it, and a live token reads until it expires.",
+            "es": "El bloqueo dura hasta un reaprovisionamiento activo explícito (active verdadero). La consola responde 403 deprovisioned; los nodos no lo verifican y el token vivo lee hasta expirar."
           },
           "reference": {
-            "pt": "#diretorio-e-revogacao",
-            "en": "#directory-and-revocation",
-            "es": "#directorio-y-revocacion"
+            "pt": "#diretorio",
+            "en": "#directory",
+            "es": "#directorio"
           }
         },
         {
@@ -2459,16 +2459,16 @@
             "x": 600,
             "y": 230
           },
-          "kind": "planned",
+          "kind": "delivered",
           "detail": {
-            "pt": "Um sujeito nunca provisionado continuará no caminho normal de admissão. Ausência de registro, por si só, não equivale a uma exclusão SCIM anterior.",
-            "en": "A never-provisioned subject will retain the normal admission path. An absent record alone does not mean there was a prior SCIM deletion.",
-            "es": "Un sujeto nunca aprovisionado conservará la admisión normal. La ausencia de registro por sí sola no significa que hubo una eliminación SCIM anterior."
+            "pt": "Um sujeito nunca provisionado mantém a admissão normal. A ausência no diretório não é, por si, uma exclusão.",
+            "en": "A never-provisioned subject keeps normal admission. Absence from the directory is not, by itself, a deletion.",
+            "es": "Un sujeto nunca aprovisionado mantiene la admisión normal. La ausencia en el directorio no es, por sí sola, una eliminación."
           },
           "reference": {
-            "pt": "#diretorio-e-revogacao",
-            "en": "#directory-and-revocation",
-            "es": "#directorio-y-revocacion"
+            "pt": "#diretorio",
+            "en": "#directory",
+            "es": "#directorio"
           }
         }
       ],
@@ -2479,7 +2479,7 @@
           "target": "deleted",
           "sourceHandle": "right",
           "targetHandle": "left",
-          "kind": "planned"
+          "kind": "normal"
         },
         {
           "id": "deleted-blocked",
@@ -2487,7 +2487,7 @@
           "target": "blocked",
           "sourceHandle": "right",
           "targetHandle": "left",
-          "kind": "planned"
+          "kind": "normal"
         }
       ],
       "start": "provisioned"

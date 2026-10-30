@@ -120,6 +120,24 @@ Console operations require OIDC and are off by default. When enabled, they use t
 
 </details>
 
+## Audit
+
+With `[postgres]` in the bootstrap (and the schema up to date through `meada postgres migrate`), every console write and every CLI command that mirrors one (`meada workspace import` and `apply`, `meada snapshot pointer set`, `retain` and `drop`, `meada snapshot fence recover`) leaves a record in Postgres: who (subject, role and, for a team operator, the owners), what (action and arguments), when (Postgres's clock) and the outcome (`pending`, `accepted`, `refused` or `failed`). The record is written before the write touches Valkey or the store: when it cannot be written, the write is refused and nothing changes (the console answers 503 `audit_unavailable`, the CLI exits 1 naming Postgres). Role refusals and refusals under the lock are recorded too; invalid bodies (400, 413, 422) are not. The console starts with Postgres down (reads keep working) and refuses to start on a schema version it does not know. The global operator reads the records, newest first, on the **Audit log** page or through `GET /api/v1/audit?before=<id>&limit=<1 to 100>`. The stderr audit line is unchanged, with or without `[postgres]`, and Meada never deletes a record.
+
+## Directory (SCIM)
+
+With the `directory` feature (part of `cloud`), `[directory]` in the bootstrap, beside `[postgres]` and `[oidc]`, makes the console serve a SCIM 2.0 endpoint under `/scim/v2/`, which Entra ID's or Okta's provisioning pushes users and groups into:
+
+```toml
+[directory]
+token_env = "MEADA_SCIM_TOKEN"   # or token_file; read by the console at start
+user_claim = "oid"
+user_attribute = "externalId"    # or "userName"
+group_attribute = "externalId"   # "displayName" by default
+```
+
+The endpoint accepts only its own bearer token, at least 32 characters long: the console refuses to start with a short, missing or unreadable token, and rotating it means restarting the console. A console token is no good there, the SCIM token is no good under `/api/v1/`, and any request carrying `Origin` gets a 403. Users and groups live in the Postgres schema (run `meada postgres migrate` first) as the provider sent them, never with `password`; a body over 1 MiB or a resource over 64 KiB gets a 413. Deleting a user removes it from every group and leaves a revocation marker until it is provisioned again with `active` true. Each write leaves one stderr line, `scim: <method> <resource> <id>: <status>`, with no values. The console reads the directory on every request: a user whose `user_claim` value finds an inactive user (or a revocation marker) gets a 403 `deprovisioned` on every route but `GET /api/v1/config`, whatever its role, and the console shows a deactivated-account page; a user never provisioned is admitted. With the directory unreadable, reads are admitted and writes are a 503 `audit_unavailable`. The workspace editor offers the directory's groups as owners to the global operator alone, `owner_missing` flags in text the entries whose owner names no group (once a group was ever provisioned), and the admission page shows the users and groups counts and the last SCIM write.
+
 ## Teams
 
 Several teams can share one workspace: each changes its own entries and the global operator answers for the rest. The numbered rules below are the whole contract.
@@ -142,9 +160,11 @@ Several teams can share one workspace: each changes its own entries and the glob
     meada workspace import repositories.toml --message "Assign billing to its team" --workspace /etc/meada/job.workspace.toml
     ```
 
+    An entry may also carry `added_by = "<GitHub login>"`, the login that added it: 1 to 39 characters of lowercase ASCII letters, digits, `-` and `_` (an Enterprise Managed Users login such as `ana_acme` fits), compared exactly, so `Ana` is refused. It follows `owner` in `meada workspace show` and is part of the version id. With `[oidc.github]`, a team operator's save in the console sets the `added_by` of each addition on the GitHub grant provider's `host` to the saver's login, whatever the submitted text says (and clears it on additions off it); the refresh fetches the entry only while that login holds an accepted role, and the workspace views mark `excluded` the entry the last role check left out. An addition on the `host` without `added_by`, or by a token without a login, is refused `unattributed`, and an edit that changes, clears or sets `added_by` is refused `added_by_change`. The global operator and the CLI store `added_by` as written: setting, clearing or replacing it is how they adopt a team's addition. In a bootstrap manifest's own `[[repository]]` entries it is an error, as `owner` is.
+
 3. **Who changes what.** The team operator may edit and remove the entries its teams own and add entries owned by its teams. The global operator keeps owner changes (set, clear or replace), entries with no owner, other owners' entries and every generation operation (`pointer` and `fence`).
 4. **Delegation.** A group becomes a team when the global operator assigns it its first entry. A team that removes its last entry stops being one until the global operator assigns it an entry again.
-5. **Configuration.** Ownership never widens what a token reads. Map each team's group in `[oidc.groups]` to the identities it owns, and to an identity before the team can add it; without that, the team cannot see its entries, and an addition outside the grant is refused `outside_grant`.
+5. **Configuration.** Ownership never widens what a token reads. Map each team's group in `[oidc.groups]` to the identities it owns, and to an identity before the team can add it; without that, the team cannot see its entries, and an addition outside the grant is refused `outside_grant`. With `[oidc.github]`, an addition on the GitHub grant provider's `host` needs no such mapping, but an identity the workspace already holds outside the grant is still refused `outside_grant` on save, which tells the team it exists.
 
     ```toml
     [oidc.groups]

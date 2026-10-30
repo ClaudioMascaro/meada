@@ -1,4 +1,6 @@
 # Operator must seed/apply the workspace and publish before init pull can finish.
+# Identity automation (modules.postgres, modules.oidc.github, modules.directory and
+# modules.oidc.entra) is in values-identity.yaml.
 image:
   cloud: true
 workspace:

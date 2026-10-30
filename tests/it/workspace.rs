@@ -216,6 +216,11 @@ fn invalid_config_errors_name_file_line_and_key() {
             "<repo>/meada.toml:1: `owner` is not a meada.toml key",
         ),
         (
+            "config_added_by",
+            "added_by = \"ana\"\n",
+            "<repo>/meada.toml:1: `added_by` is not a meada.toml key",
+        ),
+        (
             "config_missing",
             "[[peer]]\npath = \"../api\"\n",
             "<repo>/meada.toml:1: `peer.repo` is missing",

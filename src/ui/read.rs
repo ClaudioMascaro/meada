@@ -510,6 +510,25 @@ impl Console {
         Ok(Some(entries))
     }
 
+    /// `excluded: true` on each of `entries`, of the version `id`, whose identity the newest
+    /// permissions set excluded when it checked that version (#333): absent otherwise, so without
+    /// `[oidc.github]` the body is as before.
+    #[cfg(feature = "oidc")]
+    fn flag_excluded(&self, id: &str, entries: &mut [Value]) {
+        let found = self.oidc.as_ref().and_then(|oidc| oidc.excluded());
+        let Some((_, excluded)) = found.filter(|(checked, _)| checked == id) else {
+            return;
+        };
+        for entry in entries {
+            if entry["repo"]
+                .as_str()
+                .is_some_and(|repo| excluded.contains(repo))
+            {
+                entry["excluded"] = true.into();
+            }
+        }
+    }
+
     async fn workspace_read(
         &self,
         route: &str,
@@ -568,6 +587,10 @@ impl Console {
         let mut version = serde_json::to_value(version).map_err(|e| e.to_string())?;
         if let Some(Value::Array(entries)) = version.get_mut("repositories") {
             filter_entries(entries, "repo", session);
+            #[cfg(feature = "directory")]
+            self.flag_missing_owners(entries).await;
+            #[cfg(feature = "oidc")]
+            self.flag_excluded(id, entries);
         }
         if single.is_some() {
             return Ok(Some(version));

@@ -57,3 +57,22 @@ assert console_bootstrap["ui"]["dir"] == "/usr/share/meada/ui"
 seed = tomllib.loads((DEPLOY / "console.repositories.toml").read_text())
 assert seed["repository"] == node_bootstrap["repository"]
 print("compose-check: isolated storage, managed writer and public console proxy contracts passed")
+
+postgres = json.loads(subprocess.check_output(
+    ["docker", "compose", "--env-file", ".env.example", "-f", "compose.yaml", "-f", "compose.console.yaml",
+     "-f", "compose.postgres.yaml", "--profile", "generations", "--profile", "console", "config", "--format", "json"],
+    cwd=DEPLOY, text=True))["services"]
+assert "postgres" not in console and "postgres-migrate" not in console, "Postgres is opt-in"
+assert postgres["postgres"]["image"].startswith("postgres:15")
+assert "ports" not in postgres["postgres"]
+assert postgres["postgres-migrate"]["command"][:2] == ["postgres", "migrate"]
+assert postgres["postgres-migrate"]["depends_on"]["postgres"]["condition"] == "service_healthy"
+for name in ["generation-indexer", "console", "generation-one", "generation-two"]:
+    assert postgres[name]["depends_on"]["postgres-migrate"]["condition"] == "service_completed_successfully", name
+assert postgres["generation-one"]["environment"]["MEADA_POSTGRES_READ_URL"].startswith("postgres://meada_read:")
+assert postgres["console"]["environment"]["MEADA_POSTGRES_URL"].startswith("postgres://meada_write:")
+assert postgres["postgres-migrate"]["environment"]["MEADA_POSTGRES_MIGRATE_URL"].startswith("postgres://meada_migrate:")
+migrate = tomllib.loads((DEPLOY / "postgres.workspace.toml").read_text())
+assert list(migrate) == ["postgres"] and migrate["postgres"]["url_env"] == "MEADA_POSTGRES_MIGRATE_URL"
+assert not any("postgres://" in line for path in DEPLOY.glob("*.toml") for line in path.read_text().splitlines() if not line.startswith("#")), "no URL in a manifest"
+print("compose-check: opt-in Postgres service, migrate step order and roles passed")

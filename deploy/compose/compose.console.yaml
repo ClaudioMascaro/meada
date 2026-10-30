@@ -17,6 +17,7 @@ services:
       - ./job.workspace.toml:/etc/meada/meada.workspace.toml:ro
       - ./console.repositories.toml:/etc/meada/repositories.toml:ro
       - ./managed-refresh.sh:/etc/meada/refresh.sh:ro
+      - ./fetch-pulled.sh:/etc/meada/fetch-pulled.sh:ro
 
   init-console:
     image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}

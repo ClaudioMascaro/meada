@@ -74,8 +74,9 @@ rmcp = { version = "3.5.1", features = [
     "transport-io",
     "transport-streamable-http-server",
 ] }
-# The snapshot store's TLS configuration, only behind `snapshot`: ring, the one rustls provider
-# of every build (ureq and redis use it too), and the system's roots.
+# The TLS configuration of the snapshot store and of Postgres, only behind `snapshot` and
+# `postgres`: ring, the one rustls provider of every build (ureq and redis use it too), and the
+# system's roots.
 rustls = { version = "0.23.46", optional = true, default-features = false, features = [
     "ring",
     "std",
@@ -93,6 +94,13 @@ serde_json = "1.0.154"
 # The snapshot store's bundles (ADR 0012), only behind `snapshot`: no extended attributes.
 tar = { version = "=0.4.46", optional = true, default-features = false }
 toml = "1.1.8"
+# The Postgres client of the data layer (ADR 0016), only behind `postgres`: no `runtime` feature,
+# since the module opens the TCP stream itself and hands it over with `connect_raw`.
+tokio-postgres = { version = "=0.7.18", optional = true, default-features = false }
+# Postgres's TLS, only behind `postgres`: rustls with ring (no default features, so no aws-lc-rs).
+tokio-rustls = { version = "0.26.6", optional = true, default-features = false, features = [
+    "ring",
+] }
 tokio = { version = "1.53.3", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 tree-sitter = "0.27.1"
 tree-sitter-c-sharp = "0.23.5"
@@ -138,11 +146,31 @@ oidc = ["dep:jsonwebtoken", "ureq/platform-verifier"]
 # git's credential helper with GitHub App installation tokens (`[[github_app]]`, ADR 0013): the
 # App's JWT signed from its PEM key, its REST calls through the binary's own ureq client.
 github-app = ["valkey", "dep:jsonwebtoken", "jsonwebtoken/use_pem", "ureq/platform-verifier"]
+# The data layer (`[postgres]`, `meada postgres migrate`, ADR 0016): an asynchronous Postgres
+# client over the binary's tokio runtime and rustls with ring.
+postgres = [
+    "dep:tokio-postgres",
+    "dep:tokio-rustls",
+    "dep:rustls",
+    "dep:rustls-platform-verifier",
+]
+# The directory (`[directory]`, ADR 0016): a SCIM 2.0 endpoint on the console's listener, its
+# users and groups in the data layer. No crate beyond `postgres`'s.
+directory = ["postgres"]
 # The management console (`[ui]`, `meada ui`, ADR 0014): the node's hyper listener and
 # serde_json. No crate of its own.
 ui = []
 # Every cloud module at once (ADR 0012). Unix only, since `refresh-lock` is.
-cloud = ["snapshot", "generation-pointer", "refresh-lock", "oidc", "github-app", "ui"]
+cloud = [
+    "snapshot",
+    "generation-pointer",
+    "refresh-lock",
+    "oidc",
+    "github-app",
+    "ui",
+    "postgres",
+    "directory",
+]
 
 # `cargo test` runs the example's own tests too.
 [[example]]

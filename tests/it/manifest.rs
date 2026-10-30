@@ -369,6 +369,14 @@ fn manifest_errors_name_the_file_the_line_and_the_key() {
              entries of a workspace version, which a static manifest has none of: use [workspace] \
              source = \"store\" and `meada workspace import`\n",
         ),
+        // Likewise an `added_by` (#330); a repository's own `meada.toml` keeps it unknown.
+        (
+            "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
+             path = \"../chain-web\"\nadded_by = \"ana\"\n",
+            "meada: ops/meada.workspace.toml:6: `repository.added_by`: an `added_by` belongs to \
+             the entries of a workspace version, which a static manifest has none of: use \
+             [workspace] source = \"store\" and `meada workspace import`\n",
+        ),
         (
             "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
              path = \"../chain-web\"\nowner = \" team\"\n",
@@ -434,6 +442,21 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
         cases.push((
             "index_dir = \"../indexes\"\n[oidc]\nissuer = \"https://id.example.com\"\n",
             "meada: ops/meada.workspace.toml:2: [oidc] needs a Meada built with the oidc feature\n",
+        ));
+    }
+    // Nor does `postgres`.
+    if !cfg!(feature = "postgres") {
+        cases.push((
+            "index_dir = \"../indexes\"\n\n[postgres]\nschema = \"meada\"\n",
+            "meada: ops/meada.workspace.toml:3: [postgres] needs a Meada built with the postgres feature\n",
+        ));
+    }
+    // Nor does `directory`.
+    if !cfg!(feature = "directory") {
+        cases.push((
+            "index_dir = \"../indexes\"\n\n[directory]\nuser_claim = \"oid\"\n",
+            "meada: ops/meada.workspace.toml:3: [directory] needs a Meada built with the directory \
+             feature\n",
         ));
     }
     // `ui` needs no `valkey` either.
@@ -622,6 +645,307 @@ fn valkey_section_errors_name_the_file_the_line_and_the_key() {
             assert!(!ok && stdout.is_empty(), "{command}: {body}");
             assert_eq!(stderr, expected, "{command}: {body}");
         }
+    }
+}
+
+/// The identity provider's `type` and its table (ADR 0016): each error names the file, the line
+/// and the key, and none echoes a value, a token or a URL.
+#[cfg(feature = "oidc")]
+#[test]
+fn oidc_type_errors_name_the_file_the_line_and_the_key() {
+    let dir = mirrors("manifest_oidc_type_errors");
+    let head = "index_dir = \"../indexes\"\n\n[oidc]\nissuer = \"https://id.example\"\npublic_url = \
+                \"https://meada.example\"\nidentities_claim = \"r\"\n";
+    let at = "meada: ops/meada.workspace.toml";
+    let types = "must be one of `generic`, `entra`, `okta` or `keycloak`";
+    let entra = "`oidc.entra`: needs `oidc.type = \"entra\"`";
+    let overage = "`oidc.entra.overage`: must be one of `ignore` or `directory`";
+    for (body, expected) in [
+        (
+            "type = \"azure\"\n",
+            format!("{at}:7: `oidc.type`: {types}\n"),
+        ),
+        ("type = 1\n", format!("{at}:7: `oidc.type`: {types}\n")),
+        ("[oidc.entra]\n", format!("{at}:7: {entra}\n")),
+        (
+            "type = \"generic\"\n[oidc.entra]\n",
+            format!("{at}:8: {entra}\n"),
+        ),
+        (
+            "type = \"okta\"\n[oidc.entra]\noverage = \"ignore\"\n",
+            format!("{at}:8: {entra}\n"),
+        ),
+        (
+            "type = \"entra\"\n[oidc.entra]\noverage = \"always\"\n",
+            format!("{at}:9: {overage}\n"),
+        ),
+        (
+            "type = \"entra\"\n[oidc.entra]\ntenant = \"https://login.example\"\n",
+            format!("{at}:9: `oidc.entra.tenant` is not a meada.workspace.toml key\n"),
+        ),
+        (
+            "[oidc.github]\nlogin_claim = \"login\"\nmax_age_seconds = 60\norg = \"acme\"\n",
+            format!("{at}:10: `oidc.github.org` is not a meada.workspace.toml key\n"),
+        ),
+    ] {
+        write_manifest(&dir, &format!("{head}{body}"));
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {body}");
+            assert_eq!(stderr, expected, "{command}: {body}");
+        }
+    }
+}
+
+/// `overage = "directory"` (#336) needs `[oidc] groups_claim` and `[directory]`: each missing one
+/// is the error naming the file, the line and the key or section (a build without the
+/// `directory` feature names the feature instead), and under a `type` other than `entra` the
+/// error of `[oidc.entra]` stands.
+#[cfg(feature = "oidc")]
+#[test]
+fn oidc_overage_directory_names_what_it_needs() {
+    let dir = mirrors("manifest_oidc_overage");
+    let head = "index_dir = \"../indexes\"\n\n[oidc]\nissuer = \"https://id.example\"\npublic_url = \
+                \"https://meada.example\"\nidentities_claim = \"r\"\n";
+    let at = "meada: ops/meada.workspace.toml";
+    let feature =
+        "`oidc.entra.overage`: [oidc.entra] needs a Meada built with the directory feature";
+    let claim = "`oidc.entra.overage`: `oidc.groups_claim` is missing";
+    let section = "`oidc.entra.overage`: [oidc.entra] needs [directory]";
+    let groups = "groups_claim = \"groups\"\n[oidc.groups]\n\"g\" = [\"a\"]\n";
+    let directory = cfg!(feature = "directory");
+    for (body, expected) in [
+        (
+            "type = \"entra\"\n[oidc.entra]\noverage = \"directory\"\n".to_string(),
+            format!("{at}:9: {}\n", if directory { claim } else { feature }),
+        ),
+        (
+            format!("type = \"entra\"\n{groups}[oidc.entra]\noverage = \"directory\"\n"),
+            format!("{at}:12: {}\n", if directory { section } else { feature }),
+        ),
+        (
+            "type = \"okta\"\n[oidc.entra]\noverage = \"directory\"\n".to_string(),
+            format!("{at}:8: `oidc.entra`: needs `oidc.type = \"entra\"`\n"),
+        ),
+    ] {
+        write_manifest(&dir, &format!("{head}{body}"));
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {body}");
+            assert_eq!(stderr, expected, "{command}: {body}");
+        }
+    }
+}
+
+/// The GitHub grant provider's `[oidc.github]` (#331): each key error, the table without
+/// `[postgres]` and, in a build without `postgres`, the table at all, name the file, the line
+/// and the key or the sections, never a value; alone, without `identities_claim` or
+/// `groups_claim`, it is accepted. `meada github-app roles` needs a `[[github_app]]` block for
+/// its host.
+#[cfg(feature = "oidc")]
+#[test]
+fn oidc_github_errors_name_the_file_the_line_and_the_key() {
+    let dir = mirrors("manifest_oidc_github_errors");
+    let oidc = "index_dir = \"../indexes\"\n\n[oidc]\nissuer = \"https://id.example\"\npublic_url = \
+                \"https://meada.example\"\n";
+    let at = "meada: ops/meada.workspace.toml";
+    let table = "[oidc.github]\nlogin_claim = \"github_login\"\nmax_age_seconds = 5400\n";
+    let refused = |toml: &str, expected: &str| {
+        write_manifest(&dir, toml);
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {toml}");
+            assert_eq!(stderr, expected, "{command}: {toml}");
+        }
+    };
+    if !cfg!(feature = "postgres") {
+        let feature = "[oidc.github] needs a Meada built with the postgres feature";
+        refused(
+            &format!("{oidc}{table}"),
+            &format!("{at}:6: `oidc.github`: {feature}\n"),
+        );
+        return;
+    }
+    let postgres = "\n[postgres]\nschema = \"m\"\n";
+    refused(
+        &format!("{oidc}{table}"),
+        &format!("{at}:6: `oidc.github`: [oidc.github] needs [postgres]\n"),
+    );
+    let roles = "must be a non-empty array of distinct role names of 1 to 100 characters with no \
+                 control character";
+    for (body, expected) in [
+        (
+            "[oidc.github]\nmax_age_seconds = 60\n",
+            format!("{at}:6: `oidc.github`: `oidc.github.login_claim` is missing\n"),
+        ),
+        (
+            "[oidc.github]\nlogin_claim = \"l\"\n",
+            format!("{at}:6: `oidc.github`: `oidc.github.max_age_seconds` is missing\n"),
+        ),
+        (
+            "[oidc.github]\nlogin_claim = \"\"\nmax_age_seconds = 60\n",
+            format!("{at}:7: `oidc.github.login_claim`: must not be empty\n"),
+        ),
+        (
+            "[oidc.github]\nlogin_claim = \"l\"\nmax_age_seconds = 59\n",
+            format!("{at}:8: `oidc.github.max_age_seconds`: must be at least 60\n"),
+        ),
+        (
+            "[oidc.github]\nhost = \"GitHub.com\"\nlogin_claim = \"l\"\nmax_age_seconds = 60\n",
+            format!("{at}:7: `oidc.github.host`: must be a lowercase host name\n"),
+        ),
+        (
+            "[oidc.github]\nlogin_claim = \"l\"\nroles = [\"read\", \"read\"]\nmax_age_seconds = 60\n",
+            format!("{at}:8: `oidc.github.roles`: {roles}\n"),
+        ),
+        (
+            "[oidc.github]\nlogin_claim = \"l\"\nroles = []\nmax_age_seconds = 60\n",
+            format!("{at}:8: `oidc.github.roles`: {roles}\n"),
+        ),
+        (
+            "[oidc.github]\nlogin_claim = \"l\"\nmax_age_seconds = 60\nlogin = \"x\"\n",
+            format!("{at}:9: `oidc.github.login` is not a meada.workspace.toml key\n"),
+        ),
+    ] {
+        refused(&format!("{oidc}{body}{postgres}"), &expected);
+    }
+    // Alone: no `identities_claim` or `groups_claim` is needed beside it.
+    write_manifest(&dir, &format!("{oidc}{table}{postgres}"));
+    let (_, stderr, ok) = run(&dir, "index");
+    assert!(ok, "{stderr}");
+    // The role check lists collaborators through the installations of its host.
+    #[cfg(feature = "github-app")]
+    for apps in [
+        "",
+        "\n[valkey]\nurl = \"redis://127.0.0.1:9\"\n\n[[github_app]]\nhost = \"ghe.example\"\n\
+         api = \"https://ghe.example/api/v3\"\napp_id = 1\nprivate_key_env = \"K\"\n",
+    ] {
+        write_manifest(&dir, &format!("{oidc}{table}{postgres}{apps}"));
+        let args = ["github-app", "roles", "--workspace", MANIFEST];
+        let (stdout, stderr, code) = run_args(&dir, &args);
+        assert_eq!((stdout.as_str(), code), ("", Some(1)), "{apps}");
+        let needed = "meada github-app roles needs a [[github_app]] block for host github.com";
+        assert_eq!(
+            stderr,
+            format!("{at}:6: `oidc.github`: {needed}\n"),
+            "{apps}"
+        );
+    }
+}
+
+/// The `[postgres]` section of a build that has the module (ADR 0016): each key error names the
+/// file, the line and the key.
+#[cfg(feature = "postgres")]
+#[test]
+fn postgres_section_errors_name_the_file_the_line_and_the_key() {
+    let dir = mirrors("manifest_postgres_errors");
+    let head = "index_dir = \"../indexes\"\n\n[postgres]\n";
+    let at = "meada: ops/meada.workspace.toml";
+    let schema = "must be 1 to 63 lowercase letters, digits or `_`, starting with a letter";
+    let long = "a".repeat(64);
+    for (body, expected) in [
+        (
+            "schema = \"m\"\nurl = \"postgres://localhost\"\n".to_string(),
+            format!("{at}:5: `postgres.url` is not a meada.workspace.toml key\n"),
+        ),
+        (
+            "url_env = \"P\"\nurl_file = \"p\"\n".into(),
+            format!(
+                "{at}:5: `postgres.url_file`: is set together with url_env: use one of the two\n"
+            ),
+        ),
+        (
+            "schema = \"Meada\"\n".into(),
+            format!("{at}:4: `postgres.schema`: {schema}\n"),
+        ),
+        (
+            "\nschema = \"1meada\"\n".into(),
+            format!("{at}:5: `postgres.schema`: {schema}\n"),
+        ),
+        (
+            format!("schema = \"{long}\"\n"),
+            format!("{at}:4: `postgres.schema`: {schema}\n"),
+        ),
+        (
+            "pool_size = 0\n".into(),
+            format!("{at}:4: `postgres.pool_size`: must be at least 1\n"),
+        ),
+        (
+            "connect_timeout_seconds = 0\n".into(),
+            format!("{at}:4: `postgres.connect_timeout_seconds`: must be at least 1\n"),
+        ),
+        (
+            "schema = \"m\"\nstatement_timeout_seconds = 0\n".into(),
+            format!("{at}:5: `postgres.statement_timeout_seconds`: must be at least 1\n"),
+        ),
+    ] {
+        write_manifest(&dir, &format!("{head}{body}"));
+        for command in ["index", "status"] {
+            let (stdout, stderr, ok) = run(&dir, command);
+            assert!(!ok && stdout.is_empty(), "{command}: {body}");
+            assert_eq!(stderr, expected, "{command}: {body}");
+        }
+        let migrate = ["postgres", "migrate", "--workspace", MANIFEST];
+        let (stdout, stderr, code) = run_args(&dir, &migrate);
+        assert!(code == Some(1) && stdout.is_empty(), "migrate: {body}");
+        assert_eq!(stderr, expected, "migrate: {body}");
+    }
+}
+
+/// The `[directory]` section (#334): without `[postgres]`, without `[oidc]`, with both token
+/// keys, with an unknown key and with a `user_attribute` it does not accept, each error names the
+/// file, the line and the sections or the key, and never a value.
+#[cfg(all(feature = "directory", feature = "oidc"))]
+#[test]
+fn directory_section_errors_name_the_file_the_line_and_the_keys() {
+    let dir = mirrors("manifest_directory_errors");
+    let at = "meada: ops/meada.workspace.toml";
+    let head = "index_dir = \"../indexes\"\n";
+    let postgres = "\n[postgres]\nschema = \"m\"\n";
+    let oidc = "\n[oidc]\nissuer = \"https://id.example.com\"\npublic_url = \"https://m.example\"\n\
+                identities_claim = \"r\"\n";
+    let directory = "\n[directory]\nuser_claim = \"oid\"\nuser_attribute = \"userName\"\n";
+    let full = format!("{head}{postgres}{oidc}{directory}");
+    for (toml, expected) in [
+        (
+            format!("{head}{oidc}{directory}"),
+            format!("{at}:8: [directory] needs [postgres]\n"),
+        ),
+        (
+            format!("{head}{postgres}{directory}"),
+            format!("{at}:6: [directory] needs [oidc]\n"),
+        ),
+        (
+            format!("{head}{directory}"),
+            format!("{at}:3: [directory] needs [postgres] and [oidc]\n"),
+        ),
+        (
+            format!("{full}token_env = \"SCIM\"\ntoken_file = \"scim-token\"\n"),
+            format!(
+                "{at}:15: `directory.token_file`: is set together with token_env: use one of the \
+                 two\n"
+            ),
+        ),
+        (
+            format!("{full}token = \"scim-secret-334\"\n"),
+            format!("{at}:14: `directory.token` is not a meada.workspace.toml key\n"),
+        ),
+        (
+            full.replace("\"userName\"", "\"email\""),
+            format!(
+                "{at}:13: `directory.user_attribute`: must be one of `userName` or `externalId`\n"
+            ),
+        ),
+        (
+            full.replace("user_claim = \"oid\"\n", ""),
+            format!("{at}:11: `directory`: `directory.user_claim` is missing\n"),
+        ),
+    ] {
+        write_manifest(&dir, &toml);
+        let (stdout, stderr, ok) = run(&dir, "status");
+        assert!(!ok && stdout.is_empty(), "{toml}");
+        assert_eq!(stderr, expected, "{toml}");
+        assert!(!stderr.contains("scim-secret-334"), "{stderr}");
     }
 }
 

@@ -42,17 +42,22 @@ pub fn generation_id(bundles: &[(&str, &str)]) -> String {
     id(&lines.concat())
 }
 
-/// The workspace version id of `entries` (identity, path, blocks as `entry_blocks` gives them
-/// and the owner, if any), in manifest order: the hash of their canonical text, a JSON array of
-/// one object per entry, `{"blocks":...,"path":...,"repo":...}` with `"owner":...` between
-/// `blocks` and `path` only when the entry has one, so an entry without an owner keeps the text
-/// it had before owners. Nothing else is hashed: the same entries give the same id on any
-/// machine, whoever saves them, whenever and with whatever message.
-pub fn workspace_version_id(entries: &[(&str, &str, &Json, Option<&str>)]) -> String {
+/// One entry as `workspace_version_id` hashes it: identity, path, blocks, owner, `added_by`.
+pub type VersionEntry<'a> = (&'a str, &'a str, &'a Json, Option<&'a str>, Option<&'a str>);
+
+/// The workspace version id of `entries` (identity, path, blocks as `entry_blocks` gives them,
+/// the owner and the login that added it, if any), in manifest order: the hash of their canonical
+/// text, a JSON array of one object per entry with its keys sorted,
+/// `{"blocks":...,"path":...,"repo":...}`, plus `"owner":...` and `"added_by":...` (#330) each
+/// only when the entry has one, so an entry without them keeps the text it had before they
+/// existed. Nothing else is hashed: the same entries give the same id on any machine, whoever
+/// saves them, whenever and with whatever message.
+pub fn workspace_version_id(entries: &[VersionEntry]) -> String {
     let entries: Vec<Json> = (entries.iter())
-        .map(|(repo, path, blocks, owner)| {
+        .map(|(repo, path, blocks, owner, added_by)| {
             // Inserted in key order, so sorted whether or not the map keeps insertion order.
             let fields = [
+                ("added_by", added_by.map(Json::from)),
                 ("blocks", Some((*blocks).clone())),
                 ("owner", owner.map(Json::from)),
                 ("path", Some((*path).into())),
@@ -66,7 +71,7 @@ pub fn workspace_version_id(entries: &[(&str, &str, &Json, Option<&str>)]) -> St
 }
 
 /// Each `[[repository]]` of the manifest text `src`, in order, as its blocks were written
-/// (every key but `repo`, `path`, `owner`), as JSON with every table's keys sorted: TOML's spellings
+/// (every key but `repo`, `path`, `owner`, `added_by`), as JSON with every table's keys sorted: TOML's spellings
 /// of one value give one text.
 pub fn entry_blocks(src: &str) -> Vec<Json> {
     let Ok(table) = toml::from_str::<toml::Table>(src) else {
@@ -82,6 +87,7 @@ pub fn entry_blocks(src: &str) -> Vec<Json> {
                 table.remove("repo");
                 table.remove("path");
                 table.remove("owner");
+                table.remove("added_by");
             }
             canonical(&entry)
         })

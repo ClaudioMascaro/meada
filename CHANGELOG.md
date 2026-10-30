@@ -6,6 +6,188 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Identity automation for enterprise deployments (ADR 0016, spec #319), in the entries below: the
+  `postgres` and `directory` features and the `[postgres]`, `[directory]`, `[oidc] type`,
+  `[oidc.entra]` and `[oidc.github]` sections; `meada postgres migrate`, `meada github-app roles`
+  and `meada workspace show --pulled`; an entry's `added_by` and the `unattributed` and
+  `added_by_change` reasons of `entries_refused`; the session's `login`, `github_host` and
+  `github_grant`, the token check's `sources`; the audit and `GET /api/v1/audit`; the SCIM endpoint
+  under `/scim/v2/`, the `deprovisioned` refusal, the owner picker, `owner_missing` and `excluded`.
+  Under Spec R1's stability rule every one of them is additive: a minor change. Without the new
+  sections every process behaves as before, and the default build, the CLI help, the MCP surface
+  and every export and trace golden are unchanged.
+- The identity automation documentation, in three languages: an enterprise identity guide (the
+  data layer, the audit, the provider type, the GitHub grant, additions under the provider, the
+  directory, Entra overage and Known ceilings), recipes for Entra ID, Okta and Keycloak, the
+  roadmap and diagrams with S4 delivered, and the architecture map's Known ceilings gaining the
+  login length and the audit's growth. S5 (#339), named workspaces and authoring through the UI or
+  MCP, stays planned.
+- The Compose example gains `compose.postgres.yaml` (a Postgres 15 with TLS and the three
+  recommended roles, and a one-shot `meada postgres migrate` step that finishes before the job,
+  the console and the nodes), a `fetch-pulled.sh` for the job's refresh under `[oidc.github]`, and
+  commented `[postgres]`, `[oidc.github]`, `[directory]` and `[oidc.entra]` examples in the
+  bootstraps. The Helm chart gains `modules.postgres`, `modules.githubApp`, `modules.oidc.github`,
+  `modules.oidc.type` and `entra`, `modules.directory`, a migrate hook Job with pods that wait for
+  the schema, an example Postgres (`postgres.enabled`) and `values-identity.yaml`; the default
+  values render nothing of Postgres.
+- `[oidc.github]`, the GitHub grant provider's table (ADR 0016): `host` (default `github.com`, a
+  lowercase host name), `login_claim` (required), `roles` (a non-empty array of distinct role
+  names of 1 to 100 characters with no control character, compared exactly with GitHub's
+  `role_name`; default `["read", "triage", "write", "maintain", "admin"]`) and `max_age_seconds`
+  (required, at least 60). It needs `[postgres]` and a build with `postgres`, each error naming
+  them; beside it `[oidc]` needs neither `identities_claim` nor `groups_claim`.
+- The GitHub grant at admission (ADR 0016): nodes and the console with `[oidc.github]` keep the
+  newest permissions set in memory, read every 60 seconds without admission ever waiting on
+  Postgres, and a token reads the union of its claims grant and what its `login_claim` login (1
+  to 39 ASCII letters, digits, `-` and `_`, compared in lowercase) holds an accepted role on,
+  everywhere the grant is read: a node's admission, routing, answers and 404 lists, and every
+  bounded view of the console, the team operator role, the entry authorization and the token
+  check. The GitHub part grants for at most `max_age_seconds` past the set's `finished` on
+  Postgres's clock, then nothing, the claims grant unaffected; a machine token's `*` never
+  depends on Postgres. A node starts and serves without Postgres, and names a schema version it
+  does not know once on stderr. Every row read is checked as hostile input.
+- `GET /api/v1/session` gains, with `[oidc.github]`, `login` (when the token has a valid one),
+  `github_host` and `github_grant` (`current`, `expired` or `unread`); `grant` is the union.
+  `POST /api/v1/admission/check` gains `sources`: `{"claims": "*" | [identities], "github":
+  [identities]}`, each sorted, from the console's cache. `GET /api/v1/admission` gains `github`:
+  the grant provider's settings, the grant's state and the newest set's id, `finished`, age, `max_age_seconds`,
+  repositories, rows and exclusions. The admission and session pages show them, and audit
+  records carry the subject's login.
+- Additions under the GitHub grant provider (ADR 0015, ADR 0016): a team operator may add, for
+  its team, an entry of a repository on `[oidc.github] host` that its grant does not read yet.
+  The console's save sets the addition's `added_by` to the saver's login whatever the submitted
+  text says (and clears it on additions off the host), and the role check fetches the entry only
+  while that login holds an accepted role. Two refusal reasons join `entries_refused`, in
+  precedence order `outside_grant`, `unattributed` (an addition on the host without `added_by`,
+  or by a subject without a login), `ownerless`, `owner_change`, `added_by_change` (an edit
+  changing, clearing or setting `added_by`) and `not_your_team`. A save that adds an identity
+  the workspace already holds outside the grant is refused `outside_grant`, naming it as
+  submitted. The global operator's saves and the CLI keep `added_by` as written.
+  `authorize_entries` and `compose_entries` of `meada-core`, and their WebAssembly exports, take
+  the subject's login and the GitHub grant provider's host (none without the GitHub grant provider, answering as before),
+  and the editor marks the new reasons as it marks the others, in pt-BR and English, and shows
+  each entry's `added_by`.
+- `excluded`: with `[oidc.github]`, `GET /api/v1/workspace` and `GET
+  /api/v1/workspace/versions/<id>` mark `excluded: true` on each entry of the version the newest
+  permissions set checked whose addition it left out, for those who see the entry; the field is
+  absent otherwise. The versions page and the editor mark those entries with the reason that the
+  adder holds no accepted role.
+- `meada github-app roles --workspace <bootstrap manifest>` (features `github-app`, `postgres`
+  and `oidc`), the job's role check at every refresh: for each identity of the workspace on
+  `[oidc.github] host` it lists `GET /repos/{owner}/{repo}/collaborators?affiliation=all&per_page=100`,
+  every page, through the installation ADR 0013's selection picks, and replaces the permissions
+  set in Postgres in one transaction (what GitHub showed of each repository, its rows, every
+  collaborator listed with its `role_name`, and its exclusions with their reason), refused when a set with a higher `MEADA_REFRESH_FENCE` exists. With
+  `source = "store"`, every addition whose `added_by` holds no accepted role is left out:
+  written to `<index_dir>/workspace/excluded`, and `meada index`, `status`, `export` and
+  `snapshot publish` treat it as absent from the workspace, refusing to run, naming the role
+  check, when the file is missing or names another version. A 403 or 429 passes to the next
+  installation; every one throttled, a 5xx, a timeout, an answer past the size cap or a
+  `Link` header that leaves the repository's listing fails the run, which writes nothing. A
+  404 or an owner no installation covers gives a warning and no rows. No App permission beyond
+  Metadata (read) is needed. The job's refresh becomes `workspace pull`, `github-app roles`,
+  the fetch of what `show --pulled` lists, `index` and `snapshot publish`.
+- `meada workspace show --pulled --workspace <bootstrap manifest>` prints the version `meada
+  workspace pull` left on disk in the `[[repository]]` shape, without the entries the role
+  check excluded, for the fetch script; with a version argument it is a usage error.
+
+- `added_by`, an optional key of a workspace version's `[[repository]]` entries beside `repo`,
+  `path` and `owner` (ADR 0016): the GitHub login that added the entry, 1 to 39 characters of
+  lowercase ASCII letters, digits, `-` and `_`. It is imported, stored, shown (`meada workspace
+  show` prints it right after `owner`) and pulled like `owner`, joins the version id and no
+  generation or bundle id, and nothing reads it to decide anything yet. An entry without it keeps
+  its version id. A bad value is an error naming the file, the line and the key, in a
+  bootstrap manifest's own `[[repository]]` entries (`source = "file"`) the key is an error
+  naming `source = "store"`, and a repository's `meada.toml` still rejects it as unknown.
+- `[oidc] type` names the identity provider that issues the deployment's tokens (ADR 0016):
+  `generic` (the default), `entra`, `okta` or `keycloak`. None changes the admission, the grant or
+  any answer, and a bootstrap manifest without the key works as before; the console's `GET
+  /api/v1/admission` gains `"type"`, which the admission page shows beside the issuer. Any other
+  value, or one that is not a string, is an error naming the file, the line, the key and the four
+  values.
+- `[oidc.entra] overage = "directory"` (ADR 0016): a Microsoft Entra ID token in more groups than
+  it can carry (`_claim_names` mapping `groups_claim` to a source, no `groups`) gets its groups
+  from the directory the identity provider pushes through the console's SCIM endpoint: the
+  `group_attribute` values of the groups whose members include the active user whose
+  `user_attribute` equals the token's `user_claim`. They replace the missing claim everywhere
+  `groups_claim` is read: a node's grant through `[oidc.groups]`, and the console's grant,
+  `[ui] operator_groups`, the team operator's teams, the session's `groups` and the token check.
+  It needs `[directory]` and `groups_claim`, each error naming the file, the line and the key.
+  Nodes and the console look a token up once at admission and keep the answer five minutes, per
+  `user_claim` value; a failed lookup is not kept, and with Postgres unreachable the token has no
+  groups, as before, with one stderr line. Meada never calls the source's endpoint. The console
+  still refuses a deactivated or deleted provisioned user as `deprovisioned` before any cached
+  answer is used. `overage = "ignore"` keeps today's behavior.
+- `[oidc.entra]`, the settings only Entra ID needs, allowed under `type = "entra"` alone, with one
+  key: `overage = "ignore"` (the default), a token in overage having no groups, as before. Any
+  other value, and an unknown key, is an error naming the file, the line and the key.
+- The data layer (ADR 0016): the `postgres` cargo feature, off by default and enabled by `cloud`,
+  and the bootstrap manifest's `[postgres]` section, which needs no other section. It names the
+  connection URL only through `url_env` (default `MEADA_POSTGRES_URL`) or `url_file`, plus
+  `ca_file`, `schema` (default `meada`), `pool_size`, `connect_timeout_seconds` and
+  `statement_timeout_seconds`. The URL is `postgres://` or `postgresql://` with a TCP host and no
+  query parameter (`sslmode` included); an error names the key, never the URL. A host outside
+  loopback always connects over TLS with its name verified, against `ca_file` alone when set,
+  else the system roots; a loopback host connects in plain TCP unless `ca_file` is set. Every
+  table lives in the schema `[postgres]` names. `[postgres]` in a build without the feature is
+  the error naming it. Postgres 15 and later.
+- `meada postgres migrate --workspace <bootstrap manifest>` creates the schema when absent and
+  applies each migration up to the binary's version, each in its own transaction, under an
+  advisory lock keyed by the schema, so two runs serialize; it prints the version reached and
+  never lowers one. It ships migration 1, the schema's version. Every later connection refuses a
+  version the binary does not know: a lower one (an absent schema included) names `meada
+  postgres migrate`, a higher one names both versions.
+- The directory (ADR 0016): the `directory` cargo feature, implying `postgres` and enabled by
+  `cloud`, and the bootstrap manifest's `[directory]` section, which needs `[postgres]` and
+  `[oidc]`: `token_env` (default `MEADA_SCIM_TOKEN`) or `token_file`, `user_claim`,
+  `user_attribute` (`userName` or `externalId`) and `group_attribute` (`displayName`, the
+  default, or `externalId`). Only the console reads the token, at start: shorter than 32
+  characters, unset or unreadable, it refuses to start naming the key, never the value.
+  `[directory]` in a build without the feature is the error naming it.
+- The SCIM 2.0 endpoint: with `[ui]` and `[directory]` the console serves `/scim/v2/`, where
+  Entra ID's and Okta's provisioning create, read, filter, page, replace, patch and delete users
+  and groups, stored in the data layer (migration 3) as the provider sent them, never with
+  `password`. It admits only its own bearer token (no console token, and no request carrying
+  `Origin`), bounds a body at 1 MiB and a resource at 64 KiB, answers RFC 7644's errors with
+  their `scimType` and no echoed value, a 503 with Postgres unreachable, and the
+  `/ServiceProviderConfig`, `/ResourceTypes` and `/Schemas` documents. A deleted user leaves
+  every group and a revocation marker until it is provisioned again, active. Each write leaves
+  one stderr line, `scim: <method> <resource> <id>: <status>`.
+- Deprovisioning in the console (ADR 0016): with `[directory]`, the token's `user_claim` is looked
+  up in the directory by `user_attribute` (`userName` ignoring case, `externalId` exact). A user
+  found inactive, or deleted and not provisioned active since, gets a 403 `deprovisioned` on every
+  route but `GET /api/v1/config`, whatever its role, and the console shows a deactivated-account
+  page. A user never provisioned is admitted. With the directory unreadable, reads are admitted
+  and a write is a 503 `audit_unavailable` before any audit insert, with one stderr line that
+  names the directory and never the claim. Migration 4 adds the directory's state row (the schema
+  version is now 4); a directory that had already lost its last group before the upgrade starts
+  with no group ever provisioned, so nothing is flagged until a group is provisioned again.
+- The owner picker: `GET /api/v1/directory/groups?prefix=<text>`, for the global operator alone,
+  lists at most 100 group names starting with the prefix (compared exactly, sorted), and the
+  workspace editor offers them while the caret is inside an `owner = "..."` string.
+- `owner_missing`: `GET /api/v1/workspace` and `workspace/versions/<id>` add `"owner_missing":
+  true` to an entry whose owner names no directory group, once a group was ever provisioned; the
+  versions page and the editor say so in text. `GET /api/v1/admission` gains the directory's
+  users and groups counts and the last SCIM write, which the admission page shows.
+- The audit (ADR 0016): with `[postgres]`, every console write (`workspace.save`,
+  `workspace.apply`, `pointer.set`, `pointer.retain`, `pointer.drop`, `fence.recover`) and every
+  CLI twin of one (`meada workspace import` and `apply`, `meada snapshot pointer set`, `retain`
+  and `drop`, `meada snapshot fence recover`) leaves a record in `<schema>.audit` (migration 2):
+  who (subject, role, a team operator's owners), what (action and arguments), when (Postgres's
+  clock) and the outcome. The record is written as `pending` before the write touches Valkey or
+  the store, so a write whose record cannot be written is refused and changes nothing: the
+  console answers 503 `audit_unavailable`, the CLI exits 1 naming Postgres. Role refusals and
+  refusals under the lock are recorded too. The console starts with Postgres unreachable (reads
+  are served) and refuses to start on a schema version it does not know, as each CLI twin exits
+  1. The global operator reads the records, newest first, through `GET
+  /api/v1/audit?before=<id>&limit=<n>` and the console's new audit page. Without `[postgres]`
+  every write behaves as before, and the stderr lines are unchanged in both cases.
+- `meada status --workspace` with `[postgres]` prints `postgres: reachable, schema <name>
+  version <n>` or `postgres: unreachable (<reason>)`, a version refusal included, without
+  changing its exit code.
+
 ## [0.1.0] - 2026-10-29
 
 The first release: the trunk of the roadmap (ADR 0003) and every spec merged since.

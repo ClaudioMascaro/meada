@@ -14,3 +14,4 @@ Choose modules for your deployment. Each is opt-in: both the binary feature and 
 - [Authentication and grants](admission.md)
 - [GitHub App credentials](github-app.md)
 - [Management console](console.md)
+- [Enterprise identity: Postgres, audit, GitHub grant and directory](enterprise.md)

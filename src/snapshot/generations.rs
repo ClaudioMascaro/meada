@@ -19,6 +19,46 @@ pub(crate) use crate::modules::{now, rfc3339};
 use crate::msg::Msg;
 use crate::valkey::{self, Valkey};
 
+/// An operation's error, kept apart for the audit (#328): its own refusal (a held lock, a
+/// generation not retained, a fence it may not lower) or a failure of Valkey, the store or
+/// anything else. Either reads as its message.
+#[derive(Debug, PartialEq)]
+pub enum OpError {
+    Refused(String),
+    Failed(String),
+}
+
+impl OpError {
+    /// Whether `e` is an operation's own refusal.
+    pub fn refused(e: &(dyn std::error::Error + 'static)) -> bool {
+        matches!(e.downcast_ref::<OpError>(), Some(OpError::Refused(_)))
+    }
+}
+
+impl From<String> for OpError {
+    fn from(message: String) -> Self {
+        OpError::Failed(message)
+    }
+}
+
+impl From<OpError> for String {
+    fn from(e: OpError) -> Self {
+        match e {
+            OpError::Refused(message) | OpError::Failed(message) => message,
+        }
+    }
+}
+
+impl std::fmt::Display for OpError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OpError::Refused(message) | OpError::Failed(message) => f.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for OpError {}
+
 /// The fewest generations `keep` may retain: the current one and the one it replaced.
 const KEEP_MIN: i64 = 2;
 const KEEP_DEFAULT: i64 = 3;
@@ -114,7 +154,7 @@ pub async fn point(
     id: &str,
     token: Option<&str>,
     fence: u64,
-) -> Result<(), String> {
+) -> Result<(), OpError> {
     let (current, retained) = keys(config);
     let lock = config.key("lock", true);
     let mut script = cmd("EVAL");
@@ -124,14 +164,16 @@ pub async fn point(
     let wrote = valkey.query::<i64>(&script).await;
     match wrote.map_err(|e| format!("{current}, {retained}: {e}"))? {
         1 => Ok(()),
-        0 => Err(Msg::LockNotHeld(&lock).text()),
-        -1 => Err(Msg::FenceRefused {
-            fence,
-            current: &current,
-            fence_key: &config.key("fence", true),
-        }
-        .text()),
-        _ => Err(Msg::GenerationsBadPointer(&current).text()),
+        0 => Err(OpError::Refused(Msg::LockNotHeld(&lock).text())),
+        -1 => Err(OpError::Refused(
+            Msg::FenceRefused {
+                fence,
+                current: &current,
+                fence_key: &config.key("fence", true),
+            }
+            .text(),
+        )),
+        _ => Err(Msg::GenerationsBadPointer(&current).text().into()),
     }
 }
 
@@ -538,7 +580,7 @@ mod tests {
 
         // No lock, or another token: refused, naming the lock.
         let e = point(&valkey, &config, 2, A, Some(token), 1).await;
-        assert_eq!(e, Err(Msg::LockNotHeld(&lock).text()));
+        assert_eq!(e, Err(OpError::Refused(Msg::LockNotHeld(&lock).text())));
         valkey.query::<()>(&set(&lock, "another")).await.unwrap();
         assert!(point(&valkey, &config, 2, A, Some(token), 1).await.is_err());
         assert_eq!(id(&valkey, &current).await, None);
@@ -553,9 +595,9 @@ mod tests {
         .text();
         assert!(refused.contains(&fence_key), "{refused}");
         let e = point(&valkey, &config, 2, B, Some(token), 9).await;
-        assert_eq!(e, Err(refused));
+        assert_eq!(e, Err(OpError::Refused(refused)));
         let e = point(&valkey, &config, 2, B, Some(token), 3).await;
-        assert!(e.unwrap_err().contains("refused fence 3"));
+        assert!(e.unwrap_err().to_string().contains("refused fence 3"));
         assert_eq!(id(&valkey, &current).await.as_deref(), Some(A));
         point(&valkey, &config, 2, B, Some(token), 10)
             .await
@@ -590,7 +632,10 @@ mod tests {
         // A fence in `current` that is no decimal is refused as a bad pointer.
         valkey.query::<i64>(&hset("1e3")).await.unwrap();
         let e = point(&valkey, &config, 2, A, Some(token), 5).await;
-        assert_eq!(e, Err(Msg::GenerationsBadPointer(&current).text()));
+        assert_eq!(
+            e,
+            Err(OpError::Failed(Msg::GenerationsBadPointer(&current).text()))
+        );
         // Without a token nothing is checked, as without the refresh lock.
         point(&valkey, &config, 2, A, None, 0).await.unwrap();
         valkey.query::<i64>(&del).await.unwrap();

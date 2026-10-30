@@ -26,3 +26,25 @@ keep = 3
 
 [refresh_lock]
 ttl_seconds = 300
+
+# Identity automation (ADR 0016), with compose.postgres.yaml. Uncomment these sections to run the
+# role check: the refresh then runs `meada github-app roles` after `meada workspace pull` and
+# fetches the mirrors that `meada workspace show --pulled` lists. Also export MEADA_GITHUB_APP_KEY
+# (or give the job git credentials) and set the login claim your identity provider issues.
+# [postgres]
+# url_env = "MEADA_POSTGRES_URL"
+# ca_file = "/etc/meada/ca/ca.pem"
+#
+# [oidc]
+# issuer = "https://id.example.internal/realms/agents"
+# public_url = "https://localhost:8443"
+#
+# [oidc.github]
+# login_claim = "github_login"
+# max_age_seconds = 5400     # the job's schedule plus its longest run
+#
+# [[github_app]]
+# host = "github.com"
+# api = "https://api.github.com"
+# app_id = 123456
+# private_key_env = "MEADA_GITHUB_APP_KEY"

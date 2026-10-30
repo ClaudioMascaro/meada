@@ -129,3 +129,35 @@ local, haga port-forward del Service `meada-meada-console` y envíe el Host púb
 `scripts/helm-check` valida el perfil OIDC, sus selectores y la ruta independiente.
 El smoke desplegado usa un viewer admitido por loopback; el login OIDC completo está cubierto
 por pruebas HTTP/Rust y no se simula con un IdP dentro del cluster.
+
+## Postgres e identidad empresarial, opcional
+
+`values-identity.yaml` (sobre `values-console.yaml`) activa la capa de datos y la identidad
+empresarial (ADR 0016): `modules.postgres`, `modules.githubApp`, `modules.oidc.github`,
+`modules.directory` y, comentado, `modules.oidc.type: entra` con `entra.overage: directory`. Todo
+viene desactivado por defecto y no se renderiza nada de Postgres. Las URL (que llevan contraseñas),
+la clave de la App y el token SCIM salen solo de Secrets: `meada-postgres` (claves `migrate-url`,
+`write-url`, `read-url`), `meada-github-app` (`private-key`) y `meada-scim` (`token`, al menos 32
+caracteres); ningún valor guarda secretos.
+
+```sh
+helm upgrade --install meada deploy/helm/meada -f deploy/helm/meada/values-console.yaml \
+  -f deploy/helm/meada/values-identity.yaml -f mis-valores.yaml
+```
+
+Con `modules.postgres.enabled`, un Job de hook ejecuta `meada postgres migrate` con el rol de
+`migrate-url`, en `pre-install,pre-upgrade`, antes de que el chart cree los Deployments y el
+CronJob; la consola y el refresh esperan además en un init container (`wait-postgres`) hasta que
+el schema esté migrado, mientras los nodos arrancan y sirven sin Postgres (su grant de GitHub queda
+vacío hasta que leen un conjunto). Los nodos leen `read-url`; la consola y el refresh, `write-url`. Con
+`modules.oidc.github.enabled`, el CronJob usa el bootstrap `job.workspace.toml` (el único con
+`[[github_app]]`) y ejecuta `meada workspace pull`, `meada github-app roles`,
+`meada workspace show --pulled`, tu `workspace.fetch` (que recibe ese archivo en `$1`), `index` y
+`publish`.
+
+`postgres.enabled=true` renderiza un Postgres de ejemplo, para evaluación (una réplica; Secrets
+`meada-postgres-server` y `meada-postgres-tls`, con un certificado que nombre el Service). Como la
+base no existe antes del release, el hook de migración pasa a `post-install,post-upgrade` y la
+consola espera el schema: `helm install --wait` esperaría a la consola antes de que corra el hook,
+así que instala sin `--wait` en ese caso. En producción usa tu propio Postgres 15 o posterior, con TLS y los tres
+roles; la misma `tls.caSecret` verifica su certificado (`ca_file`).

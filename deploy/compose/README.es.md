@@ -149,3 +149,37 @@ El smoke local usa un viewer por loopback, sin simular un IdP. OIDC y sus rechaz
 cubiertos por pruebas HTTP/Rust; el perfil OIDC del chart pasa lint/template. Valide con
 `python3 ../../scripts/compose-check` desde este directorio. Detenga con `compose_console down`;
 `down -v` también borra los datos y requiere un nuevo seed.
+
+## Postgres e identidad empresarial, opcional
+
+`compose.postgres.yaml` suma al overlay de la consola un Postgres 15 con TLS y el paso único
+`meada postgres migrate` (ADR 0016). Sin ese archivo no arranca ningún Postgres. Define en `.env`
+`POSTGRES_PASSWORD` y las contraseñas de los tres roles (`POSTGRES_MIGRATE_PASSWORD`,
+`POSTGRES_WRITE_PASSWORD`, `POSTGRES_READ_PASSWORD`; solo letras y dígitos, porque van en URLs).
+El job `certificates` emite también el certificado de Postgres (la CA se recrea una vez si el
+volumen `postgres-tls` aún no existe: reinicia los servicios después). Los roles se crean en el
+primer arranque del volumen con `postgres-init.sh`.
+
+```sh
+compose_postgres() {
+  docker compose -f compose.yaml -f compose.console.yaml -f compose.postgres.yaml \
+    --profile generations --profile console "$@"
+}
+compose_postgres config -q
+compose_postgres up -d postgres postgres-migrate
+compose_postgres logs postgres-migrate   # espera a que el paso termine con exit 0
+compose_postgres up -d
+```
+
+`postgres-migrate` ejecuta `meada postgres migrate` con el rol `meada_migrate` y termina antes del
+job (`generation-indexer`), la consola y los nodos, que dependen de él. Cada uno lee su URL de una
+variable (`MEADA_POSTGRES_URL` con el rol de escritura en el job y la consola,
+`MEADA_POSTGRES_READ_URL` con el de lectura en los nodos), nunca del manifiesto. Nada conecta
+hasta que descomentes `[postgres]` y las secciones que dependen de él en los bootstraps:
+`[oidc.github]` y `[[github_app]]` en `job.workspace.toml`, `[oidc.github]`, `[directory]` y
+`[oidc.entra]` en `console.workspace.toml`, `[postgres]` y `[oidc.github]` en
+`generations.workspace.toml`. Con `[oidc.github]` en el bootstrap del job, `managed-refresh.sh`
+ejecuta `meada github-app roles` y busca los espejos que lista `meada workspace show --pulled`
+(`fetch-pulled.sh`); sin la sección el fetch sigue siendo el de `REPOSITORIES`. Para `[directory]`,
+exporta `MEADA_SCIM_TOKEN` (al menos 32 caracteres). Las recetas de Entra ID, Okta y Keycloak
+están en la documentación del sitio.

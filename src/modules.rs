@@ -19,7 +19,7 @@ pub struct Module {
     pub built: bool,
 }
 
-pub const MODULES: [Module; 7] = [
+pub const MODULES: [Module; 9] = [
     Module {
         section: "valkey",
         feature: "valkey",
@@ -55,6 +55,16 @@ pub const MODULES: [Module; 7] = [
         feature: "ui",
         built: cfg!(feature = "ui"),
     },
+    Module {
+        section: "postgres",
+        feature: "postgres",
+        built: cfg!(feature = "postgres"),
+    },
+    Module {
+        section: "directory",
+        feature: "directory",
+        built: cfg!(feature = "directory"),
+    },
 ];
 
 /// The first section of `src`, the content of `file`, whose feature this build lacks. A file
@@ -73,7 +83,11 @@ pub fn check(file: &Path, src: &str) -> Result<()> {
 
 /// The error for `section` of `src`, the content of `file`, when the sections it needs that
 /// `missing` names are not there: `[section] needs [missing...]`, at the section's line.
-#[cfg(any(feature = "generation-pointer", feature = "github-app"))]
+#[cfg(any(
+    feature = "generation-pointer",
+    feature = "github-app",
+    feature = "directory"
+))]
 pub fn needs(file: &Path, src: &str, section: &str, missing: &[&str]) -> Result<()> {
     if missing.is_empty() {
         return Ok(());
@@ -106,13 +120,19 @@ fn located(file: &Path, src: &str, at: usize, what: &str) -> Box<dyn std::error:
     feature = "valkey",
     feature = "snapshot",
     feature = "oidc",
-    feature = "ui"
+    feature = "ui",
+    feature = "postgres"
 ))]
 pub type Problem = (&'static str, String);
 
 /// `section` of `src`, the content of `file`, checked by `validate` when the manifest has it; a
 /// problem is an error naming the file, the line and the key.
-#[cfg(any(feature = "valkey", feature = "snapshot", feature = "oidc"))]
+#[cfg(any(
+    feature = "valkey",
+    feature = "snapshot",
+    feature = "oidc",
+    feature = "postgres"
+))]
 pub fn validated<S, C>(
     file: &Path,
     src: &str,
@@ -128,7 +148,8 @@ pub fn validated<S, C>(
 #[cfg(any(
     feature = "generation-pointer",
     feature = "oidc",
-    feature = "github-app"
+    feature = "github-app",
+    feature = "postgres"
 ))]
 pub fn at_least(
     key: &'static str,
@@ -143,14 +164,14 @@ pub fn at_least(
 }
 
 /// Where a secret comes from: an environment variable or a file. Nothing here is a secret.
-#[cfg(any(feature = "valkey", feature = "snapshot"))]
+#[cfg(any(feature = "valkey", feature = "snapshot", feature = "postgres"))]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Secret {
     Env(String),
     File(std::path::PathBuf),
 }
 
-#[cfg(any(feature = "valkey", feature = "snapshot"))]
+#[cfg(any(feature = "valkey", feature = "snapshot", feature = "postgres"))]
 impl Secret {
     /// The secret the `env` and `file` keys of a section name (`file` relative to `base`):
     /// `None` when neither does, the `both` problem when both do.
@@ -179,14 +200,14 @@ impl Secret {
 
 /// The regular file `path` (`config::read_bounded`, at most `max` bytes) as UTF-8. An error
 /// names the file, never what it holds.
-#[cfg(any(feature = "valkey", feature = "snapshot"))]
+#[cfg(any(feature = "valkey", feature = "snapshot", feature = "postgres"))]
 pub fn read_utf8(path: &Path, max: u64) -> std::result::Result<String, String> {
     let bytes = crate::config::read_bounded(path, max)?;
     String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", path.display()))
 }
 
 /// The secret file `path`: `read_utf8` without the editor's trailing newline.
-#[cfg(any(feature = "valkey", feature = "snapshot"))]
+#[cfg(any(feature = "valkey", feature = "snapshot", feature = "postgres"))]
 pub fn read_secret(path: &Path, max: u64) -> std::result::Result<String, String> {
     let text = read_utf8(path, max)?;
     Ok(text.trim_end_matches(['\n', '\r']).to_string())
@@ -195,7 +216,7 @@ pub fn read_secret(path: &Path, max: u64) -> std::result::Result<String, String>
 /// `run` to its end on a current-thread runtime of its own, then shut down without waiting:
 /// dropping it would wait for a blocking thread still in a DNS lookup or a file read, for as long
 /// as the resolver or the mount takes.
-#[cfg(any(feature = "valkey", feature = "snapshot"))]
+#[cfg(any(feature = "valkey", feature = "snapshot", feature = "postgres"))]
 pub fn block_on<T>(run: impl Future<Output = T>) -> std::io::Result<T> {
     let runtime = (tokio::runtime::Builder::new_current_thread())
         .enable_all()
@@ -207,7 +228,7 @@ pub fn block_on<T>(run: impl Future<Output = T>) -> std::io::Result<T> {
 
 /// `ask`'s answer within `bound`, else the `timeout` message of `bound` in milliseconds: what a
 /// `meada status` line waits for a service.
-#[cfg(any(feature = "valkey", feature = "snapshot"))]
+#[cfg(any(feature = "valkey", feature = "snapshot", feature = "postgres"))]
 pub fn within<T>(
     bound: std::time::Duration,
     ask: impl Future<Output = std::result::Result<T, String>>,
@@ -243,7 +264,8 @@ pub fn agent(timeout: std::time::Duration) -> ureq::Agent {
     feature = "valkey",
     feature = "snapshot",
     feature = "oidc",
-    feature = "ui"
+    feature = "ui",
+    feature = "postgres"
 ))]
 pub fn loopback(host: &str) -> bool {
     let ip = (host.strip_prefix('[').and_then(|h| h.strip_suffix(']'))).unwrap_or(host);
@@ -370,6 +392,17 @@ mod tests {
         assert_eq!(
             err,
             "m.toml:2: [ui] needs a Meada built with the ui feature"
+        );
+    }
+
+    #[cfg(not(feature = "postgres"))]
+    #[test]
+    fn the_postgres_section_without_its_feature_names_it() {
+        let src = "index_dir = \"i\"\n\n\n[postgres]\nschema = \"meada\"\n";
+        let err = check(Path::new("m.toml"), src).unwrap_err().to_string();
+        assert_eq!(
+            err,
+            "m.toml:4: [postgres] needs a Meada built with the postgres feature"
         );
     }
 

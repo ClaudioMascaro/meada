@@ -451,7 +451,7 @@ fn a_viewer_s_grant_bounds_every_view() {
         manifest["manifest"]["ui"]["client_id"],
         json!("meada-console")
     );
-    assert_eq!(manifest["modules"].as_array().unwrap().len(), 7);
+    assert_eq!(manifest["modules"].as_array().unwrap().len(), 9);
     assert!(!manifest.to_string().contains("../gateway"));
     assert!(!manifest.to_string().contains(GATEWAY), "{manifest}");
     assert_eq!(
@@ -599,6 +599,109 @@ fn a_viewer_s_grant_bounds_the_playground_and_the_exports() {
     assert_eq!(get(&console, &route).status, 401);
 
     assert_leaks_nothing(&console.stderr(), &[&web, &all]);
+}
+
+/// The identity provider's `type` (ADR 0016): `admission` names it, `generic` with the key absent
+/// and `entra` when set, and nothing else changes for the same tokens: every read route (the
+/// file `manifest` echoes aside), `session` and `admission/check`, a token in overage
+/// (`_claim_names`, no `groups`) included.
+#[test]
+fn admission_names_the_type_and_nothing_else_changes() {
+    let (signing, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let base = issuer.base.clone();
+    let es256 = |claims: &Value| sign(&signing, "k1", Algorithm::ES256, claims);
+    let overage = |c: &mut Value| {
+        c["meada_repositories"] = json!([]);
+        c["_claim_names"] = json!({"groups": "src1"});
+        c["_claim_sources"] =
+            json!({"src1": {"endpoint": "https://graph.example/getMemberObjects"}});
+    };
+    let tokens = [
+        String::new(),
+        "not-a-jwt".into(),
+        es256(&claims(&base, &[WEB])),
+        es256(&edited(&base, |c| {
+            c["meada_repositories"] = json!([]);
+            c["groups"] = json!(["team-gw"]);
+        })),
+        es256(&edited(&base, |c| c["groups"] = json!(["team-all"]))),
+        es256(&edited(&base, overage)),
+        es256(&edited(&base, |c| c["scope"] = json!("openid"))),
+    ];
+    let node = |edit: &dyn Fn(&mut Value)| {
+        let mut claims = claims(&base, &[WEB, GATEWAY]);
+        claims["aud"] = json!(format!("{NODES}/{WEB}"));
+        edit(&mut claims);
+        es256(&claims)
+    };
+    let pasted = [
+        node(&|_| {}),
+        node(&|c| overage(c)),
+        node(&|c| c["groups"] = json!(["team-gw"])),
+    ];
+    let routes = [
+        "session",
+        "config",
+        "manifest",
+        "admission",
+        "fleet",
+        "store",
+        "workspace",
+        "repositories",
+        "credentials",
+    ];
+    let typed = head(&base).replacen("\n[oidc]\n", "\n[oidc]\ntype = \"entra\"\n", 1)
+        + "\n[oidc.entra]\noverage = \"ignore\"\n";
+    let dir = console_dir("ui_oidc_type", Some(VERSION), &head(&base), &ui_oidc());
+    let mut runs = Vec::new();
+    for head in [head(&base), typed] {
+        write_manifest(&dir, &head, &ui_oidc());
+        let console = start(&dir, "127.0.0.1:0");
+        let mut answers = Vec::new();
+        let mut kinds = Vec::new();
+        for token in &tokens {
+            for route in routes {
+                let path = format!("/api/v1/{route}");
+                let reply = match token.is_empty() {
+                    true => get(&console, &path),
+                    false => ask(&console, &path, token),
+                };
+                let challenge = reply.header("www-authenticate").map(str::to_string);
+                let mut body: Value = serde_json::from_str(&reply.body).unwrap();
+                if route == "admission" && reply.status == 200 {
+                    kinds.push(body["type"].take());
+                    body["refreshed"].take();
+                }
+                if let Some(oidc) = body["manifest"]["oidc"].as_object_mut() {
+                    oidc.remove("type");
+                    oidc.remove("entra");
+                }
+                answers.push((route, reply.status, challenge, body));
+            }
+        }
+        for by in &tokens[2..5] {
+            for token in &pasted {
+                let reply = check(&console, by, token);
+                answers.push(("admission/check", reply.status, None, reply.json()));
+            }
+        }
+        runs.push((answers, kinds, console.stderr()));
+    }
+    let [(answers, generic, stderr), (typed, entra, typed_stderr)] = &runs[..] else {
+        unreachable!()
+    };
+    assert_eq!(generic, &vec![json!("generic"); 4]);
+    assert_eq!(entra, &vec![json!("entra"); 4]);
+    assert_eq!(answers, typed);
+    assert_eq!(stderr, typed_stderr);
+    // The overage token has no groups: no grant through `team-gw`.
+    let session = |nth: usize| &answers[nth * routes.len()].3;
+    assert_eq!(session(5)["groups"], json!([]));
+    assert_eq!(session(5)["grant"], json!([]));
+    assert_eq!(session(3)["grant"], json!([GATEWAY]));
+    let tokens: Vec<&str> = tokens.iter().chain(&pasted).map(String::as_str).collect();
+    assert_leaks_nothing(stderr, &tokens[1..]);
 }
 
 /// Without `[oidc]`, the admission routes are not there.
@@ -985,6 +1088,18 @@ fn refused_writes_are_authorized_and_audited_before_any_body_is_consumed() {
     }
 }
 
+#[cfg(all(feature = "refresh-lock", feature = "postgres", feature = "github-app"))]
+mod additions;
+#[cfg(all(feature = "refresh-lock", feature = "postgres"))]
+mod audit;
+#[cfg(all(feature = "directory", feature = "refresh-lock"))]
+mod deprovision;
+#[cfg(feature = "directory")]
+mod directory;
+#[cfg(all(feature = "refresh-lock", feature = "postgres", feature = "github-app"))]
+mod github;
+#[cfg(all(feature = "directory", feature = "refresh-lock"))]
+mod overage;
 #[cfg(feature = "refresh-lock")]
 mod team;
 #[cfg(feature = "refresh-lock")]

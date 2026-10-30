@@ -14,18 +14,18 @@ use jsonwebtoken::{Algorithm, EncodingKey};
 use serde_json::{Value, json};
 use std::fs;
 
-const BILLING: &str = "e.test/team/billing";
-const LEDGER: &str = "e.test/team/ledger";
-const SEARCH: &str = "e.test/team/search";
-const SHARED: &str = "e.test/team/shared";
-const JOINT: &str = "e.test/team/joint";
-const VAULT: &str = "e.test/team/vault";
-const DOCS: &str = "e.test/team/docs";
-const INVOICES: &str = "e.test/team/invoices";
+pub(super) const BILLING: &str = "e.test/team/billing";
+pub(super) const LEDGER: &str = "e.test/team/ledger";
+pub(super) const SEARCH: &str = "e.test/team/search";
+pub(super) const SHARED: &str = "e.test/team/shared";
+pub(super) const JOINT: &str = "e.test/team/joint";
+pub(super) const VAULT: &str = "e.test/team/vault";
+pub(super) const DOCS: &str = "e.test/team/docs";
+pub(super) const INVOICES: &str = "e.test/team/invoices";
 
 /// Version 1: who owns what. `team-billing` reads billing, ledger, shared, joint and invoices;
 /// `team-search` reads search and joint; `team-docs` reads nothing; the vault is read by nobody.
-const ENTRIES: [(&str, Option<&str>); 7] = [
+pub(super) const ENTRIES: [(&str, Option<&str>); 7] = [
     (BILLING, Some("team-billing")),
     (LEDGER, Some("team-billing")),
     (SEARCH, Some("team-search")),
@@ -35,7 +35,7 @@ const ENTRIES: [(&str, Option<&str>); 7] = [
     (DOCS, Some("team-docs")),
 ];
 
-fn entries(list: &[(&str, Option<&str>)]) -> String {
+pub(super) fn entries(list: &[(&str, Option<&str>)]) -> String {
     let entry = |(repo, owner): &(&str, Option<&str>)| {
         let owner = owner.map_or(String::new(), |o| format!("owner = \"{o}\"\n"));
         format!("[[repository]]\nrepo = \"{repo}\"\npath = \"../{repo}\"\n{owner}")
@@ -56,18 +56,18 @@ fn team_oidc(issuer: &str) -> String {
     )
 }
 
-struct Team {
-    fleet: Fleet,
+pub(super) struct Team {
+    pub(super) fleet: Fleet,
     encoding: EncodingKey,
-    issuer: Issuer,
-    console: Server,
+    pub(super) issuer: Issuer,
+    pub(super) console: Server,
     /// The version applied before the console started.
-    v1: String,
+    pub(super) v1: String,
 }
 
 /// A fleet whose current workspace version is `ENTRIES` (imported and applied through the CLI)
 /// and a console over its store with `operations`.
-fn team(case: &'static str, operations: bool) -> Option<Team> {
+pub(super) fn team(case: &'static str, operations: bool) -> Option<Team> {
     let fleet = Fleet::new(case, 2)?;
     let (encoding, jwk) = key("team");
     let issuer = Issuer::new(set(&[&jwk]));
@@ -97,7 +97,7 @@ fn team(case: &'static str, operations: bool) -> Option<Team> {
     })
 }
 
-fn start(fleet: &Fleet) -> Server {
+pub(super) fn start(fleet: &Fleet) -> Server {
     Server::start_command(
         &fleet.dir,
         "ui",
@@ -107,7 +107,7 @@ fn start(fleet: &Fleet) -> Server {
 }
 
 impl Team {
-    fn token(&self, subject: &str, groups: &[&str], operator: bool) -> String {
+    pub(super) fn token(&self, subject: &str, groups: &[&str], operator: bool) -> String {
         let mut claims = claims(&self.issuer.base, &[]);
         claims["sub"] = json!(subject);
         claims["groups"] = json!(groups);
@@ -115,6 +115,26 @@ impl Team {
             claims["operator"] = json!(true);
         }
         sign(&self.encoding, "team", Algorithm::ES256, &claims)
+    }
+
+    /// A token for exactly `claims`, signed by the team's key.
+    #[cfg_attr(
+        not(any(feature = "directory", feature = "github-app")),
+        allow(dead_code)
+    )]
+    pub(super) fn sign(&self, claims: &Value) -> String {
+        sign(&self.encoding, "team", Algorithm::ES256, claims)
+    }
+
+    /// The claims `token` mints for `subject`: the base of `sign`.
+    #[cfg_attr(
+        not(any(feature = "directory", feature = "github-app")),
+        allow(dead_code)
+    )]
+    pub(super) fn claims(&self, subject: &str) -> Value {
+        let mut claims = claims(&self.issuer.base, &[]);
+        claims["sub"] = json!(subject);
+        claims
     }
 
     fn post(&self, route: &str, token: &str, body: Value) -> Reply {
@@ -165,7 +185,7 @@ impl Team {
 }
 
 /// The audit lines a console wrote, once it is killed.
-fn audit(console: Server) -> Vec<String> {
+pub(super) fn audit(console: Server) -> Vec<String> {
     let stderr = console.stderr();
     stderr
         .lines()
@@ -308,6 +328,14 @@ fn a_team_operator_sees_its_grant_and_every_role_sees_the_owners() {
             !body.contains(VAULT) && !body.contains(SEARCH),
             "{route}: {body}"
         );
+    }
+    // Without `[oidc.github]` no entry carries the role check's mark (#333).
+    for route in [
+        "workspace".to_string(),
+        format!("workspace/versions/{}", team.v1),
+    ] {
+        let body = ask(&team.console, &format!("/api/v1/{route}"), &operator).body;
+        assert!(!body.contains("excluded"), "{route}: {body}");
     }
     let viewer_sees = owners(&of(&viewer));
     assert_eq!(

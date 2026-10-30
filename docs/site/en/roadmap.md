@@ -1,6 +1,6 @@
 # Roadmap
 
-S1 and S2 are delivered. S3, S4 and S5 remain planned. This map shows dependencies and scope boundaries without promising dates.
+S1, S2 and S4 are delivered. S3 and S5 remain planned. This map shows dependencies and scope boundaries without promising dates.
 
 <!-- meada-graph:roadmap -->
 
@@ -10,7 +10,7 @@ S1 and S2 are delivered. S3, S4 and S5 remain planned. This map shows dependenci
 
 ## Foundations in progress
 
-[S3, #294](https://github.com/ClaudioMascaro/meada/issues/294) covers owners and entry authorization. [S4, #319](https://github.com/ClaudioMascaro/meada/issues/319) covers identity, grants, directory and audit. Parts of these foundations can advance in parallel; the ticket graph determines the actual blockers. This map does not make all of S3 a prerequisite of all of S4.
+[S3, #294](https://github.com/ClaudioMascaro/meada/issues/294) covers owners and entry authorization. [S4, #319](https://github.com/ClaudioMascaro/meada/issues/319), already delivered as [enterprise identity](enterprise.md), covers identity, grants, directory and audit. Parts of these foundations can advance in parallel; the ticket graph determines the actual blockers. This map does not make all of S3 a prerequisite of all of S4.
 
 S5 depends on both foundations, [atomic publication, #316](https://github.com/ClaudioMascaro/meada/issues/316), and [measurement and validation, #338](https://github.com/ClaudioMascaro/meada/issues/338).
 

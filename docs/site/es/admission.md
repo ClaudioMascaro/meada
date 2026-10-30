@@ -15,10 +15,11 @@ proveedor de identidad del operador. Meada no emite tokens, no registra clientes
 
 ```toml
 [oidc]
+type = "generic"                                # por defecto; "entra", "okta" o "keycloak"
 issuer = "https://id.ejemplo.internal/realms/agentes"
 public_url = "https://meada.ejemplo.internal"   # la URL que usan los clientes, detrás del proxy
 audience = "https://meada.ejemplo.internal"     # opcional; por defecto: la URL canónica del endpoint
-identities_claim = "meada_repositories"          # opcional con groups_claim
+identities_claim = "meada_repositories"          # opcional con groups_claim o [oidc.github]
 groups_claim = "groups"                          # opcional, junto con [oidc.groups]
 scopes = ["meada:read"]                          # opcional, anunciado y exigido
 jwks_refresh_seconds = 3600                      # por defecto; como mínimo 60
@@ -27,6 +28,27 @@ jwks_refresh_seconds = 3600                      # por defecto; como mínimo 60
 "equipo-pagos" = ["github.ejemplo.internal/acme/payments-api", "github.ejemplo.internal/acme/ledger"]
 "plataforma" = ["*"]
 ```
+
+`type` dice qué proveedor de identidad emite los tokens: `generic` (el predeterminado), `entra`,
+`okta` o `keycloak`. Ninguno cambia la admisión, el grant ni una respuesta; el tipo aparece en la
+página de admisión de la consola. Solo `entra` tiene una tabla propia, `[oidc.entra]`, con una
+clave, `overage`: `"ignore"` (el predeterminado), donde un token en overage (sin la claim `groups`
+y con un objeto `_claim_names` que apunta `groups_claim` a una fuente) no tiene grupos, o
+`"directory"`, donde sus grupos vienen del [directorio](console.md#directorio-scim) que empuja el
+proveedor de identidad: los valores de `group_attribute` de los grupos de los que es miembro el
+usuario activo cuyo `user_attribute` es igual al `user_claim` del token. Sustituyen la claim
+ausente en todo lugar donde se lee `groups_claim`, en los nodos y en la consola (grant,
+operadores, equipos, `session`, verificación de token). Exige `[directory]` y `groups_claim`, y
+cada error nombra la clave. El nodo o la consola consulta el token una vez en la admisión y guarda
+la respuesta cinco minutos por valor de `user_claim` (un cambio de miembros llega con ese
+retraso); con Postgres inalcanzable y nada guardado, el token queda sin grupos, con una línea en
+stderr, y Meada nunca llama al endpoint de la fuente. La consola rechaza a un usuario desactivado
+o eliminado antes de usar cualquier respuesta guardada; los nodos no verifican el
+desaprovisionamiento. `[oidc.entra]` con otro `type` es un error. `[oidc.github]`, el
+proveedor de grant de GitHub, tiene su propia sección en
+[Credenciales de GitHub App](github-app.md#verificacion-de-roles); con él ninguna de las dos
+claims es obligatoria, y el grant de un token pasa a ser la unión del grant de las claims con lo
+que lee su login de GitHub.
 
 ## Preparar el proveedor de identidad
 

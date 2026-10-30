@@ -107,39 +107,56 @@ other Kotlin grammar may enter the dependency tree: they all export `tree_sitter
   empty, at most `OWNER_MAX` characters, no control character, no whitespace at either end;
   compared exactly), so the browser's validation, every import, every pull and every read of a
   stored version check it alike; `authorize` reads it to decide a write (#323).
+  `EntryFile::added_by` is the optional GitHub login that added the entry (#330), checked there
+  too (`added_by_problem`: one string, 1 to 39 characters of lowercase ASCII letters, digits,
+  `-` and `_`; compared exactly); attribution and no grant. Under the GitHub grant provider
+  `authorize` reads it to decide a write (#333) and `meada github-app roles` excludes an addition
+  whose adder holds no accepted role (#331).
   `validate_import(file, src)`
   validates entries while ignoring other top-level keys, with CLI import's file prefix on
   identity errors; CLI, HTTP and WASM import validation share it, preserving empty workspaces and ignored
   bootstrap sections.
 - `meada-core/src/ids.rs`: `bundle_id`, `generation_id` (ADR 0012), `workspace_version_id`
   (ADR 0014: the canonical JSON of the entries, `{"blocks","path","repo"}` in manifest order, with
-  `"owner"` between `blocks` and `path` only when the entry has one, so an ownerless entry keeps
-  its text and its version id), `is_id`, `fence`, `entry_blocks` (every key of an entry but
-  `repo`, `path` and `owner`; the owner is no block, so no bundle id reads it).
+  `"owner"` between `blocks` and `path` and, keys being sorted, `"added_by"` (#330) before
+  `blocks`, each only when the entry has one, so an entry without them keeps its text and its
+  version id), `is_id`, `fence`, `entry_blocks` (every key of an entry but `repo`, `path`,
+  `owner` and `added_by`; neither is a block, so no bundle id reads them).
 - `meada-core/src/workspace.rs`: `diff(file, before, after)` validates through `validate_import`
   and lists added/removed/changed identities and changed dotted keys in manifest order. Array
   tables retain each field's row position and absence; common entries reordered relative to
   one another report the `repository` array key. Formatting is ignored. `entries_text` is the
   pure JSON-repositories-to-TOML conversion shared with `snapshot::versions` and WASM; it prints
-  an entry's `owner` right after its `path`, before the block tables, so the text reads back to
+  an entry's `owner` and `added_by` right after its `path`, before the block tables, so the text reads back to
   the same id. `version_entries` (`entriesJson`) is the opposite way, a text to the entries a
   version document holds, so the browser authorizes and composes the same entries the server
   stores: `entry`, which builds one, is the function `snapshot::versions` stores them with. An owner change alone is the
-  changed dotted key `repository.owner`.
+  changed dotted key `repository.owner`, likewise `repository.added_by`.
 - `meada-core/src/authorize.rs` (ADR 0015): what a subject may change in a workspace version,
-  over a version document's JSON `repositories`. `authorize_entries(role, groups, grant,
-  current, new)` returns the refused entries (`Refusal`: `identity`, `change` `add`/`edit`/
-  `remove`, `reason`), the new entries' order then the removed ones in the current order; the
-  global operator (`Role::Operator`) gets none. For anyone else, entries pair by `repo`, one is
-  changed when anything but its position differs, and each changed entry gets the first rule it
-  fails: `outside_grant`, `ownerless` (the current entry has no owner, or the addition has
-  none), `owner_change` (an edit's owner differs, cleared included), `not_your_team` (the owner
-  is none of its teams: its groups owning an entry of `current` the `Grant` reads). `role` is
-  admission's rule (#324): the global operator stays one, anyone else is a team operator while
-  it has a team, else a viewer. `compose_entries(grant, current, submitted)` is the version a
-  team operator's save stores: the current entries in place, those the grant reads replaced or
-  dropped, those outside it kept, additions appended in submitted order. The binary's apply and
-  the browser (`authorizeEntries`, `composeEntries` in `wasm.rs`) call the same functions.
+  over a version document's JSON `repositories`. `authorize_entries(role, groups, grant, login,
+  github_host, current, new)` returns the refused entries (`Refusal`: `identity`, `change`
+  `add`/`edit`/`remove`, `reason`), the new entries' order then the removed ones in the current
+  order; the global operator (`Role::Operator`) gets none. `login` and `github_host` are the
+  subject's GitHub login and the GitHub grant provider's host (ADR 0016, #333), both none
+  without `[oidc.github]`, where every answer is ADR 0015's. For anyone else, entries pair by `repo`,
+  one is changed when anything but its position differs, and each changed entry gets the first
+  rule it fails: `outside_grant` (under the GitHub grant provider, never for an addition on its host,
+  `on_host`: the identity's first segment), `unattributed` (under the GitHub grant provider, an addition on
+  its host without `added_by`, or by a subject without a login), `ownerless` (the current entry
+  has no owner, or the addition has none), `owner_change` (an edit's owner differs, cleared
+  included), `added_by_change` (under the GitHub grant provider, an edit's `added_by` differs: changed,
+  cleared or set), `not_your_team` (the owner is none of its teams: its groups owning an entry
+  of `current` the `Grant` reads). `role` is admission's rule (#324): the global operator stays
+  one, anyone else is a team operator while it has a team, else a viewer.
+  `compose_entries(grant, login, github_host, current, submitted)` is the version a team
+  operator's save stores: the current entries in place, those the grant reads replaced by their
+  submitted form or dropped, those outside it kept, additions appended in submitted order; under
+  the GitHub grant provider each addition is attributed (`added_by` the login on its host whatever the text
+  held, absent without a valid login; absent off it). The attribution step comes before
+  authorization: the server and the browser both authorize the change from the entries the
+  grant reads to `compose_entries` over them, so a forged `added_by` decides no reason. The
+  binary's save and apply and the browser (`authorizeEntries`, `composeEntries` in `wasm.rs`,
+  `login` and `github_host` as `string | undefined`) call the same functions.
 - `meada-core/src/msg.rs`: the messages of those checks and the language flag the binary's
   `msg.rs` reads too; `meada-core/src/http.rs`: `normalize_path` and `PARAM`, which the HTTP
   kind re-exports. `qualify` and `parent` (dotted names) live in its `lib.rs`.
@@ -194,6 +211,12 @@ page and a current-generation load reads again. `graph-i18n.ts` holds this area'
 `operations.ts` projects their checked DTOs, with bilingual copy in `operations-i18n.ts`.
 Missing modules name their sections, errors remain local to the page, and the pasted token
 exists only in the uncontrolled field and its request body, cleared on completion.
+`AuditPage.tsx` (#328) reads `GET audit` a page at a time, newest first, following `next` (older
+records) and back to the newest; `audit.ts` projects each record's time, via, subject, login,
+role, owners, action, arguments, outcome and message into text, with copy in `audit-i18n.ts`.
+`pages.tsx`'s `offered` lists the page for the global operator alone when `config` says
+`"audit": true` (the console has `[postgres]`), and `App.tsx` answers its path with the
+not-found page otherwise.
 The API reader preserves large JSON integers as decimal strings instead of rounding fences.
 `actions.ts` offers generation operations only to an operator while operations are enabled;
 `ActionControls.tsx` displays their CLI commands and the optional fence floor without rounding
@@ -212,7 +235,12 @@ A team operator (#325) edits the entries its grant reads, as `GET .../versions/<
 them (`workspace.ts`: `teamEditorModel` composes the text with `composeEntries`, diffs the
 composed version and runs `authorizeEntries`, so a refusal is marked with its reason in the diff
 and the save disabled with no request; `entryRows` shows each entry's owner and the answer to
-changing it alone). `plainEntries` projects the flags a view adds (`may_change`, `refusal`) out
+changing it alone). Under the GitHub grant provider (#333) `authority` carries the session's
+`login` and `github_host` into both functions, so `unattributed` and `added_by_change` are
+marked as ADR 0015's reasons are; the entries tables show each entry's `added_by` once one has it, and
+the editor and the versions page mark the entries a version's `excluded` names (the global
+operator's editor lists them in a labelled status), in text. `plainEntries` projects the flags
+a view adds (`may_change`, `refusal`, `owner_missing`, `excluded`) out
 before any TOML or id, and a partial view's hash is never a saved id: a team save reads the
 server's `result`. Its save and apply confirmations name the teams that authorize them (the
 owners of the entries touched) instead of a CLI command, an apply is offered only when
@@ -302,7 +330,8 @@ one for the area a change touches.
   `msg.rs`: the CLI message catalog. Detail: [map/queries.md](map/queries.md).
 - `modules.rs`, `valkey.rs`: the cloud modules (ADR 0012). `modules.rs` is the section table,
   in every build: each module section of `meada.workspace.toml` (`[valkey]`, `[snapshot]`,
-  `[generations]`, `[refresh_lock]`, `[oidc]`, `[[github_app]]`, `[ui]`) with the cargo feature that
+  `[generations]`, `[refresh_lock]`, `[oidc]`, `[[github_app]]`, `[ui]`, `[postgres]`,
+  `[directory]`) with the cargo feature that
   owns it and whether this build has it. `Manifest::read` checks it before the typed parse, so a
   section whose feature is missing is an error naming the file, the line, the section and the
   feature, and a section the table lacks stays an unknown key. A module ticket adds its row and
@@ -330,12 +359,177 @@ one for the area a change touches.
   reachable` or `valkey: unreachable (<reason>)` after waiting at most `PING_TIMEOUT`; the
   line is informational and never changes the probe's exit code. With a `ca_file` the client
   trusts that file alone, not the system roots as well (redis-rs replaces them).
+- `postgres.rs` (feature `postgres`, enabled by `cloud`; ADR 0016's row of ADR 0012's module
+  table, section `[postgres]`, needing no other section; the only place `tokio-postgres` and
+  `tokio-rustls` are used): the data layer, the durable mutable state of server mode in Postgres
+  15 and later. `File` is the `[postgres]` section and `File::validate` its `Config`: `url_env`
+  (default `MEADA_POSTGRES_URL`) or `url_file`, at most one; `ca_file`; `schema` (default
+  `meada`, lowercase letters, digits and `_`, starting with a letter, 1 to 63 characters);
+  `pool_size` (4), `connect_timeout_seconds` (5) and `statement_timeout_seconds` (10), each at
+  least 1, the last at most `STATEMENT_MAX` (Postgres's `INT_MAX` milliseconds); every problem names its key. The URL is read only when a process connects
+  (`Config::url`), kept in memory, and `parse` accepts only `postgres://` or `postgresql://` with
+  a TCP host (a name or an address rustls can verify, so no Unix socket path and no host list),
+  optionally a user, a password, a port and a database, and no query or fragment, so no
+  `sslmode`: such a refusal, an unset variable or an unreadable file is an error naming
+  `postgres.url_env` or `postgres.url_file`, never the URL or a part of it; once connected an
+  error never carries the password, but may name the host (a certificate for another name) or
+  the user (a refused login). The TLS rule is `over_tls`: a host outside loopback (`modules::loopback`) always connects
+  over TLS with its name verified, against `ca_file` alone when set, else the platform verifier;
+  a loopback host connects in plain TCP unless `ca_file` is set, then over TLS against that file.
+  `open` makes the TCP connection itself and hands it to tokio-postgres (`connect_raw`, no
+  `runtime` feature) with its own `TlsConnect` over tokio-rustls and ring (no channel binding),
+  the URL read, the TCP connection and the handshake bounded together by
+  `connect_timeout_seconds`, every statement bounded by `statement_timeout_seconds`
+  (`-c statement_timeout`), the password scrubbed from every error. Every table lives in
+  `[postgres] schema` and every statement names it, quoted (`Config::quoted`): Meada writes
+  nothing outside it (ADR 0002, invariant 3). `MIGRATIONS` lists the migrations in order; a
+  ticket appends the next number when it integrates, never editing one before it. Migration 1
+  creates the version table, `<schema>.schema_version` (one row, `version`), the schema itself
+  created in its transaction when absent; migration 2 the audit's table, `<schema>.audit`
+  (`audit.rs`); migration 3 the directory's tables (`directory/scim.rs`); migration 4 its state row,
+  `<schema>.directory_state` (`groups_provisioned`, `last_write`; #335); migration 5 the
+  permissions set (#331): `<schema>.permission_sets` (`id`, 32 lowercase hex characters from
+  `gen_random_uuid`, `fence`, `version`, `started`, `finished` from Postgres's clock,
+  `repositories`), `<schema>.permission_rows` (`identity`, `login` lowercase, `role` as GitHub
+  spells it) and `<schema>.permission_exclusions` (`identity`, `added_by`), both cascading from
+  their set. `connected` is `connect` keeping the password for scrubbing a later statement's
+  error (`Opened::scrubber` a copy of it for a transaction, which borrows the client), and `probe` is the console's start check (a version refusal refuses the start, Postgres
+  unreachable does not). `migrate` (`meada postgres migrate --workspace
+  <bootstrap manifest>`, reading `Manifest::postgres`, no mirror) is the only command that
+  creates or alters a table: it takes `pg_advisory_lock` on `lock_key(schema)` (the first eight
+  bytes of BLAKE3 of `meada postgres migrate <schema>`, so two runs serialize; the wait runs
+  with `statement_timeout` off, so a run waits for the one before it whatever it takes), applies each migration from the stored
+  version to the binary's in its own transaction, prints the version reached and refuses a
+  stored version above the binary's, never lowering it. The version check, `connect`, is the
+  one function every other connection goes through: it reads the version (`stored`, 0 for an
+  absent schema or table) and `check` refuses one the binary does not know, lower naming `meada
+  postgres migrate`, higher naming both versions. A CLI command or the console refuses on it
+  (exit 1, or no start); a node writes it once on stderr and treats Postgres as unreachable,
+  keeping its readiness (the permissions cache tells that refusal apart through `versioned`). In debug builds
+  `MEADA_POSTGRES_VERSION_MAX` caps the version the binary knows (`known`), a test knob as
+  `MEADA_DRAIN_MS` is, ignored by release builds. `status --workspace` prints `postgres:
+  reachable, schema <name> version <n>` or `postgres: unreachable (<reason>)` within
+  `connect_timeout_seconds` (a readiness probe running `status --workspace` waits that long for
+  a Postgres that does not answer, where the Valkey line waits at most `PING_TIMEOUT`), a version refusal being the reason, since every process treats it
+  as unreachable; the line never changes the exit code, as the Valkey line does. Who connects:
+  the console (audit, directory, permissions, overage), nodes with `[oidc.github]` or overage
+  through the directory (reads only), the job's `meada github-app roles` and the CLI twins that
+  write; `meada index` never does. Three Postgres roles are recommended: one for `migrate`,
+  which owns the schema; one that writes (the console, the role check, the CLI twins); one that
+  reads (nodes). `pool_size` is read by the callers that pool connections; `migrate` and
+  `status` open one.
+- `directory/read.rs` (feature `ui` on top of `directory`; #335): the console's readers of the
+  directory, one statement per call on `postgres::connected`, never cached. `deprovisioned`
+  (the token's `user_claim` value against `user_attribute`: `userName` ignoring case,
+  `externalId` exact; an inactive user or a revocation marker) answers the admission;
+  `groups(prefix)` is the owner picker (`starts_with`, exact, byte order, at most `PICKER_MAX`
+  100); `named` is which of the given owners name a group, `None` while `groups_provisioned` is
+  false; `counts` is the admission view's users, groups and last write. `ui/directory.rs` is the
+  console's side: `directory_refusal` (a deprovisioned user is a 403 `deprovisioned` on every
+  route but `config`, before the role is computed and for a team operator too; an unreadable
+  directory admits a read, and refuses a write as 503 `audit_unavailable` before any audit
+  insert, with one `directory: unreadable (<reason>)` line that names no claim), the route
+  `GET /api/v1/directory/groups?prefix=` (the global operator alone; a prefix over `OWNER_MAX`
+  is a 400), `flag_missing_owners` (`owner_missing: true` on the entries of `workspace` and
+  `workspace/versions/<id>` whose owner names no group; nothing flagged before a group was ever
+  provisioned, ownerless entries never flagged, no flags and one stderr line when the read
+  fails), `flag_excluded` (`ui/read.rs`, #333: `excluded: true` on the entries of `workspace`
+  and `workspace/versions/<id>` whose identity the newest permissions set excluded, only for the
+  version that set checked and only after the grant bounded the entries; the field is present
+  only when true, so without `[oidc.github]` every body is as before) and `with_directory_counts`
+  (`GET /api/v1/admission` gains `directory`: `users`,
+  `groups`, `last_write`; `null` when unreadable, absent without `[directory]`).
+- `directory.rs`, `directory/scim.rs` (feature `directory`, implying `postgres`, enabled by
+  `cloud`, no crate beyond `postgres`'s; ADR 0016's `directory` row of ADR 0012's module table;
+  #334): the directory, users and groups the identity provider pushes in over SCIM 2.0.
+  `directory.rs` is the `[directory]` section, which needs `[postgres]` and `[oidc]`
+  (`modules::needs`); `File::validate` gives its `Config`: `token_env` (default
+  `MEADA_SCIM_TOKEN`) or `token_file`, at most one (`Msg::DirectoryBoth`); `user_claim`,
+  required and non-empty; `user_attribute`, required, `userName` or `externalId`;
+  `group_attribute`, `displayName` by default or `externalId` (`Msg::OidcOneOf`). Every problem
+  names its key, never a value. `Config::token` reads the token, only in the console and only at
+  start (`Console::start`): unset, unreadable or shorter than `TOKEN_MIN` (32) characters refuses
+  the start naming the key (`Msg::DirectoryTokenShort`), never the value; rotating it means a
+  restart. Nodes parse the section and never read the token; `user_claim` is read by the console's
+  deprovisioning (`ui/directory.rs`) and, for nodes and the console alike, Entra overage
+  (`oidc/overage.rs`, #336).
+  `directory/scim.rs` (with `ui`) is the endpoint the console serves under `/scim/v2/` with
+  `[ui]` and `[directory]` (`Console::scim`, routed before the console's admission). Admission
+  in order: S2's `Host` check (the plain 403); a 403 for any request carrying `Origin`; the
+  `Authorization: Bearer <token>` (`Scim::admits`, comparing BLAKE3 hashes, which is constant
+  time and keeps no token in memory), else a 401 with `WWW-Authenticate: Bearer`. OIDC admission
+  never applies there, and the SCIM token is no console token under `/api/v1/` (a 401 there).
+  The body of a `POST`, `PUT` or `PATCH` is read only after admission, at most `SCIM_BODY_MAX`
+  (1 MiB, else a 413 without `scimType`), and must be `application/scim+json` or
+  `application/json` (else a 415). Operations (`Scim::answer`): `/Users` and `/Groups` take
+  `POST` (201, `Location`), `GET` with `filter` (`userName eq "<v>"`, compared ignoring case, or
+  `externalId eq`; `displayName eq` or `externalId eq` for groups; attribute names and `eq`
+  ignoring case), `startIndex` (1 by default) and `count` (`PAGE_MAX`, 100, by default and at
+  most), ordered by creation, and `GET`, `PUT`, `PATCH` and `DELETE` (204) of `/<kind>/<id>`. A
+  user `PATCH` answers 200 with the user, a group `PATCH` 204; `excludedAttributes=members`
+  leaves a group's members out. `PATCH` (`operations`, `apply`) takes `add`, `replace` and
+  `remove` (ignoring case) with or without a path; a path (`path`) is an optional schema URN
+  (the core schemas' dropped), an attribute, an optional `[<sub> eq <value>]` filter and an
+  optional `.<sub>`, names compared ignoring case; a `remove` of `members` with a value list
+  removes those values, an `add` through a filter that matches nothing adds the value it
+  describes, a `replace` through one is `noTarget`. Every operation applies to the resource in
+  memory and the result is stored as one write, so a later failure writes nothing.
+  `/ServiceProviderConfig`, `/ResourceTypes` and `/Schemas` are fixed documents (`patch`,
+  `filter` with `maxResults` 100; no `bulk`, `sort`, `etag` or `changePassword`; the bearer
+  token scheme). Storage: migration 3's `directory_users`, `directory_groups`,
+  `directory_members` and `directory_revoked`; a resource is the JSON the provider sent
+  (`candidate`) without `id`, `meta` and `password` (dropped wherever they appear, so the
+  provider can change none of them), a group without `members` (rows of `directory_members`,
+  each naming a stored user, else a 400 `invalidValue`; a deleted user's rows go with it), at
+  most `SCIM_RESOURCE_MAX` (64 KiB, else a 413) after every change; `userName` is required, `active`
+  is a boolean or `"True"`/`"False"`, true when absent, and an inactive user is returned like
+  any other. Ids are Postgres's (`gen_random_uuid` without dashes: 32 lowercase hex characters),
+  checked wherever read (`is_id`, `Stored::of`): a path id that fails is a 404, a row that fails
+  is skipped. Each answer carries `meta` (`resourceType`, `created` and `lastModified` from
+  Postgres's clock, `location` from `[ui] public_url`). Every write is one transaction holding
+  one advisory lock of the schema (`Scim::begin`), so the uniqueness checks (`store`: a
+  `userName` ignoring case or an `externalId` another user holds, a `group_attribute` another
+  group holds, exactly; a 409 `uniqueness`), the members check and the write cannot interleave
+  with another write. A deleted user leaves every group and a revocation marker (its `userName`
+  and `externalId` in `directory_revoked`), separate from the deleted resource, which a write
+  naming `active` true for a user whose `user_attribute` matches it (a `userName` ignoring case)
+  clears (active by default is not enough); the console's admission reads the markers
+  (`directory/read.rs`). Every committed write also stamps `directory_state.last_write`, and the
+  first group stored sets `groups_provisioned` for good (a deleted group does not unset it).
+  Errors are RFC 7644's, with `scimType` (`invalidFilter`,
+  `invalidPath`, `invalidValue`, `noTarget`, `uniqueness`, `invalidSyntax`) for a 400 or 409, an
+  unknown id a 404, and a fixed detail that echoes no value; a value Postgres cannot store
+  (SQLSTATE class 22, as a NUL) is a 400 `invalidValue`. Postgres unreachable, or a schema
+  version this binary does not know (`postgres::connected`), is a 503 in the same schema after
+  one `ui: postgres: unreachable (<reason>)` line; the console's other routes are unaffected.
+  Each `POST`, `PUT`, `PATCH` or `DELETE` under the prefix leaves one stderr line `scim:
+  <method> <resource> <id>: <status>`, `<resource>` `Users`, `Groups` or `-`, `<id>` the stored
+  resource the write named or `-` (a failed `POST`, an unknown id, a refusal before routing):
+  no payload, attribute value, group name or token reaches stderr. The console's `manifest`
+  route shows `[directory]` as written, the token's variable or file name (the default
+  `token_env` filled in) and never its value. `/Schemas` describes the comparisons: `userName`
+  ignoring case, the `group_attribute` unique.
 - `oidc.rs` (feature `oidc`; with `github_app.rs` the only places `jsonwebtoken` is used, with
   RustCrypto as its backend, never aws-lc-rs): server mode as an OAuth 2.1 resource server. `File`
-  is the `[oidc]` section and `File::validate` its `Config` (`issuer` `https` or loopback `http`
+  is the `[oidc]` section, the identity provider (ADR 0016: the one token issuer of the
+  deployment), and `File::validate` its `Config` (`type` one of `TYPES`, `generic` by default,
+  `entra`, `okta` or `keycloak`, any other value or a value that is not a string the error naming
+  the four and never the value; `[oidc.entra]` only under `type = "entra"`, its one key `overage`
+  one of `OVERAGES`: `ignore`, a token in overage having no groups, or `directory` (#336), which
+  needs `groups_claim` (`Msg::KeyMissing`), a build with `directory` (`Msg::NeedsFeature`) and
+  `[directory]` (`Manifest::read`, which hands it `[directory]` and `[postgres]`,
+  `Config::overage`, `Msg::NeedsSections`), each error at `oidc.entra.overage`; `okta` and
+  `keycloak` take no table and, as `entra`, change no answer; `[oidc.github]` the GitHub grant
+  provider, `GithubFile::validate` its `Github` (`host` a lowercase host name, `github.com` by
+  default; `login_claim` required and not empty; `roles` a non-empty array of distinct names
+  that `role_ok` takes, 1 to `ROLE_MAX` characters with no control character, `ROLES`, GitHub's
+  five built-in roles, by default; `max_age_seconds` required, at least `MAX_AGE_MIN`), in a
+  build without `postgres` the error naming the feature, without `[postgres]` the error naming
+  both (`workspace::Manifest::read`, which also hands it its `[postgres]`, `Github::postgres`);
+  beside it neither claim is needed; `issuer` `https` or loopback `http`
   with no user, query or fragment, `public_url` the same with no path (`modules::reachable`),
   `identities_claim` and `audience` not empty, `groups_claim` (not empty) and its `[oidc.groups]`
-  table together, at least one of the two claims, scopes RFC 6749 scope-tokens,
+  table together, at least one of the two claims or `[oidc.github]`, scopes RFC 6749 scope-tokens,
   `jwks_refresh_seconds` at least 60). `Oidc::start`,
   called by `mcp::Gate::new` before the listener binds, finds the metadata at the URLs the MCP
   specification tries in order (`metadata_urls`: RFC 8414 and OpenID discovery with the path
@@ -352,21 +546,58 @@ one for the area a change touches.
   carry one, the key's own `alg`, its type and curve), the JWKS fetched again
   when none does (`refetch`, at most once per `KID_REFRESH_EVERY`), `exp` and `nbf` with
   `LEEWAY`, `iss`, `aud` against the configured audience or the path's and its identity's
-  resources, then the scopes (403 when one is missing). The grant (`Grant::of`, once per
-  request) is the union of `identities_claim` and what `[oidc.groups]` maps the groups of
-  `groups_claim` to, a claim counting only as an array of strings, `*` from either for all;
-  routing checks it and it bounds the workspace of each answer (`mcp.rs`). No token, error text
+  resources, then the scopes (403 when one is missing). The grant (`Oidc::granted`, once per
+  request, on nodes and in the console; `Granted::union`) is the union of every configured grant
+  provider's identities: the identity provider's claims grant (`Grant::of`, `claims_grant`: the
+  union of `identities_claim` and what `[oidc.groups]` maps the groups of `groups_claim` to, a
+  claim counting only as an array of strings, `*` from either for all) and, with
+  `[oidc.github]`, the GitHub grant (#332), never `*`: the identities the token's login holds an
+  accepted role on in the permissions cache. The login is `login_claim`'s value when it is a
+  string of 1 to 39 ASCII letters, digits, `-` and `_`, lowercased (`permissions::login`); any
+  other value gives no GitHub grant. Under `[oidc.entra] overage = "directory"` the groups the
+  claims grant maps are `Oidc::groups`: the `groups_claim` array, or, for a token in overage, the
+  directory's (see Entra overage below). The permissions cache (`oidc/permissions.rs`, feature
+  `postgres`, `Permissions`) is empty until the listener printed its address (`Oidc::listening`,
+  called by `mcp::run` and `ui::listen`), then a thread reads, every `PERMISSIONS_POLL` (60 s),
+  in one `REPEATABLE READ READ ONLY` transaction through `postgres::versioned`, the newest set's
+  id, `finished` and age on Postgres's clock (`clock_timestamp() - finished`) and, only when the
+  id changed, its counts, its rows whose `role` is in `roles`, keyed by login, its `version`
+  and its exclusions' identities (`Permissions::excluded`, read by the console whatever the
+  set's age, #333; a `version` that is no version id marks nothing, with one
+  `Msg::PermissionsBadRow` line, and the set still grants). The age rule:
+  the age at the last successful read plus the process's monotonic time since, a read of the
+  same set never lowering it (`Set::seen`), so neither clock moving back extends a set; at most
+  `max_age_seconds` the GitHub grant is honored (`current`), past it empty (`expired`), and
+  before a set is loaded empty (`unread`). A read is bounded by `postgres::Config::bound` (the
+  connect timeout plus one statement timeout per statement), so a Postgres that stops answering
+  without closing the connection cannot stall the poll. A failed read is one `Msg::PermissionsUnreadable`
+  line per poll and keeps the set aging; a schema version this binary does not know is one
+  `Msg::PermissionsVersion` line, once, and counts as unreachable, readiness unchanged. Every row
+  is hostile: a set whose id, `finished` (ahead of Postgres's clock included) or counts fail
+  their checks, and a row whose identity is not on `host` or not a safe identity, whose login or
+  role fails its pattern, is skipped with one `Msg::PermissionsBadRow` line naming its table.
+  In debug builds `MEADA_PERMISSIONS_POLL_MS` shortens the poll and lowers the floor of
+  `max_age_seconds` to 1 (`max_age_min`), a test knob as `MEADA_DRAIN_MS` is. Routing checks
+  the grant and it bounds the workspace of each answer and each 404 list (`mcp.rs`). No token, error text
   of `jsonwebtoken` or claim value is ever printed. With feature `ui`, the console reaches the
   same checks through `admit_console` (one audience, `[ui] audience`; a `Bearer` challenge with
-  no `resource_metadata`), `check` (a pasted token's outcome per check, signature, issuer,
+  no `resource_metadata`; its `groups`, the session's, and the `operator_groups` match read the
+  same effective groups, `Granted::groups`), `check` (a pasted token's outcome per check, signature, issuer,
   audience as a node checks it, lifetime and scopes, and its grant when every check passes,
-  against the cached keys only, so it never fetches) and `admission` (the issuer's metadata as
-  read at start, the cached key ids, the last read and a refresh that failed since, with its
-  reason and never the answer's body, and the groups table bounded by the caller's grant).
+  against the cached keys only, so it never fetches; with `[oidc.github]` its two sides,
+  `Checked::sources`, from the cache) and `admission` (the identity provider's
+  `type`, always present, the issuer's metadata as read at start, the cached key ids, the last
+  read and a refresh that failed since, with its reason and never the answer's body, the
+  groups table bounded by the caller's grant, and with `[oidc.github]` `github`: the host,
+  `login_claim`, `roles`, `max_age_seconds`, the grant's state and the loaded set's id,
+  `finished`, `age_seconds` and the counts the job wrote, `repositories`, `rows` and
+  `exclusions`, or `null` before one is loaded).
 - `ui.rs` (feature `ui`, no crate of its own; `cloud` enables it): the management console's
   process (ADR 0014), `meada ui --listen <addr> --workspace <bootstrap manifest>`,
   on the node's listener (`mcp::serve_http`, `mcp::address`, the same drain); never a node's
-  route, never an MCP server. `File` is `[ui]` and `validated` lists every problem of it at
+  route, never an MCP server. With `[directory]` (feature `directory`) a request under
+  `/scim/v2/` goes to the directory's endpoint (`Console::scim`, `directory/scim.rs`) with its
+  own admission, before the console's. `File` is `[ui]` and `validated` lists every problem of it at
   once (`dir` and `public_url` required, `public_url` `https` or loopback `http` with nothing
   past the host through `modules::reachable`; `audience` defaults to `public_url`; `client_id`,
   `operations` defaults to false and requires `[oidc]` plus one operator key when true;
@@ -405,7 +636,11 @@ one for the area a change touches.
   "message"}}`, an unknown path a 404 in that shape, as the admission routes are without
   `[oidc]`); `config` adds, with `[oidc]`, the issuer, `client_id`, the scopes and the audience
   the browser's authorization code flow with PKCE needs; `session` is the subject and role (`viewer`, `team_operator`, `operator`) and, with `[oidc]`, `groups`
-  (sorted), `grant` (`"*"` or sorted identities) and, for a team operator, `teams`;
+  (sorted), `grant` (`"*"` or sorted identities, the union of the grant providers', which every
+  bounded view, the team operator role and its teams, and `authorize_entries` and
+  `compose_entries` read through `Session::reads` and `core_grant`) and, for a team operator,
+  `teams`; with `[oidc.github]` (#332) `login` when the token has a valid one, `github_host` and
+  `github_grant` (the cache's state, `Oidc::github`, whatever the token's login);
   `manifest` answers the file as loaded at start (a TOML table as JSON: secrets' variable and
   file names only), the module table with what this build has, and the errors of the file as it
   now stands on disk, read again per request, for a session that does not read everything
@@ -413,7 +648,9 @@ one for the area a change touches.
   (group wildcards remain visible), and with only the file and line of an error whose text
   could name one, including an identity known only through groups; `admission/check` reads `{"token": ...}` (`CHECK_MAX`) and answers each check's outcome and the identities, of the
   file's entries or the checked current workspace version's entries for `source = "store"`,
-  that both the token's grant and the session's admit; the token lives
+  that both the token's grant and the session's admit, and with `[oidc.github]` `sources`
+  (`{"claims": "*" | [...], "github": [...]}`, each side of those identities, sorted; `null` when
+  a check fails); the token lives
   only for that request, and a body that does not parse is a fixed 400, never serde's text.
   `ui/write.rs` owns four POST routes, all disabled unless `operations` is true and the
   admitted operator has a nonempty subject. Host, Origin, admission and role are checked before
@@ -429,10 +666,16 @@ one for the area a change touches.
   with the admitted subject as author. Success is 200 `{result: "<CLI line>"}`; operational
   refusals are 409 with the CLI message; entry validation is 422 with CLI line/key diagnostics;
   malformed JSON, extra keys or malformed ids/fences are safe fixed 400s; caps are 413s. A team
-  operator's save runs `versions::save` as `Role::TeamOperator`: after validation (422), under
-  the refresh lock and against the version then current, its role recomputed, `authorize_entries`
-  over the current entries its grant reads, and `compose_entries` over the whole current version
-  makes the stored one (author its subject); its apply is `versions::apply`'s authorized path.
+  operator's save runs `versions::save` as `Role::TeamOperator` (`versions::Acting`, with the
+  session's login and `[oidc.github] host` under the GitHub grant provider): after validation
+  (422), under the refresh lock and against the version then current, its role recomputed, the
+  submission composed over the current entries its grant reads (the attribution step,
+  `compose_entries`), `authorize_entries` over that change, every addition of an identity the
+  whole current version holds outside the grant refused `outside_grant` whatever else it failed
+  (`versions::collisions`, #333: the one refusal the editor cannot predict, which tells the
+  subject the identity exists, named as it submitted it), and `compose_entries` over the whole
+  current version makes the stored one (author its subject). The global operator's text is
+  stored as written, `added_by` included. Its apply is `versions::apply`'s authorized path.
   A refused change is a 403 `{"error": {"code": "entries_refused", "message":
   <Msg::WorkspaceRefused>, "refused": [{"identity", "change", "reason"}], "hidden": <n>}}` with
   nothing written and the lock released: a save names every refused entry (it refuses only what
@@ -448,6 +691,45 @@ one for the area a change touches.
   the 422 response but logs only the fixed outcome `workspace entries failed validation`, so
   invalid identities cannot copy editor contents into stderr. No route releases locks or
   triggers refresh.
+  The audit (#328, ADR 0016, `audit.rs`): with `[postgres]` every write route and every CLI twin
+  of one leaves a record in `<schema>.audit`: `id` (an identity column), `time` (Postgres's
+  `now()`, answered RFC 3339, UTC, microseconds), `via` (`console` or `cli`), `subject`, `login`
+  (the session's GitHub login under `[oidc.github]`, #332, else null; a stored one that fails the
+  login pattern leaves the row out), `role` (`viewer`, `operator`, `team_operator`; the
+  CLI acts as the operator), `owners` (a team operator's, as its stderr line names them, else
+  null), `action` (`audit::ACTIONS`: `workspace.save`, `workspace.import`, `workspace.apply`,
+  `pointer.set`, `pointer.retain`, `pointer.drop`, `fence.recover`, and `pointer` for a pointer
+  request refused before its body), `arguments` (`{"version", "message"}` for a save or an import,
+  the id of the entries as submitted; `{"version"}` for an apply; `{"generation"}` for the
+  pointer actions; `{"at_least"}` for a recovery with a floor, its decimal digits; `{}` for a
+  refusal before the body), `outcome` (`pending`, `accepted`, `refused`, `failed`) and `message`
+  (the new state, or the refusal's or failure's message as the stderr line has it). The order is
+  fail closed: a write that passed its role and its body's checks (400, 413 and 422 are never
+  recorded, nor the `Host`, `Origin` and admission refusals) inserts its record as `pending`
+  (`Audit::pending`, `Console::pending` in `ui/write.rs`) before it touches Valkey or the store;
+  an insert that fails answers 503 `audit_unavailable` (`Msg::AuditUnavailable`), its stderr
+  line carrying that message after one `ui: postgres: unreachable (<reason>)` line, and writes
+  nothing; on the CLI (`audit::cli`, which `main.rs` wraps around each twin) it exits 1 with
+  `Msg::AuditCli` naming Postgres and the reason. The helpers that print a write's stderr line
+  then finish its record (`Audit::finish`) with that line's outcome text and owners: `accepted`,
+  `refused` for a held or lost lock, an operation's own refusal (`snapshot::generations::OpError
+  ::Refused`: a generation not retained, the current one dropped, the kept set full, a fence it
+  may not lower or raise, a version not stored, `ApplyError::Conflict`, `SaveError::Refused`),
+  `entries_refused` or a role lost under the lock, and `failed` for anything else (Valkey, the
+  store, the manifest). A failed update leaves the record `pending`. A role refusal in
+  `Console::checked` is inserted directly as `refused` with the route's action (`write::recorded`)
+  and `{}`, before any body is read; a refusal that finds Postgres unreachable is answered as
+  before and leaves only its stderr line. Each call opens its own connection through
+  `postgres::connected`, so a schema version this binary does not know counts as unreachable;
+  `pool_size` is still unread. The stderr lines are unchanged, with and without `[postgres]`.
+  `GET audit?before=<id>&limit=<n>` (`Console::audit_page`, only with `[postgres]`, when `config`
+  adds `"audit": true`; a 404 without) is the global operator's alone (anyone else gets the 403 `Msg::UiOperatorRequired`):
+  records with an id below `before`, newest first, at most `limit` (1 to `AUDIT_LIMIT_MAX`, 100; `AUDIT_LIMIT`, 50, by default), as
+  `{"records": [...], "next": <id or null>}`, `next` the `before` of the following page; any other
+  query, a repeated key or a value out of range is a 400 (`Msg::UiAuditQuery`), Postgres
+  unreachable a 503 `audit_unavailable`. Every row is hostile: one whose columns fail their
+  checks (`audit::record`) is left out with one stderr line naming the table
+  (`Msg::AuditBadRecord`), never a value. Records are never deleted by Meada.
   Operational reads live in `ui/read.rs`: `GET fleet` reads the checked pointer/retained/kept
   state (`generations::inspect`), live heartbeats (`heartbeat::read`), holder and remaining
   lock TTL, and fence counter from Valkey; workspace ids come from generation documents and
@@ -531,8 +813,47 @@ one for the area a change touches.
   `installation:<id>:` `token` (`<expiry> <token>`), `mint`, `throttled`;
   `owner:<owner>:next` (the counter, the only key with no TTL); `repo:<owner>/<repo>:last`. A
   token must be visible ASCII before it is cached or answered, so the API cannot inject a
-  protocol line. Errors carry an HTTP status or a URL, never a body, and the JWT is scrubbed
-  from ureq's (`valkey::scrub`).
+  protocol line. Errors carry an HTTP status or a URL, never a body, and the bearer (the JWT, or
+  an installation token) is scrubbed from ureq's (`valkey::scrub`).
+  The role check (#331, features `github-app`, `postgres` and `oidc`): `roles` (`meada
+  github-app roles --workspace <bootstrap manifest>`) needs `[oidc.github]` (`Msg::RolesNoGithub`)
+  and a `[[github_app]]` block for its `host` (`Msg::RolesNoApp`, at the table's line), reads
+  the workspace as `index --workspace` does but whole (`checked_entries`: with `source = "store"`
+  the pulled version through `versions::pulled`, never `eligible`, its id the set's `version`),
+  and takes its fence from `MEADA_REFRESH_FENCE` under `[refresh_lock]` (`run_fence`, a positive
+  decimal within `bigint`, else `Msg::RolesFenceEnv`), 0 without. `check` then runs in this
+  order: `postgres::connected` (the schema version refusal), the newest set's fence read with
+  Postgres's `now()` as `started` and a higher one refused (`Msg::RolesFenceBelow`); the
+  exclusions file removed; every identity on the host listed (`listed`: the owner's
+  installations in `Run::rotation`'s order, the round robin `get` shares; a 403 or 429 marks the
+  installation and passes to the next, every one throttled, a 5xx, a timeout, an answer past
+  `ANSWER_MAX` or a page that is not a JSON array fails the run with `Msg::RolesFailed` naming the
+  identity and why; a 404 (`Failure::Missing`) and an owner no installation covers are a warning
+  and no rows; an identity on the host that is not `<host>/<owner>/<repo>` likewise); one
+  transaction under `LOCK TABLE permission_sets IN EXCLUSIVE MODE`, which serializes writers and
+  lets readers see the old set or the new one, checking the fence again, inserting the set, its
+  repositories' coverage (`Shown`: `listed`, `not_found`, `uncovered`, plus `not_a_repository`),
+  its rows (`unnest` of three arrays) and its exclusions with their reason (`no_role`,
+  `role_not_accepted`) and deleting every older set, all under
+  `<index_dir>/workspace/excluded.lock` (`versions::lock_excluded`; the file is removed again
+  once the fence passes, a refused run leaving it as it is), held until the file is written by rename (`versions::write_excluded`) only while
+  the set still exists, else `Msg::RolesReplaced`: on one machine a file is always that of the
+  last run to commit. Postgres and the file are never
+  written atomically together: a run that fails anywhere after the removal leaves no file, so no
+  reader admits a previous check's exclusions for the same version, and the local recovery is
+  to run the role check again. `collaborators` lists one repository with its token: the URL is
+  always `Listing::url` (`affiliation=all`, `PER_PAGE`, the page), and `Listing::next` reads the
+  `Link` header's `rel="next"` as hostile, never echoed: on the REST base's origin with no user,
+  at `/repos/<owner>/<repo>/collaborators` or GitHub's `/repositories/<id>/collaborators` (one
+  id for every page), naming a `page` not requested yet (`Msg::RolesLinkForeign`,
+  `Msg::RolesLinkCycle`), at most `COLLABORATOR_PAGES_MAX` (`Msg::RolesPages`); only the page
+  number is followed, so the token reaches no other URL. `collaborator` keeps a row whose login
+  `meada_core::manifest::added_by_problem` takes once lowercased and whose `role_name`
+  `oidc::role_ok` takes, else one line naming the identity (`Msg::RolesSkipped`); rows are keyed
+  by identity and login, the first kept. An entry with `added_by` on the host whose login holds
+  no role in `roles` among its repository's rows is excluded (`Msg::RolesExcluded`, the reason
+  and never the login). The line on stdout is `Msg::RolesSet`: the set's id, the repositories
+  listed, the rows and the exclusions.
 - `snapshot.rs`, `snapshot/store.rs`, `snapshot/pull.rs` (feature `snapshot`; the only places
   `object_store`, `reqwest` as a client of Meada's own and `tar` are used): the snapshot store. `File` is the
   `[snapshot]` section and `File::validate` its `Config` (an `https` endpoint, or `http` on
@@ -683,8 +1004,10 @@ one for the area a change touches.
   `path` as written, its `owner` when it has one, plus its blocks as `entry_blocks` gives
   them), stored with the size and hash metadata every object carries and never rewritten. The
   id is `meada_core::ids::workspace_version_id` of the entries alone, owners included.
-  `meada index`, `status`, `export` and `snapshot publish` ignore the owner of a pulled version,
-  and a generation document's entry blocks holding an `owner` are refused (`snapshot/pull.rs`). The current version is
+  `meada index`, `status`, `export` and `snapshot publish` ignore the owner and the `added_by` of a pulled version
+  (the role check reads the `added_by`, and under `[oidc.github]` they leave out what its
+  exclusions file names),
+  and a generation document's entry blocks holding an `owner` or an `added_by` are refused (`snapshot/pull.rs`). The current version is
   `{<key_prefix>}:workspace`, a hash `{id, fence}` under the pointer's hash tag (`pointer_key`,
   read by `current`, moved by `meada workspace apply`, #302). `import` (`meada workspace import
   <file> --message <text> [--author <name>] --workspace <bootstrap manifest>`) reads the file's
@@ -712,10 +1035,11 @@ one for the area a change touches.
   (`Msg::BadVersionArg`), needs `[refresh_lock]` (`operation::sections`), reads and checks the
   version's document in the store (missing, `Msg::WorkspaceNoVersion` naming its key), then runs
   under `operation::locked` (holder `workspace apply <author>`), for a subject other than the
-  global operator (its `Role`, groups and `Grant`), the authorization against the version then
-  current: its role recomputed (`authorize::role`; none current, or no team left, is
-  `ApplyError::RoleLost`), then `authorize_entries` over the whole current entries and the
-  applied ones (`ApplyError::Refused` with the refusals; `Msg::WorkspaceRefused` counts them).
+  global operator (`Acting`: its `Role`, groups, `Grant`, login and GitHub host), the
+  authorization against the version then current: its role recomputed (`authorize::role`; none
+  current, or no team left, is `ApplyError::RoleLost`), then `authorize_entries` over the whole
+  current entries and the applied ones, so an addition on the GitHub host without `added_by` is
+  `unattributed` (`ApplyError::Refused` with the refusals; `Msg::WorkspaceRefused` counts them).
   Either releases the lock and moves nothing; two applies serialize on the lock, so a version is
   checked against the one it replaces. The CLI passes the global operator, which reads nothing
   more; the console passes the session's role (#324). `apply` returns `Applied`: the line and
@@ -824,13 +1148,27 @@ one for the area a change touches.
   (`Msg::WorkspaceStoreBeside`); `Manifest::store` records it, with no entries from `read`. An
   `owner` in the bootstrap manifest's own `[[repository]]` entries (`source = "file"`) is an
   error naming the file, the line, `repository.owner` and `source = "store"`
-  (`Msg::WorkspaceOwnerStatic`); `meada workspace import` reads the same entries with it allowed.
+  (`Msg::WorkspaceOwnerStatic`), and an `added_by` likewise (`Msg::WorkspaceAddedByStatic`);
+  `meada workspace import` reads the same entries with them allowed.
   `Manifest::read_listed`, which `index`, `status`, `export` without `--generations` and
   `snapshot publish` call, reads the entries of the version `meada workspace pull` left under
   `<index_dir>/workspace/` (`versions::pulled`, from disk, once per read, `Manifest::version`
   its id), its paths relative to the bootstrap manifest's directory, and goes on as for a
   file's entries (the checks that need a mirror run in `mirror`); without one it refuses naming
-  `meada workspace pull` (`Msg::WorkspaceNotPulled`). `mcp --listen` without `--generations`
+  `meada workspace pull` (`Msg::WorkspaceNotPulled`). Under `[oidc.github]` (#331) it reads
+  `versions::eligible` instead: the pulled version without the identities the exclusions file
+  `<index_dir>/workspace/excluded` names (`versions::excluded`: hostile input, at most
+  `VERSION_MAX`, its first line a version id equal to the pulled one, then one identity per
+  line, no space or control character and no `identity_problem`), refused naming `meada
+  github-app roles` when the file is missing (`Msg::ExcludedMissing`), names another version
+  (`Msg::ExcludedOther`) or holds a malformed line (`Msg::ExcludedBad`, the file and the line);
+  an excluded identity is absent as an entry the workspace does not list (a peer naming it misses
+  it). `Manifest::excludes` says whether a manifest's readers do so (`[oidc.github]` with
+  `source = "store"`). `meada workspace show --pulled` (`versions::show_pulled`) prints what
+  they read, in the `[[repository]]` shape, for the fetch script; without `[oidc.github]` the
+  pulled version whole, and with a version argument it is a usage error (clap's
+  `conflicts_with`). `[oidc.github]` without `[postgres]` is refused here, at the table's line,
+  naming both. `mcp --listen` without `--generations`
   refuses such a manifest naming `--generations` (`Msg::WorkspaceStoreRefused`): a managed
   workspace's nodes serve generations, which take their repositories from the generation.
   `Manifest::index_dir` is the directory every index lives under.
@@ -2176,6 +2514,12 @@ one for the area a change touches.
   identity, and the optional Ingress leaves admission and header forwarding to the controller.
 - `scripts/helm-check` checks public renders with Helm and parses the resulting TOML. The
   Helm workflow runs it without a cluster; a local kind smoke checks MCP search after install.
+- The job's refresh under `[oidc.github]` (#331), under `meada snapshot lock`: `meada workspace
+  pull`, `meada github-app roles`, the fetch of the mirrors `meada workspace show --pulled`
+  lists, `meada index --workspace` and `meada snapshot publish`; one that stops on the role
+  check's exit publishes nothing, and its exclusion of an addition is a decision before the
+  fetch, not a failed fetch (#316). The compose and Helm profiles gain the step, Postgres and
+  `migrate` with the documentation and profiles slice of #319.
 
 ## Tests (`tests/`)
 
@@ -2266,6 +2610,9 @@ one for the area a change touches.
 
 ## Known ceilings
 
+- `directory/read.rs`: the owner picker lists at most `PICKER_MAX` (100) group names and says
+  nothing when it cut the list; the global operator narrows it by typing more of the prefix
+  (#335).
 - `meada-core/src/manifest.rs`: an entry's `owner` holds at most `OWNER_MAX` (256) characters
   (ADR 0015); a longer name is an error naming its line and key, wherever the entry is read
   (import, a stored version, a pull, the browser).
@@ -2462,18 +2809,65 @@ qualification budget does (ADR 0017).
   An empty CA file or invalid certificate is also refused before connecting.
 - `valkey.rs`: `password_file` holds at most `PASSWORD_MAX` (4096 bytes) and `ca_file` at most
   `CA_MAX` (1 MiB); past either the connection fails, naming the file.
+- `postgres.rs`: `url_file` holds at most `URL_MAX` (4096 bytes) and `ca_file` at most `CA_MAX`
+  (1 MiB); past either the connection fails, naming the file.
+- `oidc/permissions.rs`: a process holds every accepted-role row of the newest permissions set in
+  memory (logins times repositories under an organization base role), loaded whole when the set
+  changes; a revocation on GitHub reaches it at the next successful refresh plus at most
+  `PERMISSIONS_POLL` (60 seconds), and without one at most `max_age_seconds` after the last.
+- `oidc/overage.rs`: an overage answer is kept `OVERAGE_TTL` (5 minutes), so a membership change
+  reaches an overage subject that late; the cache has no cap on live entries, since only a token
+  that passed every check adds one, and holds at most the subjects seen in the last two TTLs
+  (an expired entry is dropped when found and swept once per TTL); a failed lookup is not cached,
+  so with Postgres blackholed every uncached overage request waits up to the connect and
+  statement timeouts and writes one stderr line; a console whose directory cannot be read admits
+  reads (the deprovisioning rule of #335), so within the TTL a user deactivated meanwhile keeps
+  its cached overage groups for reads, while writes are refused (503 `audit_unavailable`).
+- `oidc/overage.rs` (feature `directory`, #336): Entra overage through the directory. A token is
+  in overage (`in_overage`) when it has no claim named `groups_claim` and its `_claim_names` is an
+  object whose value for `groups_claim` is a string; anything else, `groups` present with any
+  value included, is a token without groups and is never looked up. The groups of such a token
+  are the `group_attribute` values (`displayName` or `externalId`) of the groups whose members
+  include the active `directory_users` row whose `user_attribute` equals the token's
+  `user_claim` value (`externalId` exactly, `userName` through `lower()`), one statement after
+  the version check (`postgres::versioned`), bounded by `Config::bound`; an inactive or absent
+  user has none, and a value failing `owner_problem` is skipped with one `Msg::PermissionsBadRow`
+  line naming `directory_groups`. `Overage::groups` looks up at admission, on nodes (`Oidc::admit`,
+  inside `block_in_place`) and in the console (`admit_console`, the token check's `check`), and
+  keeps the answer in memory by `user_claim` value for `OVERAGE_TTL` (5 minutes; in debug builds
+  `MEADA_OVERAGE_TTL_MS` shortens it, a test knob as `MEADA_DRAIN_MS` is): an answer of no groups
+  is kept like any other, a failed lookup is not (one `Msg::OverageUnreadable` line, the token
+  having no groups, whether Postgres is unreachable or its schema version unknown), and an entry
+  is dropped when found expired and by a sweep of all the expired ones that a store triggers once
+  per TTL (`Cache::put`). Only a token that passed every check reaches the lookup. It is the
+  only lookup on a node's request path. The console's `directory_refusal` runs after
+  `admit_console` and before any role is computed from the groups, so an inactive or deleted
+  provisioned user is refused (`deprovisioned`) before cached overage authority is used; nodes do
+  not check deprovisioning.
 - `oidc.rs`: each metadata and JWKS request takes at most `FETCH_TIMEOUT` (10 seconds), a
   metadata document at most `METADATA_MAX` (64 KiB) and a JWKS at most `JWKS_MAX` (256 KiB);
   past any of them the request fails (at start, the start is refused; on a refresh, the cached
   keys stay). An identity whose path starts with `.well-known/oauth-protected-resource` is
-  unreachable with `[oidc]`, since that path serves the metadata. The `scope` claim is read as a
+  unreachable with `[oidc]`, since that path serves the metadata. A role name of
+  `[oidc.github] roles`, and a `role_name` the role check stores, holds at most `ROLE_MAX` (100)
+  characters; a longer `role_name` from GitHub is a skipped row. The `scope` claim is read as a
   space-separated string; `scp` and arrays are not read. With `audience` unset, the root's 404
   takes a token whose `aud` is `public_url` itself. The caps are inclusive: a body of exactly
   the cap is read. The `oidc` build carries `rsa`, whose RUSTSEC-2023-0071 (Marvin timing) hits
   private-key operations; Meada only verifies with public keys, so it does not apply.
+- `meada-core/src/manifest.rs`: a GitHub login (an entry's `added_by`, and a token's `login_claim`
+  value, which `oidc/permissions.rs` reads through `added_by_problem`) holds at most `ADDED_BY_MAX`
+  (39) characters; a longer one is an error in an entry and no GitHub grant in a token.
+- `audit.rs`: the audit grows without bound, one `<schema>.audit` row per write and refusal, until
+  the operator prunes it in SQL; Meada never deletes a record, and a page of `GET /api/v1/audit`
+  answers at most 100.
 - `github_app.rs`: each REST request takes at most `REQUEST_TIMEOUT` (10 seconds) and reads at
   most `ANSWER_MAX` (4 MiB); an App's installations are listed over at most `PAGES_MAX` pages of
-  100 (10,000 installations), the rest unseen; a `private_key_file` holds at most `KEY_MAX` (16
+  100 (10,000 installations), the rest unseen; the role check lists one repository's
+  collaborators over at most `COLLABORATOR_PAGES_MAX` pages of 100 (100,000 collaborators), past
+  which the run fails, writing nothing. It costs one listing per repository on the host,
+  `ceil(collaborators / 100)` requests each, against the installation's REST budget (#319's
+  Known ceilings), and it holds every row of the set in memory once, as Postgres receives it; a `private_key_file` holds at most `KEY_MAX` (16
   KiB) and git's request at most `INPUT_MAX` (64 KiB). The time margins are fixed, not
   configured: `TOKEN_MARGIN` and `REFRESH_EVERY` (10 minutes each), the JWT's `JWT_LIFE` (9
   minutes) and `JWT_BACKDATE` (60 s), `INSTALLATIONS_TTL` (the listed installations stay usable
@@ -2496,6 +2890,15 @@ qualification budget does (ADR 0017).
   timed-out workers retain their slots until I/O completes, so overload starts no additional
   work. `index.rs` reads optional `index.commit.json` up to
   `PROVENANCE_MAX` (4 KiB); anything larger has no trusted indexed commit.
+- `directory/scim.rs`: a request's body is read up to `SCIM_BODY_MAX` (1 MiB), and a stored
+  resource (the JSON the provider sent, a group without its members) holds at most
+  `SCIM_RESOURCE_MAX` (64 KiB) after every change; past either the answer is a 413. A list
+  answers at most `PAGE_MAX` (100) resources, `count` above it is lowered to it. Each request opens
+  its own Postgres connection (`pool_size` is still unread), and every write holds one advisory
+  lock of the schema, so the directory's writes run one at a time: per-resource locks when a
+  provider's throughput needs them. A group's answer lists every member.
+- `directory.rs`: `token_file` holds at most `TOKEN_MAX` (4096 bytes); past it the console
+  refuses to start, naming the file.
 - `ui/write.rs`: `POINTER_MAX`, `FENCE_MAX` and `APPLY_MAX` bound their respective POST bodies
   to 1 KiB; `SAVE_MAX` bounds a version save's JSON body to 4 MiB. Over-cap authorized uploads
   get 413 before any operation; unauthorized uploads are never consumed.

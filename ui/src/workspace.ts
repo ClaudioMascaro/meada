@@ -15,16 +15,26 @@ export function editorModel(text: string, current: string, locale: Language) {
   };
 }
 
-export interface Entry { repo: string; path: string; owner?: string; [key: string]: unknown }
-export type Reason = 'outside_grant' | 'ownerless' | 'owner_change' | 'not_your_team';
+export interface Entry { repo: string; path: string; owner?: string; added_by?: string; [key: string]: unknown }
+/** The identities of a version's entries carrying the response metadata `flag`, present only when true. */
+const flagged = (flag: string) => (repositories: Record<string, unknown>[]): Set<string> =>
+  new Set(repositories.filter(entry => entry[flag] === true).map(entry => String(entry.repo)));
+/** A version's entries the directory flagged (`owner_missing`). */
+export const ownerMissing = flagged('owner_missing');
+/** A version's entries the last role check left out (`excluded`, #333). */
+export const excludedEntries = flagged('excluded');
+export type Reason = 'outside_grant' | 'unattributed' | 'ownerless' | 'owner_change' | 'added_by_change' | 'not_your_team';
 export interface Refusal { identity: string; change: 'add' | 'edit' | 'remove'; reason: Reason }
-/** What the session's token says it is: the teams' groups and what it reads. */
-export interface Authority { groups: string[]; grant: '*' | string[] }
+/**
+ * What the session's token says it is: the teams' groups and what it reads; under the GitHub grant provider its login
+ * (absent without a valid one) and the GitHub grant provider's host, which the core's functions take to attribute and authorize additions.
+ */
+export interface Authority { groups: string[]; grant: '*' | string[]; login?: string; host?: string }
 /** An entry as a view shows it: whether the session may change it, and why not. */
 export interface EntryRow extends Entry { may_change: boolean; refusal?: Reason }
 
 /** The flags a view adds to an entry. They never enter a text, an id or a payload. */
-const ANNOTATIONS = ['may_change', 'refusal'];
+const ANNOTATIONS = ['may_change', 'refusal', 'owner_missing', 'excluded'];
 
 export function plainEntries(entries: Record<string, unknown>[]): Entry[] {
   return entries.map(entry => Object.fromEntries(Object.entries(entry).filter(([key]) => !ANNOTATIONS.includes(key)))) as Entry[];
@@ -36,11 +46,13 @@ export function versionText(repositories: Record<string, unknown>[]): string {
 }
 
 export function authority(session: Session): Authority | undefined {
-  return session.role === 'team_operator' ? { groups: session.groups ?? [], grant: session.grant ?? '*' } : undefined;
+  return session.role === 'team_operator'
+    ? { groups: session.groups ?? [], grant: session.grant ?? '*', login: session.login, host: session.github_host }
+    : undefined;
 }
 
 function refusals(who: Authority, current: Entry[], next: Entry[]): Refusal[] {
-  return JSON.parse(authorizeEntries('team_operator', JSON.stringify(who.groups), JSON.stringify(who.grant),
+  return JSON.parse(authorizeEntries('team_operator', JSON.stringify(who.groups), JSON.stringify(who.grant), who.login, who.host,
     JSON.stringify(current), JSON.stringify(next))) as Refusal[];
 }
 
@@ -59,14 +71,16 @@ function touchedOwners(diff: WorkspaceDiff, before: Entry[], after: Entry[]): st
 
 /**
  * A team operator's editor: the text holds the entries it reads. Each change is composed with the
- * current ones, diffed and authorized by the core's own functions, so the server's refusals show
- * before a save. The partial text's id is not the saved version's, so none is returned.
+ * current ones (its additions attributed from the login under the GitHub grant provider), diffed
+ * and authorized by the core's own functions, so the server's refusals show before a save, an
+ * identity the workspace holds outside the grant excepted. The partial text's id is not the saved
+ * version's, so none is returned.
  */
 export function teamEditorModel(text: string, held: Entry[], who: Authority, locale: Language) {
   const current = JSON.stringify(held);
   const base = editorModel(text, entriesText(current), locale);
   if (base.errors.length) return { errors: base.errors, diff: undefined, refusals: [] as Refusal[], owners: [] as string[] };
-  const composed = JSON.parse(composeEntries(JSON.stringify(who.grant), current, entriesJson(text))) as Entry[];
+  const composed = JSON.parse(composeEntries(JSON.stringify(who.grant), who.login, who.host, current, entriesJson(text))) as Entry[];
   const diff = JSON.parse(workspaceDiff(entriesText(current), entriesText(JSON.stringify(composed)))) as WorkspaceDiff;
   return { errors: [], diff, refusals: refusals(who, held, composed), owners: touchedOwners(diff, held, composed) };
 }
@@ -120,3 +134,17 @@ export function teamApplyAction(version: VersionSummary, current: string | undef
   return { kind: 'apply', route: 'workspace/apply', body: { version: version.id },
     rollback: isRollback(version, current, versions), teams: diff ? touchedOwners(diff, held, stored) : [] };
 }
+
+/** The `owner = "<partial>` the caret is inside, as the picker's prefix (decoded) and where its text starts; `undefined` elsewhere. */
+export function ownerAt(text: string, caret: number): { prefix: string; start: number } | undefined {
+  const line = caret > 0 ? text.lastIndexOf('\n', caret - 1) + 1 : 0;
+  const match = /^\s*owner\s*=\s*"((?:[^"\\\n]|\\.)*)$/.exec(text.slice(line, caret));
+  if (!match) return undefined;
+  const written = match[1] ?? '';
+  let prefix = written;
+  try { prefix = JSON.parse(`"${written}"`) as string; } catch { /* an escape still being typed stays as written */ }
+  return { prefix, start: caret - written.length };
+}
+
+/** `value` as the inside of a TOML basic string. */
+export const tomlEscaped = (value: string): string => JSON.stringify(value).slice(1, -1);

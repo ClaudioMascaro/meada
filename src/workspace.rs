@@ -200,6 +200,13 @@ pub struct Manifest {
     /// The `[ui]` section, when the build has the module (ADR 0014).
     #[cfg(feature = "ui")]
     pub ui: Option<crate::ui::Config>,
+    /// The `[postgres]` section, when the build has the module (ADR 0016).
+    #[cfg(feature = "postgres")]
+    pub postgres: Option<crate::postgres::Config>,
+    /// The `[directory]` section, when the build has the module (ADR 0016); `read` checks that
+    /// `[postgres]` and `[oidc]` are there too.
+    #[cfg(feature = "directory")]
+    pub directory: Option<crate::directory::Config>,
     /// `[workspace] source = "store"` (ADR 0014): the repositories come from the current
     /// workspace version: `entries` is empty, or with `read_listed` the pulled version's.
     #[cfg(feature = "generation-pointer")]
@@ -247,6 +254,10 @@ struct ManifestFile {
     oidc: Option<crate::oidc::File>,
     #[cfg(feature = "ui")]
     ui: Option<crate::ui::File>,
+    #[cfg(feature = "postgres")]
+    postgres: Option<crate::postgres::File>,
+    #[cfg(feature = "directory")]
+    directory: Option<crate::directory::File>,
     #[cfg(feature = "github-app")]
     #[serde(default, rename = "github_app")]
     github_apps: Vec<crate::github_app::File>,
@@ -329,6 +340,58 @@ impl Manifest {
         let oidc = modules::validated(file, &src, parsed.oidc, |o| o.validate())?;
         #[cfg(feature = "ui")]
         let ui = crate::ui::validated(file, &src, base, parsed.ui)?;
+        #[cfg(feature = "postgres")]
+        let postgres = modules::validated(file, &src, parsed.postgres, |p| p.validate(base))?;
+        // `[oidc.github]` keeps its permissions set in the data layer (ADR 0016); without the
+        // `postgres` feature its own check already named it.
+        #[cfg(all(feature = "oidc", feature = "postgres"))]
+        let mut oidc = oidc;
+        #[cfg(all(feature = "oidc", feature = "postgres"))]
+        if let Some(github) = oidc.as_mut().and_then(|o| o.github.as_mut()) {
+            if postgres.is_none() {
+                let needed = Msg::NeedsSections {
+                    section: "oidc.github",
+                    needed: &["postgres"],
+                };
+                return Err(config::error_at(file, &src, "oidc.github", &needed.text()));
+            }
+            github.postgres = postgres.clone();
+        }
+        #[cfg(feature = "oidc")]
+        let github = oidc.as_ref().is_some_and(|o| o.github.is_some());
+        #[cfg(not(feature = "oidc"))]
+        let github = false;
+        #[cfg(feature = "directory")]
+        let directory = modules::validated(file, &src, parsed.directory, |d| d.validate(base))?;
+        #[cfg(feature = "directory")]
+        if directory.is_some() {
+            // Without the `oidc` feature an `[oidc]` section was already the error naming it.
+            #[cfg(feature = "oidc")]
+            let no_oidc = oidc.is_none();
+            #[cfg(not(feature = "oidc"))]
+            let no_oidc = true;
+            let missing = [("postgres", postgres.is_none()), ("oidc", no_oidc)];
+            let missing: Vec<&str> = (missing.iter()).filter(|m| m.1).map(|m| m.0).collect();
+            modules::needs(file, &src, "directory", &missing)?;
+        }
+        // `[oidc.entra] overage = "directory"` (#336) reads the directory `[directory]` names, in
+        // the data layer `[postgres]` names; `[directory]` already needed both.
+        #[cfg(all(feature = "oidc", feature = "directory"))]
+        if let Some(overage) = oidc.as_mut().and_then(|o| o.overage.as_mut()) {
+            match (&directory, &postgres) {
+                (Some(directory), Some(postgres)) => {
+                    overage.lookup = Some((directory.clone(), postgres.clone()));
+                }
+                _ => {
+                    let needed = Msg::NeedsSections {
+                        section: "oidc.entra",
+                        needed: &["directory"],
+                    };
+                    let key = "oidc.entra.overage";
+                    return Err(config::error_at(file, &src, key, &needed.text()));
+                }
+            }
+        }
         // The `[[github_app]]` blocks are checked, `[valkey]` among their needs; only
         // `github_apps` keeps them.
         #[cfg(feature = "github-app")]
@@ -357,6 +420,15 @@ impl Manifest {
             let owner = Msg::WorkspaceOwnerStatic.text();
             return Err(config::error_at(file, &src, "repository.owner", &owner));
         }
+        if parsed.repositories.iter().any(|e| e.added_by.is_some()) {
+            let added_by = Msg::WorkspaceAddedByStatic.text();
+            return Err(config::error_at(
+                file,
+                &src,
+                "repository.added_by",
+                &added_by,
+            ));
+        }
         let index_dir = base.join(index_dir);
         #[cfg(feature = "snapshot")]
         #[cfg_attr(not(feature = "generation-pointer"), allow(unused_mut))]
@@ -366,22 +438,19 @@ impl Manifest {
         #[cfg(feature = "generation-pointer")]
         if store && pulled {
             let dir = index_dir.join(crate::snapshot::versions::DIR);
-            let not_pulled = || {
-                let (manifest, dir) = (file.display().to_string(), dir.display().to_string());
-                Msg::WorkspaceNotPulled {
-                    manifest: &manifest,
-                    dir: &dir,
-                }
-                .text()
+            // Under `[oidc.github]` without the additions the role check left out (#331).
+            let read = match github {
+                true => crate::snapshot::versions::eligible(&dir)?,
+                false => crate::snapshot::versions::pulled(&dir)?,
             };
-            let (id, repositories, text) =
-                crate::snapshot::versions::pulled(&dir)?.ok_or_else(not_pulled)?;
+            let not_pulled = || crate::snapshot::versions::not_pulled(file, &dir);
+            let (id, repositories, text) = read.ok_or_else(not_pulled)?;
             parsed.repositories = repositories;
             entries_src = text;
             version = Some(id);
         }
         #[cfg(not(feature = "generation-pointer"))]
-        let _ = pulled;
+        let _ = (pulled, github);
         // Each entry's blocks as written, in manifest order: the typed read checked them.
         #[cfg(feature = "snapshot")]
         let mut written = crate::snapshot::entry_blocks(&entries_src).into_iter();
@@ -447,6 +516,10 @@ impl Manifest {
             oidc,
             #[cfg(feature = "ui")]
             ui,
+            #[cfg(feature = "postgres")]
+            postgres,
+            #[cfg(feature = "directory")]
+            directory,
             #[cfg(feature = "generation-pointer")]
             store,
             #[cfg(feature = "generation-pointer")]
@@ -460,6 +533,17 @@ impl Manifest {
     /// paths relative to `file`'s directory; without one it is refused, naming the pull.
     pub fn read_listed(file: &Path) -> Result<Self> {
         Self::read_from(file, true)
+    }
+
+    /// Whether the readers of the pulled version leave out what the exclusions file names:
+    /// `[oidc.github]` with `source = "store"` (#331).
+    #[cfg(feature = "generation-pointer")]
+    pub(crate) fn excludes(&self) -> bool {
+        #[cfg(feature = "oidc")]
+        let github = self.oidc.as_ref().is_some_and(|o| o.github.is_some());
+        #[cfg(not(feature = "oidc"))]
+        let github = false;
+        self.store && github
     }
 
     /// The `[valkey]` section and the `[[github_app]]` blocks of the manifest at `file`,
@@ -480,6 +564,17 @@ impl Manifest {
         let has_valkey = valkey.is_some();
         let apps = crate::github_app::validated(file, &src, base, parsed.github_apps, has_valkey)?;
         Ok((valkey, apps))
+    }
+
+    /// The `[postgres]` section of the manifest at `file`, checked as `read` checks it, without
+    /// reading any mirror: what `meada postgres migrate` needs.
+    #[cfg(feature = "postgres")]
+    pub(crate) fn postgres(file: &Path) -> Result<Option<crate::postgres::Config>> {
+        let src = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
+        modules::check(file, &src)?;
+        let parsed: ManifestFile = config::parse(file, &src, "meada.workspace.toml")?;
+        let base = file.parent().unwrap_or(Path::new(""));
+        modules::validated(file, &src, parsed.postgres, |p| p.validate(base))
     }
 
     /// The workspace of a pulled generation (`meada snapshot pull`, ADR 0012), which `dir`
@@ -550,6 +645,10 @@ impl Manifest {
             oidc: None,
             #[cfg(feature = "ui")]
             ui: None,
+            #[cfg(feature = "postgres")]
+            postgres: None,
+            #[cfg(feature = "directory")]
+            directory: None,
             #[cfg(feature = "generation-pointer")]
             store: false,
             #[cfg(feature = "generation-pointer")]

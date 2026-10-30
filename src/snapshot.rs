@@ -506,7 +506,8 @@ async fn store_generation(
         };
         #[cfg(not(feature = "refresh-lock"))]
         let (token, fence) = (None, 0);
-        return generations::point(valkey, config, keep, generation, token, fence).await;
+        return (generations::point(valkey, config, keep, generation, token, fence).await)
+            .map_err(Into::into);
     }
     let current = config.key("current");
     let pointer = format!("{generation}\n").into_bytes();

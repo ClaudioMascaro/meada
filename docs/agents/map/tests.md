@@ -9,8 +9,8 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
 `--range` forms) prints added, removed and moved entries per section instead of the raw JSON.
 
 - `ui/tests/operations.test.ts` projects operational API fixtures into fleet diagnostics,
-  retention/bundle metadata, repository provenance, cached credential lifetime and token-check
-  outcomes. `operations.test.tsx` exercises the five pages through their DOM and HTTP client,
+  retention/bundle metadata, repository provenance, cached credential lifetime, token-check
+  outcomes and the admission page's fields, the identity provider's type beside the issuer. `operations.test.tsx` exercises the five pages through their DOM and HTTP client,
   including bilingual accessible controls and the pasted token's lifetime.
 - `ui/tests/actions.test.ts` checks the operator/operations gates, eligible generation actions,
   shell-quoted commands and exact u64 recovery floors. `action-pages.test.tsx` exercises those
@@ -58,7 +58,7 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `freshness` moves a `mod`, declares the orphan, adds a module, drops the `[[bin]]`, edits a
   `pub use`, moves an item between files and renames a package, and
   exports it with the walk reversed), `xlang` (a TypeScript and a Python repository linked both ways, over HTTP
-  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files; and a TypeScript and a Java one, `xlang-java-web` and `xlang-java-api`, the Java bases from Spring `@Value` fields and a constructor parameter (a placeholder, a literal URL, a placeholder with a default a peer serves and one no peer serves) and `System.getenv`, and a Kafka topic produced in TypeScript and consumed by a `@KafkaListener` whose topic the configuration names: exports, `trace` down (also from the producer, `xlang-java.trace-channel-down.txt`), up and from uncommitted changes, `freshness` editing, adding and deleting `.java` and configuration files, and a configuration edited alone), `index` (export, schema rebuild, writes only in `.meada/`), `self_index` (a copy of this repository's tracked files, indexed in about 6 s in debug: no call from `src/` reaches `tests/fixtures/`, and `Resolver.call` has an `exact` caller), `hostile` (per pack, repositories of pathological files sized past the limits of Known ceilings: deep nesting, long chains, wide files and manifests, values traced through chains and lattices of constants, wrappers, parameters and return values; each indexed on a thread with a small stack within a time budget, so a recursion with no limit aborts the run and a loop with none fails it; `--nocapture` names each case as it starts; and one test over the table `chained`, a row for each pack of `PACKS`, which indexes a chain of 80 locals each holding a call on the one before, from a receiver typed outside the repository and from a type of it, side by side within the budget: a pack that reads a result twice per link misses it, as Java's and C#'s did before `result_of` read exact targets alone), `query` (search/context), `workspace` (peers, status, config errors, an `owner` key in a `meada.toml` as an unknown key), `manifest` (server mode's workspace manifest: `index`, `status` and `export --repo` with `--workspace`, the refused entries, manifest errors, entry blocks configuring mirrors with no `meada.toml` and ignored under one, decisions replayed, reads that write nothing and see the index until `meada index` refreshes it, nothing written into a mirror, refreshed equals cold, `[workspace]`'s unknown key and source, `source = "file"` as before, `source = "store"` naming `generation-pointer` without it and its sections or `[[repository]]` with it; an `owner` in a static manifest's entry naming the file, the line, the key and `source = "store"`, and each `owner` rule it breaks; with `snapshot`, a bad `[snapshot] node_name` naming the file, the line and the key), `gateway`
+  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files; and a TypeScript and a Java one, `xlang-java-web` and `xlang-java-api`, the Java bases from Spring `@Value` fields and a constructor parameter (a placeholder, a literal URL, a placeholder with a default a peer serves and one no peer serves) and `System.getenv`, and a Kafka topic produced in TypeScript and consumed by a `@KafkaListener` whose topic the configuration names: exports, `trace` down (also from the producer, `xlang-java.trace-channel-down.txt`), up and from uncommitted changes, `freshness` editing, adding and deleting `.java` and configuration files, and a configuration edited alone), `index` (export, schema rebuild, writes only in `.meada/`), `self_index` (a copy of this repository's tracked files, indexed in about 6 s in debug: no call from `src/` reaches `tests/fixtures/`, and `Resolver.call` has an `exact` caller), `hostile` (per pack, repositories of pathological files sized past the limits of Known ceilings: deep nesting, long chains, wide files and manifests, values traced through chains and lattices of constants, wrappers, parameters and return values; each indexed on a thread with a small stack within a time budget, so a recursion with no limit aborts the run and a loop with none fails it; `--nocapture` names each case as it starts; and one test over the table `chained`, a row for each pack of `PACKS`, which indexes a chain of 80 locals each holding a call on the one before, from a receiver typed outside the repository and from a type of it, side by side within the budget: a pack that reads a result twice per link misses it, as Java's and C#'s did before `result_of` read exact targets alone), `query` (search/context), `workspace` (peers, status, config errors, an `owner` key in a `meada.toml` as an unknown key), `manifest` (server mode's workspace manifest: `index`, `status` and `export --repo` with `--workspace`, the refused entries, manifest errors, entry blocks configuring mirrors with no `meada.toml` and ignored under one, decisions replayed, reads that write nothing and see the index until `meada index` refreshes it, nothing written into a mirror, refreshed equals cold, `[workspace]`'s unknown key and source, `source = "file"` as before, `source = "store"` naming `generation-pointer` without it and its sections or `[[repository]]` with it; `[postgres]` naming the `postgres` feature without it, and with it each key error (an unknown key, `url_env` with `url_file`, a `schema` with an uppercase letter, a leading digit or 64 characters, `pool_size = 0`, a zero timeout) naming the file, the line and the key in `index`, `status` and `postgres migrate`; an `owner` in a static manifest's entry naming the file, the line, the key and `source = "store"`, and each `owner` rule it breaks; with `oidc`, `type = "azure"`, `type = 1`, `[oidc.entra]` with no `type` and under `generic` and `okta`, `overage = "directory"` and `"always"`, an unknown key in `[oidc.entra]` and `[oidc.github]` each naming the file, the line and the key, never the value; `[oidc.github]` (#331) without `[postgres]` naming both, in a build without `postgres` naming the feature, without `login_claim` or `max_age_seconds`, with an empty `login_claim`, `max_age_seconds = 59`, an uppercase `host`, repeated or no `roles` and an unknown key, each naming the file, the line and the key or the section, the table alone accepted without `identities_claim` or `groups_claim`, and `github-app roles` without a `[[github_app]]` block for its host (none, or one for another host) naming it; without `directory`, `[directory]` naming the feature, and with `directory` and `oidc`, `[directory]` without `[postgres]`, without `[oidc]` and without both, with both token keys, with an unknown key, with `user_attribute = "email"` and without `user_claim`, each naming the file, the line and the sections or the key, never a value; with `snapshot`, a bad `[snapshot] node_name` naming the file, the line and the key), `gateway`
   (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `processes`
   (entry points and `trace` from `process::...` over the chain: the processes each export
   carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a channel handler's process, a cycle, an
@@ -74,7 +74,14 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `freshness` (cold vs refreshed, also an edited zod schema dropping a field, edited calls moving
   every repository's communities and processes, and the chain's export byte-identical under
   `meada::with_reversed_walk`), `items` (open items and their `search` goldens, fixtures
-  `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`; with
+  `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`;
+  with `oidc`, the identity provider's errors: an unknown `type`, `[oidc.entra]` under `okta` and
+  an `overage` other than `ignore` and `directory`; with `oidc` and `directory`,
+  `overage = "directory"` without `groups_claim` and without `[directory]` (#336); without `directory`, `[directory]` naming the feature; with
+  `directory` and `oidc`, `[directory]` without `[postgres]` and `[oidc]`, with both token keys
+  and with `user_attribute = "email"`; without `postgres`, `[postgres]` naming the feature and no `meada postgres`; with it, a
+  `[postgres]` key error, the URL refusals (an unset variable, a query, a Unix socket) and,
+  against the local Postgres, both version refusals; with
   `refresh-lock`, the operations' refusals: a malformed id, no `[refresh_lock]`, a generation
   not retained, the current generation dropped, a full kept set, a lock held by a named or an
   unknown holder; without it, no `snapshot pointer`
@@ -85,7 +92,7 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   `refresh-lock`, `workspace apply`'s malformed id and missing `[refresh_lock]`, and against the
   services `apply` of a version not stored, `pull` with no current version, below the current
   file's fence and already current; with `snapshot`, the `[snapshot] node_name` error in both
-  languages; `owner`'s errors and the static manifest's `owner` error in both languages),
+  languages; `owner`'s and `added_by`'s errors and the static manifest's `owner` and `added_by` errors in both languages; an `added_by` stored, shown after the owner, pulled and refused when malformed, #330),
   `mcp`
   (the binary over stdio), `server` (`meada mcp --listen` as a child process over the chain's
   mirrors, through rmcp's streamable HTTP client and plain HTTP requests: the stdio tools and
@@ -126,11 +133,11 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   pointer whose fence is not above the current file's; a malformed pointer id or fence, a
   document of another id, one whose id does not derive from its entries, an oversized one and
   one with invalid entries each refused, the directory unchanged; `index` over a pulled version
-  opening no connection to its `[snapshot]` and `[valkey]` ports, the export goldens after it (the pulled version holds owners);
+  opening no connection to its `[snapshot]` and `[valkey]` ports, the export goldens after it (the pulled version holds owners and `added_by` logins);
   with the chain stored, applied and pulled, `index` and `export` giving the export goldens,
   `status` the file's report, `publish` recording the version in the document's `workspace`
   field with the ids of a file's publish, the stored document unchanged by a file's publish and
-  after another version and after one that only changes owners (the document still naming the first version), no field from a file's new generation, a node pulling and serving it
+  after another version and after one that only changes owners or only `added_by` (the document still naming the first version), no field from a file's new generation, a node pulling and serving it
   and refusing a field that is no version id; and without a pulled version `index`, `status`,
   `export` and `snapshot publish` naming `meada workspace pull` and `mcp --listen` naming
   `--generations`, while the `--generations` commands serve),
@@ -147,16 +154,63 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   heartbeats written by hand; `workspace apply` moving `{<key_prefix>}:workspace` with a fence
   above the previous one and rolling back with a new one, refused for a version not stored,
   while a job holds the lock and with the fence lowered, `fence recover` counting the workspace
-  pointer, and a malformed id refused before any connection; `apply` of versions that set, change and clear owners and touch an ownerless entry), `oidc` (`[oidc]`
+  pointer, and a malformed id refused before any connection; `apply` of versions that set, change and clear owners and touch an ownerless entry, and of versions that set, change and clear `added_by`), `postgres` (the data layer, ADR 0016, feature `postgres`; a test that needs Postgres, `MEADA_TEST_POSTGRES_URL`, prints why and skips without it, or fails with `MEADA_TEST_SERVICES_REQUIRED=1`, each in a schema `meada_t<pid>_<case>` of its own: each URL refusal (another scheme, a Unix socket path, a query, `sslmode=disable`, a zero port, an unset variable, an unreadable file, a refused URL in a file) naming `postgres.url_env` or `postgres.url_file` and neither the URL, its password nor its host in `migrate`'s stderr or `status`'s line; `migrate` without `[postgres]` naming the manifest, and `meada index` with it opening no connection; `migrate` on an empty schema printing the binary's version, a second run printing it again with the schema unchanged (its columns and the version row's `xmin`) and no table outside it, a schema the operator created beforehand migrated; a run waiting on the advisory lock the test holds, past a one-second `statement_timeout_seconds`, writing nothing until it is released, and two runs started together both succeeding; with `MEADA_POSTGRES_VERSION_MAX`, an absent schema making `status` print the unreachable form naming `meada postgres migrate`, a higher version the form naming both, and a capped `migrate` refusing to lower it, naming both, the schema unchanged; `status`'s `postgres:` line, unreachable against a closed port and reachable against the local Postgres, with the exit code it has without `[postgres]`, indexed or not, and a loopback `ca_file` asking for TLS), `oidc` (`[oidc]`
   against an issuer and a JWKS served on loopback: a token admits what its claim lists and leaks
   nowhere, a rotated key, an oversized JWKS refusing the start, a pinned path admitted as its
-  identity), `github_app` (`github-app credential` and `throttled` against a GitHub API served
+  identity; the identity provider's `type` (no key, `generic`, `okta`, `keycloak`, and `entra`
+  with and without `[oidc.entra] overage = "ignore"`) answering every case, the metadata (of a pin
+  too), the 401s, 403s and 404 lists, the groups' grant, a token in overage with no groups and a
+  key added after the start, with the same status, headers and body and the same stderr, which
+  holds no token part, group or claim value, as the manifest without the key, and an oversized
+  JWKS refusing the start alike; in `oidc/overage.rs` (with `ui,directory`; the debug knob
+  `MEADA_OVERAGE_TTL_MS` shortens the answers' lifetime to three seconds, and a loopback relay
+  the test closes stands for Postgres stopped), Entra overage through the directory on nodes,
+  the directory fed through the console's SCIM endpoint: a token with `_claim_names` and no
+  `groups` reading the identities `[oidc.groups]` maps its directory groups to, with the claims
+  grant beside them and nothing under `overage = "ignore"`, an inactive, an unknown and a
+  groupless user reading nothing, a token with `groups` or a `_claim_names` that is no object or
+  maps to a non-string never looked up (no line with Postgres closed), an answer, of no groups
+  too, kept for the TTL and no longer, a cached subject keeping its groups with Postgres stopped
+  until expiry and an uncached one having none, each failed lookup one stderr line, readiness
+  unchanged and a schema version newer than the node knows named, group values failing the owner
+  name rule skipped with a line naming `directory_groups`, `userName` matched ignoring case and
+  `externalId` exactly, and no token, object id, group or URL on stderr), `github_app` (`github-app credential` and `throttled` against a GitHub API served
   on loopback that verifies each App's JWT against the fixture keys of
   `tests/fixtures/github-app/`: a minted token cached and reused, two Apps taken in turn, a
   throttled installation skipped until its retry time, a mint answered 429 passing to the next
   installation, a token minted again after its cache runs out or `erase`, an uncovered host or
   owner, a new block and new installations after the refresh, `[[github_app]]` errors, no
-  request from `mcp --listen`, and no key, JWT or token on stderr), `ui` (`meada ui` as a child
+  request from `mcp --listen`, and no key, JWT or token on stderr; and in
+  `tests/it/github_app/roles.rs`, the role check `meada github-app roles` (#331) against the
+  fake's collaborators listing, each connection on a thread of its own so one listing can be
+  held, the local Valkey and the local Postgres in a schema of each test's own, observed through
+  the command's line, its fence refusal and the readers, never the tables: every page of a
+  250-collaborator repository, each request with `affiliation=all` and `per_page=100`, a login
+  checked ignoring case, a 404 and an uncovered owner each a warning and no rows, the exclusions
+  file holding the version id alone, a second run a new set id; with `source = "file"` no
+  exclusions file, `MEADA_REFRESH_FENCE` required under `[refresh_lock]`, a lower fence refused
+  naming the higher (also in `pt_BR`), a 403 without `retry-after` passing to the next
+  installation, a 429 with it leaving every one throttled and the run failing naming the
+  identity and the status, every one marked failing before any request, a 503 failing alike, the
+  set staying each time; an addition whose adder GitHub lists with no role, or a role outside
+  `roles`, excluded with its reason and no login, in the file, absent from `show --pulled`, not
+  indexed, absent from `status` (a peer naming it misses it) and `export`, an entry without
+  `added_by` never excluded, and both included once GitHub lists an accepted role, a custom one
+  of `roles` included; every reader (`index`, `status`, `export`, `snapshot publish`, `show
+  --pulled`) refusing at the first pull with no file, after a new pull with the old file, and on
+  each malformed line naming the file and the line, `index` with a good file recording no
+  connection on the store's, Valkey's and Postgres's loopback listeners, `--pulled` with a version
+  a usage error and without `[oidc.github]` the version whole (no service needed); a failed
+  check, a commit whose file cannot be written and a check killed mid-listing each leaving no
+  file a reader admits, the next success writing it, and a low fence held mid-listing while a high
+  one completes refused at its commit, the high check's file kept; a schema never migrated and
+  one a newer Meada migrated refused; a `Link` to another origin, with a user, to another
+  repository or to a page listed already failing the run with no request to the other origin;
+  and the job's refresh under `meada snapshot lock` against the local store: an excluded
+  addition absent from the published generation, a refresh stopping at the role check
+  publishing nothing, `show` and `import` carrying `added_by` to the same id, an adopted entry
+  published once its index can be written (the failed index keeping the current generation,
+  #316), and an attribution-only change publishing the same generation), `ui` (`meada ui` as a child
   process over a `[ui] dir` it writes, with a `meada-ui.json` naming this build's version, in
   plain HTTP over raw sockets so no path is normalised: the `config`, `session` and `manifest`
   documents, the JSON 404, the `manifest` errors of a file broken after the start; the
@@ -199,7 +253,16 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
   bounding the manifest's entries and its error text, whole for `*`; the playground and the
   exports under a grant, the goldens for `*`, a `WEB`-only trace and export with no peer
   outside the grant, the repositories outside it the 404 of one not served, a 401 without a
-  token; the admission routes
+  token; `admission`'s `type`, `generic` with no key and `entra` when set, every read route,
+  `session` and `admission/check` answering the same tokens alike under both, a token in overage
+  with no groups; in `ui/oidc/overage.rs` (with `directory,refresh-lock`), a token in overage
+  granted through directory groups, made `operator` through `operator_groups` and `team_operator`
+  through a group owning an entry it reads, its `session` listing the groups, and none of it under
+  `overage = "ignore"`; a token with `groups` or an odd `_claim_names` never looked up; an
+  inactive or deleted user refused with 403 `deprovisioned` before its cached answer is used, on
+  `session` and a write, and a viewer once reprovisioned in no group and the answer expired; the
+  token check of a pasted overage token listing the identities its directory groups grant,
+  none under `ignore`, with no request on the issuer; the admission routes
   absent without `[oidc]`; manifest peers and error text bounded even for an unlisted peer;
   operator groups and strict boolean claims, all five configuration errors, whole operator
   views despite restricted grants, and header-only refused writes proving bodies stay unread;
@@ -470,8 +533,11 @@ versions, nested keys, reordered entries and absent fields moving between array-
 `entries_text` printing an entry's `owner` after its `path`, an owner set, cleared or replaced
 alone being the changed key `repository.owner`, and `version_entries` reading a text as a
 document's entries (#325). `meada-core/tests/ids.rs` and
-`meada-core/tests/manifest.rs` hold the `owner` cases (canonical text, version id, each rule and
-the names accepted); the shared validation table below carries the `owner` rows in both languages.
+`meada-core/tests/manifest.rs` hold the `owner` and `added_by` cases (canonical text, version id,
+each rule and the names accepted; an `added_by` printed after the owner, its change alone the
+changed key `repository.added_by`, and `authorize_entries` treating it as an edit, #330, which
+under the GitHub grant provider is `added_by_change`, #333); the
+shared validation table below carries the `owner` and `added_by` rows in both languages.
 `tests/fixtures/workspace-validation.json` is the single pt-BR/English validation table used
 by the real WASM in `ui/tests/core.test.ts` and the binary `workspace import` in
 `tests/it/generations/imports.rs` with generation-pointer and real configured store services.
@@ -481,7 +547,19 @@ precedence, an owner set on an ownerless entry, cleared and replaced, several te
 change, a group that owns nothing yet, an owned entry outside the grant, moved entries, the
 refused list's order and a viewer passed in; every row is also refused nothing for the global
 operator. Its composition rows (`grant`, `current`, `new` in, `composed` out) cover an edit, a
-removal and additions around entries outside the grant, and a reordering submission.
+removal and additions around entries outside the grant, and a reordering submission. Under the
+GitHub grant provider (#333) rows also carry `login` and `github_host` (none on S3's rows, which
+answer as before): an addition on the host outside the grant with `added_by` accepted, the same
+by a subject without a login and one without `added_by` (inside the grant too) `unattributed`,
+an addition off the host outside the grant `outside_grant` and inside it needing no `added_by`,
+an edit changing, clearing or setting `added_by` `added_by_change`, a kept `added_by` and the
+removal of an attributed entry accepted, the full precedence (`outside_grant`, `unattributed`,
+`ownerless`, `owner_change`, `added_by_change`, `not_your_team`) in one change, the global
+operator refused nothing, and without the GitHub grant provider the same addition `outside_grant` and an
+`added_by` change alone ADR 0015's edit; composition rows with a login and a host: a forged `added_by`
+on an addition on the host replaced by the login, cleared off the host, left absent with no
+login, an edited entry kept as submitted, and additions kept as submitted without the
+GitHub grant provider.
 `meada-core/tests/authorize.rs` drives `authorize_entries` and `compose_entries` through those
 rows and `role` on inline entries; `ui/tests/core.test.ts` drives `authorizeEntries` and
 `composeEntries` through the same rows, and the binary's import test reads only the text rows.
@@ -500,14 +578,172 @@ its `hidden` count, a viewer refusal turning the editor read-only, apply and rol
 by authorization, owners and an owner change for a viewer, no save or apply for a viewer or with
 operations off, the global operator's unchanged editor and CLI command, one unreadable stored
 version leaving the other applies, and a long version list read two versions at a time.
+`ui/tests/GithubWorkspace.test.tsx` (#333) renders the views under the GitHub grant provider:
+`unattributed` (a session without a login adding on the host) and `added_by_change` (an
+`added_by` changed or set) marked in text in both languages with the save disabled and no
+request while typing; an addition on the host outside the grant with a forged `added_by`
+accepted with a login and sent as typed, the same off the host `outside_grant`; a server
+`outside_grant` for an identity already present listed with its change and reason; each entry's
+`added_by` in the team editor's table; and the `excluded` mark, with its reason in text, in the
+team editor's table, the global operator's labelled status and the versions page (only for the
+version that carries it), never in the editor's text or a save. `ui/tests/workspace.test.ts`
+keeps `excluded` out of a text, an id and a payload.
 `ui/tests/actions.test.ts` and `ui/tests/action-pages.test.tsx` keep the fleet and store pages
 action-free for a team operator.
+
+### The audit (#328)
+
+`tests/it/ui/oidc/audit.rs` runs the team fixture's console with `[postgres]` (a schema of each
+test's own, its URL in `ops/pg-url` through `postgres::Relay`, a loopback relay the test closes;
+`postgres::audited` migrates it and reads the records back). The global operator's `pointer`
+`retain`, `set` and `drop`, `fence/recover`, `workspace/versions` and `workspace/apply` leave one
+`accepted` record each and `GET audit` lists them newest first with Postgres's time, paged by
+`next` with every record once; a write while `meada snapshot lock` holds the lock ends
+`refused`; a hostile row is left out with one line naming the table; a team operator and a
+viewer get the role refusal and bad queries a 400; the stderr lines are S2's. A team operator's
+accepted save and apply record `team_operator` and the touched owners, its refused save its teams
+and the message with the named identity and the hidden count; a viewer's apply and a team
+operator's `pointer` and `fence/recover` with a body that never completes are refused and
+recorded with the route's action and `{}`. With the relay closed every write is a 503
+`audit_unavailable` with Valkey and the store unchanged, reads, `session` and a fresh start still
+answer, a viewer's write keeps its refusal and line and leaves no record; a schema version the
+binary does not know refuses the start naming both. No record, line or body carries a token part
+or the Postgres URL. `tests/it/refresh_lock.rs`
+(`every_cli_twin_is_audited_and_none_writes_without_its_record`) holds the CLI twins: one record
+each with `via = "cli"`, the author, the operator's role and the outcome, an exit 1 naming
+Postgres and nothing written with the relay closed, and an exit 1 naming both versions on an
+unknown schema version; their behavior without `[postgres]` stays covered, output and exit
+code, by the existing `refresh_lock` and `generations` cases. `tests/it/cli.rs`
+(`the_audit_refusal_follows_lang`) checks the CLI refusal in pt-BR and English, and
+`tests/it/postgres.rs` migration 2's columns. `ui/tests/audit.test.tsx` holds the page's view
+model from `fixtures/audit.json`, `offered`, the labelled and keyboard-reachable table paging
+through `next` in both languages, the 503's message and the copy keys.
 
 Review regressions for #293 cover manifest-wide grant filtering (including groups-only
 identities in validation errors), issuer query preservation at `Auth.login`, exact recovery
 ceilings through CLI and HTTP, and live-heartbeat selection with a controlled RESP `TIME`
 response while all other commands reach the real Valkey fixture. The ceiling tests preserve
 one final locked publish and compare English and Brazilian Portuguese refusals.
+
+### The directory (#334)
+
+`tests/it/ui/oidc/directory.rs` runs a console with `[oidc]` (the `oidc` module's loopback
+issuer), `[postgres]` and `[directory]`. Against the local Postgres (a schema of each test's
+own through `postgres::audited` and its relay; skipped without `MEADA_TEST_POSTGRES_URL`,
+failed with `MEADA_TEST_SERVICES_REQUIRED=1`): an Entra ID sequence (the `userName` lookup,
+`POST` with its id, `Location` and `meta`, a `PATCH` of attributes through a filtered path, a
+sub-attribute and the enterprise extension, `PATCH active` with `"False"`, the user shown
+inactive, a group with members added and removed by path and by value list answered 204,
+`excludedAttributes=members` on a list and a read, the user's `DELETE` leaving the group and a
+revocation marker, the group's `DELETE`), then the relay closed: a 503 in RFC 7644's schema and
+`config` still answering; each write's one `scim:` line, exactly, and no token, attribute value
+or Postgres URL on stderr. An Okta sequence (the lookup with `startIndex` and `count`, `POST`
+with a `password` that neither the answer nor the stored row holds, `PUT` of the whole user,
+`PATCH active=false` without a path, a group with no members, `PUT` replacing its members, a
+rename by a path-less `PATCH`, `DELETE`) and paging over 150 users in creation order, with
+`count` capped at 100. The refusals: 409 `uniqueness` for a `userName` differing in case on
+`POST`, `PUT` and `PATCH`, a repeated `externalId` and a repeated group name; 400
+`invalidValue` for a member naming no user or no id; `invalidFilter`, `invalidPath` and
+`invalidSyntax` for an unsupported filter, path and operation; 404 for an unknown or malformed
+id; a two-operation `PATCH` whose second fails (`noTarget`) writing nothing; `id` and `meta`
+unchanged by `PATCH` and `PUT`; 413 without `scimType` for a body over 1 MiB and a resource
+over 64 KiB on `POST` and after a `PATCH`; eight concurrent `POST`s of one `userName` storing
+one; no error body or stderr line echoing a value. The revocation marker: none after a
+deactivation; one after deleting an inactive and an active user, which `filter` does not show;
+none for an unknown id; kept by an inactive reprovisioning and by a `POST` active only by
+default, cleared by one naming `active` true (by `PATCH`, `userName` differing in case, and by a
+path-less `add`). Four concurrent `POST`s of one group name store one; a group `PUT` and `PATCH`
+renaming to a held name are 409 `uniqueness`; a user deleted while a `PATCH` adds it to a group
+leaves no membership; a NUL in a value is a 400 `invalidValue`, not a 503. Without a service (a
+`[postgres]` naming a closed port): no token, a console token, a wrong token, the token one
+character short and a `Basic` scheme each a 401 with `WWW-Authenticate: Bearer`; `Origin` a 403
+with and without the token; a foreign `Host` a 403; the SCIM token under `/api/v1/session` a
+401; another media type a 415; the three discovery documents' fixed content; a 405; a 503 for a
+resource with `config` answering; the `manifest` route naming the default `token_env` and not the token; `/Schemas` marking the
+`group_attribute` unique; the
+console refusing to start with a 31-character token and with none, naming the key and its line
+in English under `en_US` and `pt_BR`. `tests/it/postgres.rs` holds migration 3's columns.
+
+### Deprovisioning, the owner picker and `owner_missing` (#335)
+
+`tests/it/ui/oidc/deprovision.rs` runs the same console against the local Postgres (the `directory`
+and `refresh-lock` features). A deactivated user is a 403 `deprovisioned` on every route but
+`config` (a global and a team operator, a read and a write), the static files unchanged, the
+audit holding no row for the refusal and a never-provisioned user admitted; a deleted user stays
+refused until it is provisioned active; an `externalId` lookup is exact where a `userName` lookup
+ignores case. With the relay closed, reads are admitted, a write is a 503 `audit_unavailable` with
+no audit insert and one stderr line that names the directory and never the claim. The picker lists
+group names by exact prefix, sorted, an empty prefix the first 100, a prefix over 256 a 400, for
+the global operator alone (a team operator and a viewer are refused). `owner_missing` appears
+only when true in `workspace` and `workspace/versions/<id>`: nothing flagged before a group was
+provisioned, owned entries flagged after the last group is deleted, ownerless entries never,
+and no flags plus one stderr line with the directory unreadable. `GET admission` carries the
+counts and the last write. `ui/tests/Directory.test.tsx` holds the editor's picker (the global
+operator alone, the owner escaped into the TOML string, no request for a team operator or a
+viewer), the flag in text in the editor, the comparison and a team operator's table in both
+languages, the save and editor text without the flag, the admission page's rows and the
+deactivated-account page. `tests/it/postgres.rs` holds migration 4's columns, and migration
+5's, the permissions set (#331). `tests/it/cli.rs` holds the role check's refusals under
+`pt_BR` and `en_US` (`[oidc.github]` without `[postgres]`, a `host` and a `roles` error, the
+role check without `[oidc.github]`, without a `[[github_app]]` block for its host and without
+`MEADA_REFRESH_FENCE` under `[refresh_lock]`, and a reader without the exclusions file).
+
+### The GitHub grant at admission (#332)
+
+`tests/it/oidc/github.rs` runs `meada mcp --listen` over the chain with `[oidc]` (one audience)
+and `[oidc.github]`, its permissions set seeded by `meada github-app roles` against
+`github_app`'s fake (`oidc::github::Github`: the fake with the owners `chain` and `team`, the
+local Valkey and Postgres in a schema and key prefix of each test's own; skipped without them,
+failed with `MEADA_TEST_SERVICES_REQUIRED=1`). `MEADA_PERMISSIONS_POLL_MS`, a debug-build knob
+as `MEADA_DRAIN_MS` is, shortens the 60-second poll to 200 ms and lowers the 60-second floor of
+`max_age_seconds` to one second. The union: a login holding `write` and a custom role of
+`roles` (`Custom Reviewer`) and a claims grant read all three in the root's 404, a trace keeps
+the gateway's link, a role outside `roles` (`triage`) is a 403, the login in another case than
+GitHub's; no login claim, an empty, 40-character, numeric, `ana.souza` or array value reads the
+claims grant only; a machine token's `*` reads everything; a replacing set without a role
+revokes it. The age, through
+`postgres::Relay` (closed, then opened again on its port): the GitHub grant holds past the
+relay's close until the set is `max_age_seconds` old on Postgres's clock, then only the claims
+grant answers, every stderr line one failed poll and their count bounded by the polls; a new set
+after the relay opens restores it. A node never reaching Postgres starts and serves, its GitHub
+grant empty and `*` whole; over a schema one version newer than `MEADA_POSTGRES_VERSION_MAX` it
+names both versions on exactly one stderr line. Hostile rows (written by the test): a set whose
+`finished` is ahead of Postgres's clock grants nothing and is named by its table, and once valid
+a `*` row and an off-host row are skipped with one line each naming `permission_rows`. No
+stderr line carries a token part, a login or the Postgres URL. `src/oidc/permissions.rs`'s unit
+tests hold the exact expiry (`max_age_seconds` grants, a millisecond past it does not), an age
+that never moves back when Postgres's clock does, the login's shape and the row identity check.
+
+`tests/it/ui/oidc/github.rs` runs the team fixture's console with `[oidc.github]` and
+`[postgres]`: the session is `unread` with the login lowercased before any set, then `current`
+with the GitHub identity in `grant`, a group owning an entry only GitHub grants making a
+`team_operator` with that team, every bounded route (`workspace`, its versions, `repositories`,
+`manifest`, `store`, `credentials`) naming no identity outside the union; the token check's
+`sources` (`claims` and `github`, sorted, `*` for a machine token) with no request to the
+loopback issuer or the fake GitHub; `admission`'s `github` with the set's id, `finished`, age,
+`max_age_seconds` and the counts the job wrote; an audited write's record carrying the login;
+then `expired`, a viewer with an empty grant.
+
+`tests/it/ui/oidc/additions.rs` (#333) runs the same console with `[oidc.github]` and
+`[postgres]` (every write audited) and the role check over the store's version: a team
+operator's addition on the host outside its grant stored with `added_by` set from its login over
+a forged `mallory`, the entries outside the grant kept; without a login `unattributed`; an
+`added_by` set on its entry `added_by_change`; an identity the workspace holds outside its grant
+`outside_grant`, named as submitted, with a login and without one; each refusal writing nothing
+and recorded `refused`, the accepted save `accepted`, with the login when there is one; the
+global operator setting, replacing and clearing `added_by` and its own additions kept as written;
+a team operator's apply of a version whose addition on the host inside its grant lacks
+`added_by` refused `unattributed` with the pointer unmoved, and applied once the addition has
+one; after `meada workspace pull` and `meada github-app roles` exclude an addition, `workspace`
+and `workspace/versions/<id>` of that version marking it `excluded: true` for the global operator
+and for a viewer the GitHub grant lets read it, another version holding the same entry and every
+other entry unmarked, and a team operator that does not read it never seeing it. No stderr line
+carries a token, a login or the forged value. `tests/it/ui/oidc/team.rs` checks that without
+`[oidc.github]` no workspace body carries `excluded`. `tests/it/ui/oidc/audit.rs` also leaves out a record whose stored login fails the login
+pattern. `ui/tests/models.test.ts`,
+`ui/tests/operations.test.ts` and `ui/tests/operations.test.tsx` hold the session view's login
+and state, the admission page's set rows (and `unread` with no set) and the token check's
+sources, in both languages.
 
 ## Java declarative clients (#90)
 

@@ -1,0 +1,4 @@
+# The bootstrap of the one-shot migrate step: only [postgres], with the migrate role's URL.
+[postgres]
+url_env = "MEADA_POSTGRES_MIGRATE_URL"
+ca_file = "/etc/meada/ca/ca.pem"

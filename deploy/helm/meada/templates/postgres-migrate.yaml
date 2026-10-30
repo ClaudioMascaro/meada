@@ -1,0 +1,86 @@
+{{- if .Values.modules.postgres.enabled }}
+{{- /* With the example Postgres the database does not exist before the release, so the step runs after the resources are created; the pods hold back (wait-postgres) until the schema is migrated. With your own Postgres it runs before them. */ -}}
+{{- $hook := "pre-install,pre-upgrade" }}
+{{- if .Values.postgres.enabled }}{{ $hook = "post-install,post-upgrade" }}{{ end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "meada.name" . | trunc 52 | trimSuffix "-" }}-migrate
+  labels:
+    {{- include "meada.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: {{ $hook }}
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+data:
+  postgres.workspace.toml: |
+    [postgres]
+    url_env = "MEADA_POSTGRES_MIGRATE_URL"
+    schema = {{ .Values.modules.postgres.schema | toJson }}
+    {{- if or .Values.tls.caSecret .Values.tls.caConfigMap }}
+    ca_file = "/etc/meada-ca/ca.crt"
+    {{- end }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "meada.name" . | trunc 52 | trimSuffix "-" }}-migrate
+  labels:
+    {{- include "meada.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    helm.sh/hook: {{ $hook }}
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "meada.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: migrate
+          image: {{ include "meada.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - for attempt in $(seq 1 60); do meada postgres migrate --workspace /etc/meada/postgres.workspace.toml && exit 0; sleep 5; done; exit 1
+          env:
+            - name: MEADA_POSTGRES_MIGRATE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.modules.postgres.credentialsSecret }}
+                  key: migrate-url
+          volumeMounts:
+            - name: config
+              mountPath: /etc/meada
+              readOnly: true
+            {{- if or .Values.tls.caSecret .Values.tls.caConfigMap }}
+            - name: ca
+              mountPath: /etc/meada-ca
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "meada.name" . | trunc 52 | trimSuffix "-" }}-migrate
+        {{- if .Values.tls.caSecret }}
+        - name: ca
+          secret:
+            secretName: {{ .Values.tls.caSecret }}
+        {{- else if .Values.tls.caConfigMap }}
+        - name: ca
+          configMap:
+            name: {{ .Values.tls.caConfigMap }}
+        {{- end }}
+{{- end }}

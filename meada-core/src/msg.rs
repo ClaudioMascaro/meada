@@ -3,7 +3,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::manifest::OWNER_MAX;
+use crate::manifest::{ADDED_BY_MAX, OWNER_MAX};
 
 static PT: AtomicBool = AtomicBool::new(false);
 
@@ -31,6 +31,9 @@ pub enum Msg<'a> {
     OwnerTooLong,
     OwnerControl,
     OwnerPadded,
+    AddedByNotString,
+    AddedByTooLong,
+    AddedByChars,
 }
 
 impl Msg<'_> {
@@ -87,6 +90,18 @@ impl Msg<'_> {
             Msg::OwnerPadded => pick(
                 "has whitespace at either end".into(),
                 "tem espaço em branco numa das pontas".into(),
+            ),
+            Msg::AddedByNotString => pick(
+                "must be one string, a GitHub login".into(),
+                "deve ser uma única string, um login do GitHub".into(),
+            ),
+            Msg::AddedByTooLong => pick(
+                format!("is longer than {ADDED_BY_MAX} characters"),
+                format!("tem mais de {ADDED_BY_MAX} caracteres"),
+            ),
+            Msg::AddedByChars => pick(
+                "holds a character other than lowercase ASCII letters, digits, `-` and `_`".into(),
+                "contém um caractere além de letras ASCII minúsculas, dígitos, `-` e `_`".into(),
             ),
         }
     }

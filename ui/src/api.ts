@@ -4,13 +4,21 @@ export interface Config {
   version: string;
   public_url: string;
   operations: boolean;
+  /** With `[postgres]`: the audit page has its route. */
+  audit?: boolean;
   issuer?: string;
   client_id?: string;
   scopes?: string[];
   audience?: string;
 }
 
-export interface Session { subject: string | null; role: 'viewer' | 'team_operator' | 'operator'; groups?: string[]; grant?: '*' | string[]; teams?: string[] }
+export interface Session {
+  subject: string | null; role: 'viewer' | 'team_operator' | 'operator'; groups?: string[]; grant?: '*' | string[]; teams?: string[];
+  /** With `[oidc.github]`: the token's GitHub login (absent without a valid one), the host and the GitHub grant's state. */
+  login?: string; github_host?: string; github_grant?: GithubGrant;
+}
+/** The GitHub grant's state: the permissions set is within `max_age_seconds`, past it, or not read yet. */
+export type GithubGrant = 'current' | 'expired' | 'unread';
 export interface Module { section: string; feature: string; built: boolean }
 export interface Manifest {
   file: string;

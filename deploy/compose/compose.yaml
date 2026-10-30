@@ -135,8 +135,10 @@ services:
       - ca:/ca
       - valkey-tls:/valkey
       - store-tls:/store
+      - postgres-tls:/postgres
       - valkey-data:/valkey-data
       - store-data:/store-data
+      - postgres-data:/postgres-data
       - job-mirrors:/job-mirrors
       - job-indexes:/job-indexes
       - node-one:/node-one
@@ -310,8 +312,10 @@ volumes:
   ca:
   valkey-tls:
   store-tls:
+  postgres-tls:
   valkey-data:
   store-data:
+  postgres-data:
   job-mirrors:
   job-indexes:
   node-one:

@@ -83,3 +83,55 @@ GET.
 
 En GitHub.com y GitHub Enterprise Cloud, `api` queda fuera de la frontera del operador; se acepta
 porque los fetches del job ya van a ese host (ADR 0013).
+
+## Verificación de roles
+
+Con `[oidc.github]` (features `github-app`, `postgres` y `oidc`), el job le pregunta a GitHub, en
+cada refresh, quién tiene qué rol en cada repositorio del workspace en el `host` del proveedor,
+con las mismas instalaciones, marcas de límite y caché de tokens del helper. El App no necesita
+ningún permiso más allá de Metadata (lectura).
+
+```toml
+[oidc.github]
+host = "github.com"                     # el valor por defecto; un nombre de host en minúsculas
+login_claim = "github_login"            # la claim con el login de GitHub del sujeto
+roles = ["read", "triage", "write", "maintain", "admin"]   # por defecto; también roles propios
+max_age_seconds = 5400                  # obligatorio, al menos 60
+```
+
+`[oidc.github]` exige `[postgres]` y un Meada compilado con `postgres`; a su lado, `[oidc]` no
+necesita `identities_claim` ni `groups_claim`. `meada github-app roles --workspace <manifiesto>`
+lista `GET /repos/{owner}/{repo}/collaborators?affiliation=all&per_page=100`, todas las páginas,
+y escribe en Postgres, en una transacción, un conjunto de permisos que reemplaza al anterior:
+cada colaborador listado con su `role_name`. Bajo `[refresh_lock]` el conjunto lleva el
+`MEADA_REFRESH_FENCE` del job, y un conjunto con un fence mayor ya escrito rechaza la ejecución.
+Un 403 o 429 pasa a la siguiente instalación; con todas limitadas, en un 5xx, un timeout o un
+encabezado `Link` que sale del listado del repositorio, no se escribe nada y la salida es 1. Un
+404, o un owner que ninguna instalación cubre, da un aviso y ninguna fila.
+
+Con `source = "store"`, toda adición cuyo `added_by` no tiene un rol de `roles` queda fuera: el
+comando escribe `<index_dir>/workspace/excluded` (el id de la versión, luego las identidades
+excluidas, una por línea), y `meada index`, `status`, `export` y `snapshot publish` la tratan como
+ausente del workspace. Sin ese archivo, o con uno de otra versión, se niegan y nombran `meada
+github-app roles`; una verificación que falló no deja archivo. `meada workspace show --pulled`
+imprime la versión descargada sin las exclusiones, para el script de fetch. El refresh del job,
+bajo `meada snapshot lock`, queda: `workspace pull`, `github-app roles`, el fetch de lo que
+`show --pulled` lista, `index --workspace` y `snapshot publish`; un refresh que se detiene en la
+verificación no publica nada.
+
+### El grant en la admisión
+
+Los nodos y la consola con `[oidc.github]` leen cada minuto el conjunto de permisos más nuevo, y
+cargan las filas cuyo rol está en `roles` solo cuando el conjunto cambia; la admisión nunca espera
+a Postgres. El login de un token es el valor de `login_claim` cuando es una cadena de 1 a 39
+letras ASCII, dígitos, `-` y `_`, comparado en minúsculas; cualquier otro valor no da grant de
+GitHub. Use una claim que el administrador del proveedor de identidad mapea desde un atributo
+verificado, nunca una que el usuario edita. El grant de GitHub es lo que ese login lee en el
+conjunto mientras su edad (el reloj de Postgres menos `finished`, más el tiempo monotónico del
+proceso desde la lectura) es como mucho `max_age_seconds`; después, con el job detenido o Postgres
+inalcanzable, queda vacío y el grant de las claims sigue valiendo. Nunca vale `*`, y un token de
+máquina con `*` no depende de Postgres. La sesión de la consola muestra `login`, `github_host` y
+`github_grant` (`current`, `expired` o `unread`), la verificación de token separa las identidades
+en `sources` (`claims` y `github`) y la página de admisión muestra el conjunto cargado. Un nodo
+que encuentra una versión de schema que no conoce lo dice una vez en stderr y trata a Postgres
+como inalcanzable.

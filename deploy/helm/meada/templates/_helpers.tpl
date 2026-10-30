@@ -69,6 +69,21 @@ app.kubernetes.io/component: server
 {{- if and (eq .Values.workspace.source "store") (not .Values.modules.refreshLock.enabled) -}}
 {{- fail "workspace.source=store requires modules.refreshLock for the managed refresh" -}}
 {{- end -}}
+{{- if not (has .Values.modules.oidc.type (list "generic" "entra" "okta" "keycloak")) -}}
+{{- fail "modules.oidc.type must be generic, entra, okta or keycloak" -}}
+{{- end -}}
+{{- if and (eq .Values.modules.oidc.entra.overage "directory") (not (and (eq .Values.modules.oidc.type "entra") .Values.modules.directory.enabled .Values.modules.oidc.groupsClaim)) -}}
+{{- fail "modules.oidc.entra.overage=directory requires type entra, modules.directory and modules.oidc.groupsClaim" -}}
+{{- end -}}
+{{- if and .Values.modules.oidc.github.enabled (not (and .Values.modules.oidc.enabled .Values.modules.postgres.enabled .Values.modules.githubApp.enabled .Values.modules.oidc.github.loginClaim)) -}}
+{{- fail "modules.oidc.github requires modules.oidc, modules.postgres, modules.githubApp and loginClaim" -}}
+{{- end -}}
+{{- if and .Values.modules.directory.enabled (not (and .Values.modules.oidc.enabled .Values.modules.postgres.enabled .Values.modules.directory.userClaim)) -}}
+{{- fail "modules.directory requires modules.oidc, modules.postgres and userClaim" -}}
+{{- end -}}
+{{- if and .Values.postgres.enabled (not .Values.modules.postgres.enabled) -}}
+{{- fail "postgres.enabled requires modules.postgres" -}}
+{{- end -}}
 {{- if .Values.console.enabled -}}
 {{- if not (and .Values.image.cloud .Values.modules.snapshot.enabled .Values.modules.generations.enabled .Values.modules.valkey.enabled) -}}
 {{- fail "console requires image.cloud and snapshot, valkey and generations" -}}
@@ -164,4 +179,42 @@ app.kubernetes.io/component: console
   configMap:
     name: {{ .Values.tls.caConfigMap }}
 {{- end }}
+{{- end -}}
+{{- define "meada.postgresName" -}}
+{{- printf "%s-postgres" (include "meada.name" . | trunc 54 | trimSuffix "-") -}}
+{{- end -}}
+{{- /* MEADA_POSTGRES_URL from the Secret's key: write-url for the console and the refresh, read-url for the nodes. */ -}}
+{{- define "meada.postgresEnv" -}}
+{{- if .root.Values.modules.postgres.enabled }}
+- name: MEADA_POSTGRES_URL
+  valueFrom:
+    secretKeyRef:
+      name: {{ .root.Values.modules.postgres.credentialsSecret }}
+      key: {{ .key }}
+{{- end }}
+{{- end -}}
+{{- /* The init container that holds the console and the refresh back until the schema is migrated: `meada status` reports "postgres: reachable" only at a schema version it knows. Nodes start and serve without Postgres (#332), so they never wait. */ -}}
+{{- define "meada.waitPostgres" -}}
+{{- if .root.Values.modules.postgres.enabled }}
+- name: wait-postgres
+  image: {{ include "meada.image" .root }}
+  imagePullPolicy: {{ .root.Values.image.pullPolicy }}
+  command: ["/bin/sh", "-c"]
+  args:
+    - until meada status --workspace /etc/meada/postgres.workspace.toml 2>/dev/null | grep -q '^postgres: reachable'; do sleep 3; done
+  env:
+    - name: LC_ALL
+      value: C
+    {{- include "meada.postgresEnv" . | nindent 4 }}
+  volumeMounts: {{ include "meada.mounts" .root | nindent 4 }}
+{{- end }}
+{{- end -}}
+{{- /* The refresh job's workspace bootstrap: with modules.githubApp it carries the App's section, which the nodes' and console's never do. */ -}}
+{{- define "meada.jobWorkspace" -}}
+{{- if .Values.modules.githubApp.enabled -}}/etc/meada/job.workspace.toml{{- else -}}/etc/meada/meada.workspace.toml{{- end -}}
+{{- end -}}
+{{- define "meada.refresh" -}}
+{{- $ws := include "meada.jobWorkspace" . -}}
+{{- if eq .Values.workspace.source "store" }}meada workspace pull --workspace {{ $ws }} && {{ end -}}
+{{- if .Values.modules.oidc.github.enabled }}meada github-app roles --workspace {{ $ws }} && meada workspace show --pulled --workspace {{ $ws }} > /data/pulled.toml && /bin/sh /etc/meada/fetch.sh /data/pulled.toml{{ else }}/bin/sh /etc/meada/fetch.sh{{ end }} && meada index --workspace {{ $ws }} && meada snapshot publish --workspace {{ $ws }}
 {{- end -}}

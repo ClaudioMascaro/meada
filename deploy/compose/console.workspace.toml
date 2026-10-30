@@ -42,6 +42,28 @@ ttl_seconds = 300
 # A team: map its group to the identities it owns (docs site, console, Teams).
 # "team-billing" = ["github.com/acme/billing"]
 
+# Identity automation (ADR 0016), with compose.postgres.yaml. [postgres] reads the write role's
+# URL; [oidc.github], [directory] and [oidc.entra] need [oidc] above. [directory] reads the SCIM
+# token from MEADA_SCIM_TOKEN (at least 32 characters); the identity provider pushes to
+# https://localhost:8444/scim/v2/ (see the identity recipes on the docs site).
+# [postgres]
+# url_env = "MEADA_POSTGRES_URL"
+# ca_file = "/etc/meada/ca/ca.pem"
+#
+# [oidc.github]
+# login_claim = "github_login"
+# max_age_seconds = 5400
+#
+# [directory]
+# token_env = "MEADA_SCIM_TOKEN"
+# user_claim = "oid"
+# user_attribute = "externalId"
+# group_attribute = "externalId"
+#
+# Entra ID only: set type = "entra" in [oidc] above, then
+# [oidc.entra]
+# overage = "directory"      # needs [directory] and groups_claim
+
 [ui]
 dir = "/usr/share/meada/ui"
 public_url = "https://localhost:8444"

@@ -1,0 +1,123 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "meada.postgresName" . }}
+  labels:
+    {{- include "meada.labels" . | nindent 4 }}
+data:
+  10-roles.sh: |
+    #!/bin/sh
+    set -eu
+    # Runs once, on the volume's first start: the three roles ADR 0016 recommends. meada_migrate
+    # owns the schema; meada_write is the console and the refresh; meada_read is the nodes.
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
+      -v migrate_password="$POSTGRES_MIGRATE_PASSWORD" \
+      -v write_password="$POSTGRES_WRITE_PASSWORD" \
+      -v read_password="$POSTGRES_READ_PASSWORD" <<'SQL'
+    CREATE ROLE meada_migrate LOGIN PASSWORD :'migrate_password';
+    CREATE ROLE meada_write LOGIN PASSWORD :'write_password';
+    CREATE ROLE meada_read LOGIN PASSWORD :'read_password';
+    GRANT CREATE ON DATABASE meada TO meada_migrate;
+    ALTER DEFAULT PRIVILEGES FOR ROLE meada_migrate GRANT USAGE ON SCHEMAS TO meada_write, meada_read;
+    ALTER DEFAULT PRIVILEGES FOR ROLE meada_migrate GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO meada_write;
+    ALTER DEFAULT PRIVILEGES FOR ROLE meada_migrate GRANT USAGE, SELECT ON SEQUENCES TO meada_write;
+    ALTER DEFAULT PRIVILEGES FOR ROLE meada_migrate GRANT SELECT ON TABLES TO meada_read;
+    SQL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "meada.postgresName" . }}
+  labels:
+    {{- include "meada.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  selector:
+    {{- include "meada.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "meada.postgresName" . }}
+  labels:
+    {{- include "meada.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  serviceName: {{ include "meada.postgresName" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "meada.labels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "meada.labels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["-c", "ssl=on", "-c", "ssl_cert_file=/tls/tls.crt", "-c", "ssl_key_file=/tls/tls.key"]
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: meada
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            {{- range $variable, $key := dict "POSTGRES_PASSWORD" "postgres-password" "POSTGRES_MIGRATE_PASSWORD" "migrate-password" "POSTGRES_WRITE_PASSWORD" "write-password" "POSTGRES_READ_PASSWORD" "read-password" }}
+            - name: {{ $variable }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.postgres.passwordsSecret }}
+                  key: {{ $key }}
+            {{- end }}
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-h", "localhost", "-U", "postgres", "-d", "meada"]
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          resources: {{ toYaml .Values.postgres.resources | nindent 12 }}
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ .Values.postgres.tlsSecret }}
+            defaultMode: 0640
+        - name: init
+          configMap:
+            name: {{ include "meada.postgresName" . }}
+            defaultMode: 0755
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage }}
+{{- end }}

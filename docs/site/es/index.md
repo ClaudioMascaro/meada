@@ -58,6 +58,6 @@ Sigue la cadena entre repositorios.
 
 ## Qué está disponible
 
-El modo servidor ([S1, #259](https://github.com/ClaudioMascaro/meada/issues/259)) y la consola ([S2, #293](https://github.com/ClaudioMascaro/meada/issues/293)) están entregados. Ownership por equipo (S3), automatización de identidad (S4) y workspaces con nombre (S5) están planificados. Cada página distingue el comportamiento disponible de la propuesta.
+El modo servidor ([S1, #259](https://github.com/ClaudioMascaro/meada/issues/259)), la consola ([S2, #293](https://github.com/ClaudioMascaro/meada/issues/293)) y la automatización de identidad ([S4, #319](https://github.com/ClaudioMascaro/meada/issues/319)) están entregados. Ownership por equipo (S3) y workspaces con nombre (S5) están planificados. Cada página distingue el comportamiento disponible de la propuesta.
 
 [Consulta las capacidades y los límites](capabilities.md) · [S3](workspaces.md) · [S4](enterprise.md) · [S5](named-workspaces.md)

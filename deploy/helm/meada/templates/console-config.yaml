@@ -25,4 +25,17 @@ data:
     {{- with .Values.console.operatorClaim }}
     operator_claim = {{ . | toJson }}
     {{- end }}
+  {{- if .Values.modules.postgres.enabled }}
+  postgres.workspace.toml: |
+    index_dir = "/data/console/indexes"
+    {{- with .Values.modules.postgres }}
+
+    [postgres]
+    url_env = "MEADA_POSTGRES_URL"
+    schema = {{ .schema | toJson }}
+    {{- if or $.Values.tls.caSecret $.Values.tls.caConfigMap }}
+    ca_file = "/etc/meada-ca/ca.crt"
+    {{- end }}
+    {{- end }}
+  {{- end }}
 {{- end }}

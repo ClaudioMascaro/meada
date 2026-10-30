@@ -83,6 +83,21 @@ enum Command {
         #[command(subcommand)]
         command: WorkspaceCommand,
     },
+    #[cfg(feature = "postgres")]
+    Postgres {
+        #[command(subcommand)]
+        command: PostgresCommand,
+    },
+}
+
+/// `meada postgres` (ADR 0016, feature `postgres`).
+#[cfg(feature = "postgres")]
+#[derive(Subcommand)]
+enum PostgresCommand {
+    Migrate {
+        #[arg(long)]
+        workspace: PathBuf,
+    },
 }
 
 /// `meada workspace` (ADR 0014, feature `generation-pointer`).
@@ -104,6 +119,8 @@ enum WorkspaceCommand {
     },
     Show {
         version: Option<String>,
+        #[arg(long, conflicts_with = "version")]
+        pulled: bool,
         #[arg(long)]
         workspace: PathBuf,
     },
@@ -133,7 +150,19 @@ fn workspace(command: WorkspaceCommand) -> ! {
             workspace,
         } => {
             let author = author.unwrap_or_else(versions::cli_author);
-            (versions::import(&workspace, &file, &message, &author, &mut notes)).map(|imported| {
+            let src = std::fs::read_to_string(&file).ok();
+            let id = src.and_then(|src| versions::version_id(&src, &message, &author).ok());
+            let arguments = id.map(|id| serde_json::json!({"version": id, "message": message}));
+            meada::audit::cli(
+                &workspace,
+                &author,
+                "workspace.import",
+                arguments,
+                || versions::import(&workspace, &file, &message, &author, &mut notes),
+                |imported| imported.id.clone(),
+                |_| false,
+            )
+            .map(|imported| {
                 if let Some(first) = &imported.first {
                     let (author, message) = (
                         versions::shown(&first.author),
@@ -156,18 +185,30 @@ fn workspace(command: WorkspaceCommand) -> ! {
             }
             listing.text()
         }),
-        WorkspaceCommand::Show { version, workspace } => {
-            versions::show(&workspace, version.as_deref())
-        }
+        WorkspaceCommand::Show {
+            pulled: true,
+            workspace,
+            ..
+        } => versions::show_pulled(&workspace),
+        WorkspaceCommand::Show {
+            version, workspace, ..
+        } => versions::show(&workspace, version.as_deref()),
         #[cfg(feature = "refresh-lock")]
         WorkspaceCommand::Apply { version, workspace } => {
             let author = versions::cli_author();
             // The CLI holds the store's and Valkey's credentials: the global operator (ADR 0015).
-            let operator = meada_core::authorize::Role::Operator;
-            let grant = meada_core::authorize::Grant::All;
-            versions::apply(&workspace, &version, &author, operator, &[], &grant)
-                .map(|applied| format!("{}\n", applied.line))
-                .map_err(Into::into)
+            let operator = versions::Acting::operator();
+            let id = meada_core::ids::is_id(&version).then(|| version.clone());
+            meada::audit::cli(
+                &workspace,
+                &author,
+                "workspace.apply",
+                id.map(|id| serde_json::json!({"version": id})),
+                || versions::apply(&workspace, &version, &author, &operator),
+                |applied| applied.line.clone(),
+                |e| e.refused(),
+            )
+            .map(|applied| format!("{}\n", applied.line))
         }
         // The id on stdout either way; that nothing changed on stderr.
         WorkspaceCommand::Pull { workspace } => versions::pull(&workspace).map(|pulled| {
@@ -198,6 +239,29 @@ fn workspace(command: WorkspaceCommand) -> ! {
     }
 }
 
+/// A pointer operation by `author` on `generation` under the audit of `workspace` (#328): an id
+/// that fails its check is refused by `op` with no record.
+#[cfg(feature = "refresh-lock")]
+fn pointer_audited(
+    workspace: &Path,
+    author: &str,
+    action: &str,
+    generation: &str,
+    op: impl FnOnce() -> meada::Result<String>,
+) -> meada::Result<String> {
+    let arguments =
+        meada_core::ids::is_id(generation).then(|| serde_json::json!({"generation": generation}));
+    meada::audit::cli(
+        workspace,
+        author,
+        action,
+        arguments,
+        op,
+        String::clone,
+        |e| meada::snapshot::generations::OpError::refused(&**e),
+    )
+}
+
 /// `meada github-app` (ADR 0013, feature `github-app`).
 #[cfg(feature = "github-app")]
 #[derive(Subcommand)]
@@ -215,6 +279,11 @@ enum GithubAppCommand {
         #[arg(long, value_name = "SECONDS")]
         retry_after: Option<u64>,
     },
+    #[cfg(all(feature = "postgres", feature = "oidc"))]
+    Roles {
+        #[arg(long)]
+        workspace: PathBuf,
+    },
 }
 
 /// `meada github-app`: git's answer on stdout, notes on stderr; on a failure every line on
@@ -230,6 +299,8 @@ fn github_app(command: GithubAppCommand) -> ! {
             repository,
             retry_after,
         } => meada::github_app::throttled(&workspace, &repository, retry_after),
+        #[cfg(all(feature = "postgres", feature = "oidc"))]
+        GithubAppCommand::Roles { workspace } => meada::github_app::roles(&workspace),
     };
     match reply {
         Ok(reply) => {
@@ -475,6 +546,13 @@ fn main() -> ExitCode {
                     .mut_arg("retry_after", |a| a.help(Msg::GithubAppRetryAfter.text()))
             })
     });
+    #[cfg(all(feature = "github-app", feature = "postgres", feature = "oidc"))]
+    let matches = matches.mut_subcommand("github-app", |c| {
+        c.mut_subcommand("roles", |c| {
+            (c.about(Msg::GithubAppRoles.text()))
+                .mut_arg("workspace", |a| a.help(Msg::PostgresWorkspaceHelp.text()))
+        })
+    });
     #[cfg(feature = "ui")]
     let matches = matches.mut_subcommand("ui", |c| {
         (c.about(Msg::Ui.text()))
@@ -498,6 +576,7 @@ fn main() -> ExitCode {
             .mut_subcommand("show", |c| {
                 (c.about(Msg::WorkspaceShow.text()))
                     .mut_arg("version", |a| a.help(Msg::WorkspaceShowVersion.text()))
+                    .mut_arg("pulled", |a| a.help(Msg::WorkspaceShowPulled.text()))
                     .mut_arg("workspace", bootstrap)
             })
             .mut_subcommand("pull", |c| {
@@ -510,6 +589,13 @@ fn main() -> ExitCode {
             (c.about(Msg::WorkspaceApply.text()))
                 .mut_arg("version", |a| a.help(Msg::WorkspaceApplyVersion.text()))
                 .mut_arg("workspace", |a| a.help(Msg::WorkspaceBootstrapHelp.text()))
+        })
+    });
+    #[cfg(feature = "postgres")]
+    let matches = matches.mut_subcommand("postgres", |c| {
+        (c.about(Msg::Postgres.text())).mut_subcommand("migrate", |c| {
+            (c.about(Msg::PostgresMigrate.text()))
+                .mut_arg("workspace", |a| a.help(Msg::PostgresWorkspaceHelp.text()))
         })
     });
     #[cfg(feature = "snapshot")]
@@ -619,6 +705,11 @@ fn main() -> ExitCode {
         Command::GithubApp { command } => github_app(command),
         #[cfg(feature = "generation-pointer")]
         Command::Workspace { command } => workspace(command),
+        // The version reached is the only line on stdout.
+        #[cfg(feature = "postgres")]
+        Command::Postgres {
+            command: PostgresCommand::Migrate { workspace },
+        } => meada::postgres::migrate(&workspace).map(|version| println!("{version}")),
         // Every problem that refuses the start on its own line. The API is English whatever
         // `LANG` says, as the MCP surface is (ADR 0008).
         #[cfg(feature = "ui")]
@@ -658,7 +749,8 @@ fn main() -> ExitCode {
                 },
         } => {
             let author = meada::snapshot::lock::cli_author();
-            meada::snapshot::operation::pointer_set(&workspace, &generation, &author)
+            let op = || meada::snapshot::operation::pointer_set(&workspace, &generation, &author);
+            pointer_audited(&workspace, &author, "pointer.set", &generation, op)
                 .map(|state| println!("{state}"))
         }
         #[cfg(feature = "refresh-lock")]
@@ -673,7 +765,9 @@ fn main() -> ExitCode {
                 },
         } => {
             let author = meada::snapshot::lock::cli_author();
-            meada::snapshot::operation::pointer_retain(&workspace, &generation, &author)
+            let op =
+                || meada::snapshot::operation::pointer_retain(&workspace, &generation, &author);
+            pointer_audited(&workspace, &author, "pointer.retain", &generation, op)
                 .map(|id| println!("{id}"))
         }
         #[cfg(feature = "refresh-lock")]
@@ -688,7 +782,8 @@ fn main() -> ExitCode {
                 },
         } => {
             let author = meada::snapshot::lock::cli_author();
-            meada::snapshot::operation::pointer_drop(&workspace, &generation, &author)
+            let op = || meada::snapshot::operation::pointer_drop(&workspace, &generation, &author);
+            pointer_audited(&workspace, &author, "pointer.drop", &generation, op)
                 .map(|id| println!("{id}"))
         }
         // What could not be counted on stderr, the new fence on stdout.
@@ -705,14 +800,27 @@ fn main() -> ExitCode {
         } => {
             let author = meada::snapshot::lock::cli_author();
             let at_least = at_least.as_deref();
-            meada::snapshot::operation::fence_recover(&workspace, at_least, &author).map(
-                |(fence, skipped)| {
-                    for line in skipped.iter().flat_map(|s| s.lines()) {
-                        eprintln!("meada: {line}");
-                    }
-                    println!("{fence}");
-                },
+            // The floor as the console records it: its decimal digits, normalized.
+            let arguments = match at_least.map(meada_core::ids::fence) {
+                None => Some(serde_json::json!({})),
+                Some(Some(floor)) => Some(serde_json::json!({"at_least": floor.to_string()})),
+                Some(None) => None,
+            };
+            meada::audit::cli(
+                &workspace,
+                &author,
+                "fence.recover",
+                arguments,
+                || meada::snapshot::operation::fence_recover(&workspace, at_least, &author),
+                |(fence, _)| fence.to_string(),
+                |e| meada::snapshot::generations::OpError::refused(&**e),
             )
+            .map(|(fence, skipped)| {
+                for line in skipped.iter().flat_map(|s| s.lines()) {
+                    eprintln!("meada: {line}");
+                }
+                println!("{fence}");
+            })
         }
         Command::Export {
             workspace: Some(manifest),
