@@ -192,7 +192,7 @@ cloud = [
 name = "golden_diff"
 test = true
 
-# The benchmark over the public fixtures (spec #32), run by CI; its checks are tests too.
+# The benchmark over the public fixtures (spec #32); its checks are tests too.
 [[example]]
 name = "bench"
 test = true

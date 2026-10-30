@@ -9,13 +9,13 @@ diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_
 `--range` forms) prints added, removed and moved entries per section instead of the raw JSON.
 
 The benchmark over the public fixtures (spec #32) is `examples/bench.rs`, a development harness
-and no command, so it adds nothing to the frozen surface: `cargo build --release --bin meada`,
-then `cargo run --release --example bench -- [--out <dir>]`. It copies the chain of ADR 0003
-(`chain-{web,gateway,catalog,worker}`, one workspace), every `conformance-*` fixture and each
-`xlang-*` pair to `<dir>/work/`, and measures per scenario the cold index time and size, the
-single-file reindex time (a trailing newline appended to the probe's file) and the estimated
-tokens of four default answers (`search`, `context`, `trace` down and up, about the symbol that
-makes the most calls), plus the tool list's tokens read from `meada mcp`. Timings are the
+and no command, so it adds nothing to the frozen surface: `cargo build --release --locked --bin meada`,
+then `cargo run --release --locked --example bench -- [--out <dir>]`. It copies the chain of ADR 0003
+(`chain-{web,gateway,catalog,worker}`, one workspace), every `conformance-*` fixture (`go` with
+its sibling `conformance-go-ledger`) and each `xlang-*` pair to `<dir>/work/`, and measures per scenario the cold index time and size, the
+single-file reindex time (a trailing newline appended to the subject's file) and the estimated
+tokens of four default answers (`search`, `context`, `trace` down and up, about the symbol on the
+most calls, made or received, which the table names), plus the tool list's tokens read from `meada mcp`. Timings are the
 median of `MEADA_BENCH_RUNS` runs (default 3) and are never judged; tokens are
 `meada_core::render::tokens`, gated by the tests (`mcp.tools.json`, the grammar goldens) and not
 by the harness. It writes `bench.md` and `bench.json` to `<dir>` (default `target/bench`) and

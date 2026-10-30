@@ -20,9 +20,10 @@
 //! workspace each). Fixtures are copied to `<dir>/work/` and made repositories of their own, as
 //! the tests do, so the checkout is never written.
 //!
-//! The default answers of a scenario are about its probe, the symbol of the repository where
-//! Meada runs that makes the most calls (ties by identity): `search` by its name, `context` and
-//! `trace` down and up from its identity, each at the default budget.
+//! The default answers of a scenario are about its subject, the symbol of the repository where
+//! Meada runs that is on the most calls, made or received (ties by identity): `search` by its
+//! name, `context` and `trace` down and up from its identity, each at the default budget. The
+//! table names the subject, so a jump in tokens that follows a change of subject reads as one.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -42,6 +43,14 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 /// The origin every conformance fixture is cloned from.
 const CONFORMANCE: &str = "https://example.com/acme/conformance.git";
+
+/// Conformance fixtures that are sibling repositories of another, not scenarios of their own:
+/// the fixture, its origin and the fixture whose workspace it joins (`tests/it/conformance.rs`).
+const SIBLINGS: &[(&str, &str, &str)] = &[(
+    "conformance-go-ledger",
+    "https://example.com/acme/ledger.git",
+    "conformance-go",
+)];
 
 /// The chain of ADR 0003 (spec #3, #19): the repository where Meada runs first.
 const CHAIN: &[(&str, &str)] = &[
@@ -130,7 +139,8 @@ struct Row {
     cold: Duration,
     size: u64,
     reindex: Duration,
-    probe: String,
+    subject: String,
+    subject_name: String,
     answers: Vec<(&'static str, usize)>,
 }
 
@@ -218,10 +228,16 @@ fn scenarios(fixtures: &Path) -> Result<Vec<Scenario>> {
         .collect();
     conformance.sort();
     for name in conformance {
-        all.push(Scenario {
-            fixtures: vec![(name.clone(), CONFORMANCE.to_string())],
-            name,
-        });
+        if SIBLINGS.iter().any(|&(sibling, _, _)| sibling == name) {
+            continue;
+        }
+        let mut fixtures = vec![(name.clone(), CONFORMANCE.to_string())];
+        for &(sibling, origin, of) in SIBLINGS {
+            if of == name {
+                fixtures.push((sibling.to_string(), origin.to_string()));
+            }
+        }
+        all.push(Scenario { fixtures, name });
     }
     for (name, pair) in XLANG {
         all.push(Scenario {
@@ -272,8 +288,10 @@ fn git(dir: &Path, args: &[&str]) -> Result<()> {
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("GIT_AUTHOR_NAME", "Meada")
         .env("GIT_AUTHOR_EMAIL", "fixtures@example.com")
+        .env("GIT_AUTHOR_DATE", "2026-01-01T00:00:00Z")
         .env("GIT_COMMITTER_NAME", "Meada")
         .env("GIT_COMMITTER_EMAIL", "fixtures@example.com")
+        .env("GIT_COMMITTER_DATE", "2026-01-01T00:00:00Z")
         .output()?;
     if !out.status.success() {
         return Err(format!(
@@ -307,7 +325,7 @@ fn measure(root: &Path, work: &Path, scenario: &Scenario, runs: usize) -> Result
 
     let export: Value = serde_json::from_str(&engine.export()?)?;
     let files = export["files"].as_array().map_or(0, Vec::len);
-    let (identity, path, name) = probe(&export)?;
+    let (identity, path, name) = subject(&export)?;
     let answers = vec![
         ("search", tokens(&engine.search(&name, None, None)?)),
         ("context", tokens(&engine.context(&identity, None)?)),
@@ -340,26 +358,29 @@ fn measure(root: &Path, work: &Path, scenario: &Scenario, runs: usize) -> Result
         cold: median(&mut cold),
         size,
         reindex: median(&mut reindex),
-        probe: identity,
+        subject: identity,
+        subject_name: name,
         answers,
     })
 }
 
-/// The symbol of `export` that makes the most calls (ties: the least identity), as its identity,
-/// the path of its file and its name.
-fn probe(export: &Value) -> Result<(String, String, String)> {
+/// The symbol of `export` that is on the most calls, as caller or as target (ties: the least
+/// identity), as its identity, the path of its file and its name.
+fn subject(export: &Value) -> Result<(String, String, String)> {
     let repository = export["repository"]
         .as_str()
         .ok_or("export has no repository")?;
-    let mut made: BTreeMap<&str, usize> = BTreeMap::new();
+    let mut on: BTreeMap<&str, usize> = BTreeMap::new();
     for call in export["calls"].as_array().into_iter().flatten() {
-        if let Some(caller) = call["caller"].as_str() {
-            *made.entry(caller).or_default() += 1;
+        for end in [&call["caller"], &call["target"]] {
+            if let Some(symbol) = end.as_str() {
+                *on.entry(symbol).or_default() += 1;
+            }
         }
     }
     let mut best: Option<(&Value, usize)> = None;
     for symbol in export["symbols"].as_array().into_iter().flatten() {
-        let calls = made
+        let calls = on
             .get(symbol["id"].as_str().unwrap_or(""))
             .copied()
             .unwrap_or(0);
@@ -466,20 +487,26 @@ fn markdown(rows: &[Row], tool_list: usize, runs: usize) -> String {
         environment()
     ));
     out.push_str(&format!("Tool list: {tool_list} tokens.\n\n"));
+    let names: Vec<&str> = (rows[0].answers.iter()).map(|(name, _)| *name).collect();
     out.push_str(
-        "| Scenario | Repos | Files | Cold index (ms) | Index size (KiB) | Reindex (ms) \
-         | search | context | trace down | trace up |\n",
+        "| Scenario | Repos | Files | Cold index (ms) | Index size (KiB) | Reindex (ms) | Subject |",
     );
-    out.push_str("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    for name in &names {
+        out.push_str(&format!(" {name} |"));
+    }
+    out.push_str("\n| --- | ---: | ---: | ---: | ---: | ---: | --- |");
+    out.push_str(&" ---: |".repeat(names.len()));
+    out.push('\n');
     for row in rows {
         out.push_str(&format!(
-            "| {} | {} | {} | {} | {} | {} |",
+            "| {} | {} | {} | {} | {} | {} | `{}` |",
             row.name,
             row.repos,
             row.files,
             ms(row.cold),
             kib(row.size),
-            ms(row.reindex)
+            ms(row.reindex),
+            row.subject_name.replace('|', "\\|")
         ));
         for (_, tokens) in &row.answers {
             out.push_str(&format!(" {tokens} |"));
@@ -488,8 +515,8 @@ fn markdown(rows: &[Row], tool_list: usize, runs: usize) -> String {
     }
     out.push_str(
         "\nFiles are the indexed files of the repository where Meada runs; the index size sums \
-         every repository of the scenario. The last four columns are the estimated tokens of \
-         the default answers about the scenario's probe (the symbol making the most calls).\n",
+         every repository of the scenario. The columns after the subject (the symbol on the most \
+         calls) are the estimated tokens of the default answers about it.\n",
     );
     out
 }
@@ -505,7 +532,7 @@ fn report(rows: &[Row], tool_list: usize, runs: usize) -> Value {
                 "cold_index_ms": ms(row.cold),
                 "index_bytes": row.size,
                 "reindex_ms": ms(row.reindex),
-                "probe": row.probe,
+                "subject": row.subject,
                 "answer_tokens": row.answers.iter().cloned().collect::<BTreeMap<_, _>>(),
             })
         })
@@ -554,11 +581,13 @@ mod tests {
                 (e.as_ref().unwrap().file_name().to_str().unwrap()).starts_with("conformance-")
             })
             .count();
-        assert_eq!(all.len(), 1 + conformance + XLANG.len());
+        assert_eq!(all.len(), 1 + conformance - SIBLINGS.len() + XLANG.len());
+        let go = all.iter().find(|s| s.name == "conformance-go").unwrap();
+        assert_eq!(go.fixtures[1].0, "conformance-go-ledger");
     }
 
     #[test]
-    fn the_probe_is_the_symbol_with_the_most_calls() {
+    fn the_subject_is_the_symbol_on_the_most_calls() {
         let export = json!({
             "repository": "example.com/x",
             "symbols": [
@@ -567,14 +596,15 @@ mod tests {
                 {"id": "example.com/x::c.ts::c", "span": {"path": "c.ts"}},
             ],
             "calls": [
-                {"caller": "example.com/x::a.ts::a"},
-                {"caller": "example.com/x::b.ts::m::b"},
-                {"caller": "example.com/x::b.ts::m::b"},
-                {"caller": "example.com/x::c.ts::c"},
-                {"caller": "example.com/x::c.ts::c"},
+                {"caller": "example.com/x::a.ts::a", "target": "example.com/x::b.ts::m::b"},
+                {"caller": "example.com/x::b.ts::m::b", "target": null},
+                {"caller": "example.com/x::b.ts::m::b", "target": null},
+                {"caller": "example.com/x::c.ts::c", "target": "example.com/x::a.ts::a"},
+                {"caller": "example.com/x::c.ts::c", "target": null},
             ],
         });
-        let (identity, path, name) = probe(&export).unwrap();
+        // b makes two and receives one; a and c are on two each.
+        let (identity, path, name) = subject(&export).unwrap();
         assert_eq!(identity, "example.com/x::b.ts::m::b");
         assert_eq!((path.as_str(), name.as_str()), ("b.ts", "m::b"));
     }
