@@ -1023,10 +1023,40 @@ fn collaborators(
     }
 }
 
+/// The role rows under every selected spelling of a repository (#508): GitHub lists a repository
+/// once, under the spelling its target keeps, and each other selected spelling that folds to it
+/// on `host` gets the same rows, since a grant matches an identity exactly. Its `source` row
+/// stays the target's alone.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+fn spelled<'a>(
+    host: &str,
+    targets: &[(&str, &str)],
+    selected: impl Iterator<Item = &'a str>,
+    rows: &mut std::collections::BTreeMap<(String, String), String>,
+) {
+    let fold = |identity: &str| crate::modules::fold(host, identity);
+    let written: HashMap<String, &str> = (targets.iter()).map(|&(i, _)| (fold(i), i)).collect();
+    let mut copies = Vec::new();
+    for spelling in selected {
+        let Some(&key) = written.get(&fold(spelling)).filter(|key| **key != spelling) else {
+            continue;
+        };
+        let listed = rows.range((key.to_string(), String::new())..);
+        for ((_, login), role) in listed.take_while(|((identity, _), _)| identity == key) {
+            copies.push(((spelling.to_string(), login.clone()), role.clone()));
+        }
+    }
+    for (row, role) in copies {
+        rows.entry(row).or_insert(role);
+    }
+}
+
 /// Where each identity comes from (`source`): the workspace's own in its order, then the
 /// repositories named workspaces select, then the catalog's alone, sorted. Compared as GitHub
 /// compares them (#508): an identity on `host` folds to lowercase, the row keeps the identity as
-/// written, and two spellings of one repository are one row (the first kept).
+/// written, and two spellings of one repository are one `source` row (the first kept); `spelled`
+/// gives the others their role rows.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
 fn targets_of<'a>(
     host: &str,
     entries: &[&'a str],
@@ -1299,13 +1329,9 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     #[cfg(feature = "workspaces")]
     if let Some(catalog) = catalog {
         let named: Vec<String> = contexts.iter().flat_map(|c| c.identities()).collect();
-        // Folded as GitHub compares them (#508), so the cap does not count a selected
-        // repository written with uppercase letters as one more.
-        let folded: Vec<String> = (entries.iter().map(|(i, _)| i.as_str()))
+        let selected = (entries.iter().map(|(i, _)| i.as_str()))
             .chain(named.iter().map(String::as_str))
-            .map(|i| crate::modules::fold(&github.host, i))
             .collect();
-        let selected = folded.iter().map(String::as_str).collect();
         let listed = catalog::candidates(&mut run, apps, &github.host, catalog, &selected).await;
         notes.append(&mut run.notes);
         candidates = listed?;
@@ -1343,17 +1369,12 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         Ok::<_, String>(())
     };
     let listing = list_all().await;
-    // A row is keyed by the identity as written, the first spelling of a repository (#508): the
-    // other spellings look their roles up under it.
-    let written: std::collections::HashMap<String, &str> = (targets.iter())
-        .map(|&(i, _)| (crate::modules::fold(&github.host, i), i))
-        .collect();
-    let role_of = |identity: &str, login: &String| {
-        let key = written.get(&crate::modules::fold(&github.host, identity));
-        key.and_then(|key| rows.get(&(key.to_string(), login.clone())))
-    };
     notes.append(&mut run.notes);
     listing?;
+    // Grants match an identity exactly: every selected spelling of a repository gets its roles.
+    let selected = own.iter().copied().chain(named.iter().map(String::as_str));
+    spelled(&github.host, &targets, selected, &mut rows);
+    let role_of = |identity: &str, login: &String| rows.get(&(identity.to_string(), login.clone()));
 
     // The additions whose `added_by` holds no accepted role on their repository, with
     // `source = "store"` only (a file's entries have no `added_by`).
@@ -1663,6 +1684,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(all(feature = "postgres", feature = "oidc"))]
     fn a_selected_identity_and_its_lowercase_candidate_are_one_both_row() {
         let candidates = [
             "github.com/acme/api",
@@ -1687,6 +1709,56 @@ mod tests {
                 ("ghe.example/Acme/X", "selected"),
                 ("ghe.example/acme/x", "catalog"),
                 ("github.com/acme/web", "catalog"),
+            ]
+        );
+    }
+
+    /// Option (a) of #508: the deployment writes `github.com/Acme/API` and a named workspace
+    /// selected `github.com/acme/api`, so GitHub is listed once, under the first; both spellings
+    /// get its role rows, since a grant matches exactly. A spelling of another host, or of a
+    /// repository nobody listed, gets none.
+    #[test]
+    #[cfg(all(feature = "postgres", feature = "oidc"))]
+    fn every_selected_spelling_of_a_repository_gets_its_role_rows() {
+        let candidates = ["github.com/acme/api"].map(String::from).into();
+        let named = ["github.com/acme/api", "github.com/ACME/web"]
+            .map(String::from)
+            .into();
+        let entries = [
+            "github.com/Acme/API",
+            "github.com/acme/web",
+            "ghe.example/A/x",
+        ];
+        let targets = targets_of("github.com", &entries, &named, &candidates);
+        let row = |identity: &str, login: &str| (identity.to_string(), login.to_string());
+        // What GitHub showed: two logins on the repository, under the spelling its target keeps.
+        let mut rows = std::collections::BTreeMap::from([
+            (row("github.com/Acme/API", "ana"), "write".to_string()),
+            (row("github.com/Acme/API", "bo"), "admin".to_string()),
+            (row("ghe.example/A/x", "ana"), "write".to_string()),
+        ]);
+        let selected = entries.into_iter().chain(named.iter().map(String::as_str));
+        spelled("github.com", &targets, selected, &mut rows);
+        let keys: Vec<(&str, &str, &str)> = (rows.iter())
+            .map(|((i, l), r)| (i.as_str(), l.as_str(), r.as_str()))
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                ("ghe.example/A/x", "ana", "write"),
+                ("github.com/Acme/API", "ana", "write"),
+                ("github.com/Acme/API", "bo", "admin"),
+                ("github.com/acme/api", "ana", "write"),
+                ("github.com/acme/api", "bo", "admin"),
+            ]
+        );
+        // One `source` row per repository all the same.
+        assert_eq!(
+            targets,
+            [
+                ("github.com/Acme/API", "both"),
+                ("github.com/acme/web", "selected"),
+                ("ghe.example/A/x", "selected"),
             ]
         );
     }

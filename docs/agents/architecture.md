@@ -396,7 +396,8 @@ the catalog beside the rows (`Catalog`, the identities `catalog` or `both` and `
 with `[catalog]`) and answers per subject (`Permissions::catalog`: the whole fresh catalog for the
 platform administrator, else the catalog intersected with the identities the login holds an
 accepted role on, pending `no_set`, `stale_set` or `missing_login`); `ui/catalog.rs` is `GET
-/api/v1/catalog` and `POST /api/v1/catalog/check`; the front end's `CatalogPage.tsx` is the
+/api/v1/catalog` and `POST /api/v1/catalog/check` (`Catalog` carries the host, and the listing's
+prefix and the check compare folded, #508); the front end's `CatalogPage.tsx` is the
 picker. Nothing else of S5 exists yet: no workspace record, route, table beyond that column or
 manifest, and discovery creates no ACL and no index. Until #342 a reader of the code finds one
 workspace per deployment (ADR 0014); `tests/fixtures/named-workspaces.json` is the shared Y/A/B
@@ -513,7 +514,9 @@ one for the area a change touches.
   host, no user or fragment, and past the host what its `Shape` allows: a path, nothing, or a path
   and a query); `Secret` (a variable or a file, at most one of the pair, and `read_secret`, a
   bounded regular file whose error names only the file); `block_on` (a current-thread runtime shut
-  down without waiting) and `within` (a `status` line's bounded wait). `valkey.rs` (feature
+  down without waiting), `within` (a `status` line's bounded wait) and `fold` (an identity as
+  GitHub compares it: lowercase on the `[oidc.github]` host, as written elsewhere, #508).
+  `valkey.rs` (feature
   `valkey`, internal; the only place
   the `redis` crate is used) is the one Valkey client the modules share: `File` is the
   `[valkey]` section, `File::validate` turns it into a `Config` (no password in the URL, `rediss`
@@ -1005,7 +1008,12 @@ one for the area a change touches.
   page of `GET /installation/repositories`, filtered by `[catalog] allow`, and a failed or
   throttled listing, a body that is not the documented object, more than `PAGES_MAX` pages or
   more candidates than `max_repositories` besides the selected ones fails the run before the
-  transaction; the line on stdout then reads `Msg::RolesSetCatalog`); one
+  transaction; the line on stdout then reads `Msg::RolesSetCatalog`; `targets_of` compares an
+  identity on the host with the candidates and the other selected ones folded (`modules::fold`,
+  #508), so one GitHub repository is one `source` row keyed by its first written spelling, `both`
+  when a candidate; `spelled` copies the role rows GitHub listed under that key to every other
+  selected spelling, since grants match exactly, and the exclusion check and the sponsor rule read
+  each spelling's own rows); one
   transaction under `LOCK TABLE permission_sets IN EXCLUSIVE MODE`, which serializes writers and
   lets readers see the old set or the new one, checking the fence again, inserting the set, its
   repositories' coverage (`Shown`: `listed`, `not_found`, `uncovered`, plus `not_a_repository`),

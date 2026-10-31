@@ -167,15 +167,7 @@ impl Console {
             let message = Msg::CatalogQuery(PREFIX_MAX).text();
             return error(StatusCode::BAD_REQUEST, "bad_request", &message);
         };
-        let after = query.after.as_deref();
-        let prefix = crate::modules::fold(&catalog.host, &query.prefix);
-        let mut page: Vec<&String> = (catalog.selectable.iter())
-            .filter(|i| after.is_none_or(|a| i.as_str() > a))
-            .filter(|i| crate::modules::fold(&catalog.host, i).starts_with(&prefix))
-            .take(query.limit + 1)
-            .collect();
-        let more = page.len() > query.limit;
-        page.truncate(query.limit);
+        let (page, more) = page(&catalog, query.after.as_deref(), &query.prefix, query.limit);
         let next = page.last().filter(|_| more).map(|i| encode(i.as_bytes()));
         let mut document = header(&catalog);
         document["repositories"] = page.iter().map(|i| json!({"identity": i})).collect();
@@ -216,6 +208,26 @@ impl Console {
         };
         json_answer(StatusCode::OK, &checked(&catalog, &asked.identities))
     }
+}
+
+/// One page of what `catalog` makes selectable: at most `limit` identities after `after` that
+/// start with `prefix`, compared as GitHub compares them on the host (#508), and whether more
+/// follow.
+fn page<'a>(
+    catalog: &'a Catalog,
+    after: Option<&str>,
+    prefix: &str,
+    limit: usize,
+) -> (Vec<&'a String>, bool) {
+    let prefix = crate::modules::fold(&catalog.host, prefix);
+    let mut page: Vec<&String> = (catalog.selectable.iter())
+        .filter(|i| after.is_none_or(|a| i.as_str() > a))
+        .filter(|i| crate::modules::fold(&catalog.host, i).starts_with(&prefix))
+        .take(limit + 1)
+        .collect();
+    let more = page.len() > limit;
+    page.truncate(limit);
+    (page, more)
 }
 
 /// The check of `identities` against `catalog`: `{"state", "reason", "results": [{"identity",
@@ -269,6 +281,33 @@ mod tests {
             .map(|r| r["state"].as_str().unwrap().to_string())
             .collect();
         assert_eq!(states, ["selectable", "unavailable"]);
+    }
+
+    #[test]
+    fn a_prefix_on_the_host_lists_whatever_its_case() {
+        let catalog = Catalog {
+            reason: None,
+            set: None,
+            selectable: [
+                "ghe.example/acme/x",
+                "github.com/acme/api",
+                "github.com/acme/web",
+            ]
+            .map(String::from)
+            .into(),
+            host: "github.com".into(),
+        };
+        let api = "github.com/acme/api".to_string();
+        assert_eq!(
+            page(&catalog, None, "github.com/Acme/A", 1),
+            (vec![&api], false)
+        );
+        assert_eq!(
+            page(&catalog, None, "github.com/ACME/", 1),
+            (vec![&api], true)
+        );
+        // Another host compares exactly, as before.
+        assert!(page(&catalog, None, "ghe.example/Acme", 10).0.is_empty());
     }
 
     #[test]

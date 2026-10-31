@@ -71,8 +71,11 @@ All notable changes to Meada are recorded here. The format follows
 - A repository identity on the `[oidc.github]` host compares without case wherever it meets the
   catalog (#508): the roles job gives a selected `github.com/Acme/API` and the catalog's
   `github.com/acme/api` one `both` row keyed as written, the `max_repositories` cap does not
-  count it as extra, and the console's catalog check and listing match it. Other hosts compare
-  exactly. No golden changed.
+  count it as extra, and the console's catalog check and listing match it. A repository selected
+  in two spellings (a deployment's `github.com/Acme/API`, a named workspace's
+  `github.com/acme/api`) keeps one `source` row under the first and gets its role rows under
+  each, so grants, which match exactly, read both. Other hosts compare exactly. No golden
+  changed.
 - Compose mirror origins (#445): `fetch.sh` and `fetch-pulled.sh` read an existing mirror's
   `origin` before fetching and refuse one whose HTTP(S) URL carries credentials (a mirror cloned
   from a URL with a token keeps it there), naming the identity and never the URL, and the refresh

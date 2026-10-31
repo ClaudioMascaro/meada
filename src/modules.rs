@@ -358,7 +358,7 @@ pub fn rfc3339(secs: u64) -> String {
 /// `identity` as GitHub compares it: lowercase when it is on `host`, as written on any other
 /// host. Only the comparison folds; a row stays keyed by the identity as written.
 #[cfg_attr(
-    not(any(feature = "github-app", feature = "workspaces")),
+    not(all(feature = "github-app", feature = "postgres", feature = "oidc")),
     allow(dead_code)
 )]
 pub(crate) fn fold(host: &str, identity: &str) -> String {

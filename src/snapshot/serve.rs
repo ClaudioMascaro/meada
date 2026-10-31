@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use super::store::Store;
-use super::{CURRENT_MAX, Config, DOCUMENT_MAX, Document, is_id, pull};
+use super::{CURRENT_MAX, Config, Context, DOCUMENT_MAX, Document, is_id, pull};
 use crate::msg::Msg;
 use crate::workspace::Manifest;
 use crate::{Result, config};
@@ -60,14 +60,11 @@ impl Held {
         )
     }
 
-    /// Whether a caller whose grant is `grant` sees context `id` (ADR 0020's discovery rule,
-    /// #510): the generation records it and the grant reads every entry of its version, the
-    /// identities it records and those the sponsor rule excluded alike. It decides with the
-    /// console's function, with no operator exemption: a node knows no operators.
-    fn sees(&self, id: &str, grant: &meada_core::authorize::Grant) -> bool {
-        let Some(context) = self.document.contexts.iter().find(|c| c.id == id) else {
-            return false;
-        };
+    /// Whether a caller whose grant is `grant` sees `context` (ADR 0020's discovery rule, #510):
+    /// the grant reads every entry of its version, the identities it records and those the
+    /// sponsor rule excluded alike. It decides with the console's function, with no operator
+    /// exemption: a node knows no operators.
+    fn sees(context: &Context, grant: &meada_core::authorize::Grant) -> bool {
         let recorded = context.repositories.iter().map(|r| r.repo.clone());
         let entries: Vec<String> = recorded.chain(context.excluded.iter().cloned()).collect();
         meada_core::named::visible(false, &entries, grant)
@@ -78,14 +75,17 @@ impl Held {
     /// no bundle in the context, so it is never admitted.
     pub fn admits(&self, id: &str, identity: &str, grant: &meada_core::authorize::Grant) -> bool {
         let recorded = self.document.contexts.iter().find(|c| c.id == id);
-        recorded.is_some_and(|c| c.repositories.iter().any(|r| r.repo == identity))
-            && self.sees(id, grant)
+        recorded.is_some_and(|c| {
+            c.repositories.iter().any(|r| r.repo == identity) && Self::sees(c, grant)
+        })
     }
 
-    /// The ids of the contexts a caller whose grant is `grant` sees (`sees`), sorted.
+    /// The ids of the contexts a caller whose grant is `grant` sees (`sees`), sorted (the pull
+    /// refuses a document whose contexts are not).
     pub fn viewable(&self, grant: &meada_core::authorize::Grant) -> Vec<&str> {
-        (self.context_ids().into_iter())
-            .filter(|id| self.sees(id, grant))
+        (self.document.contexts.iter())
+            .filter(|c| Self::sees(c, grant))
+            .map(|c| c.id.as_str())
             .collect()
     }
 
