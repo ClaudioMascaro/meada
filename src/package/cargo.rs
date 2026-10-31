@@ -569,9 +569,10 @@ mod tests {
     /// One repository: `app` depends on `core-lib` (its library is `corelib`, in the workspace)
     /// and on `fancy`, which renames the crate `other-lib` that no repository provides.
     fn workspace() -> Export {
-        let file = |path: &str| crate::index::File {
-            path: path.to_string(),
-            hash: String::new(),
+        let file = |path: &str| {
+            let mut file = crate::index::File::default();
+            file.path = path.to_string();
+            file
         };
         let row =
             |path: &str, name: &str, file: &str, target: Option<&str>| crate::resolve::Exported {

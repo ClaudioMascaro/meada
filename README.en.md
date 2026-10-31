@@ -8,26 +8,25 @@ agents, and people too, query that map over MCP. No step of indexing uses an LLM
 
 ## Installation
 
-Pick the channel that fits your environment. All of them deliver the same `meada` binary.
+Pick the row that matches what you already have. Every channel delivers the same `meada`
+binary, and the last column is the command your agent's MCP configuration runs.
+
+| You have | Install | MCP server command |
+| --- | --- | --- |
+| Node.js | nothing: `npx -y @meada/meada --version` | `npx -y @meada/meada mcp` |
+| Rust | `cargo install meada` | `meada mcp` |
+| Linux or macOS | the shell installer below | `meada mcp` |
+| Any system | the archive for your system from the [GitHub releases](https://github.com/ClaudioMascaro/meada/releases), with `meada` on your `PATH` | `meada mcp` |
+| Docker | `docker pull ghcr.io/claudiomascaro/meada:1.0.0` | the `docker run` line in [Connect an agent](#connect-an-agent-mcp) |
 
 ```sh
-# Cargo (builds with the Rust toolchain)
-cargo install meada
-
 # Shell installer (Linux and macOS)
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ClaudioMascaro/meada/releases/latest/download/meada-installer.sh | sh
-
-# npm: downloads the binary for your platform and runs it, with nothing installed first
-npx meada --version
 ```
 
-- **Prebuilt binary**: download the archive for your system (Linux, macOS or Windows, on x86_64
-  or arm64) from the [GitHub releases](https://github.com/ClaudioMascaro/meada/releases) and put
-  `meada` on your `PATH`.
-- **Container**: `ghcr.io/claudiomascaro/meada:<version>`, for Linux amd64 and arm64.
-
-The npm package's version is always the release's. To index, Meada needs only the binary and git.
-The details of each channel, the console and the container are in
+The prebuilt archives cover Linux, macOS and Windows on x86_64 and arm64; the image covers Linux
+amd64 and arm64. The npm package's version is always the release's. To index, Meada needs only
+the binary and git. The details of each channel, the console and the container are in
 [Installation](https://claudiomascaro.github.io/meada/en/installation/) and in the
 [user guide](docs/user-guide.en.md) (section 1, Installation).
 
@@ -53,23 +52,54 @@ The full `meada.toml` reference is in the
 
 ## Connect an agent (MCP)
 
-`npx meada mcp` is the launch line of the MCP server: the client runs it and talks to Meada over
-stdio. In your agent's configuration (for example Claude Code's `.mcp.json`):
+The client runs the MCP server command and talks to Meada over stdio. In your agent's
+configuration (for example Claude Code's `.mcp.json`), with npx:
 
 ```json
 {
   "mcpServers": {
-    "meada": { "command": "npx", "args": ["meada", "mcp"] }
+    "meada": { "command": "npx", "args": ["-y", "@meada/meada", "mcp"] }
   }
 }
 ```
 
-In Claude Code, the same in one line: `claude mcp add meada -- npx meada mcp`. With `meada`
-already on your `PATH`, use `"command": "meada", "args": ["mcp"]`.
+In Claude Code, the same in one line: `claude mcp add meada -- npx -y @meada/meada mcp`. With
+`meada` already on your `PATH` (Cargo, installer or archive), use
+`"command": "meada", "args": ["mcp"]`.
+
+With Docker (Linux and macOS):
+
+```json
+{
+  "mcpServers": {
+    "meada": {
+      "command": "sh",
+      "args": ["-c", "exec docker run -i --rm --network none --user \"$(id -u):$(id -g)\" -v \"${PWD%/*}:${PWD%/*}\" -w \"$PWD\" ghcr.io/claudiomascaro/meada:1.0.0 mcp"]
+    }
+  }
+}
+```
+
+The client starts the server in your repository. Meada answers about the path the client sends
+as its root, so the container mounts the folder that holds the repository, and its sibling
+peers, at that same path; it runs as your user, so `.meada/` stays yours, and without a network,
+which neither indexing nor stdio needs.
 
 The agent gets three tools, `search`, `context` and `trace`, which only read. See
 [Agents and MCP](https://claudiomascaro.github.io/meada/en/mcp/) and the
 [user guide](docs/user-guide.en.md) (section 2, Connect an agent).
+
+### Agent skill
+
+[`skills/meada/SKILL.md`](skills/meada/SKILL.md) teaches an agent when to reach for each tool
+and how to read the levels in an answer. For Claude Code:
+
+```sh
+mkdir -p ~/.claude/skills/meada
+curl -fsSL https://raw.githubusercontent.com/ClaudioMascaro/meada/v1.0.0/skills/meada/SKILL.md -o ~/.claude/skills/meada/SKILL.md
+```
+
+Other agents: see [Agents and MCP](https://claudiomascaro.github.io/meada/en/mcp/#agent-skill).
 
 ## Status
 
@@ -86,13 +116,15 @@ Meada 1.0 delivers the whole v1 scope of [ADR 0003](docs/adr/0003-v1-scope-and-r
 **Stability promise.** From 1.0 on, semver holds: a breaking change to any of these items needs
 a major version.
 
-- the names, parameters and output grammar of `search`, `context` and `trace`;
+- the names, parameters and output grammar of the MCP tools (`search`, `context` and `trace`
+  today);
 - the CLI commands and flags;
 - the schemas of `meada.toml` and `meada.decisions.toml`;
 - the format of `meada export`.
 
-Adding an optional parameter, a search kind, a configuration key, an export field or a language
-is a minor change. Not covered: the wording of CLI messages, the text of tool descriptions, the
+Adding an MCP tool, an optional parameter, an accepted value to a parameter, a search kind, a
+field at the end of an output line, a configuration key, an export field or a language is a minor
+change. Not covered: the wording of CLI messages, the text of tool descriptions, the
 index file and the layout of `.meada/` (rebuilt when the schema changes), and which links Meada
 finds in a code base (improving resolution is a fix, not a break). What 1.x freezes, and what it
 does not, is detailed in [Stability](https://claudiomascaro.github.io/meada/en/stability/).
@@ -149,6 +181,7 @@ results by symbol identity. Embeddings and any model step live downstream, outsi
 - [Configuration](https://claudiomascaro.github.io/meada/en/configuration/)
 - [Agents and MCP](https://claudiomascaro.github.io/meada/en/mcp/)
 - [Server mode](https://claudiomascaro.github.io/meada/en/server/)
+- [Deploy with Docker, Compose or Helm](https://claudiomascaro.github.io/meada/en/deploy/)
 - [Console](https://claudiomascaro.github.io/meada/en/console/)
 - [Capabilities and limits](https://claudiomascaro.github.io/meada/en/capabilities/)
 - [Stability](https://claudiomascaro.github.io/meada/en/stability/)

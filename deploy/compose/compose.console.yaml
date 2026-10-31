@@ -1,6 +1,6 @@
 # Opt in with both --profile generations and --profile console.
 x-console: &console
-  image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}-cloud
+  image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-1.0.0}-cloud
   profiles: [console]
   hostname: console
   environment:
@@ -20,7 +20,7 @@ services:
       - ./fetch-pulled.sh:/etc/meada/fetch-pulled.sh:ro
 
   init-console:
-    image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}
+    image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-1.0.0}
     profiles: [console]
     user: "0:0"
     entrypoint: [sh, -ec]

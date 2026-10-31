@@ -336,15 +336,17 @@ impl ContractKind for Channel {
         };
         let providers = providers.iter().map(|&(_, p)| p);
         (reaching(contract, providers, &Routes::new(exports)).into_iter())
-            .map(|(provider, (level, reason))| Link {
-                consumer: consumer.site.clone(),
-                provider: provider.to_string(),
-                contract: contract.clone(),
-                level,
-                reason,
-                by: None,
-                p: None,
-                drift: None,
+            .map(|(provider, (level, reason))| {
+                Link::new(
+                    consumer.site.clone(),
+                    provider.to_string(),
+                    contract.clone(),
+                    level,
+                    reason,
+                    None,
+                    None,
+                    None,
+                )
             })
             .collect()
     }
@@ -517,6 +519,15 @@ mod tests {
     /// A NATS producer, a wildcard and a plain consumer of it, and a RabbitMQ publish whose
     /// exchange a binding routes to the queue `q`.
     fn workspace() -> [Export; 1] {
+        let mut binding = Binding::default();
+        binding.contract = "channel::rabbitmq::q".into();
+        binding.exchange = "ex".into();
+        binding.pattern = "order.*".into();
+        binding.site = "r::b.ts::bind".into();
+        let mut publish = Publish::default();
+        publish.exchange = "ex".into();
+        publish.key = "order.created".into();
+        publish.site = "r::a.ts::pub".into();
         [Export {
             providers: vec![provider(
                 "channel::nats::orders.created",
@@ -526,17 +537,8 @@ mod tests {
                 consumer("channel::nats::orders.*", "r::b.ts::watch"),
                 consumer("channel::nats::orders.created", "r::b.ts::handle"),
             ],
-            bindings: vec![Binding {
-                contract: "channel::rabbitmq::q".into(),
-                exchange: "ex".into(),
-                pattern: "order.*".into(),
-                site: "r::b.ts::bind".into(),
-            }],
-            publishes: vec![Publish {
-                exchange: "ex".into(),
-                key: "order.created".into(),
-                site: "r::a.ts::pub".into(),
-            }],
+            bindings: vec![binding],
+            publishes: vec![publish],
             ..Export::default()
         }]
     }

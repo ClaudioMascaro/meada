@@ -191,16 +191,16 @@ impl Decision {
     }
 
     fn link(&self, provider: &str, contract: &str) -> Link {
-        Link {
-            consumer: self.call.clone(),
-            provider: provider.into(),
-            contract: contract.into(),
-            level: Level::Decided,
-            reason: self.reason(),
-            by: Some(self.by.clone()),
-            p: self.p,
-            drift: None,
-        }
+        Link::new(
+            self.call.clone(),
+            provider.into(),
+            contract.into(),
+            Level::Decided,
+            self.reason(),
+            Some(self.by.clone()),
+            self.p,
+            None,
+        )
     }
 }
 
@@ -342,11 +342,7 @@ pub(crate) fn replay(
             let (call, target) = (d.call.clone(), d.target.clone());
             match fate {
                 Fate::Applies(provider, contract) => applied.push((d, provider, contract)),
-                Fate::Stale(cause) => evaluation.stale.push(Stale {
-                    call,
-                    target,
-                    cause,
-                }),
+                Fate::Stale(cause) => evaluation.stale.push(Stale::new(call, target, cause)),
                 Fate::Waiting(peer) => evaluation.waiting.push(Waiting { call, target, peer }),
             }
         }

@@ -33,7 +33,7 @@ services:
     mem_limit: 512m
 
   postgres-migrate:
-    image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-0.1.0}-cloud
+    image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-1.0.0}-cloud
     profiles: [generations]
     command: [postgres, migrate, --workspace, /etc/meada/meada.workspace.toml]
     environment:

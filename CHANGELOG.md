@@ -6,7 +6,27 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-30
+
+The tree declares `1.0.0`: this release raises the workspace, the `meada-core` pin, the Dockerfile,
+the compose defaults and the Helm chart from `0.1.0`, and the `v1.0.0` tag follows its merge on
+main. Publication is still ahead and belongs to the maintainer under
+[#154](https://github.com/ClaudioMascaro/meada/issues/154): `cargo publish` of the crates (core
+first), approval of the staged npm package with 2FA, and publication of the GitHub draft release,
+which triggers the OCI image and Helm chart workflow.
+Release notes and the scope evidence checklist are available in
+[pt-BR](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.0.0.md),
+[English](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.0.0.en.md) and
+[Spanish](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.0.0.es.md).
+The [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md)
+starts at publication. The [#32 tracking checklist](https://github.com/ClaudioMascaro/meada/issues/32)
+still needs the post-publication evidence.
+
 ### Added
+
+- Public fixture benchmark (issue #149): release-profile index/reindex timings, root and
+  workspace index sizes, and default-answer/tool-list token estimates in every PR/main CI
+  summary and retained JSON/Markdown artifact. Timings are informational.
 
 - The English user guide and README (#150, spec #32): `docs/user-guide.en.md` translates both
   halves of the pt-BR guide section by section (sections 1 to 11) with the same neutral examples
@@ -36,8 +56,8 @@ All notable changes to Meada are recorded here. The format follows
   macros are not indexed), shape drift, and communities and processes. Java, Kotlin, C# and Swift
   are named only as planned Release 2 work. No code, default dependency or golden changed.
 - The pt-BR user guide, first half (#146, spec #32), in `docs/user-guide.md`: installation through
-  every channel (Cargo, prebuilt binary, shell installer, `npx meada`, container), MCP setup with
-  `npx meada mcp` and the three tools with their parameters, the `meada.toml` reference (every
+  every channel (Cargo, prebuilt binary, shell installer, `npx @meada/meada`, container), MCP setup with
+  `npx @meada/meada mcp` and the three tools with their parameters, the `meada.toml` reference (every
   table and key), decisions and deciders (protocols, environment variables, what is sent,
   privacy), every CLI command and the export. The READMEs in all three languages gain the
   installation channels, first steps, MCP setup and a 1.0 status section with the stability
@@ -57,6 +77,33 @@ All notable changes to Meada are recorded here. The format follows
   instead of 170 to 190 MB and answers in about 0.3 s instead of 1 to 1.4 s. The index gains
   seven lookup indexes (about 40% larger on junit5) and its schema version changes, so existing
   indexes are rebuilt. `meada export`, `status` and the decision report still read every row.
+- A Meada skill for agents, `skills/meada/SKILL.md`: when to reach for `search`, `context` and
+  `trace`, how to read each level, and that a missing caller is unproven. The READMEs and the
+  site's MCP page show how to install it.
+- Per-channel install and MCP setup: the READMEs open with one row per channel (npx, Cargo, shell
+  installer, archive, Docker) with its install line and MCP server command, and gain a Docker MCP
+  line that mounts the folder holding the repository at the same path and runs without a network.
+  `scripts/container-smoke` runs that line as a stdio client.
+- The site's Deploy page (`docs/site/{pt,en,es}/deploy.md`) covers Docker, Compose and Helm, and
+  the chart gains `values-minimal.yaml`, which `scripts/helm-check` renders.
+
+### Changed
+
+- For `meada-core` crate users: the export's structs (`Export` and each of its pieces, with
+  `Shape` and `Drift`) are `#[non_exhaustive]`, so a field added in 1.x is a minor change. Build
+  one with `T::default()` and named field assignments, or, for a struct with a field that has no
+  default (`Document`, `Import`, `Link`, `Process`, `Step`, `Stale`), with `T::new` taking every
+  field in declaration order (`Shape::new` takes the source, the rest set after it). A struct
+  literal or an exhaustive pattern of these types outside `meada-core` no longer compiles. No
+  output, golden or exported byte changed.
+- The stability promise (spec #32) lets 1.x grow the MCP surface. In
+  `docs/site/{pt,en,es}/stability.md` and the three READMEs, these are minor changes: adding an MCP
+  tool while the tool list stays within its 1,000-token budget, adding an accepted value to an
+  existing parameter (a new value of `changes`) and adding a field at the end of an existing line
+  kind. Removing or renaming a tool or parameter and changing what an existing one means stay
+  breaking. ADR 0008 is amended: three tools is where the surface started, not a ceiling.
+- `SECURITY` (pt-BR, English and Spanish): the latest published 1.x version receives security
+  fixes, which ship as a patch or minor release.
 
 ### Changed
 
@@ -134,6 +181,50 @@ All notable changes to Meada are recorded here. The format follows
 - Console GitHub grant (#496): a session's GitHub grant and its state (`unread`, `current`,
   `expired`) are read from the same permissions set at the same instant, so a session never shows
   `expired` with a grant read while the set was fresh.
+- Release preparation keeps the GitHub release in draft state for the maintainer to publish.
+  A pinned cargo-dist regeneration helper compares the entire workflow after the explicit
+  draft policy; OCI publication follows the human `release: published` event.
+
+### Prepared
+
+- The v1 scope: HTTP, declared resources and gateway paths, OpenAPI/AsyncAPI, channels and
+  packages; levels and cross-repository chains, recorded decisions with optional deciders,
+  shape drift, TypeScript/JavaScript, Python, Go, Rust, communities and processes.
+- The R1 stability promise, normative MCP output grammar, surface goldens, complete user
+  references and public-fixture CI benchmark. Fixture timings are informational.
+- Configured Cargo, binary, shell, npm and OCI distribution. Configuration is not evidence
+  of actual publication or a successful published-installer smoke check.
+
+### Acceptance
+
+The [public #152 receipt](https://github.com/ClaudioMascaro/meada/issues/152#issuecomment-6379316350)
+retains both complete runs on AMD Ryzen 7 5825U, 16 logical CPUs, 7.16 GiB RAM,
+Ubuntu 24.04.5 LTS, x86_64. The measured build was
+`9b99c3a4091b6c1b2c590c43059763f25b6987ef`, `meada 0.1.0`, not every later documentation head.
+
+| Metric | Target | First complete run | Complete rerun |
+| --- | --- | --- | --- |
+| Cold configured-workspace index | <= 7 s | 12.680 s, not met | 2.711 s, met |
+| Root index size | <= 37 MB | 21.057536 MB, met | 21.057536 MB, met |
+| Single-file configured-workspace reindex | <= 1 s | 1.346 s, not met | 1.152 s, not met |
+| Compact MCP `tools/list` result | <= 1,000 tokens | 622, met | 622, met |
+| Largest default answer among 11 queries | <= 2,000 tokens | 1,996, met | 1,996, met |
+
+MB means 10^6 bytes; tokens are ceil(UTF-8 bytes / 4). Public fixture peers supplement the
+private workload; the receipt does not claim every feature naturally occurs in the private root.
+The [rerun of 2026-10-30](https://github.com/ClaudioMascaro/meada/issues/152#issuecomment-6531862493)
+on main `1d648ad6` uses a reconstructed workspace (not directly comparable) and meets four of the
+five targets: cold index (medians 5.586 to 6.625 s, <= 7 s), root index size (31.883266 MB,
+<= 37 MB), `tools/list` (643 tokens, <= 1,000) and largest default answer (1,999 tokens,
+<= 2,000). The single-file reindex (<= 1 s) met the target in the two quieter runs (0.99 and
+0.931 s) and missed it in the two runs at a load average near 3 (1.068 and 1.123 s). The
+maintainer [waived the reindex target for 1.0.0](https://github.com/ClaudioMascaro/meada/issues/350#issuecomment-6532716065),
+recorded on [#350](https://github.com/ClaudioMascaro/meada/issues/350).
+
+Known limit: the single-file reindex sits near 1 s and exceeds it under load. #350 stays open for
+1.x, with the goal of 1 s with headroom under ordinary load; a speedup changes no output, so it
+ships as a patch or minor release. Publication is done separately by the maintainer under
+[#154](https://github.com/ClaudioMascaro/meada/issues/154).
 
 ## [0.1.0] - 2026-10-30
 
@@ -684,5 +775,6 @@ and `trace` from the two longest processes. The spec adds about 0.3 MB and 0.03 
 The rise of the single-file reindex since 2026-10-14 predates it (specs #22 and #23), and at
 692 files it is close to its target.
 
-[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.0.0
 [0.1.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v0.1.0

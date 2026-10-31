@@ -350,7 +350,7 @@ impl Ecosystem for Pypi {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::index::{File, Span, Symbol};
+    use crate::index::{File, Symbol};
     use crate::package::Flag;
     use crate::resolve::Exported;
     use std::cell::OnceCell;
@@ -541,20 +541,18 @@ serve = "acme.cli:main"
         Export {
             repository: name.into(),
             files: (files.iter())
-                .map(|p| File {
-                    path: p.to_string(),
-                    hash: String::new(),
+                .map(|p| {
+                    let mut file = File::default();
+                    file.path = p.to_string();
+                    file
                 })
                 .collect(),
             symbols: (files.iter())
-                .map(|p| Symbol {
-                    id: format!("{name}::{p}::f"),
-                    span: Span {
-                        path: p.to_string(),
-                        start: 0,
-                        end: 0,
-                    },
-                    hash: String::new(),
+                .map(|p| {
+                    let mut symbol = Symbol::default();
+                    symbol.id = format!("{name}::{p}::f");
+                    symbol.span.path = p.to_string();
+                    symbol
                 })
                 .collect(),
             manifests: (manifests.iter())
@@ -797,9 +795,10 @@ serve = "acme.cli:main"
         let export = Export {
             repository: "lib".into(),
             files: (["pkg/__init__.py", "pkg/api.py"].iter())
-                .map(|p| File {
-                    path: p.to_string(),
-                    hash: String::new(),
+                .map(|p| {
+                    let mut file = File::default();
+                    file.path = p.to_string();
+                    file
                 })
                 .collect(),
             exported: vec![row("pkg/api.py", "fetch")],

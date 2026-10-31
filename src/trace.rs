@@ -1057,30 +1057,30 @@ impl<'a> Graph<'a> {
 
     /// `entry`'s process as the export carries it.
     pub(crate) fn export_process(&self, entry: &'a EntryPoint) -> Process {
-        let steps = self.process(entry).into_iter().map(|s| ProcessStep {
-            depth: s.depth,
-            repository: self.workspace.repos[s.repo].identity.clone(),
-            level: s.level,
-            via: match s.via {
+        let steps = self.process(entry).into_iter().map(|s| {
+            let via = match s.via {
                 Via::Entry => StepVia::Entry,
                 Via::Call => StepVia::Call,
                 Via::Link(_) => StepVia::Link,
-            },
-            node: s.node.to_string(),
-            reason: match s.via {
+            };
+            let reason = match s.via {
                 Via::Link(link) => Some(link.reason.clone()),
                 _ => None,
-            },
-            mark: s.mark,
-            candidates: s.candidates.iter().map(|c| c.to_string()).collect(),
-            contract: s.contract.map(String::from),
+            };
+            ProcessStep::new(
+                s.depth,
+                self.workspace.repos[s.repo].identity.clone(),
+                s.level,
+                via,
+                s.node.to_string(),
+                reason,
+                s.mark,
+                s.candidates.iter().map(|c| c.to_string()).collect(),
+                s.contract.map(String::from),
+            )
         });
-        Process {
-            entry_point: entry.identity.clone(),
-            kind: entry.kind,
-            label: entry.label.clone(),
-            steps: steps.collect(),
-        }
+        let (identity, label) = (entry.identity.clone(), entry.label.clone());
+        Process::new(identity, entry.kind, label, steps.collect())
     }
 }
 
@@ -1264,31 +1264,31 @@ mod tests {
     #[test]
     fn a_chain_past_the_depth_limit_ends_at_it() {
         let id = |n: usize| format!("r::a.ts::f{n}");
-        let span = || Span {
-            path: "a.ts".into(),
-            start: 0,
-            end: 0,
+        let span = || {
+            let mut span = Span::default();
+            span.path = "a.ts".into();
+            span
         };
         let length = PROCESS_DEPTH + 50;
         let export = Export {
             repository: "r".into(),
             symbols: (0..=length)
-                .map(|n| Symbol {
-                    id: id(n),
-                    span: span(),
-                    hash: String::new(),
+                .map(|n| {
+                    let mut symbol = Symbol::default();
+                    symbol.id = id(n);
+                    symbol.span = span();
+                    symbol
                 })
                 .collect(),
             calls: (0..length)
-                .map(|n| CallSite {
-                    id: format!("r::a.ts::f{n}@{n}"),
-                    caller: id(n),
-                    target: Some(id(n + 1)),
-                    level: Some(Level::Exact),
-                    candidates: Vec::new(),
-                    narrowed: false,
-                    decorates: None,
-                    span: span(),
+                .map(|n| {
+                    let mut call = CallSite::default();
+                    call.id = format!("r::a.ts::f{n}@{n}");
+                    call.caller = id(n);
+                    call.target = Some(id(n + 1));
+                    call.level = Some(Level::Exact);
+                    call.span = span();
+                    call
                 })
                 .collect(),
             ..Export::default()
