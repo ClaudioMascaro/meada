@@ -100,6 +100,16 @@ fn repositories(
     Err(Failure::Other(Msg::RolesCatalogPages(PAGES_MAX).text()))
 }
 
+/// How many of `found` the cap counts: those `selected` does not hold. `found` is lowercase
+/// (`repository`) and the caller folds `selected` as GitHub compares it (#508), so a selected
+/// identity written with uppercase letters is not one more.
+fn extra(found: &BTreeSet<String>, selected: &BTreeSet<&str>) -> usize {
+    found
+        .iter()
+        .filter(|i| !selected.contains(i.as_str()))
+        .count()
+}
+
 /// The catalog's candidates on `host`: the identities the installations cover that `config`
 /// allows, sorted. A candidate set with more identities than `selected` holds, plus
 /// `[catalog] max_repositories`, fails the run (the selected identities are not counted).
@@ -138,13 +148,25 @@ pub(super) async fn candidates(
             Err(Failure::Other(why) | Failure::Missing(why)) => return Err(failed(&why)),
         }
     }
-    let extra = found
-        .iter()
-        .filter(|i| !selected.contains(i.as_str()))
-        .count();
+    let extra = extra(&found, selected);
     let max = config.max_repositories;
     if extra > max {
         return Err(Msg::RolesCatalogCap { found: extra, max }.text());
     }
     Ok(found)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_selected_identity_with_uppercase_letters_is_not_an_extra_repository() {
+        let found: BTreeSet<String> = ["github.com/acme/api", "github.com/acme/web"]
+            .map(String::from)
+            .into();
+        let written = crate::modules::fold("github.com", "github.com/Acme/API");
+        let selected = BTreeSet::from([written.as_str()]);
+        assert_eq!(extra(&found, &selected), 1);
+    }
 }

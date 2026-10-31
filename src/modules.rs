@@ -355,6 +355,21 @@ pub fn rfc3339(secs: u64) -> String {
     format!("{y:04}-{m:02}-{d:02}T{h:02}:{min:02}:{s:02}Z")
 }
 
+/// `identity` as GitHub compares it: lowercase when it is on `host`, as written on any other
+/// host. Only the comparison folds; a row stays keyed by the identity as written.
+#[cfg_attr(
+    not(any(feature = "github-app", feature = "workspaces")),
+    allow(dead_code)
+)]
+pub(crate) fn fold(host: &str, identity: &str) -> String {
+    let on_host = (identity.strip_prefix(host)).is_some_and(|rest| rest.starts_with('/'));
+    if on_host {
+        identity.to_lowercase()
+    } else {
+        identity.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;

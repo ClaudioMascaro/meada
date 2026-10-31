@@ -1023,6 +1023,35 @@ fn collaborators(
     }
 }
 
+/// Where each identity comes from (`source`): the workspace's own in its order, then the
+/// repositories named workspaces select, then the catalog's alone, sorted. Compared as GitHub
+/// compares them (#508): an identity on `host` folds to lowercase, the row keeps the identity as
+/// written, and two spellings of one repository are one row (the first kept).
+fn targets_of<'a>(
+    host: &str,
+    entries: &[&'a str],
+    named: &'a std::collections::BTreeSet<String>,
+    candidates: &'a std::collections::BTreeSet<String>,
+) -> Vec<(&'a str, &'static str)> {
+    let fold = |identity: &str| crate::modules::fold(host, identity);
+    let mut targets = Vec::new();
+    let mut own = std::collections::HashSet::new();
+    for identity in entries
+        .iter()
+        .copied()
+        .chain(named.iter().map(String::as_str))
+    {
+        let folded = fold(identity);
+        let both = candidates.contains(&folded);
+        if own.insert(folded) {
+            targets.push((identity, if both { "both" } else { "selected" }));
+        }
+    }
+    let alone = candidates.iter().filter(|c| !own.contains(&fold(c)));
+    targets.extend(alone.map(|c| (c.as_str(), "catalog")));
+    targets
+}
+
 /// What `roles` reads of the workspace: the pulled version's id with `source = "store"` and each
 /// entry's identity and `added_by`, whole: the exclusions are this command's to write. With
 /// `[workspaces]` also the named workspaces the pull read (#342) and the digest of their file.
@@ -1270,37 +1299,24 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     #[cfg(feature = "workspaces")]
     if let Some(catalog) = catalog {
         let named: Vec<String> = contexts.iter().flat_map(|c| c.identities()).collect();
-        let selected = (entries.iter().map(|(i, _)| i.as_str()))
+        // Folded as GitHub compares them (#508), so the cap does not count a selected
+        // repository written with uppercase letters as one more.
+        let folded: Vec<String> = (entries.iter().map(|(i, _)| i.as_str()))
             .chain(named.iter().map(String::as_str))
+            .map(|i| crate::modules::fold(&github.host, i))
             .collect();
+        let selected = folded.iter().map(String::as_str).collect();
         let listed = catalog::candidates(&mut run, apps, &github.host, catalog, &selected).await;
         notes.append(&mut run.notes);
         candidates = listed?;
     }
-    // Where each identity comes from (`source`): the workspace's own in its order, then the
-    // catalog's alone, sorted.
-    let mut targets: Vec<(&str, &str)> = Vec::new();
-    for (identity, _) in &entries {
-        let both = candidates.contains(identity);
-        targets.push((identity.as_str(), if both { "both" } else { "selected" }));
-    }
-    #[cfg_attr(not(feature = "workspaces"), allow(unused_mut))]
-    let mut own: std::collections::HashSet<&str> =
-        entries.iter().map(|(i, _)| i.as_str()).collect();
-    // The repositories named workspaces select have rows too, `selected` like the deployment's.
     #[cfg(feature = "workspaces")]
     let named: std::collections::BTreeSet<String> =
         contexts.iter().flat_map(|c| c.identities()).collect();
-    #[cfg(feature = "workspaces")]
-    for identity in &named {
-        if !own.insert(identity.as_str()) {
-            continue;
-        }
-        let both = candidates.contains(identity);
-        targets.push((identity.as_str(), if both { "both" } else { "selected" }));
-    }
-    let alone = candidates.iter().filter(|c| !own.contains(c.as_str()));
-    targets.extend(alone.map(|c| (c.as_str(), "catalog")));
+    #[cfg(not(feature = "workspaces"))]
+    let named: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let own: Vec<&str> = entries.iter().map(|(i, _)| i.as_str()).collect();
+    let targets = targets_of(&github.host, &own, &named, &candidates);
     // Per identity on the host, what GitHub showed of it: the App and repository coverage.
     let mut coverage: Vec<(&str, &str, &str)> = Vec::new();
     let prefix = format!("{}/", github.host);
@@ -1327,6 +1343,15 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         Ok::<_, String>(())
     };
     let listing = list_all().await;
+    // A row is keyed by the identity as written, the first spelling of a repository (#508): the
+    // other spellings look their roles up under it.
+    let written: std::collections::HashMap<String, &str> = (targets.iter())
+        .map(|&(i, _)| (crate::modules::fold(&github.host, i), i))
+        .collect();
+    let role_of = |identity: &str, login: &String| {
+        let key = written.get(&crate::modules::fold(&github.host, identity));
+        key.and_then(|key| rows.get(&(key.to_string(), login.clone())))
+    };
     notes.append(&mut run.notes);
     listing?;
 
@@ -1338,7 +1363,7 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         let Some(login) = added_by.as_ref().filter(|_| identity.starts_with(&prefix)) else {
             continue;
         };
-        let role = rows.get(&(identity.clone(), login.clone()));
+        let role = role_of(identity, login);
         if role.is_some_and(|role| github.roles.contains(role)) {
             continue;
         }
@@ -1361,7 +1386,7 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     for context in &contexts {
         for identity in context.identities() {
             let sponsored = (context.operators.iter()).any(|login| {
-                let role = rows.get(&(identity.clone(), login.clone()));
+                let role = role_of(&identity, login);
                 identity.starts_with(&prefix) && role.is_some_and(|r| github.roles.contains(r))
             });
             if !sponsored {
@@ -1636,6 +1661,35 @@ pub(crate) async fn inspect(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_selected_identity_and_its_lowercase_candidate_are_one_both_row() {
+        let candidates = [
+            "github.com/acme/api",
+            "github.com/acme/web",
+            "ghe.example/acme/x",
+        ]
+        .map(String::from)
+        .into();
+        let named = ["github.com/ACME/api"].map(String::from).into();
+        let entries = [
+            "github.com/Acme/API",
+            "github.com/acme/api",
+            "ghe.example/Acme/X",
+        ];
+        let targets = targets_of("github.com", &entries, &named, &candidates);
+        // Another host compares exactly: its uppercase entry is `selected` and its lowercase
+        // candidate a `catalog` row of its own.
+        assert_eq!(
+            targets,
+            [
+                ("github.com/Acme/API", "both"),
+                ("ghe.example/Acme/X", "selected"),
+                ("ghe.example/acme/x", "catalog"),
+                ("github.com/acme/web", "catalog"),
+            ]
+        );
+    }
 
     fn block(toml: &str) -> Result<Config, Problem> {
         let file: File = toml::from_str(toml).unwrap();

@@ -168,9 +168,10 @@ impl Console {
             return error(StatusCode::BAD_REQUEST, "bad_request", &message);
         };
         let after = query.after.as_deref();
+        let prefix = crate::modules::fold(&catalog.host, &query.prefix);
         let mut page: Vec<&String> = (catalog.selectable.iter())
             .filter(|i| after.is_none_or(|a| i.as_str() > a))
-            .filter(|i| i.starts_with(&query.prefix))
+            .filter(|i| crate::modules::fold(&catalog.host, i).starts_with(&prefix))
             .take(query.limit + 1)
             .collect();
         let more = page.len() > query.limit;
@@ -222,10 +223,17 @@ impl Console {
 /// of them while the catalog is. The console's check and a proposal's eligibility (ADR 0022).
 pub(super) fn checked(catalog: &Catalog, identities: &[String]) -> Value {
     let mut seen = std::collections::HashSet::new();
+    // GitHub compares names without case, so an identity on the host matches its lowercase row.
+    let folded: std::collections::HashSet<String> = (catalog.selectable.iter())
+        .map(|i| crate::modules::fold(&catalog.host, i))
+        .collect();
     let results: Vec<Value> = (identities.iter())
         .filter(|i| seen.insert(i.as_str()))
         .map(|identity| {
-            let state = match (catalog.reason, catalog.selectable.contains(identity)) {
+            let state = match (
+                catalog.reason,
+                folded.contains(&crate::modules::fold(&catalog.host, identity)),
+            ) {
                 (Some(_), _) => "pending",
                 (None, true) => "selectable",
                 (None, false) => "unavailable",
@@ -242,6 +250,26 @@ pub(super) fn checked(catalog: &Catalog, identities: &[String]) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_identity_on_the_host_is_selectable_whatever_its_case() {
+        let catalog = Catalog {
+            reason: None,
+            set: None,
+            selectable: ["github.com/acme/api", "ghe.example/acme/x"]
+                .map(String::from)
+                .into(),
+            host: "github.com".into(),
+        };
+        let asked = ["github.com/Acme/API", "ghe.example/Acme/X"].map(String::from);
+        let states: Vec<_> = checked(&catalog, &asked)["results"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["state"].as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(states, ["selectable", "unavailable"]);
+    }
 
     #[test]
     fn a_cursor_is_the_canonical_base64url_of_an_identity() {
