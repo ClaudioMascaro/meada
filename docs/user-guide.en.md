@@ -884,10 +884,10 @@ brokers is two channels:
 | NATS | `nats` | wildcards `*` and `>` |
 | Redis streams | `redis` | |
 | BullMQ | `bullmq` | TypeScript and JavaScript only |
+| JMS | `jms` | Java and Kotlin only (Spring JMS) |
+| Azure Service Bus | `servicebus` | C# only |
 
-The clients of each language are in section 9. JMS (`jms`) and Azure Service Bus (`servicebus`)
-are brokers of Java, Kotlin and C#, planned Release 2 work (section 9), and are not part of 1.0
-(an AsyncAPI document with that protocol still gives channel sides for those brokers).
+The clients of each language are in section 9. Swift has no channel reading in 1.0.
 
 Rules that apply to all of them:
 
@@ -928,6 +928,9 @@ import that reaches the code adds `; import <what was used>` to the reason.
 | PyPI | `pyproject.toml` with a name in `[project]` or `[tool.poetry]` | `package::pypi::<name>` | Normalized by PEP 503. Also reads `requirements*.txt`. Ranges are not checked |
 | Cargo | `Cargo.toml` with `[package] name` | `package::cargo::<name>` | Each member of the Cargo workspace is a provider. Ranges are not checked |
 | Go | `go.mod` with `module` | `package::go::<module path>` | Reads `require` and `replace` to a local directory |
+| Maven | `pom.xml` with literal coordinates, or a Gradle project with a literal `group` and name | `package::maven::<group>:<artifact>` | Each module is an artifact. Also reads `settings.gradle` and `settings.gradle.kts`. Ranges are not checked |
+| NuGet | SDK-style `.csproj` | `package::nuget::<id>` | The id is the `PackageId`, else the `AssemblyName`, else the file name. Ranges are not checked |
+| SwiftPM | `Package.swift` | `package::swiftpm::<name>` | The name is the literal of `Package(name:)`. Ranges are not checked |
 
 Details per ecosystem:
 
@@ -948,20 +951,40 @@ Details per ecosystem:
 - **Go.** A `replace` that leaves the repository is resolved textually, like Cargo's `path`, and a
   replacement by another module is left out. An `import` of `<module>/<directory>` reaches the
   exported functions, types and methods of the directory.
+- **Maven and Gradle.** A dependency, also in Gradle's map notation (`group: 'g', name: 'a'`),
+  links to the workspace artifact as `exact`, with `range unchecked`. A group or artifact written
+  with a property or a variable links when the build declares the value as a literal; otherwise
+  the link is `ambiguous`. An `import` of a class of the artifact reaches the provider's code
+  through the files' `package` declaration, not through a path (in Kotlin, also that of a
+  top-level or extension function): `exact` when a single provider declares the package and the
+  type, `ambiguous` when several declare it or overloads with the same number of arguments
+  remain, `inferred` when an ancestor of the class comes from outside the provider's repository.
+  The reason ends with `; import package`.
+- **NuGet.** A `PackageReference` that names a workspace package links as `exact`, with `Version`
+  as the range, and a `ProjectReference` to a project of another repository of the workspace
+  links to that project's package. A `using` of a namespace of a project the file depends on
+  reaches its types: `exact` when a provider declares the namespace and the type, `ambiguous`
+  when several declare it, `inferred` when an ancestor comes from outside the provider's
+  repository; the reason ends with `; import namespace`. Meada queries no feed and does not read
+  `Directory.Packages.props`.
+- **SwiftPM.** A `.package(url:)` links to the workspace repository with the same remote
+  identity, and a `.package(path:)` to the repository at that path. Only literal values count: a
+  URL, a path or a computed name leaves the link `ambiguous`. An `import Module` of a module of a
+  package the `Package.swift` depends on reaches the `public` and `open` declarations, chosen by
+  name and by the argument labels; the reason ends with `; import module`. Platform modules
+  (`Foundation`, `SwiftUI`) never become a link, and `Package.resolved` is not read.
 
 When two providers serve the same name, the link is `ambiguous`, one per candidate, with the
 reason starting with `<n> providers fit`.
 
-Maven and Gradle, NuGet and SwiftPM are the package managers of Java and Kotlin, C# and Swift,
-planned Release 2 work (section 9): they arrive with those languages, after 1.0.
-
 ## 9. Languages
 
-Meada 1.0 reads **TypeScript and JavaScript, Python, Go and Rust**. Each section below lists the
-files read, the frameworks and HTTP clients, the environment reads, the manifests, the channel
-clients and the known limits. A library outside these lists produces no link.
+Meada 1.0 reads **TypeScript and JavaScript, Python, Go, Rust, Java, Kotlin, C# and Swift**,
+nine languages. Each section below lists the files read, the frameworks and HTTP clients, the
+environment reads, the manifests, the channel clients and the known limits. A library outside
+these lists produces no link.
 
-Rules that apply to all four languages:
+Rules that apply to all languages:
 
 - Meada reads the text with tree-sitter. It runs no compiler, interpreter or package manager and
   opens no network, and it never reads the value of an environment variable.
@@ -975,11 +998,8 @@ Rules that apply to all four languages:
   at any depth. What does not fold is an unresolved consumer (HTTP) or an unresolved side
   (channels).
 
-**Java, Kotlin, C# and Swift** are planned Release 2 work of ADR 0003 and are not part of 1.0.
-They arrive later, as 1.x minor versions, under issues #26 to #29. This guide and the 1.0
-stability promise do not cover them: the current build already reads files in those languages,
-but what Meada links in them may change in any version. In a repository in those languages, only
-what it declares (a `meada.toml`, an OpenAPI or AsyncAPI document) is covered.
+The 1.0 stability promise covers all nine languages: it freezes the surface (tools, CLI,
+configuration and export), and resolving better what a language finds is a fix, not a break.
 
 ### 9.1 TypeScript and JavaScript
 
@@ -1221,6 +1241,259 @@ by `push_str`, `push` and `+=` also folds.
   `fallback_service`, an outside wrapper) is not mounted anywhere.
 - `option_env!` and an `env!` that the file itself defines are not reads.
 
+### 9.5 Java
+
+**Files.** `.java`, resolved by the `package` declarations. Meada needs no JDK, Maven or Gradle
+and runs no code from the repository.
+
+**What becomes a definition.** Classes, interfaces, enums, records, methods and constructors,
+nested ones included. Names carry the package and, for methods, the written parameter types
+(`example.Orders.place(String,int)`). The calls of a lambda or an anonymous class belong to the
+symbol that contains them. Public types and their public or protected members form the exported
+surface. Single, package, static and `*` imports resolve through the `package` declarations. A
+call with no receiver, with `this` or static is `exact` when one method remains by argument count
+(`varargs` included), and overloads with the same count are `ambiguous`. On a field, parameter or
+local variable with a written type, the call resolves in that type and in the supertypes of
+`extends` and `implements`. A supertype from outside the repository has unknown members: the call
+resolves by name, unless it is a platform type with known members (`Serializable`, `Comparable`
+and the like).
+
+**HTTP.**
+
+| Role | Library |
+| --- | --- |
+| Consumer | RestTemplate, WebClient, `java.net.http`, OkHttp, OpenFeign, Retrofit |
+| Provider | Spring MVC, JAX-RS |
+
+- **Providers.** A method of a `@RestController` or `@Controller` class with `@GetMapping`,
+  `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping` or `@RequestMapping(method =
+  ...)` is a provider, under the class's `@RequestMapping` prefix; a `@RequestMapping` with no
+  `method` serves every method (`http::ANY::`). In JAX-RS, a method with `@GET`, `@POST` and the
+  others in a class with `@Path` is a provider. `static final` constants fold into the path.
+  `server.servlet.context-path` is not applied.
+- **Consumers.** The RestTemplate methods, the `.uri(...)` of a WebClient request, and the
+  `build()` of an `HttpRequest.newBuilder()` or an OkHttp `Request.Builder()` (with no method in
+  the chain, `GET`). The client counts by the type the code writes for it or by the call that
+  creates it, and a WebClient's base comes from the `WebClient.create(base)` or `baseUrl(base)`
+  it comes from. A method that builds the URL from its parameters is a wrapper.
+- **Declarative clients.** In a `@FeignClient` or Retrofit interface (`@GET("x")` and the
+  others), each method is a consumer, at the interface method itself. The base comes from `url`
+  and `path` in Feign (with `${key}` placeholders from the Spring configuration) and from the
+  `Retrofit.Builder().baseUrl(base)` that creates the interface.
+
+**Environment.** `System.getenv("X")` and Spring's `@Value("${key}")` on a field or constructor
+parameter, with the key read from `application.properties`, `application.yml` or
+`application.yaml` in the module's `src/main/resources`. A `${VAR}` placeholder that no key fills
+is the variable `VAR`, which the peer's `base_url_env` maps. Profiles (`application-<profile>`)
+and SpEL are not read.
+
+**Manifests.** `pom.xml` and the Gradle build files (`build.gradle`, `build.gradle.kts`,
+`settings.gradle` and `settings.gradle.kts`). See Maven and Gradle in section 8.5.
+
+**Channels.**
+
+| Broker | Library |
+| --- | --- |
+| Kafka | Spring Kafka |
+| RabbitMQ | Spring AMQP |
+| Amazon SQS | AWS SDK v2 |
+| NATS | jnats |
+| Redis streams | Jedis, Lettuce |
+| JMS | Spring JMS |
+
+The client counts by the type the code writes for it, and a listener by the Spring annotation
+(`@KafkaListener`, `@RabbitListener`, `@JmsListener`). The channel name folds like a URL, with the
+`${key}` of the annotations read from the Spring configuration.
+
+**Known limits.**
+
+- A repository type with the name of an annotation or a client of the library hides it.
+- Feign's `@RequestLine`, Retrofit's `@HTTP` and an annotation inherited from an interface are not
+  read.
+- A channel name that cannot be computed (an environment variable, SpEL) is an unresolved side.
+- A file whose repeated enclosing names exceed 4 MiB in total is left with no symbols or calls,
+  and `meada status` names it.
+
+### 9.6 Kotlin
+
+**Files.** `.kt` and `.kts` (except `build.gradle.kts` and `settings.gradle.kts`), resolved by the
+`package` declarations. Meada needs no Kotlin compiler, JDK or Gradle.
+
+**What becomes a definition.** Classes (also `data`, `sealed`, `enum` and `annotation`),
+interfaces, objects, companions, top-level functions, extension functions, properties with a
+getter and methods, nested ones included. Names carry the package and, for functions, the written
+parameter types (`example.helper(Int)`); an extension function carries the receiver type
+(`example.Point.norm()`). The calls of a lambda belong to the symbol that contains it.
+Declarations that are neither `private` nor `internal` form the exported surface. Single, `as`
+and `*` imports resolve through the `package` declarations, and the file's own package is visible
+without an import. Calling a class name constructs it. Kotlin and Java in the same repository call
+each other by fully qualified name. Inside a lambda, a call with no receiver may belong to an
+implicit receiver, and resolves by name only.
+
+**HTTP.**
+
+| Role | Library |
+| --- | --- |
+| Consumer | RestTemplate, WebClient, OkHttp, Retrofit, Ktor client |
+| Provider | Spring MVC, Ktor |
+
+- **Spring, OkHttp and Retrofit.** They follow Java's rules (section 9.5), written the Kotlin
+  way: `RestTemplate()` without `new`, named arguments and `Api::class.java` as the Retrofit
+  service.
+- **Ktor, provider.** A route inside `routing { }` (`get`, `post`, `put`, `patch`, `delete`,
+  `head`, `options` and `route(path, HttpMethod.X)`) is a provider under the prefix of each
+  enclosing `route(prefix) { }` block, also in an extension function of `Route` or `Routing`
+  called inside the block. The route's lambda is the handler. Ktor names count only with the Ktor
+  import, and typed routing (resource classes) is not read.
+- **Ktor, consumer.** A call (`get`, `post` and the others, or `request(url) { method =
+  HttpMethod.X }`; with no method, `GET`) on an `HttpClient`. A `defaultRequest { url(base) }` is
+  the base of relative URLs. `url { path(..) }` is not read.
+
+**Environment.** `System.getenv("X")` and `System.getenv()["X"]`, also through `?:`, `!!`,
+parentheses and string methods such as `trim` and `removeSuffix`, and Spring's `@Value("\${key}")`
+(the `$` escaped), with Java's configuration. The read may be in a property, in a local `val` or in
+the URL itself; a `var` is not followed.
+
+**Manifests.** Java's: see Maven and Gradle in section 8.5.
+
+**Channels.** The same brokers and clients as Java (section 9.5), written the Kotlin way: named
+arguments and arrays (`@KafkaListener(topics = ["a", "b"])`), a top-level `const val` or one in a
+`companion object`, and a client received through the constructor.
+
+**Known limits.**
+
+- A call on an implicit receiver (a client extension function, `apply` and `with` blocks) is not
+  read in channels.
+- In a `request` block, a method assignment that may not run leaves the method unknown, never
+  `GET`.
+- A channel name with a part that cannot be evaluated (`"orders-$env"`) is an unresolved side.
+
+### 9.7 C#
+
+**Files.** `.cs`, grouped into projects by SDK-style `.csproj` files (with `Sdk`; an old
+`.csproj` is not a project, and `.sln` files change nothing) and resolved by the `namespace`
+declarations. The `obj/` and `bin/` folders next to a `.csproj` stay out of the index. Meada needs
+no .NET SDK or MSBuild.
+
+**What becomes a definition.** Classes, records, structs and interfaces, nested and `partial`
+ones included, methods and constructors with the written parameter types
+(`Acme.Orders.OrderService.Place(string,int)`) and local functions. Public types and their public
+or protected members form the exported surface, and an `internal` type exists only for the files
+of its project. `using`, `using static`, aliases and `global using` resolve through the namespaces
+of all projects; `global using`, the `<Using>` items of the `.csproj` and implicit usings apply
+to the files of the project. A call with no receiver, with `this`, `base`, static or through
+`using static` is `exact` when one method remains by argument count (`params` and default values
+included). A base from outside the repository leaves calls to the class's members without
+`exact`, except for a type with known members (`IDisposable`, `IEquatable` and the like). An
+attribute is a call on what it decorates.
+
+**HTTP.**
+
+| Role | Library |
+| --- | --- |
+| Consumer | `HttpClient`, typed clients, Refit |
+| Provider | ASP.NET Core (controllers and minimal APIs) |
+
+- **Controllers.** A method of a controller class (with `[ApiController]`, or deriving from
+  `ControllerBase` or `Controller`) with `[HttpGet]`, `[HttpPost]` and the others is a provider,
+  under the class's `[Route]`; `[controller]`, `[action]` and `{id:int}` are understood.
+  Conventional routing (`MapControllerRoute`) is not read.
+- **Minimal APIs.** `MapGet`, `MapPost`, `MapPut`, `MapPatch`, `MapDelete` and `MapMethods` on the
+  application or on a `MapGroup(prefix)`, with nested groups; the prefix follows the group through
+  variables, arguments, returns and extension methods. A group Meada does not read (a lambda
+  parameter, a field, a reassigned variable) yields no route.
+- **Consumers.** `GetAsync`, `PostAsync`, `GetFromJsonAsync`, `SendAsync(new
+  HttpRequestMessage(HttpMethod.X, url))` and the like on an `HttpClient`, by the declared type
+  or by the construction, never by the name alone. The URL folds literals, interpolation, `+` and
+  `const` and `static readonly` fields. A `BaseAddress = new Uri(base)` is the base of relative
+  URLs, and a typed client registered with `AddHttpClient<T>(c => c.BaseAddress = ...)` gives the
+  base to the `HttpClient` of `T`. Each method of a Refit interface (`[Get("/x")]` and the others)
+  is a consumer, with the base of the `RestService.For<T>(url)` that creates it.
+
+**Environment.** `Environment.GetEnvironmentVariable("X")`, through `??`, `!` and `Trim`, and
+`configuration["Section:Key"]` on an `IConfiguration` or on `builder.Configuration`, which is the
+variable `Section__Key`. A literal URL in the project's `appsettings.json` is the default of that
+variable. `appsettings.<Environment>.json`, `GetValue`, `GetSection`, options binding and user
+secrets are not read.
+
+**Manifests.** SDK-style `.csproj` and `Directory.Build.props`. See NuGet in section 8.5.
+
+**Channels.**
+
+| Broker | Library |
+| --- | --- |
+| Kafka | `Confluent.Kafka` |
+| RabbitMQ | `RabbitMQ.Client` |
+| Amazon SQS | `AWSSDK.SQS` |
+| NATS | `NATS.Client` |
+| Redis streams | `StackExchange.Redis` |
+| Azure Service Bus | `Azure.Messaging.ServiceBus` |
+
+The client counts by the type the code writes for it or by the construction that created it,
+resolved through the `using`s, never by the name alone.
+
+**Known limits.**
+
+- A controller that inherits from another class of the repository, a class that is the base of
+  another and a `partial` class spread over several files yield no route.
+- `IHttpClientFactory.CreateClient(name)` is not read, and a Refit interface registered with
+  `AddRefitClient` has an unknown base.
+- MassTransit, `BasicGet`, `SubscribeSync` and NATS.Net v2 are not read in channels.
+- A channel name read from the environment or from `IConfiguration` is an unresolved side.
+
+### 9.8 Swift
+
+**Files.** `.swift` (except `Package.swift` and `Package@swift-<version>.swift`), grouped into
+modules by the targets of `Package.swift`; the files outside any target form a single module.
+Meada needs no Swift toolchain or Xcode.
+
+**What becomes a definition.** Classes, structs, enums, actors and protocols, nested ones
+included, and functions, methods and initializers with the argument labels in the name
+(`OrderService.place(order:quantity:)`). The members of an extension belong to the extended type.
+The calls of a closure belong to the symbol that contains it. Names resolve first in the file's
+module and then in the modules it imports, through the `public` and `open` declarations (and
+`internal` with `@testable`). A call is `exact` when one declaration remains by the labels, and
+overloads with the same labels are `ambiguous`. A receiver whose type comes from outside the
+repository (`session: URLSession`) reaches only the extensions of that type that the repository
+writes, and a call through a protocol-typed receiver stops at the requirement.
+
+**HTTP.**
+
+| Role | Library |
+| --- | --- |
+| Consumer | `URLSession`, Alamofire, AsyncHTTPClient |
+| Provider | Vapor, Hummingbird |
+
+- **Vapor.** A route (`get`, `post`, `put`, `patch`, `delete` and `on(.METHOD, path)`) called on
+  the application or on a `grouped(prefix)` of it is a provider under the prefix of each
+  enclosing `grouped`. A `RouteCollection` registered with `register(collection:)` serves the
+  routes of its `boot(routes:)`. Names count only with the `Vapor` import.
+- **Hummingbird.** A route (`get`, `post`, `put`, `patch`, `delete` and `on(path, method: .get)`)
+  called on a `Router()` or on a `group(prefix)` of it is a provider under the prefix of each
+  enclosing `group`. Names count only with the `Hummingbird` import.
+- **Consumers.** `data(from:)` and `data(for:)` on a `URLSession`, `AF.request(url, method:)` and
+  `execute` of an `HTTPClientRequest(url:)`. The method is GET when not written, and the
+  `httpMethod` assigned to a `URLRequest` counts. The URL folds `URL(string:)`,
+  `appendingPathComponent`, literals, interpolation, `+` and `let` constants.
+
+**Environment.** `ProcessInfo.processInfo.environment["X"]`, through `!`, parentheses, `??` with a
+plain string literal and string methods such as `trimmingCharacters` and `lowercased`. The read
+may be stored in a `let`. A reassigned `var` is not followed, and Vapor's `Environment.get("X")`
+is not a read.
+
+**Manifests.** `Package.swift`. See SwiftPM in section 8.5.
+
+**Channels.** Swift has no channel reading in 1.0.
+
+**Known limits.**
+
+- `dataTask(with:)` and a Hummingbird controller's `addRoutes` are not read.
+- A middleware built in `grouped(..)` adds no path, and a path Meada does not read yields no
+  route.
+- A module that is not a target of the repository is external.
+- All the dependencies of the nearest `Package.swift` apply to the files below it, without
+  separating what each target declares.
+
 ## 10. Shape drift
 
 A contract's **shape** is what it carries, recorded as a set of field paths (`items[].id`;
@@ -1320,6 +1593,12 @@ Program starts, per language:
   without a leading `_`, or those of a literal `__all__`.
 - **Rust:** the `fn main` of each binary, in `src/main.rs`, `src/bin/` or `[[bin]] path`.
 - **Go:** `func main` in a `package main`.
+- **Java:** `public static void main` with a `String[]` or `String...` parameter.
+- **Kotlin:** a top-level `fun main`.
+- **C#:** a `static Main` (any signature) and, in a file with top-level statements, the symbol
+  `Main`.
+- **Swift:** a type marked `@main` (through its `main()` when it declares one) and the top-level
+  statements of a `main.swift`, in the symbol `main`.
 - **TypeScript and JavaScript:** there is no `program` kind; the doors are the routes, the channel
   handlers and the exported functions that nobody calls.
 

@@ -23,7 +23,8 @@ this ADR records it with its order and its acceptance numbers.
 - Languages: TypeScript and JavaScript first, then Python, Go, Java, Kotlin, C#, Swift and Rust
   (ADR 0007). (Amended 2026-10-21: 1.0 ships TypeScript and JavaScript, Python, Go and
   Rust; Java, Kotlin, C# and Swift move to Release 2 and arrive as 1.x minors, which the
-  stability rule of Spec R1 allows, since a language pack is an additive change.)
+  stability rule of Spec R1 allows, since a language pack is an additive change.) (Amended
+  2026-10-31: all nine languages ship in 1.0, see Amendment below.)
 - Communities and processes, computed deterministically.
 - The MCP surface of ADR 0008, distribution and community practice of ADR 0010.
 
@@ -34,7 +35,8 @@ this ADR records it with its order and its acceptance numbers.
 - 1.0 is the semver stability promise: MCP tool names and shapes, CLI flags and the config
   format. It is tagged only when the whole v1 scope exists and the acceptance numbers below are
   met. (Amended 2026-10-21: the 1.0 scope is the v1 scope without the four Release 2
-  packs.)
+  packs.) (Amended 2026-10-31: the four packs are in 1.0, so the 1.0 scope is the whole v1
+  scope again, see Amendment below.)
 - The announced launch happens when every differentiator exists for TypeScript and JavaScript,
   which is the end of track A. Earlier releases are public but quiet.
 
@@ -92,7 +94,8 @@ Acceptance:
 - **1.0 freezes the API and languages arrive in 1.x.** Semver allows additive minors, so this
   would work. The maintainer chose a feature-complete 1.0 instead. (Amended 2026-10-21: adopted
   for Java, Kotlin, C# and Swift, so that the release rites and the npm installer wait on no
-  pack; TypeScript and JavaScript, Python, Go and Rust stay in 1.0.)
+  pack; TypeScript and JavaScript, Python, Go and Rust stay in 1.0.) (Amended 2026-10-31: the
+  four packs landed before 1.0.0 was tagged, see Amendment below.)
 - **One sequential queue of milestones.** Slower, and no parallelism between differentiators and
   languages.
 - **Breadth-first languages.** The differentiators would arrive late.
@@ -104,3 +107,18 @@ Acceptance:
 - 1.0 is far from the first release. Until then the 0.x series carries no stability promise.
 - Tracks A, B and C all build on the seams of the v0.1 trunk, so a change to a seam after the
   trunk touches every track.
+
+## Amendment (2026-10-31): the four packs ship in 1.0
+
+The 2026-10-21 amendments moved Java, Kotlin, C# and Swift to Release 2, to arrive as 1.x
+minors. They did not wait: the four packs were merged on `main` before the `1.0.0` tree was
+prepared (Java, spec #26, #351; Kotlin, spec #27, #357; C#, spec #28, #364; Swift, spec #29,
+#384), and `1.0.0` carries them. The registered language packs are TypeScript and JavaScript
+(one pack), Python, Rust, Go, Java, Kotlin, C# and Swift, nine languages.
+
+- **Scope.** The 1.0 scope is the whole v1 scope of this ADR: the language list of "Scope of
+  v1" holds as first written, and there is no Release 2 for languages. The 2026-10-21
+  amendments above record the plan of that day and stay as history.
+- **Stability.** The four packs sit under the 1.x promise as the other five do: what 1.x freezes
+  is the surface (tool names and shapes, CLI, config, export), and a better resolution of what
+  a pack finds is a fix, not a break.
