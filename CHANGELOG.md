@@ -16,6 +16,15 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- No manifest error quotes a written value (#545), after #449 stopped serde's `invalid type` and
+  `invalid value`: `unknown variant` names the key and the values it accepts (`` `workspace.source`:
+  is not one of the values it accepts (`file`, `store`) ``) instead of serde's text, an error no
+  key spans reads "a value is not valid here" instead of serde's message, and the rule errors
+  for `serve.prefix`, `serve.strip`, `serve.documents` and a resource's `kind` name the key and
+  the rule (`` `serve.strip`: must start with `/` ``) instead of the value. The console's cut of
+  an error to its position stays as a second guard (it still covers an error built outside
+  `describe` that names an identity). English and pt-BR texts changed; the workspace validation
+  fixture changed only by the new texts.
 - The deploy fetch reads a `[[repository]]` entry by its own keys (#544): any table header ends
   the entry before it, so a `[[repository.peer]]` or `[[repository.resource]]` table no longer
   replaces its `repo` or `path`, and a value is the text between its quotes, so a trailing

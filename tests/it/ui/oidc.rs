@@ -472,7 +472,9 @@ fn a_viewer_s_grant_bounds_every_view() {
     assert_eq!(entries(&gateway).0, [GATEWAY]);
     assert_eq!(entries(&all).0, [WEB, GATEWAY]);
 
-    // On disk, an error quoting a value of `GATEWAY`'s entry: only its position for `web`.
+    // On disk, an error in `GATEWAY`'s entry that was written with its identity as the value: no
+    // error `describe` words quotes a written value (#545), so no viewer sees the identity, and `web`
+    // sees what `all` sees. The cut to a position is a second guard (`ui::cut_named`).
     let broken = head(&base).replace(
         "path = \"../gateway\"\n",
         &format!("path = \"../gateway\"\nserve.strip = \"{GATEWAY}\"\n"),
@@ -481,9 +483,12 @@ fn a_viewer_s_grant_bounds_every_view() {
     let errors = |token: &str| ask(&console, "/api/v1/manifest", token).json()["errors"].clone();
     let whole = errors(&all);
     let line = whole[0].as_str().unwrap();
-    assert!(line.contains(GATEWAY), "{line}");
-    let position = line.split(": ").next().unwrap();
-    assert_eq!(errors(&web), json!([position]));
+    assert!(
+        line.contains("`repository.serve.strip`: must start with `/`"),
+        "{line}"
+    );
+    assert!(!whole.to_string().contains(GATEWAY), "{whole}");
+    assert_eq!(errors(&web), whole);
     assert_eq!(errors(&gateway), whole);
     let broken_peer = nested.replace(
         &format!("repo = \"{UNLISTED}\"\n"),
@@ -493,7 +498,7 @@ fn a_viewer_s_grant_bounds_every_view() {
     let whole = errors(&all);
     assert!(!whole.as_array().unwrap().is_empty(), "{whole}");
     assert!(!whole.to_string().contains(UNLISTED), "{whole}");
-    // The message names the key and the expected type only, so there is nothing to cut.
+    // The message names the key and the expected type only, so no viewer sees the value.
     assert_eq!(errors(&web), whole);
 
     assert_leaks_nothing(&console.stderr(), &[&web, &gateway, &all]);
@@ -514,11 +519,13 @@ fn manifest_errors_hide_identities_known_only_through_groups() {
         &format!("path = \"../web\"\nserve.strip = \"{HIDDEN}\"\n"),
     );
     write_manifest(&dir, &broken, &ui_oidc());
+    // The error does not quote the identity, for the whole view or a restricted one (#545).
     let whole = ask(&console, "/api/v1/manifest", &token(&["*"])).json();
-    assert!(whole["errors"].to_string().contains(HIDDEN), "{whole}");
+    assert!(!whole["errors"].as_array().unwrap().is_empty(), "{whole}");
+    assert!(!whole["errors"].to_string().contains(HIDDEN), "{whole}");
     let restricted = ask(&console, "/api/v1/manifest", &token(&[WEB])).json();
     assert!(!restricted.to_string().contains(HIDDEN), "{restricted}");
-    assert!(!restricted["errors"].as_array().unwrap().is_empty());
+    assert_eq!(restricted["errors"], whole["errors"]);
 
     // A new on-disk group may have the wrong scalar shape, so it never reached loaded state.
     const NEW: &str = "private.example/group/new";

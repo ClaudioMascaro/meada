@@ -357,7 +357,7 @@ fn manifest_errors_name_the_file_the_line_and_the_key() {
         (
             "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
              path = \"../chain-web\"\n\n[repository.serve]\nprefix = \"edge\"\n",
-            "meada: ops/meada.workspace.toml:8: `repository.serve.prefix`: `edge` must start with `/`\n",
+            "meada: ops/meada.workspace.toml:8: `repository.serve.prefix`: must start with `/`\n",
         ),
         // An owner belongs to a workspace version (ADR 0015): a static manifest names the key
         // of the first entry that holds one, and `source = "store"`.
@@ -528,8 +528,8 @@ fn the_workspace_section_is_read_in_every_build() {
     let mut cases = vec![
         (
             "index_dir = \"../indexes\"\n\n[workspace]\nsource = \"git\"\n",
-            "meada: ops/meada.workspace.toml:4: `workspace.source`: unknown variant `git`, \
-             expected `file` or `store`\n",
+            "meada: ops/meada.workspace.toml:4: `workspace.source`: is not one of the values it accepts \
+             (`file`, `store`)\n",
         ),
         (
             "index_dir = \"../indexes\"\n\n[workspace]\nrepositories = \"store\"\n",

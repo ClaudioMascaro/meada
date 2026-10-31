@@ -53,13 +53,23 @@ pub enum Msg<'a> {
         expected: Kind,
     },
     InvalidValue(&'a str),
-    NotInRepository(&'a str),
+    /// A path that is absolute or climbs out of the repository; the path is not quoted.
+    NotInRepository,
     KeyUnknown {
         key: &'a str,
         file: &'a str,
     },
-    NotLowercase(&'a str),
-    NoLeadingSlash(&'a str),
+    /// A key with a fixed set of values, and the values it accepts (the schema's, not input).
+    UnknownVariant {
+        key: &'a str,
+        accepted: &'a [&'a str],
+    },
+    /// An error no key of the file spans: its line is all there is to say.
+    NoKey,
+    /// A `kind` that is not a lowercase identifier; the value is not quoted.
+    NotLowercase,
+    /// A `[serve]` rewrite without its leading `/`; the value is not quoted.
+    NoLeadingSlash,
     Empty,
     OwnerNotString,
     OwnerTooLong,
@@ -113,28 +123,40 @@ impl Msg<'_> {
                 format!("`{key}`: has an invalid value"),
                 format!("`{key}`: tem um valor inválido"),
             ),
-            Msg::NotInRepository(path) => pick(
-                format!("`{path}` is not a path inside the repository"),
-                format!("`{path}` não é um caminho dentro do repositório"),
+            Msg::NotInRepository => pick(
+                "must be a path inside the repository".into(),
+                "deve ser um caminho dentro do repositório".into(),
             ),
             Msg::KeyUnknown { key, file } => pick(
                 format!("`{key}` is not a {file} key"),
                 format!("`{key}` não é uma chave do {file}"),
             ),
-            Msg::NotLowercase(value) => pick(
-                format!(
-                    "`{value}` is not a lowercase identifier \
-                     (ASCII letters, digits and hyphens, starting with a letter)"
-                ),
-                format!(
-                    "`{value}` não é um identificador em minúsculas \
-                     (letras ASCII, dígitos e hífens, começando por uma letra)"
-                ),
+            Msg::UnknownVariant { key, accepted } => {
+                let list = accepted
+                    .iter()
+                    .map(|v| format!("`{v}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                pick(
+                    format!("`{key}`: is not one of the values it accepts ({list})"),
+                    format!("`{key}`: não é um dos valores que aceita ({list})"),
+                )
+            }
+            Msg::NoKey => pick(
+                "a value is not valid here".into(),
+                "um valor não é válido aqui".into(),
             ),
-            Msg::NoLeadingSlash(value) => pick(
-                format!("`{value}` must start with `/`"),
-                format!("`{value}` deve começar com `/`"),
+            Msg::NotLowercase => pick(
+                "must be a lowercase identifier \
+                 (ASCII letters, digits and hyphens, starting with a letter)"
+                    .into(),
+                "deve ser um identificador em minúsculas \
+                 (letras ASCII, dígitos e hífens, começando por uma letra)"
+                    .into(),
             ),
+            Msg::NoLeadingSlash => {
+                pick("must start with `/`".into(), "deve começar com `/`".into())
+            }
             Msg::Empty => pick("is empty".into(), "está vazio".into()),
             Msg::OwnerNotString => pick(
                 "must be one string, the name of one group".into(),

@@ -58,10 +58,10 @@
     "text": "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n[repository.serve]\nprefix = \"edge\"\n",
     "errors": {
       "en": [
-        "entries:5: `repository.serve.prefix`: `edge` must start with `/`"
+        "entries:5: `repository.serve.prefix`: must start with `/`"
       ],
       "pt-BR": [
-        "entries:5: `repository.serve.prefix`: `edge` deve começar com `/`"
+        "entries:5: `repository.serve.prefix`: deve começar com `/`"
       ]
     }
   },
