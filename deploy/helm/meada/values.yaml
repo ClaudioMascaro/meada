@@ -48,11 +48,13 @@ workspace:
     path = "/data/mirrors/meada"
   # Runs outside Meada. Fetch and index finish before a module-free node starts. It reads the
   # repositories from $1 when given (under modules.oidc.github, the file `meada workspace show
-  # --pulled` writes), else from the bootstrap manifest. A failed fetch stops the refresh before
+  # --pulled` writes), else from workspace.repositories (mounted as repositories.toml, the
+  # operator's list even when workspace.source=store leaves it out of the bootstrap). A mirror
+  # whose origin carries credentials is refused, and a failed fetch stops the refresh before
   # publication (#316); no line carries a URL or a token.
   fetch: |
     set -eu
-    list=${1:-/etc/meada/meada.workspace.toml}
+    list=${1:-/etc/meada/repositories.toml}
     pairs=$(awk '
       /^\[\[repository\]\]/ { if (repo != "" || path != "") print repo " " path; repo = ""; path = "" }
       /^repo = "/ { repo = $0; sub(/^repo = "/, "", repo); sub(/"$/, "", repo) }
@@ -68,12 +70,20 @@ workspace:
         *//*|*/../*|*/./*) echo 'Invalid repository path' >&2; exit 1 ;;
       esac
       case "$path" in
-        */../*|*/..) echo "refresh: the path of $identity must stay under /data/mirrors" >&2; exit 1 ;;
+        *//*|*/../*|*/..|*/./*|*/.) echo "refresh: the path of $identity must stay under /data/mirrors" >&2; exit 1 ;;
         /data/mirrors/?*) ;;
         *) echo "refresh: the path of $identity must stay under /data/mirrors" >&2; exit 1 ;;
       esac
       mkdir -p /data/mirrors
       if [ -d "$path/.git" ]; then
+        origin=$(git -c "safe.directory=$path" -C "$path" remote get-url origin 2>/dev/null || true)
+        case "$origin" in
+          https://*|http://*)
+            host=${origin#*://}
+            case "${host%%/*}" in
+              *@*) echo "refresh: the origin of $identity takes a URL without credentials; give git a credential helper" >&2; exit 1 ;;
+            esac ;;
+        esac
         git -c "safe.directory=$path" -C "$path" fetch --depth 1 origin HEAD &&
           git -c "safe.directory=$path" -C "$path" checkout --detach FETCH_HEAD
       else

@@ -106,7 +106,7 @@ impl Msg<'_> {
                 let (en, pt) = expected.words();
                 pick(
                     format!("`{key}`: has the wrong type ({en} was expected)"),
-                    format!("`{key}`: tem o tipo errado (era esperado {pt})"),
+                    format!("`{key}`: tem o tipo errado (esperava-se {pt})"),
                 )
             }
             Msg::InvalidValue(key) => pick(

@@ -249,7 +249,7 @@ pub(super) fn providers(code: &Code) -> Vec<Found> {
     let mut routes = Vec::new();
     for (&path, facts) in code.files() {
         let mut touched = false;
-        let mut unread = Unread::default();
+        let mut walked = Unread::default();
         for (n, call) in facts.calls.iter().enumerate() {
             let member = call.callee.rsplit('.').next().unwrap_or_default();
             if !matches!(
@@ -299,7 +299,7 @@ pub(super) fn providers(code: &Code) -> Vec<Found> {
                     // A child Meada cannot read is a call it does not follow: the routers
                     // given to it are mounted there, so served nowhere.
                     if children.is_empty() {
-                        for unread in axum_unread(code, &mut unread, path, &call.scope, child) {
+                        for unread in axum_unread(code, &mut walked, path, &call.scope, child) {
                             mounts.entry(unread).or_default();
                         }
                     }
@@ -308,7 +308,7 @@ pub(super) fn providers(code: &Code) -> Vec<Found> {
                 ("route_service" | "fallback_service", args) => {
                     for unread in args
                         .iter()
-                        .flat_map(|a| axum_unread(code, &mut unread, path, &call.scope, a))
+                        .flat_map(|a| axum_unread(code, &mut walked, path, &call.scope, a))
                     {
                         mounts.entry(unread).or_default();
                     }
@@ -320,7 +320,7 @@ pub(super) fn providers(code: &Code) -> Vec<Found> {
         // Meada cannot follow it: it is served nowhere.
         if touched {
             for (scope, value) in code.rebound(path) {
-                for unread in axum_unread(code, &mut unread, path, scope, value) {
+                for unread in axum_unread(code, &mut walked, path, scope, value) {
                     mounts.entry(unread).or_default();
                 }
             }

@@ -419,8 +419,12 @@ its proxy preserves Host, Origin and Authorization. MCP keeps its separate admis
 
 Managed writers pull the workspace before the external fetch, index and publish, inside one
 refresh lock. A failed stage ends the job before publish, so the pointer stays (#316, ADR
-0012): the compose `fetch.sh` refuses URLs carrying credentials and names the identity whose
-fetch failed, and `meada index --workspace` ends a failure with the stage and the count.
+0012): the compose `fetch.sh` and `fetch-pulled.sh` and the chart's default `workspace.fetch`
+refuse URLs carrying credentials, and an existing mirror whose `origin` carries them (#445),
+and name the identity whose fetch failed (#444), and `meada index --workspace` ends a failure
+with the stage and the count. Without `$1` (the pulled list under `[oidc.github]`) the chart's
+fetch reads `workspace.repositories`, mounted as `repositories.toml`, since a store-sourced
+bootstrap has no `[[repository]]`.
 Seeding and applying the first version are explicit operator actions. The fetch list/script and
 mirror provisioning still belong to the operator: applying a new identity or path does not
 clone it. `scripts/compose-check` and `scripts/helm-check` check the rendered
@@ -1177,8 +1181,10 @@ one for the area a change touches.
   and a generation document's entry blocks holding an `owner` or an `added_by` are refused (`snapshot/pull.rs`). The current version is
   `{<key_prefix>}:workspace`, a hash `{id, fence}` under the pointer's hash tag (`pointer_key`,
   read by `current`, moved by `meada workspace apply`, #302). `import` (`meada workspace import
-  <file> --message <text> [--author <name>] --workspace <bootstrap manifest>`) reads the file's
-  `[[repository]]` entries through `meada_core::manifest::validate_import`, names each other
+  <file> --message <text> [--author <name>] --workspace <bootstrap manifest>`) reads the file
+  once (`read_import`, bounded by `VERSION_MAX`; the CLI audits the id of that same text, and a
+  file it cannot read writes no audit record, #450), takes its `[[repository]]` entries through
+  `meada_core::manifest::validate_import`, names each other
   top-level key on stderr as not imported (`Msg::WorkspaceNotImported`), and validates before
   `Store::connect`; entries whose document is stored upload nothing and answer it with its first
   author and message (`Msg::WorkspaceStored`). Shared `store_version` checks the serialized
@@ -4189,7 +4195,11 @@ qualification budget does (ADR 0017).
   served at the root; so is one whose `nest` prefix cannot be read, or that is mounted on a
   router Meada cannot read. A router handed to a call that is neither a mount nor a wrapper
   of one in its arguments (a router put in a struct, a closure capture) is not told from one
-  nothing mounts.
+  nothing mounts. The axum reading of those unread values (`axum_unread`) walks each value
+  once per file (its `Unread` state keeps the values walked across the file's starts), and asks
+  `Code::origins` only of a call whose builder chain (`Code::chain`) goes through methods a
+  router hands back, and of a name not written (`Code::written`) as text, a path, a number, a
+  boolean or a character (`is_plain`, by the last path segment) (#431).
 - `http/kotlin.rs` (spec #27, #98): a scope holding a `route` call whose lambda is not read (one
   nested past the Kotlin pack's `DEFINITION_DEPTH`, or a block passed as a function reference,
   `route(path, Route::orders)`) registers nothing: its routes and routing extension calls, the

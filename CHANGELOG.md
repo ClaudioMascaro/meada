@@ -85,23 +85,25 @@ All notable changes to Meada are recorded here. The format follows
   than 256 usings (`PROJECT_USINGS`) marks each of them with the new `Facts::usings`, which a new
   status line names (`Msg::FileTooManyUsings`, with the count). Kotlin's `misparsed` file stays
   `unbuilt` (a grammar defect, not a limit). An index built before this change keeps a Java,
-  Kotlin or Swift file dropped by its budget as `unbuilt` until the file changes. No limit changed. The `cli.status-budget` goldens gained the new cases; no stored
-  format golden changed (the new field is absent from every sample), so the schema version is the
-  same.
+  Kotlin or Swift file dropped by its budget as `unbuilt` until the file changes. No limit
+  changed. The `cli.status-budget` goldens gained the new cases; no stored format golden changed
+  (the new field is absent from every sample), so the schema version is the same.
 - Resolution: the receiver and call depth (`RECEIVER_DEPTH`) is one count for the whole lookup
   (#432, from #417), carried through a glob, an alias or an on-demand import as the link count is,
   so a chain that alternates receivers and imports costs its length, not `RECEIVER_DEPTH` per link
   up to `LINK_DEPTH`. No limit changed and no answer under the limits; no golden changed.
 - Helm: the default `workspace.fetch` (#444, from #316) reads the repositories from `$1` when
-  given (the pulled list under `modules.oidc.github`) else from the bootstrap manifest, refuses a
-  URL carrying a credential, and on failure prints `refresh: fetch failed for <identity>; the
-  refresh stops before publication` and exits nonzero without echoing a URL or token.
-  `scripts/helm-check` asserts the three behaviors on the rendered script; the chart READMEs
-  describe it.
-- `meada workspace import` reads its file once, bounded by the version size limit, and audits the
-  id of the text it stored (#450); a file past the bound or not a regular file is refused before
-  any audit record is written.
-
+  given (the pulled list under `modules.oidc.github`) else from `workspace.repositories`, now
+  mounted as `repositories.toml` so a store-sourced refresh, whose bootstrap lists none, still
+  fetches the operator's list, refuses a URL carrying a credential and, as the compose
+  scripts do (#445), an existing mirror whose `origin` carries one, keeps each mirror strictly
+  under `/data/mirrors`, and on failure prints `refresh: fetch failed for <identity>; the refresh
+  stops before publication` and exits nonzero without echoing a URL or token.
+  `scripts/helm-check` runs the rendered script under `sh` with a stub `git` to check these; the
+  chart READMEs describe it.
+- Workspace import (#450): `meada workspace import` reads its file once, bounded by the version
+  size limit, and audits the id of the text it stored; a file past the bound or not a regular
+  file is refused before any audit record is written.
 - Manifest type errors (#449): a `meada.toml` or workspace manifest key of the wrong type, or
   with an invalid value, reports the key and the expected kind (`` `oidc.entra`: has the wrong
   type (a table was expected) ``) instead of serde's message, which echoed the written value, so a

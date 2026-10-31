@@ -11130,7 +11130,7 @@ mod kotlin_tests {
             .collect();
         let took = start.elapsed();
         assert!(took.as_secs() < 10, "{took:?}");
-        // The call in `m{i}` reads `n - 1 - i` receivers down the chain: it is known up to the
+        // The call in `p{i}/M.kt` reads `n - 1 - i` receivers down the chain: it is known up to the
         // limit, whichever imports it crosses, and cut past it.
         for (i, known) in exact.iter().enumerate() {
             assert_eq!(*known, i + RECEIVER_DEPTH + 1 >= n, "call {i} of {n}");
