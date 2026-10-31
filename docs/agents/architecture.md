@@ -432,8 +432,9 @@ refresh lock. A failed stage ends the job before publish, so the pointer stays (
 0012): the compose `fetch.sh` and `fetch-pulled.sh` and the chart's default `workspace.fetch`
 refuse URLs carrying credentials, and an existing mirror whose `origin` carries them (#445),
 and name the identity whose fetch failed (#444), and `meada index --workspace` ends a failure
-with the stage and the count. Without `$1` (the pulled list under `[oidc.github]`) the chart's
-fetch reads `workspace.repositories`, mounted as `repositories.toml`, since a store-sourced
+with the stage and the count. The fetch reads each `[[repository]]` table by its own keys, one
+awk program that `fetch-pulled.sh` and `workspace.fetch` carry and a test compares (#544).
+Without `$1` (the pulled list under `[oidc.github]`) the chart's fetch reads `workspace.repositories`, mounted as `repositories.toml`, since a store-sourced
 bootstrap has no `[[repository]]`.
 Seeding and applying the first version are explicit operator actions. The fetch list/script and
 mirror provisioning still belong to the operator: applying a new identity or path does not

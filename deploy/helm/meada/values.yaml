@@ -56,10 +56,18 @@ workspace:
     set -eu
     list=${1:-/etc/meada/repositories.toml}
     pairs=$(awk '
-      /^\[\[repository\]\]/ { if (repo != "" || path != "") print repo " " path; repo = ""; path = "" }
-      /^repo = "/ { repo = $0; sub(/^repo = "/, "", repo); sub(/"$/, "", repo) }
-      /^path = "/ { path = $0; sub(/^path = "/, "", path); sub(/"$/, "", path) }
-      END { if (repo != "" || path != "") print repo " " path }
+      # Reads the keys of each [[repository]] table itself: any table header ends the entry before
+      # it, so a [[repository.peer]] or [[repository.resource]] table adds nothing. A value is the text
+      # between its quotes. Basic strings only: an identity and a mirror path carry no literal string,
+      # multi-line string or escape, and no multi-line array with a line that starts with [. The same
+      # program is in deploy/compose/fetch-pulled.sh and the chart workspace.fetch (values.yaml); a
+      # test fails when the two drift (#544).
+      function value(line) { sub(/^[^"]*"/, "", line); sub(/".*$/, "", line); return line }
+      function flush() { if (inrepo && (repo != "" || path != "")) print repo " " path; repo = ""; path = "" }
+      /^[ \t]*\[/ { flush(); inrepo = ($0 ~ /^[ \t]*\[\[repository\]\]/); next }
+      inrepo && /^[ \t]*repo[ \t]*=[ \t]*"/ { repo = value($0) }
+      inrepo && /^[ \t]*path[ \t]*=[ \t]*"/ { path = value($0) }
+      END { flush() }
     ' "$list")
     [ -n "$pairs" ] || exit 0
     while read -r identity path; do

@@ -16,6 +16,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- The deploy fetch reads a `[[repository]]` entry by its own keys (#544): any table header ends
+  the entry before it, so a `[[repository.peer]]` or `[[repository.resource]]` table no longer
+  replaces its `repo` or `path`, and a value is the text between its quotes, so a trailing
+  comment is not part of it. Before, such a version stopped the Compose refresh and let the chart
+  clone the peer's repository into the entry's path (or into a directory named after the
+  comment). `fetch-pulled.sh` and the chart's `workspace.fetch` carry one awk program, and a
+  test fails when the two copies drift. No golden changed.
 - A repository identity on the `[oidc.github]` host compares without case wherever it meets the
   catalog (#508): the roles job gives a selected `github.com/Acme/API` and the catalog's
   `github.com/acme/api` one `both` row keyed as written, the `max_repositories` cap does not
