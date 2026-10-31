@@ -14,7 +14,7 @@ pairs=$(awk '
   # test fails when the two drift (#544).
   function value(line) { sub(/^[^"]*"/, "", line); sub(/".*$/, "", line); return line }
   function flush() { if (inrepo && (repo != "" || path != "")) print repo " " path; repo = ""; path = "" }
-  /^[ \t]*\[/ { flush(); inrepo = ($0 ~ /^[ \t]*\[\[repository\]\]/); next }
+  /^[ \t]*\[/ { flush(); inrepo = ($0 ~ /^[ \t]*\[\[[ \t]*repository[ \t]*\]\]/); next }
   inrepo && /^[ \t]*repo[ \t]*=[ \t]*"/ { repo = value($0) }
   inrepo && /^[ \t]*path[ \t]*=[ \t]*"/ { path = value($0) }
   END { flush() }

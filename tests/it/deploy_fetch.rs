@@ -75,6 +75,13 @@ fn the_deploy_fetch_reads_each_repository_table_by_its_own_keys() {
     let rows = "[[repository]]\nrepo = \"github.com/a/web\"\npath = \"/data/mirrors/web\"\n\
                 [[repository]]\nrepo = \"github.com/b/api\"\npath = \"/data/mirrors/api\"\n";
     assert_eq!(parse(rows), both, "two entries in a row");
+    let spaced = "[[ repository ]]\nrepo = \"github.com/a/web\"\npath = \"/data/mirrors/web\"\n\
+                  [[ repository.peer ]]\nrepo = \"x\"\n";
+    assert_eq!(
+        parse(spaced),
+        want,
+        "spaces inside the brackets of a header"
+    );
     let before = "repo = \"github.com/x/y\"\n[[repository]]\nrepo = \"github.com/a/web\"\n";
     assert_eq!(
         parse(before),
