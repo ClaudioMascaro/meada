@@ -294,7 +294,8 @@ Delivered by #346 (ADR 0022's proposal server; ADR 0022 "As built (#346)"), feat
 (`ui::proposals`, a `WorkspacesCommand::Mcp` that `main` serves as it serves `meada ui`): a
 `Console` started for it (`for_proposals`: every Postgres session read-only through
 `Manifest::read_only` and `postgres::Config::read_only`, the audit off, no SCIM, front end or
-GitHub App; `Holds::of`, `directory_of` and `Session::admitted` are the console's own), the hyper
+GitHub App; `Holds::of`, `directory_of`, `grant::Providers::of` and `Session::admitted` are the
+console's own), the hyper
 listener of `mcp::serve_http` with its own route (`Origin` 403, the protected resource metadata,
 `Oidc::admit_console` with `[proposals] audience` and the directory's block, `/` only, a semaphore
 of calls in flight, the body bound) and an rmcp `StreamableHttpService` of four read-only tools,
@@ -377,7 +378,7 @@ each context with the identities the sponsor rule excluded from its version (`ex
 `snapshot/pull.rs` checks them; `snapshot/serve.rs` `Held::context` builds a context once, and
 `Held::admits` and `Held::viewable` decide a workspace route and its 404 list with
 `named::visible` over every entry of the recorded version, excluded ones included, with no
-operator exemption (the token's grant through `oidc::Grant::core`, as the console maps it);
+operator exemption (the token's grant through `grant::Grant::core`, as the console maps it);
 `mcp.rs` routes `/-/workspaces/<id>/<identity>` and `Engine::open_context` opens it;
 `meada-core/src/named.rs` holds the pure rules (`creation`, `visible`, `answers`, `shown`,
 `unsponsored`, names, named entries and their version id) that the Rust table test, the console
@@ -395,7 +396,7 @@ and the console alike); `github_app/catalog.rs` is the job's installation listin
 (`GET /installation/repositories`, every page, for each installation of the host's Apps whose
 owner some pattern names, under ADR 0013's tokens and throttle marks; a failure, a throttle or a
 set above the cap fails the run before anything is written); migration 6 is
-`permission_repositories.source` (`selected`, `catalog` or `both`); `oidc/permissions.rs` loads
+`permission_repositories.source` (`selected`, `catalog` or `both`); `grant/permissions.rs` loads
 the catalog beside the rows (`Catalog`, the identities `catalog` or `both` and `listed`, only
 with `[catalog]`) and answers per subject (`Permissions::catalog`: the whole fresh catalog for the
 platform administrator, else the catalog intersected with the identities the login holds an
@@ -489,9 +490,12 @@ one for the area a change touches.
   is left and exits 0 without waiting for the runtime's threads. Every request goes through
   `Gate` before routing, after the `Origin` check: in the default build, or with no `[oidc]`, it
   lets everything through; with `[oidc]` (feature `oidc`) it is `oidc::Oidc::admit`, which
-  answers itself (the protected resource metadata, a 401) or hands routing a `Pass`, whose grant routing checks
-  at an endpoint (`Pass::refused`, the 403) and filters every 404 listing through
-  (`Pass::reads`). Routing then puts the `Pass` in the request's extensions, which rmcp's
+  answers itself (the protected resource metadata, a 401) or hands routing a `Pass`, which
+  carries only a `grant::Grant`, whichever verifier produced it: routing checks it at an
+  endpoint (`Gate::refused`, the 403 in the admitting verifier's words) and filters every 404
+  listing through it (`Pass::reads`). The gate builds the node's grant providers once
+  (`grant::Providers::of` the manifest) and hands them to the verifier, and `mcp::run` starts
+  their permissions poll (`Providers::listening`) once the address is printed. Routing then puts the `Pass` in the request's extensions, which rmcp's
   stateless transport hands the tool inside the request's `http::request::Parts`:
   `Meada::answer` opens the engine (`open_listed`, `open_held`) over `Manifest::workspace` with
   `Pass::reads`, which drops every entry outside the grant before the missing peers are
@@ -697,9 +701,9 @@ one for the area a change touches.
   `[directory]` (`Manifest::read`, which hands it `[directory]` and `[postgres]`,
   `Config::overage`, `Msg::NeedsSections`), each error at `oidc.entra.overage`; `okta` and
   `keycloak` take no table and, as `entra`, change no answer; `[oidc.github]` the GitHub grant
-  provider, `GithubFile::validate` its `Github` (`host` a lowercase host name, `github.com` by
-  default; `login_claim` required and not empty; `roles` a non-empty array of distinct names
-  that `role_ok` takes, 1 to `ROLE_MAX` characters with no control character, `ROLES`, GitHub's
+  provider, `GithubFile::validate` its `login_claim` and its `grant::Github` (`host` a lowercase
+  host name, `github.com` by default; `login_claim` required and not empty; `roles` a non-empty
+  array of distinct names that `grant::role_ok` takes, 1 to `ROLE_MAX` characters with no control character, `ROLES`, GitHub's
   five built-in roles, by default; `max_age_seconds` required, at least `MAX_AGE_MIN`), in a
   build without `postgres` the error naming the feature, without `[postgres]` the error naming
   both (`workspace::Manifest::read`, which also hands it its `[postgres]`, `Github::postgres`);
@@ -724,18 +728,61 @@ one for the area a change touches.
   when none does (`refetch`, at most once per `KID_REFRESH_EVERY`), `exp` and `nbf` with
   `LEEWAY`, `iss`, `aud` against the configured audience or the path's and its identity's
   resources, then the scopes (403 when one is missing). The grant (`Oidc::granted`, once per
-  request, on nodes and in the console; `Granted::union`) is the union of every configured grant
-  provider's identities: the identity provider's claims grant (`Grant::of`, `claims_grant`: the
-  union of `identities_claim` and what `[oidc.groups]` maps the groups of `groups_claim` to, a
-  claim counting only as an array of strings, `*` from either for all) and, with
-  `[oidc.github]`, the GitHub grant (#332), never `*`: the identities the token's login holds an
-  accepted role on in the permissions cache. The login is `login_claim`'s value when it is a
-  string of 1 to 39 ASCII letters, digits, `-` and `_`, lowercased (`permissions::login`); any
-  other value gives no GitHub grant. Under `[oidc.entra] overage = "directory"` the groups the
-  claims grant maps are `Oidc::groups`: the `groups_claim` array, or, for a token in overage, the
-  directory's (see Entra overage below). The permissions cache (`oidc/permissions.rs`, feature
-  `postgres`, `Permissions`) is empty until the listener printed its address (`Oidc::listening`,
-  called by `mcp::run` and `ui::listen`), then a thread reads, every `PERMISSIONS_POLL` (60 s),
+  request, on nodes and in the console; `Granted::union`) is computed by the grant providers
+  (`grant.rs`, below) from what the claims name: `Oidc::groups` and `login_claim`'s value when it
+  is a string go to `Providers::grant`, and the identities `identities_claim` lists join its
+  groups side (`claims_listed`, `Granted::listing`); a claim counts only as an array of strings,
+  `*` from either side for all. That groups side is the identity provider's claims grant, and
+  `Checked::sources` shows it beside the GitHub grant. Under `[oidc.entra] overage = "directory"`
+  the groups are `Oidc::groups`: the `groups_claim` array, or, for a token in overage, the
+  directory's (see Entra overage below). The OIDC module reads no permissions set and keeps no
+  cache: `Oidc::start` takes the process's `grant::Providers`. `[oidc.github]` validates into
+  `grant::Github` (`Config::github`, read through `Manifest::github`) and the OIDC-only
+  `Config::login_claim`; the admission view's `github` is `Providers::admission` with
+  `login_claim` added. Routing checks
+  the grant and it bounds the workspace of each answer and each 404 list (`mcp.rs`). No token, error text
+  of `jsonwebtoken` or claim value is ever printed. With feature `ui`, the console reaches the
+  same checks through `admit_console` (one audience, `[ui] audience`; a `Bearer` challenge with
+  no `resource_metadata`; its `groups`, the session's, and the `operator_groups` match read the
+  same effective groups, those `Oidc::granted` read; it returns a `grant::Admitted`), `check` (a pasted token's outcome per check, signature, issuer,
+  audience as a node checks it, lifetime and scopes, and its grant when every check passes,
+  against the cached keys only, so it never fetches; with `[oidc.github]` its two sides,
+  `Checked::sources`, from the cache) and `admission` (the identity provider's
+  `type`, always present, the issuer's metadata as read at start, the cached key ids, the last
+  read and a refresh that failed since, with its reason and never the answer's body, the
+  groups table bounded by the caller's grant, and with `[oidc.github]` `github`: the host,
+  `login_claim`, `roles`, `max_age_seconds`, the grant's state and the loaded set's id,
+  `finished`, `age_seconds` and the counts the job wrote, `repositories`, `rows` and
+  `exclusions`, or `null` before one is loaded).
+- `grant.rs` (feature `oidc`): the grant providers (ADR 0016), fed by neutral inputs so that any
+  verifier of a subject is a producer of them and none duplicates a grant. `Grant` is what an
+  admitted subject reads (`All` or `Only`, `reads`, `core`); `Github` the GitHub grant provider's
+  settings (`host`, `roles`, `max_age`, its `postgres` and `catalog` filled by `Manifest::read`),
+  which every reader (the node's and the console's providers, the session and the admission
+  view, `meada github-app roles`, the catalog, named workspaces, the proposal server, `status`
+  through `Manifest::excludes`) reaches through `Manifest::github`, the one accessor a later
+  section can also fill; `role_ok` and `ROLE_MAX` the role names it takes. `Providers` is a
+  process's providers, built once from its manifest (`Providers::of`: the groups table of
+  `[oidc.groups]` and `Manifest::github`) by `mcp::Gate::new`, `ui::Console::start` and
+  `Console::for_proposals`, shared through an `Arc` with the verifier, and its permissions
+  cache's poll starts at `Providers::listening` (called by `mcp::run`, `ui::listen` and the
+  proposal server's listener once the address is printed). `Providers::grant(groups, login)` is
+  the grant, with no reference to a token: the groups side (`Granted::claims`, what the table
+  maps `groups` to, a group it lacks granting nothing, `*` all) and, with the GitHub grant
+  provider, the GitHub side (`Granted::github`, `GithubGrant`), never `*`: the identities the
+  login holds an accepted role on in the permissions cache, with the grant's state read at the
+  same instant. The login is kept (`Granted::login`) only under the GitHub grant provider and
+  only when it is 1 to 39 ASCII letters, digits, `-` and `_`, lowercased
+  (`permissions::login`); any other value gives no GitHub grant. `Granted::union` is the grant
+  every check reads. `Providers::github` (the host), `catalog`, `excluded`, `excluded_in` and
+  `admission` are what the console reads of the cache. `Admitted` (feature `ui`) is the neutral
+  admitted subject (subject, global operator flag, groups sorted without repeats, login, grant,
+  and under the GitHub grant provider its host and the grant's state), built by
+  `Admitted::new` from a `Granted`: `Oidc::admit_console` produces one (with the token's
+  `user_claim` beside it, the directory's question), and `ui::Session::admitted` builds the
+  console's and the proposal server's session from it alone. The permissions cache
+  (`grant/permissions.rs`, feature `postgres`, `Permissions`) is empty until the listener
+  printed its address, then a thread reads, every `PERMISSIONS_POLL` (60 s),
   in one `REPEATABLE READ READ ONLY` transaction through `postgres::versioned`, the newest set's
   id, `finished` and age on Postgres's clock (`clock_timestamp() - finished`) and, only when the
   id changed, its counts, its rows whose `role` is in `roles`, keyed by login, its `version`
@@ -754,21 +801,7 @@ one for the area a change touches.
   their checks, and a row whose identity is not on `host` or not a safe identity, whose login or
   role fails its pattern, is skipped with one `Msg::PermissionsBadRow` line naming its table.
   In debug builds `MEADA_PERMISSIONS_POLL_MS` shortens the poll and lowers the floor of
-  `max_age_seconds` to 1 (`max_age_min`), a test knob as `MEADA_DRAIN_MS` is. Routing checks
-  the grant and it bounds the workspace of each answer and each 404 list (`mcp.rs`). No token, error text
-  of `jsonwebtoken` or claim value is ever printed. With feature `ui`, the console reaches the
-  same checks through `admit_console` (one audience, `[ui] audience`; a `Bearer` challenge with
-  no `resource_metadata`; its `groups`, the session's, and the `operator_groups` match read the
-  same effective groups, `Granted::groups`), `check` (a pasted token's outcome per check, signature, issuer,
-  audience as a node checks it, lifetime and scopes, and its grant when every check passes,
-  against the cached keys only, so it never fetches; with `[oidc.github]` its two sides,
-  `Checked::sources`, from the cache) and `admission` (the identity provider's
-  `type`, always present, the issuer's metadata as read at start, the cached key ids, the last
-  read and a refresh that failed since, with its reason and never the answer's body, the
-  groups table bounded by the caller's grant, and with `[oidc.github]` `github`: the host,
-  `login_claim`, `roles`, `max_age_seconds`, the grant's state and the loaded set's id,
-  `finished`, `age_seconds` and the counts the job wrote, `repositories`, `rows` and
-  `exclusions`, or `null` before one is loaded).
+  `max_age_seconds` to 1 (`oidc::max_age_min`), a test knob as `MEADA_DRAIN_MS` is.
 - `ui.rs` (feature `ui`, no crate of its own; `cloud` enables it): the management console's
   process (ADR 0014), `meada ui --listen <addr> --workspace <bootstrap manifest>`,
   on the node's listener (`mcp::serve_http`, `mcp::address`, the same drain); never a node's
@@ -790,8 +823,12 @@ one for the area a change touches.
   one), admission (`Console::admit`), then routing; the 403 bodies are fixed text. Admission:
   behind the operator's proxy every request is a viewer's that reads everything; with `[oidc]`
   (feature `oidc`) a bearer token for `[ui] audience` through the nodes' module
-  (`Oidc::admit_console`), a 401 with `WWW-Authenticate: Bearer` (and `error="invalid_token"`
-  when a token was sent) or a 403 for a missing scope, both as JSON errors. The static files
+  (`Oidc::admit_console`), whose neutral `grant::Admitted` the session is built from alone
+  (`Session::admitted`, as the proposal server's is), a 401 with `WWW-Authenticate: Bearer` (and
+  `error="invalid_token"` when a token was sent) or a 403 for a missing scope, both as JSON
+  errors. The console's grant providers (`Console::providers`, `grant::Providers::of` the
+  bootstrap manifest) are shared with the OIDC module and answer the catalog, the exclusions and
+  the token check's `sources` switch. The static files
   and `config` need no token, since the browser needs them to log in. A verified subject in
   `operator_groups`, or with the top-level `operator_claim` equal to JSON boolean true, is an
   operator; string `"true"` is a viewer. With `[ui] operations = true`, `[workspace] source =
@@ -1038,7 +1075,7 @@ one for the area a change touches.
   `Msg::RolesLinkCycle`), at most `COLLABORATOR_PAGES_MAX` (`Msg::RolesPages`); only the page
   number is followed, so the token reaches no other URL. `collaborator` keeps a row whose login
   `meada_core::manifest::added_by_problem` takes once lowercased and whose `role_name`
-  `oidc::role_ok` takes, else one line naming the identity (`Msg::RolesSkipped`); rows are keyed
+  `grant::role_ok` takes, else one line naming the identity (`Msg::RolesSkipped`); rows are keyed
   by identity and login, the first kept. An entry with `added_by` on the host whose login holds
   no role in `roles` among its repository's rows is excluded (`Msg::RolesExcluded`, the reason
   and never the login). The line on stdout is `Msg::RolesSet`: the set's id, the repositories
@@ -3057,7 +3094,7 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   `CA_MAX` (1 MiB); past either the connection fails, naming the file.
 - `postgres.rs`: `url_file` holds at most `URL_MAX` (4096 bytes) and `ca_file` at most `CA_MAX`
   (1 MiB); past either the connection fails, naming the file.
-- `oidc/permissions.rs`: a process holds every accepted-role row of the newest permissions set in
+- `grant/permissions.rs`: a process holds every accepted-role row of the newest permissions set in
   memory (logins times repositories under an organization base role), loaded whole when the set
   changes; a revocation on GitHub reaches it at the next successful refresh plus at most
   `PERMISSIONS_POLL` (60 seconds), and without one at most `max_age_seconds` after the last.
@@ -3095,14 +3132,14 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   past any of them the request fails (at start, the start is refused; on a refresh, the cached
   keys stay). An identity whose path starts with `.well-known/oauth-protected-resource` is
   unreachable with `[oidc]`, since that path serves the metadata. A role name of
-  `[oidc.github] roles`, and a `role_name` the role check stores, holds at most `ROLE_MAX` (100)
-  characters; a longer `role_name` from GitHub is a skipped row. The `scope` claim is read as a
+  `[oidc.github] roles`, and a `role_name` the role check stores, holds at most `ROLE_MAX` (100,
+  in `grant.rs`) characters; a longer `role_name` from GitHub is a skipped row. The `scope` claim is read as a
   space-separated string; `scp` and arrays are not read. With `audience` unset, the root's 404
   takes a token whose `aud` is `public_url` itself. The caps are inclusive: a body of exactly
   the cap is read. The `oidc` build carries `rsa`, whose RUSTSEC-2023-0071 (Marvin timing) hits
   private-key operations; Meada only verifies with public keys, so it does not apply.
 - `meada-core/src/manifest.rs`: a GitHub login (an entry's `added_by`, and a token's `login_claim`
-  value, which `oidc/permissions.rs` reads through `added_by_problem`) holds at most `ADDED_BY_MAX`
+  value, which `grant/permissions.rs` reads through `added_by_problem`) holds at most `ADDED_BY_MAX`
   (39) characters; a longer one is an error in an entry and no GitHub grant in a token.
 - `audit.rs`: the audit grows without bound, one `<schema>.audit` row per write and refusal, until
   the operator prunes it in SQL; Meada never deletes a record, and a page of `GET /api/v1/audit`

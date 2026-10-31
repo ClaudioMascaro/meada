@@ -1,5 +1,6 @@
-//! The GitHub grant at admission (#332, ADR 0016): a process with `[oidc.github]` keeps the
-//! newest permissions set `meada github-app roles` wrote in memory, keyed by login. A thread
+//! The GitHub grant at admission (#332, ADR 0016): a process with the GitHub grant provider
+//! (`Manifest::github`, `[oidc.github]`) keeps the newest permissions set `meada github-app
+//! roles` wrote in memory, keyed by login. A thread
 //! reads, every `poll_every()` (`PERMISSIONS_POLL`, 60 seconds), the newest set's id, its
 //! `finished` and its age on Postgres's clock, and loads its rows whose `role` is in `roles` only
 //! when the id changed, in one read-only transaction that sees one set. Admission never waits on
@@ -50,12 +51,12 @@ pub(super) fn poll_every() -> Duration {
 
 /// `MEADA_PERMISSIONS_POLL_MS`, when set to a positive number of milliseconds.
 #[cfg(debug_assertions)]
-pub(super) fn poll_knob() -> Option<u64> {
+pub(crate) fn poll_knob() -> Option<u64> {
     let ms = std::env::var("MEADA_PERMISSIONS_POLL_MS").ok()?;
     ms.parse().ok().filter(|ms| *ms > 0)
 }
 
-/// The cache of one process: `[oidc.github]`, the data layer it reads and what it last read.
+/// The cache of one process: the GitHub grant provider, the data layer it reads and what it last read.
 pub(super) struct Permissions {
     github: Github,
     postgres: crate::postgres::Config,
@@ -127,7 +128,7 @@ pub(crate) struct Catalog {
     pub(crate) reason: Option<&'static str>,
     pub(crate) set: Option<SetInfo>,
     pub(crate) selectable: BTreeSet<String>,
-    /// `[oidc.github] host`: identities on it compare case-insensitively (#508).
+    /// The GitHub grant provider's `host`: identities on it compare case-insensitively (#508).
     pub(crate) host: String,
 }
 
@@ -172,7 +173,7 @@ impl Permissions {
         std::thread::spawn(move || poll(cache, poll_every()));
     }
 
-    /// `[oidc.github] host`.
+    /// The GitHub grant provider's `host`.
     #[cfg_attr(not(feature = "ui"), allow(dead_code))]
     pub(super) fn host(&self) -> &str {
         &self.github.host
@@ -257,7 +258,6 @@ impl Permissions {
         });
         json!({
             "host": self.github.host,
-            "login_claim": self.github.login_claim,
             "roles": self.github.roles,
             "max_age_seconds": self.github.max_age.as_secs(),
             "grant": self.state_of(state.set.as_ref(), now),
@@ -517,10 +517,10 @@ fn login_ok(login: &str) -> bool {
     meada_core::manifest::added_by_problem(login).is_none()
 }
 
-/// A token's login: `login_claim`'s value when it is a string of 1 to 39 ASCII letters, digits,
-/// `-` and `_`, lowercased, as GitHub compares logins; anything else is none.
-pub(super) fn login(claim: Option<&Value>) -> Option<String> {
-    let login = claim?.as_str()?.to_ascii_lowercase();
+/// A subject's login: `login` when it is 1 to 39 ASCII letters, digits, `-` and `_`, lowercased,
+/// as GitHub compares logins; anything else is none.
+pub(super) fn login(login: Option<&str>) -> Option<String> {
+    let login = login?.to_ascii_lowercase();
     login_ok(&login).then_some(login)
 }
 
@@ -543,7 +543,6 @@ mod tests {
     fn github(max_age: u64) -> Github {
         Github {
             host: "github.com".into(),
-            login_claim: "login".into(),
             roles: vec!["write".into()],
             max_age: Duration::from_secs(max_age),
             postgres: None,
@@ -644,7 +643,8 @@ mod tests {
 
     #[test]
     fn a_login_is_a_short_ascii_string_compared_in_lowercase() {
-        let login = |v: Value| super::login(Some(&v));
+        // A value that is no string is no login: the verifier reads none from it.
+        let login = |v: Value| super::login(v.as_str());
         assert_eq!(login(json!("Ana-Souza_2")).as_deref(), Some("ana-souza_2"));
         assert_eq!(login(json!("a".repeat(39))), Some("a".repeat(39)));
         for refused in [
@@ -790,5 +790,70 @@ mod tests {
         assert_eq!((seen.reason, seen.selectable.len()), (None, 0));
         assert_eq!(cache.catalog(None, false).reason, Some("missing_login"));
         assert_eq!(cache.catalog(None, true).selectable.len(), 1);
+    }
+
+    /// The providers of the groups table `super::tests::table()` and a GitHub grant provider
+    /// whose cache holds `held`.
+    fn providers(held: Option<Set>) -> super::super::Providers {
+        let cache = cache(60);
+        cache.state.write().unwrap().set = held;
+        super::super::Providers {
+            groups: Some(super::super::tests::table()),
+            github: Some(Arc::new(cache)),
+        }
+    }
+
+    #[test]
+    fn the_grant_is_the_union_of_the_groups_side_and_the_login_s_github_grant() {
+        use super::super::tests::{groups, only, sorted};
+        let providers = providers(Some(set(0, Instant::now())));
+        let granted = providers.grant(&groups(&["g"]), Some("Ana"));
+        assert_eq!(granted.login.as_deref(), Some("ana"));
+        let github = granted.github.as_ref().unwrap();
+        assert_eq!(github.state, "current");
+        assert_eq!(sorted(&granted.claims), only(&["b"]));
+        assert_eq!(
+            sorted(&granted.union()),
+            only(&["b", "github.com/acme/api"])
+        );
+        // `*` from a group stays all with the GitHub side beside it.
+        let all = providers.grant(&groups(&["p"]), Some("ana"));
+        assert_eq!(sorted(&all.union()), None);
+        // An unmapped group grants nothing, and the login's rows still do.
+        let unmapped = providers.grant(&groups(&["unmapped"]), Some("ana"));
+        assert_eq!(sorted(&unmapped.union()), only(&["github.com/acme/api"]));
+        assert_eq!(providers.github(), Some("github.com"));
+    }
+
+    #[test]
+    fn a_missing_or_malformed_login_gets_no_github_grant() {
+        use super::super::tests::{groups, only, sorted};
+        let providers = providers(Some(set(0, Instant::now())));
+        for login in [
+            None,
+            Some(""),
+            Some("ana.souza"),
+            Some("ana souza"),
+            Some(&*"a".repeat(40)),
+        ] {
+            let granted = providers.grant(&groups(&["g"]), login);
+            assert_eq!(granted.login, None, "{login:?}");
+            let github = granted.github.as_ref().unwrap();
+            assert_eq!((github.identities.len(), github.state), (0, "current"));
+            assert_eq!(sorted(&granted.union()), only(&["b"]), "{login:?}");
+        }
+    }
+
+    #[test]
+    fn an_expired_or_unread_set_grants_nothing_through_github_and_says_so() {
+        use super::super::tests::{groups, only, sorted};
+        for (held, state) in [(Some(set(61, Instant::now())), "expired"), (None, "unread")] {
+            let providers = providers(held);
+            let granted = providers.grant(&groups(&["g"]), Some("ana"));
+            assert_eq!(granted.login.as_deref(), Some("ana"));
+            let github = granted.github.as_ref().unwrap();
+            assert_eq!((github.identities.len(), github.state), (0, state));
+            assert_eq!(sorted(&granted.union()), only(&["b"]));
+        }
     }
 }

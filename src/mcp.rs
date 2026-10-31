@@ -522,20 +522,23 @@ enum Routes {
 }
 
 /// What admits a request before routing: the OIDC module when the manifest has `[oidc]`
-/// (feature `oidc`), else nothing, the operator's proxy admitting clients (ADR 0011).
+/// (feature `oidc`), else nothing, the operator's proxy admitting clients (ADR 0011). The
+/// verifier feeds the node's grant providers, `providers`.
 #[derive(Clone)]
 struct Gate {
     #[cfg(feature = "oidc")]
     oidc: Option<Arc<crate::oidc::Oidc>>,
+    #[cfg(feature = "oidc")]
+    providers: Arc<crate::grant::Providers>,
 }
 
-/// What a request `Gate` let through may read: every identity, or those its token grants.
-/// Routing hands it to the endpoint in the request's extensions, so a call's workspace holds
-/// only what it may read.
+/// What a request `Gate` let through may read: every identity, or those its grant reads,
+/// whichever verifier admitted it. Routing hands it to the endpoint in the request's
+/// extensions, so a call's workspace holds only what it may read.
 #[derive(Clone)]
 struct Pass {
     #[cfg(feature = "oidc")]
-    token: Option<(Arc<crate::oidc::Oidc>, crate::oidc::Grant)>,
+    grant: Option<crate::grant::Grant>,
 }
 
 impl Gate {
@@ -543,12 +546,18 @@ impl Gate {
     /// check before the listener binds.
     fn new(manifest: &Manifest) -> crate::Result<Self> {
         #[cfg(feature = "oidc")]
-        let oidc = (manifest.oidc.clone().map(crate::oidc::Oidc::start)).transpose()?;
+        let providers = Arc::new(crate::grant::Providers::of(manifest));
+        #[cfg(feature = "oidc")]
+        let start = |config| crate::oidc::Oidc::start(config, providers.clone());
+        #[cfg(feature = "oidc")]
+        let oidc = (manifest.oidc.clone().map(start)).transpose()?;
         #[cfg(not(feature = "oidc"))]
         let _ = manifest;
         Ok(Self {
             #[cfg(feature = "oidc")]
             oidc,
+            #[cfg(feature = "oidc")]
+            providers,
         })
     }
 
@@ -564,14 +573,31 @@ impl Gate {
         if let Some(oidc) = &self.oidc {
             let admit = || oidc.admit(request.headers(), path, identity);
             let grant = tokio::task::block_in_place(admit)?;
-            let token = Some((oidc.clone(), grant));
-            return Ok(Pass { token });
+            return Ok(Pass { grant: Some(grant) });
         }
         let _ = (request, path, identity);
         Ok(Pass {
             #[cfg(feature = "oidc")]
-            token: None,
+            grant: None,
         })
+    }
+
+    /// The 403 for `path`, an endpoint of `identity`, when `pass` may not read it: the challenge
+    /// of the verifier that admitted it.
+    fn refused(
+        &self,
+        pass: &Pass,
+        path: &str,
+        identity: &str,
+    ) -> Option<Response<BoxBody<Bytes, Infallible>>> {
+        #[cfg(feature = "oidc")]
+        if let (Some(oidc), Some(grant)) = (&self.oidc, &pass.grant)
+            && !grant.reads(identity)
+        {
+            return Some(oidc.forbidden(path));
+        }
+        let _ = (pass, path, identity);
+        None
     }
 }
 
@@ -579,7 +605,7 @@ impl Pass {
     /// Whether the request may read `identity`.
     fn reads(&self, identity: &str) -> bool {
         #[cfg(feature = "oidc")]
-        if let Some((_, grant)) = &self.token {
+        if let Some(grant) = &self.grant {
             return grant.reads(identity);
         }
         let _ = identity;
@@ -590,22 +616,10 @@ impl Pass {
     #[cfg(feature = "snapshot")]
     fn grant(&self) -> meada_core::authorize::Grant {
         #[cfg(feature = "oidc")]
-        if let Some((_, grant)) = &self.token {
+        if let Some(grant) = &self.grant {
             return grant.core();
         }
         meada_core::authorize::Grant::All
-    }
-
-    /// The 403 for `path`, an endpoint of `identity`, when the request may not read it.
-    fn refused(&self, path: &str, identity: &str) -> Option<Response<BoxBody<Bytes, Infallible>>> {
-        #[cfg(feature = "oidc")]
-        if let Some((oidc, grant)) = &self.token
-            && !grant.reads(identity)
-        {
-            return Some(oidc.forbidden(path));
-        }
-        let _ = (path, identity);
-        None
     }
 }
 
@@ -689,9 +703,7 @@ fn run(
 ) -> crate::Result<()> {
     serve_http(address, move |_, config| {
         #[cfg(feature = "oidc")]
-        if let Some(oidc) = &gate.oidc {
-            oidc.listening();
-        }
+        gate.providers.listening();
         let routes = Arc::new(routes(config));
         move |request| {
             let (routes, gate) = (routes.clone(), gate.clone());
@@ -889,7 +901,7 @@ async fn route(
             endpoints,
             listing: all,
         } => match endpoints.get(identity) {
-            Some(endpoint) => match pass.refused(identity, identity) {
+            Some(endpoint) => match gate.refused(&pass, identity, identity) {
                 Some(refused) => refused,
                 None => {
                     request.extensions_mut().insert(pass.clone());
@@ -969,7 +981,7 @@ async fn route(
                     if workspace.is_none()
                         && held.listed.entries.iter().any(|l| l.repo == target) =>
                 {
-                    if let Some(refused) = pass.refused(identity, target) {
+                    if let Some(refused) = gate.refused(&pass, identity, target) {
                         return refused;
                     }
                     let id = held.id.clone();
@@ -992,7 +1004,7 @@ async fn route(
                     // A workspace route answers 404 where the plain route would say 403: a 403
                     // would confirm that the id exists.
                     if workspace.is_none()
-                        && let Some(refused) = pass.refused(identity, target)
+                        && let Some(refused) = gate.refused(&pass, identity, target)
                     {
                         return refused;
                     }

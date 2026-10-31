@@ -685,14 +685,15 @@ impl Manifest {
     pub fn read_only(mut self) -> Self {
         use crate::postgres::Config;
         self.postgres = self.postgres.map(Config::read_only);
-        if let Some(oidc) = &mut self.oidc {
-            if let Some(github) = &mut oidc.github {
-                github.postgres = github.postgres.take().map(Config::read_only);
-            }
-            #[cfg(feature = "directory")]
-            if let Some((_, postgres)) = (oidc.overage.as_mut()).and_then(|o| o.lookup.as_mut()) {
-                *postgres = postgres.clone().read_only();
-            }
+        if let Some(github) = self.github_mut() {
+            github.postgres = github.postgres.take().map(Config::read_only);
+        }
+        #[cfg(feature = "directory")]
+        if let Some((_, postgres)) = (self.oidc.as_mut())
+            .and_then(|oidc| oidc.overage.as_mut())
+            .and_then(|overage| overage.lookup.as_mut())
+        {
+            *postgres = postgres.clone().read_only();
         }
         self
     }
@@ -710,10 +711,25 @@ impl Manifest {
     #[cfg(feature = "generation-pointer")]
     pub(crate) fn excludes(&self) -> bool {
         #[cfg(feature = "oidc")]
-        let github = self.oidc.as_ref().is_some_and(|o| o.github.is_some());
+        let github = self.github().is_some();
         #[cfg(not(feature = "oidc"))]
         let github = false;
         self.store && github
+    }
+
+    /// The GitHub grant provider (ADR 0016), as `read` validated it with its `[postgres]` and
+    /// `[catalog]`: `[oidc.github]`. Every reader of the provider's settings (the grant at
+    /// admission, the role check, the catalog, named workspaces, the proposal server, `status`)
+    /// reaches it here.
+    #[cfg(feature = "oidc")]
+    pub(crate) fn github(&self) -> Option<&crate::grant::Github> {
+        self.oidc.as_ref().and_then(|oidc| oidc.github.as_ref())
+    }
+
+    /// `github`, to change.
+    #[cfg(feature = "proposals")]
+    fn github_mut(&mut self) -> Option<&mut crate::grant::Github> {
+        self.oidc.as_mut().and_then(|oidc| oidc.github.as_mut())
     }
 
     /// The `[valkey]` section and the `[[github_app]]` blocks of the manifest at `file`,

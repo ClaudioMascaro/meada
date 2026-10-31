@@ -33,7 +33,7 @@ impl Env {
         let ready = manifest.workspaces.is_some()
             && manifest.postgres.is_some()
             && manifest.snapshot.is_some()
-            && (manifest.oidc.as_ref()).is_some_and(|o| o.github.is_some());
+            && manifest.github().is_some();
         if !ready {
             return Err(missing().into());
         }
@@ -56,8 +56,7 @@ impl Env {
     }
 
     fn policy(&self) -> Policy<'_> {
-        let github = (self.manifest.oidc.as_ref()).and_then(|o| o.github.as_ref());
-        let github = github.expect("checked by read");
+        let github = self.manifest.github().expect("checked by read");
         Policy {
             postgres: self.postgres(),
             max_age: github.max_age,

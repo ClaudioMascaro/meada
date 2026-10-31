@@ -2,7 +2,7 @@
 //! `[catalog]` against `github_app`'s fake GitHub API writes the permissions set, and the console
 //! (`oidc`'s loopback issuer, the local Valkey and Postgres) answers `GET /api/v1/catalog` and
 //! `POST /api/v1/catalog/check` from it, per caller, with the rows of the shared Y/A/B table
-//! (`tests/fixtures/named-workspaces.json`, the same rows `oidc::permissions`'s unit test reads).
+//! (`tests/fixtures/named-workspaces.json`, the same rows `grant::permissions`'s unit test reads).
 //! What a caller may select is seen through the console's routes, never the module's tables.
 //! Without a service the tests print why and skip; with `MEADA_TEST_SERVICES_REQUIRED=1` they
 //! fail.

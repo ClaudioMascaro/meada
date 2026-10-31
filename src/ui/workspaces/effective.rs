@@ -85,9 +85,9 @@ impl Console {
     /// The identities the newest permissions set excludes from workspace `id`, for whoever
     /// operates it.
     pub(super) fn excluded_for(&self, id: &str, operates: bool) -> BTreeSet<String> {
-        match (&self.oidc, operates) {
-            (Some(oidc), true) => oidc.excluded_in(id),
-            _ => BTreeSet::new(),
+        match operates {
+            true => self.providers.excluded_in(id),
+            false => BTreeSet::new(),
         }
     }
 

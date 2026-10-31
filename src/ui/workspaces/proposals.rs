@@ -160,9 +160,7 @@ pub(in crate::ui) fn listen(listen: &str, manifest: &Path) -> crate::Result<()> 
     let console = Arc::new(Console::for_proposals(manifest)?);
     let section = (console.bootstrap.proposals.clone()).expect("checked at start");
     crate::mcp::serve_http(address, move |_, config| {
-        if let Some(oidc) = &console.oidc {
-            oidc.listening();
-        }
+        console.providers.listening();
         let tools = Tools::new(console.clone());
         let server = Arc::new(Server {
             console: console.clone(),
@@ -198,7 +196,9 @@ impl Console {
         let src = fs::read_to_string(file).map_err(|e| format!("{shown}: {e}"))?;
         let at = |key: &str, problem: String| crate::config::error_at(file, &src, key, &problem);
         let mut problems: Vec<String> = Vec::new();
-        let oidc = match read.oidc.clone().map(crate::oidc::Oidc::start).transpose() {
+        let providers = Arc::new(crate::grant::Providers::of(&read));
+        let start = |config| crate::oidc::Oidc::start(config, providers.clone());
+        let oidc = match read.oidc.clone().map(start).transpose() {
             Ok(oidc) => oidc,
             Err(e) => {
                 problems.push(e.to_string());
@@ -223,6 +223,7 @@ impl Console {
             loaded: Value::Null,
             csp: header::HeaderValue::from_str(&csp(None))?,
             oidc,
+            providers,
             holds: Holds::of(file, &read),
             entries: std::sync::Mutex::new(None),
             audit: crate::audit::Audit::default(),
@@ -306,14 +307,14 @@ impl Server {
             console.user_claim(),
         );
         match admitted {
-            Ok(admitted) => {
+            Ok((admitted, user)) => {
                 #[cfg(feature = "directory")]
-                if let Some((refused, _)) =
-                    console.directory_refusal(admitted.user.as_deref(), false)
-                {
+                if let Some((refused, _)) = console.directory_refusal(user.as_deref(), false) {
                     return Err(refused);
                 }
-                Ok(Session::admitted(admitted, Vec::new(), oidc))
+                #[cfg(not(feature = "directory"))]
+                let _ = user;
+                Ok(Session::admitted(admitted, Vec::new()))
             }
             Err((status, challenge)) => {
                 let metadata = format!(

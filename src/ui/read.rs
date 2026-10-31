@@ -149,7 +149,7 @@ impl Console {
     pub(super) fn teams(
         self: &Arc<Self>,
         groups: &[String],
-        grant: &crate::oidc::Grant,
+        grant: &crate::grant::Grant,
     ) -> Vec<String> {
         #[cfg(feature = "generation-pointer")]
         if self.ui.operations && self.bootstrap.store && !groups.is_empty() {
@@ -157,8 +157,8 @@ impl Console {
                 read_runtime(console.current_entries(&service), &service)
             });
             let grant = match grant {
-                crate::oidc::Grant::All => meada_core::authorize::Grant::All,
-                crate::oidc::Grant::Only(identities) => {
+                crate::grant::Grant::All => meada_core::authorize::Grant::All,
+                crate::grant::Grant::Only(identities) => {
                     meada_core::authorize::Grant::Only(identities.iter().cloned().collect())
                 }
             };
@@ -512,10 +512,10 @@ impl Console {
 
     /// `excluded: true` on each of `entries`, of the version `id`, whose identity the newest
     /// permissions set excluded when it checked that version (#333): absent otherwise, so without
-    /// `[oidc.github]` the body is as before.
+    /// the GitHub grant provider the body is as before.
     #[cfg(feature = "oidc")]
     fn flag_excluded(&self, id: &str, entries: &mut [Value]) {
-        let found = self.oidc.as_ref().and_then(|oidc| oidc.excluded());
+        let found = self.providers.excluded();
         let Some((_, excluded)) = found.filter(|(checked, _)| checked == id) else {
             return;
         };

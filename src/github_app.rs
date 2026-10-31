@@ -986,7 +986,7 @@ type Entry = (String, Option<String>);
 fn collaborator(value: &serde_json::Value) -> Option<Row> {
     let login = value.get("login")?.as_str()?.to_ascii_lowercase();
     let role = value.get("role_name")?.as_str()?;
-    let role_ok = crate::oidc::role_ok(role);
+    let role_ok = crate::grant::role_ok(role);
     let login_ok = meada_core::manifest::added_by_problem(&login).is_none();
     (login_ok && role_ok).then(|| (login, role.to_string()))
 }
@@ -1169,9 +1169,7 @@ fn run_fence(read: &crate::workspace::Manifest) -> Result<u64, String> {
 pub fn roles(manifest: &Path) -> crate::Result<Reply> {
     let shown = manifest.display().to_string();
     let read = crate::workspace::Manifest::read(manifest)?;
-    let github = (read.oidc.as_ref())
-        .and_then(|o| o.github.clone())
-        .ok_or_else(|| Msg::RolesNoGithub(&shown).text())?;
+    let github = (read.github().cloned()).ok_or_else(|| Msg::RolesNoGithub(&shown).text())?;
     let (valkey, all) = crate::workspace::Manifest::github_apps(manifest)?;
     let apps: Vec<&Config> = all.iter().filter(|a| a.host == github.host).collect();
     let (Some(valkey), false) = (valkey, apps.is_empty()) else {
@@ -1233,7 +1231,7 @@ struct Check<'a> {
     postgres: &'a crate::postgres::Config,
     valkey: &'a valkey::Config,
     apps: &'a [&'a Config],
-    github: &'a crate::oidc::Github,
+    github: &'a crate::grant::Github,
     /// `[catalog]` (#341): the repositories listed besides the workspace's own.
     #[cfg(feature = "workspaces")]
     catalog: Option<&'a crate::catalog::Config>,

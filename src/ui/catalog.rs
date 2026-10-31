@@ -9,7 +9,7 @@
 use meada_core::manifest::identity_problem;
 
 use super::*;
-use crate::oidc::Catalog;
+use crate::grant::Catalog;
 
 // ponytail: the most identities `POST catalog/check` takes, and the most bytes of its body.
 const CHECK_IDENTITIES: usize = 50;
@@ -147,11 +147,10 @@ pub(super) fn header(catalog: &Catalog) -> Value {
 
 impl Console {
     /// The catalog `session` may select from: none unless `[catalog]` is configured and the
-    /// OIDC module keeps the permissions cache.
+    /// GitHub grant provider keeps the permissions cache.
     pub(super) fn catalog_of(&self, session: &Session) -> Option<Catalog> {
         self.bootstrap.catalog.as_ref()?;
-        let oidc = self.oidc.as_ref()?;
-        oidc.catalog(session.login.as_deref(), session.operator)
+        (self.providers).catalog(session.login.as_deref(), session.operator)
     }
 
     /// `GET catalog?limit=&after=&q=`: `{"state", "reason", "set", "repositories": [{"identity"}],
