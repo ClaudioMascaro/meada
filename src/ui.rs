@@ -224,6 +224,10 @@ struct Console {
     /// The nodes' OIDC module, with `[oidc]`: the console's admission.
     #[cfg(feature = "oidc")]
     oidc: Option<Arc<crate::oidc::Oidc>>,
+    /// The grant providers (`grant::Providers::of` the bootstrap manifest), which the OIDC module
+    /// feeds and the catalog, the exclusions and the admission view read.
+    #[cfg(feature = "oidc")]
+    providers: Arc<crate::grant::Providers>,
     /// What the playground and the exports answer from.
     holds: Holds,
     /// The entries of the last current workspace version a role was computed from, by id: a
@@ -280,25 +284,21 @@ struct Session {
     groups: Vec<String>,
     /// A team operator's teams, sorted (ADR 0015, #324); empty for everyone else.
     teams: Vec<String>,
-    /// The token's grant; none behind the proxy, where every identity is read.
+    /// The subject's grant; none behind the proxy, where every identity is read.
     #[cfg(feature = "oidc")]
-    grant: Option<crate::oidc::Grant>,
-    /// The token's GitHub login, when `[oidc.github] login_claim` holds a valid one (#332).
+    grant: Option<crate::grant::Grant>,
+    /// The subject's GitHub login, under the GitHub grant provider, when it is a valid one (#332).
     login: Option<String>,
-    /// With `[oidc.github]`, its host and the GitHub grant's state at admission.
+    /// Under the GitHub grant provider, its host and the GitHub grant's state at admission.
     #[cfg(feature = "oidc")]
     github: Option<(String, &'static str)>,
 }
 
 impl Session {
-    /// The session of a token `oidc` admitted, with a team operator's `teams`: the console's,
-    /// and the proposal server's with none (ADR 0022).
+    /// The session of an admitted subject, whichever verifier admitted it, with a team
+    /// operator's `teams`: the console's, and the proposal server's with none (ADR 0022).
     #[cfg(feature = "oidc")]
-    fn admitted(
-        admitted: crate::oidc::Admitted,
-        teams: Vec<String>,
-        oidc: &crate::oidc::Oidc,
-    ) -> Self {
+    fn admitted(admitted: crate::grant::Admitted, teams: Vec<String>) -> Self {
         Session {
             subject: admitted.subject,
             grant: Some(admitted.grant),
@@ -306,10 +306,7 @@ impl Session {
             groups: admitted.groups,
             teams,
             login: admitted.login,
-            github: oidc
-                .github()
-                .zip(admitted.github_state)
-                .map(|(host, state)| (host.to_string(), state)),
+            github: admitted.github,
         }
     }
 
@@ -348,7 +345,7 @@ impl Session {
         meada_core::authorize::Grant::All
     }
 
-    /// `[oidc.github] host`, under the GitHub grant provider.
+    /// The GitHub grant provider's host, under it.
     #[cfg(feature = "refresh-lock")]
     fn github_host(&self) -> Option<&str> {
         #[cfg(feature = "oidc")]
@@ -377,8 +374,8 @@ impl Session {
         if let Some(grant) = &self.grant {
             document["groups"] = json!(self.groups);
             document["grant"] = match grant {
-                crate::oidc::Grant::All => json!("*"),
-                crate::oidc::Grant::Only(identities) => {
+                crate::grant::Grant::All => json!("*"),
+                crate::grant::Grant::Only(identities) => {
                     let mut identities: Vec<_> = identities.iter().collect();
                     identities.sort();
                     json!(identities)
@@ -405,7 +402,7 @@ impl Session {
         }
         #[cfg(feature = "oidc")]
         if let Some(grant) = &self.grant {
-            return matches!(grant, crate::oidc::Grant::All);
+            return matches!(grant, crate::grant::Grant::All);
         }
         true
     }
@@ -421,9 +418,7 @@ pub fn listen(listen: &str, manifest: &Path) -> Result<()> {
     let console = Arc::new(Console::start(manifest)?);
     crate::mcp::serve_http(address, move |bound, _| {
         #[cfg(feature = "oidc")]
-        if let Some(oidc) = &console.oidc {
-            oidc.listening();
-        }
+        console.providers.listening();
         move |request: Request<Incoming>| {
             let console = console.clone();
             async move {
@@ -525,7 +520,11 @@ impl Console {
         }
         // As a node does: the issuer's metadata and JWKS read now, a start check.
         #[cfg(feature = "oidc")]
-        let oidc = match read.oidc.clone().map(crate::oidc::Oidc::start).transpose() {
+        let providers = Arc::new(crate::grant::Providers::of(&read));
+        #[cfg(feature = "oidc")]
+        let start = |config| crate::oidc::Oidc::start(config, providers.clone());
+        #[cfg(feature = "oidc")]
+        let oidc = match read.oidc.clone().map(start).transpose() {
             Ok(oidc) => oidc,
             Err(e) => {
                 problems.push(e);
@@ -595,6 +594,8 @@ impl Console {
             csp: header::HeaderValue::from_str(&csp(issuer))?,
             #[cfg(feature = "oidc")]
             oidc,
+            #[cfg(feature = "oidc")]
+            providers,
             holds,
             #[cfg(all(feature = "oidc", feature = "generation-pointer"))]
             entries: std::sync::Mutex::new(None),
@@ -857,11 +858,13 @@ impl Console {
                 self.ui.operator_claim.as_deref(),
                 self.user_claim(),
             ) {
-                Ok(admitted) => {
+                Ok((admitted, user)) => {
                     #[cfg(feature = "directory")]
-                    if let Some(refused) = self.directory_refusal(admitted.user.as_deref(), write) {
+                    if let Some(refused) = self.directory_refusal(user.as_deref(), write) {
                         return Err(refused);
                     }
+                    #[cfg(not(feature = "directory"))]
+                    let _ = user;
                     // A team operator reads what a viewer reads: only `session` and the writes
                     // need the role, so only they read the current version.
                     let role_route =
@@ -870,7 +873,7 @@ impl Console {
                         true => Vec::new(),
                         false => self.teams(&admitted.groups, &admitted.grant),
                     };
-                    Ok(Session::admitted(admitted, teams, oidc))
+                    Ok(Session::admitted(admitted, teams))
                 }
                 Err((status, challenge)) => {
                     let (code, message) = match status {
@@ -997,7 +1000,7 @@ impl Console {
         }
         // With `[catalog]` (#341), the picker has its routes.
         #[cfg(feature = "workspaces")]
-        if self.bootstrap.catalog.is_some() && self.oidc.is_some() {
+        if self.bootstrap.catalog.is_some() && self.providers.github().is_some() {
             config["catalog"] = true.into();
         }
         // With `[workspaces]` (#342), the workspaces pages have their routes and the bound the
@@ -1127,7 +1130,7 @@ impl Console {
             "scopes": checked.scopes,
         });
         let mut answer = json!({"checks": checks, "identities": identities});
-        if oidc.github().is_some() {
+        if self.providers.github().is_some() {
             let sorted = |reads: &dyn Fn(&str) -> bool| {
                 let mut identities = admitted(reads);
                 identities.sort();
@@ -1137,7 +1140,7 @@ impl Console {
                 None => Value::Null,
                 Some((claims, github)) => json!({
                     "claims": match claims {
-                        crate::oidc::Grant::All => json!("*"),
+                        crate::grant::Grant::All => json!("*"),
                         claims => json!(sorted(&|i| claims.reads(i))),
                     },
                     "github": sorted(&|i| github.iter().any(|g| g == i)),

@@ -730,9 +730,14 @@ grant empty and `*` whole; over a schema one version newer than `MEADA_POSTGRES_
 names both versions on exactly one stderr line. Hostile rows (written by the test): a set whose
 `finished` is ahead of Postgres's clock grants nothing and is named by its table, and once valid
 a `*` row and an off-host row are skipped with one line each naming `permission_rows`. No
-stderr line carries a token part, a login or the Postgres URL. `src/oidc/permissions.rs`'s unit
+stderr line carries a token part, a login or the Postgres URL. `src/grant/permissions.rs`'s unit
 tests hold the exact expiry (`max_age_seconds` grants, a millisecond past it does not), an age
-that never moves back when Postgres's clock does, the login's shape and the row identity check.
+that never moves back when Postgres's clock does, the login's shape and the row identity check,
+and `Providers::grant` with a GitHub grant provider (the union of the groups side and the login's
+rows, `*` from a group, an unmapped group, a missing or malformed login, an expired and an unread
+set); `src/grant.rs`'s own tests hold the groups side without one (the union of the groups, `*`,
+an unmapped group, no table, a login kept only under the GitHub grant provider) and the
+identities a verifier grants by name (`Granted::listing`).
 
 `tests/it/ui/oidc/github.rs` runs the team fixture's console with `[oidc.github]` and
 `[postgres]`: the session is `unread` with the login lowercased before any set, then `current`
@@ -759,7 +764,7 @@ prefix; a set past `max_age_seconds` pending `stale_set` for everyone, the admin
 included, a failed run leaving the set to age, a new set restoring it; `config` naming the
 picker, `manifest` hiding `catalog.allow` from everyone but the global operator, `admission`
 counting the catalog, and the fake seeing no request while the console answers. The
-`oidc::permissions` unit test reads the same table against the cache. In
+`grant::permissions` unit test reads the same table against the cache. In
 `tests/it/github_app/roles.rs` the catalog cases check the installation listing (the owners a
 pattern names, every page, the allow list, names compared lowercase, an owner no pattern names
 never asked, a repository the list refuses never listed for collaborators), the cap (the count and

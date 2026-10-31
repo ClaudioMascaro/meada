@@ -22,6 +22,8 @@ pub mod engine;
 mod entry;
 #[cfg(feature = "github-app")]
 pub mod github_app;
+#[cfg(feature = "oidc")]
+mod grant;
 mod http;
 mod index;
 #[doc(hidden)]

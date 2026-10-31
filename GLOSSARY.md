@@ -197,13 +197,14 @@ written in full: "provider" alone is the side of a contract (ADR 0016).
 _Avoid_: provider, IdP, auth provider, login provider
 
 **Grant provider**:
-A source of a token's grant: the identity provider's claims grant, or for a local account the
-groups table `[accounts.groups]` (ADR 0024), and the GitHub grant provider (`[oidc.github]` or
+A source of an admitted subject's grant, computed from the subject's groups and GitHub login
+whichever token carried them: the identity provider's claims grant (what `[oidc.groups]` maps the
+groups to, with the identities `identities_claim` lists), or for a local account the groups table
+`[accounts.groups]` (ADR 0024), and the GitHub grant provider (`[oidc.github]` or
 `[accounts.github]`, never both), which grants what the token's GitHub login, or a local
 account's verified login, holds an accepted role on, in the permissions set the job's role check
-wrote at the last refresh. A token's grant is the union of every configured grant provider's
-identities, computed when the token is admitted. Always written in full, never "provider" (ADR
-0016).
+wrote at the last refresh. A grant is the union of every configured grant provider's identities,
+computed when the token is admitted. Always written in full, never "provider" (ADR 0016).
 _Avoid_: provider, grant source, permission source, authorizer
 
 **Data layer**:

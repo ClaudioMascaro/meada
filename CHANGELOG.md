@@ -18,6 +18,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- The grant providers take neutral inputs (#553, from #551): the new `grant` module computes a
+  subject's grant from its groups and its GitHub login (`Providers::grant`), with no reference
+  to a token, and holds the GitHub grant provider's permissions cache, which moved out of the
+  OIDC module; the OIDC module feeds it from a token's claims. Every reader of `[oidc.github]`
+  goes through `Manifest::github`, the console and the proposal server build their sessions
+  from a neutral admitted subject (`grant::Admitted`), and a node's pass carries only a grant.
+  Nothing a caller sees changes; no golden changed.
+
 - The axum provider reader walks each value once per file (#431): the values a file's rebound
   `let`s reach share one `seen` set, and `Code::origins` is not asked for a call whose builder
   chain goes through a method no router hands back, nor for a name written as text, a path, a
