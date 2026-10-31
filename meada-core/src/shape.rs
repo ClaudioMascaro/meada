@@ -14,6 +14,7 @@ use crate::export::Level;
 /// recorded is presence, the scalar leaves and a consumer's optional fields; types are never
 /// compared, and no format is kept.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Shape {
     pub source: Source,
     pub fields: BTreeSet<String>,
@@ -47,7 +48,8 @@ pub struct Shape {
 }
 
 impl Shape {
-    /// A shape with no fields, read from `source`.
+    /// A shape with no fields, read from `source`. Outside this crate, the way to build one: the
+    /// other fields, a field added later among them, start empty and are set after `new`.
     pub fn new(source: Source) -> Self {
         Self {
             source,
@@ -367,7 +369,8 @@ pub fn shown(path: &str) -> &str {
 }
 
 /// The field paths a consumer reads that the provider does not return (spec #23).
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[non_exhaustive]
 pub struct Drift {
     /// The consumer's paths the provider's shape does not contain, each the shallowest one
     /// of its branch (nothing below a missing path is listed), with the level of that report:

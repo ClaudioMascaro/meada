@@ -7,8 +7,8 @@
 
 ## Supported versions
 
-Only the **latest published 0.x version** receives security fixes. Until Meada reaches 1.0,
-update to the latest version before reporting, if you can.
+Only the **latest published 1.x version** receives security fixes. Update to the latest
+version before reporting, if you can.
 
 ## How to report a vulnerability
 
@@ -24,7 +24,7 @@ You may write in Portuguese, Spanish or English.
 ## What happens next
 
 The maintainer acknowledges receipt, assesses the report and talks to you through the private
-report itself. When there is a fix, it ships in a new 0.x version, and the GitHub security
+report itself. When there is a fix, it ships in a new 1.x version (a patch or minor release), and the GitHub security
 advisory credits whoever reported it, if you wish.
 
 ## What matters

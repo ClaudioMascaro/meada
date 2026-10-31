@@ -7,8 +7,8 @@
 
 ## Versiones con soporte
 
-Solo la **última versión 0.x publicada** recibe correcciones de seguridad. Mientras Meada no
-llegue a la 1.0, actualiza a la última versión antes de reportar, si puedes.
+Solo la **última versión 1.x publicada** recibe correcciones de seguridad. Actualiza a la
+última versión antes de reportar, si puedes.
 
 ## Cómo reportar una vulnerabilidad
 
@@ -25,7 +25,7 @@ Puedes escribir en portugués, español o inglés.
 ## Qué pasa después
 
 El mantenedor confirma la recepción, evalúa el reporte y conversa contigo a través del propio
-reporte privado. Cuando haya una corrección, sale en una nueva versión 0.x, y el aviso de
+reporte privado. Cuando haya una corrección, sale en una nueva versión 1.x (patch o minor), y el aviso de
 seguridad de GitHub da el crédito a quien reportó, si lo deseas.
 
 ## Qué interesa

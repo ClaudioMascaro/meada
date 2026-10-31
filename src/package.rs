@@ -537,13 +537,13 @@ impl Package {
     /// The package as `meada export` writes it: its ecosystem named only when it is not npm's.
     pub(crate) fn written(self) -> meada_core::export::Package {
         let ecosystem = self.ecosystem.name();
-        meada_core::export::Package {
-            name: self.name,
-            version: self.version,
-            repository: self.repository,
-            directory: self.directory,
-            ecosystem: (ecosystem != Npm.name()).then(|| ecosystem.to_string()),
-        }
+        let mut package = meada_core::export::Package::default();
+        package.name = self.name;
+        package.version = self.version;
+        package.repository = self.repository;
+        package.directory = self.directory;
+        package.ecosystem = (ecosystem != Npm.name()).then(|| ecosystem.to_string());
+        package
     }
 
     /// The site of its manifest, which a dependency entry's link names as its provider.
@@ -1255,14 +1255,14 @@ fn import(exports: &mut [Export], providers: &Providers) {
                 {
                     let repository = &exports[m].repository;
                     for target in targets {
-                        imports.push(Import {
-                            site: call.site.clone(),
-                            specifier: call.specifier.clone(),
-                            name: call.chain.clone(),
+                        imports.push(Import::new(
+                            call.site.clone(),
+                            call.specifier.clone(),
+                            call.chain.clone(),
                             level,
                             how,
-                            target: target.clone(),
-                        });
+                            target.clone(),
+                        ));
                         hops.push(Hop {
                             manifest: site(repository, &manifest.path),
                             target,
@@ -1562,13 +1562,13 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                         fragments: Vec::new(),
                         hops: Vec::new(),
                     });
-                    dependencies.push(Dependency {
-                        manifest: manifest.path.clone(),
-                        field: e.field.clone(),
-                        name: e.name.clone(),
-                        alias: e.alias.clone(),
-                        range: e.range.clone(),
-                    });
+                    let mut dependency = Dependency::default();
+                    dependency.manifest = manifest.path.clone();
+                    dependency.field = e.field.clone();
+                    dependency.name = e.name.clone();
+                    dependency.alias = e.alias.clone();
+                    dependency.range = e.range.clone();
+                    dependencies.push(dependency);
                 }
             }
             (consumers, dependencies)
@@ -1961,33 +1961,36 @@ impl ContractKind for Packages {
                     Some(why) => format!("{why}; {said}"),
                     None => said,
                 };
-                let link = Link {
-                    consumer: consumer.site.clone(),
-                    provider: p.site.clone(),
-                    contract: contract.clone(),
-                    level,
-                    reason: match n {
-                        Some(n) => format!("{n} providers fit; {said}"),
-                        None => said,
-                    },
-                    by: None,
-                    p: None,
-                    drift: None,
+                let said = match n {
+                    Some(n) => format!("{n} providers fit; {said}"),
+                    None => said,
                 };
+                let link = Link::new(
+                    consumer.site.clone(),
+                    p.site.clone(),
+                    contract.clone(),
+                    level,
+                    said,
+                    None,
+                    None,
+                    None,
+                );
                 if consumer.hops.is_empty() {
                     return vec![link];
                 }
                 (consumer.hops.iter())
                     .filter(|h| h.manifest == p.site)
-                    .map(|h| Link {
-                        consumer: link.consumer.clone(),
-                        provider: h.target.clone(),
-                        contract: link.contract.clone(),
-                        level: link.level.max(h.level),
-                        reason: format!("{}; import {}", link.reason, h.how.name()),
-                        by: None,
-                        p: None,
-                        drift: None,
+                    .map(|h| {
+                        Link::new(
+                            link.consumer.clone(),
+                            h.target.clone(),
+                            link.contract.clone(),
+                            link.level.max(h.level),
+                            format!("{}; import {}", link.reason, h.how.name()),
+                            None,
+                            None,
+                            None,
+                        )
                     })
                     .collect()
             })
@@ -2026,6 +2029,12 @@ mod tests {
     fn a_symbol_reached_through_a_package_import_gets_a_consumers_section() {
         let contract = "package::npm::kit";
         let call = "r::web/app.ts::go#0";
+        let mut span = Span::default();
+        span.path = "web/app.ts".into();
+        let mut call_site = CallSite::default();
+        call_site.id = call.into();
+        call_site.caller = "r::web/app.ts::go".into();
+        call_site.span = span;
         let export = Export {
             repository: "r".into(),
             consumers: vec![Consumer {
@@ -2037,32 +2046,19 @@ mod tests {
                 fragments: Vec::new(),
                 hops: Vec::new(),
             }],
-            calls: vec![CallSite {
-                id: call.into(),
-                caller: "r::web/app.ts::go".into(),
-                target: None,
-                level: None,
-                candidates: Vec::new(),
-                narrowed: false,
-                decorates: None,
-                span: Span {
-                    path: "web/app.ts".into(),
-                    start: 0,
-                    end: 0,
-                },
-            }],
+            calls: vec![call_site],
             ..Export::default()
         };
-        let link = Link {
-            consumer: call.into(),
-            provider: "r::kit/index.ts::greet".into(),
-            contract: contract.into(),
-            level: Level::Exact,
-            reason: format!("{contract} ^1.0.0 (local none)"),
-            by: None,
-            p: None,
-            drift: None,
-        };
+        let link = Link::new(
+            call.into(),
+            "r::kit/index.ts::greet".into(),
+            contract.into(),
+            Level::Exact,
+            format!("{contract} ^1.0.0 (local none)"),
+            None,
+            None,
+            None,
+        );
         let repo = Repository {
             root: "/nonexistent".into(),
             identity: "r".into(),
@@ -2102,16 +2098,16 @@ mod tests {
             ],
             ..Export::default()
         };
-        let link = Link {
-            consumer: "r::web/package.json::dependencies::@a/Kit".into(),
-            provider: export.packages[0].site(),
-            contract: "package::npm::@a/Kit".into(),
-            level: Level::Exact,
-            reason: "x".into(),
-            by: None,
-            p: None,
-            drift: None,
-        };
+        let link = Link::new(
+            "r::web/package.json::dependencies::@a/Kit".into(),
+            export.packages[0].site(),
+            "package::npm::@a/Kit".into(),
+            Level::Exact,
+            "x".into(),
+            None,
+            None,
+            None,
+        );
         let hits = Packages.own_search(&[export], &[link], "kit");
         assert_eq!(
             hits,
@@ -2811,17 +2807,19 @@ mod tests {
         files: &[(&str, &[&str])],
         config: bool,
     ) -> Export {
-        let shape = |fields: &[&str]| Shape {
-            fields: fields.iter().map(|f| f.to_string()).collect(),
-            ..Shape::new(shape::Source::Literals("x.ts".into()))
+        let shape = |fields: &[&str]| {
+            let mut shape = Shape::new(shape::Source::Literals("x.ts".into()));
+            shape.fields = fields.iter().map(|f| f.to_string()).collect();
+            shape
         };
         Export {
             repository: name.into(),
             root: PathBuf::new(),
             files: (files.iter())
-                .map(|(p, _)| index::File {
-                    path: p.to_string(),
-                    hash: String::new(),
+                .map(|(p, _)| {
+                    let mut file = index::File::default();
+                    file.path = p.to_string();
+                    file
                 })
                 .collect(),
             dropped: Vec::new(),

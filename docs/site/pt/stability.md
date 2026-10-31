@@ -10,7 +10,7 @@ Este documento descreve o build padrão (`cargo install meada`). Os [módulos de
 
 ### Ferramentas MCP
 
-Três ferramentas, sempre com estes nomes. Nenhuma escreve.
+Estas ferramentas, sempre com estes nomes. Nenhuma escreve. Uma versão menor pode acrescentar outras, que também não escrevem.
 
 | Ferramenta | Parâmetro | Tipo | Padrão | Significado |
 | --- | --- | --- | --- | --- |
@@ -20,7 +20,7 @@ Três ferramentas, sempre com estes nomes. Nenhuma escreve.
 | `context` | `symbol` | texto, obrigatório | | Nome do símbolo, `<caminho>::<nome>` ou identidade completa; um recurso (`resource::<tipo>::<id>`) ou um canal (`channel::<broker>::<nome>`). |
 | `context` | `budget` | inteiro sem sinal de 32 bits, opcional | 2.000 | Orçamento de tokens da resposta. |
 | `trace` | `from` | texto, opcional | | Início: um símbolo, uma rota (`GET /users/{}` ou seu contrato), um call site ou um processo (`process::<identidade do ponto de entrada>`, só `down`). |
-| `trace` | `changes` | texto, opcional | | `uncommitted`: parte dos símbolos que o diff da árvore de trabalho toca. É o único valor aceito. |
+| `trace` | `changes` | texto, opcional | | `uncommitted`: parte dos símbolos que o diff da árvore de trabalho toca. Hoje é o único valor aceito. |
 | `trace` | `direction` | texto, opcional | `down` | `down` (o que ele alcança) ou `up` (o que o alcança). |
 | `trace` | `budget` | inteiro sem sinal de 32 bits, opcional | 2.000 | Orçamento de tokens da resposta. |
 
@@ -30,7 +30,7 @@ Três ferramentas, sempre com estes nomes. Nenhuma escreve.
 
 ### Gramática da saída
 
-A saída das três ferramentas é texto em linhas, e sua gramática é especificada no [documento de referência da gramática de saída](https://github.com/ClaudioMascaro/meada/blob/main/docs/reference/output-grammar.md) (em inglês, como a superfície MCP, [ADR 0008](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0008-mcp-surface-and-output-languages.md)). Estão congelados:
+A saída das ferramentas é texto em linhas, e sua gramática é especificada no [documento de referência da gramática de saída](https://github.com/ClaudioMascaro/meada/blob/main/docs/reference/output-grammar.md) (em inglês, como a superfície MCP, [ADR 0008](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0008-mcp-surface-and-output-languages.md)). Estão congelados:
 
 - cada tipo de linha de cada ferramenta e o significado de cada um dos seus campos;
 - a notação de link `→[nível: motivo]`, com os níveis `exact`, `declared`, `inferred`, `decided` e `ambiguous`;
@@ -149,7 +149,7 @@ Os campos de `shape` (`source`, `fields`, `open`, `scalars`, `declared`, `option
 Depois da 1.0, uma quebra em qualquer item congelado exige uma versão maior. Quebrar é:
 
 - remover ou renomear um item (ferramenta, parâmetro, comando, flag, tabela, chave, campo do export);
-- mudar o tipo, o padrão ou o significado de um parâmetro, inclusive o orçamento padrão de 2.000 tokens;
+- mudar o tipo, o padrão ou o significado de um parâmetro ou de um valor que ele já aceita, inclusive o orçamento padrão de 2.000 tokens;
 - mudar a gramática ou o significado de um tipo de linha, de um campo ou de uma chave que já existe;
 - tornar inválida uma configuração que era válida.
 
@@ -157,9 +157,12 @@ Depois da 1.0, uma quebra em qualquer item congelado exige uma versão maior. Qu
 
 Estas mudanças entram em uma versão menor:
 
+- acrescentar uma ferramenta MCP, desde que a lista de ferramentas continue dentro do orçamento de 1.000 tokens;
 - acrescentar um parâmetro opcional;
+- acrescentar um valor aceito a um parâmetro que já existe, como um novo valor de `changes`;
 - acrescentar um tipo de `search`;
 - acrescentar um tipo de linha à saída;
+- acrescentar um campo no fim de um tipo de linha que já existe;
 - acrescentar um campo ao export;
 - acrescentar uma chave de configuração;
 - acrescentar um tipo de contrato;

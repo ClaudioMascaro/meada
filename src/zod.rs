@@ -298,10 +298,8 @@ impl Zod {
         node.render("", &mut sent);
         let (mut out, mut imports) = (BTreeMap::new(), Vec::new());
         node.declared("", &mut out, &mut imports);
-        let mut typed = Shape {
-            imports: imports.into_iter().collect(),
-            ..Shape::new(Source::Zod(path.to_string()))
-        };
+        let mut typed = Shape::new(Source::Zod(path.to_string()));
+        typed.imports = imports.into_iter().collect();
         for (field, optional) in out {
             typed.list(field, optional, true);
         }

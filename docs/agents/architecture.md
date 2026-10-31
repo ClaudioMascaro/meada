@@ -192,7 +192,11 @@ other Kotlin grammar may enter the dependency tree: they all export `tree_sitter
   re-exports the shared pieces where they lived (`index`, `contract`, `package`, `decisions`,
   `community`, `entry`, `document`) and keeps its own `Export`, `Provider`, `Consumer`,
   `Document` and `Package` with what only the build needs, turned into these by
-  `index::Export::written`.
+  `index::Export::written`. Its structs, with `Shape` and `Drift`, are `#[non_exhaustive]`, so a
+  new field is a minor change for crate users, the binary included: one whose fields all have a
+  default derives `Default` and is built with `T::default()` and field assignments; one with a
+  field that has none has `new` taking every field in declaration order, a later field starting
+  empty and set after it (`Shape::new` takes the source alone).
 - `meada-core/src/shape.rs`: shapes and shape drift (ADR 0009: `Drift`, `{missing, unchecked}`,
   `shape::drift`), which the binary reaches as `crate::shape`. `drift.rs`: how `context`,
   `search` and `status` show a link's drift (`consumers`, `matches`, `counts`, over the `Entry`s
@@ -2726,6 +2730,16 @@ one for the area a change touches.
   module per subject (`tests/it/<subject>.rs`) and the harness in `tests/it/common/`. A new
   subject is a file there and its `mod` line in `main.rs` (`every_file_here_is_a_module` checks
   it); `cargo test --test it <subject>::` runs one.
+- `tests/it/benchmark.rs` is an ignored development harness over the public chain (with
+  document/drift overlays), every conformance fixture and peer, and every cross-language
+  chain. It reuses the disk fixture helpers and `Engine`, times cold workspace indexing and
+  refresh after one root source edit, verifies the changed file hash through the export,
+  and reports each index's logical file size plus root/workspace totals. Fixed default
+  search/context/trace queries reject empty or missing subjects. Token costs use
+  `meada-core::render::tokens`; the MCP stdio list records both the full compact result and
+  descriptions plus schemas, which the existing tests budget. A fixture inventory guard
+  catches new conformance/cross-language directories. CI runs the release harness on every
+  PR and main push, retaining JSON/Markdown and a job-summary table. Timings are informational.
 - `tests/it/common/mod.rs`: `fixture_repo(case, fixture, origin)` copies `tests/fixtures/<fixture>`
   to `$CARGO_TARGET_TMPDIR/<case>/<fixture>` and makes it a git repository (`init`, `origin`,
   one commit). `case` must be unique per test across every subject, since they run in parallel in
