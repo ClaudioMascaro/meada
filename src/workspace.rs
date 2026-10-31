@@ -37,7 +37,9 @@ pub struct Repository {
 }
 
 impl Repository {
-    /// The repository checked out at `root`, read locally, its index in its own `.meada/`.
+    /// The repository checked out at `root`, read locally, its index in its own `.meada/`. The
+    /// developer owns the checkout, so its `meada.toml` and `meada.decisions.toml` are read with
+    /// symbolic links followed, unlike a mirror's (`mirror`).
     fn local(root: PathBuf, identity: String) -> Result<Self> {
         Ok(Self {
             config: config::load(&root)?,
@@ -988,11 +990,14 @@ fn mirror(
         }
         .text());
     }
-    let own = config::load_own(&root).map_err(|e| e.to_string())?;
+    // The mirror is a clone of a repository its operator does not control: its two files are
+    // read as a pulled generation's are, bounded and through no symbolic link.
+    let max = Some(config::GENERATION_CONFIG_MAX);
+    let own = config::read_own_up_to(&root, "meada.toml", max).map_err(|e| e.to_string())?;
     let has_own = own.is_some();
     let repository = Repository {
         config: own.unwrap_or(listed),
-        decisions: decisions::load(&root).map_err(|e| e.to_string())?,
+        decisions: decisions::load_up_to(&root, max).map_err(|e| e.to_string())?,
         index: index_dir.join(repo).join("index.db"),
         root,
         identity: found,

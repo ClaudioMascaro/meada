@@ -26,6 +26,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A server-mode mirror's `meada.toml` and `meada.decisions.toml` are read through no symbolic
+  link (#547, after #506), as a pulled generation's are: `mirror()`, behind `Manifest::read`
+  (`mcp --listen`, snapshot pull, the lock and pointer operations, workspace versions, the
+  heartbeat, the UI, the workspaces CLI, the GitHub App), now refuses a link unopened, one that
+  stays inside the mirror included, a file that is not regular and a file replaced while read,
+  with the generation's messages, and bounds each file at 1 MiB (`GENERATION_CONFIG_MAX`, now
+  built without the `snapshot` feature). A local checkout and an operator's own files still
+  follow links. The architecture map and the snapshots page, in its three languages, say so.
 - No manifest error quotes a written value (#545), after #449 stopped serde's `invalid type` and
   `invalid value`: `unknown variant` names the key and the values it accepts (`` `workspace.source`:
   is not one of the values it accepts (`file`, `store`) ``) instead of serde's text, an error no

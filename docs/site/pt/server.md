@@ -70,6 +70,10 @@ os blocos do manifesto são ignorados (o `meada status` os nomeia). Um espelho �
 - O servidor lê o manifesto e o `meada.toml` e o `meada.decisions.toml` de cada espelho uma vez,
   ao iniciar: mudar esses arquivos pede reiniciar o servidor. Uma mudança de código num espelho
   pede só `meada index --workspace`; a chamada seguinte já vê o índice novo.
+- O `meada.toml` e o `meada.decisions.toml` de um espelho são lidos só como arquivos regulares de
+  até 1 MiB, sem passar por link simbólico, mesmo um que aponte para dentro do espelho (um
+  espelho é o clone de um repositório que o operador não controla): uma entrada cujo espelho
+  descumpre isso não é servida, com o erro nomeando o arquivo. Um checkout local segue links.
 - `context` imprime `index behind the mirror: run meada index --workspace` quando o arquivo de
   um trecho mudou depois da indexação. `trace` com `changes: uncommitted` é recusado, pois a
   árvore de trabalho está na máquina do cliente.

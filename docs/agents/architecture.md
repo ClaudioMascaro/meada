@@ -3189,12 +3189,15 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   directory and an `internal/` package are no different from any other directory of the provider;
   a `replace` to an absolute directory leaves the module outside.
 - `workspace.rs`: a sibling with an invalid `meada.toml` or `meada.decisions.toml` is skipped
-  silently. In a pulled generation, a mirror's `meada.toml` and `meada.decisions.toml` are read
-  only as regular files of at most `GENERATION_CONFIG_MAX` (1 MiB, `config.rs`), through no
+  silently. Every read of a mirror's `meada.toml` and `meada.decisions.toml`, in a pulled
+  generation and in a server-mode manifest's entry (`mirror()`, behind `Manifest::read`) alike,
+  reads only regular files of at most `GENERATION_CONFIG_MAX` (1 MiB, `config.rs`), through no
   symbolic link (`config::read_unlinked`, refused unopened, then the opened file checked against
-  the one checked); past it, or through a link, the generation is not servable, the error naming
-  the file. An operator's file (a secret, a CA, `config::read_bounded`) follows links, as
-  Kubernetes mounts secrets through one.
+  the one checked), one that stays inside the mirror included; past the bound, or through a
+  link, the generation or the entry is not servable, the error naming the file. A local checkout
+  (`Repository::local`, the sibling scan of `Workspace::discover`) is the developer's own tree
+  and follows links, and so does an operator's file (a secret, a CA, `config::read_bounded`),
+  as Kubernetes mounts secrets through one.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the
   first by site; the target names no site.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is

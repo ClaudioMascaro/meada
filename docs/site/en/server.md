@@ -70,6 +70,10 @@ refused.
 - The server reads the manifest and each mirror's `meada.toml` and `meada.decisions.toml` once,
   at start: a change to those files needs a server restart. A code change in a mirror needs only
   `meada index --workspace`; the next call sees the new index.
+- A mirror's `meada.toml` and `meada.decisions.toml` are read only as regular files of at most
+  1 MiB, through no symbolic link, even one into the mirror (a mirror is a clone of a repository
+  the operator does not control): an entry whose mirror breaks that is not served, the error
+  naming the file. A local checkout follows links.
 - `context` prints `index behind the mirror: run meada index --workspace` when a span's file
   changed since indexing. `trace` with `changes: uncommitted` is refused, since the working tree
   is on the client's machine.

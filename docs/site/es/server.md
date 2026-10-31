@@ -71,6 +71,10 @@ Un espejo es un checkout con árbol de trabajo; un clon bare no tiene qué index
 - El servidor lee el manifiesto y el `meada.toml` y el `meada.decisions.toml` de cada espejo una
   vez, al iniciar: cambiar esos archivos exige reiniciar el servidor. Un cambio de código en un
   espejo solo pide `meada index --workspace`; la siguiente llamada ya ve el índice nuevo.
+- El `meada.toml` y el `meada.decisions.toml` de un espejo se leen solo como archivos regulares
+  de hasta 1 MiB, sin pasar por un enlace simbólico, aunque apunte dentro del espejo (un espejo
+  es el clon de un repositorio que el operador no controla): una entrada cuyo espejo no cumple
+  esto no se sirve, con el error nombrando el archivo. Un checkout local sigue los enlaces.
 - `context` imprime `index behind the mirror: run meada index --workspace` cuando el archivo de
   un fragmento cambió después de indexar. `trace` con `changes: uncommitted` se rechaza, pues el
   árbol de trabajo está en la máquina del cliente.

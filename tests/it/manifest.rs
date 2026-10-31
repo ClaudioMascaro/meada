@@ -1719,3 +1719,101 @@ fn workspaces_section_errors_name_the_file_the_line_and_the_sections() {
         assert_eq!(stderr, expected, "{toml}");
     }
 }
+
+/// A server-mode mirror's `meada.toml` or `meada.decisions.toml` that is a symbolic link (#547),
+/// to a file outside the mirror and to one inside it, is refused unopened as a pulled
+/// generation's is (#506): `index` and `status` name the file, and what the target holds (which
+/// would parse) is in none of their output. The file itself, in the link's place, is read.
+#[cfg(unix)]
+#[test]
+fn a_mirror_config_through_a_symbolic_link_is_refused_and_never_read() {
+    let marker = "example.com/leak/host-secret";
+    let targets = [
+        ("meada.toml", format!("[[peer]]\nrepo = \"{marker}\"\n")),
+        (
+            "meada.decisions.toml",
+            format!(
+                "[[decision]]\nkind = \"ambiguous-link\"\ncall = \"{marker}\"\n\
+                 target = \"x::http::GET::/\"\nby = \"human\"\n"
+            ),
+        ),
+    ];
+    for (name, content) in targets {
+        for inside in [false, true] {
+            let case = format!("manifest_linked_{name}_{inside}");
+            let dir = chain_manifest(&case);
+            let mirror = dir.join("chain-web");
+            let file = mirror.join(name);
+            let target = if inside {
+                mirror.join("src").join("linked.toml")
+            } else {
+                dir.join("outside.toml")
+            };
+            fs::write(&target, &content).unwrap();
+            let _ = fs::remove_file(&file);
+            std::os::unix::fs::symlink(&target, &file).unwrap();
+            let why = format!("/chain-web/{name}: a symbolic link");
+
+            let (stdout, stderr, code) = run_code(&dir, "index");
+            assert_eq!(code, Some(1), "{name} {inside}: {stderr}");
+            assert!(stderr.contains(&why), "{stderr}");
+            let (status, stderr, code) = run_code(&dir, "status");
+            assert_eq!(code, Some(1), "{name} {inside}: {stderr}");
+            assert!(status.contains(&why), "{status}");
+            for out in [&stdout, &stderr, &status] {
+                assert!(!out.contains(marker), "{out}");
+            }
+            // The other mirrors are served as before.
+            assert!(
+                status.contains("example.com/chain/gateway (../chain-gateway) indexed"),
+                "{status}"
+            );
+
+            fs::remove_file(&file).unwrap();
+            fs::write(&file, "").unwrap();
+            let (_, stderr, code) = run_code(&dir, "index");
+            assert_eq!(code, Some(0), "{name} {inside}: {stderr}");
+        }
+    }
+}
+
+/// A local checkout is the developer's own tree (#547): its `meada.toml`, a symbolic link, is
+/// read as the file would be.
+#[cfg(unix)]
+#[test]
+fn a_local_checkouts_meada_toml_through_a_symbolic_link_is_read() {
+    let (web, ..) = chain("local_linked_config");
+    let dir = web.parent().unwrap().to_path_buf();
+    let (before, stderr, code) = run_args(&web, &["status"]);
+    assert_eq!(code, Some(0), "{stderr}");
+    let file = web.join("meada.toml");
+    let outside = dir.join("outside.toml");
+    fs::copy(&file, &outside).unwrap();
+    fs::remove_file(&file).unwrap();
+    std::os::unix::fs::symlink(&outside, &file).unwrap();
+    let (after, stderr, code) = run_args(&web, &["status"]);
+    assert_eq!(code, Some(0), "{stderr}");
+    assert_eq!(after, before);
+    assert!(after.contains("example.com/chain/gateway"), "{after}");
+}
+
+/// A server-mode mirror's `meada.toml` or `meada.decisions.toml` past 1 MiB is refused naming
+/// the file (#547), as a pulled generation's is; one of exactly 1 MiB is read.
+#[test]
+fn an_oversized_mirror_config_is_refused_naming_the_file() {
+    const MAX: usize = 1 << 20;
+    for name in ["meada.toml", "meada.decisions.toml"] {
+        let dir = chain_manifest(&format!("manifest_oversized_{name}"));
+        let file = dir.join("chain-web").join(name);
+        fs::write(&file, " ".repeat(MAX + 1)).unwrap();
+        let (_, stderr, code) = run_code(&dir, "index");
+        assert_eq!(code, Some(1), "{name}: {stderr}");
+        assert!(
+            stderr.contains(&format!("/chain-web/{name}: larger than {MAX} bytes")),
+            "{stderr}"
+        );
+        fs::write(&file, " ".repeat(MAX)).unwrap();
+        let (_, stderr, code) = run_code(&dir, "index");
+        assert_eq!(code, Some(0), "{name}: {stderr}");
+    }
+}

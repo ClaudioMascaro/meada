@@ -81,9 +81,11 @@ techos de bytes y de entradas por generación. El `.git/config` extraído se ree
 mínimo que Meada escribe (solo `[core]` y el `origin` de la identidad), `.git/hooks` se borra, y
 el `git` de Meada corre en esos espejos sin la configuración del sistema ni la global. Un pull
 que falla en cualquier paso deja el puntero y las generaciones guardadas como estaban. Al
-servir, el `meada.toml` y el `meada.decisions.toml` de un espejo se leen solo como archivos
-regulares de hasta 1 MiB: un enlace simbólico se rechaza sin abrirlo, aunque apunte dentro del
-espejo, y la generación no es servible, con el error nombrando el archivo.
+servir, y cuando un manifiesto del modo servidor lista un espejo, el `meada.toml` y el
+`meada.decisions.toml` de este se leen solo como archivos regulares de hasta 1 MiB: un enlace
+simbólico se rechaza sin abrirlo, aunque apunte dentro del espejo, y la generación o la entrada
+no es servible, con el error nombrando el archivo. Un checkout local, que es del desarrollador,
+sigue los enlaces.
 
 </details>
 
