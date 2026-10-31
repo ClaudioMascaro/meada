@@ -3197,7 +3197,13 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   link, the generation or the entry is not servable, the error naming the file. A local checkout
   (`Repository::local`, the sibling scan of `Workspace::discover`) is the developer's own tree
   and follows links, and so does an operator's file (a secret, a CA, `config::read_bounded`),
-  as Kubernetes mounts secrets through one.
+  as Kubernetes mounts secrets through one. Both reads check a file and then open it
+  (`read_unlinked` opens, then checks the opened file; `read_bounded` checks, then opens), so a
+  regular file replaced by a FIFO between the check and the open blocks the read instead of
+  being refused. Reaching the window takes write access to the directory, which already allows
+  worse; repository content cannot (git stores no FIFO, and the generation extraction refuses
+  one); a FIFO given as the path is refused by the check. Closing it would take
+  `O_NONBLOCK | O_NOFOLLOW` and a direct `libc` dependency, declined in #548.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the
   first by site; the target names no site.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is
