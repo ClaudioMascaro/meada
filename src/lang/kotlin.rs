@@ -271,7 +271,8 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     // names, which `Code::field_written_in` is asked about.
     let mut writes: Vec<(String, String, bool)> = Vec::new();
     let mut seen = Declared::new(root);
-    let mut members: BTreeSet<(String, String)> = BTreeSet::new();
+    // The classes that declare a property, by its name.
+    let mut members: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut classes: BTreeSet<String> = BTreeSet::new();
     let mut locals: Vec<Receiver> = Vec::new();
     // The `val`s of unknown class a `Bound` was recorded for, by qualified name.
@@ -532,7 +533,10 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                             class: class.clone(),
                         };
                         property(&mut facts, place, bound, constant, initial, src);
-                        members.insert((scope.as_ref().clone(), name.to_string()));
+                        members
+                            .entry(name.to_string())
+                            .or_default()
+                            .insert(scope.as_ref().clone());
                         let on = Marked::Field {
                             class: scope.as_ref().clone(),
                             name: name.to_string(),
@@ -561,7 +565,10 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     let on = Marked::Param(scope.as_ref().clone(), at);
                     mark(&mut facts, on, node, src, &scope, PARAM_TARGETS);
                     if written {
-                        members.insert((scope.as_ref().clone(), name.to_string()));
+                        members
+                            .entry(name.to_string())
+                            .or_default()
+                            .insert(scope.as_ref().clone());
                         let on = Marked::Field {
                             class: scope.as_ref().clone(),
                             name: name.to_string(),
@@ -863,8 +870,9 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     let writes: BTreeSet<(String, Option<String>)> = (writes.into_iter())
         .map(|(scope, name, own)| {
             let around = innermost(&classes, &scope);
-            let owner =
-                around.filter(|at| own && members.contains(&(at.to_string(), name.clone())));
+            let owner = around.filter(|at| {
+                own && (members.get(name.as_str())).is_some_and(|owners| owners.contains(*at))
+            });
             (name, owner.map(str::to_string))
         })
         .collect();
@@ -3087,13 +3095,17 @@ class A {
         let fields = (0..5_000).fold(String::new(), |s, n| s + &format!("var f{n} = 0\n"));
         let locals = (0..5_000).fold(String::new(), |s, n| {
             s + &format!("val f{n}: Foo = Foo()\n")
-        });
+        }) + "val control: Foo = Foo()\n";
         let src = format!("package a\nclass C {{\n{fields} fun f() {{\n{locals} }} }}");
         let start = std::time::Instant::now();
         let facts = parse(src.as_bytes(), false).unwrap();
-        // Every local shares its name with a property, so none keeps its class.
-        let typed = facts.receivers.iter().filter(|r| r.class != Class::Unknown);
-        assert_eq!(typed.count(), 0);
+        // Every local shares its name with a property, so none keeps its class; the control
+        // local, whose name no property has, is the one that does.
+        let typed: Vec<_> = (facts.receivers.iter())
+            .filter(|r| r.class != Class::Unknown)
+            .map(|r| r.name.as_str())
+            .collect();
+        assert_eq!(typed, ["control"]);
         assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
     }
 

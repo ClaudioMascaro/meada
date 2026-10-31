@@ -1527,12 +1527,14 @@ mod tests {
         let fields = (0..5_000).fold(String::new(), |s, n| s + &format!("int f{n};\n"));
         let locals = (0..5_000).fold(String::new(), |s, n| {
             s + &format!("Foo f{n} = new Foo();\n")
-        });
+        }) + "Foo control = new Foo();\n";
         let src = format!("class C {{ {fields} void f() {{ {locals} }} }}");
         let start = std::time::Instant::now();
         let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
-        // Every local shares its name with a field, so none is bound to its initializer.
-        assert!(facts.bound.is_empty());
+        // Every local shares its name with a field, so none is bound to its initializer; the
+        // control local, whose name no field has, is the one that is.
+        assert_eq!(facts.bound.len(), 1);
+        assert_eq!(facts.bound[0].name, "control");
         assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
     }
 
