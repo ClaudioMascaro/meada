@@ -291,6 +291,11 @@ pub struct Context {
     pub version: String,
     /// The non-excluded entries in manifest order.
     pub repositories: Vec<ContextEntry>,
+    /// The identities the sponsor rule excluded from the version, sorted (#510): a node shows
+    /// the context only to a grant that reads these too. Without an exclusion the document has
+    /// no such field, so it, the context's digest and the generation id read as before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub excluded: Vec<String>,
 }
 
 /// One repository of a context: its identity and its blocks as `entry_blocks` gives them.
@@ -458,8 +463,8 @@ pub fn publish(manifest: &Path) -> Result<String> {
 }
 
 /// The contexts `listed` records (#342): its named workspaces, sorted by id, with the entries
-/// the role check left in and their blocks as the workspace version holds them. Empty without
-/// `[workspaces]`.
+/// the role check left in and their blocks as the workspace version holds them, and the
+/// identities it excluded (#510). Empty without `[workspaces]`.
 fn recorded_contexts(listed: &Manifest) -> Vec<Context> {
     #[cfg(feature = "workspaces")]
     {
@@ -473,6 +478,7 @@ fn recorded_contexts(listed: &Manifest) -> Vec<Context> {
                         blocks: crate::workspaces::Context::blocks(e),
                     })
                     .collect(),
+                excluded: c.excluded.clone(),
             })
             .collect();
         contexts.sort_by(|a, b| a.id.cmp(&b.id));

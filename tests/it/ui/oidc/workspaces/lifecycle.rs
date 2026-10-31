@@ -578,7 +578,8 @@ fn a_partial_revocation_hides_for_peers_and_never_drops_entries_for_the_operator
 
 /// Two workspaces share Y and are maintained independently; removing one keeps Y in the other
 /// and in the fleet's membership, and the repository is still indexed once; a context that
-/// loses a reader's grant answers that reader nothing.
+/// loses a reader's grant answers that reader nothing; once A loses its sponsor, the console and
+/// a node hide the workspace alike from a reader of Y alone (#510).
 #[test]
 fn overlapping_workspaces_live_and_end_independently_over_one_index() {
     let Some(case) = Case::new("ws_overlap") else {
@@ -707,6 +708,36 @@ fn overlapping_workspaces_live_and_end_independently_over_one_index() {
     // The peers that never held the context cannot use the shared Y to reach it.
     let denied = export("bob", &y);
     assert_eq!(denied.status, 404, "{}", denied.body);
+
+    // A lost its only sponsor with alice's role (#510): the next generation records the context
+    // with Y alone and A excluded, and the console and a node agree on who sees it. Yoda reads Y
+    // alone: the unknown id from both, the node's 404 listing nothing of it. Erin reads both.
+    case.job_ok(&["index", "--workspace", MANIFEST]);
+    let last = case.job_ok(&["snapshot", "publish", "--workspace", MANIFEST]);
+    let document = read(last.trim());
+    let context = (document["contexts"].as_array().unwrap().iter())
+        .find(|c| c["id"] == json!(ya))
+        .unwrap();
+    let recorded: Vec<&str> = (context["repositories"].as_array().unwrap().iter())
+        .map(|r| r["repo"].as_str().unwrap())
+        .collect();
+    assert_eq!(recorded, [y.as_str()]);
+    assert_eq!(context["excluded"], json!([a]));
+    let (node, pulled) = case.node();
+    assert_eq!(pulled, last.trim());
+    let route = |id: &str| format!("/-/workspaces/{id}/{y}");
+    assert_eq!(case.show("erin", &ya).status, 200);
+    until_status(&node, &route(&ya), &case.node_token("erin"), 200);
+    let hidden = case.show("yoda", &ya);
+    assert_eq!((hidden.status, &hidden.body), (404, &unknown.body));
+    let yoda = case.node_token("yoda");
+    let (status, listing) = node_call(&node, &route(&ya), &yoda, "handle");
+    assert_eq!(status, 404, "{listing}");
+    assert!(!listing.contains(&ya), "{listing}");
+    let (_, other) = node_call(&node, &route("0123456789abcdef"), &yoda, "handle");
+    assert_eq!(listing, other);
+    let (status, _) = node_call(&node, &format!("{}@{pulled}", route(&ya)), &yoda, "handle");
+    assert_eq!(status, 404);
     case.github.clean(&case.console.stderr(), &[]);
 }
 

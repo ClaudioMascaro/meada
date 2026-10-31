@@ -102,8 +102,8 @@ impl Console {
     /// What `session` reads, as `meada-core` takes it.
     fn read_grant(session: &Session) -> Grant {
         #[cfg(feature = "oidc")]
-        if let Some(crate::oidc::Grant::Only(identities)) = &session.grant {
-            return Grant::Only(identities.iter().cloned().collect());
+        if let Some(grant) = &session.grant {
+            return grant.core();
         }
         Grant::All
     }

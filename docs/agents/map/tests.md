@@ -839,7 +839,12 @@ whole pipeline (pull, roles, index, publish, node pull, `/-/workspaces/<id>/<ide
 caller, one bundle of Y, `members` and `contexts` in the document, `state` `applied` then `live`)
 and the sponsor rule (`excluded`, not a failure). `meada-core/tests/named_workspaces.rs` reads
 the same table through `meada_core::named`, and `ui/tests/named-core.test.ts` through the built
-WebAssembly; `ui/tests/NamedWorkspaces.test.tsx` drives the page.
+WebAssembly; `ui/tests/NamedWorkspaces.test.tsx` drives the page. Without services,
+`tests/it/oidc.rs` serves a hand-made generation whose context records the web repository with
+the gateway excluded (#510): a grant reading the web repository alone gets the unknown-id 404
+and a list without the context, a grant reading both is admitted, the gateway is the 404 to every
+grant, current and pinned alike; `snapshot/serve.rs`, `snapshot/pull.rs` and `workspaces.rs` hold
+the units (`Held::admits`, the digest and checks of `excluded`, `membership`).
 
 ## Named workspaces: versions and overlap (#343)
 
@@ -854,7 +859,9 @@ creator keeps the workspace with a hidden count, saves without dropping what it 
 refused B with `hidden`, cannot apply what a lost role no longer covers, nothing moves; a
 peer sees one 404 on the workspace, its versions and its history); overlapping Y+A and Y+B
 (independent edits and deletes, one member and one bundle of Y, graph answers through the context
-bounded by the grant); a SCIM-deleted operator blocked on every lifecycle route until
+bounded by the grant, and once A loses its sponsor a generation recording the context with A
+`excluded`, which the console and a node both hide from a reader of Y alone, #510); a
+SCIM-deleted operator blocked on every lifecycle route until
 provisioned active, a never-provisioned subject admitted (`directory`); and the `meada
 workspaces` twins as the administrator with `cli` audit records. `meada-core/tests/
 named_workspaces.rs` checks the `lifecycle` rows of the table (compose keeps hidden entries,

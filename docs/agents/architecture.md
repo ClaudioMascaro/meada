@@ -367,8 +367,13 @@ with its context lines and digest (`excluded_contexts`, `write_excluded_with`); 
 lists the contexts' identities and applies the sponsor rule (`no_sponsor`);
 `workspace.rs` gives `Listed` its `member` flag, builds the members after the deployment entries
 from `membership`, and `Manifest::of_context` builds a recorded context; `snapshot.rs` records
-`members` and `contexts` in the document (`Context::digest`) and `generation_id_of` hashes them;
-`snapshot/pull.rs` checks them; `snapshot/serve.rs` `Held::context` builds a context once;
+`members` and `contexts` in the document (`Context::digest`) and `generation_id_of` hashes them,
+each context with the identities the sponsor rule excluded from its version (`excluded`, which
+`membership` keeps and the digest covers, absent when there is none, #510);
+`snapshot/pull.rs` checks them; `snapshot/serve.rs` `Held::context` builds a context once, and
+`Held::admits` and `Held::viewable` decide a workspace route and its 404 list with
+`named::visible` over every entry of the recorded version, excluded ones included, with no
+operator exemption (the token's grant through `oidc::Grant::core`, as the console maps it);
 `mcp.rs` routes `/-/workspaces/<id>/<identity>` and `Engine::open_context` opens it;
 `meada-core/src/named.rs` holds the pure rules (`creation`, `visible`, `answers`, `shown`,
 `unsponsored`, names, named entries and their version id) that the Rust table test, the console

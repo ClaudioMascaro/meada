@@ -119,6 +119,15 @@ All notable changes to Meada are recorded here. The format follows
   refused too, as the index refuses a linked pack config. The file opened is checked to be the one
   checked. Secrets and CAs a manifest names still follow links (Kubernetes mounts them through
   one). The snapshots page says so in its three languages.
+- Named workspaces on a node (#510): a node shows a named workspace's route
+  (`/-/workspaces/<id>/<identity>`, pinned or not) and lists it in a 404 only to a token whose
+  grant reads every entry of the workspace's version, the entries the sponsor rule excluded
+  included, as the console does. Before, once A of a Y+A workspace lost its sponsor, a subject
+  reading Y alone found the workspace on a node. A generation's context now records `excluded`,
+  the identities the sponsor rule left out, sorted, and its digest covers them; a context without
+  one is written as before, with the same generation id, and a generation published earlier reads
+  as none excluded. A node on an older binary refuses a generation that records an exclusion, so
+  upgrade nodes before or with the publisher. No golden changed.
 - Console GitHub grant (#496): a session's GitHub grant and its state (`unread`, `current`,
   `expired`) are read from the same permissions set at the same instant, so a session never shows
   `expired` with a grant read while the set was fresh.

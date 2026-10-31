@@ -386,6 +386,17 @@ impl Grant {
         }
     }
 
+    /// The grant as `meada-core` takes it, for the rules the console and a node share.
+    #[cfg(feature = "snapshot")]
+    pub fn core(&self) -> meada_core::authorize::Grant {
+        match self {
+            Grant::All => meada_core::authorize::Grant::All,
+            Grant::Only(identities) => {
+                meada_core::authorize::Grant::Only(identities.iter().cloned().collect())
+            }
+        }
+    }
+
     /// The identity provider's claims grant of `claims` under `config`, its `groups` being those
     /// the grant reads (the claim's, or the directory's for a token in overage), `*` for all.
     fn of(claims: &Map<String, Value>, config: &Config, groups: &[String]) -> Self {

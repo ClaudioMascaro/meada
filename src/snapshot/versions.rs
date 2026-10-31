@@ -927,6 +927,7 @@ async fn named_contexts(
             version,
             operators,
             entries,
+            excluded: Vec::new(),
         });
     }
     Ok(contexts)

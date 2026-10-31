@@ -342,8 +342,8 @@ impl Session {
     #[cfg(feature = "refresh-lock")]
     fn core_grant(&self) -> meada_core::authorize::Grant {
         #[cfg(feature = "oidc")]
-        if let Some(crate::oidc::Grant::Only(identities)) = &self.grant {
-            return meada_core::authorize::Grant::Only(identities.iter().cloned().collect());
+        if let Some(grant) = &self.grant {
+            return grant.core();
         }
         meada_core::authorize::Grant::All
     }
