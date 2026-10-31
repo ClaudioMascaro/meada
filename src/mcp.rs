@@ -586,6 +586,16 @@ impl Pass {
         true
     }
 
+    /// What the request may read, as `meada-core` takes it: every identity without a token.
+    #[cfg(feature = "snapshot")]
+    fn grant(&self) -> meada_core::authorize::Grant {
+        #[cfg(feature = "oidc")]
+        if let Some((_, grant)) = &self.token {
+            return grant.core();
+        }
+        meada_core::authorize::Grant::All
+    }
+
     /// The 403 for `path`, an endpoint of `identity`, when the request may not read it.
     fn refused(&self, path: &str, identity: &str) -> Option<Response<BoxBody<Bytes, Infallible>>> {
         #[cfg(feature = "oidc")]
@@ -906,16 +916,12 @@ async fn route(
             };
             let held = held.map_err(|e| e.to_string());
             // A named workspace's route is admitted only when the generation records the context
-            // and the token reads every repository it records; otherwise the answer is the 404 an
-            // unknown id gets, listing the workspaces the token may view (ADR 0021).
+            // and the identity, and the token reads every entry of the context's version, excluded
+            // ones included (`Held::admits`, #510); otherwise the answer is the 404 an unknown id
+            // gets, listing the workspaces the token may view (ADR 0021).
             if let (Some(id), Ok(Some(held))) = (workspace, held.as_ref()) {
-                let reads_all = |id: &str| {
-                    (held.context_repositories(id))
-                        .is_some_and(|repos| repos.iter().all(|r| pass.reads(r)))
-                };
-                let admitted = reads_all(id)
-                    && (held.context_repositories(id)).is_some_and(|r| r.contains(&target));
-                let context = match admitted {
+                let grant = pass.grant();
+                let context = match held.admits(id, target, &grant) {
                     true => {
                         tokio::task::block_in_place(|| held.context(id)).map_err(|e| e.to_string())
                     }
@@ -947,8 +953,7 @@ async fn route(
                         named(plain(StatusCode::NOT_FOUND, body), &held.id)
                     }
                     Ok(None) => {
-                        let viewable: String = (held.context_ids().into_iter())
-                            .filter(|c| reads_all(c))
+                        let viewable: String = (held.viewable(&grant).into_iter())
                             .map(|c| format!("{c}\n"))
                             .collect();
                         named(plain(StatusCode::NOT_FOUND, viewable), &held.id)

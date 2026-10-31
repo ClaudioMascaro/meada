@@ -99,6 +99,9 @@ pub struct Context {
     pub operators: Vec<String>,
     /// The version document's entries, in manifest order: `{"repo": ..., blocks...}`.
     pub entries: Vec<Json>,
+    /// The identities of the version the sponsor rule excluded from `entries`, sorted: what
+    /// `membership` removed (#510). Empty as the contexts file holds a context.
+    pub excluded: Vec<String>,
 }
 
 impl Context {
@@ -193,6 +196,7 @@ pub fn read_contexts(dir: &Path) -> Result<Option<(Vec<Context>, String)>, Strin
             version: version.to_string(),
             operators,
             entries: checked,
+            excluded: Vec::new(),
         });
     }
     let digest = contexts_digest(&text);
@@ -213,8 +217,8 @@ pub fn write_contexts(dir: &Path, contexts: &[Context]) -> Result<String, String
 }
 
 /// What the pulled contexts and the role check's exclusions decide (ADR 0021): the named
-/// workspaces with the entries the sponsor rule left in (dropping the ones left empty) and the
-/// repositories only they select, sorted by identity.
+/// workspaces with the entries the sponsor rule left in and the ones it excluded (dropping the
+/// workspaces left empty), and the repositories only they select, sorted by identity.
 pub struct Membership {
     pub contexts: Vec<Context>,
     pub members: Vec<String>,
@@ -236,10 +240,16 @@ pub fn membership(dir: &Path, version: &str, deployment: &[String]) -> Result<Me
     let mut contexts = Vec::new();
     for mut context in named {
         let left = out.get(&context.id);
+        let mut excluded = std::collections::BTreeSet::new();
         context.entries.retain(|e| {
             let repo = e["repo"].as_str().unwrap_or_default();
-            !left.is_some_and(|l| l.contains(repo))
+            let dropped = left.is_some_and(|l| l.contains(repo));
+            if dropped {
+                excluded.insert(repo.to_string());
+            }
+            !dropped
         });
+        context.excluded = excluded.into_iter().collect();
         if context.entries.is_empty() {
             continue;
         }
@@ -302,6 +312,7 @@ mod tests {
             version: version.clone(),
             operators: vec!["alice".into()],
             entries: entries.clone(),
+            excluded: Vec::new(),
         };
         let digest = write_contexts(
             &dir,
@@ -330,5 +341,45 @@ mod tests {
         assert!(read_contexts(&dir).is_err());
         std::fs::remove_file(dir.join(CONTEXTS)).unwrap();
         assert!(read_contexts(&dir).unwrap().is_none());
+    }
+
+    /// The membership keeps, beside a context's entries the sponsor rule left in, the identities
+    /// it excluded, sorted (#510): what the generation records for the node's admission. A
+    /// context left with no entry is dropped.
+    #[test]
+    fn the_membership_records_each_context_s_exclusions() {
+        let dir = std::env::temp_dir().join(format!("meada-membership-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let text = "[[repository]]\nrepo = \"h/o/y\"\n[[repository]]\nrepo = \"h/o/b\"\n\
+                    [[repository]]\nrepo = \"h/o/a\"\n";
+        let entries = meada_core::named::version_entries("t", text, 5).unwrap();
+        let context = |id: &str| Context {
+            id: id.into(),
+            version: meada_core::named::version_id(&entries),
+            operators: vec!["alice".into()],
+            entries: entries.clone(),
+            excluded: Vec::new(),
+        };
+        let (kept, plain, gone) = ("aaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbb", "cccccccccccccccc");
+        let digest = write_contexts(&dir, &[context(kept), context(plain), context(gone)]).unwrap();
+        let version = crate::snapshot::versions::NO_VERSION;
+        let mut out = std::collections::BTreeSet::new();
+        for identity in ["h/o/a", "h/o/b"] {
+            out.insert((kept.to_string(), identity.to_string()));
+        }
+        for identity in ["h/o/a", "h/o/b", "h/o/y"] {
+            out.insert((gone.to_string(), identity.to_string()));
+        }
+        let none = std::collections::BTreeSet::new();
+        crate::snapshot::versions::write_excluded_with(&dir, version, &none, Some((&digest, &out)))
+            .unwrap();
+        let found = membership(&dir, "", &[]).unwrap();
+        let ids: Vec<&str> = found.contexts.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, [kept, plain]);
+        assert_eq!(found.contexts[0].identities(), ["h/o/y"]);
+        assert_eq!(found.contexts[0].excluded, ["h/o/a", "h/o/b"]);
+        assert!(found.contexts[1].excluded.is_empty());
+        assert_eq!(found.members, ["h/o/a", "h/o/b", "h/o/y"]);
     }
 }

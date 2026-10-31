@@ -100,6 +100,16 @@ fn repositories(
     Err(Failure::Other(Msg::RolesCatalogPages(PAGES_MAX).text()))
 }
 
+/// How many of `found` the cap counts: those `selected` does not hold. `found` is lowercase
+/// (`repository`) and `selected` is folded on `host` as GitHub compares it (#508), so a selected
+/// identity written with uppercase letters is not one more.
+fn extra(host: &str, found: &BTreeSet<String>, selected: &BTreeSet<&str>) -> usize {
+    let selected: BTreeSet<String> = (selected.iter())
+        .map(|i| crate::modules::fold(host, i))
+        .collect();
+    found.iter().filter(|i| !selected.contains(*i)).count()
+}
+
 /// The catalog's candidates on `host`: the identities the installations cover that `config`
 /// allows, sorted. A candidate set with more identities than `selected` holds, plus
 /// `[catalog] max_repositories`, fails the run (the selected identities are not counted).
@@ -138,13 +148,28 @@ pub(super) async fn candidates(
             Err(Failure::Other(why) | Failure::Missing(why)) => return Err(failed(&why)),
         }
     }
-    let extra = found
-        .iter()
-        .filter(|i| !selected.contains(i.as_str()))
-        .count();
+    let extra = extra(host, &found, selected);
     let max = config.max_repositories;
     if extra > max {
         return Err(Msg::RolesCatalogCap { found: extra, max }.text());
     }
     Ok(found)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_selected_identity_with_uppercase_letters_is_not_an_extra_repository() {
+        let found: BTreeSet<String> = ["github.com/acme/api", "github.com/acme/web"]
+            .map(String::from)
+            .into();
+        let selected = BTreeSet::from(["github.com/Acme/API"]);
+        assert_eq!(extra("github.com", &found, &selected), 1);
+        // Another host compares exactly, as before.
+        let found = BTreeSet::from(["ghe.example/acme/x".to_string()]);
+        let selected = BTreeSet::from(["ghe.example/Acme/X"]);
+        assert_eq!(extra("github.com", &found, &selected), 1);
+    }
 }

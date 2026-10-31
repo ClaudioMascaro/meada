@@ -850,3 +850,60 @@ fn an_entry_without_a_sponsor_is_excluded_before_the_fetch_and_not_a_failure() {
     assert_eq!(shown["state"], "applied");
     case.github.clean(&case.console.stderr(), &[]);
 }
+
+/// One repository selected in two spellings (#508, option (a)): the deployment writes
+/// `github.com/Acme/Y` and alice's workspace holds `github.com/acme/y`, the catalog's spelling.
+/// The role check lists GitHub once and writes one `source` row under the first spelling, and a
+/// role row under each, since grants match exactly: the workspace stays visible to erin, a
+/// non-operator whose roles read Y and A, and hidden from yoda, who reads Y alone.
+#[test]
+fn a_repository_selected_in_two_spellings_keeps_the_grant_of_each() {
+    let Some(case) = Case::new("ws_spellings") else {
+        return;
+    };
+    case.refresh();
+    case.ready();
+    let ya = case.create("alice", "ya", &["Y", "A"]).json()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(case.listed("erin"), vec![ya.clone()]);
+    // The deployment's version names Y with uppercase letters, imported and applied from the
+    // command line; `apply` takes the refresh lock, so it reads a copy of the manifest with one.
+    let upper = case.identity("Y").replace("acme/y", "Acme/Y");
+    let text = format!("[[repository]]\nrepo = \"{upper}\"\npath = \"../y\"\n");
+    fs::write(case.dir.join("ops/upper.toml"), text).unwrap();
+    let import = ["workspace", "import", "ops/upper.toml", "--message", "m"];
+    let version = case.job_ok(&[&import[..], &["--workspace", MANIFEST]].concat());
+    let locked = "ops/locked.workspace.toml";
+    let manifest = fs::read_to_string(case.dir.join(MANIFEST)).unwrap();
+    let with_lock = format!("{manifest}\n[refresh_lock]\nttl_seconds = 10\n");
+    fs::write(case.dir.join(locked), with_lock).unwrap();
+    case.job_ok(&["workspace", "apply", version.trim(), "--workspace", locked]);
+    let root = case.token("root");
+    let line = case.refresh();
+    assert!(line.ends_with(", 0 exclusions\n"), "{line}");
+    // The console has read the new set once its catalog lists Y as the deployment writes it.
+    let start = Instant::now();
+    loop {
+        let listed = case.get("/api/v1/catalog", &root).json();
+        let identities: Vec<&str> = (listed["repositories"].as_array().unwrap().iter())
+            .map(|r| r["identity"].as_str().unwrap())
+            .collect();
+        if identities.contains(&upper.as_str()) {
+            assert!(
+                !identities.contains(&case.identity("Y").as_str()),
+                "{listed}"
+            );
+            break;
+        }
+        assert!(start.elapsed() < Duration::from_secs(30), "{listed}");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert_eq!(case.listed("erin"), vec![ya.clone()]);
+    assert_eq!(case.listed("dave"), vec![ya.clone()]);
+    assert!(case.listed("yoda").is_empty());
+    let shown = case.get(&format!("/api/v1/workspaces/{ya}"), &case.token("erin"));
+    assert_eq!(shown.status, 200, "{}", shown.body);
+    case.github.clean(&case.console.stderr(), &[]);
+}

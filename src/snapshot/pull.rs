@@ -378,9 +378,9 @@ fn checked(
         lens.contains(&text.len()) && text.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
     };
     let (mut identities, mut bundles, mut total) = (HashSet::new(), HashSet::new(), 0u64);
+    let unsafe_char = |c: char| c.is_whitespace() || c.is_control() || matches!(c, '"' | '\\');
     for entry in document.repositories.iter().chain(&document.members) {
         let identity = entry.identity.as_str();
-        let unsafe_char = |c: char| c.is_whitespace() || c.is_control() || matches!(c, '"' | '\\');
         let problem = identity_problem(identity)
             .or_else(|| {
                 (identity.chars().any(unsafe_char)).then(|| Msg::SnapshotIdentityChars.text())
@@ -460,6 +460,17 @@ fn checked(
             fields.insert("path".into(), "".into());
             serde_json::from_value::<meada_core::manifest::EntryFile>(fields.into())
                 .map_err(|_| not())?;
+        }
+        // The excluded identities (#510): sorted, once each, none of them recorded.
+        for (at, identity) in context.excluded.iter().enumerate() {
+            let ordered = at == 0 || context.excluded[at - 1] < *identity;
+            if identity_problem(identity).is_some()
+                || identity.chars().any(unsafe_char)
+                || !ordered
+                || seen.contains(identity.as_str())
+            {
+                return Err(not());
+            }
         }
         digests.push((context.id.as_str(), context.digest()));
     }
@@ -1023,6 +1034,64 @@ mod tests {
         assert!(e.contains("ceiling"), "{e}");
         text["repositories"][0]["size"] = GENERATION_BYTES_MAX.into();
         let bytes = serde_json::to_vec(&text).unwrap();
+        assert!(checked(&config(), &id, "d", &bytes).is_ok());
+    }
+
+    /// A document of `WEB` alone, as a member, with one context recording it: `context` (its
+    /// `id`, `version` and `repositories` added), the generation id derived from them.
+    fn with_context(context: serde_json::Value) -> (String, Vec<u8>) {
+        let mut context = context;
+        context["id"] = "c000000000000001".into();
+        context["version"] = "0000000000000001".into();
+        context["repositories"] = serde_json::json!([{"repo": WEB.0, "blocks": {}}]);
+        let recorded: super::super::Context = serde_json::from_value(context.clone()).unwrap();
+        let member = [(WEB.0, bundle_of(WEB.1))];
+        let id = meada_core::ids::generation_id_of(
+            &[],
+            &member,
+            &[(recorded.id.as_str(), recorded.digest().as_str())],
+        );
+        let text = serde_json::json!({"generation": id, "repositories": [], "members": [
+            {"identity": WEB.0, "head": HEAD, "bundle": WEB.1, "blocks": {}, "size": 10,
+             "blake3": "a".repeat(64)}], "contexts": [context]});
+        (id, serde_json::to_vec(&text).unwrap())
+    }
+
+    /// A context's excluded identities (#510) are part of its digest, so of the generation id;
+    /// without one the context, its digest and the id read as before the field existed.
+    #[test]
+    fn a_context_records_its_excluded_identities_in_its_digest() {
+        const API: &str = "example.com/acme/api";
+        let (plain, bytes) = with_context(serde_json::json!({}));
+        let document = checked(&config(), &plain, "d", &bytes).unwrap();
+        assert!(document.contexts[0].excluded.is_empty());
+        let before = serde_json::json!({"id": "c000000000000001", "version": "0000000000000001",
+            "repositories": [{"repo": WEB.0, "blocks": {}}]});
+        assert_eq!(
+            document.contexts[0].digest(),
+            meada_core::ids::context_digest(&before)
+        );
+        let written = serde_json::to_string(&document.contexts[0]).unwrap();
+        assert!(!written.contains("excluded"), "{written}");
+        let (excluding, bytes) = with_context(serde_json::json!({"excluded": [API]}));
+        assert_ne!(excluding, plain);
+        let document = checked(&config(), &excluding, "d", &bytes).unwrap();
+        assert_eq!(document.contexts[0].excluded, [API]);
+        // The same bundles under the id without the exclusion: not this document.
+        assert!(checked(&config(), &plain, "d", &bytes).is_err());
+        let (zed, other) = ("example.com/acme/zed", "example.com/acme/other");
+        for bad in [
+            serde_json::json!([zed, API]),
+            serde_json::json!([API, API]),
+            serde_json::json!([WEB.0]),
+            serde_json::json!(["example.com/../x"]),
+            serde_json::json!(["example.com/a b"]),
+            serde_json::json!([API, zed, other]),
+        ] {
+            let (id, bytes) = with_context(serde_json::json!({"excluded": bad}));
+            assert!(checked(&config(), &id, "d", &bytes).is_err(), "{bad}");
+        }
+        let (id, bytes) = with_context(serde_json::json!({"excluded": [API, other, zed]}));
         assert!(checked(&config(), &id, "d", &bytes).is_ok());
     }
 

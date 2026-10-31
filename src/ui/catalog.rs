@@ -167,14 +167,7 @@ impl Console {
             let message = Msg::CatalogQuery(PREFIX_MAX).text();
             return error(StatusCode::BAD_REQUEST, "bad_request", &message);
         };
-        let after = query.after.as_deref();
-        let mut page: Vec<&String> = (catalog.selectable.iter())
-            .filter(|i| after.is_none_or(|a| i.as_str() > a))
-            .filter(|i| i.starts_with(&query.prefix))
-            .take(query.limit + 1)
-            .collect();
-        let more = page.len() > query.limit;
-        page.truncate(query.limit);
+        let (page, more) = page(&catalog, query.after.as_deref(), &query.prefix, query.limit);
         let next = page.last().filter(|_| more).map(|i| encode(i.as_bytes()));
         let mut document = header(&catalog);
         document["repositories"] = page.iter().map(|i| json!({"identity": i})).collect();
@@ -217,15 +210,42 @@ impl Console {
     }
 }
 
+/// One page of what `catalog` makes selectable: at most `limit` identities after `after` that
+/// start with `prefix`, compared as GitHub compares them on the host (#508), and whether more
+/// follow.
+fn page<'a>(
+    catalog: &'a Catalog,
+    after: Option<&str>,
+    prefix: &str,
+    limit: usize,
+) -> (Vec<&'a String>, bool) {
+    let prefix = crate::modules::fold(&catalog.host, prefix);
+    let mut page: Vec<&String> = (catalog.selectable.iter())
+        .filter(|i| after.is_none_or(|a| i.as_str() > a))
+        .filter(|i| crate::modules::fold(&catalog.host, i).starts_with(&prefix))
+        .take(limit + 1)
+        .collect();
+    let more = page.len() > limit;
+    page.truncate(limit);
+    (page, more)
+}
+
 /// The check of `identities` against `catalog`: `{"state", "reason", "results": [{"identity",
 /// "state"}]}` in the order given, each once, `selectable` or `unavailable`, or `pending` for all
 /// of them while the catalog is. The console's check and a proposal's eligibility (ADR 0022).
 pub(super) fn checked(catalog: &Catalog, identities: &[String]) -> Value {
     let mut seen = std::collections::HashSet::new();
+    // GitHub compares names without case, so an identity on the host matches its lowercase row.
+    let folded: std::collections::HashSet<String> = (catalog.selectable.iter())
+        .map(|i| crate::modules::fold(&catalog.host, i))
+        .collect();
     let results: Vec<Value> = (identities.iter())
         .filter(|i| seen.insert(i.as_str()))
         .map(|identity| {
-            let state = match (catalog.reason, catalog.selectable.contains(identity)) {
+            let state = match (
+                catalog.reason,
+                folded.contains(&crate::modules::fold(&catalog.host, identity)),
+            ) {
                 (Some(_), _) => "pending",
                 (None, true) => "selectable",
                 (None, false) => "unavailable",
@@ -242,6 +262,53 @@ pub(super) fn checked(catalog: &Catalog, identities: &[String]) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_identity_on_the_host_is_selectable_whatever_its_case() {
+        let catalog = Catalog {
+            reason: None,
+            set: None,
+            selectable: ["github.com/acme/api", "ghe.example/acme/x"]
+                .map(String::from)
+                .into(),
+            host: "github.com".into(),
+        };
+        let asked = ["github.com/Acme/API", "ghe.example/Acme/X"].map(String::from);
+        let states: Vec<_> = checked(&catalog, &asked)["results"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["state"].as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(states, ["selectable", "unavailable"]);
+    }
+
+    #[test]
+    fn a_prefix_on_the_host_lists_whatever_its_case() {
+        let catalog = Catalog {
+            reason: None,
+            set: None,
+            selectable: [
+                "ghe.example/acme/x",
+                "github.com/acme/api",
+                "github.com/acme/web",
+            ]
+            .map(String::from)
+            .into(),
+            host: "github.com".into(),
+        };
+        let api = "github.com/acme/api".to_string();
+        assert_eq!(
+            page(&catalog, None, "github.com/Acme/A", 1),
+            (vec![&api], false)
+        );
+        assert_eq!(
+            page(&catalog, None, "github.com/ACME/", 1),
+            (vec![&api], true)
+        );
+        // Another host compares exactly, as before.
+        assert!(page(&catalog, None, "ghe.example/Acme", 10).0.is_empty());
+    }
 
     #[test]
     fn a_cursor_is_the_canonical_base64url_of_an_identity() {

@@ -115,6 +115,14 @@ still needs the post-publication evidence.
 
 ### Fixed
 
+- A repository identity on the `[oidc.github]` host compares without case wherever it meets the
+  catalog (#508): the roles job gives a selected `github.com/Acme/API` and the catalog's
+  `github.com/acme/api` one `both` row keyed as written, the `max_repositories` cap does not
+  count it as extra, and the console's catalog check and listing match it. A repository selected
+  in two spellings (a deployment's `github.com/Acme/API`, a named workspace's
+  `github.com/acme/api`) keeps one `source` row under the first and gets its role rows under
+  each, so grants, which match exactly, read both. Other hosts compare exactly. No golden
+  changed.
 - Compose mirror origins (#445): `fetch.sh` and `fetch-pulled.sh` read an existing mirror's
   `origin` before fetching and refuse one whose HTTP(S) URL carries credentials (a mirror cloned
   from a URL with a token keeps it there), naming the identity and never the URL, and the refresh
@@ -161,6 +169,15 @@ still needs the post-publication evidence.
   refused too, as the index refuses a linked pack config. The file opened is checked to be the one
   checked. Secrets and CAs a manifest names still follow links (Kubernetes mounts them through
   one). The snapshots page says so in its three languages.
+- Named workspaces on a node (#510): a node shows a named workspace's route
+  (`/-/workspaces/<id>/<identity>`, pinned or not) and lists it in a 404 only to a token whose
+  grant reads every entry of the workspace's version, the entries the sponsor rule excluded
+  included, as the console does. Before, once A of a Y+A workspace lost its sponsor, a subject
+  reading Y alone found the workspace on a node. A generation's context now records `excluded`,
+  the identities the sponsor rule left out, sorted, and its digest covers them; a context without
+  one is written as before, with the same generation id, and a generation published earlier reads
+  as none excluded. A node on an older binary refuses a generation that records an exclusion, so
+  upgrade nodes before or with the publisher. No golden changed.
 - Console GitHub grant (#496): a session's GitHub grant and its state (`unread`, `current`,
   `expired`) are read from the same permissions set at the same instant, so a session never shows
   `expired` with a grant read while the set was fresh.

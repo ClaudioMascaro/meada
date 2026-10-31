@@ -57,7 +57,9 @@ pub fn generation_id_of(
 }
 
 /// A context's digest as the generation id hashes it (ADR 0021): the first 16 hex characters of
-/// the BLAKE3 hash of its canonical JSON `{"id","repositories","version"}` as recorded.
+/// the BLAKE3 hash of its canonical JSON `{"id","repositories","version"}` as recorded, with
+/// `"excluded"` first when the context excludes an identity (#510), so a context without one
+/// keeps its digest.
 pub fn context_digest(context: &Json) -> String {
     id(&context.to_string())
 }

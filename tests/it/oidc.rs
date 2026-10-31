@@ -1163,3 +1163,104 @@ fn a_pinned_path_is_admitted_as_its_identity_is() {
     let answer = ask(&at(&none), Some(&token), &[], None);
     assert_eq!((answer.status, answer.body), (404, format!("{WEB}\n")));
 }
+
+/// A named workspace's route on a node (#510, ADR 0020's discovery rule): a context recording
+/// `WEB` whose version also held the gateway, which the sponsor rule excluded, is the unknown-id
+/// 404 to a grant that reads `WEB` alone and is left out of its 404 list, while a grant that
+/// reads both is admitted to `WEB`; the excluded gateway is the 404 to every grant. A pin of the
+/// generation answers the same. The generation is made by hand; the pins' `[valkey]` is never
+/// reached.
+#[cfg(feature = "generation-pointer")]
+#[test]
+fn a_context_with_an_excluded_entry_is_seen_only_by_a_grant_reading_it() {
+    const GATEWAY: &str = "example.com/chain/gateway";
+    const PLAIN: &str = "c000000000000001";
+    const EXCLUDING: &str = "c000000000000002";
+    let (signing, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let (dir, manifest, local) = crate::serving::hand_node("oidc_excluded_context");
+    let pointer = fs::read_to_string(local.join("current")).unwrap();
+    let generation = pointer.split(' ').next().unwrap().to_string();
+    let file = local.join(&generation).join("generation.json");
+    let mut document: Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
+    let context = |id: &str| {
+        json!({"id": id, "version": "0000000000000001",
+            "repositories": [{"repo": WEB, "blocks": {}}]})
+    };
+    let mut excluding = context(EXCLUDING);
+    excluding["excluded"] = json!([GATEWAY]);
+    document["contexts"] = json!([context(PLAIN), excluding]);
+    fs::write(&file, serde_json::to_vec(&document).unwrap()).unwrap();
+    let node = dir.join(&manifest);
+    let pins = "\n[valkey]\nurl = \"redis://127.0.0.1:1\"\n\n[generations]\nkeep = 2\n";
+    fs::write(&node, fs::read_to_string(&node).unwrap() + pins).unwrap();
+    append(&dir, &manifest, &issuer.base);
+    let server = crate::serving::serve(&dir, &manifest);
+    let token = |path: &str, identities: &[&str]| {
+        sign(
+            &signing,
+            "k1",
+            Algorithm::ES256,
+            &claims(&issuer.base, path, identities),
+        )
+    };
+    let (reads_web, reads_both) = (token(WEB, &[WEB]), token(WEB, &[WEB, GATEWAY]));
+    let route = |id: &str, identity: &str| format!("{}/-/workspaces/{id}/{identity}", server.url);
+    let pinned = |id: &str, identity: &str| format!("{}@{generation}", route(id, identity));
+    let call = || Some(("search", json!({"query": "dashboard"})));
+    let workspace = |answer: &Answer| {
+        assert_eq!(answer.status, 200, "{answer:?}");
+        let json: Value = serde_json::from_str(&answer.body).unwrap();
+        json["result"]["_meta"]["meada/workspace"].clone()
+    };
+
+    // A grant reading `WEB` alone: the context is the unknown id, absent from the list.
+    let unknown = ask(
+        &route("0123456789abcdef", WEB),
+        Some(&reads_web),
+        &[],
+        call(),
+    );
+    assert_eq!(
+        (unknown.status, unknown.body.as_str()),
+        (404, "c000000000000001\n")
+    );
+    let hidden = ask(&route(EXCLUDING, WEB), Some(&reads_web), &[], call());
+    assert_eq!((hidden.status, &hidden.body), (404, &unknown.body));
+    assert_eq!(
+        workspace(&ask(&route(PLAIN, WEB), Some(&reads_web), &[], call())),
+        json!(PLAIN)
+    );
+    let hidden = ask(&pinned(EXCLUDING, WEB), Some(&reads_web), &[], call());
+    assert_eq!(hidden.status, 404, "{hidden:?}");
+    assert!(!hidden.body.contains(EXCLUDING), "{}", hidden.body);
+    // A grant reading both: admitted to `WEB`, and the list holds both contexts.
+    for url in [route(EXCLUDING, WEB), pinned(EXCLUDING, WEB)] {
+        let answer = ask(&url, Some(&reads_both), &[], call());
+        assert_eq!(workspace(&answer), json!(EXCLUDING), "{url}");
+    }
+    let unknown = ask(
+        &route("0123456789abcdef", WEB),
+        Some(&reads_both),
+        &[],
+        call(),
+    );
+    assert_eq!(
+        (unknown.status, unknown.body.as_str()),
+        (404, "c000000000000001\nc000000000000002\n")
+    );
+    // The excluded gateway has no bundle in the context: the unknown-id 404 to every grant.
+    for identities in [&[WEB, GATEWAY][..], &["*"]] {
+        let gateway = token(GATEWAY, identities);
+        for pin in [false, true] {
+            let at = |id: &str| match pin {
+                true => pinned(id, GATEWAY),
+                false => route(id, GATEWAY),
+            };
+            let unknown = ask(&at("0123456789abcdef"), Some(&gateway), &[], call());
+            let answer = ask(&at(EXCLUDING), Some(&gateway), &[], call());
+            assert_eq!(unknown.status, 404, "{unknown:?}");
+            assert_eq!((answer.status, &answer.body), (404, &unknown.body));
+        }
+    }
+}

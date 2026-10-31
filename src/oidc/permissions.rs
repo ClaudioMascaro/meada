@@ -127,15 +127,18 @@ pub(crate) struct Catalog {
     pub(crate) reason: Option<&'static str>,
     pub(crate) set: Option<SetInfo>,
     pub(crate) selectable: BTreeSet<String>,
+    /// `[oidc.github] host`: identities on it compare case-insensitively (#508).
+    pub(crate) host: String,
 }
 
 #[cfg(feature = "workspaces")]
 impl Catalog {
-    fn pending(reason: &'static str, set: Option<SetInfo>) -> Self {
+    fn pending(reason: &'static str, set: Option<SetInfo>, host: &str) -> Self {
         Self {
             reason: Some(reason),
             set,
             selectable: BTreeSet::new(),
+            host: host.to_string(),
         }
     }
 }
@@ -272,7 +275,7 @@ impl Permissions {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
         let now = Instant::now();
         let Some(set) = &state.set else {
-            return Catalog::pending("no_set", None);
+            return Catalog::pending("no_set", None, &self.github.host);
         };
         let age = set.age(now);
         let info = Some(SetInfo {
@@ -281,11 +284,11 @@ impl Permissions {
             max_age_seconds: self.github.max_age.as_secs(),
         });
         if age > self.github.max_age {
-            return Catalog::pending("stale_set", info);
+            return Catalog::pending("stale_set", info, &self.github.host);
         }
         let selectable = match (administrator, login) {
             (true, _) => set.catalog.clone(),
-            (false, None) => return Catalog::pending("missing_login", info),
+            (false, None) => return Catalog::pending("missing_login", info, &self.github.host),
             (false, Some(login)) => {
                 let roles = set.logins.get(login).map(Vec::as_slice).unwrap_or_default();
                 roles
@@ -299,6 +302,7 @@ impl Permissions {
             reason: None,
             set: info,
             selectable,
+            host: self.github.host.clone(),
         }
     }
 

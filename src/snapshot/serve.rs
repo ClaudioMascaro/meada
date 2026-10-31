@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use super::store::Store;
-use super::{CURRENT_MAX, Config, DOCUMENT_MAX, Document, is_id, pull};
+use super::{CURRENT_MAX, Config, Context, DOCUMENT_MAX, Document, is_id, pull};
 use crate::msg::Msg;
 use crate::workspace::Manifest;
 use crate::{Result, config};
@@ -58,6 +58,35 @@ impl Held {
                 .map(|r| r.repo.as_str())
                 .collect(),
         )
+    }
+
+    /// Whether a caller whose grant is `grant` sees `context` (ADR 0020's discovery rule, #510):
+    /// the grant reads every entry of its version, the identities it records and those the
+    /// sponsor rule excluded alike. It decides with the console's function, with no operator
+    /// exemption: a node knows no operators.
+    fn sees(context: &Context, grant: &meada_core::authorize::Grant) -> bool {
+        let recorded = context.repositories.iter().map(|r| r.repo.clone());
+        let entries: Vec<String> = recorded.chain(context.excluded.iter().cloned()).collect();
+        meada_core::named::visible(false, &entries, grant)
+    }
+
+    /// Whether a caller whose grant is `grant` is admitted to `identity` in context `id`: it
+    /// sees the context (`sees`) and the context records the identity. An excluded identity has
+    /// no bundle in the context, so it is never admitted.
+    pub fn admits(&self, id: &str, identity: &str, grant: &meada_core::authorize::Grant) -> bool {
+        let recorded = self.document.contexts.iter().find(|c| c.id == id);
+        recorded.is_some_and(|c| {
+            c.repositories.iter().any(|r| r.repo == identity) && Self::sees(c, grant)
+        })
+    }
+
+    /// The ids of the contexts a caller whose grant is `grant` sees (`sees`), sorted (the pull
+    /// refuses a document whose contexts are not).
+    pub fn viewable(&self, grant: &meada_core::authorize::Grant) -> Vec<&str> {
+        (self.document.contexts.iter())
+            .filter(|c| Self::sees(c, grant))
+            .map(|c| c.id.as_str())
+            .collect()
     }
 
     /// The workspace version context `id` was recorded at.
@@ -560,5 +589,51 @@ mod tests {
         std::os::unix::fs::symlink(&outside, mirror.join("meada.toml")).unwrap();
         let facts = loaded.facts(REPO).unwrap();
         assert!(facts.own && !facts.documents);
+    }
+
+    /// The node gate's rule on a named workspace's route (#510): a context recording `REPO`
+    /// with `GONE` excluded is seen only by a grant that reads both, on the current generation
+    /// and on a pin alike; the excluded identity is admitted to no one, and the 404's list holds
+    /// only the contexts the grant sees. A context without `excluded` reads as none excluded.
+    #[test]
+    fn a_context_is_admitted_only_to_a_grant_reading_its_excluded_identities_too() {
+        use meada_core::authorize::Grant;
+        const GONE: &str = "example.com/serve/gone";
+        const PLAIN: &str = "c000000000000001";
+        const EXCLUDING: &str = "c000000000000002";
+        let local = scratch("excluded");
+        generation(&local, A, &[("a.ts", "export function alpha() {}\n")]);
+        generation(&local, B, &[("a.ts", "export function beta() {}\n")]);
+        let mut recorded = document(A);
+        let context = |id: &str| {
+            serde_json::json!({"id": id, "version": "0000000000000001",
+                "repositories": [{"repo": REPO, "blocks": {}}]})
+        };
+        let mut excluding = context(EXCLUDING);
+        excluding["excluded"] = serde_json::json!([GONE]);
+        recorded["contexts"] = serde_json::json!([context(PLAIN), excluding]);
+        write(&local, A, &recorded);
+        point(&local, A);
+        let current = Current::new(local.clone());
+        let only =
+            |identities: &[&str]| Grant::Only(identities.iter().map(|i| i.to_string()).collect());
+        let (reads_y, reads_both) = (only(&[REPO]), only(&[REPO, GONE]));
+        // The current generation, then a pin of it while the pointer names another.
+        let now = current.get().unwrap();
+        point(&local, B);
+        let pinned = current.pinned(A).unwrap().unwrap();
+        for held in [now, pinned] {
+            assert!(!held.admits(EXCLUDING, REPO, &reads_y));
+            assert_eq!(held.viewable(&reads_y), [PLAIN]);
+            assert!(held.admits(PLAIN, REPO, &reads_y));
+            assert!(held.admits(EXCLUDING, REPO, &reads_both));
+            assert_eq!(held.viewable(&reads_both), [PLAIN, EXCLUDING]);
+            for grant in [&reads_y, &reads_both, &only(&[GONE]), &Grant::All] {
+                assert!(!held.admits(EXCLUDING, GONE, grant));
+            }
+            assert!(!held.admits(EXCLUDING, REPO, &only(&[GONE])));
+            assert!(held.admits(EXCLUDING, REPO, &Grant::All));
+            assert!(!held.admits("c000000000000003", REPO, &Grant::All));
+        }
     }
 }
