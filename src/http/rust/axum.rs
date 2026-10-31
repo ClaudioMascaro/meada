@@ -15,8 +15,8 @@ use super::super::{
 use super::frameworks::{self, Made};
 use crate::contract::Found;
 use crate::lang::{Call, Value, literal};
-use crate::resolve::{Code, Follow, Of, Origin, scope_of};
-use std::collections::{BTreeSet, HashSet};
+use crate::resolve::{Code, Follow, Of, Origin, method, scope_of};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 /// The method routers of axum, as functions of `axum::routing` and as methods of a method
 /// router: `get(a).post(b)`.
@@ -100,37 +100,98 @@ fn axum_routers<'a>(
     ))
 }
 
+/// What the reading of one file's unread values keeps between its starts: the values walked
+/// (`seen`), so a value several starts reach is walked once for the file, and, by call, whether
+/// the builder chain the call ends could make an axum router at all.
+#[derive(Default)]
+struct Unread<'a> {
+    seen: HashSet<*const Value>,
+    router_chain: HashMap<(&'a str, usize), bool>,
+}
+
+impl<'a> Unread<'a> {
+    /// Whether the chain the call at `index` of `path` ends could make an axum router: every
+    /// method above where it stops is one a router hands back (`Follow::Values` keeps no origin
+    /// of a chain that goes through another), so `Code::origins` of a chain that is not such
+    /// has no router, and is not asked. One walk down a chain answers for each of its calls.
+    fn may_be_router(&mut self, code: &Code<'a>, path: &'a str, index: usize) -> bool {
+        if let Some(&known) = self.router_chain.get(&(path, index)) {
+            return known;
+        }
+        let Some(chain) = code.chain(path, index) else {
+            self.router_chain.insert((path, index), false);
+            return false;
+        };
+        let passes = frameworks::passes(Made::Router);
+        let mut all = true;
+        for (n, &at) in chain.iter().enumerate().rev() {
+            // The last call is where the chain stops: no step of it.
+            if n + 1 < chain.len() {
+                let callee = code.call(path, at).map_or("", |c| c.callee.as_str());
+                all &= passes.contains(&method(callee));
+            }
+            self.router_chain.insert((path, at), all);
+        }
+        all
+    }
+}
+
+/// Whether `ty`, the type a name is written with, is one no router is: text, a path, a number,
+/// a boolean or a character.
+fn is_plain(ty: &str) -> bool {
+    const PLAIN: &[&str] = &[
+        "str", "String", "Path", "PathBuf", "OsStr", "OsString", "bool", "char", "usize", "isize",
+        "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", "f32", "f64",
+    ];
+    PLAIN.contains(&ty.rsplit("::").next().unwrap_or(ty))
+}
+
 /// The axum routers given to what `value`, written in `call`, is made of, when it is not a
 /// router itself: the arguments and receiver of its calls, the values a function of the
-/// repository returns (found by name too), and the values of constants.
+/// repository returns (found by name too), and the values of constants. `unread` carries the
+/// values walked by the earlier starts of the file, which are not walked again.
 fn axum_unread<'a>(
     code: &Code<'a>,
+    unread: &mut Unread<'a>,
     path: &'a str,
     scope: &'a str,
     value: &'a Value,
 ) -> BTreeSet<CallAt<'a>> {
     let mut found = BTreeSet::new();
-    let mut seen = HashSet::new();
     let mut work = vec![(path, scope, value)];
     while let Some((path, scope, value)) = work.pop() {
-        if !seen.insert(std::ptr::from_ref(value)) {
+        if !unread.seen.insert(std::ptr::from_ref(value)) {
             continue;
         }
-        let routers = axum_routers_of(code.origins(
-            path,
-            scope,
-            Of::Value(value),
-            Follow::Values {
-                passes: frameworks::passes_on,
-            },
-        ));
-        if !routers.is_empty() {
-            found.extend(routers);
-            continue;
+        let index = match value {
+            Value::Call(invocation) => code.call_index(path, &invocation.range),
+            _ => None,
+        };
+        // A chain through a method no router hands back, and a name written as text or a
+        // number, have no router origin: their values are still read, not asked.
+        let plain = match value {
+            Value::Ref(name) => code
+                .written(path, scope, name)
+                .is_some_and(|(_, _, ty)| is_plain(ty)),
+            _ => false,
+        };
+        if !plain && index.is_none_or(|at| unread.may_be_router(code, path, at)) {
+            let routers = axum_routers_of(code.origins(
+                path,
+                scope,
+                Of::Value(value),
+                Follow::Values {
+                    passes: frameworks::passes_on,
+                },
+            ));
+            if !routers.is_empty() {
+                found.extend(routers);
+                continue;
+            }
         }
         match value {
-            Value::Call(invocation) => {
-                let Some(index) = code.call_index(path, &invocation.range) else {
+            Value::Call(_) => {
+                let Some(index) = index else {
                     continue;
                 };
                 let Some(call) = code.call(path, index) else {
@@ -188,6 +249,7 @@ pub(super) fn providers(code: &Code) -> Vec<Found> {
     let mut routes = Vec::new();
     for (&path, facts) in code.files() {
         let mut touched = false;
+        let mut unread = Unread::default();
         for (n, call) in facts.calls.iter().enumerate() {
             let member = call.callee.rsplit('.').next().unwrap_or_default();
             if !matches!(
@@ -237,7 +299,7 @@ pub(super) fn providers(code: &Code) -> Vec<Found> {
                     // A child Meada cannot read is a call it does not follow: the routers
                     // given to it are mounted there, so served nowhere.
                     if children.is_empty() {
-                        for unread in axum_unread(code, path, &call.scope, child) {
+                        for unread in axum_unread(code, &mut unread, path, &call.scope, child) {
                             mounts.entry(unread).or_default();
                         }
                     }
@@ -246,7 +308,7 @@ pub(super) fn providers(code: &Code) -> Vec<Found> {
                 ("route_service" | "fallback_service", args) => {
                     for unread in args
                         .iter()
-                        .flat_map(|a| axum_unread(code, path, &call.scope, a))
+                        .flat_map(|a| axum_unread(code, &mut unread, path, &call.scope, a))
                     {
                         mounts.entry(unread).or_default();
                     }
@@ -258,7 +320,7 @@ pub(super) fn providers(code: &Code) -> Vec<Found> {
         // Meada cannot follow it: it is served nowhere.
         if touched {
             for (scope, value) in code.rebound(path) {
-                for unread in axum_unread(code, path, scope, value) {
+                for unread in axum_unread(code, &mut unread, path, scope, value) {
                     mounts.entry(unread).or_default();
                 }
             }
@@ -281,6 +343,38 @@ pub(super) fn providers(code: &Code) -> Vec<Found> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A file whose `lets` rebound `let`s each hold a call on one `base`, the end of a builder
+    /// chain of `links` calls no router hands back.
+    fn shared(lets: usize, links: usize) -> String {
+        let chain = ".a()".repeat(links);
+        let rebound: String = (0..lets)
+            .map(|i| format!("    let x{i} = base.b();\n    let x{i} = 0;\n"))
+            .collect();
+        format!(
+            "use axum::{{Router, routing::get}};\nasync fn h() {{}}\nfn f() -> u8 {{ 0 }}\n\
+             pub fn g() {{\n    let base = f(){chain};\n{rebound}    Router::new().route(\"/a\", get(h));\n}}\n"
+        )
+    }
+
+    #[test]
+    fn many_lets_sharing_one_deep_value_are_read_in_linear_time() {
+        use crate::lang::LanguagePack;
+        use crate::lang::rust::Rust;
+        use crate::resolve::Resolver;
+        let src = shared(40, 500);
+        let facts = Rust.parse("src/lib.rs", src.as_bytes()).unwrap();
+        let files = std::collections::BTreeMap::from([("src/lib.rs", &facts)]);
+        let resolver = Resolver::new(&files, Rust.modules(&[], &files).unwrap(), &Rust);
+        let code = Code::new(&resolver, &files, &Rust);
+        let start = std::time::Instant::now();
+        let found = providers(&code);
+        let took = start.elapsed();
+        assert_eq!(found.len(), 1);
+        // Under 0.5 s in a local debug build (the whole test takes 0.55 s); each let walking the
+        // chain again took 28.8 s with 1000 links.
+        assert!(took < std::time::Duration::from_secs(10), "{took:?}");
+    }
 
     #[test]
     fn an_escaped_brace_is_literal_and_a_wildcard_is_a_parameter() {

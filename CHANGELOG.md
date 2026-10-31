@@ -58,6 +58,14 @@ All notable changes to Meada are recorded here. The format follows
   seven lookup indexes (about 40% larger on junit5) and its schema version changes, so existing
   indexes are rebuilt. `meada export`, `status` and the decision report still read every row.
 
+### Changed
+
+- The axum provider reader walks each value once per file (#431): the values a file's rebound
+  `let`s reach share one `seen` set, and `Code::origins` is not asked for a call whose builder
+  chain goes through a method no router hands back, nor for a name written as text, a path, a
+  number, a boolean or a character. The reader's share of a one-file refresh on this repository
+  drops from about 1.4 s to about 0.1 s. No golden changed.
+
 ### Fixed
 
 - Java and Kotlin: a file with thousands of fields and locals is read in linear time (#442, from
