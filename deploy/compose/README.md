@@ -26,9 +26,11 @@ Não execute dois indexers para o mesmo volume ao mesmo tempo.
 `REPOSITORIES` contém URLs Git HTTP(S), separadas por espaço. Ao trocar repositórios, ajuste
 também os blocos `[[repository]]` nos manifestos: identidade sem `.git` e caminho abaixo de
 `/srv/mirrors`. O fetch faz parte do job; o `meada index` continua sem rede. As URLs não
-levam credenciais (use um credential helper do git). Um fetch que falha nomeia a identidade e
-encerra o refresh antes de `index` e `publish`, mantendo a geração atual (#316). Os dados vivem em
-volumes Docker; `docker compose down` os preserva, e `down -v` os apaga.
+levam credenciais (use um credential helper do git). Um espelho clonado antes a partir de uma
+URL com token guarda o token no `origin` e é recusado do mesmo modo (#445): rode
+`git remote set-url origin <URL sem credenciais>` nele. Um fetch que falha nomeia a identidade
+e encerra o refresh antes de `index` e `publish`, mantendo a geração atual (#316). Os dados
+vivem em volumes Docker; `docker compose down` os preserva, e `down -v` os apaga.
 
 ## TLS, admissão e ferramentas
 

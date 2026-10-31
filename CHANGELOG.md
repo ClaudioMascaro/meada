@@ -68,6 +68,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Compose mirror origins (#445): `fetch.sh` and `fetch-pulled.sh` read an existing mirror's
+  `origin` before fetching and refuse one whose HTTP(S) URL carries credentials (a mirror cloned
+  from a URL with a token keeps it there), naming the identity and never the URL, and the refresh
+  stops before index and publish as a failed fetch does. The READMEs tell the operator to run
+  `git remote set-url origin <URL without credentials>` in such a mirror.
 - Java and Kotlin: a file with thousands of fields and locals is read in linear time (#442, from
   #424). The hides check indexes the fields by name instead of scanning every field per local,
   the class around a write is found from the prefixes of its scope, and `declared_before` (and
