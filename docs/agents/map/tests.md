@@ -645,6 +645,45 @@ ceilings through CLI and HTTP, and live-heartbeat selection with a controlled RE
 response while all other commands reach the real Valkey fixture. The ceiling tests preserve
 one final locked publish and compare English and Brazilian Portuguese refusals.
 
+### Local accounts: sign-in and session tokens (#554)
+
+`src/accounts.rs` holds the unit tests of the section (one key of each pair, names only), the
+key pair (a ring-generated Ed25519 pair accepted; a mismatched pair, a public key that is a
+private one, a garbage private key, a key not named, an unset variable and an unreadable file
+refused naming the key and no value; a key file past `KEY_MAX` and a password file past
+`PASSWORD_FILE_MAX` refused naming the file), the session token (issuer, audience, other key,
+expired and not yet valid past the leeway, a non-local subject, an unknown role, no `exp`,
+HS256, a `crit` header), the password policy table (every rule, characters not bytes) and
+argon2id (OWASP parameters in the PHC string, a fresh salt, a non-argon2id string matching
+nothing, a hash past one of the parameter ceilings neither a stored hash nor computed).
+`tests/it/ui/accounts.rs` runs the console as a process. Without a service: the section rules
+through `meada status` (`[accounts]` without `[postgres]`, beside `[oidc]`, both keys of a pair,
+`operations = true` naming no further problem), the start refused on a mismatched, non-Ed25519,
+unreadable or missing key and, with a good pair, on the default account Postgres cannot take,
+never a key or the URL in stderr, and a node over the chain fixture whose `[accounts]` names key
+files that do not exist starting and answering. Against Postgres (`postgres::audited`, a schema
+of each test's own behind the relay): the tracer bullet (`config`'s `sign_in`, the 401 before
+routing, the `Origin` 403s of `login`, fixed 400s and the 413, `admin123` giving a token that
+opens only the password change (a write without a token a 401, with that token a 403
+`password_change_required`, the change's body past its cap a 413), one body for an unknown
+username and a wrong password, a
+tampered token's `invalid_token`, a token another key signed and an expired one each an
+`invalid_token` 401 where the console's key signing the same claims passes, the policy's 422
+and the wrong current password's 401, then a
+fresh operator token whose `session` is `local:admin`, an old token keeping its mark, a viewer
+seeded with the same hash reading, refused the audit page and a write, and refused reusing its
+password), the audit page listing every sign-in, refusal and change, a hostile row (an unknown
+role) answering as an unknown username with one line naming the table, no cookie or CORS header
+and no password, token part, hash, key or URL in any error body, record or stderr line; the
+default account created from the deployer's password without a change required, never touched
+once the table holds a row, refused at start for a password failing the policy (the key named,
+never the value), and created once by two consoles started together; a burst of sign-ins past
+`HASHES_MAX` answered 503 `busy`, no token when the audit table cannot take the record, and every
+sign-in and change a 503 `audit_unavailable` with the relay closed. With the fleet's Valkey and
+store too, the default account saves a workspace version after its change, audited as
+`workspace.save` under `local:admin` and listed with that author. `tests/it/postgres.rs` holds
+migration 9's columns, and the tests that name the schema version moved to 9.
+
 ### The directory (#334)
 
 `tests/it/ui/oidc/directory.rs` runs a console with `[oidc]` (the `oidc` module's loopback

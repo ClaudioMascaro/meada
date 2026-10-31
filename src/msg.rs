@@ -1007,6 +1007,9 @@ pub enum Msg<'a> {
     /// Console operator configuration requires OIDC.
     #[cfg(feature = "ui")]
     UiNeedsOidc,
+    /// Console writes need an admission that names an operator: `[oidc]` or `[accounts]`.
+    #[cfg(all(feature = "ui", feature = "accounts"))]
+    UiNeedsAdmission,
     /// Enabled writes require one operator admission key.
     #[cfg(feature = "ui")]
     UiOperatorNeeded,
@@ -1043,6 +1046,80 @@ pub enum Msg<'a> {
     /// A subject the identity provider deactivated (#335): the 403 `deprovisioned`.
     #[cfg(all(feature = "ui", feature = "directory"))]
     UiDeprovisioned,
+    /// `[accounts]` with both keys of a pair: the other key's name (ADR 0024).
+    #[cfg(feature = "accounts")]
+    AccountsBoth(&'a str),
+    /// A variable `[accounts]` names that is not set.
+    #[cfg(feature = "accounts")]
+    AccountsUnset(&'a str),
+    /// A variable `[accounts]` names whose value is not UTF-8.
+    #[cfg(feature = "accounts")]
+    AccountsNotUtf8,
+    /// `[accounts]` naming no public or private key, at the console's start.
+    #[cfg(feature = "accounts")]
+    AccountsKeyMissing {
+        env: &'a str,
+        file: &'a str,
+        private: bool,
+    },
+    /// A key of `[accounts]` that is no Ed25519 key in PEM.
+    #[cfg(feature = "accounts")]
+    AccountsNotEd25519 {
+        private: bool,
+    },
+    /// A private key that does not sign what the public key verifies.
+    #[cfg(feature = "accounts")]
+    AccountsKeyMismatch,
+    /// `[accounts]` beside `[oidc]`: local sign-in is off once an identity provider is configured.
+    #[cfg(feature = "accounts")]
+    AccountsBesideOidc,
+    /// The password policy's rules, each named, never the password.
+    #[cfg(feature = "accounts")]
+    AccountsPasswordShort(usize),
+    #[cfg(feature = "accounts")]
+    AccountsPasswordLong(usize),
+    #[cfg(feature = "accounts")]
+    AccountsPasswordDefault,
+    #[cfg(feature = "accounts")]
+    AccountsPasswordUsername,
+    #[cfg(feature = "accounts")]
+    AccountsPasswordCurrent,
+    /// The default account could not be made at the console's start: Postgres's reason.
+    #[cfg(feature = "accounts")]
+    AccountsBootstrap(&'a str),
+    /// The 503 `busy` of a hash past the console's bound.
+    #[cfg(feature = "accounts")]
+    AccountsBusy,
+    /// The one 401 `invalid_credentials` of a sign-in or a password change.
+    #[cfg(feature = "accounts")]
+    AccountsInvalid,
+    /// A request to the console with no valid session token.
+    #[cfg(feature = "accounts")]
+    AccountsUnauthorized,
+    /// A session token with the change-required mark, on any route but the password change.
+    #[cfg(feature = "accounts")]
+    AccountsChangeRequired,
+    /// A sign-in whose body is no `{"username", "password"}`.
+    #[cfg(feature = "accounts")]
+    AccountsLoginBody,
+    /// A password change whose body is no `{"current", "new"}`.
+    #[cfg(feature = "accounts")]
+    AccountsPasswordBody,
+    /// An accounts row that fails its checks, naming the table and never its values.
+    #[cfg(feature = "accounts")]
+    AccountsBadRow(&'a str),
+    /// The audit message of an accepted sign-in.
+    #[cfg(feature = "accounts")]
+    AccountsSignedIn,
+    /// The audit message of a password change.
+    #[cfg(feature = "accounts")]
+    AccountsPasswordChanged,
+    /// The accounts table could not be written.
+    #[cfg(feature = "accounts")]
+    AccountsUnavailable,
+    /// A session token the console could not sign.
+    #[cfg(feature = "accounts")]
+    AccountsUnsigned,
     /// The directory could not be read: the stderr line, naming the directory and never a claim.
     #[cfg(all(feature = "ui", feature = "directory"))]
     DirectoryUnreadable(&'a str),
@@ -3356,6 +3433,11 @@ impl Msg<'_> {
             ),
             #[cfg(feature = "ui")]
             Msg::UiNeedsOidc => pick("requires [oidc]".into(), "exige [oidc]".into()),
+            #[cfg(all(feature = "ui", feature = "accounts"))]
+            Msg::UiNeedsAdmission => pick(
+                "requires [oidc] or [accounts]".into(),
+                "exige [oidc] ou [accounts]".into(),
+            ),
             #[cfg(feature = "ui")]
             Msg::UiOperatorNeeded => pick(
                 "set `ui.operator_groups` or `ui.operator_claim`".into(),
@@ -3417,6 +3499,139 @@ impl Msg<'_> {
             Msg::UiDeprovisioned => pick(
                 "the identity provider deactivated this account".into(),
                 "o provedor de identidade desativou esta conta".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsBoth(other) => pick(
+                format!("is set together with {other}: use one of the two"),
+                format!("está junto de {other}: use um dos dois"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsNotUtf8 => pick(
+                "names a variable whose value is not UTF-8".into(),
+                "nomeia uma variável cujo valor não é UTF-8".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsUnset(var) => pick(
+                format!("the variable {var} is not set"),
+                format!("a variável {var} não está definida"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsKeyMissing {
+                env,
+                file,
+                private,
+            } => {
+                let (en, pt_br) = half_of(*private);
+                pick(
+                    format!("names no {en} key of the signing key pair: set `{env}` or `{file}`"),
+                    format!(
+                        "não nomeia a chave {pt_br} do par de chaves de assinatura: defina \
+                         `{env}` ou `{file}`"
+                    ),
+                )
+            }
+            #[cfg(feature = "accounts")]
+            Msg::AccountsNotEd25519 { private } => {
+                let (en, pt_br) = half_of(*private);
+                pick(
+                    format!("is not an Ed25519 {en} key in PEM"),
+                    format!("não é uma chave {pt_br} Ed25519 em PEM"),
+                )
+            }
+            #[cfg(feature = "accounts")]
+            Msg::AccountsKeyMismatch => pick(
+                "does not match the public key: what it signs, the public key does not verify"
+                    .into(),
+                "não corresponde à chave pública: o que ela assina, a chave pública não verifica"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsBesideOidc => pick(
+                "[accounts] cannot sit beside [oidc]: local sign-in is off once an identity \
+                 provider is configured"
+                    .into(),
+                "[accounts] não pode ficar junto de [oidc]: o login local fica desligado quando \
+                 há um provedor de identidade"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordShort(min) => pick(
+                format!("the password has fewer than {min} characters"),
+                format!("a senha tem menos de {min} caracteres"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordLong(max) => pick(
+                format!("the password has more than {max} characters"),
+                format!("a senha tem mais de {max} caracteres"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordDefault => pick(
+                "the password is the published default password".into(),
+                "a senha é a senha padrão publicada".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordUsername => pick(
+                "the password is the username".into(),
+                "a senha é o nome de usuário".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordCurrent => pick(
+                "the new password is the current one".into(),
+                "a nova senha é a atual".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsBootstrap(reason) => pick(
+                format!("the default account cannot be created: {reason}"),
+                format!("a conta padrão não pode ser criada: {reason}"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsBusy => pick(
+                "too many sign-ins at once: try again".into(),
+                "logins demais ao mesmo tempo: tente de novo".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsInvalid => pick(
+                "the username or the password is wrong".into(),
+                "o nome de usuário ou a senha está errado".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsUnauthorized => pick(
+                "a valid session token is needed: sign in".into(),
+                "é preciso um token de sessão válido: entre".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsChangeRequired => pick(
+                "the password must be changed first".into(),
+                "a senha precisa ser trocada antes".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsLoginBody => pick(
+                "the body must be {\"username\", \"password\"}".into(),
+                "o corpo deve ser {\"username\", \"password\"}".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordBody => pick(
+                "the body must be {\"current\", \"new\"}".into(),
+                "o corpo deve ser {\"current\", \"new\"}".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsBadRow(table) => pick(
+                format!("accounts: a row of {table} fails its checks and admits nothing"),
+                format!("contas: uma linha de {table} falha nas verificações e não admite nada"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsSignedIn => pick("signed in".into(), "entrou".into()),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordChanged => pick("password changed".into(), "senha trocada".into()),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsUnavailable => pick(
+                "the accounts in Postgres are unavailable".into(),
+                "as contas no Postgres estão indisponíveis".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsUnsigned => pick(
+                "the session token could not be signed".into(),
+                "o token de sessão não pôde ser assinado".into(),
             ),
             #[cfg(all(feature = "ui", feature = "directory"))]
             Msg::DirectoryUnreadable(reason) => pick(
@@ -3960,5 +4175,14 @@ fn confidence_of(confidence: Option<f64>) -> (String, String) {
             format!(", confiança {c:.2}"),
         ),
         None => Default::default(),
+    }
+}
+
+/// The half of the signing key pair a message names, in English and in pt-BR.
+#[cfg(feature = "accounts")]
+fn half_of(private: bool) -> (&'static str, &'static str) {
+    match private {
+        true => ("private", "privada"),
+        false => ("public", "pública"),
     }
 }

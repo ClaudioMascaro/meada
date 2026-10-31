@@ -2,7 +2,7 @@ import type { AuditCopy } from './audit-i18n';
 
 export interface AuditRecord {
   id: number; time: string; via: 'console' | 'cli'; subject: string | null; login: string | null;
-  role: 'viewer' | 'operator' | 'team_operator'; owners: string[] | null; action: string;
+  role: 'viewer' | 'operator' | 'team_operator' | 'none'; owners: string[] | null; action: string;
   arguments: Record<string, string>; outcome: 'pending' | 'accepted' | 'refused' | 'failed'; message: string | null;
 }
 export interface AuditPage { records: AuditRecord[]; next: number | null }

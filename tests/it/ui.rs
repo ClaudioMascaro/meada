@@ -15,6 +15,10 @@ use serde_json::{Value, json};
 use crate::manifest::{MANIFEST, run_args};
 use crate::server::Server;
 
+/// With `[accounts]`: the console's own sign-in, the default account and its session tokens.
+#[cfg(feature = "accounts")]
+mod accounts;
+
 /// With `[oidc]`: the console's admission, its routes and the grant bounding every view.
 #[cfg(feature = "oidc")]
 mod oidc;
@@ -215,7 +219,8 @@ fn serves_config_session_and_manifest() {
             "directory",
             "catalog",
             "workspaces",
-            "proposals"
+            "proposals",
+            "accounts"
         ]
     );
     for module in modules {
@@ -228,6 +233,7 @@ fn serves_config_session_and_manifest() {
             "github-app" => cfg!(feature = "github-app"),
             "ui" => true,
             "postgres" => cfg!(feature = "postgres"),
+            "accounts" => cfg!(feature = "accounts"),
             "directory" => cfg!(feature = "directory"),
             "workspaces" => cfg!(feature = "workspaces"),
             "proposals" => cfg!(feature = "proposals"),

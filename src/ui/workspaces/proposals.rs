@@ -227,6 +227,9 @@ impl Console {
             holds: Holds::of(file, &read),
             entries: std::sync::Mutex::new(None),
             audit: crate::audit::Audit::default(),
+            // The proposal server signs no session token: it never reads `[accounts]`'s keys.
+            #[cfg(feature = "accounts")]
+            accounts: None,
             #[cfg(feature = "directory")]
             scim: None,
             #[cfg(feature = "directory")]

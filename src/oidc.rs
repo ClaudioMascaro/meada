@@ -61,8 +61,8 @@ const METADATA_MAX: u64 = 64 << 10;
 const JWKS_MAX: u64 = 256 << 10;
 /// The least time between two JWKS fetches an unknown `kid` causes.
 const KID_REFRESH_EVERY: Duration = Duration::from_secs(60);
-/// The seconds of clock skew `exp` and `nbf` tolerate.
-const LEEWAY: u64 = 60;
+/// The seconds of clock skew `exp` and `nbf` tolerate, a Meada-signed token's too (ADR 0024).
+pub(crate) const LEEWAY: u64 = 60;
 /// The shortest `jwks_refresh_seconds`, and its default.
 const REFRESH_MIN: i64 = 60;
 const REFRESH_DEFAULT: i64 = 3600;
@@ -365,7 +365,7 @@ fn strings<'a>(
 
 /// Why a token is not admitted.
 #[derive(Debug, PartialEq)]
-enum Refusal {
+pub(crate) enum Refusal {
     /// No `Authorization` header.
     Missing,
     /// A header or token that does not pass.
@@ -560,7 +560,7 @@ fn fits(key: &Jwk, header: &Header) -> bool {
 /// The token of `headers`' one `Authorization: Bearer` header: `Ok(None)` without one, or with
 /// another scheme (RFC 6750 §3.1: no bearer token was sent); two headers, a value that is not
 /// UTF-8 and an empty token are refused.
-fn bearer(headers: &HeaderMap) -> Result<Option<&str>, Refusal> {
+pub(crate) fn bearer(headers: &HeaderMap) -> Result<Option<&str>, Refusal> {
     let mut values = headers.get_all(header::AUTHORIZATION).iter();
     let Some(value) = values.next() else {
         return Ok(None);

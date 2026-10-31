@@ -19,7 +19,7 @@ pub struct Module {
     pub built: bool,
 }
 
-pub const MODULES: [Module; 12] = [
+pub const MODULES: [Module; 13] = [
     Module {
         section: "valkey",
         feature: "valkey",
@@ -80,6 +80,11 @@ pub const MODULES: [Module; 12] = [
         feature: "proposals",
         built: cfg!(feature = "proposals"),
     },
+    Module {
+        section: "accounts",
+        feature: "accounts",
+        built: cfg!(feature = "accounts"),
+    },
 ];
 
 /// The first section of `src`, the content of `file`, whose feature this build lacks. A file
@@ -101,7 +106,8 @@ pub fn check(file: &Path, src: &str) -> Result<()> {
 #[cfg(any(
     feature = "generation-pointer",
     feature = "github-app",
-    feature = "directory"
+    feature = "directory",
+    feature = "accounts"
 ))]
 pub fn needs(file: &Path, src: &str, section: &str, missing: &[&str]) -> Result<()> {
     if missing.is_empty() {
@@ -433,6 +439,17 @@ mod tests {
         assert_eq!(
             err,
             "m.toml:4: [postgres] needs a Meada built with the postgres feature"
+        );
+    }
+
+    #[cfg(not(feature = "accounts"))]
+    #[test]
+    fn the_accounts_section_without_its_feature_names_it() {
+        let src = "index_dir = \"i\"\n[accounts]\npublic_key_file = \"k.pem\"\n";
+        let err = check(Path::new("m.toml"), src).unwrap_err().to_string();
+        assert_eq!(
+            err,
+            "m.toml:2: [accounts] needs a Meada built with the accounts feature"
         );
     }
 

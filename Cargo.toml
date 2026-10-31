@@ -23,6 +23,17 @@ categories = ["development-tools", "command-line-utilities"]
 exclude = [".github/", "AGENTS.md", "CLAUDE.md", "dist-workspace.toml"]
 
 [dependencies]
+# The local accounts' password hashes (ADR 0024), only behind `accounts`: argon2id, its salt from
+# the operating system's generator.
+argon2 = { version = "=0.5.3", optional = true, default-features = false, features = [
+    "alloc",
+    "password-hash",
+    "rand",
+] }
+# The salt of a hash from the operating system's generator (`OsRng`), only behind `accounts`.
+password-hash = { version = "=0.5.0", optional = true, default-features = false, features = [
+    "getrandom",
+] }
 # The transport guard of the snapshot store (ADR 0012), only behind `snapshot`: object_store's
 # `HttpService` is an `async_trait`.
 async-trait = { version = "=0.1.92", optional = true }
@@ -39,9 +50,10 @@ ignore = "0.4.33"
 # At the workspace's version, exactly: bump both together.
 meada-core = { path = "meada-core", version = "=1.0.0" }
 # The OIDC module's JWT validation (ADR 0012), only behind `oidc`, and the GitHub App module's
-# JWT signing (ADR 0013), only behind `github-app`: RustCrypto as its backend, since the other,
-# aws-lc-rs, would be a second rustls provider beside ring. PEM reading (`use_pem`) only with
-# `github-app`, whose App key is a PEM file; OIDC keys come as JWKs.
+# JWT signing (ADR 0013), only behind `github-app`, and the local accounts' Ed25519 tokens (ADR
+# 0024), only behind `accounts`: RustCrypto as its backend, since the other, aws-lc-rs, would be a
+# second rustls provider beside ring. PEM reading (`use_pem`) only with `github-app` and
+# `accounts`, whose keys are PEM files; OIDC keys come as JWKs.
 jsonwebtoken = { version = "=11.1.0", optional = true, default-features = false, features = [
     "rust_crypto",
 ] }
@@ -173,6 +185,16 @@ workspaces = [
 # The proposal server (ADR 0022, `[proposals]`, `meada workspaces mcp`): the named workspaces'
 # discovery, validation and stateless proposals over MCP, for agents. No crate of its own.
 proposals = ["workspaces"]
+# Local accounts (ADR 0024, `[accounts]`): the console's sign-in and its Ed25519 session tokens,
+# over the OIDC module's JWT code and grant providers and the data layer; `argon2` hashes the
+# passwords.
+accounts = [
+    "oidc",
+    "postgres",
+    "dep:argon2",
+    "dep:password-hash",
+    "jsonwebtoken/use_pem",
+]
 # Every cloud module at once (ADR 0012). Unix only, since `refresh-lock` is.
 cloud = [
     "snapshot",
@@ -185,6 +207,7 @@ cloud = [
     "directory",
     "workspaces",
     "proposals",
+    "accounts",
 ]
 
 # `cargo test` runs the example's own tests too.

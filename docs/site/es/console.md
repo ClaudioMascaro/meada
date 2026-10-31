@@ -97,6 +97,21 @@ Registra en el issuer un cliente público, sin secreto, con Authorization Code y
 
 El navegador debe alcanzar los metadatos y el endpoint de token del issuer, con CORS para el origen de la consola. Intercambia el código directamente con el issuer. El bearer queda en memoria; `state` y `verifier` quedan en sessionStorage hasta que el callback los elimina. Recargar la página reinicia el login.
 
+## Cuentas locales
+
+Sin un proveedor de identidad, la consola puede autenticar sus propias cuentas (feature `accounts`, parte de `cloud`; ADR 0024). `[accounts]` exige `[postgres]` y no puede estar junto a `[oidc]`:
+
+```toml
+[accounts]
+public_key_file = "/run/secrets/meada-signing.pub.pem"   # o public_key_env
+private_key_file = "/run/secrets/meada-signing.pem"      # o private_key_env; solo la consola la lee
+# admin_password_env = "MEADA_ADMIN_PASSWORD"            # el predeterminado; o admin_password_file
+```
+
+El par de claves es Ed25519 en PEM (`openssl genpkey -algorithm ed25519 -out meada-signing.pem` y `openssl pkey -in meada-signing.pem -pubout -out meada-signing.pub.pem`). La consola se niega a arrancar con una clave ausente, ilegible, que no sea Ed25519 o que no corresponda a la otra, nombrando la clave y nunca su valor. Ejecuta `meada postgres migrate` antes: en el primer arranque con la tabla vacía, la consola crea la cuenta predeterminada `admin` con la contraseña `admin123`, que debe cambiarse antes de cualquier otra cosa, o con el valor de `MEADA_ADMIN_PASSWORD`, sin cambio obligatorio, si pasa la política de contraseñas (de 12 a 128 caracteres, ni la contraseña predeterminada ni el nombre de usuario). Con `[accounts]`, `operations = true` no necesita `[oidc]` ni clave de operador: el rol es el de la cuenta.
+
+`POST /api/v1/login` recibe `{"username", "password"}` y responde `{"token", "expires_at", "change_required"}`: un token de sesión que la consola firma y acepta durante ocho horas como bearer en toda ruta salvo los archivos estáticos, `config` y `login`. Un usuario desconocido y una contraseña errónea reciben el mismo 401 `invalid_credentials`. Con el cambio pendiente, solo `POST /api/v1/account/password` (`{"current", "new"}`) acepta el token; devuelve uno nuevo. `config` incluye `"sign_in": "accounts"` y `session` incluye `"account": true`. Cada inicio de sesión, rechazo y cambio de contraseña queda en la auditoría (`account.login`, `account.password`) antes del token, sin contraseña ni token; sin el registro, la respuesta es 503 `audit_unavailable`. Limita la tasa de `/api/v1/login` en el proxy.
+
 ## Flota y diagnóstico
 
 Cada `snapshot pull --every` envía un heartbeat, el registro periódico de estado del nodo. Informa generación, fence, generaciones locales, disponibilidad, versión y hora.

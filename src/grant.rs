@@ -229,6 +229,14 @@ impl Providers {
         }
     }
 
+    /// Whether a table bounds the grant: the groups table or the GitHub grant provider. Without
+    /// either, a local account reads every repository (ADR 0024).
+    #[cfg(feature = "accounts")]
+    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    pub fn bounds(&self) -> bool {
+        self.groups.is_some() || self.github().is_some()
+    }
+
     /// With the GitHub grant provider, its host, whatever a subject's login (#332).
     #[cfg_attr(not(feature = "ui"), allow(dead_code))]
     pub fn github(&self) -> Option<&str> {

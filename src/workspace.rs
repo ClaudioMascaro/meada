@@ -226,6 +226,10 @@ pub struct Manifest {
     /// `[workspaces]` is there too.
     #[cfg(feature = "proposals")]
     pub proposals: Option<crate::proposals::Config>,
+    /// The `[accounts]` section, when the build has the module (ADR 0024); `read` checks that
+    /// `[postgres]` is there and `[oidc]` is not, and gives it `[postgres]`.
+    #[cfg(feature = "accounts")]
+    pub accounts: Option<crate::accounts::Config>,
     /// `[workspace] source = "store"` (ADR 0014): the repositories come from the current
     /// workspace version: `entries` is empty, or with `read_listed` the pulled version's.
     #[cfg(feature = "generation-pointer")]
@@ -287,6 +291,8 @@ struct ManifestFile {
     workspaces: Option<crate::workspaces::File>,
     #[cfg(feature = "proposals")]
     proposals: Option<crate::proposals::File>,
+    #[cfg(feature = "accounts")]
+    accounts: Option<crate::accounts::File>,
     #[cfg(feature = "github-app")]
     #[serde(default, rename = "github_app")]
     github_apps: Vec<crate::github_app::File>,
@@ -386,6 +392,24 @@ impl Manifest {
             }
             github.postgres = postgres.clone();
         }
+        // `[accounts]` (ADR 0024) keeps its accounts in the data layer, and local sign-in is off
+        // once an identity provider is configured: never both.
+        #[cfg(feature = "accounts")]
+        let accounts = {
+            let mut section =
+                modules::validated(file, &src, parsed.accounts, |a| a.validate(base))?;
+            if let Some(accounts) = section.as_mut() {
+                if postgres.is_none() {
+                    modules::needs(file, &src, "accounts", &["postgres"])?;
+                }
+                if oidc.is_some() {
+                    let beside = Msg::AccountsBesideOidc.text();
+                    return Err(config::error_at(file, &src, "accounts", &beside));
+                }
+                accounts.postgres = postgres.clone();
+            }
+            section
+        };
         #[cfg(feature = "oidc")]
         let github = oidc.as_ref().is_some_and(|o| o.github.is_some());
         #[cfg(not(feature = "oidc"))]
@@ -671,6 +695,8 @@ impl Manifest {
             contexts,
             #[cfg(feature = "proposals")]
             proposals,
+            #[cfg(feature = "accounts")]
+            accounts,
             #[cfg(feature = "generation-pointer")]
             store,
             #[cfg(feature = "generation-pointer")]
@@ -880,6 +906,8 @@ impl Manifest {
             contexts: Vec::new(),
             #[cfg(feature = "proposals")]
             proposals: None,
+            #[cfg(feature = "accounts")]
+            accounts: None,
             #[cfg(feature = "generation-pointer")]
             store: false,
             #[cfg(feature = "generation-pointer")]

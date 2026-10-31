@@ -97,6 +97,21 @@ Register a public client at the issuer, without a secret, using Authorization Co
 
 The browser must reach the issuer's metadata and token endpoint, with CORS for the console origin. It exchanges the code directly with the issuer. The bearer stays in memory; `state` and `verifier` stay in sessionStorage until the callback removes them. Reloading the page restarts login.
 
+## Local accounts
+
+Without an identity provider, the console can sign in its own accounts (feature `accounts`, part of `cloud`; ADR 0024). `[accounts]` needs `[postgres]` and cannot sit beside `[oidc]`:
+
+```toml
+[accounts]
+public_key_file = "/run/secrets/meada-signing.pub.pem"   # or public_key_env
+private_key_file = "/run/secrets/meada-signing.pem"      # or private_key_env; only the console reads it
+# admin_password_env = "MEADA_ADMIN_PASSWORD"            # the default; or admin_password_file
+```
+
+The key pair is Ed25519 in PEM (`openssl genpkey -algorithm ed25519 -out meada-signing.pem` and `openssl pkey -in meada-signing.pem -pubout -out meada-signing.pub.pem`). The console refuses to start with a key that is missing, unreadable, not Ed25519 or not matching the other, naming the key and never its value. Run `meada postgres migrate` first: on the first start with an empty table, the console creates the default account `admin` with the password `admin123`, which must be changed before anything else, or with the value of `MEADA_ADMIN_PASSWORD`, with no change required, when it passes the password policy (12 to 128 characters, neither the default password nor the username). With `[accounts]`, `operations = true` needs no `[oidc]` and no operator key: the role is the account's.
+
+`POST /api/v1/login` takes `{"username", "password"}` and answers `{"token", "expires_at", "change_required"}`: a session token the console signs and accepts for eight hours as a bearer on every route but the static files, `config` and `login`. An unknown username and a wrong password get the same 401 `invalid_credentials`. While a change is pending, only `POST /api/v1/account/password` (`{"current", "new"}`) accepts the token; it answers a fresh one. `config` carries `"sign_in": "accounts"` and `session` carries `"account": true`. Every sign-in, refusal and password change is audited (`account.login`, `account.password`) before the token, with no password or token; without the record, the answer is a 503 `audit_unavailable`. Rate-limit `/api/v1/login` at the proxy.
+
 ## Fleet and diagnostics
 
 Each `snapshot pull --every` sends a heartbeat, the node's periodic status record. It reports generation, fence, local generations, readiness, version and time.

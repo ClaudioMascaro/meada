@@ -508,7 +508,7 @@ one for the area a change touches.
 - `modules.rs`, `valkey.rs`: the cloud modules (ADR 0012). `modules.rs` is the section table,
   in every build: each module section of `meada.workspace.toml` (`[valkey]`, `[snapshot]`,
   `[generations]`, `[refresh_lock]`, `[oidc]`, `[[github_app]]`, `[ui]`, `[postgres]`,
-  `[directory]`, `[catalog]`) with the cargo feature that
+  `[directory]`, `[catalog]`, `[workspaces]`, `[proposals]`, `[accounts]`) with the cargo feature that
   owns it and whether this build has it. `Manifest::read` checks it before the typed parse, so a
   section whose feature is missing is an error naming the file, the line, the section and the
   feature, and a section the table lacks stays an unknown key. A module ticket adds its row and
@@ -572,7 +572,8 @@ one for the area a change touches.
   `repositories`), `<schema>.permission_rows` (`identity`, `login` lowercase, `role` as GitHub
   spells it) and `<schema>.permission_exclusions` (`identity`, `added_by`), both cascading from
   their set; migration 6 `permission_repositories.source` (#341); migration 7 the named
-  workspaces' tables (#342); migration 8 `workspace_versions.entries` (#343).
+  workspaces' tables (#342); migration 8 `workspace_versions.entries` (#343); migration 9 the
+  local accounts' table, `<schema>.accounts` (#554, `accounts/store.rs`).
   `connected` is `connect` keeping the password for scrubbing a later statement's
   error (`Opened::scrubber` a copy of it for a transaction, which borrows the client), and `probe` is the console's start check (a version refusal refuses the start, Postgres
   unreachable does not). `migrate` (`meada postgres migrate --workspace
@@ -593,7 +594,7 @@ one for the area a change touches.
   `connect_timeout_seconds` (a readiness probe running `status --workspace` waits that long for
   a Postgres that does not answer, where the Valkey line waits at most `PING_TIMEOUT`), a version refusal being the reason, since every process treats it
   as unreachable; the line never changes the exit code, as the Valkey line does. Who connects:
-  the console (audit, directory, permissions, overage), nodes with `[oidc.github]` or overage
+  the console (audit, directory, permissions, overage, local accounts), nodes with `[oidc.github]` or overage
   through the directory (reads only), the job's `meada github-app roles` and the CLI twins that
   write; `meada index` never does. Three Postgres roles are recommended: one for `migrate`,
   which owns the schema; one that writes (the console, the role check, the CLI twins); one that
@@ -804,6 +805,45 @@ one for the area a change touches.
   role fails its pattern, is skipped with one `Msg::PermissionsBadRow` line naming its table.
   In debug builds `MEADA_PERMISSIONS_POLL_MS` shortens the poll and lowers the floor of
   `max_age_seconds` to 1 (`oidc::max_age_min`), a test knob as `MEADA_DRAIN_MS` is.
+- `accounts.rs`, `accounts/store.rs` (feature `accounts`, implying `oidc` and `postgres`, enabled
+  by `cloud`; ADR 0024's `accounts` row of ADR 0012's module table; the only place `argon2` is
+  used; #554): local accounts. `File` is the `[accounts]` section and `File::validate` its
+  `Config`: `public_key_env` or `public_key_file`, `private_key_env` or `private_key_file`,
+  `admin_password_env` (`MEADA_ADMIN_PASSWORD` by default) or `admin_password_file`, at most one
+  of each pair (`Msg::AccountsBoth`), names only. `Manifest::read` refuses it without `[postgres]`
+  (`modules::needs`) and beside `[oidc]` (`Msg::AccountsBesideOidc`), and gives it its
+  `[postgres]`. `Config::keys` reads the key pair, only in the console and only at start: a key
+  not named (`Msg::AccountsKeyMissing`), an unset variable, an unreadable file (`KEY_MAX`), a key
+  that is no Ed25519 key in PEM (`jsonwebtoken`'s `from_ed_pem`) or a private key that does not
+  sign what the public key verifies (a probe token) refuses the start naming the key, never its
+  value; nodes and the proposal server parse the section and read neither key.
+  `Config::admin_password` reads the initial password only when the default account is created
+  (an unset or empty variable is none; a file past `PASSWORD_FILE_MAX` refused naming it). `Keys`
+  signs and verifies session tokens: EdDSA, `iss` the console's `[ui] public_url`, `aud`
+  `CONSOLE` (`meada:console`), `sub` `local:<username>` (`SUBJECT_PREFIX`), `role` (`Role`,
+  `operator` or `viewer`), `groups`, `change_required` only when set, `iat`, `exp`
+  `SESSION_HOURS` (8) later; `verify` takes EdDSA alone, no `crit`, the issuer, the audience,
+  `exp` and `nbf` with `oidc::LEEWAY`, a local subject whose username passes `username_ok` (1 to
+  `USERNAME_MAX`, 64, lowercase ASCII letters, digits, `.`, `-`, `_`) and groups that are owner
+  names. `policy(password, username)` is the password policy, one pure function returning the
+  first `Rule` failed: fewer than `PASSWORD_MIN` (12) or more than `PASSWORD_MAX` (128) Unicode
+  scalar values, the default password, the username ignoring case (`Rule::Current`, the new
+  password equal to the current one, is the change route's own check); each rule has a `code`
+  and a message naming it, never the password. `hash` is argon2id at 19 MiB, two iterations, one
+  lane, a fresh salt from `OsRng`, the parameters in the PHC string; `verify` checks with the
+  stored string's own parameters, and `is_hash` is what a stored hash must be (argon2id, its
+  parameters within `HASH_MEMORY_MAX_KIB`, `HASH_ITERATIONS_MAX` and `HASH_LANES_MAX`, so a
+  hostile row never costs more than a bounded hash, `verify` refusing any other); `dummy` is a fixed
+  hash computed once at start, which an unknown username is checked against. `store.rs` is the
+  table, every call its own connection through `postgres::connected` bounded as the audit's:
+  `find` (a row is hostile: a username other than the one asked or failing `username_ok`, a hash
+  that is no argon2id string, a role or a group that fails its check is `Found::Bad`, admitting
+  nothing, its reader writing one `Msg::AccountsBadRow` line), `set_password` (the new hash, no
+  change required, `password_changed` now, only on an account not suspended) and `bootstrap`
+  (in one transaction under `pg_advisory_xact_lock` of the first eight bytes of BLAKE3 of
+  `meada accounts <schema>`: when the table is empty, `admin`, an operator, with the hash and
+  change required its caller gives; a table holding a row is never touched and the initial
+  password never read).
 - `ui.rs` (feature `ui`, no crate of its own; `cloud` enables it): the management console's
   process (ADR 0014), `meada ui --listen <addr> --workspace <bootstrap manifest>`,
   on the node's listener (`mcp::serve_http`, `mcp::address`, the same drain); never a node's
@@ -812,7 +852,8 @@ one for the area a change touches.
   own admission, before the console's. `File` is `[ui]` and `validated` lists every problem of it at
   once (`dir` and `public_url` required, `public_url` `https` or loopback `http` with nothing
   past the host through `modules::reachable`; `audience` defaults to `public_url`; `client_id`,
-  `operations` defaults to false and requires `[oidc]` plus one operator key when true;
+  `operations` defaults to false and requires `[oidc]` plus one operator key when true, or
+  `[accounts]` without `[oidc]` and no operator key (ADR 0024);
   `operator_groups` and `operator_claim` are mutually exclusive and require `[oidc]`, and the
   groups key also requires `oidc.groups_claim`). `Console::start` refuses, listing every problem: a manifest error, no `[ui]`, `[oidc]`
   without `[ui] client_id`, `[oidc]` whose issuer's metadata or JWKS cannot be read
@@ -823,7 +864,9 @@ one for the area a change touches.
   `public_url`'s host and port, or the bound address on loopback), the `Origin` check (403 for
   an `Origin` other than `public_url`, and for a write, any method but `GET` and `HEAD`, without
   one), admission (`Console::admit`), then routing; the 403 bodies are fixed text. Admission:
-  behind the operator's proxy every request is a viewer's that reads everything; with `[oidc]`
+  behind the operator's proxy every request is a viewer's that reads everything; with
+  `[accounts]` (feature `accounts`, #554) the console's own session tokens (`ui/accounts.rs`,
+  below); with `[oidc]`
   (feature `oidc`) a bearer token for `[ui] audience` through the nodes' module
   (`Oidc::admit_console`), whose neutral `grant::Admitted` the session is built from alone
   (`Session::admitted`, as the proposal server's is), a 401 with `WWW-Authenticate: Bearer` (and
@@ -850,9 +893,11 @@ one for the area a change touches.
   (#305) bound theirs through it. `/api/v1/` is the JSON API (`config`, `session`, `manifest`,
   and with `[oidc]` `admission` and `POST admission/check`; errors `{"error": {"code",
   "message"}}`, an unknown path a 404 in that shape, as the admission routes are without
-  `[oidc]`); `config` adds, with `[oidc]`, the issuer, `client_id`, the scopes and the audience
+  `[oidc]`); `config` adds `sign_in` (`accounts` with `[accounts]`, `oidc` with `[oidc]`) and,
+  with `[oidc]`, the issuer, `client_id`, the scopes and the audience
   the browser's authorization code flow with PKCE needs; `session` is the subject and role (`viewer`, `team_operator`, `operator`) and, with `[oidc]`, `groups`
-  (sorted), `grant` (`"*"` or sorted identities, the union of the grant providers', which every
+  (sorted), and with a local account's session token `account: true`, `grant` (`"*"` or sorted
+  identities, the union of the grant providers', which every
   bounded view, the team operator role and its teams, and `authorize_entries` and
   `compose_entries` read through `Session::reads` and `core_grant`) and, for a team operator,
   `teams`; with `[oidc.github]` (#332) `login` when the token has a valid one, `github_host` and
@@ -915,7 +960,8 @@ one for the area a change touches.
   CLI acts as the operator), `owners` (a team operator's, as its stderr line names them, else
   null), `action` (`audit::ACTIONS`: `workspace.save`, `workspace.import`, `workspace.apply`,
   `pointer.set`, `pointer.retain`, `pointer.drop`, `fence.recover`, and `pointer` for a pointer
-  request refused before its body), `arguments` (`{"version", "message"}` for a save or an import,
+  request refused before its body; the named workspaces' `workspaces.*`; `account.login` and
+  `account.password`, #554, below), `arguments` (`{"version", "message"}` for a save or an import,
   the id of the entries as submitted; `{"version"}` for an apply; `{"generation"}` for the
   pointer actions; `{"at_least"}` for a recovery with a floor, its decimal digits; `{}` for a
   refusal before the body), `outcome` (`pending`, `accepted`, `refused`, `failed`) and `message`
@@ -946,6 +992,47 @@ one for the area a change touches.
   unreachable a 503 `audit_unavailable`. Every row is hostile: one whose columns fail their
   checks (`audit::record`) is left out with one stderr line naming the table
   (`Msg::AuditBadRecord`), never a value. Records are never deleted by Meada.
+  Local accounts (#554, ADR 0024, `ui/accounts.rs`, feature `accounts`): with `[accounts]`,
+  `Console::start` runs `accounts::Local::start` once every other check passed: the key pair
+  (`Config::keys`), `accounts::dummy`, then `store::bootstrap`, whose initial password is
+  `admin123` with a change required, or the deployer's (`Config::admin_password`), which must
+  pass the policy (else the start is refused naming `accounts.admin_password_env` or `_file`)
+  and then needs no change; Postgres unreachable there refuses the start
+  (`Msg::AccountsBootstrap`, at `postgres`). The proposal server's `Console` has no `Local`.
+  Admission (`Console::admit_local`, before the OIDC branch): the static files, `config` and
+  `login` need no token; every other route a bearer `Keys::verify` passes for `[ui] public_url`
+  and `CONSOLE`, else a 401 `unauthorized` with `WWW-Authenticate: Bearer` (`error=
+  "invalid_token"` when a token was sent) before routing; a token with `change_required` opens
+  `account/password` alone, every other route a 403 `password_change_required`. The session is
+  the token's: operator for the role `operator`, its groups sorted, the grant
+  `Providers::grant` of its groups with no login, or `*` when no table bounds it
+  (`Providers::bounds`), a team operator's teams as with `[oidc]` (`Console::teams_on`),
+  `account: true` (`Session::local`). A write keeps every check it has, but with `[accounts]`
+  admission runs before `operations` (`Console::checked`), so a write without a token is a 401
+  and one with a token awaiting its change a 403 `password_change_required` whatever
+  `operations` says; with `[oidc]` the order is unchanged. `POST login` (`LOGIN_MAX`, a fixed
+  400 `Msg::AccountsLoginBody` for a body that is not `{username, password}`, 413 past the cap):
+  `Console::credentials` reads the account (`store::find`; a username failing `username_ok` is
+  not looked up; Postgres unreachable is a 503 `audit_unavailable`), takes a hash permit of
+  `HASHES_MAX` (`try_acquire`, else 503 `busy`, nothing hashed), then makes exactly one hash:
+  the account's, or `dummy` for an unknown username, a bad row and a suspended account; a
+  refusal is the one 401 `invalid_credentials` (`Msg::AccountsInvalid`). The record
+  (`Audit::record`, the final outcome inserted at once) is written before the answer:
+  `account.login`, `subject` `local:<username>` and the account's role, or no subject and the
+  role `none` for an unknown username, `arguments` `{"account"}` (absent for an unknown
+  username) and for a refusal `"reason"` (`unknown`, `password`, `suspended`); an insert that
+  fails is a 503 `audit_unavailable` and no token. A success is
+  `{token, expires_at (RFC 3339), change_required}`. `POST account/password`
+  (`PASSWORD_BODY_MAX`, `{current, new}`, `Msg::AccountsPasswordBody`): the policy on `new`, a
+  422 `password_policy` with its `rule` (not recorded, as every body check), then
+  `Console::credentials` on the session's own account and `current`; a refusal is the 401
+  `invalid_credentials`, recorded `refused` with its reason; `new` equal to `current`, once
+  `current` is known right, is the 422 of the rule `current_password`; then a second permit for
+  the new hash, `account.password` inserted `pending` before `store::set_password`, finished
+  `accepted`, and a fresh token without the mark.
+  without the mark. Tokens issued before stay valid until they expire. Each sign-in and change
+  writes one line `ui: <subject or -> <action> <username or ->: accepted` or `refused (<reason>)`;
+  no line, record or error holds a password, a hash or a token.
   Operational reads live in `ui/read.rs`: `GET fleet` reads the checked pointer/retained/kept
   state (`generations::inspect`), live heartbeats (`heartbeat::read`), holder and remaining
   lock TTL, and fence counter from Valkey; workspace ids come from generation documents and
@@ -2865,6 +2952,15 @@ one for the area a change touches.
   first and lists each call's level and target, its providers, consumers and links (needs `jq`).
 
 ## Known ceilings
+
+- `accounts.rs` (#554, ADR 0024): `KEY_MAX` (16 KiB) bounds a key file of `[accounts]` and
+  `PASSWORD_FILE_MAX` (1 KiB) `admin_password_file`, each refused past it naming the file;
+  `HASH_MEMORY_MAX_KIB` (64 MiB), `HASH_ITERATIONS_MAX` (8) and `HASH_LANES_MAX` (4) bound the
+  argon2id parameters a stored hash may carry (a row past one is hostile and admits nothing);
+  `ui/accounts.rs`: `HASHES_MAX` (4) bounds the argon2id hashes the console computes at once,
+  19 MiB each (a further sign-in or password change is a 503 `busy`, nothing hashed), and
+  `LOGIN_MAX` and `PASSWORD_BODY_MAX` (4 KiB each) the bodies of `login` and `account/password`
+  (413 past them).
 
 - `ui/workspaces/proposals.rs` (#346, ADR 0022): `BODY_MAX` (80 KiB) bounds a request's body
   (413), `OUTPUT_MAX` (192 KiB) a tool's answer (`too_large` with its counts, never cut),

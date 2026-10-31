@@ -24,9 +24,10 @@ use serde_json::json;
 
 use crate::msg::Msg;
 
-/// The actions a record names: the operations, and `pointer`, the route-level action of a
-/// pointer request refused before its body is read.
-pub const ACTIONS: [&str; 15] = [
+/// The actions a record names: the operations, `pointer`, the route-level action of a pointer
+/// request refused before its body is read, and the local accounts' sign-in and password change
+/// (ADR 0024).
+pub const ACTIONS: [&str; 17] = [
     "workspace.save",
     "workspace.import",
     "workspace.apply",
@@ -42,6 +43,8 @@ pub const ACTIONS: [&str; 15] = [
     "workspaces.rename",
     "workspaces.delete",
     "workspaces.operators",
+    "account.login",
+    "account.password",
 ];
 
 /// The outcome a finished write records.
@@ -74,7 +77,8 @@ impl Outcome {
 }
 
 /// Who acts and through what: `via` is `console` or `cli`, `role` `viewer`, `operator` or
-/// `team_operator`, `owners` a team operator's owner groups.
+/// `team_operator` (or `none`, for a sign-in naming no account), `owners` a team operator's owner
+/// groups.
 pub struct Actor<'a> {
     pub via: &'static str,
     pub subject: Option<&'a str>,
@@ -145,6 +149,25 @@ impl Audit {
         }
         let _ = (actor, action, arguments);
         Ok(Pending(None))
+    }
+
+    /// Inserts the record of an action already decided, with its outcome and message, before its
+    /// answer is given (a sign-in, ADR 0024): the reason Postgres cannot be reached when the insert
+    /// fails, and then the answer is a 503 that gives nothing.
+    #[cfg(feature = "accounts")]
+    pub fn record(
+        &self,
+        actor: &Actor,
+        action: &str,
+        arguments: &Value,
+        outcome: Outcome,
+        message: &str,
+    ) -> Result<(), String> {
+        if let Some(config) = &self.config {
+            let (outcome, message) = (outcome.name(), Some(message));
+            return insert(config, actor, action, arguments, outcome, message).map(|_| ());
+        }
+        Ok(())
     }
 
     /// Inserts a refusal found before the write; one that finds Postgres unreachable leaves no
@@ -296,7 +319,7 @@ fn record(row: &tokio_postgres::Row) -> Option<Value> {
     if (login.as_deref()).is_some_and(|l| meada_core::manifest::added_by_problem(l).is_some()) {
         return None;
     }
-    let role = one_of(5, &["viewer", "operator", "team_operator"])?;
+    let role = one_of(5, &["viewer", "operator", "team_operator", "none"])?;
     let owners = match text(6)? {
         None => Value::Null,
         Some(json) => serde_json::from_str::<Vec<String>>(&json).ok()?.into(),
@@ -311,6 +334,8 @@ fn record(row: &tokio_postgres::Row) -> Option<Value> {
         "workspace",
         "authority",
         "base",
+        "account",
+        "reason",
     ];
     if !(arguments.iter()).all(|(k, v)| known.contains(&k.as_str()) && v.is_string()) {
         return None;

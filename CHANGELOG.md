@@ -8,6 +8,24 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Local sign-in for the console (#554, ADR 0024, from #551): the new `accounts` cargo feature
+  (enabled by `cloud`) and its `[accounts]` section, which needs `[postgres]` and never sits
+  beside `[oidc]`, name the Ed25519 signing key pair and the default account's initial password,
+  each from a variable or a file. Migration 9 adds the `accounts` table, so `meada postgres
+  migrate` reaches version 9. On its start the console checks the key pair and creates the
+  default account `admin` (password `admin123` with a change required, or the policy-checked
+  `MEADA_ADMIN_PASSWORD` without) once, under an advisory lock. `POST /api/v1/login` answers a
+  session token the console signs with EdDSA for eight hours; a token carrying the change-required
+  mark opens only `POST /api/v1/account/password`. Every route but the static files, `config` and
+  `login` then needs a session token; `[ui] operations = true` is accepted with `[accounts]` and
+  no `[oidc]`; `config` names the sign-in mode (`sign_in`: `accounts`, or `oidc` with an identity
+  provider), `session` adds `account: true`, and
+  every account reads every repository while no groups table bounds it. Passwords are argon2id at
+  OWASP's parameters under a policy of 12 to 128 characters that refuses the default password and
+  the username, at most four hashes run at once, and every sign-in, refusal and password change
+  is audited (`account.login`, `account.password`, role `none` for an unknown username) before its
+  token. The module table gains `accounts`; no golden changed.
+
 - `meada status` names a Kotlin file the grammar misreads (#546, from #434). A declaration read
   as an infix call leaves the file out of the index; the file now sets the new `Facts::misparsed`
   (absent from every other file's stored facts) instead of `unbuilt`, and a new status line,

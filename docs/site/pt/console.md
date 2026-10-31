@@ -97,6 +97,21 @@ Registre no issuer um cliente público, sem segredo, com Authorization Code e PK
 
 O navegador precisa alcançar os metadados e o endpoint de token do issuer, com CORS para a origem da console. Ele troca o código diretamente com o issuer. O bearer fica na memória; `state` e `verifier` ficam em sessionStorage até o callback removê-los. Recarregar a página reinicia o login.
 
+## Contas locais
+
+Sem um provedor de identidade, a console pode autenticar as próprias contas (feature `accounts`, parte de `cloud`; ADR 0024). `[accounts]` exige `[postgres]` e não pode ficar junto de `[oidc]`:
+
+```toml
+[accounts]
+public_key_file = "/run/secrets/meada-signing.pub.pem"   # ou public_key_env
+private_key_file = "/run/secrets/meada-signing.pem"      # ou private_key_env; só a console lê
+# admin_password_env = "MEADA_ADMIN_PASSWORD"            # o padrão; ou admin_password_file
+```
+
+O par de chaves é Ed25519 em PEM (`openssl genpkey -algorithm ed25519 -out meada-signing.pem` e `openssl pkey -in meada-signing.pem -pubout -out meada-signing.pub.pem`). A console recusa a partida com uma chave ausente, ilegível, que não seja Ed25519 ou que não corresponda à outra, nomeando a chave e nunca o valor. Rode `meada postgres migrate` antes: na primeira partida com a tabela vazia, a console cria a conta padrão `admin` com a senha `admin123`, que precisa ser trocada antes de qualquer outra coisa, ou com o valor de `MEADA_ADMIN_PASSWORD`, sem troca obrigatória, se ele passar pela política de senhas (de 12 a 128 caracteres, nem a senha padrão nem o nome de usuário). Com `[accounts]`, `operations = true` não precisa de `[oidc]` nem de chave de operador: o papel é o da conta.
+
+`POST /api/v1/login` recebe `{"username", "password"}` e responde `{"token", "expires_at", "change_required"}`: um token de sessão que a console assina e aceita por oito horas como bearer, em toda rota menos os arquivos estáticos, `config` e `login`. Um usuário desconhecido e uma senha errada recebem o mesmo 401 `invalid_credentials`. Com a troca pendente, só `POST /api/v1/account/password` (`{"current", "new"}`) aceita o token; ela devolve um token novo. `config` traz `"sign_in": "accounts"` e `session` traz `"account": true`. Cada login, recusa e troca de senha fica na auditoria (`account.login`, `account.password`) antes do token, sem senha nem token; sem o registro, a resposta é 503 `audit_unavailable`. Limite a taxa de `/api/v1/login` no proxy.
+
 ## Frota e diagnóstico
 
 Cada `snapshot pull --every` envia um heartbeat, o registro periódico de estado do nó. Ele informa geração, fence, gerações locais, prontidão, versão e horário.

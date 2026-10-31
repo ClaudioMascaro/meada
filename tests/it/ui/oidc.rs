@@ -167,7 +167,8 @@ fn admits_a_bearer_token_for_the_console_s_audience() {
     assert_eq!(
         config.json(),
         json!({
-            "version": VERSION, "operations": false, "public_url": PUBLIC, "issuer": base,
+            "version": VERSION, "operations": false, "public_url": PUBLIC, "sign_in": "oidc",
+            "issuer": base,
             "client_id": "meada-console", "scopes": [SCOPE], "audience": PUBLIC,
         })
     );
@@ -451,7 +452,7 @@ fn a_viewer_s_grant_bounds_every_view() {
         manifest["manifest"]["ui"]["client_id"],
         json!("meada-console")
     );
-    assert_eq!(manifest["modules"].as_array().unwrap().len(), 12);
+    assert_eq!(manifest["modules"].as_array().unwrap().len(), 13);
     assert!(!manifest.to_string().contains("../gateway"));
     assert!(!manifest.to_string().contains(GATEWAY), "{manifest}");
     assert_eq!(
