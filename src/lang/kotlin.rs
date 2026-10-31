@@ -311,9 +311,9 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         budget = left;
         if misparsed(node, src) {
             // The declaration is lost with no ERROR node: the file is left out as a whole, like
-            // one over budget, rather than indexed without it.
+            // one over budget, rather than indexed without it, and `meada status` names it.
             return Ok(Facts {
-                unbuilt: true,
+                misparsed: true,
                 ..Facts::default()
             });
         }
@@ -2538,13 +2538,23 @@ mod tests {
         // What the grammar makes of a declaration it misparses: a hard keyword as an operand
         // of an infix call, with no ERROR node (`val a = b class C` is one such tree).
         let facts = parse(b"package a\nfun f() {}\nval a = b class C\n", false).unwrap();
-        assert!(facts.unbuilt && facts.defs.is_empty());
+        assert!(facts.misparsed && facts.defs.is_empty());
+        assert!(!facts.unbuilt);
         // Soft keywords are names, and a backticked keyword is one too.
         let facts = parse(
             b"package a\nval p = value to open\nval q = x `class` y\n",
             false,
         );
-        assert!(!facts.unwrap().unbuilt);
+        let facts = facts.unwrap();
+        assert!(!facts.misparsed);
+        // Only a misparsed file stores the key, so every other file's facts stay as they were.
+        assert!(!serde_json::to_string(&facts).unwrap().contains("misparsed"));
+        let facts = parse(b"package a\nval a = b class C\n", false).unwrap();
+        assert!(
+            serde_json::to_string(&facts)
+                .unwrap()
+                .contains("\"misparsed\":true")
+        );
     }
 
     /// The parts a string literal's value is: `$name` and `${name}` are names, any other

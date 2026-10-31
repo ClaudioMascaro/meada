@@ -6,6 +6,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `meada status` names a Kotlin file the grammar misreads (#546, from #434). A declaration read
+  as an infix call leaves the file out of the index; the file now sets the new `Facts::misparsed`
+  (absent from every other file's stored facts) instead of `unbuilt`, and a new status line,
+  `Msg::FileMisparsed`, in English and Portuguese, names it beside the byte-budget and using
+  drops. The Java and Kotlin layout skips it as it skips the other drops. The schema version is
+  the same: a file dropped before the upgrade gets its line when it next changes, or at once
+  after deleting `.meada/index.db`. The `cli.status-budget` goldens gained the new line.
+
 ### Changed
 
 - The axum provider reader walks each value once per file (#431): the values a file's rebound
@@ -55,8 +65,8 @@ All notable changes to Meada are recorded here. The format follows
   #419). The Java, Kotlin and Swift qualified-name budget (4 MiB) now sets `Facts::budget`, as the
   C# one does, instead of `unbuilt`, which prints nothing; a C# project that gives its files more
   than 256 usings (`PROJECT_USINGS`) marks each of them with the new `Facts::usings`, which a new
-  status line names (`Msg::FileTooManyUsings`, with the count). Kotlin's `misparsed` file stays
-  `unbuilt` (a grammar defect, not a limit). An index built before this change keeps a Java,
+  status line names (`Msg::FileTooManyUsings`, with the count). Kotlin's `misparsed` file stayed
+  `unbuilt` (a grammar defect, not a limit; #546 names it too). An index built before this change keeps a Java,
   Kotlin or Swift file dropped by its budget as `unbuilt` until the file changes. No limit
   changed. The `cli.status-budget` goldens gained the new cases; no stored format golden changed
   (the new field is absent from every sample), so the schema version is the same.

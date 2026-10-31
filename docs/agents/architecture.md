@@ -2628,6 +2628,7 @@ one for the area a change touches.
   Kotlin file declares `expect` or `actual` (`Facts::expect`, `Facts::actual`), the size of the budget a file exhausted
   (`Facts::budget`, which `meada status` names), the count of usings the project of a file
   passed (`Facts::usings`, set by a join and stamped into the stored facts after it, which
+  `meada status` names), whether the grammar misread a Kotlin file (`Facts::misparsed`, which
   `meada status` names), the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
@@ -2932,8 +2933,8 @@ one for the area a change touches.
   pack (`jvm::spring::CONFIG_FILES`, spec #27, #100), so a Kotlin-only repository gets them
   through `Indexed::configs` (a mixed one lists each twice, which `Configs::read` takes as once).
   A declaration the grammar reads as an
-infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out, as the
-qualification budget does (ADR 0017).
+infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out (`Facts::misparsed`, which
+`meada status` names), as the qualification budget does (ADR 0017).
 
 - `resolve.rs`: `TYPE_PARTS` (64) bounds the files of one unit one partial type is read across
   (`Resolver::parts`); classes of one name in more files are each a class of its own, so a

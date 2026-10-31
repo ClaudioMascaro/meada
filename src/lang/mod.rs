@@ -472,6 +472,11 @@ pub struct Facts {
     /// purpose.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usings: Option<usize>,
+    /// Whether the grammar misread a declaration of the file as an infix call (Kotlin's
+    /// `misparsed`): the file has no facts and `meada status` names it. A grammar defect, not a
+    /// limit, so no size is kept. Like `budget`, never set for a file left out on purpose.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub misparsed: bool,
     /// The package the file declares (Go's `package` clause), which `layout` groups files by
     /// (`Layout::shared`).
     #[serde(default, skip_serializing_if = "String::is_empty")]

@@ -302,6 +302,7 @@ impl Engine {
                 lines.extend(export.dropped.iter().map(|(path, limit)| match *limit {
                     Dropped::Bytes(limit) => Msg::FileTooBroad { path, limit }.text(),
                     Dropped::Usings(limit) => Msg::FileTooManyUsings { path, limit }.text(),
+                    Dropped::Misparsed => Msg::FileMisparsed { path }.text(),
                 }));
                 if drift > 0 {
                     lines.push(Msg::Drift(drift).text());

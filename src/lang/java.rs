@@ -113,8 +113,10 @@ impl LanguagePack for Java {
         // constants, which an import names by fully qualified name too.
         let mut tops: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for (&path, facts) in files {
-            // A Kotlin script's declarations are its own: no package or import reaches them.
-            if facts.unbuilt || facts.budget.is_some() || path.ends_with(".kts") {
+            // A file a pack dropped has no facts, and a Kotlin script's declarations are its
+            // own: no package or import reaches them.
+            if facts.unbuilt || facts.budget.is_some() || facts.misparsed || path.ends_with(".kts")
+            {
                 continue;
             }
             packages

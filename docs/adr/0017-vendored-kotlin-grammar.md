@@ -47,10 +47,13 @@ reach `cargo install meada`, which builds from the registry.
   container build copies them.
 - A misparse the fixes miss never yields a wrong symbol: a declaration's hard keyword (`class`,
   `fun`, `interface`, `object`, `typealias`, `val`, `var`) as an operand of an
-  `infix_expression` leaves the whole file out (`Facts::unbuilt`), as a file over the
-  qualification budget is. Valid Kotlin never names anything with a hard keyword, and the patched
-  grammar produces the shape nowhere in the corpus. No diagnostic names such a file yet: it is
-  simply absent from the index.
+  `infix_expression` leaves the whole file out (`Facts::misparsed`), as a file over the
+  qualification budget is (`Facts::budget`). Valid Kotlin never names anything with a hard
+  keyword, and the patched grammar produces the shape nowhere in the corpus. `meada status` names
+  such a file (`Msg::FileMisparsed`, the drop reason `Dropped::Misparsed`, read from `Facts::misparsed`
+  stored beside `budget` and `usings`), so it does not drop out of every answer unexplained. The field is skipped in
+  serialization when false, so no stored format changed and the schema version is the same: a
+  file dropped as `unbuilt` before this change gets its line when it next changes.
 
 ## Updating or dropping it
 

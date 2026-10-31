@@ -129,6 +129,11 @@ pub enum Msg<'a> {
         path: &'a str,
         limit: usize,
     },
+    /// A source file the grammar misreads (a Kotlin declaration read as an infix call): no
+    /// symbols, no calls.
+    FileMisparsed {
+        path: &'a str,
+    },
     DocumentUnreadable {
         path: &'a str,
         line: usize,
@@ -1470,6 +1475,10 @@ impl Msg<'_> {
             Msg::FileTooManyUsings { path, limit } => pick(
                 format!("{path}: its project gives more than {limit} usings: no symbols or calls"),
                 format!("{path}: seu projeto dá mais de {limit} usings: sem símbolos nem chamadas"),
+            ),
+            Msg::FileMisparsed { path } => pick(
+                format!("{path}: left out, the grammar misreads it: no symbols or calls"),
+                format!("{path}: deixado de fora, a gramática o lê errado: sem símbolos nem chamadas"),
             ),
             Msg::DocumentUnreadable { path, line, error } => pick(
                 format!("{path}:{line}: unreadable document ({error}), ignored"),
