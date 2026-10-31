@@ -1792,3 +1792,53 @@ fn every_cli_twin_is_audited_and_none_writes_without_its_record() {
         "{listed}"
     );
 }
+
+/// With `[postgres]`, an import of a file one byte past the version bound exits 1, names the
+/// bound on stderr, prints no id and leaves the audit with the records it had: `audit::cli`
+/// writes none when the read gave it no arguments (#541).
+#[cfg(feature = "postgres")]
+#[test]
+fn an_import_past_the_version_bound_leaves_no_audit_record() {
+    let Some(fleet) = fleet("ops_audit_big") else {
+        return;
+    };
+    let dir = &fleet.dir;
+    let Some(audit) = crate::postgres::audited(dir, "ops_audit_big") else {
+        return;
+    };
+    append_section(dir, &audit.section);
+    let args = |file: &str| -> Vec<String> {
+        [
+            "workspace",
+            "import",
+            file,
+            "--message",
+            "m",
+            "--author",
+            "a",
+        ]
+        .iter()
+        .chain(&["--workspace", MANIFEST])
+        .map(|a| a.to_string())
+        .collect()
+    };
+    let run = |file: &str| {
+        let args = args(file);
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        text(&meada(dir, &args).output().unwrap())
+    };
+    // An accepted import writes a record, so the count below is not trivially zero.
+    let entries = "[[repository]]\nrepo = \"example.com/chain/web\"\npath = \"../chain-web\"\n";
+    fs::write(dir.join("ops/entries.toml"), entries).unwrap();
+    let (_, stderr, code) = run("ops/entries.toml");
+    assert_eq!(code, Some(0), "{stderr}");
+    let before = audit.records().len();
+    assert_eq!(before, 1);
+    // `VERSION_MAX` (src/snapshot/versions.rs), 4 MiB, plus one byte: the integration tests
+    // cannot see the constant.
+    fs::write(dir.join("ops/big.toml"), vec![b'#'; 4_194_304 + 1]).unwrap();
+    let (stdout, stderr, code) = run("ops/big.toml");
+    assert_eq!((stdout.as_str(), code), ("", Some(1)), "{stderr}");
+    assert!(stderr.contains("larger than 4194304 bytes"), "{stderr}");
+    assert_eq!(audit.records().len(), before);
+}
