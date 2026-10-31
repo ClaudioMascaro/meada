@@ -41,7 +41,10 @@ remaining points. This ADR records the decisions; the spec fixes the details the
 
 - A team is an OIDC group: a name from the token's `groups_claim`, the claim `[oidc.groups]` and
   `operator_groups` already read. Meada keeps no team table; teams and their members are managed
-  in the identity provider.
+  in the identity provider. (Amended 2026-10-31; #551: a team is a group of a token or of a
+  local account. Without an identity provider, ADR 0024's global operator assigns groups to local
+  accounts in the console and owners name the same groups, compared as above; Meada still keeps
+  no team table.)
 - Each `[[repository]]` entry of a workspace version may carry `owner = "<group>"`, one group.
   The name is a string of 1 to 256 characters with no control character and no whitespace at
   either end, compared exactly, case included, as `[oidc.groups]` keys and `operator_groups` are
@@ -65,7 +68,9 @@ remaining points. This ADR records the decisions; the spec fixes the details the
   subject's grant reads; those groups are its teams. Every other admitted subject is a viewer.
 - Team operators exist only with `[oidc]` carrying `groups_claim`, `[ui] operations = true` and
   `[workspace] source = "store"`. Without them, owners are recorded and shown, and nobody is a
-  team operator.
+  team operator. (Amended 2026-10-31; #551: ADR 0024's `[accounts]` without `[oidc]` stands for
+  `[oidc]` carrying `groups_claim`: a local viewer account one of whose groups owns an entry its
+  grant reads is a team operator, with the other two conditions unchanged.)
 - A group becomes a team when the global operator assigns it its first entry: that is the
   delegation. A team that removes its last entry is no longer one, until the global operator
   assigns it an entry again.
@@ -144,7 +149,9 @@ remaining points. This ADR records the decisions; the spec fixes the details the
   console, the nodes and the job, which runs every fetch with one set of credentials. Not a goal
   under shared trust.
 - **A team table in Meada.** Members, names and lifecycles kept beside the identity provider's
-  groups, with a second place to revoke someone. The OIDC group is the team.
+  groups, with a second place to revoke someone. The OIDC group is the team. (Amended
+  2026-10-31; #551: still rejected; ADR 0024's local accounts carry group names, and a local
+  account never sits beside the identity provider, so there is still one place to revoke.)
 - **Team roles as a `[ui]` key** (a list of groups allowed to act as teams). A second list to keep
   beside the owners: an owner already names the group, and assigning its first entry is the
   delegation.

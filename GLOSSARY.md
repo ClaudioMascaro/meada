@@ -160,7 +160,8 @@ _Avoid_: dashboard, admin panel, UI
 **Operator**:
 Whoever runs a server mode deployment and owns its boundary, its admission, its services and
 its job. In the console, the global operator is the role that may make every write, held by the
-admitted people the identity provider marks with the group or claim the console names; a team
+admitted people the identity provider marks with the group or claim the console names, or,
+without an identity provider, by the local accounts whose role is operator (ADR 0024); a team
 operator may change only its teams' entries (ADR 0015). Its authority over named workspaces is the
 **platform administrator** (ADR 0020).
 _Avoid_: admin, superuser
@@ -171,12 +172,12 @@ view, within what a node would answer their token, and writes nothing.
 _Avoid_: reader, guest, read-only user
 
 **Owner**:
-The OIDC group, read from the token's `groups_claim`, that an entry of the workspace version
-names as the team answering for that repository. An entry has at most one owner; one without an
-owner is the global operator's. The owner is part of the workspace version, never of a
-generation (ADR 0012's bundle and generation ids never read it), and never widens what a token
-may read. It is entry metadata, not an access list of a workspace and not a source grant
-(ADR 0015).
+The group, read from the token's `groups_claim` or assigned to a local account by the global
+operator, that an entry of the workspace version names as the team answering for that
+repository. An entry has at most one owner; one without an owner is the global operator's. The
+owner is part of the workspace version, never of a generation (ADR 0012's bundle and generation
+ids never read it), and never widens what a token may read. It is entry metadata, not an access
+list of a workspace and not a source grant (ADR 0015).
 _Avoid_: tenant, maintainer, team lead, CODEOWNER
 
 **Team operator**:
@@ -187,27 +188,30 @@ A group becomes a team when the global operator assigns it its first entry.
 _Avoid_: team admin, team lead, maintainer, tenant admin
 
 **Identity provider**:
-The one token issuer of a server mode deployment, configured in `[oidc]` with its `type`
-(generic, Entra ID, Okta or Keycloak) and the table of settings that type needs. It issues the
-tokens nodes and the console admit, carries the claims grant (`identities_claim` and
-`[oidc.groups]`) and, with the directory, pushes its users and groups to the console. Always
+The one external token issuer of a server mode deployment, configured in `[oidc]` with its
+`type` (generic, Entra ID, Okta or Keycloak) and the table of settings that type needs. It
+issues the tokens nodes and the console admit, carries the claims grant (`identities_claim` and
+`[oidc.groups]`) and, with the directory, pushes its users and groups to the console; once it is
+configured, only the break-glass account of the local accounts still signs in (ADR 0024). Always
 written in full: "provider" alone is the side of a contract (ADR 0016).
 _Avoid_: provider, IdP, auth provider, login provider
 
 **Grant provider**:
-A source of a token's grant: the identity provider's claims grant, and the GitHub grant provider
-(`[oidc.github]`), which grants what the token's GitHub login holds an accepted role on, in the
-permissions set the job's role check wrote at the last refresh. A token's grant is the union of
-every configured grant provider's identities. Always written in full, never "provider" (ADR
+A source of a token's grant: the identity provider's claims grant, or for a local account the
+groups table `[accounts.groups]` (ADR 0024), and the GitHub grant provider (`[oidc.github]` or
+`[accounts.github]`, never both), which grants what the token's GitHub login, or a local
+account's verified login, holds an accepted role on, in the permissions set the job's role check
+wrote at the last refresh. A token's grant is the union of every configured grant provider's
+identities, computed when the token is admitted. Always written in full, never "provider" (ADR
 0016).
 _Avoid_: provider, grant source, permission source, authorizer
 
 **Data layer**:
 Postgres as a cloud module (`[postgres]`): the durable mutable state of server mode, beside the
-immutable snapshot store and the volatile Valkey, holding the audit, the permissions set and the
-directory in one schema that only `meada postgres migrate` changes. The console, the job's role
-check and the CLI twins that write connect to it; nodes only read it; `meada index` never
-connects (ADR 0016).
+immutable snapshot store and the volatile Valkey, holding the audit, the permissions set, the
+directory and the local accounts in one schema that only `meada postgres migrate` changes. The
+console, the job's role check and the CLI twins that write connect to it; nodes only read it;
+`meada index` never connects (ADR 0016, ADR 0024).
 _Avoid_: database, persistence layer, state store
 
 **Permissions set**:
@@ -247,6 +251,52 @@ the console can still refuse its live tokens. A write naming `active` true for a
 `[directory] user_attribute` clears it; deactivating a user leaves none, and nodes never read it
 (ADR 0016, #334).
 _Avoid_: tombstone, soft delete
+
+**Local account**:
+A username and password kept in the data layer, with the role operator or viewer and the groups
+the global operator assigns, for people who sign in to the console of a deployment without an
+identity provider. Its subject is `local:<username>`, never an identity provider's; it is never
+deleted or renamed, and it is not an account with Meada (ADR 0024).
+_Avoid_: user, local user, Meada account, login (a GitHub login is the verified login)
+
+**Default account**:
+The local account `admin`, an operator, that the console creates when no account exists. Until
+its published initial password is changed it may do nothing else, unless the deployer chose that
+password (ADR 0024).
+_Avoid_: admin user, root, superuser, bootstrap account
+
+**Break-glass account**:
+The default account of a deployment with an identity provider and `[accounts] break_glass`: the
+one local account that may still sign in, to the console only, as the global operator, so the
+console can be recovered while the identity provider is down. It gets no agent token, no account
+administration and no verified login (ADR 0024).
+_Avoid_: emergency account, admin user, backdoor, recovery user
+
+**Session token**:
+The short-lived token the console signs when a local account signs in, admitted by the console
+alone and held by the browser for the tab's life, never as a cookie (ADR 0024).
+_Avoid_: session cookie, login token, access token, session
+
+**Agent token**:
+A token the console signs for a local account's agents, admitted by one surface only (the nodes
+or the proposal server), carrying its owner's role and the inputs of its grant, not the grant.
+Meada stores none, so its expiry is its revocation (ADR 0024).
+_Avoid_: API key (a key kept per account, which Meada does not keep, or the key `meada decide`
+uses), personal access token, static bearer, service token
+
+**Signing key**:
+The key pair the deployer gives Meada for its own tokens: its private half, held by the console
+alone, signs session and agent tokens, and its public half verifies them wherever they are
+admitted. Rotating it ends every outstanding token (ADR 0024).
+_Avoid_: JWT secret, shared secret, App private key (the GitHub App's, ADR 0013), JWKS (the
+identity provider's)
+
+**Verified login**:
+The GitHub login a local account proved once with a GitHub personal access token the console
+read it with and discarded, held by at most one account. The GitHub grant provider grants from it
+as from an identity provider's login claim (ADR 0024).
+_Avoid_: GitHub binding (a binding is RabbitMQ's), GitHub link (a link joins a consumer and a
+provider), linked account, connected account
 
 ### Across repositories
 

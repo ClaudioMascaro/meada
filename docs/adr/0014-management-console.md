@@ -51,7 +51,11 @@ the spec fixes the details the slices build.
   the snapshot store, Valkey, and with `[oidc]` the issuer and its `jwks_uri`. It never calls a
   node or GitHub, and discovers nothing. (Amended 2026-10-22; #319: ADR 0016 adds Postgres,
   with `[postgres]`, for the audit, the permissions set, the directory and overage; the console
-  still never calls GitHub or the identity provider's API.)
+  still never calls GitHub or the identity provider's API.) (Amended 2026-10-31; #551: with
+  `[accounts.github]`, ADR 0024 adds the console's one call to GitHub, `GET /user` on
+  `[accounts.github] api`, once per login verification, with the personal access token the
+  person pastes for that request only; the console still holds no GitHub App key and never calls
+  the identity provider's API.)
 - With `[snapshot]` the console is deployed like a node, with an init `meada snapshot pull` and a
   `meada snapshot pull --every` companion on a `local_dir` of its own, and answers the query
   playground and the graph views from the generations it holds, in process, through the
@@ -76,7 +80,9 @@ the spec fixes the details the slices build.
 - `operations = true` without `[oidc]` is an error naming both, so every write carries an
   authenticated subject. An operator key without `[oidc]`, `operations = true` without an
   operator key, and `operator_groups` without `[oidc] groups_claim` are errors naming what is
-  missing.
+  missing. (Amended 2026-10-31; #551: ADR 0024 accepts `operations = true` with `[accounts]` and
+  no `[oidc]`, since every write then carries a local account's subject, `local:<username>`, and
+  the account's role stands for the operator key; the operator keys keep requiring `[oidc]`.)
 - `[snapshot] node_name` is new and optional: the name a node's heartbeat carries, the host name
   in lowercase by default, checked against a name pattern (lowercase letters, digits, `.` and
   `-`, 1 to 63 characters) before it becomes part of a key. Names must be unique, as pod names
@@ -101,7 +107,10 @@ the spec fixes the details the slices build.
   credential compared in constant time. OIDC admission never applies there, no console token is
   accepted there, and the SCIM token is accepted nowhere else.)
 - The console sets and reads no cookie and sends no `Access-Control-*` header, so the same-origin
-  rule is its whole CSRF surface.
+  rule is its whole CSRF surface. (Amended 2026-10-31; #551: still true with ADR 0024's local
+  accounts: a session token is held in the tab's `sessionStorage` and sent as a bearer header,
+  never as a cookie, and `POST /api/v1/login` passes the `Host` and `Origin` checks like every
+  write.)
 - Static files are served only from `[ui] dir`: no listing, no `..` or empty segment, no symbolic
   link out of the directory, a fixed table of content types, `nosniff`, `no-referrer`, and a
   content security policy of `default-src 'self'`, `script-src 'self' 'wasm-unsafe-eval'`,
@@ -141,7 +150,9 @@ the spec fixes the details the slices build.
 ### Roles and admission
 
 - Without `[oidc]`, the reverse proxy admits, as for the nodes, and the console is read only:
-  every admitted request is a viewer's.
+  every admitted request is a viewer's. (Amended 2026-10-31; #551: with `[accounts]` and no
+  `[oidc]`, ADR 0024's console admits a local account's session token, and the account's role
+  makes it an operator or a viewer.)
 - With `[oidc]`, the console validates a bearer JWT with the nodes' module and its own audience.
   A subject in an `operator_groups` group, or whose `operator_claim` is `true`, is an operator;
   every other admitted subject is a viewer. Operators are managed in the identity provider, not
@@ -150,7 +161,10 @@ the spec fixes the details the slices build.
   that group's entries and nothing else; this ADR's operator is the global operator.) (Amended
   2026-10-30; #340: ADR 0020 names the global operator the platform administrator for named
   workspaces and adds the workspace operator, a per-workspace authority that is not a session
-  role; `operator`, `team_operator` and `viewer` keep their serialized values.)
+  role; `operator`, `team_operator` and `viewer` keep their serialized values.) (Amended
+  2026-10-31; #551: still so with `[oidc]`. Without it, ADR 0024's local accounts are managed by
+  the global operator in the console, in the data layer, each with the role operator or viewer;
+  with `[oidc]`, only the break-glass account may still sign in.)
 - A viewer reads every view and writes nothing. A write from a viewer, and any write while
   `operations` is off, is a 403; the front end hides what the role cannot do, but the API is what
   refuses.
@@ -165,7 +179,11 @@ the spec fixes the details the slices build.
   `[directory]`, a subject the identity provider deactivated is refused as `deprovisioned`.)
 - The browser logs in with the authorization code flow and PKCE against the operator's issuer,
   as the public client `[ui] client_id`, keeps the token in memory only and sends it as a bearer
-  header. Meada issues no token, registers no client and forwards none.
+  header. Meada issues no token, registers no client and forwards none. (Amended 2026-10-31;
+  #551: with `[accounts]`, ADR 0024's console issues Meada-signed tokens, Ed25519 JWTs from its
+  own sign-in: session tokens for itself and agent tokens for the nodes or the proposal server,
+  each admitted by its one surface. It still registers no client, forwards no token and is no
+  OAuth authorization server.)
 - The token check takes a pasted token, runs the nodes' checks and grant code on it, and holds it
   only for that request: it is never written to stderr, Valkey, the store or a URL, and never
   sent to the issuer or any other host.
@@ -180,7 +198,9 @@ the spec fixes the details the slices build.
 
 - Every write the console makes is first a CLI subcommand taking `--workspace <bootstrap
   manifest>`, and the console calls the same code in process, so recovery and scripts need no
-  browser and the tests live on the CLI:
+  browser and the tests live on the CLI (amended 2026-10-31; #551: ADR 0024's account
+  administration, password change, agent token issue and login verification have no CLI twin,
+  except `meada ui reset-admin`, which recovers the default account; ADR 0024 records why):
   - `meada snapshot pointer set <generation>` moves the Valkey pointer to a generation of the
     retained set, a rollback or forward again;
   - `meada snapshot pointer retain <generation>` adds a stored generation to the retained set and
@@ -225,7 +245,9 @@ the spec fixes the details the slices build.
   rollback.
 - `meada workspace import <file>` stores a version from a manifest file's `[[repository]]`
   entries, and the console's save is the same function over the editor's text. The author is the
-  OIDC subject in the console, and `--author` or `cli:<login>@<host>` on the CLI. Every save
+  OIDC subject in the console, and `--author` or `cli:<login>@<host>` on the CLI. (Amended
+  2026-10-31; #551: with ADR 0024's local accounts, the console's author is
+  `local:<username>`.) Every save
   validates with `meada-core`; the checks that need a mirror stay in `meada index --workspace`.
 - `meada workspace pull` brings the current version onto the machine, as `meada snapshot pull`
   brings a generation: it reads the Valkey pointer and the document, checks both as hostile
@@ -324,7 +346,9 @@ the spec fixes the details the slices build.
   contributor a JavaScript toolchain, and every `ui` build would carry the assets. The image and
   the release tarball ship the files instead.
 - **Writes behind the reverse proxy alone.** A write without an authenticated subject has no
-  author for its log line or its workspace version, so operations need `[oidc]`.
+  author for its log line or its workspace version, so operations need `[oidc]`. (Amended
+  2026-10-31; #551: still rejected; ADR 0024's local accounts give a write an authenticated
+  subject without an identity provider, so operations need `[oidc]` or `[accounts]`.)
 - **Releasing the lock or triggering a refresh from the console.** The renewed TTL already frees
   a dead job's lock, and releasing a live one races it; the refresh belongs to the orchestrator,
   so the console shows the lock and the last publish.
@@ -368,7 +392,9 @@ the spec fixes the details the slices build.
   job's: the console reads its state in Valkey and never calls GitHub. (Amended 2026-10-22;
   #319: still so with ADR 0016: the job's `meada github-app roles` writes the permissions set
   and the console reads it from Postgres; the console calls neither GitHub nor the identity
-  provider's API, which pushes to it over SCIM.)
+  provider's API, which pushes to it over SCIM.) (Amended 2026-10-31; #551: ADR 0024 adds one
+  call from the console to GitHub, `GET /user` on `[accounts.github] api`, to verify a local
+  account's login; the role check stays the job's.)
 - Everything is additive under Spec R1's stability rule (a feature, subcommands, keys, Valkey
   keys, a document field): the console is a minor change. Without `ui`, nothing changes; without
   `[workspace]`, the manifest in the ops repository works as today.

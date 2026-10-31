@@ -62,7 +62,9 @@ before: the stdio server, discovery and freshness on demand are unchanged.
   needs Meada itself to check credentials (in rmcp 3.5.1 its OAuth support is mostly the
   client's side), and that needs its own decision. (Amended 2026-10-21; ADR 0012: the opt-in
   OIDC module validates a bearer JWT inside Meada, as an OAuth resource server; the reverse
-  proxy stays the documented default admission.)
+  proxy stays the documented default admission.) (Amended 2026-10-31; #551: with `[accounts]`,
+  ADR 0024 has Meada check its own tokens too, agent tokens its console signed with Ed25519,
+  through the OIDC module's verifier and still without rmcp's `auth`.)
 - Nothing else changes: no account, no telemetry, no key, and indexing still never calls a model
   or the network. Accepting connections opens no outbound one. (Amended 2026-10-21; ADR 0012:
   unless an opt-in cloud module is configured, and then only to its configured endpoints.)
