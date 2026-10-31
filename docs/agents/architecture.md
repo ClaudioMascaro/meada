@@ -295,8 +295,7 @@ Delivered by #346 (ADR 0022's proposal server; ADR 0022 "As built (#346)"), feat
 `Console` started for it (`for_proposals`: every Postgres session read-only through
 `Manifest::read_only` and `postgres::Config::read_only`, the audit off, no SCIM, front end or
 GitHub App; `Holds::of`, `directory_of`, `grant::Providers::of` and `Session::admitted` are the
-console's own), the hyper
-listener of `mcp::serve_http` with its own route (`Origin` 403, the protected resource metadata,
+console's own), the hyper listener of `mcp::serve_http` with its own route (`Origin` 403, the protected resource metadata,
 `Oidc::admit_console` with `[proposals] audience` and the directory's block, `/` only, a semaphore
 of calls in flight, the body bound) and an rmcp `StreamableHttpService` of four read-only tools,
 `catalog`, `workspaces`, `show` and `propose`, each calling the console's own functions
@@ -495,7 +494,8 @@ one for the area a change touches.
   endpoint (`Gate::refused`, the 403 in the admitting verifier's words) and filters every 404
   listing through it (`Pass::reads`). The gate builds the node's grant providers once
   (`grant::Providers::of` the manifest) and hands them to the verifier, and `mcp::run` starts
-  their permissions poll (`Providers::listening`) once the address is printed. Routing then puts the `Pass` in the request's extensions, which rmcp's
+  their permissions poll (`Providers::listening`) once the address is printed. Routing then
+  puts the `Pass` in the request's extensions, which rmcp's
   stateless transport hands the tool inside the request's `http::request::Parts`:
   `Meada::answer` opens the engine (`open_listed`, `open_held`) over `Manifest::workspace` with
   `Pass::reads`, which drops every entry outside the grant before the missing peers are
@@ -703,7 +703,8 @@ one for the area a change touches.
   `keycloak` take no table and, as `entra`, change no answer; `[oidc.github]` the GitHub grant
   provider, `GithubFile::validate` its `login_claim` and its `grant::Github` (`host` a lowercase
   host name, `github.com` by default; `login_claim` required and not empty; `roles` a non-empty
-  array of distinct names that `grant::role_ok` takes, 1 to `ROLE_MAX` characters with no control character, `ROLES`, GitHub's
+  array of distinct names that `grant::role_ok` takes, 1 to `ROLE_MAX` characters with no
+  control character, `ROLES`, GitHub's
   five built-in roles, by default; `max_age_seconds` required, at least `MAX_AGE_MIN`), in a
   build without `postgres` the error naming the feature, without `[postgres]` the error naming
   both (`workspace::Manifest::read`, which also hands it its `[postgres]`, `Github::postgres`);
@@ -739,12 +740,13 @@ one for the area a change touches.
   cache: `Oidc::start` takes the process's `grant::Providers`. `[oidc.github]` validates into
   `grant::Github` (`Config::github`, read through `Manifest::github`) and the OIDC-only
   `Config::login_claim`; the admission view's `github` is `Providers::admission` with
-  `login_claim` added. Routing checks
-  the grant and it bounds the workspace of each answer and each 404 list (`mcp.rs`). No token, error text
+  `login_claim` added. Routing checks the grant and it bounds the workspace of each answer and
+  each 404 list (`mcp.rs`). No token, error text
   of `jsonwebtoken` or claim value is ever printed. With feature `ui`, the console reaches the
   same checks through `admit_console` (one audience, `[ui] audience`; a `Bearer` challenge with
   no `resource_metadata`; its `groups`, the session's, and the `operator_groups` match read the
-  same effective groups, those `Oidc::granted` read; it returns a `grant::Admitted`), `check` (a pasted token's outcome per check, signature, issuer,
+  same effective groups, those `Oidc::granted` read; it returns a `grant::Admitted`), `check`
+  (a pasted token's outcome per check, signature, issuer,
   audience as a node checks it, lifetime and scopes, and its grant when every check passes,
   against the cached keys only, so it never fetches; with `[oidc.github]` its two sides,
   `Checked::sources`, from the cache) and `admission` (the identity provider's
@@ -758,7 +760,7 @@ one for the area a change touches.
   verifier of a subject is a producer of them and none duplicates a grant. `Grant` is what an
   admitted subject reads (`All` or `Only`, `reads`, `core`); `Github` the GitHub grant provider's
   settings (`host`, `roles`, `max_age`, its `postgres` and `catalog` filled by `Manifest::read`),
-  which every reader (the node's and the console's providers, the session and the admission
+  which every reader (the node's and the console's grant providers, the session and the admission
   view, `meada github-app roles`, the catalog, named workspaces, the proposal server, `status`
   through `Manifest::excludes`) reaches through `Manifest::github`, the one accessor a later
   section can also fill; `role_ok` and `ROLE_MAX` the role names it takes. `Providers` is a
@@ -3133,7 +3135,8 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   keys stay). An identity whose path starts with `.well-known/oauth-protected-resource` is
   unreachable with `[oidc]`, since that path serves the metadata. A role name of
   `[oidc.github] roles`, and a `role_name` the role check stores, holds at most `ROLE_MAX` (100,
-  in `grant.rs`) characters; a longer `role_name` from GitHub is a skipped row. The `scope` claim is read as a
+  in `grant.rs`) characters; a longer `role_name` from GitHub is a skipped row. The `scope`
+  claim is read as a
   space-separated string; `scp` and arrays are not read. With `audience` unset, the root's 404
   takes a token whose `aud` is `public_url` itself. The caps are inclusive: a body of exactly
   the cap is read. The `oidc` build carries `rsa`, whose RUSTSEC-2023-0071 (Marvin timing) hits

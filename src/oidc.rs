@@ -234,7 +234,8 @@ pub struct Config {
     pub scopes: Vec<String>,
     /// How often the JWKS is fetched again.
     pub refresh: Duration,
-    /// `[oidc.github]`, the GitHub grant provider: read through `Manifest::github`.
+    /// `[oidc.github]`, the GitHub grant provider: every reader outside `Manifest::read` reaches
+    /// it through `Manifest::github`.
     pub github: Option<Github>,
     /// `[oidc.github] login_claim`, the top-level claim holding a subject's GitHub login: set
     /// exactly when `github` is.
@@ -629,17 +630,12 @@ impl Oidc {
         Ok(oidc)
     }
 
-    /// The module of `config` with `keys` cached, its grant providers those of `config` alone,
-    /// with no permissions cache.
+    /// The module of `config` with `keys` cached, its grant providers only the groups table of
+    /// `config` until `start` hands it the process's.
     fn new(config: Config, agent: ureq::Agent, jwks_uri: String, keys: Vec<Jwk>) -> Self {
         let groups = config.groups.as_ref().map(|(_, table)| table.clone());
-        let github = config.github.clone().map(|github| Github {
-            #[cfg(feature = "postgres")]
-            postgres: None,
-            ..github
-        });
         Self {
-            providers: Arc::new(Providers::new(groups, github.as_ref())),
+            providers: Arc::new(Providers::new(groups, None)),
             config,
             jwks_uri,
             agent,
@@ -898,13 +894,7 @@ impl Oidc {
                         .is_some_and(|name| claims.get(name) == Some(&Value::Bool(true)))
                         || by_groups;
                     let subject = subject.map(str::to_string);
-                    let admitted = crate::grant::Admitted::new(
-                        subject,
-                        operator,
-                        groups,
-                        granted,
-                        &self.providers,
-                    );
+                    let admitted = crate::grant::Admitted::new(subject, operator, groups, granted);
                     let user = (user_claim.and_then(|name| claims.get(name)))
                         .and_then(Value::as_str)
                         .map(str::to_string);

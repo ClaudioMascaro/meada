@@ -56,7 +56,8 @@ pub(crate) fn poll_knob() -> Option<u64> {
     ms.parse().ok().filter(|ms| *ms > 0)
 }
 
-/// The cache of one process: the GitHub grant provider, the data layer it reads and what it last read.
+/// The cache of one process: the GitHub grant provider, the data layer it reads and what it last
+/// read.
 pub(super) struct Permissions {
     github: Github,
     postgres: crate::postgres::Config,
@@ -792,8 +793,8 @@ mod tests {
         assert_eq!(cache.catalog(None, true).selectable.len(), 1);
     }
 
-    /// The providers of the groups table `super::tests::table()` and a GitHub grant provider
-    /// whose cache holds `held`.
+    /// The grant providers of the groups table `super::tests::table()` and a GitHub grant
+    /// provider whose cache holds `held`.
     fn providers(held: Option<Set>) -> super::super::Providers {
         let cache = cache(60);
         cache.state.write().unwrap().set = held;
@@ -823,6 +824,26 @@ mod tests {
         let unmapped = providers.grant(&groups(&["unmapped"]), Some("ana"));
         assert_eq!(sorted(&unmapped.union()), only(&["github.com/acme/api"]));
         assert_eq!(providers.github(), Some("github.com"));
+    }
+
+    #[test]
+    fn identities_granted_by_name_beside_a_github_grant_keep_star_whole() {
+        use super::super::tests::{groups, only, sorted};
+        let providers = providers(Some(set(0, Instant::now())));
+        let all = providers.grant(&groups(&["g"]), Some("ana")).listing(["*"]);
+        assert_eq!(sorted(&all.claims), None);
+        assert_eq!(sorted(&all.union()), None);
+        let named = providers.grant(&groups(&["g"]), Some("ana")).listing(["a"]);
+        assert_eq!(sorted(&named.claims), only(&["a", "b"]));
+        assert_eq!(
+            sorted(&named.union()),
+            only(&["a", "b", "github.com/acme/api"])
+        );
+        let github = named.github.as_ref().unwrap();
+        assert_eq!(
+            (github.host.as_str(), github.state),
+            ("github.com", "current")
+        );
     }
 
     #[test]

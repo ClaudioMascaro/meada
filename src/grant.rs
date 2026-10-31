@@ -88,7 +88,7 @@ impl Grant {
 
 /// The GitHub grant provider's settings (ADR 0016), `[oidc.github]` as validated: what `meada
 /// github-app roles` checks against (#331) and the grant at admission reads (#332). Every reader
-/// reaches it through `Manifest::github`.
+/// but `Manifest::read`, which fills it, reaches it through `Manifest::github`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Github {
     /// The git host whose identities it grants, a lowercase host name.
@@ -107,12 +107,14 @@ pub struct Github {
     pub catalog: bool,
 }
 
-/// The GitHub side of a grant: the identities the login reads through GitHub, and the grant's
-/// state read with them (`unread`, `current` or `expired`).
+/// The GitHub side of a grant: the identities the login reads through GitHub, the grant's state
+/// read with them (`unread`, `current` or `expired`) and the GitHub grant provider's host.
 pub struct GithubGrant {
     pub identities: Vec<String>,
     #[cfg_attr(not(feature = "ui"), allow(dead_code))]
     pub state: &'static str,
+    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    pub host: String,
 }
 
 /// A subject's grant by side (ADR 0016).
@@ -159,8 +161,8 @@ pub struct Providers {
 }
 
 impl Providers {
-    /// The providers of `groups` and `github`: the permissions cache over `github`'s
-    /// `[postgres]`, empty until `listening`.
+    /// The grant providers of the groups table `groups` and the GitHub grant provider `github`:
+    /// its permissions cache over `github`'s `[postgres]`, empty until `listening`.
     pub fn new(groups: Option<HashMap<String, Vec<String>>>, github: Option<&Github>) -> Self {
         #[cfg(feature = "postgres")]
         let github = github
@@ -175,7 +177,7 @@ impl Providers {
         }
     }
 
-    /// The providers `manifest` configures: `[oidc.groups]` and `Manifest::github`.
+    /// The grant providers `manifest` configures: `[oidc.groups]` and `Manifest::github`.
     pub fn of(manifest: &crate::workspace::Manifest) -> Self {
         let groups = (manifest.oidc.as_ref())
             .and_then(|oidc| oidc.groups.as_ref())
@@ -208,10 +210,15 @@ impl Providers {
         if let Some(cache) = &self.github {
             let login = permissions::login(login);
             let (identities, state) = cache.grant_and_state(login.as_deref());
+            let host = cache.host().to_string();
             return Granted {
                 claims,
                 login,
-                github: Some(GithubGrant { identities, state }),
+                github: Some(GithubGrant {
+                    identities,
+                    state,
+                    host,
+                }),
             };
         }
         let _ = login;
@@ -293,28 +300,24 @@ pub struct Admitted {
 
 #[cfg(feature = "ui")]
 impl Admitted {
-    /// `subject`, global operator when `operator`, whose grant `providers` computed from `groups`
-    /// (`granted`).
+    /// `subject`, global operator when `operator`, whose grant the grant providers computed
+    /// from `groups` (`granted`).
     pub fn new(
         subject: Option<String>,
         operator: bool,
         mut groups: Vec<String>,
         granted: Granted,
-        providers: &Providers,
     ) -> Self {
         groups.sort();
         groups.dedup();
         let grant = granted.union();
-        let state = granted.github.map(|github| github.state);
         Admitted {
             subject,
             operator,
             groups,
             login: granted.login,
             grant,
-            github: (providers.github())
-                .zip(state)
-                .map(|(host, state)| (host.to_string(), state)),
+            github: granted.github.map(|github| (github.host, github.state)),
         }
     }
 }
