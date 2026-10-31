@@ -86,7 +86,7 @@ fn repo_paths<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> 
     for path in Vec::<String>::deserialize(d)? {
         let segments: Vec<&str> = path.split('/').collect();
         if path.starts_with('/') || segments.contains(&"..") {
-            return Err(D::Error::custom(Msg::NotInRepository(&path).text()));
+            return Err(D::Error::custom(Msg::NotInRepository.text()));
         }
         paths.push(
             segments
@@ -106,7 +106,7 @@ fn gateway_key<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Err
         return Ok(None);
     };
     if !value.starts_with('/') {
-        return Err(D::Error::custom(Msg::NoLeadingSlash(&value).text()));
+        return Err(D::Error::custom(Msg::NoLeadingSlash.text()));
     }
     Ok(Some(
         crate::http::normalize_path(&value)
@@ -156,7 +156,7 @@ fn kind<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
         && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
     match valid {
         true => Ok(kind),
-        false => Err(D::Error::custom(Msg::NotLowercase(&kind).text())),
+        false => Err(D::Error::custom(Msg::NotLowercase.text())),
     }
 }
 
@@ -526,17 +526,32 @@ fn describe(src: &str, at: usize, message: &str, file: &str) -> String {
             Msg::KeyMissing(&qualify(parent.unwrap_or(""), field)).text()
         }
         (Some(_), Some(key)) => Msg::KeyUnknown { key, file }.text(),
-        // Serde quotes the written value in these two; a secret pasted under the wrong key
-        // must not reach a log.
+        // Serde quotes the written value in `invalid type`, `invalid value` and `unknown
+        // variant`; a secret pasted under the wrong key must not reach a log. Meada's own rule
+        // errors name the key and the rule only, so what reaches the fallback quotes nothing.
         (_, Some(key)) if message.starts_with("invalid type") => Msg::WrongType {
             key,
             expected: expected_kind(message),
         }
         .text(),
         (_, Some(key)) if message.starts_with("invalid value") => Msg::InvalidValue(key).text(),
+        (_, Some(key)) if message.starts_with("unknown variant") => Msg::UnknownVariant {
+            key,
+            accepted: &accepted_variants(message),
+        }
+        .text(),
         (_, Some(key)) => format!("`{key}`: {message}"),
-        (_, None) => message.to_string(),
+        (_, None) => Msg::NoKey.text(),
     }
+}
+
+/// The variants serde's `unknown variant` message lists after `, expected `: the schema's own
+/// names, never the written value (which comes first, and may itself hold a backtick).
+fn accepted_variants(message: &str) -> Vec<&str> {
+    let Some((_, expected)) = message.rsplit_once(", expected ") else {
+        return Vec::new();
+    };
+    expected.split('`').skip(1).step_by(2).collect()
 }
 
 /// The kind of value serde's `invalid type` message expected, in words that carry no value.

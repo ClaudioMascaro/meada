@@ -45,12 +45,12 @@ fn a_text_error_names_the_file_the_line_and_the_key() {
         (
             "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n[repository.serve]\n\
              prefix = \"edge\"\n",
-            "ops/meada.workspace.toml:5: `repository.serve.prefix`: `edge` must start with `/`",
+            "ops/meada.workspace.toml:5: `repository.serve.prefix`: must start with `/`",
         ),
         (
             "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n[[repository.resource]]\n\
              kind = \"Postgres\"\nid = \"orders\"\nrole = \"read\"\n",
-            "ops/meada.workspace.toml:5: `repository.resource.kind`: `Postgres` is not a \
+            "ops/meada.workspace.toml:5: `repository.resource.kind`: must be a \
              lowercase identifier (ASCII letters, digits and hyphens, starting with a letter)",
         ),
         // A workspace's text holds its entries alone.
@@ -235,4 +235,20 @@ fn every_kind_and_an_invalid_value_are_worded_without_the_value() {
         let got = problems(src).join("\n");
         assert!(got.contains(want), "{got}");
     }
+}
+
+/// `unknown variant` is worded from the schema's own variants: the written value, even one that
+/// imitates serde's text, never reaches the message (#545).
+#[test]
+fn an_unknown_variant_names_the_key_and_the_values_it_accepts() {
+    let src = "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n[[repository.resource]]\n\
+               kind = \"pg\"\nid = \"a\"\nrole = \"x`, expected `y\"\n";
+    let problems = validate(FILE, src).err().unwrap_or_default();
+    assert_eq!(
+        problems,
+        [format!(
+            "{FILE}:7: `repository.resource.role`: is not one of the values it accepts \
+             (`read`, `write`, `read-write`)"
+        )]
+    );
 }

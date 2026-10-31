@@ -955,6 +955,22 @@ fn import_validates_before_any_connection() {
     );
 }
 
+/// A file one byte past the version bound is refused before any connection: exit 1, the bound
+/// named, nothing on stdout (so no id), the store and Valkey the manifest names listening
+/// nowhere (#541).
+#[test]
+fn import_of_a_file_past_the_version_bound_is_refused() {
+    let dir = chain_manifest("workspace_import_oversize");
+    unreachable_bootstrap(&dir);
+    // `VERSION_MAX` (src/snapshot/versions.rs), 4 MiB, plus one byte: the integration tests
+    // cannot see the constant.
+    fs::write(dir.join("ops/big.toml"), vec![b'#'; 4_194_304 + 1]).unwrap();
+    let args = ["import", "ops/big.toml", "--message", "m"];
+    let (stdout, stderr, code) = workspace(&dir, &args);
+    assert_eq!((stdout.as_str(), code), ("", Some(1)), "{stderr}");
+    assert!(stderr.contains("larger than 4194304 bytes"), "{stderr}");
+}
+
 /// `text`'s `[[repository]]` entries with `owners[n]`, when it is `Some`, as the `owner` right
 /// after the `path` of its n-th entry.
 pub(crate) fn owned(text: &str, owners: &[Option<&str>]) -> String {

@@ -885,7 +885,7 @@ fn status_reports_documents_follow_lang() {
 
 /// A file whose qualified names pass its pack's budget (C#, Java, Kotlin, Swift) and a C# file
 /// of a project that gives more usings than the pack takes are dropped, and `status` names each
-/// and its limit.
+/// and its limit, as is a Kotlin file the grammar misreads.
 #[test]
 fn status_reports_a_file_over_a_pack_limit_follow_lang() {
     let repo = fixture_repo("cli_budget", "ts-basic", None);
@@ -920,6 +920,12 @@ fn status_reports_a_file_over_a_pack_limit_follow_lang() {
             "struct {name} {{ func g() {{\n{}}} }}\n",
             "f()\n".repeat(repeats)
         ),
+    )
+    .unwrap();
+    // A declaration the grammar reads as an infix call leaves the file out, and status says so.
+    fs::write(
+        repo.join("Misread.kt"),
+        "package a\nfun f() {}\nval a = b class C\n",
     )
     .unwrap();
     // A project whose global usings pass the count every file of it is dropped for.

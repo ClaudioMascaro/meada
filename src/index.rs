@@ -1764,13 +1764,15 @@ fn relative(root: &Path, path: &Path) -> Option<String> {
     Some(parts?.join("/"))
 }
 
-/// The limit a pack dropped a file for passing.
+/// Why a pack dropped a file: the limit it passed, or a misparse.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Dropped {
     /// The bytes of the qualified-names budget (`Facts::budget`).
     Bytes(usize),
     /// The count of usings a project may give its files (`Facts::usings`).
     Usings(usize),
+    /// A declaration the grammar read as something else (`Facts::misparsed`).
+    Misparsed,
 }
 
 /// One repository's index content, as the engine builds on it: what the export writes
@@ -1781,8 +1783,9 @@ pub(crate) struct Export {
     /// Where the repository stands in the workspace; set by the engine, never stored or shown.
     pub(crate) root: PathBuf,
     pub(crate) files: Vec<File>,
-    /// The files a pack dropped for passing a limit (`Facts::budget`, `Facts::usings`), each with
-    /// the limit, in path order: no symbols, no calls. Shown by `meada status` only.
+    /// The files a pack dropped for passing a limit (`Facts::budget`, `Facts::usings`) or because
+    /// the grammar misread them (`Facts::misparsed`), each with the limit or the reason, in path
+    /// order: no symbols, no calls. Shown by `meada status` only.
     pub(crate) dropped: Vec<(String, Dropped)>,
     pub(crate) symbols: Vec<Symbol>,
     pub(crate) calls: Vec<CallSite>,
@@ -2021,7 +2024,8 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         .prepare(
             "SELECT path, facts FROM files WHERE NOT EXISTS \
              (SELECT 1 FROM symbols s WHERE s.path = files.path) \
-             AND (instr(facts, '\"budget\":') > 0 OR instr(facts, '\"usings\":') > 0) \
+             AND (instr(facts, '\"budget\":') > 0 OR instr(facts, '\"usings\":') > 0 \
+                  OR instr(facts, '\"misparsed\":') > 0) \
              ORDER BY path",
         )?
         .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
@@ -2032,6 +2036,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
             let limit = match (facts.budget, facts.usings) {
                 (Some(bytes), _) => Dropped::Bytes(bytes),
                 (None, Some(count)) => Dropped::Usings(count),
+                (None, None) if facts.misparsed => Dropped::Misparsed,
                 (None, None) => return None,
             };
             Some((path, limit))

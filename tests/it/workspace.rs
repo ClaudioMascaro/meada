@@ -165,12 +165,12 @@ fn invalid_config_errors_name_file_line_and_key() {
         (
             "config_documents_absolute",
             "[serve]\ndocuments = [\"docs/api.yaml\", \"/etc/api.yaml\"]\n",
-            "<repo>/meada.toml:2: `serve.documents`: `/etc/api.yaml` is not a path inside the repository",
+            "<repo>/meada.toml:2: `serve.documents`: must be a path inside the repository",
         ),
         (
             "config_documents_parent",
             "[serve]\ndocuments = [\"docs/../../api.yaml\"]\n",
-            "<repo>/meada.toml:2: `serve.documents`: `docs/../../api.yaml` is not a path inside the repository",
+            "<repo>/meada.toml:2: `serve.documents`: must be a path inside the repository",
         ),
         (
             "config_resource_key",
@@ -180,14 +180,14 @@ fn invalid_config_errors_name_file_line_and_key() {
         (
             "config_resource_kind",
             "[[resource]]\nkind = \"Postgres\"\nid = \"orders\"\nrole = \"read\"\n",
-            "<repo>/meada.toml:2: `resource.kind`: `Postgres` is not a lowercase identifier \
+            "<repo>/meada.toml:2: `resource.kind`: must be a lowercase identifier \
              (ASCII letters, digits and hyphens, starting with a letter)",
         ),
         (
             "config_resource_role",
             "[[resource]]\nkind = \"postgres\"\nid = \"orders\"\nrole = \"append\"\n",
-            "<repo>/meada.toml:4: `resource.role`: unknown variant `append`, \
-             expected one of `read`, `write`, `read-write`",
+            "<repo>/meada.toml:4: `resource.role`: is not one of the values it accepts \
+             (`read`, `write`, `read-write`)",
         ),
         (
             "config_resource_id",
@@ -197,12 +197,12 @@ fn invalid_config_errors_name_file_line_and_key() {
         (
             "config_prefix",
             "[serve]\nhosts = [\"api.example.com\"]\nprefix = \"api\"\n",
-            "<repo>/meada.toml:3: `serve.prefix`: `api` must start with `/`",
+            "<repo>/meada.toml:3: `serve.prefix`: must start with `/`",
         ),
         (
             "config_strip",
             "[serve]\nstrip = \"v1/\"\n",
-            "<repo>/meada.toml:2: `serve.strip`: `v1/` must start with `/`",
+            "<repo>/meada.toml:2: `serve.strip`: must start with `/`",
         ),
         (
             "config_unknown",

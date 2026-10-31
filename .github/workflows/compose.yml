@@ -6,6 +6,11 @@ on:
       - deploy/compose/**
       - .github/workflows/compose.yml
       - scripts/compose-check
+  push:
+    # loop/**: the backlog loop's ticket branches, where the checks gate the merge. No paths filter
+    # here: a push is diffed against its predecessor, so a later push without Helm/Compose changes
+    # would leave its head commit with no check.
+    branches: ['loop/**']
 
 permissions:
   contents: read

@@ -432,8 +432,9 @@ refresh lock. A failed stage ends the job before publish, so the pointer stays (
 0012): the compose `fetch.sh` and `fetch-pulled.sh` and the chart's default `workspace.fetch`
 refuse URLs carrying credentials, and an existing mirror whose `origin` carries them (#445),
 and name the identity whose fetch failed (#444), and `meada index --workspace` ends a failure
-with the stage and the count. Without `$1` (the pulled list under `[oidc.github]`) the chart's
-fetch reads `workspace.repositories`, mounted as `repositories.toml`, since a store-sourced
+with the stage and the count. The fetch reads each `[[repository]]` table by its own keys, one
+awk program that `fetch-pulled.sh` and `workspace.fetch` carry and a test compares (#544).
+Without `$1` (the pulled list under `[oidc.github]`) the chart's fetch reads `workspace.repositories`, mounted as `repositories.toml`, since a store-sourced
 bootstrap has no `[[repository]]`.
 Seeding and applying the first version are explicit operator actions. The fetch list/script and
 mirror provisioning still belong to the operator: applying a new identity or path does not
@@ -2627,6 +2628,7 @@ one for the area a change touches.
   Kotlin file declares `expect` or `actual` (`Facts::expect`, `Facts::actual`), the size of the budget a file exhausted
   (`Facts::budget`, which `meada status` names), the count of usings the project of a file
   passed (`Facts::usings`, set by a join and stamped into the stored facts after it, which
+  `meada status` names), whether the grammar misread a Kotlin file (`Facts::misparsed`, which
   `meada status` names), the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
@@ -2931,8 +2933,8 @@ one for the area a change touches.
   pack (`jvm::spring::CONFIG_FILES`, spec #27, #100), so a Kotlin-only repository gets them
   through `Indexed::configs` (a mixed one lists each twice, which `Configs::read` takes as once).
   A declaration the grammar reads as an
-infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out, as the
-qualification budget does (ADR 0017).
+infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out (`Facts::misparsed`, which
+`meada status` names), as the qualification budget does (ADR 0017).
 
 - `resolve.rs`: `TYPE_PARTS` (64) bounds the files of one unit one partial type is read across
   (`Resolver::parts`); classes of one name in more files are each a class of its own, so a
@@ -3187,12 +3189,21 @@ qualification budget does (ADR 0017).
   directory and an `internal/` package are no different from any other directory of the provider;
   a `replace` to an absolute directory leaves the module outside.
 - `workspace.rs`: a sibling with an invalid `meada.toml` or `meada.decisions.toml` is skipped
-  silently. In a pulled generation, a mirror's `meada.toml` and `meada.decisions.toml` are read
-  only as regular files of at most `GENERATION_CONFIG_MAX` (1 MiB, `config.rs`), through no
+  silently. Every read of a mirror's `meada.toml` and `meada.decisions.toml`, in a pulled
+  generation and in a server-mode manifest's entry (`mirror()`, behind `Manifest::read`) alike,
+  reads only regular files of at most `GENERATION_CONFIG_MAX` (1 MiB, `config.rs`), through no
   symbolic link (`config::read_unlinked`, refused unopened, then the opened file checked against
-  the one checked); past it, or through a link, the generation is not servable, the error naming
-  the file. An operator's file (a secret, a CA, `config::read_bounded`) follows links, as
-  Kubernetes mounts secrets through one.
+  the one checked), one that stays inside the mirror included; past the bound, or through a
+  link, the generation or the entry is not servable, the error naming the file. A local checkout
+  (`Repository::local`, the sibling scan of `Workspace::discover`) is the developer's own tree
+  and follows links, and so does an operator's file (a secret, a CA, `config::read_bounded`),
+  as Kubernetes mounts secrets through one. Both reads check a file and then open it
+  (`read_unlinked` then compares the opened file with the checked one), so a regular file
+  replaced by a FIFO between the check and the open blocks the read instead of being refused.
+  Reaching the window takes write access to the directory, which already allows worse;
+  repository content cannot (git stores no FIFO, and the generation extraction refuses one); a
+  FIFO given as the path is refused by the check. Closing it would take
+  `O_NONBLOCK | O_NOFOLLOW` and a direct `libc` dependency, declined in #548.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the
   first by site; the target names no site.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is

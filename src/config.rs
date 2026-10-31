@@ -61,14 +61,14 @@ fn read_own<T: DeserializeOwned>(root: &Path, name: &str) -> Result<Option<T>> {
     read_own_up_to(root, name, None)
 }
 
-/// The most a mirror's `meada.toml` or `meada.decisions.toml` holds in a pulled generation
-/// (ADR 0012), whose files are hostile; a larger one fails the generation, naming the file.
-#[cfg(feature = "snapshot")]
+/// The most a mirror's `meada.toml` or `meada.decisions.toml` holds, in a server-mode mirror
+/// and in a pulled generation (ADR 0012) alike, since both are a clone of a repository its
+/// operator does not control; a larger one fails the mirror, naming the file.
 // ponytail: a flat 1 MiB, as `lang::MAX_BYTES`; real ones are a few kilobytes.
 pub(crate) const GENERATION_CONFIG_MAX: u64 = 1 << 20;
 
 /// `read_own`, reading at most `max` bytes through no symbolic link (`read_unlinked`) when it
-/// is set: a mirror's file in a pulled generation.
+/// is set: a mirror's file, in a server-mode mirror or a pulled generation.
 pub(crate) fn read_own_up_to<T: DeserializeOwned>(
     root: &Path,
     name: &str,
@@ -82,8 +82,9 @@ pub(crate) fn read_own_up_to<T: DeserializeOwned>(
 }
 
 /// The text of `file`, `None` when it does not exist; with `max`, the file is a mirror's in a
-/// pulled generation (hostile, ADR 0012), read as `read_unlinked` reads: a regular file of at
-/// most `max` bytes, and a symbolic link refused unopened.
+/// mirror (hostile: a clone of a repository its operator does not control, ADR 0012), read as
+/// `read_unlinked` reads: a regular file of at most `max` bytes, and a symbolic link refused
+/// unopened, one that stays inside the mirror included.
 pub(crate) fn text(file: &Path, max: Option<u64>) -> Result<Option<String>> {
     let missing = |e: &std::io::Error| e.kind() == std::io::ErrorKind::NotFound;
     let Some(max) = max else {
@@ -142,9 +143,10 @@ pub(crate) fn read_bounded(path: &Path, max: u64) -> std::result::Result<Vec<u8>
 }
 
 /// `read_bounded` for a file the repository holds (a mirror's `meada.toml` or
-/// `meada.decisions.toml` in a pulled generation), which goes through no symbolic link: one
-/// at `path` is refused unopened, naming the file. On Unix the file opened must be the one
-/// checked, so a link put in its place between the check and the open is refused too.
+/// `meada.decisions.toml`, in server mode or in a pulled generation), which goes through no
+/// symbolic link: one at `path` is refused unopened, naming the file. On Unix the file opened
+/// must be the one checked, so a link put in its place between the check and the open is
+/// refused too.
 fn read_unlinked(path: &Path, max: u64) -> std::result::Result<Vec<u8>, String> {
     let problem = io_problem(path);
     let checked = fs::symlink_metadata(path).map_err(problem)?;

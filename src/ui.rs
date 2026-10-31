@@ -1066,14 +1066,7 @@ impl Console {
                     .collect()
             });
             let file = self.file.display().to_string();
-            for line in &mut errors {
-                let named = hidden
-                    .as_ref()
-                    .is_none_or(|h| h.iter().any(|i| line.contains(i.as_str())));
-                if named {
-                    *line = position(line, &file);
-                }
-            }
+            cut_named(&mut errors, hidden.as_deref(), &file);
         }
         let modules: Vec<Value> = (modules::MODULES.iter())
             .map(|m| json!({"section": m.section, "feature": m.feature, "built": m.built}))
@@ -1466,6 +1459,19 @@ fn identities(manifest: &Value) -> impl Iterator<Item = &str> {
     repositories.chain(groups)
 }
 
+/// Each of `errors` that names an identity of `hidden` cut to its position; all of them when
+/// `hidden` is unknown (the file is unreadable). No error `describe` words quotes a written
+/// value now (#545), so this is a second guard for those, and still the guard for the errors
+/// built elsewhere that name an identity (a named workspace's reserved first segment).
+fn cut_named(errors: &mut [String], hidden: Option<&[String]>, file: &str) {
+    for line in errors {
+        let named = hidden.is_none_or(|h| h.iter().any(|i| line.contains(i.as_str())));
+        if named {
+            *line = position(line, file);
+        }
+    }
+}
+
 /// The position of the manifest error `line` about `file`: `<file>:<line>`, its text left out.
 fn position(line: &str, file: &str) -> String {
     let rest = line.strip_prefix(file).and_then(|r| r.strip_prefix(':'));
@@ -1601,5 +1607,29 @@ mod tests {
         for ext in ["", "exe", "sh", "HTML", "toml"] {
             assert!(content_type(ext).is_none(), "{ext}");
         }
+    }
+
+    #[test]
+    fn an_error_naming_a_hidden_identity_is_cut_to_its_position() {
+        let file = "ops/meada.toml";
+        let hidden = ["private.example/team/api".to_string()];
+        let line = |text: &str| format!("{file}:7: {text}");
+        let mut errors = vec![
+            line("`serve.strip`: private.example/team/api is no rule"),
+            line("`serve.prefix`: must start with `/`"),
+            "ops/meada.toml: not valid".to_string(),
+        ];
+        cut_named(&mut errors, Some(&hidden), file);
+        assert_eq!(
+            errors,
+            [
+                "ops/meada.toml:7".to_string(),
+                line("`serve.prefix`: must start with `/`"),
+                "ops/meada.toml: not valid".to_string(),
+            ]
+        );
+        // With the identities unknown, every error is cut.
+        cut_named(&mut errors, None, file);
+        assert_eq!(errors, ["ops/meada.toml:7", "ops/meada.toml:7", file]);
     }
 }

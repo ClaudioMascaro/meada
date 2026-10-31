@@ -6,6 +6,114 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `meada status` names a Kotlin file the grammar misreads (#546, from #434). A declaration read
+  as an infix call leaves the file out of the index; the file now sets the new `Facts::misparsed`
+  (absent from every other file's stored facts) instead of `unbuilt`, and a new status line,
+  `Msg::FileMisparsed`, in English and Portuguese, names it beside the byte-budget and using
+  drops. The Java and Kotlin layout skips it as it skips the other drops. The schema version is
+  the same: a file dropped before the upgrade gets its line when it next changes, or at once
+  after deleting `.meada/index.db`. The `cli.status-budget` goldens gained the new line.
+
+### Changed
+
+- The axum provider reader walks each value once per file (#431): the values a file's rebound
+  `let`s reach share one `seen` set, and `Code::origins` is not asked for a call whose builder
+  chain goes through a method no router hands back, nor for a name written as text, a path, a
+  number, a boolean or a character. The reader's share of a one-file refresh on this repository
+  drops from about 1.4 s to about 0.1 s. No golden changed.
+
+### Fixed
+
+- A server-mode mirror's `meada.toml` and `meada.decisions.toml` are read through no symbolic
+  link (#547, after #506), as a pulled generation's are: `mirror()`, behind `Manifest::read`
+  (`mcp --listen`, snapshot pull, the lock and pointer operations, workspace versions, the
+  heartbeat, the UI, the workspaces CLI, the GitHub App), now refuses a link unopened, one that
+  stays inside the mirror included, a file that is not regular and a file replaced while read,
+  with the generation's messages, and bounds each file at 1 MiB (`GENERATION_CONFIG_MAX`, now
+  built without the `snapshot` feature). A local checkout and an operator's own files still
+  follow links. The architecture map and the snapshots page, in its three languages, say so.
+- No manifest error quotes a written value (#545), after #449 stopped serde's `invalid type` and
+  `invalid value`: `unknown variant` names the key and the values it accepts (`` `workspace.source`:
+  is not one of the values it accepts (`file`, `store`) ``) instead of serde's text, an error no
+  key spans reads "a value is not valid here" instead of serde's message, and the rule errors
+  for `serve.prefix`, `serve.strip`, `serve.documents` and a resource's `kind` name the key and
+  the rule (`` `serve.strip`: must start with `/` ``) instead of the value. The console's cut of
+  an error to its position stays as a second guard (it still covers an error built outside
+  `describe` that names an identity). English and pt-BR texts changed; the workspace validation
+  fixture changed only by the new texts.
+- The deploy fetch reads a `[[repository]]` entry by its own keys (#544): any table header ends
+  the entry before it, so a `[[repository.peer]]` or `[[repository.resource]]` table no longer
+  replaces its `repo` or `path`, and a value is the text between its quotes, so a trailing
+  comment is not part of it. Before, such a version stopped the Compose refresh and let the chart
+  clone the peer's repository into the entry's path (or into a directory named after the
+  comment). `fetch-pulled.sh` and the chart's `workspace.fetch` carry one awk program, and a
+  test fails when the two copies drift. No golden changed.
+- A repository identity on the `[oidc.github]` host compares without case wherever it meets the
+  catalog (#508): the roles job gives a selected `github.com/Acme/API` and the catalog's
+  `github.com/acme/api` one `both` row keyed as written, the `max_repositories` cap does not
+  count it as extra, and the console's catalog check and listing match it. A repository selected
+  in two spellings (a deployment's `github.com/Acme/API`, a named workspace's
+  `github.com/acme/api`) keeps one `source` row under the first and gets its role rows under
+  each, so grants, which match exactly, read both. Other hosts compare exactly. No golden
+  changed.
+- Compose mirror origins (#445): `fetch.sh` and `fetch-pulled.sh` read an existing mirror's
+  `origin` before fetching and refuse one whose HTTP(S) URL carries credentials (a mirror cloned
+  from a URL with a token keeps it there), naming the identity and never the URL, and the refresh
+  stops before index and publish as a failed fetch does. The READMEs tell the operator to run
+  `git remote set-url origin <URL without credentials>` in such a mirror.
+- Java and Kotlin: a file with thousands of fields and locals is read in linear time (#442, from
+  #424). The hides check indexes the fields by name instead of scanning every field per local,
+  the class around a write is found from the prefixes of its scope, and `declared_before` (and
+  Kotlin's `assigned`) read a node's parent from an index built once per file, since
+  `Node::parent()` is found from the root and made a deep file quadratic per write. Same answers;
+  no golden changed.
+- Indexing: a file a pack drops for passing a limit is named by `meada status` (#434, from
+  #419). The Java, Kotlin and Swift qualified-name budget (4 MiB) now sets `Facts::budget`, as the
+  C# one does, instead of `unbuilt`, which prints nothing; a C# project that gives its files more
+  than 256 usings (`PROJECT_USINGS`) marks each of them with the new `Facts::usings`, which a new
+  status line names (`Msg::FileTooManyUsings`, with the count). Kotlin's `misparsed` file stayed
+  `unbuilt` (a grammar defect, not a limit; #546 names it too). An index built before this change keeps a Java,
+  Kotlin or Swift file dropped by its budget as `unbuilt` until the file changes. No limit
+  changed. The `cli.status-budget` goldens gained the new cases; no stored format golden changed
+  (the new field is absent from every sample), so the schema version is the same.
+- Resolution: the receiver and call depth (`RECEIVER_DEPTH`) is one count for the whole lookup
+  (#432, from #417), carried through a glob, an alias or an on-demand import as the link count is,
+  so a chain that alternates receivers and imports costs its length, not `RECEIVER_DEPTH` per link
+  up to `LINK_DEPTH`. No limit changed and no answer under the limits; no golden changed.
+- Helm: the default `workspace.fetch` (#444, from #316) reads the repositories from `$1` when
+  given (the pulled list under `modules.oidc.github`) else from `workspace.repositories`, now
+  mounted as `repositories.toml` so a store-sourced refresh, whose bootstrap lists none, still
+  fetches the operator's list, refuses a URL carrying a credential and, as the compose
+  scripts do (#445), an existing mirror whose `origin` carries one, keeps each mirror strictly
+  under `/data/mirrors`, and on failure prints `refresh: fetch failed for <identity>; the refresh
+  stops before publication` and exits nonzero without echoing a URL or token.
+  `scripts/helm-check` runs the rendered script under `sh` with a stub `git` to check these; the
+  chart READMEs describe it.
+- Workspace import (#450): `meada workspace import` reads its file once, bounded by the version
+  size limit, and audits the id of the text it stored; a file past the bound or not a regular
+  file is refused before any audit record is written.
+- Manifest type errors (#449): a `meada.toml` or workspace manifest key of the wrong type, or
+  with an invalid value, reports the key and the expected kind (`` `oidc.entra`: has the wrong
+  type (a table was expected) ``) instead of serde's message, which echoed the written value, so a
+  secret pasted under the wrong key no longer reaches stderr.
+- Pulled generations (#506): a mirror's `meada.toml` or `meada.decisions.toml` that is a symbolic
+  link is refused unopened, the error naming the file, so a repository can no longer make a node
+  read and parse a file of the host. A link into the mirror (`meada.toml -> conf/meada.toml`) is
+  refused too, as the index refuses a linked pack config. The file opened is checked to be the one
+  checked. Secrets and CAs a manifest names still follow links (Kubernetes mounts them through
+  one). The snapshots page says so in its three languages.
+- Named workspaces on a node (#510): a node shows a named workspace's route
+  (`/-/workspaces/<id>/<identity>`, pinned or not) and lists it in a 404 only to a token whose
+  grant reads every entry of the workspace's version, the entries the sponsor rule excluded
+  included, as the console does. Before, once A of a Y+A workspace lost its sponsor, a subject
+  reading Y alone found the workspace on a node. A generation's context now records `excluded`,
+  the identities the sponsor rule left out, sorted, and its digest covers them; a context without
+  one is written as before, with the same generation id, and a generation published earlier reads
+  as none excluded. A node on an older binary refuses a generation that records an exclusion, so
+  upgrade nodes before or with the publisher. No golden changed.
+
 ## [1.0.0] - 2026-10-30
 
 The tree declares `1.0.0`: this release raises the workspace, the `meada-core` pin, the Dockerfile,
@@ -105,79 +213,8 @@ still needs the post-publication evidence.
 - `SECURITY` (pt-BR, English and Spanish): the latest published 1.x version receives security
   fixes, which ship as a patch or minor release.
 
-### Changed
-
-- The axum provider reader walks each value once per file (#431): the values a file's rebound
-  `let`s reach share one `seen` set, and `Code::origins` is not asked for a call whose builder
-  chain goes through a method no router hands back, nor for a name written as text, a path, a
-  number, a boolean or a character. The reader's share of a one-file refresh on this repository
-  drops from about 1.4 s to about 0.1 s. No golden changed.
-
 ### Fixed
 
-- A repository identity on the `[oidc.github]` host compares without case wherever it meets the
-  catalog (#508): the roles job gives a selected `github.com/Acme/API` and the catalog's
-  `github.com/acme/api` one `both` row keyed as written, the `max_repositories` cap does not
-  count it as extra, and the console's catalog check and listing match it. A repository selected
-  in two spellings (a deployment's `github.com/Acme/API`, a named workspace's
-  `github.com/acme/api`) keeps one `source` row under the first and gets its role rows under
-  each, so grants, which match exactly, read both. Other hosts compare exactly. No golden
-  changed.
-- Compose mirror origins (#445): `fetch.sh` and `fetch-pulled.sh` read an existing mirror's
-  `origin` before fetching and refuse one whose HTTP(S) URL carries credentials (a mirror cloned
-  from a URL with a token keeps it there), naming the identity and never the URL, and the refresh
-  stops before index and publish as a failed fetch does. The READMEs tell the operator to run
-  `git remote set-url origin <URL without credentials>` in such a mirror.
-- Java and Kotlin: a file with thousands of fields and locals is read in linear time (#442, from
-  #424). The hides check indexes the fields by name instead of scanning every field per local,
-  the class around a write is found from the prefixes of its scope, and `declared_before` (and
-  Kotlin's `assigned`) read a node's parent from an index built once per file, since
-  `Node::parent()` is found from the root and made a deep file quadratic per write. Same answers;
-  no golden changed.
-- Indexing: a file a pack drops for passing a limit is named by `meada status` (#434, from
-  #419). The Java, Kotlin and Swift qualified-name budget (4 MiB) now sets `Facts::budget`, as the
-  C# one does, instead of `unbuilt`, which prints nothing; a C# project that gives its files more
-  than 256 usings (`PROJECT_USINGS`) marks each of them with the new `Facts::usings`, which a new
-  status line names (`Msg::FileTooManyUsings`, with the count). Kotlin's `misparsed` file stays
-  `unbuilt` (a grammar defect, not a limit). An index built before this change keeps a Java,
-  Kotlin or Swift file dropped by its budget as `unbuilt` until the file changes. No limit
-  changed. The `cli.status-budget` goldens gained the new cases; no stored format golden changed
-  (the new field is absent from every sample), so the schema version is the same.
-- Resolution: the receiver and call depth (`RECEIVER_DEPTH`) is one count for the whole lookup
-  (#432, from #417), carried through a glob, an alias or an on-demand import as the link count is,
-  so a chain that alternates receivers and imports costs its length, not `RECEIVER_DEPTH` per link
-  up to `LINK_DEPTH`. No limit changed and no answer under the limits; no golden changed.
-- Helm: the default `workspace.fetch` (#444, from #316) reads the repositories from `$1` when
-  given (the pulled list under `modules.oidc.github`) else from `workspace.repositories`, now
-  mounted as `repositories.toml` so a store-sourced refresh, whose bootstrap lists none, still
-  fetches the operator's list, refuses a URL carrying a credential and, as the compose
-  scripts do (#445), an existing mirror whose `origin` carries one, keeps each mirror strictly
-  under `/data/mirrors`, and on failure prints `refresh: fetch failed for <identity>; the refresh
-  stops before publication` and exits nonzero without echoing a URL or token.
-  `scripts/helm-check` runs the rendered script under `sh` with a stub `git` to check these; the
-  chart READMEs describe it.
-- Workspace import (#450): `meada workspace import` reads its file once, bounded by the version
-  size limit, and audits the id of the text it stored; a file past the bound or not a regular
-  file is refused before any audit record is written.
-- Manifest type errors (#449): a `meada.toml` or workspace manifest key of the wrong type, or
-  with an invalid value, reports the key and the expected kind (`` `oidc.entra`: has the wrong
-  type (a table was expected) ``) instead of serde's message, which echoed the written value, so a
-  secret pasted under the wrong key no longer reaches stderr.
-- Pulled generations (#506): a mirror's `meada.toml` or `meada.decisions.toml` that is a symbolic
-  link is refused unopened, the error naming the file, so a repository can no longer make a node
-  read and parse a file of the host. A link into the mirror (`meada.toml -> conf/meada.toml`) is
-  refused too, as the index refuses a linked pack config. The file opened is checked to be the one
-  checked. Secrets and CAs a manifest names still follow links (Kubernetes mounts them through
-  one). The snapshots page says so in its three languages.
-- Named workspaces on a node (#510): a node shows a named workspace's route
-  (`/-/workspaces/<id>/<identity>`, pinned or not) and lists it in a 404 only to a token whose
-  grant reads every entry of the workspace's version, the entries the sponsor rule excluded
-  included, as the console does. Before, once A of a Y+A workspace lost its sponsor, a subject
-  reading Y alone found the workspace on a node. A generation's context now records `excluded`,
-  the identities the sponsor rule left out, sorted, and its digest covers them; a context without
-  one is written as before, with the same generation id, and a generation published earlier reads
-  as none excluded. A node on an older binary refuses a generation that records an exclusion, so
-  upgrade nodes before or with the publisher. No golden changed.
 - Console GitHub grant (#496): a session's GitHub grant and its state (`unread`, `current`,
   `expired`) are read from the same permissions set at the same instant, so a session never shows
   `expired` with a grant read while the set was fresh.

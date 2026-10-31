@@ -74,11 +74,12 @@ def assert_fetch(items):
                        '[ -z "$FAIL" ]\n')
         git.chmod(0o755)
 
-        def run(entries=None, fail="", origin=""):
+        def run(entries=None, fail="", origin="", text=None):
             args = ["sh", str(fetch)]
-            if entries is not None:
+            if entries is not None or text is not None:
                 listed = tmp / "pulled.toml"
-                listed.write_text("".join(f'[[repository]]\nrepo = "{repo}"\npath = "{mirrors}/{path}"\n\n'
+                listed.write_text(text if text is not None else
+                                  "".join(f'[[repository]]\nrepo = "{repo}"\npath = "{mirrors}/{path}"\n\n'
                                           for repo, path in entries))
                 args.append(str(listed))
             log.write_text("")
@@ -88,6 +89,11 @@ def assert_fetch(items):
 
         # $1 when given, else the operator's workspace.repositories.
         code, _, calls = run([("github.com/acme/web", "web")])
+        assert code == 0 and calls == f"clone --depth 1 -- https://github.com/acme/web.git {mirrors}/web\n", calls
+        # A peer table after an entry and a comment after a value change nothing (#544).
+        code, _, calls = run(text=f'[[repository]]\nrepo = "github.com/acme/web"\npath = "{mirrors}/web" # note\n\n'
+                                  '[[repository.peer]]\nrepo = "github.com/other/x"\n\n'
+                                  f'[[repository.resource]]\npath = "{mirrors}/other"\n')
         assert code == 0 and calls == f"clone --depth 1 -- https://github.com/acme/web.git {mirrors}/web\n", calls
         listed = tomllib.loads(operator_list)["repository"]
         code, _, calls = run()

@@ -116,7 +116,7 @@ test('an older apply is a rollback for the next refresh, confirms once and keeps
 
 test('saving existing entries shows the first author and message, while a 422 keeps the server lines and keys', async () => {
   const read = reads(); let reject = false;
-  const serverError = 'entries:9: `repository.peer.repo` is missing\nentries:12: `repository.serve.prefix`: `edge` must start with `/`';
+  const serverError = 'entries:9: `repository.peer.repo` is missing\nentries:12: `repository.serve.prefix`: must start with `/`';
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
     if (init?.method === 'POST') return reject ? Response.json({ error: { code: 'invalid_entries', message: serverError } }, { status: 422 }) : Response.json({ result: current.id });
     if (url === '/api/v1/manifest') return Response.json({ file: 'ops.toml', manifest: {}, modules: [], errors: [] });

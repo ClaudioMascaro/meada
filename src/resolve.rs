@@ -9790,8 +9790,9 @@ mod tests {
     /// the next file's, whose own is named through the one after, so the chain alternates
     /// receivers and imports (`m{i}` imports `m{i + 1}` whole, and `v{n - 1}` is a `K`, whose
     /// member `C` is a class that derives from it). Past `RECEIVER_DEPTH` receivers the class is
-    /// unknown, however many imports it crosses, and the whole costs its length: the count is
-    /// one across an import, as the link count is.
+    /// unknown, however many imports it crosses, and the whole costs its length. No receiver is
+    /// resolved inside a glob's own lookup here: that the count holds across such a lookup is
+    /// `a_swift_chain_of_receivers_through_typealiases_counts_them_across_each_alias`.
     #[test]
     fn a_python_chain_of_receivers_across_globs_is_bounded_by_the_receiver_depth() {
         let n = RECEIVER_DEPTH + 8;
@@ -9823,6 +9824,42 @@ mod tests {
         // limit, whichever imports it crosses, and cut past it.
         for (i, known) in exact.iter().enumerate() {
             assert_eq!(*known, i + RECEIVER_DEPTH + 1 >= n, "call {i} of {n}");
+        }
+    }
+
+    /// `typealias A{i} = H{i}.r.B` and `enum H{i} { static let q = A{i + 1}(); static let r =
+    /// q.B() }`, Swift's: the class of `r` is named through `q`, whose own is named through the
+    /// next alias, so each step holds two receivers and the next is resolved inside the alias's
+    /// own lookup (a fresh `Work`, `Resolver::alias`), with both still in flight (`H{n - 1}.q`
+    /// is a `K`, whose class `B` derives from it). The count of receivers is one across those
+    /// lookups (`Resolver::chain`): past `RECEIVER_DEPTH` the class is unknown, however many
+    /// aliases it crosses, and the whole costs its length. Fewer aliases than `LINK_DEPTH`, so no
+    /// link is cut.
+    #[test]
+    fn a_swift_chain_of_receivers_through_typealiases_counts_them_across_each_alias() {
+        let n = RECEIVER_DEPTH / 2 + 8;
+        assert!(n < LINK_DEPTH);
+        let mut src = String::from("class K { class B: K { func m() {} } }\n");
+        for i in 0..n {
+            let q = match i + 1 == n {
+                true => "K()".to_string(),
+                false => format!("A{}()", i + 1),
+            };
+            src.push_str(&format!(
+                "typealias A{i} = H{i}.r.B\n\
+                 enum H{i} {{ static let q = {q}; static let r = q.B() }}\n\
+                 func f{i}() {{ H{i}.r.m() }}\n"
+            ));
+        }
+        let start = std::time::Instant::now();
+        let calls = pack_calls(&crate::lang::swift::Swift, "A.swift", &src);
+        let took = start.elapsed();
+        assert!(took.as_secs() < 10, "{took:?}");
+        // The call in `f{i}` reads `2 * (n - i)` receivers down the chain: it is known up to
+        // the limit, however many aliases it crosses, and cut past it.
+        for i in 0..n {
+            let known = calls[&format!("f{i}() H{i}.r.m")] == "exact K.B.m()";
+            assert_eq!(known, 2 * (n - i) <= RECEIVER_DEPTH, "call {i} of {n}");
         }
     }
 
@@ -11098,8 +11135,10 @@ mod kotlin_tests {
     /// `val v{i} = v{i + 1}.C()` through star imports, Kotlin's: the class of each local is
     /// named through the next file's, so the chain alternates receivers and imports (`v{n - 1}`
     /// is a `K`, whose inner class `C` derives from it). Past `RECEIVER_DEPTH` receivers the
-    /// class is unknown, however many imports it crosses, and the whole costs its length: the
-    /// count is one across an import, as the link count is.
+    /// class is unknown, however many imports it crosses, and the whole costs its length. No
+    /// receiver is resolved inside a star import's own lookup here: that the count holds across
+    /// such a lookup is
+    /// `tests::a_swift_chain_of_receivers_through_typealiases_counts_them_across_each_alias`.
     #[test]
     fn a_chain_of_receivers_across_star_imports_is_bounded_by_the_receiver_depth() {
         let n = RECEIVER_DEPTH + 8;

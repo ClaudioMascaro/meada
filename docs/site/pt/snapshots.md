@@ -79,10 +79,11 @@ repositório, uma entrada gravada através de um link simbólico e dispositivos 
 de bytes e de entradas por geração. O `.git/config` extraído é trocado por um mínimo que o Meada
 escreve (só `[core]` e o `origin` da identidade), `.git/hooks` é apagado, e o `git` do Meada
 roda nesses espelhos sem a configuração do sistema nem a global. Um pull que falha em qualquer
-passo deixa o ponteiro e as gerações guardadas como estavam. Ao servir, o `meada.toml` e o
-`meada.decisions.toml` de um espelho são lidos só como arquivos regulares de até 1 MiB: um link
-simbólico é recusado sem ser aberto, mesmo apontando para dentro do espelho, e a geração não é
-servível, com o erro nomeando o arquivo.
+passo deixa o ponteiro e as gerações guardadas como estavam. Ao servir, e quando um manifesto
+do modo servidor lista um espelho, o `meada.toml` e o `meada.decisions.toml` dele são lidos só
+como arquivos regulares de até 1 MiB: um link simbólico é recusado sem ser aberto, mesmo
+apontando para dentro do espelho, e a geração ou a entrada não é servível, com o erro nomeando o
+arquivo. Um checkout local, que é do desenvolvedor, continua seguindo links.
 
 </details>
 

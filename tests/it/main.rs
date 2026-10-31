@@ -16,6 +16,7 @@ mod decide;
 mod decider;
 mod decisions;
 mod decorations;
+mod deploy_fetch;
 mod docs;
 mod documents;
 mod drift;

@@ -87,8 +87,8 @@ fn invalid_decisions_errors_name_file_line_and_key() {
         (
             "decisions_kind",
             format!("{}{tail}", head.replace("dynamic-url", "merge")),
-            "<repo>/meada.decisions.toml:2: `decision.kind`: unknown variant `merge`, expected \
-             `ambiguous-link` or `dynamic-url`",
+            "<repo>/meada.decisions.toml:2: `decision.kind`: is not one of the values it accepts \
+             (`ambiguous-link`, `dynamic-url`)",
         ),
         (
             "decisions_missing",
