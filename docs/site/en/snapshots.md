@@ -79,7 +79,10 @@ leaves its repository, an entry written through a symbolic link, and devices or 
 and entry ceilings per generation. The extracted `.git/config` is replaced by a minimal one Meada
 writes (only `[core]` and the identity's `origin`), `.git/hooks` is removed, and Meada's `git`
 runs in those mirrors without the system or global configuration. A pull that fails at any step
-leaves the pointer and the held generations as they were.
+leaves the pointer and the held generations as they were. When serving, a mirror's `meada.toml`
+and `meada.decisions.toml` are read only as regular files of at most 1 MiB: a symbolic link is
+refused unopened, even one into the mirror, and the generation is not servable, the error naming
+the file.
 
 </details>
 

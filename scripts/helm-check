@@ -3,6 +3,7 @@
 
 import pathlib
 import subprocess
+import tempfile
 import tomllib
 
 import yaml
@@ -53,6 +54,65 @@ assert resource(minimal, "Deployment")["spec"]["replicas"] == 1
 assert not any(item["kind"] in ("CronJob", "Ingress") for item in minimal)
 assert [r["path"] for r in tomllib.loads(manifest(minimal))["repository"]] == ["/data/mirrors/meada"]
 
+
+def assert_fetch(items):
+    """Run the rendered fetch script under sh with a stub git, its paths moved to a temp dir."""
+    script = resource(items, "ConfigMap")["data"]["fetch.sh"]
+    assert "set -eu" in script
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = pathlib.Path(tmp)
+        mirrors, listed_file, log = tmp / "mirrors", tmp / "repositories.toml", tmp / "git.log"
+        operator_list = resource(items, "ConfigMap")["data"]["repositories.toml"]
+        listed_file.write_text(operator_list.replace("/data/mirrors", str(mirrors)))
+        fetch = tmp / "fetch.sh"
+        fetch.write_text(script.replace("/data/mirrors", str(mirrors))
+                         .replace("/etc/meada/repositories.toml", str(listed_file)))
+        (tmp / "bin").mkdir()
+        git = tmp / "bin/git"
+        git.write_text('#!/bin/sh\necho "$*" >> "$LOG"\n'
+                       'case "$*" in *"remote get-url origin") echo "$ORIGIN"; exit 0 ;; esac\n'
+                       '[ -z "$FAIL" ]\n')
+        git.chmod(0o755)
+
+        def run(entries=None, fail="", origin=""):
+            args = ["sh", str(fetch)]
+            if entries is not None:
+                listed = tmp / "pulled.toml"
+                listed.write_text("".join(f'[[repository]]\nrepo = "{repo}"\npath = "{mirrors}/{path}"\n\n'
+                                          for repo, path in entries))
+                args.append(str(listed))
+            log.write_text("")
+            env = {"PATH": f"{tmp / 'bin'}:/usr/bin:/bin", "LOG": str(log), "FAIL": fail, "ORIGIN": origin}
+            done = subprocess.run(args, env=env, capture_output=True, text=True)
+            return done.returncode, done.stderr, log.read_text()
+
+        # $1 when given, else the operator's workspace.repositories.
+        code, _, calls = run([("github.com/acme/web", "web")])
+        assert code == 0 and calls == f"clone --depth 1 -- https://github.com/acme/web.git {mirrors}/web\n", calls
+        listed = tomllib.loads(operator_list)["repository"]
+        code, _, calls = run()
+        assert code == 0 and calls == "".join(f"clone --depth 1 -- https://{r['repo']}.git "
+                                              f"{r['path'].replace('/data/mirrors', str(mirrors))}\n"
+                                              for r in listed), calls
+        # A failed fetch names the identity and stops the refresh.
+        code, err, _ = run([("github.com/acme/web", "web")], fail="1")
+        assert code == 1 and err == "refresh: fetch failed for github.com/acme/web; the refresh stops before publication\n", err
+        # A credential in the identity or in an existing mirror's origin is refused, never printed.
+        code, err, calls = run([("tok@github.com/acme/web", "web")])
+        assert code == 1 and calls == "" and err == "REPOSITORIES takes URLs without credentials; give git a credential helper\n", err
+        (mirrors / "web/.git").mkdir(parents=True)
+        code, err, calls = run([("github.com/acme/web", "web")], origin="https://x:tok@github.com/acme/web.git")
+        assert code == 1 and "fetch" not in calls and "tok" not in err, (err, calls)
+        assert err == "refresh: the origin of github.com/acme/web takes a URL without credentials; give git a credential helper\n", err
+        code, _, calls = run([("github.com/acme/web", "web")], origin="https://github.com/acme/web.git")
+        assert code == 0 and "fetch --depth 1 origin HEAD" in calls, calls
+        # A path that leaves the mirrors, or is the mirrors directory itself, is refused.
+        for path in ["../web", ".", "web/..", "", "a//b"]:
+            code, err, calls = run([("github.com/acme/web", path)])
+            assert code == 1 and calls == "" and "must stay under" in err, (path, err)
+
+
+assert_fetch(default)
 generations = render("-f", str(CHART / "values-generations.yaml"))
 spec = pod(generations)
 assert spec["initContainers"][0]["args"][:2] == ["snapshot", "pull"]
@@ -140,6 +200,9 @@ assert refresh[:2] == ["snapshot", "lock"]
 steps = refresh[-1].split(" && ")
 assert [step.split()[:3] for step in steps] == [["meada", "workspace", "pull"], ["/bin/sh", "/etc/meada/fetch.sh"],
     ["meada", "index", "--workspace"], ["meada", "snapshot", "publish"]]
+# A store-sourced bootstrap lists no repository: without $1 the fetch reads the operator's list.
+assert "[[repository]]" not in manifest(console_profile)
+assert_fetch(console_profile)
 claim = render("-f", str(CHART / "values-console.yaml"), "--set-json", "console.operatorGroups=[]",
                "--set", "console.operatorClaim=meada_operator", "--set", "console.operations=true", "--set", "tls.caConfigMap=private-ca")
 claim_config = tomllib.loads(resource(claim, "ConfigMap", console=True)["data"]["meada.workspace.toml"])
@@ -183,6 +246,7 @@ assert [step.split()[:3] for step in steps] == [["meada", "workspace", "pull"], 
     ["meada", "workspace", "show"], ["/bin/sh", "/etc/meada/fetch.sh", "/data/pulled.toml"],
     ["meada", "index", "--workspace"], ["meada", "snapshot", "publish"]]
 assert "--pulled" in steps[2]
+assert_fetch(identity)
 identity_nodes = manifest(identity)
 node_config = tomllib.loads(identity_nodes)
 assert node_config["postgres"]["url_env"] == "MEADA_POSTGRES_URL" and node_config["oidc"]["github"]["login_claim"] == "github_login"

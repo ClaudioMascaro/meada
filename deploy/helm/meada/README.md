@@ -26,7 +26,14 @@ Os valores padrão criam dois nós sem módulos cloud. Cada pod faz o fetch de s
 mirrors e a indexação em um init container, usando seu próprio `emptyDir`; só então o servidor
 inicia. Ajuste `workspace.repositories` (TOML) e `workspace.fetch` (script executado fora da
 Meada). `workspace.gitCredentialsSecret` permite passar variáveis de um Secret ao fetch.
-Nada executa fetch ou acessa a rede dentro de `meada index`.
+Nada executa fetch ou acessa a rede dentro de `meada index`. O `workspace.fetch` padrão lê os
+repositórios de `$1` quando recebido (o arquivo de `meada workspace show --pulled`, que o refresh
+passa com `modules.oidc.github`), senão de `workspace.repositories` (montado como
+`repositories.toml`, também com `workspace.source: store`, cujo bootstrap não lista nenhum);
+recusa um repositório com credencial na URL, e um mirror cujo `origin` traz uma (rode `git remote
+set-url origin <URL sem credenciais>` nele); e, se um fetch falha, imprime `refresh: fetch failed
+for <identidade>; the refresh stops before publication` (sem URL nem token) e sai com erro, antes
+de `index` e `publish`.
 
 ## Gerações
 
@@ -102,8 +109,9 @@ publish. Cada job/pod tem seus próprios diretórios. Uma CA montada acrescenta 
 snapshot; Valkey usa somente as raízes desse arquivo.
 
 Inicialize o workspace uma vez antes do primeiro publish. Salve as entradas abaixo em
-`repositories.toml` (ajuste junto com `workspace.fetch`). O exemplo usa release `meada` e
-namespace atual. O pod temporário reaproveita volumes e Secrets do CronJob, mas substitui
+`repositories.toml` (ajuste junto com `workspace.repositories`, a lista que o `workspace.fetch`
+padrão busca). O exemplo usa release `meada` e namespace atual. O pod temporário reaproveita
+volumes e Secrets do CronJob, mas substitui
 seu comando por sleep para o operador executar import/apply. Nenhum deploy reaplica o seed:
 
 ```toml

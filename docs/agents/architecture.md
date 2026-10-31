@@ -31,9 +31,10 @@ builds the workspace from a generation the node holds instead
 (`snapshot::serve::held` reads the pointer file and the generation document, and
 `Manifest::of_generation` turns it into the same `Manifest`: per entry the mirror at
 `<generation id>/<bundle id>/mirror`, the index beside it, the mirror's own `meada.toml` whole or
-else the blocks the document recorded, each read up to `config::GENERATION_CONFIG_MAX`; no
-`git` runs, the pull checked each mirror) and opens it read-only as `open_manifest` does, one
-engine per call. The server keeps the last generation read (`serve::Current`, one `Arc<Held>`:
+else the blocks the document recorded, each read up to `config::GENERATION_CONFIG_MAX` and
+through no symbolic link; no `git` runs, the pull checked each mirror) and opens it read-only
+as `open_manifest` does, one engine per call. The server keeps the last generation read
+(`serve::Current`, one `Arc<Held>`:
 a generation's directory never changes once renamed into place), so a request reads only the
 pointer file until it names another id, and the request's route hands the `Held` it routed by
 to the call (`Source::Generation`): a swap between two calls changes the generation and one
@@ -123,7 +124,7 @@ other Kotlin grammar may enter the dependency tree: they all export `tree_sitter
 - `meada-core/src/manifest.rs`: a workspace manifest's `[[repository]]` (`EntryFile`,
   `EntryPeer`) and the `[serve]` and `[[resource]]` shapes `meada.toml` shares (`Serve`,
   `Resource`, `Role`, `declared`, `gateway_path`); `parse` and `error_at`, the errors naming
-  the file, the line and the dotted key (`line_of`); `identity_problem` and `entry_problems`
+  the file, the line and the dotted key, never the value written there (`line_of`); `identity_problem` and `entry_problems`
   (an identity listed twice); `validate`, a workspace text's entries or its problems as the CLI
   prints them (a text holding only `[[repository]]` entries). `EntryFile::owner` is an entry's
   optional `owner` (ADR 0015), checked where the entry is read (`owner_problem`: one string, not
@@ -422,8 +423,12 @@ its proxy preserves Host, Origin and Authorization. MCP keeps its separate admis
 
 Managed writers pull the workspace before the external fetch, index and publish, inside one
 refresh lock. A failed stage ends the job before publish, so the pointer stays (#316, ADR
-0012): the compose `fetch.sh` refuses URLs carrying credentials and names the identity whose
-fetch failed, and `meada index --workspace` ends a failure with the stage and the count.
+0012): the compose `fetch.sh` and `fetch-pulled.sh` and the chart's default `workspace.fetch`
+refuse URLs carrying credentials, and an existing mirror whose `origin` carries them (#445),
+and name the identity whose fetch failed (#444), and `meada index --workspace` ends a failure
+with the stage and the count. Without `$1` (the pulled list under `[oidc.github]`) the chart's
+fetch reads `workspace.repositories`, mounted as `repositories.toml`, since a store-sourced
+bootstrap has no `[[repository]]`.
 Seeding and applying the first version are explicit operator actions. The fetch list/script and
 mirror provisioning still belong to the operator: applying a new identity or path does not
 clone it. `scripts/compose-check` and `scripts/helm-check` check the rendered
@@ -1180,8 +1185,10 @@ one for the area a change touches.
   and a generation document's entry blocks holding an `owner` or an `added_by` are refused (`snapshot/pull.rs`). The current version is
   `{<key_prefix>}:workspace`, a hash `{id, fence}` under the pointer's hash tag (`pointer_key`,
   read by `current`, moved by `meada workspace apply`, #302). `import` (`meada workspace import
-  <file> --message <text> [--author <name>] --workspace <bootstrap manifest>`) reads the file's
-  `[[repository]]` entries through `meada_core::manifest::validate_import`, names each other
+  <file> --message <text> [--author <name>] --workspace <bootstrap manifest>`) reads the file
+  once (`read_import`, bounded by `VERSION_MAX`; the CLI audits the id of that same text, and a
+  file it cannot read writes no audit record, #450), takes its `[[repository]]` entries through
+  `meada_core::manifest::validate_import`, names each other
   top-level key on stderr as not imported (`Msg::WorkspaceNotImported`), and validates before
   `Store::connect`; entries whose document is stored upload nothing and answer it with its first
   author and message (`Msg::WorkspaceStored`). Shared `store_version` checks the serialized
@@ -2270,9 +2277,10 @@ one for the area a change touches.
   `implements I, J` with `J extends I`), and a `base_receiver` call reads the overloads of the
   family past the class (`Resolver::base_member`). A call made on a call's result names it
   (`Call::on`), as a local may (`Class::Result`): the receiver is the class the declared result
-  of that call's exact target names (`Resolver::result_of`, bounded by `RECEIVER_DEPTH`). A name
-  match of a call narrowed by `Call::arity` (`Resolver::matched`) reads the family that owns it:
-  a typed receiver, `this` or a bare call match within that family alone, a bare call past an
+  of that call's exact target names (`Resolver::result_of`, bounded by `RECEIVER_DEPTH`, across
+  imports too, see Known ceilings). A name match of a call narrowed by `Call::arity`
+  (`Resolver::matched`) reads the family that owns it: a typed receiver, `this` or a bare call
+  match within that family alone, a bare call past an
   opaque base, or past a class around it with one for the name (`Resolver::outer_opaque`), falls
   back to what its scope binds, and any other receiver takes, from several,
   the one declared in the family of the class around the call other than the caller; a match
@@ -2604,7 +2612,9 @@ one for the area a change touches.
   (`Facts::project`, names as `Facts::imports` holds them), the qualified names of the types a C#
   file declares in `partial` parts (`Facts::partial`), the qualified names of the classes a
   Kotlin file declares `expect` or `actual` (`Facts::expect`, `Facts::actual`), the size of the budget a file exhausted
-  (`Facts::budget`, which `meada status` names), the literal URL path fragments and the
+  (`Facts::budget`, which `meada status` names), the count of usings the project of a file
+  passed (`Facts::usings`, set by a join and stamped into the stored facts after it, which
+  `meada status` names), the literal URL path fragments and the
   method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
   consumer reads from the parsed response, and those of the zod schema or object literals a
@@ -2851,7 +2861,8 @@ one for the area a change touches.
   `QUALIFICATION_BYTES` (4 MiB) bounds enclosing-name bytes across syntax visits, before each
   visit's bounded metadata fanout. Pending visits share their scope strings. A file that
   exceeds this budget contributes no facts or package layout, so an incomplete overload
-  family cannot produce an exact link; other files still index. The Java hostile-depth and
+  family cannot produce an exact link; other files still index, and `Facts::budget` (not
+  `unbuilt`) makes `meada status` name the file, as for C#. The Java hostile-depth and
   long-prefix engine fixtures exceed these limits.
 
 - `jvm/names.rs`: `LOCAL_DEPTH` (8) bounds how many locals a JVM client reader (Ktor,
@@ -2934,7 +2945,7 @@ qualification budget does (ADR 0017).
   around a definition and the segments of a callee (past them a body keeps its enclosing
   symbol and a callee is `(navigation_expression)`); `QUALIFICATION_BYTES` (4 MiB) bounds the
   enclosing-name bytes a file's definitions, calls and bindings store, past which the file
-  keeps no facts; `ALIAS_DEPTH` (16) bounds the aliases of aliases of a function type `join`
+  keeps no facts and `Facts::budget`, which `meada status` names; `ALIAS_DEPTH` (16) bounds the aliases of aliases of a function type `join`
   follows (`function_aliases`), past which a parameter written as one takes no trailing closure.
   The pack's unit tests exceed each. Beyond the limits, what the pack leaves out
   (spec #29, #117): a target's `sources:` and `exclude:`, a closure,
@@ -2964,7 +2975,10 @@ qualification budget does (ADR 0017).
   pack sets for a file it leaves out on purpose) makes `meada status` name it (`index::export`
   reads it from the stored facts of the files with no symbols, as `Export::dropped`); `PROJECT_USINGS` (256) bounds the distinct usings `join` adds to every file of a
   project, past which the project's files keep no facts, since a partial set could make a
-  name exact that a missing using leaves ambiguous. The C# hostile-depth, long-prefix and
+  name exact that a missing using leaves ambiguous; `join` marks each such file with
+  `Facts::usings`, the index writer stamps the mark into its stored facts (and clears it
+  once the project is back within the count), and `meada status` names the file and the
+  count (`Msg::FileTooManyUsings`). The C# hostile-depth, long-prefix and
   pack unit tests exceed them. Beyond the limits, what the pack leaves out (spec #28, #107):
   a `using` inside a namespace block binds in the whole file, and a file joins its first
   namespace's group (`Facts::package`): a type it declares in another namespace binds there
@@ -3161,8 +3175,11 @@ qualification budget does (ADR 0017).
   a `replace` to an absolute directory leaves the module outside.
 - `workspace.rs`: a sibling with an invalid `meada.toml` or `meada.decisions.toml` is skipped
   silently. In a pulled generation, a mirror's `meada.toml` and `meada.decisions.toml` are read
-  only as regular files of at most `GENERATION_CONFIG_MAX` (1 MiB, `config.rs`); past it the
-  generation is not servable, the error naming the file.
+  only as regular files of at most `GENERATION_CONFIG_MAX` (1 MiB, `config.rs`), through no
+  symbolic link (`config::read_unlinked`, refused unopened, then the opened file checked against
+  the one checked); past it, or through a link, the generation is not servable, the error naming
+  the file. An operator's file (a secret, a CA, `config::read_bounded`) follows links, as
+  Kubernetes mounts secrets through one.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the
   first by site; the target names no site.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is
@@ -3214,10 +3231,15 @@ qualification budget does (ADR 0017).
   more receivers than that, each through the next (`x: y.C`, `x = y.C()`, or a Rust `let` that
   takes the class of a call's result on the next, `let x = y.f()`, `Class::Returned`), holds an
   unknown class.
-  The receivers count from where the walk started. When `FAMILY_DEPTH` or `RECEIVER_DEPTH` cuts
-  a walk, or `LINK_DEPTH` cuts one begun past an import, the families being linearized give up
-  and none is kept: each is linearized again when asked for, and does not depend on the walk
-  that first reached it.
+  The receivers and the calls whose result is being read count from where the walk started, and
+  across a walk begun past a glob, an alias or an on-demand import: the count is one for the
+  whole lookup (`Resolver::chain`, as `Resolver::links` is for the links), so a chain that
+  alternates receivers and imports costs its length, not `RECEIVER_DEPTH` per link up to
+  `LINK_DEPTH`. A receiver or call met again is found in its own `Work` alone, and so are the
+  families linearized so far: an import's lookup begins with none. When `FAMILY_DEPTH` or
+  `RECEIVER_DEPTH` cuts a walk, or `LINK_DEPTH` cuts one begun past an import, the families
+  being linearized give up and none is kept: each is linearized again when asked for, and does
+  not depend on the walk that first reached it.
 - `lang/go/values.rs`: `VALUE_DEPTH` (64): a value (an argument, a returned or held expression)
   nested deeper (`f(g(h(..)))`) is unknown. A name is a constant only when it is bound once in
   the function (`:=` or `var`, one name, never assigned, in a statement of the function body, not
@@ -4187,7 +4209,11 @@ qualification budget does (ADR 0017).
   served at the root; so is one whose `nest` prefix cannot be read, or that is mounted on a
   router Meada cannot read. A router handed to a call that is neither a mount nor a wrapper
   of one in its arguments (a router put in a struct, a closure capture) is not told from one
-  nothing mounts.
+  nothing mounts. The axum reading of those unread values (`axum_unread`) walks each value
+  once per file (its `Unread` state keeps the values walked across the file's starts), and asks
+  `Code::origins` only of a call whose builder chain (`Code::chain`) goes through methods a
+  router hands back, and of a name not written (`Code::written`) as text, a path, a number, a
+  boolean or a character (`is_plain`, by the last path segment) (#431).
 - `http/kotlin.rs` (spec #27, #98): a scope holding a `route` call whose lambda is not read (one
   nested past the Kotlin pack's `DEFINITION_DEPTH`, or a block passed as a function reference,
   `route(path, Route::orders)`) registers nothing: its routes and routing extension calls, the

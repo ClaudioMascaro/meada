@@ -197,3 +197,42 @@ fn a_named_peer_takes_an_environment_name_of_at_most_128_bytes() {
     assert_eq!(problems.len(), 1, "{problems:?}");
     assert!(problems[0].contains(&past), "{problems:?}");
 }
+
+#[test]
+fn a_value_of_the_wrong_type_is_named_by_key_and_kind_never_echoed() {
+    let secret = "s3cr3t-token";
+    // A string where a table is expected.
+    let table = format!("[[repository]]\nrepo = \"example.com/acme/api\"\nserve = \"{secret}\"\n");
+    // An integer where a string is expected.
+    let string = "[[repository]]\nrepo = 12345678\n".to_string();
+    let a = problems(&table).join("\n");
+    assert!(
+        a.contains("`repository.serve`: has the wrong type (a table was expected)"),
+        "{a}"
+    );
+    assert!(!a.contains(secret), "{a}");
+    let b = problems(&string).join("\n");
+    assert!(
+        b.contains("`repository.repo`: has the wrong type (a string was expected)"),
+        "{b}"
+    );
+    assert!(!b.contains("12345678"), "{b}");
+}
+
+#[test]
+fn every_kind_and_an_invalid_value_are_worded_without_the_value() {
+    let kinds = [
+        (
+            "[[repository]]\nrepo = \"a.b/c/d\"\npeer = 9\n",
+            "(an array was expected)",
+        ),
+        (
+            "[[repository]]\nrepo = \"a.b/c/d\"\npath = true\n",
+            "(a string was expected)",
+        ),
+    ];
+    for (src, want) in kinds {
+        let got = problems(src).join("\n");
+        assert!(got.contains(want), "{got}");
+    }
+}

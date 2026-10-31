@@ -459,11 +459,19 @@ pub struct Facts {
     /// constraints exclude it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub unbuilt: bool,
-    /// The size in bytes of the budget the file exhausted, a hostile-input drop (C#'s
-    /// `QUALIFICATION_BYTES`): the file has no facts and `meada status` names it. Unlike
-    /// `unbuilt`, a file the pack leaves out on purpose never sets it.
+    /// The size in bytes of the budget the file exhausted, a hostile-input drop (the Java,
+    /// Kotlin, Swift and C# `QUALIFICATION_BYTES`): the file has no facts and `meada status`
+    /// names it. Unlike `unbuilt`, a file the pack leaves out on purpose never sets it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub budget: Option<usize>,
+    /// The count of usings a project may give its files, set on a file its project passed
+    /// (C#'s `PROJECT_USINGS`): the file has no facts and `meada status` names it. Set by
+    /// `LanguagePack::join`, not by a parse, and written to the stored facts after the joins
+    /// (cleared once the project is back within the count), since the count is the project's
+    /// and the file's own parse cannot see it. Like `budget`, never set for a file left out on
+    /// purpose.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usings: Option<usize>,
     /// The package the file declares (Go's `package` clause), which `layout` groups files by
     /// (`Layout::shared`).
     #[serde(default, skip_serializing_if = "String::is_empty")]

@@ -26,8 +26,10 @@ indexers against the same volume simultaneously.
 `REPOSITORIES` lists space-separated HTTP(S) Git URLs. When changing repositories, also edit
 the `[[repository]]` blocks in the manifests: identity without `.git` and path under
 `/srv/mirrors`. Fetching belongs to the job; `meada index` still performs no network requests.
-URLs carry no credentials (give git a credential helper). A failed fetch names the identity and
-ends the refresh before `index` and `publish`, keeping the current generation (#316).
+URLs carry no credentials (give git a credential helper). A mirror cloned earlier from a URL
+with a token keeps it in `origin` and is refused the same way (#445): run
+`git remote set-url origin <URL without credentials>` in it. A failed fetch names the identity
+and ends the refresh before `index` and `publish`, keeping the current generation (#316).
 Data lives in Docker volumes; `docker compose down` preserves it, and `down -v` deletes it.
 
 ## TLS, admission and tools

@@ -22,6 +22,14 @@ while read -r identity path; do
   fi
   remote=https://$identity.git
   if [ -d "$path/.git" ]; then
+    origin=$(git -c "safe.directory=$path" -C "$path" remote get-url origin 2>/dev/null || true)
+    case "$origin" in
+      https://*|http://*)
+        host=${origin#*://}
+        case "${host%%/*}" in
+          *@*) echo "refresh: the origin of $identity takes a URL without credentials; give git a credential helper" >&2; exit 1 ;;
+        esac ;;
+    esac
     git -c "safe.directory=$path" -C "$path" fetch --prune origin HEAD &&
       git -c "safe.directory=$path" -C "$path" reset --hard FETCH_HEAD
   else

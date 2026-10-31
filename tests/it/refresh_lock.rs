@@ -1497,9 +1497,24 @@ fn a_failed_fetch_or_index_publishes_nothing_and_keeps_the_current_generation() 
     assert!(stderr.contains("without credentials"), "{stderr}");
     assert!(!stderr.contains("s3cr3t"), "{stderr}");
 
+    // A mirror cloned earlier from a URL with a token is refused before any fetch (#445),
+    // without echoing it.
+    let web = dir.join("chain-web");
+    let origin = "https://x-access-token:s3cr3t@example.com/chain/web.git";
+    crate::common::git(&web, &["remote", "set-url", "origin", origin]);
+    let (stdout, stderr, code) = compose_refresh(dir, "https://example.com/chain/web");
+    let clean = "https://example.com/chain/web.git";
+    crate::common::git(&web, &["remote", "set-url", "origin", clean]);
+    assert_eq!((code, stdout.as_str()), (Some(1), ""), "{stderr}");
+    assert!(
+        stderr.contains("origin of example.com/chain/web takes a URL without credentials"),
+        "{stderr}"
+    );
+    assert!(!stderr.contains("s3cr3t"), "{stderr}");
+    assert_eq!(current(&fleet), (g1.clone(), "1".to_string()));
+
     // The fetch passes and the web's index cannot be written: the job stops at `meada index`.
     fs::write(dir.join("ops/fetch.sh"), ":\n").unwrap();
-    let web = dir.join("chain-web");
     commit_later(&web);
     let Some(locked) = ReadOnly::lock(&dir.join("indexes/example.com/chain/web")) else {
         return;
@@ -1534,6 +1549,59 @@ fn a_failed_fetch_or_index_publishes_nothing_and_keeps_the_current_generation() 
     let g2 = g2.trim().to_string();
     assert_ne!(g2, g1);
     assert_eq!(current(&fleet).0, g2);
+}
+
+/// `deploy/compose/fetch-pulled.sh`, with `/srv/mirrors` moved into a case directory, refuses a
+/// mirror whose `origin` carries a token before any fetch (#445): one line naming the identity,
+/// never the token. With the token gone the fetch runs, and fails without the network.
+#[test]
+fn a_pulled_fetch_refuses_a_mirror_whose_origin_carries_credentials() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("pulled_origin");
+    let _ = fs::remove_dir_all(&dir);
+    let mirrors = dir.join("mirrors").display().to_string();
+    let deploy = Path::new(env!("CARGO_MANIFEST_DIR")).join("deploy/compose");
+    let src = fs::read_to_string(deploy.join("fetch-pulled.sh")).unwrap();
+    let mirror = dir.join("mirrors/example.com/chain/web");
+    fs::create_dir_all(&mirror).unwrap();
+    fs::write(
+        dir.join("fetch-pulled.sh"),
+        src.replace("/srv/mirrors", &mirrors),
+    )
+    .unwrap();
+    let list = format!(
+        "[[repository]]\nrepo = \"example.com/chain/web\"\npath = \"{}\"\n",
+        mirror.display()
+    );
+    fs::write(dir.join("pulled.toml"), list).unwrap();
+    crate::common::git(&mirror, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    let fetch = |origin: &str| {
+        crate::common::git(&mirror, &["remote", "add", "origin", origin]);
+        let out = Command::new("sh")
+            .current_dir(&dir)
+            .args(["fetch-pulled.sh", "pulled.toml"])
+            .env("GIT_ALLOW_PROTOCOL", "file")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .output()
+            .expect("sh runs");
+        crate::common::git(&mirror, &["remote", "remove", "origin"]);
+        text(&out)
+    };
+
+    let (stdout, stderr, code) = fetch("https://x-access-token:s3cr3t@example.com/chain/web.git");
+    let refused = "refresh: the origin of example.com/chain/web takes a URL without credentials; \
+                   give git a credential helper\n";
+    assert_eq!(
+        (stdout.as_str(), stderr.as_str(), code),
+        ("", refused, Some(1))
+    );
+
+    let (_, stderr, code) = fetch("https://example.com/chain/web.git");
+    let failed = "refresh: fetch failed for example.com/chain/web; the refresh stops before index \
+                  and publish\n";
+    assert_eq!(code, Some(1), "{stderr}");
+    assert!(stderr.ends_with(failed), "{stderr}");
+    assert!(!stderr.contains("without credentials"), "{stderr}");
 }
 
 // The audit of the CLI twins (#328): one record each with `[postgres]`, none run without it.

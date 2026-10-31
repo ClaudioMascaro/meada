@@ -473,7 +473,7 @@ fn walk(
         let charge = if stores(node.kind()) { scope.len() } else { 0 };
         let Some(left) = budget.checked_sub(charge) else {
             return Facts {
-                unbuilt: true,
+                budget: Some(QUALIFICATION_BYTES),
                 ..Facts::default()
             };
         };
@@ -2013,9 +2013,11 @@ mod tests {
         let calls = "f()\n".repeat(QUALIFICATION_BYTES / name.len() + 1);
         let src = format!("struct {name} {{ func g() {{\n{calls}}} }}\n");
         let facts = facts(&src);
-        assert!(facts.unbuilt && facts.defs.is_empty());
+        assert!(facts.defs.is_empty() && facts.calls.is_empty());
+        assert_eq!(facts.budget, Some(QUALIFICATION_BYTES));
+        assert!(!facts.unbuilt);
         let src = format!("struct {name} {{ func g() {{\nf()\n}} }}\n");
-        assert!(!super::parse(src.as_bytes(), false).unwrap().unbuilt);
+        assert_eq!(super::parse(src.as_bytes(), false).unwrap().budget, None);
     }
 
     #[test]

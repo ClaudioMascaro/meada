@@ -130,6 +130,12 @@ pub async fn current(
     }
 }
 
+/// The text of the import `file`: one bounded read (`VERSION_MAX`) of a regular file as UTF-8.
+pub fn read_import(file: &Path) -> Result<String, String> {
+    let bytes = crate::config::read_bounded(file, VERSION_MAX)?;
+    String::from_utf8(bytes).map_err(|e| format!("{}: {e}", file.display()))
+}
+
 /// What `import` did: the version's id and, when its entries were stored already, the version
 /// as first stored (nothing was uploaded).
 pub struct Imported {
@@ -141,25 +147,27 @@ pub struct Imported {
 /// entries of `file` stored as a version by `author`. The file's other top-level keys go to
 /// `notes`, each named as not imported. Every check the text decides runs before any connection
 /// opens; an error lists each problem on its own line. The version is not applied.
+///
+/// `src` is the text `read_import` read, the one read of the file: the id a caller audits from
+/// it is the id stored here.
 pub fn import(
     manifest: &Path,
     file: &Path,
+    src: &str,
     message: &str,
     author: &str,
     notes: &mut Vec<String>,
 ) -> crate::Result<Imported> {
     let sections = sections(manifest)?;
     let shown = file.display().to_string();
-    let src = std::fs::read_to_string(file).map_err(|e| format!("{shown}: {e}"))?;
-    if let Ok(table) = toml::from_str::<toml::Table>(&src) {
+    if let Ok(table) = toml::from_str::<toml::Table>(src) {
         let others = table.keys().filter(|k| *k != "repository");
         let not_imported = Msg::WorkspaceNotImported.text();
         notes.extend(
-            others.map(|k| crate::config::error_at(file, &src, k, &not_imported).to_string()),
+            others.map(|k| crate::config::error_at(file, src, k, &not_imported).to_string()),
         );
     }
-    let version =
-        prepared(&shown, &src, message, author).map_err(|problems| problems.join("\n"))?;
+    let version = prepared(&shown, src, message, author).map_err(|problems| problems.join("\n"))?;
     let run = async {
         let store = Store::connect(&sections.snapshot)?;
         store_version(&store, &sections.snapshot, &version).await
@@ -1295,5 +1303,32 @@ mod tests {
             reasons(&refused)[0],
             ("g.com/hidden".into(), Reason::OutsideGrant)
         );
+    }
+}
+
+#[cfg(test)]
+mod import_read_tests {
+    use super::*;
+
+    /// The import file is read once, bounded: a file past `VERSION_MAX` is refused, and the text
+    /// read is the text whose id is audited.
+    #[test]
+    fn the_import_file_is_read_bounded_and_its_text_decides_the_id() {
+        let dir = std::env::temp_dir().join(format!("meada-import-read-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let big = dir.join("big.toml");
+        std::fs::write(&big, vec![b'#'; VERSION_MAX as usize + 1]).unwrap();
+        let refused = read_import(&big).unwrap_err();
+        assert!(refused.contains("larger than"), "{refused}");
+        let ok = dir.join("ok.toml");
+        std::fs::write(&ok, "# small\n").unwrap();
+        let text = read_import(&ok).unwrap();
+        assert_eq!(text, "# small\n");
+        assert_eq!(
+            version_id(&text, "m", "a").is_ok(),
+            prepared("entries", &text, "m", "a").is_ok()
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -105,8 +105,62 @@ still needs the post-publication evidence.
 - `SECURITY` (pt-BR, English and Spanish): the latest published 1.x version receives security
   fixes, which ship as a patch or minor release.
 
+### Changed
+
+- The axum provider reader walks each value once per file (#431): the values a file's rebound
+  `let`s reach share one `seen` set, and `Code::origins` is not asked for a call whose builder
+  chain goes through a method no router hands back, nor for a name written as text, a path, a
+  number, a boolean or a character. The reader's share of a one-file refresh on this repository
+  drops from about 1.4 s to about 0.1 s. No golden changed.
+
 ### Fixed
 
+- Compose mirror origins (#445): `fetch.sh` and `fetch-pulled.sh` read an existing mirror's
+  `origin` before fetching and refuse one whose HTTP(S) URL carries credentials (a mirror cloned
+  from a URL with a token keeps it there), naming the identity and never the URL, and the refresh
+  stops before index and publish as a failed fetch does. The READMEs tell the operator to run
+  `git remote set-url origin <URL without credentials>` in such a mirror.
+- Java and Kotlin: a file with thousands of fields and locals is read in linear time (#442, from
+  #424). The hides check indexes the fields by name instead of scanning every field per local,
+  the class around a write is found from the prefixes of its scope, and `declared_before` (and
+  Kotlin's `assigned`) read a node's parent from an index built once per file, since
+  `Node::parent()` is found from the root and made a deep file quadratic per write. Same answers;
+  no golden changed.
+- Indexing: a file a pack drops for passing a limit is named by `meada status` (#434, from
+  #419). The Java, Kotlin and Swift qualified-name budget (4 MiB) now sets `Facts::budget`, as the
+  C# one does, instead of `unbuilt`, which prints nothing; a C# project that gives its files more
+  than 256 usings (`PROJECT_USINGS`) marks each of them with the new `Facts::usings`, which a new
+  status line names (`Msg::FileTooManyUsings`, with the count). Kotlin's `misparsed` file stays
+  `unbuilt` (a grammar defect, not a limit). An index built before this change keeps a Java,
+  Kotlin or Swift file dropped by its budget as `unbuilt` until the file changes. No limit
+  changed. The `cli.status-budget` goldens gained the new cases; no stored format golden changed
+  (the new field is absent from every sample), so the schema version is the same.
+- Resolution: the receiver and call depth (`RECEIVER_DEPTH`) is one count for the whole lookup
+  (#432, from #417), carried through a glob, an alias or an on-demand import as the link count is,
+  so a chain that alternates receivers and imports costs its length, not `RECEIVER_DEPTH` per link
+  up to `LINK_DEPTH`. No limit changed and no answer under the limits; no golden changed.
+- Helm: the default `workspace.fetch` (#444, from #316) reads the repositories from `$1` when
+  given (the pulled list under `modules.oidc.github`) else from `workspace.repositories`, now
+  mounted as `repositories.toml` so a store-sourced refresh, whose bootstrap lists none, still
+  fetches the operator's list, refuses a URL carrying a credential and, as the compose
+  scripts do (#445), an existing mirror whose `origin` carries one, keeps each mirror strictly
+  under `/data/mirrors`, and on failure prints `refresh: fetch failed for <identity>; the refresh
+  stops before publication` and exits nonzero without echoing a URL or token.
+  `scripts/helm-check` runs the rendered script under `sh` with a stub `git` to check these; the
+  chart READMEs describe it.
+- Workspace import (#450): `meada workspace import` reads its file once, bounded by the version
+  size limit, and audits the id of the text it stored; a file past the bound or not a regular
+  file is refused before any audit record is written.
+- Manifest type errors (#449): a `meada.toml` or workspace manifest key of the wrong type, or
+  with an invalid value, reports the key and the expected kind (`` `oidc.entra`: has the wrong
+  type (a table was expected) ``) instead of serde's message, which echoed the written value, so a
+  secret pasted under the wrong key no longer reaches stderr.
+- Pulled generations (#506): a mirror's `meada.toml` or `meada.decisions.toml` that is a symbolic
+  link is refused unopened, the error naming the file, so a repository can no longer make a node
+  read and parse a file of the host. A link into the mirror (`meada.toml -> conf/meada.toml`) is
+  refused too, as the index refuses a linked pack config. The file opened is checked to be the one
+  checked. Secrets and CAs a manifest names still follow links (Kubernetes mounts them through
+  one). The snapshots page says so in its three languages.
 - Console GitHub grant (#496): a session's GitHub grant and its state (`unread`, `current`,
   `expired`) are read from the same permissions set at the same instant, so a session never shows
   `expired` with a grant read while the set was fresh.

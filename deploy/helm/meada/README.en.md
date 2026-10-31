@@ -26,6 +26,14 @@ two nodes without cloud modules. Each pod fetches its own mirrors and indexes in
 `emptyDir` in an init container before the server starts. Set `workspace.repositories` (TOML)
 and `workspace.fetch` (a script run outside Meada). `workspace.gitCredentialsSecret` supplies
 Secret environment variables to fetching. `meada index` never fetches or accesses the network.
+The default `workspace.fetch` reads the repositories from `$1` when given (the file `meada
+workspace show --pulled` writes, which the refresh passes under `modules.oidc.github`), else
+from `workspace.repositories` (mounted as `repositories.toml`, also with `workspace.source:
+store`, whose bootstrap lists none); it refuses a repository whose URL carries a credential,
+and a mirror whose `origin` carries one (run `git remote set-url origin <URL without
+credentials>` in it); and when a fetch fails it prints `refresh: fetch failed for <identity>;
+the refresh stops before publication` (no URL, no token) and exits nonzero, before `index` and
+`publish`.
 
 ## Generations
 
@@ -100,9 +108,10 @@ publish. Every job/pod has its own directories. A mounted CA adds roots to snaps
 trust; Valkey uses only the roots in that file.
 
 Seed the workspace once before first publish. Save the entries below in `repositories.toml`
-(adjust them together with `workspace.fetch`). The example uses release `meada` and the current
-namespace. The temporary pod reuses CronJob volumes and Secrets, replacing its command with
-sleep so the operator can import/apply. Deployment never reapplies the seed:
+(adjust them together with `workspace.repositories`, the list the default `workspace.fetch`
+fetches). The example uses release `meada` and the current namespace. The temporary pod reuses
+CronJob volumes and Secrets, replacing its command with sleep so the operator can import/apply.
+Deployment never reapplies the seed:
 
 ```toml
 [[repository]]

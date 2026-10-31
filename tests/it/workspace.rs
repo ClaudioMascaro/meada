@@ -228,7 +228,7 @@ fn invalid_config_errors_name_file_line_and_key() {
         (
             "config_type",
             "[serve]\nhosts = [\n  \"api.example.com\",\n  443,\n]\n",
-            "<repo>/meada.toml:4: `serve.hosts`: invalid type: integer `443`, expected a string",
+            "<repo>/meada.toml:4: `serve.hosts`: has the wrong type (a string was expected)",
         ),
         (
             "config_syntax",

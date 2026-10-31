@@ -8,6 +8,8 @@ metadata:
 data:
   fetch.sh: |
     {{- .Values.workspace.fetch | nindent 4 }}
+  repositories.toml: |
+    {{- .Values.workspace.repositories | nindent 4 }}
   meada.workspace.toml: |
     {{- include "meada.nodeBootstrap" . | nindent 4 }}
   {{- if .Values.modules.githubApp.enabled }}

@@ -266,9 +266,11 @@ enum Busy<'a> {
 // chain of thousands of parameters from overflowing the stack.
 const RECEIVER_DEPTH: usize = 64;
 
-/// What resolving one name carries along: the receivers and calls being resolved, and the
-/// families linearized so far (while `Resolver::new` linearizes them all). The families being
-/// linearized and a cut are the `Resolver`'s, shared by every `Work` (`Resolver::linearizing`).
+/// What resolving one name carries along: the receivers and calls being resolved (met again,
+/// they resolve to nothing), and the families linearized so far (while `Resolver::new`
+/// linearizes them all). The families being linearized, a cut and how many receivers and calls
+/// are in flight are the `Resolver`'s, shared by every `Work` (`Resolver::linearizing`,
+/// `Resolver::chain`).
 #[derive(Default)]
 struct Work<'a> {
     busy: Vec<Busy<'a>>,
@@ -378,6 +380,10 @@ pub struct Resolver<'a> {
     /// alias or an on-demand import sets it (`Resolver::past`), and a `Seen` begins there
     /// (`Resolver::seen`), so `LINK_DEPTH` bounds the whole walk.
     links: Cell<usize>,
+    /// The receivers and calls being resolved by every `Work` now begun, an import's lookup
+    /// included (`Busy`, `Resolver::enter`): `RECEIVER_DEPTH` bounds them all, as `links` does
+    /// the links, so a chain that goes through an import does not restart its count.
+    chain: Cell<usize>,
     /// Each class's Kotlin companion (`Resolver::companion`), read once.
     companions: HashMap<Target<'a>, Target<'a>>,
     /// The pack's keyword for the instance of the enclosing class (`LanguagePack::receiver`).
@@ -924,6 +930,7 @@ impl<'a> Resolver<'a> {
             linearizing: RefCell::new(Vec::new()),
             cut: Cell::new(false),
             links: Cell::new(0),
+            chain: Cell::new(0),
             companions: HashMap::new(),
             receiver: language.receiver(),
             base_receiver: language.base_receiver(),
@@ -1527,18 +1534,9 @@ impl<'a> Resolver<'a> {
         let Some(call) = self.files[path].calls.get(index) else {
             return Binding::Unknown;
         };
-        let key = Busy::Call(path, index);
-        let depth = (work.busy.iter())
-            .filter(|b| matches!(b, Busy::Local(..) | Busy::Call(..)))
-            .count();
-        if depth >= RECEIVER_DEPTH {
-            self.cut.set(true);
+        if !self.enter(Busy::Call(path, index), work) {
             return Binding::Unknown;
         }
-        if work.busy.contains(&key) {
-            return Binding::Unknown;
-        }
-        work.busy.push(key);
         let found = match self.resolved(path, call, false, work) {
             Resolution::Exact(t) => match &self.defs[t.path][t.name].result {
                 Some(Class::Type(class)) => {
@@ -1553,7 +1551,7 @@ impl<'a> Resolver<'a> {
             },
             _ => Binding::Unknown,
         };
-        work.busy.pop();
+        self.leave(work);
         found
     }
 
@@ -1573,17 +1571,13 @@ impl<'a> Resolver<'a> {
         let Some((head, _)) = call.callee.rsplit_once('.') else {
             return false;
         };
-        let key = Busy::Call(path, index);
-        let depth = (work.busy.iter())
-            .filter(|b| matches!(b, Busy::Local(..) | Busy::Call(..)))
-            .count();
-        if (call.on.is_none() && head.starts_with('('))
-            || depth >= RECEIVER_DEPTH
-            || work.busy.contains(&key)
-        {
+        if call.on.is_none() && head.starts_with('(') {
             return false;
         }
-        work.busy.push(key);
+        // Past the limit or met again, it is not from outside; the limit's cut is not recorded.
+        if self.chain.get() >= RECEIVER_DEPTH || !self.enter(Busy::Call(path, index), work) {
+            return false;
+        }
         let unanswered = matches!(
             self.resolved(path, call, false, work),
             Resolution::Unresolved
@@ -1608,7 +1602,7 @@ impl<'a> Resolver<'a> {
                     }
                 }
             };
-        work.busy.pop();
+        self.leave(work);
         outside
     }
 
@@ -2121,18 +2115,9 @@ impl<'a> Resolver<'a> {
         if let Class::Imported = class {
             return self.imported(path, name, &mut self.seen(path, scope));
         }
-        let key = Busy::Local(path, scope, name);
-        let depth = (work.busy.iter())
-            .filter(|b| matches!(b, Busy::Local(..) | Busy::Call(..)))
-            .count();
-        if depth >= RECEIVER_DEPTH {
-            self.cut.set(true);
+        if !self.enter(Busy::Local(path, scope, name), work) {
             return Binding::Unknown;
         }
-        if work.busy.contains(&key) {
-            return Binding::Unknown;
-        }
-        work.busy.push(key);
         let found = match class {
             Class::Enclosing => self.class(path, scope),
             Class::Named(class) => {
@@ -2147,7 +2132,7 @@ impl<'a> Resolver<'a> {
             Class::Result(index) => self.result_of(path, *index, work),
             Class::Imported | Class::Member(_) | Class::Unknown => Binding::Unknown,
         };
-        work.busy.pop();
+        self.leave(work);
         match found {
             Binding::Def(t) if self.is_class(t) => Binding::Instance(t),
             external @ Binding::External(..) => external,
@@ -2881,6 +2866,28 @@ impl<'a> Resolver<'a> {
         if seen.from > 0 {
             self.cut.set(true);
         }
+    }
+
+    /// Begins resolving the receiver or call `key`: it is pushed on `work` and counted in
+    /// `Resolver::chain`, and `leave` ends it. Not begun, and `false`, when it is being resolved
+    /// in `work` or `RECEIVER_DEPTH` are in flight past every import (the cut is recorded).
+    fn enter(&self, key: Busy<'a>, work: &mut Work<'a>) -> bool {
+        if self.chain.get() >= RECEIVER_DEPTH {
+            self.cut.set(true);
+            return false;
+        }
+        if work.busy.contains(&key) {
+            return false;
+        }
+        work.busy.push(key);
+        self.chain.set(self.chain.get() + 1);
+        true
+    }
+
+    /// Ends the receiver or call `enter` began last.
+    fn leave(&self, work: &mut Work<'a>) {
+        work.busy.pop();
+        self.chain.set(self.chain.get() - 1);
     }
 
     /// What `lookup` gives, begun past an import from `seen` (a glob, an alias, an on-demand
@@ -8498,14 +8505,10 @@ mod tests {
         let map: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
         let resolver = resolver(&map);
         let s = |depth: usize| {
-            let mut work = Work {
-                busy: (0..depth)
-                    .map(|_| Busy::Local("main.rs", "f", "y"))
-                    .collect(),
-                ..Work::default()
-            };
+            resolver.chain.set(depth);
             resolver.cut.set(false);
-            let found = resolver.instance(Binding::Local("main.rs", "f", "s"), &mut work);
+            let found =
+                resolver.instance(Binding::Local("main.rs", "f", "s"), &mut Work::default());
             (
                 matches!(found, Binding::Instance(t) if t.name == "S"),
                 resolver.cut.get(),
@@ -9783,6 +9786,46 @@ mod tests {
         assert!(took.as_secs() < 10, "{took:?}");
     }
 
+    /// `v{i} = v{i + 1}.C()` through globs, Python's: the class of each local is named through
+    /// the next file's, whose own is named through the one after, so the chain alternates
+    /// receivers and imports (`m{i}` imports `m{i + 1}` whole, and `v{n - 1}` is a `K`, whose
+    /// member `C` is a class that derives from it). Past `RECEIVER_DEPTH` receivers the class is
+    /// unknown, however many imports it crosses, and the whole costs its length: the count is
+    /// one across an import, as the link count is.
+    #[test]
+    fn a_python_chain_of_receivers_across_globs_is_bounded_by_the_receiver_depth() {
+        let n = RECEIVER_DEPTH + 8;
+        let mut sources = vec![(
+            "base.py".to_string(),
+            "class K:\n    class C(K):\n        def m(self):\n            pass\n".to_string(),
+        )];
+        for i in 0..n {
+            let rest = match i + 1 == n {
+                true => format!("v{i} = K()\n"),
+                false => format!("from m{} import *\nv{i} = v{}.C()\n", i + 1, i + 1),
+            };
+            sources.push((format!("m{i}.py"), format!("from base import *\n{rest}")));
+        }
+        let parsed: Vec<(&str, Facts)> = (sources.iter())
+            .map(|(p, s)| (p.as_str(), Python.parse(p, s.as_bytes()).unwrap()))
+            .collect();
+        let files: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &Python);
+        let start = std::time::Instant::now();
+        let exact: Vec<bool> = (parsed.iter())
+            .flat_map(|(path, facts)| facts.calls.iter().map(move |call| (*path, call)))
+            .map(|(path, call)| matches!(resolver.call(path, call), Resolution::Exact(_)))
+            .collect();
+        let took = start.elapsed();
+        assert!(took.as_secs() < 10, "{took:?}");
+        // The call in `m{i}` reads `n - 1 - i` receivers down the chain: it is known up to the
+        // limit, whichever imports it crosses, and cut past it.
+        for (i, known) in exact.iter().enumerate() {
+            assert_eq!(*known, i + RECEIVER_DEPTH + 1 >= n, "call {i} of {n}");
+        }
+    }
+
     #[test]
     fn an_outside_base_anywhere_in_the_family_keeps_a_member_from_exact() {
         let calls = java_calls(
@@ -11050,6 +11093,48 @@ mod kotlin_tests {
             }
         }
         out
+    }
+
+    /// `val v{i} = v{i + 1}.C()` through star imports, Kotlin's: the class of each local is
+    /// named through the next file's, so the chain alternates receivers and imports (`v{n - 1}`
+    /// is a `K`, whose inner class `C` derives from it). Past `RECEIVER_DEPTH` receivers the
+    /// class is unknown, however many imports it crosses, and the whole costs its length: the
+    /// count is one across an import, as the link count is.
+    #[test]
+    fn a_chain_of_receivers_across_star_imports_is_bounded_by_the_receiver_depth() {
+        let n = RECEIVER_DEPTH + 8;
+        let mut sources = vec![(
+            "base/K.kt".to_string(),
+            "package base\nopen class K { inner class C : K() { fun m() {} } }\n".to_string(),
+        )];
+        for i in 0..n {
+            let rest = match i + 1 == n {
+                true => format!("val v{i} = K()\n"),
+                false => format!("import p{}.*\nval v{i} = v{}.C()\n", i + 1, i + 1),
+            };
+            sources.push((
+                format!("p{i}/M.kt"),
+                format!("package p{i}\nimport base.*\n{rest}"),
+            ));
+        }
+        let parsed: Vec<(&str, Facts)> = (sources.iter())
+            .map(|(p, s)| (p.as_str(), Kotlin.parse(p, s.as_bytes()).unwrap()))
+            .collect();
+        let files: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let layout = Java.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
+        let start = std::time::Instant::now();
+        let exact: Vec<bool> = (parsed.iter())
+            .flat_map(|(path, facts)| facts.calls.iter().map(move |call| (*path, call)))
+            .map(|(path, call)| matches!(resolver.call(path, call), Resolution::Exact(_)))
+            .collect();
+        let took = start.elapsed();
+        assert!(took.as_secs() < 10, "{took:?}");
+        // The call in `p{i}/M.kt` reads `n - 1 - i` receivers down the chain: it is known up to the
+        // limit, whichever imports it crosses, and cut past it.
+        for (i, known) in exact.iter().enumerate() {
+            assert_eq!(*known, i + RECEIVER_DEPTH + 1 >= n, "call {i} of {n}");
+        }
     }
 
     /// A class of the file's own package hides one a star import gives, and two star imports

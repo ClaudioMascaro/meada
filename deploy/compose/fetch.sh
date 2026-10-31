@@ -15,6 +15,14 @@ for remote in ${REPOSITORIES:?Set REPOSITORIES}; do
   esac
   mirror=/srv/mirrors/$identity
   if [ -d "$mirror/.git" ]; then
+    origin=$(git -c "safe.directory=$mirror" -C "$mirror" remote get-url origin 2>/dev/null || true)
+    case "$origin" in
+      https://*|http://*)
+        host=${origin#*://}
+        case "${host%%/*}" in
+          *@*) echo "refresh: the origin of $identity takes a URL without credentials; give git a credential helper" >&2; exit 1 ;;
+        esac ;;
+    esac
     git -c "safe.directory=$mirror" -C "$mirror" fetch --prune origin HEAD &&
       git -c "safe.directory=$mirror" -C "$mirror" reset --hard FETCH_HEAD
   else

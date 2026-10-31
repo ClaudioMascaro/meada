@@ -5,8 +5,9 @@ En la raíz del repositorio:
 - `meada index` arma el índice, en `.meada/`, del repositorio y de los pares;
 - `meada status` muestra el conjunto de repositorios, el estado de cada índice y los pares que
   no se encontraron; bajo cada repositorio, los recursos sin enlace y los `via` que no
-  corresponden a ningún símbolo, y cada archivo fuente que un language pack descartó por pasar de su
-  presupuesto (`too broad`, en inglés);
+  corresponden a ningún símbolo, y cada archivo fuente que un language pack descartó por pasar de un
+  límite (`too broad`, en inglés, por el presupuesto de nombres cualificados, o un proyecto que da
+  demasiados usings a sus archivos);
 - `meada export` imprime todo el índice como JSON ordenado, útil para comparar dos ejecuciones
   con `diff`;
 - `meada decide` resuelve enlaces ambiguos y URLs dinámicas, ver Decisiones;

@@ -251,15 +251,21 @@ fn workspace(command: WorkspaceCommand) -> ! {
             workspace,
         } => {
             let author = author.unwrap_or_else(versions::cli_author);
-            let src = std::fs::read_to_string(&file).ok();
-            let id = src.and_then(|src| versions::version_id(&src, &message, &author).ok());
+            let src = versions::read_import(&file);
+            let id = (src.as_ref().ok())
+                .and_then(|src| versions::version_id(src, &message, &author).ok());
             let arguments = id.map(|id| serde_json::json!({"version": id, "message": message}));
             meada::audit::cli(
                 &workspace,
                 &author,
                 "workspace.import",
                 arguments,
-                || versions::import(&workspace, &file, &message, &author, &mut notes),
+                || match &src {
+                    Ok(src) => {
+                        versions::import(&workspace, &file, src, &message, &author, &mut notes)
+                    }
+                    Err(e) => Err(e.clone().into()),
+                },
                 |imported| imported.id.clone(),
                 |_| false,
             )
