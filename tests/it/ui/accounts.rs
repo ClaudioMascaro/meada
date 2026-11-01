@@ -3,7 +3,8 @@
 //! weaker hash, `meada ui reset-admin` and the audit of each. The section and key refusals, and
 //! `reset-admin`'s refusals before Postgres, need no service; the rest run against the local
 //! Postgres of `MEADA_TEST_POSTGRES_URL`, each test in a schema of its own, and skip without it;
-//! the save as the global operator also needs the fleet's Valkey and store.
+//! the save as the global operator also needs the fleet's Valkey and store. Break glass beside
+//! `[oidc]` (#563) is `break_glass`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -15,6 +16,8 @@ use super::{PUBLIC, Reply, VERSION, console_dir, get, send, send_body, ui_sectio
 use crate::manifest::{MANIFEST, chain_manifest, run, run_args};
 use crate::postgres::{Audited, audited, meada};
 use crate::server::Server;
+
+mod break_glass;
 
 const EN: &str = "en_US.UTF-8";
 /// The variable every test here names for the initial password, so the runner's own

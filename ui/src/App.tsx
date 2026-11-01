@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { Config, Manifest, Session } from './api';
 import { Api, ApiError, isLocal } from './api';
+import { BREAK_GLASS_PATH } from './local';
 import type { Stage } from './local';
 import { ForcedChangePage, ProfilePage, SignInPage } from './AccountPages';
+import { accountCopy } from './account-i18n';
 import { copy } from './i18n';
 import type { Language } from './i18n';
 import { loadCore } from './core';
@@ -30,6 +32,8 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
   const local = isLocal(api.auth) ? api.auth : undefined;
   const stage: Stage = useSyncExternalStore(local?.subscribe ?? noSubscription, () => local?.stage() ?? 'in');
   const before = useRef(stage);
+  // Under break glass a signed-out tab stays on the console's own page, so a reload keeps it there.
+  const signInPath = config.break_glass === true ? BREAK_GLASS_PATH : '/config';
   const operational = (['fleet', 'store', 'repositories', 'credentials', 'admission'] as const).find(kind => path === `/${kind}`);
 
   function navigate(next: string) {
@@ -56,8 +60,8 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
     const was = before.current;
     before.current = stage;
     if (stage === 'out' && was !== 'out') {
-      history.replaceState(null, '', '/config'); setPath('/config'); setSession(undefined); setManifest(undefined); setError(undefined);
-    } else if (stage === 'in' && was === 'forced') {
+      history.replaceState(null, '', signInPath); setPath(signInPath); setSession(undefined); setManifest(undefined); setError(undefined);
+    } else if (stage === 'in' && (was === 'forced' || location.pathname === BREAK_GLASS_PATH)) {
       navigate('/workspace');
     }
   }, [stage]);
@@ -81,9 +85,9 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
 
   useEffect(() => {
     const route = routes.find(route => route.path === path);
-    const name = route ? t[route.label] : t.notFound;
+    const name = route ? t[route.label] : path === BREAK_GLASS_PATH ? accountCopy[locale].breakGlassTitle : t.notFound;
     document.title = `${name} · Meada`;
-  }, [path, t]);
+  }, [path, t, locale]);
 
   async function login() {
     setError(undefined);
@@ -94,7 +98,7 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
   if (local && stage !== 'in') {
     return <Shell path={path} locale={locale} onLanguage={setLocale} t={t} locked>
       {stage === 'forced' ? <ForcedChangePage auth={local} locale={locale} />
-        : <SignInPage auth={local} locale={locale} expired={local.expired} />}
+        : <SignInPage auth={local} locale={locale} expired={local.expired} breakGlass={config.break_glass === true} />}
     </Shell>;
   }
 

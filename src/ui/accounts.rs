@@ -1,6 +1,14 @@
 //! The console's side of local accounts (ADR 0024, feature `accounts`): with `[accounts]` and no
 //! `[oidc]`, the console signs its own session tokens and admits them as bearers.
 //!
+//! Break glass (`[accounts] break_glass = true` beside `[oidc]`, #563): only the default account
+//! signs in (any other username is the same 401, recorded `not_break_glass`, with no table read),
+//! and its session token is admitted beside the identity provider's tokens
+//! (`Console::admit_break_glass`): a bearer whose issuer is the console's `public_url` is checked
+//! against the signing key alone, any other bearer by the identity provider alone. The session is
+//! the global operator's; it may change its own password, and no other route of local accounts
+//! exists.
+//!
 //! - Start (`Local::start`): the signing key pair read once (`accounts::Config::keys`), then the
 //!   default account created when the table is empty (`store::bootstrap`); either failing refuses
 //!   the start.
@@ -58,6 +66,8 @@ pub(super) struct Local {
     keys: Keys,
     postgres: crate::postgres::Config,
     hashes: tokio::sync::Semaphore,
+    /// Beside `[oidc]`: the default account alone, as the global operator (#563).
+    pub(super) break_glass: bool,
 }
 
 impl Local {
@@ -90,11 +100,21 @@ impl Local {
                 keys,
                 postgres,
                 hashes: tokio::sync::Semaphore::new(HASHES_MAX),
+                break_glass: config.break_glass,
             }),
             Err(store::Refused::Password(problem)) => Err(problem),
             Err(store::Refused::Postgres(reason)) => {
                 Err(("postgres", Msg::AccountsBootstrap(&reason).text()))
             }
+        }
+    }
+
+    /// The role and the groups a session token of `account` carries: its own, or under break
+    /// glass the global operator's with no group, which is what admission makes of it anyway.
+    fn signed_as<'a>(&self, account: &'a store::Account) -> (Role, &'a [String]) {
+        match self.break_glass {
+            true => (Role::Operator, &[]),
+            false => (account.role, &account.groups),
         }
     }
 }
@@ -123,6 +143,31 @@ fn busy() -> Answer {
 fn invalid() -> Answer {
     let message = Msg::AccountsInvalid.text();
     error(StatusCode::UNAUTHORIZED, "invalid_credentials", &message)
+}
+
+/// The 401 of a request without a valid session token, with `WWW-Authenticate: Bearer`
+/// (`error="invalid_token"` when one was `sent`), and the line the pre-authentication audit
+/// prints.
+fn unauthorized(sent: bool) -> (Box<Answer>, String) {
+    let message = Msg::AccountsUnauthorized.text();
+    let mut answer = error(StatusCode::UNAUTHORIZED, "unauthorized", &message);
+    let challenge = match sent {
+        false => "Bearer",
+        true => "Bearer error=\"invalid_token\"",
+    };
+    let challenge = header::HeaderValue::from_static(challenge);
+    answer
+        .headers_mut()
+        .insert(header::WWW_AUTHENTICATE, challenge);
+    (Box::new(answer), message)
+}
+
+/// The 403 `password_change_required` of a session token with the mark, on any route but the
+/// password change, and its line.
+fn change_required() -> (Box<Answer>, String) {
+    let message = Msg::AccountsChangeRequired.text();
+    let answer = error(StatusCode::FORBIDDEN, "password_change_required", &message);
+    (Box::new(answer), message)
 }
 
 /// The 503 of a session token that could not be signed.
@@ -223,22 +268,10 @@ impl Console {
             _ => None,
         };
         let Some(claims) = claims else {
-            let message = Msg::AccountsUnauthorized.text();
-            let mut answer = error(StatusCode::UNAUTHORIZED, "unauthorized", &message);
-            let challenge = match found {
-                Ok(None) => "Bearer",
-                _ => "Bearer error=\"invalid_token\"",
-            };
-            let challenge = header::HeaderValue::from_static(challenge);
-            answer
-                .headers_mut()
-                .insert(header::WWW_AUTHENTICATE, challenge);
-            return Err((Box::new(answer), message));
+            return Err(unauthorized(!matches!(found, Ok(None))));
         };
         if claims.change_required && route != Some(PASSWORD) {
-            let message = Msg::AccountsChangeRequired.text();
-            let answer = error(StatusCode::FORBIDDEN, "password_change_required", &message);
-            return Err((Box::new(answer), message));
+            return Err(change_required());
         }
         let operator = claims.role == Role::Operator;
         let mut groups = claims.groups;
@@ -252,6 +285,62 @@ impl Console {
         };
         let teams = self.teams_on(route, operator, &groups, &grant);
         Ok(Session::local(claims.sub, operator, groups, teams, grant))
+    }
+
+    /// Admission under break glass (`[oidc]` beside, #563) of a request to the API route `route`
+    /// (`None`: a static file), or `None` when the identity provider's admission decides. The
+    /// static files, `config` and `login` need no token. A bearer whose issuer is this console's
+    /// `public_url` (`accounts::issued_by`, before any key is tried) is checked against the signing
+    /// key alone and must be the default account's session token, else the 401; a token with the
+    /// change-required mark opens `account/password` alone. Every other request, a bearer of any
+    /// other issuer included, is the identity provider's to admit, so it never sees this
+    /// console's tokens nor the signing key the identity provider's. The session is the global
+    /// operator's, with no group, reading every repository.
+    pub(super) fn admit_break_glass(
+        &self,
+        local: &Local,
+        headers: &HeaderMap,
+        route: Option<&str>,
+    ) -> Option<std::result::Result<Session, (Box<Answer>, String)>> {
+        if matches!(route, None | Some("config") | Some(LOGIN)) {
+            return Some(Ok(Session::anonymous()));
+        }
+        let Ok(Some(token)) = crate::oidc::bearer(headers) else {
+            return None;
+        };
+        let issuer = &self.ui.public_url;
+        if !accounts::issued_by(token, issuer) {
+            return None;
+        }
+        let claims = (local.keys.verify(token, issuer, accounts::CONSOLE))
+            .filter(|claims| claims.username() == accounts::DEFAULT_USERNAME);
+        Some(match claims {
+            None => Err(unauthorized(true)),
+            Some(claims) if claims.change_required && route != Some(PASSWORD) => {
+                Err(change_required())
+            }
+            Some(claims) => Ok(Session::local(
+                claims.sub,
+                true,
+                Vec::new(),
+                Vec::new(),
+                crate::grant::Grant::All,
+            )),
+        })
+    }
+
+    /// Under break glass, a sign-in naming any account but the default one: refused
+    /// `not_break_glass` without reading the table, after the one hash every refusal costs (the
+    /// dummy), under a permit of `HASHES_MAX`.
+    fn not_break_glass(&self, local: &Local, password: &str) -> Credentials {
+        let Ok(_permit) = local.hashes.try_acquire() else {
+            return Credentials::Busy;
+        };
+        let _ = accounts::verify(password, accounts::dummy());
+        Credentials::Checked {
+            account: None,
+            refusal: Some(Refusal::NotBreakGlass),
+        }
     }
 
     /// The account `username` names, checked for a sign-in or a password change with
@@ -317,9 +406,9 @@ impl Console {
     }
 
     /// `POST login`: `{username, password}` signed in, or the one 401 for an unknown username, a
-    /// wrong password, a suspended and a locked account alike, each costing one hash; recorded
-    /// `account.login` with the reason a refusal had, before the answer. A success redoes a
-    /// weaker stored hash (`rehash`).
+    /// wrong password, a suspended and a locked account alike (and under break glass any account
+    /// but the default one), each costing one hash; recorded `account.login` with the reason a
+    /// refusal had, before the answer. A success redoes a weaker stored hash (`rehash`).
     pub(super) fn login(&self, local: &Local, body: &Body) -> Answer {
         #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
@@ -331,7 +420,11 @@ impl Console {
             Ok(login) => login,
             Err(refused) => return *refused,
         };
-        let (account, refusal) = match self.credentials(local, &login.username, &login.password) {
+        let checked = match local.break_glass && login.username != accounts::DEFAULT_USERNAME {
+            true => self.not_break_glass(local, &login.password),
+            false => self.credentials(local, &login.username, &login.password),
+        };
+        let (account, refusal) = match checked {
             Credentials::Busy => return busy(),
             Credentials::Unreadable(why) => return unavailable(&why, None, "account.login", "-"),
             Credentials::Checked { account, refusal } => (account, refusal),
@@ -355,11 +448,12 @@ impl Console {
         let reason = refusal.unwrap_or(Refusal::Unknown).reason();
         let (answer, outcome, message) = match (&account, refusal) {
             (Some(account), None) => {
+                let (role, groups) = local.signed_as(account);
                 let signed = local.keys.session(
                     &self.ui.public_url,
                     &account.username,
-                    account.role,
-                    &account.groups,
+                    role,
+                    groups,
                     account.change_required,
                 );
                 let Ok((token, expires)) = signed else {
@@ -470,13 +564,10 @@ impl Console {
         self.audit
             .finish(pending, Outcome::Accepted, &changed, None);
         write::audit(Some(subject), None, action, username, "accepted");
-        let signed = local.keys.session(
-            &self.ui.public_url,
-            username,
-            account.role,
-            &account.groups,
-            false,
-        );
+        let (role, groups) = local.signed_as(&account);
+        let signed = local
+            .keys
+            .session(&self.ui.public_url, username, role, groups, false);
         match signed {
             Ok((token, expires)) => issued(token, expires, false),
             Err(_) => unsigned(),

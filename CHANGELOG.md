@@ -8,6 +8,19 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Break-glass account beside the identity provider (#563, ADR 0024, from #551): `[accounts]
+  break_glass = true` lets the section sit beside `[oidc]`; without `[oidc]` it is an error, and
+  `[accounts.groups]` or `[accounts.github]` under it is an error naming the table. The console
+  then signs in only the default account (any other username gets the wrong password's 401,
+  audited `not_break_glass`, the table never read) as the global operator, and admits its session
+  token beside the identity provider's, each bearer routed by its issuer to one verifier, so the
+  identity provider's keys never check a console token and the signing key never checks an
+  identity provider's; a console whose `[oidc] issuer` is its own `public_url` refuses to start.
+  The password change works; no other route of local accounts exists. Nodes and the proposal
+  server keep admitting only the identity provider and read no key. `config` adds `break_glass:
+  true`, and the front end offers a discreet break-glass sign-in (`/break-glass`) beside the
+  identity provider's, which now waits for a click under break glass. No golden changed.
+
 - Hardening of local sign-in (#555, ADR 0024, from #551): the password policy refuses an embedded
   common-password list (SecLists, MIT, the entries of 12 to 128 characters, compared ignoring
   case; rule `common_password`). Ten consecutive failed password checks, at sign-in or as a

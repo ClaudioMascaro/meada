@@ -99,7 +99,7 @@ The browser must reach the issuer's metadata and token endpoint, with CORS for t
 
 ## Local accounts
 
-Without an identity provider, the console can sign in its own accounts (feature `accounts`, part of `cloud`; ADR 0024). `[accounts]` needs `[postgres]` and cannot sit beside `[oidc]`:
+Without an identity provider, the console can sign in its own accounts (feature `accounts`, part of `cloud`; ADR 0024). `[accounts]` needs `[postgres]` and sits beside `[oidc]` only as break glass (below):
 
 ```toml
 [accounts]
@@ -117,6 +117,19 @@ The password policy refuses the passwords of a common-password list embedded in 
 To recover the default account (a lost password or a lock), run `meada ui reset-admin --workspace <bootstrap manifest>`: it creates or reactivates `admin` as an operator, clears its lock and sets the value of `MEADA_ADMIN_PASSWORD` (or of `admin_password_file`) as its password, or, without one, a random password shown once on stdout; a change is then required at the next sign-in. The command records `account.reset_admin` with `via` `cli` in the audit before it changes the account, and exits 1, changing nothing, when the record cannot be written.
 
 In the browser, `"sign_in": "accounts"` makes the console show its own sign-in page instead of the identity provider's redirect. A sign-in that must change its password goes straight to a page that asks for the current password and the new one twice, shows the rule a refusal names and offers nothing else until the change succeeds, then opens the workspace. The session token lives in the tab's `sessionStorage` (never `localStorage`, a URL or a log), is sent as the bearer, and is forgotten on sign-out, on any 401 other than a refused password (the console returns to sign-in) and when the tab closes. The profile page offers the voluntary password change and sign-out. Copy is in Portuguese and English.
+
+### Break glass
+
+Configuring `[oidc]` turns local sign-in off for every account: `[accounts]` beside `[oidc]` is an error unless it carries `break_glass = true`. Then only the default account `admin` signs in to the console, as the global operator, beside the identity provider's tokens, for when the identity provider is down:
+
+```toml
+[accounts]
+break_glass = true
+public_key_file = "/run/secrets/meada-signing.pub.pem"
+private_key_file = "/run/secrets/meada-signing.pem"
+```
+
+`break_glass` without `[oidc]` is an error, and `[accounts.groups]` and `[accounts.github]` cannot sit under it: the break-glass account needs no grant. Any other username gets the same 401 as a wrong password, and the audit records `not_break_glass`. The console tells bearers apart by issuer before any key is tried: a token whose `iss` is the console's `public_url` is checked against the Ed25519 key alone (and only `admin`'s passes), any other against the identity provider's keys alone; so the console refuses to start when `[oidc] issuer` is its own `public_url`. The break-glass account changes its own password; account administration, agent tokens and login verification do not exist (404). Nodes and the proposal server ignore `[accounts]` beside `[oidc]` and never read the private key. `config` carries `"sign_in": "oidc"` with `"break_glass": true`, and the browser, instead of redirecting straight to the identity provider, shows its button and, discreetly, a link to `/break-glass`, the default account's sign-in page; the link stays when the identity provider does not answer.
 
 ## Fleet and diagnostics
 

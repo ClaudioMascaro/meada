@@ -799,3 +799,33 @@ fn a_deleted_user_is_refused_until_provisioned_active() {
     );
     assert_eq!(status("alice").status, 200);
 }
+
+/// With `[oidc]`, the proposal server ignores `[accounts]` under break glass (#563, ADR 0024): it
+/// starts though neither key file exists, reads neither, admits the identity provider's agent
+/// token as before, and refuses a token signed with Ed25519 for the console's issuer and this
+/// server's audience, as any token the identity provider did not sign, before any tool.
+#[cfg(feature = "accounts")]
+#[test]
+fn the_proposal_server_with_oidc_ignores_accounts_under_break_glass() {
+    let Some(case) = Case::new("ws_proposals_break_glass") else {
+        return;
+    };
+    let file = case.dir.join(MANIFEST);
+    let section = "\n[accounts]\nbreak_glass = true\npublic_key_file = \"no-such-public.pem\"\n\
+                   private_key_file = \"no-such-private.pem\"\n";
+    fs::write(&file, fs::read_to_string(&file).unwrap() + section).unwrap();
+    let server = case.proposals();
+    let list = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"});
+    let bearer = |token: &str| format!("Bearer {token}");
+    let admitted = rpc(
+        &server,
+        &[("Authorization", &bearer(&case.agent("root")))],
+        &list,
+    );
+    assert_eq!(admitted.status, 200, "{}", admitted.body);
+    let local = crate::oidc::ed25519_token(PUBLIC, PROPOSALS, json!({}));
+    let refused = rpc(&server, &[("Authorization", &bearer(&local))], &list);
+    assert_eq!(refused.status, 401, "{}", refused.body);
+    let stderr = server.stderr();
+    assert!(!stderr.contains("private"), "{stderr}");
+}

@@ -4,6 +4,9 @@ import type { Config } from './api';
 /** The one `sessionStorage` key: the session token and its marks, for the tab's life. */
 export const SESSION_KEY = 'meada.session';
 
+/** The console's own sign-in page under break glass (ADR 0024, #563), beside the identity provider's. */
+export const BREAK_GLASS_PATH = '/break-glass';
+
 /** Where a tab stands: no session, a session that may only change its password, a full session. */
 export type Stage = 'out' | 'forced' | 'in';
 
@@ -27,6 +30,14 @@ function stored(): Issued | undefined {
     try { sessionStorage.removeItem(SESSION_KEY); } catch { /* storage may be blocked: the tab simply holds no session */ }
     return undefined;
   }
+}
+
+/**
+ * Under break glass, whether this tab signs in on the console's own page rather than through the
+ * identity provider: it is on that page, or holds a session token from it.
+ */
+export function breakGlassTab(config: Config, path: string): boolean {
+  return config.break_glass === true && (path === BREAK_GLASS_PATH || stored() !== undefined);
 }
 
 /**

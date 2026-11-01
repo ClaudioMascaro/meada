@@ -724,6 +724,32 @@ WebAssembly: the default account's first sign-in through the forced change to th
 with no other request before the change, a 401 returning to the sign-in page with the token
 gone, the profile and sign-out in Portuguese, and the identity provider's flow unchanged.
 
+### Break glass beside the identity provider (#563)
+
+`src/accounts.rs` holds the unit tests of `break_glass` (off by default) and `under_break_glass`
+(the grant tables refused only under `break_glass = true`), and `issued_by` routing a token by
+its unchecked issuer. `tests/it/ui/accounts/break_glass.rs` runs the console. Without a service:
+the section rules through `meada status` (`break_glass` without `[oidc]`, `[accounts]` beside
+`[oidc]` with `break_glass = false`, `[accounts.groups]` and `[accounts.github]` under it, each
+one line; the accepted section stopping only at Postgres) and the start refused for an
+`[oidc] issuer` equal to `[ui] public_url`, before any key is read. Against the local Postgres
+(skipped without it): `config` naming `oidc` with `break_glass`, the identity provider's viewer
+and operator tokens admitted as before, `admin` through `admin123` and its forced change to the
+global operator's session (`account: true`), a colleague's seeded account and an unknown username
+answered with the wrong password's body and recorded `not_break_glass` with no subject, the
+routes of account administration, agent tokens and login verification answering 404, a fence
+recovery authorized and recorded as `local:admin` (feature `refresh-lock`), and the crossed
+bearers refused (an identity provider's signature on the console's issuer, the console's key on
+the identity provider's issuer, a colleague's session token, a nodes token, an expired one); no
+password, hash, token or key in any answer, record or stderr line. `tests/it/oidc.rs` holds a
+node with `[oidc]` and `[accounts]` under break glass naming missing key files: it starts,
+answers the identity provider's token as the golden has it and refuses Ed25519 tokens of the
+console's issuer. `tests/it/ui/oidc/workspaces/proposals.rs` holds the proposal server's twin
+(the local services). `ui/tests/BreakGlass.test.tsx` holds `breakGlassTab`, the choice page (the
+identity provider first, the discreet link kept after a failure, both languages), and the app
+on `/break-glass`: the default account through its forced change to the workspace and, signed
+out, back to the break-glass page, never the local accounts' copy.
+
 ### The directory (#334)
 
 `tests/it/ui/oidc/directory.rs` runs a console with `[oidc]` (the `oidc` module's loopback

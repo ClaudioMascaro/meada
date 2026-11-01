@@ -7,9 +7,10 @@
 //!
 //! Admission: behind the operator's proxy every request is a viewer's that reads everything.
 //! With `[accounts]` (feature `accounts`, ADR 0024) the console signs in local accounts itself and
-//! admits its own session tokens (`accounts`). With `[oidc]` (feature `oidc`) the console is a
-//! resource server as a node is: a bearer token
-//! for `[ui] audience`, checked by the nodes' own module (`Oidc::admit_console`), except for the
+//! admits its own session tokens (`accounts`); beside `[oidc]`, with `break_glass = true`, only the
+//! default account's, told apart from the identity provider's tokens by issuer. With `[oidc]`
+//! (feature `oidc`) the console is a resource server as a node is: a bearer token for
+//! `[ui] audience`, checked by the nodes' own module (`Oidc::admit_console`), except for the
 //! static files and `config`, which the browser needs to log in. Every admitted subject is a
 //! viewer unless its verified groups or boolean claim admit it as an operator, or one of its
 //! groups owns an entry of the current workspace version its grant reads (a team operator, ADR
@@ -608,6 +609,16 @@ impl Console {
                 None
             }
         };
+        // Under break glass a bearer goes to one verifier by its issuer (ADR 0024): the identity
+        // provider's must not be the console's own.
+        #[cfg(feature = "accounts")]
+        if let (Some(oidc), Some(accounts)) = (&oidc, &read.accounts)
+            && accounts.break_glass
+            && oidc.login().0.trim_end_matches('/') == ui.public_url
+        {
+            let problem = Msg::AccountsBreakGlassIssuer.text();
+            problems.push(at("accounts.break_glass", problem));
+        }
         // The audit (#328): a version this binary does not know refuses the start; Postgres
         // unreachable does not (reads are served, writes answer 503 naming why on stderr).
         #[cfg(feature = "postgres")]
@@ -872,7 +883,7 @@ impl Console {
         // a request without one is a 401 and a token awaiting its password change a 403
         // `password_change_required`, whatever `operations` says.
         #[cfg(feature = "accounts")]
-        let admitted_first = self.accounts.is_some();
+        let admitted_first = (self.accounts.as_ref()).is_some_and(|local| !local.break_glass);
         #[cfg(not(feature = "accounts"))]
         let admitted_first = false;
         let writes_off = operation.is_some() && !self.ui.operations;
@@ -943,7 +954,9 @@ impl Console {
 
     /// Admission of a request to the API route `route` (`None`: a static file), `write` when it
     /// is one of the audited operations. Behind the proxy every request is a viewer's; with
-    /// `[accounts]`, a session token of this console (`admit_local`); with `[oidc]`, a bearer
+    /// `[accounts]`, a session token of this console (`admit_local`); under break glass, the
+    /// default account's session token when the bearer's issuer is this console, else the
+    /// identity provider's admission (`admit_break_glass`); with `[oidc]`, a bearer
     /// token for `[ui] audience`, except for the static files and `config`, which the browser
     /// needs to log in. With `[directory]`, the token's `user_claim` is then
     /// looked up (`deprovisioned`) before any role is computed. A refusal comes with the line
@@ -956,7 +969,12 @@ impl Console {
     ) -> std::result::Result<Session, (Box<Answer>, String)> {
         #[cfg(feature = "accounts")]
         if let Some(local) = &self.accounts {
-            return self.admit_local(local, headers, route);
+            if !local.break_glass {
+                return self.admit_local(local, headers, route);
+            }
+            if let Some(admitted) = self.admit_break_glass(local, headers, route) {
+                return admitted;
+            }
         }
         let open = matches!(route, None | Some("config"));
         #[cfg(feature = "oidc")]
@@ -1055,13 +1073,18 @@ impl Console {
         if route == "query" && *method == Method::POST {
             return self.query(request.body(), session);
         }
+        // Under break glass these two are the only routes of local accounts: account
+        // administration, agent tokens and login verification do not exist there (ADR 0024). The
+        // password change is a local account's own: an identity provider's session gets the 404.
         #[cfg(feature = "accounts")]
         if let Some(local) = &self.accounts
             && *method == Method::POST
         {
             match route {
                 accounts::LOGIN => return self.login(local, request.body()),
-                accounts::PASSWORD => return self.password(local, request.body(), session),
+                accounts::PASSWORD if session.account => {
+                    return self.password(local, request.body(), session);
+                }
                 _ => {}
             }
         }
@@ -1109,9 +1132,10 @@ impl Console {
     }
 
     /// The console's version and `operations`; with `[accounts]`, `sign_in: "accounts"`; with
-    /// `[oidc]`, `sign_in: "oidc"` and what the browser logs in with: the issuer, `[ui]
-    /// client_id`, the scopes and the audience its token must carry. The public
-    /// URL fixes the browser's callback even when the listener was opened through loopback.
+    /// `[oidc]`, `sign_in: "oidc"`, `break_glass: true` under break glass, and what the browser logs
+    /// in with: the issuer, `[ui] client_id`, the scopes and the audience its token must carry.
+    /// The public URL fixes the browser's callback even when the listener was opened through
+    /// loopback.
     fn config(&self) -> Value {
         #[allow(unused_mut)]
         let mut config = json!({
@@ -1136,8 +1160,10 @@ impl Console {
         }
         // How the browser signs in (ADR 0024): an identity provider's or the console's own.
         #[cfg(feature = "accounts")]
-        if self.accounts.is_some() {
-            config["sign_in"] = "accounts".into();
+        match &self.accounts {
+            Some(local) if local.break_glass => config["break_glass"] = true.into(),
+            Some(_) => config["sign_in"] = "accounts".into(),
+            None => {}
         }
         #[cfg(feature = "oidc")]
         if let Some(oidc) = &self.oidc {

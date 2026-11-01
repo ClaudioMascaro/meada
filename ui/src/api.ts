@@ -13,6 +13,8 @@ export interface Config {
   workspaces?: { max_entries: number };
   /** How the browser signs in (ADR 0024): the identity provider's flow or the console's own page. */
   sign_in?: 'oidc' | 'accounts';
+  /** Beside `sign_in: 'oidc'`, the break-glass account (#563): the default account may also sign in on the console's own page. */
+  break_glass?: boolean;
   issuer?: string;
   client_id?: string;
   scopes?: string[];

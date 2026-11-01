@@ -1,11 +1,13 @@
 //! Local accounts (ADR 0024, feature `accounts`): usernames and passwords in the data layer, and
 //! the session tokens the console signs with Ed25519 for them. The `accounts` module of ADR 0012's
-//! table, section `[accounts]`, which needs `[postgres]` and never sits beside `[oidc]`.
+//! table, section `[accounts]`, which needs `[postgres]` and sits beside `[oidc]` only with
+//! `break_glass = true` (the break-glass account, #563).
 //!
 //! `File` is the section and `File::validate` its `Config`: where the signing key's public and
 //! private halves and the default account's initial password come from, each a variable or a
-//! file (at most one of each pair), never a value. `Manifest::read` checks the section's needs and
-//! gives it its `[postgres]`. Only the console reads the keys (`Config::keys`), once, at start:
+//! file (at most one of each pair), never a value, and whether it is break glass.
+//! `Manifest::read` checks the section's needs (`under_break_glass` before the section is read)
+//! and gives it its `[postgres]`. Only the console reads the keys (`Config::keys`), once, at start:
 //! a missing, unreadable, non-Ed25519 or mismatched pair refuses the start, naming the key and
 //! never its value. A node or the proposal server parses the section and reads no key.
 //!
@@ -144,6 +146,8 @@ pub struct File {
     private_key_file: Option<String>,
     admin_password_env: Option<String>,
     admin_password_file: Option<String>,
+    #[serde(default)]
+    break_glass: bool,
 }
 
 /// The validated section: where each secret comes from, never a value.
@@ -152,6 +156,9 @@ pub struct Config {
     public_key: Option<Secret>,
     private_key: Option<Secret>,
     admin_password: Secret,
+    /// `break_glass = true`: beside `[oidc]`, only the default account signs in to the console,
+    /// as the global operator, and nothing else of local accounts exists (ADR 0024).
+    pub break_glass: bool,
     /// The manifest's `[postgres]`, where the accounts live: `Manifest::read` sets it, and
     /// refuses the section without it.
     pub postgres: Option<crate::postgres::Config>,
@@ -183,9 +190,37 @@ impl File {
             public_key,
             private_key,
             admin_password: admin_password.unwrap_or(Secret::Env(ADMIN_PASSWORD_ENV.into())),
+            break_glass: self.break_glass,
             postgres: None,
         })
     }
+}
+
+/// The dotted name of the first grant table (`[accounts.groups]`, `[accounts.github]`) the
+/// manifest `table` has under an `[accounts]` with `break_glass = true`, read before the section
+/// is: the break-glass account is the global operator and needs no grant, so either is refused,
+/// naming it, whatever else the section says.
+pub fn under_break_glass(table: &toml::Table) -> Option<&'static str> {
+    let accounts = table.get("accounts").and_then(toml::Value::as_table)?;
+    if accounts.get("break_glass").and_then(toml::Value::as_bool) != Some(true) {
+        return None;
+    }
+    [("groups", "accounts.groups"), ("github", "accounts.github")]
+        .into_iter()
+        .find(|(name, _)| accounts.contains_key(*name))
+        .map(|(_, dotted)| dotted)
+}
+
+/// Whether `token`'s `iss` claim, read without any check, is `issuer`. It routes a bearer to the
+/// one verifier that may check it (under break glass, the console's own key or the identity
+/// provider's), so neither ever sees the other's tokens; it admits nothing by itself.
+pub fn issued_by(token: &str, issuer: &str) -> bool {
+    #[derive(Deserialize)]
+    struct Issued {
+        iss: Option<String>,
+    }
+    let claims = jsonwebtoken::dangerous::insecure_decode_claims::<Issued>(token);
+    claims.is_ok_and(|claims| claims.iss.as_deref() == Some(issuer))
 }
 
 /// The key of a secret of the section: `<name>_env` or `<name>_file`.
@@ -569,6 +604,42 @@ mod tests {
         }
     }
 
+    /// `break_glass` is off unless set; set, it refuses the grant tables, named before the section
+    /// is read; without it they are left to the section (#563).
+    #[test]
+    fn break_glass_is_off_by_default_and_refuses_the_grant_tables() {
+        assert!(!section("").unwrap().break_glass);
+        assert!(section("break_glass = true").unwrap().break_glass);
+        assert!(!section("break_glass = false").unwrap().break_glass);
+        let table = |toml: &str| toml::from_str::<toml::Table>(toml).unwrap();
+        for (toml, expected) in [
+            (
+                "[accounts]\nbreak_glass = true\n[accounts.groups]\nops = [\"*\"]\n",
+                Some("accounts.groups"),
+            ),
+            (
+                "[accounts]\nbreak_glass = true\n[accounts.github]\nhost = \"github.com\"\n",
+                Some("accounts.github"),
+            ),
+            (
+                "[accounts]\nbreak_glass = true\n[accounts.groups]\n[accounts.github]\n",
+                Some("accounts.groups"),
+            ),
+            ("[accounts]\nbreak_glass = true\n", None),
+            ("[accounts]\n[accounts.groups]\nops = [\"*\"]\n", None),
+            ("[accounts]\nbreak_glass = false\n[accounts.github]\n", None),
+            // Not a boolean: the section's own parse names it.
+            (
+                "[accounts]\nbreak_glass = \"yes\"\n[accounts.groups]\n",
+                None,
+            ),
+            ("accounts = 1\n", None),
+            ("", None),
+        ] {
+            assert_eq!(under_break_glass(&table(toml)), expected, "{toml}");
+        }
+    }
+
     #[test]
     fn the_policy_names_the_first_rule_a_password_fails() {
         let long = "x".repeat(PASSWORD_MAX + 1);
@@ -866,6 +937,30 @@ mod tests {
         critical.crit = Some(vec!["exp".into()]);
         let crit = jsonwebtoken::encode(&critical, &base, &keys.encoding).unwrap();
         assert!(keys.verify(&crit, issuer, CONSOLE).is_none());
+    }
+
+    /// A bearer is routed by its issuer read without a check: this console's session token by
+    /// its own issuer, never another's; what is no JWT, or has no issuer, by none.
+    #[test]
+    fn a_token_is_routed_by_its_unchecked_issuer() {
+        let (private, public) = pair();
+        let keys = keyed("issued", &public, &private).keys().unwrap();
+        let issuer = "https://console.example";
+        let (token, _) = keys
+            .session(issuer, "admin", Role::Operator, &[], false)
+            .unwrap();
+        assert!(issued_by(&token, issuer));
+        assert!(!issued_by(&token, "https://console.example/"));
+        assert!(!issued_by(&token, "https://id.example"));
+        let header = Header::new(Algorithm::EdDSA);
+        let unsigned =
+            jsonwebtoken::encode(&header, &serde_json::json!({"sub": "x"}), &keys.encoding);
+        assert!(!issued_by(&unsigned.unwrap(), issuer));
+        let numeric = jsonwebtoken::encode(&header, &serde_json::json!({"iss": 1}), &keys.encoding);
+        assert!(!issued_by(&numeric.unwrap(), issuer));
+        for bad in ["", "a.b", "not a token", "a.b.c"] {
+            assert!(!issued_by(bad, issuer), "{bad}");
+        }
     }
 
     #[test]

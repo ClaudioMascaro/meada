@@ -5,3 +5,4 @@
 .account-form .error, .account-form .notice { margin: .25rem 0 0; }
 .account-form button { justify-self: start; margin-top: .75rem; }
 .sign-out { margin-top: 1rem; }
+.account-form .discreet { justify-self: start; margin-top: 1.25rem; font-size: .85rem; color: var(--muted); }

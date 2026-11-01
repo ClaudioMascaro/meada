@@ -33,6 +33,15 @@ const en = {
   rule_username: 'The new password is your username.',
   rule_current_password: 'The new password is the same as the current one.',
   rule_unknown: 'The new password was refused:',
+  chooseTitle: 'Sign in',
+  chooseIntro: 'Sign in to the console through your identity provider.',
+  identityProvider: 'Sign in with the identity provider',
+  redirecting: 'Redirecting…',
+  identityProviderFailed: 'The identity provider could not be reached. Try again, or use the break-glass sign-in if you hold the default account.',
+  breakGlassLink: 'Break-glass sign-in',
+  breakGlassTitle: 'Break-glass sign-in',
+  breakGlassIntro: 'Only the default account signs in here, as the global operator, for when the identity provider is unavailable. Everyone else signs in through the identity provider.',
+  backToIdentityProvider: 'Sign in with the identity provider instead',
 } as const;
 
 export type AccountCopy = { [K in keyof typeof en]: string };
@@ -71,5 +80,14 @@ export const accountCopy: Record<Language, AccountCopy> = {
     rule_username: 'A nova senha é o seu nome de usuário.',
     rule_current_password: 'A nova senha é igual à senha atual.',
     rule_unknown: 'A nova senha foi recusada:',
+    chooseTitle: 'Entrar',
+    chooseIntro: 'Entre na console pelo seu provedor de identidade.',
+    identityProvider: 'Entrar com o provedor de identidade',
+    redirecting: 'Redirecionando…',
+    identityProviderFailed: 'Não foi possível alcançar o provedor de identidade. Tente de novo, ou use a entrada de break glass se você tem a conta padrão.',
+    breakGlassLink: 'Entrada de break glass',
+    breakGlassTitle: 'Entrada de break glass',
+    breakGlassIntro: 'Só a conta padrão entra aqui, como operador global, para quando o provedor de identidade está indisponível. Todos os outros entram pelo provedor de identidade.',
+    backToIdentityProvider: 'Entrar com o provedor de identidade',
   },
 };

@@ -343,6 +343,15 @@ impl Manifest {
     fn read_from(file: &Path, pulled: bool) -> Result<Self> {
         let src = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
         modules::check(file, &src)?;
+        // A grant table under break glass (ADR 0024) is named as such before the section is read,
+        // which would otherwise call it an unknown key.
+        #[cfg(feature = "accounts")]
+        if let Ok(table) = toml::from_str::<toml::Table>(&src)
+            && let Some(dotted) = crate::accounts::under_break_glass(&table)
+        {
+            let refused = Msg::AccountsUnderBreakGlass(dotted).text();
+            return Err(config::error_at(file, &src, dotted, &refused));
+        }
         #[cfg_attr(not(feature = "generation-pointer"), allow(unused_mut))]
         let mut parsed: ManifestFile = config::parse(file, &src, "meada.workspace.toml")?;
         let Some(index_dir) = parsed.index_dir else {
@@ -393,7 +402,8 @@ impl Manifest {
             github.postgres = postgres.clone();
         }
         // `[accounts]` (ADR 0024) keeps its accounts in the data layer, and local sign-in is off
-        // once an identity provider is configured: never both.
+        // once an identity provider is configured: beside `[oidc]` only with `break_glass`, which
+        // means nothing without it.
         #[cfg(feature = "accounts")]
         let accounts = {
             let mut section =
@@ -402,9 +412,14 @@ impl Manifest {
                 if postgres.is_none() {
                     modules::needs(file, &src, "accounts", &["postgres"])?;
                 }
-                if oidc.is_some() {
+                if oidc.is_some() && !accounts.break_glass {
                     let beside = Msg::AccountsBesideOidc.text();
                     return Err(config::error_at(file, &src, "accounts", &beside));
+                }
+                if oidc.is_none() && accounts.break_glass {
+                    let needs = Msg::AccountsBreakGlassNeedsOidc.text();
+                    let key = "accounts.break_glass";
+                    return Err(config::error_at(file, &src, key, &needs));
                 }
                 accounts.postgres = postgres.clone();
             }

@@ -99,7 +99,7 @@ El navegador debe alcanzar los metadatos y el endpoint de token del issuer, con 
 
 ## Cuentas locales
 
-Sin un proveedor de identidad, la consola puede autenticar sus propias cuentas (feature `accounts`, parte de `cloud`; ADR 0024). `[accounts]` exige `[postgres]` y no puede estar junto a `[oidc]`:
+Sin un proveedor de identidad, la consola puede autenticar sus propias cuentas (feature `accounts`, parte de `cloud`; ADR 0024). `[accounts]` exige `[postgres]` y solo está junto a `[oidc]` como break glass (abajo):
 
 ```toml
 [accounts]
@@ -117,6 +117,19 @@ La política de contraseñas rechaza las contraseñas de una lista de contraseñ
 Para recuperar la cuenta predeterminada (contraseña perdida o bloqueo), ejecuta `meada ui reset-admin --workspace <manifiesto de bootstrap>`: crea o reactiva `admin` como operador, quita el bloqueo y pone como contraseña el valor de `MEADA_ADMIN_PASSWORD` (o de `admin_password_file`) o, sin él, una contraseña aleatoria mostrada una vez en la salida estándar; el cambio queda obligatorio en el siguiente inicio de sesión. El comando registra `account.reset_admin` con `via` `cli` en la auditoría antes de cambiar la cuenta y sale con 1, sin cambiar nada, si no puede escribir el registro.
 
 En el navegador, `"sign_in": "accounts"` hace que la consola muestre su propia página de inicio de sesión en lugar de la redirección del proveedor de identidad. Un inicio de sesión que debe cambiar la contraseña va directo a una página que pide la contraseña actual y la nueva dos veces, muestra la regla que nombra el rechazo y no ofrece nada más hasta que el cambio tenga éxito, y entonces abre el workspace. El token de sesión vive en el `sessionStorage` de la pestaña (nunca en `localStorage`, una URL o un log), se envía como bearer y se olvida al salir, ante cualquier 401 que no sea una contraseña rechazada (la consola vuelve al inicio de sesión) y al cerrar la pestaña. La página de perfil ofrece el cambio voluntario de contraseña y la salida. El texto está en portugués e inglés.
+
+### Break glass
+
+Al configurar `[oidc]`, el inicio de sesión local se apaga para todas las cuentas: `[accounts]` junto a `[oidc]` es un error, salvo que lleve `break_glass = true`. Entonces solo la cuenta predeterminada `admin` entra en la consola, como operador global, junto a los tokens del proveedor de identidad, para cuando este está caído:
+
+```toml
+[accounts]
+break_glass = true
+public_key_file = "/run/secrets/meada-signing.pub.pem"
+private_key_file = "/run/secrets/meada-signing.pem"
+```
+
+`break_glass` sin `[oidc]` es un error, y `[accounts.groups]` y `[accounts.github]` no pueden estar bajo él: la cuenta de break glass no necesita concesión. Cualquier otro nombre de usuario recibe el mismo 401 que una contraseña equivocada, y la auditoría registra `not_break_glass`. La consola distingue los bearers por emisor antes de probar cualquier clave: un token cuyo `iss` es la `public_url` de la consola solo se verifica con la clave Ed25519 (y solo vale el de `admin`), cualquier otro solo con las claves del proveedor de identidad; por eso la consola rechaza el arranque si el `issuer` de `[oidc]` es su propia `public_url`. La cuenta de break glass cambia su propia contraseña; la administración de cuentas, los tokens de agente y la verificación de login no existen (404). Los nodos y el servidor de propuestas ignoran `[accounts]` junto a `[oidc]` y nunca leen la clave privada. `config` trae `"sign_in": "oidc"` con `"break_glass": true`, y el navegador, en lugar de redirigir directo al proveedor de identidad, muestra su botón y, discreto, un enlace a `/break-glass`, la página de inicio de sesión de la cuenta predeterminada; el enlace sigue ahí cuando el proveedor de identidad no responde.
 
 ## Flota y diagnóstico
 

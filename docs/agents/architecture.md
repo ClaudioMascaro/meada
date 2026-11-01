@@ -262,6 +262,14 @@ menu, no link, no session read, reached only while the stage is `forced`; the ch
 workspace) and `ProfilePage` (the session's fields, the voluntary change, sign-out), `account.ts`
 their view model and `account-i18n.ts` their pt-BR/en copy. The shell offers `/profile` with
 local accounts only. Agent tokens, the GitHub login and the accounts page are later tickets.
+Break glass (#563): when `config` says `"sign_in": "oidc"` with `"break_glass": true`, `main.tsx`
+builds a `LocalAuth` instead for a tab on `/break-glass` (`BREAK_GLASS_PATH`) or holding a
+session token (`breakGlassTab`); any other tab without a token gets `SignInChoicePage` before the
+identity provider's redirect (its button first, a discreet link to `/break-glass`, which stays
+when the identity provider cannot be reached), and the start's error page links there too. On
+that page `SignInPage` with `breakGlass` names the default account's door and links back to the
+identity provider; signed out, the tab returns to `/break-glass`, and signed in from it, to the
+workspace.
 The API reader preserves large JSON integers as decimal strings instead of rounding fences.
 `actions.ts` offers generation operations only to an operator while operations are enabled;
 `ActionControls.tsx` displays their CLI commands and the optional fence floor without rounding
@@ -827,9 +835,16 @@ one for the area a change touches.
   used; #554): local accounts. `File` is the `[accounts]` section and `File::validate` its
   `Config`: `public_key_env` or `public_key_file`, `private_key_env` or `private_key_file`,
   `admin_password_env` (`MEADA_ADMIN_PASSWORD` by default) or `admin_password_file`, at most one
-  of each pair (`Msg::AccountsBoth`), names only. `Manifest::read` refuses it without `[postgres]`
-  (`modules::needs`) and beside `[oidc]` (`Msg::AccountsBesideOidc`), and gives it its
-  `[postgres]`. `Config::keys` reads the key pair, only in the console and only at start: a key
+  of each pair (`Msg::AccountsBoth`), names only, and `break_glass` (false by default, #563).
+  `Manifest::read` refuses, before the sections are parsed, `[accounts.groups]` or
+  `[accounts.github]` under `break_glass = true` (`under_break_glass`,
+  `Msg::AccountsUnderBreakGlass`, naming the table); then the section without `[postgres]`
+  (`modules::needs`), beside `[oidc]` without `break_glass` (`Msg::AccountsBesideOidc`), and
+  `break_glass` without `[oidc]` (`Msg::AccountsBreakGlassNeedsOidc`, at `accounts.break_glass`),
+  and gives it its `[postgres]`. `issued_by` reads a token's `iss` without any check
+  (`jsonwebtoken::dangerous::insecure_decode_claims`), only to route a bearer to its one
+  verifier under break glass. `Config::keys` reads the key pair, only in the console and only at
+  start: a key
   not named (`Msg::AccountsKeyMissing`), an unset variable, an unreadable file (`KEY_MAX`), a key
   that is no Ed25519 key in PEM (`jsonwebtoken`'s `from_ed_pem`) or a private key that does not
   sign what the public key verifies (a probe token) refuses the start naming the key, never its
@@ -888,11 +903,14 @@ one for the area a change touches.
   once (`dir` and `public_url` required, `public_url` `https` or loopback `http` with nothing
   past the host through `modules::reachable`; `audience` defaults to `public_url`; `client_id`,
   `operations` defaults to false and requires `[oidc]` plus one operator key when true, or
-  `[accounts]` without `[oidc]` and no operator key (ADR 0024);
+  `[accounts]` without `[oidc]` and no operator key (ADR 0024; under break glass `[oidc]` is
+  there, so the operator key is still required);
   `operator_groups` and `operator_claim` are mutually exclusive and require `[oidc]`, and the
   groups key also requires `oidc.groups_claim`). `Console::start` refuses, listing every problem: a manifest error, no `[ui]`, `[oidc]`
   without `[ui] client_id`, `[oidc]` whose issuer's metadata or JWKS cannot be read
-  (`Oidc::start`, as a node), a `[ui] dir` that is not a directory, and the version check:
+  (`Oidc::start`, as a node), under break glass an `[oidc] issuer` equal to `[ui] public_url`
+  (`Msg::AccountsBreakGlassIssuer`, at `accounts.break_glass`, so an issuer always tells the two
+  apart), a `[ui] dir` that is not a directory, and the version check:
   `meada-ui.json` at the root of `[ui] dir` must be `{"version": "<this Meada version>"}`, and
   a missing, oversized (`VERSION_MAX`) or unreadable file counts as another version, both
   versions named. Each request goes, in order, through the `Host` check (403 unless `Host` is
@@ -928,8 +946,9 @@ one for the area a change touches.
   (#305) bound theirs through it. `/api/v1/` is the JSON API (`config`, `session`, `manifest`,
   and with `[oidc]` `admission` and `POST admission/check`; errors `{"error": {"code",
   "message"}}`, an unknown path a 404 in that shape, as the admission routes are without
-  `[oidc]`); `config` adds `sign_in` (`accounts` with `[accounts]`, `oidc` with `[oidc]`) and,
-  with `[oidc]`, the issuer, `client_id`, the scopes and the audience
+  `[oidc]`); `config` adds `sign_in` (`accounts` with `[accounts]`, `oidc` with `[oidc]`, and
+  then `break_glass: true` under break glass) and, with `[oidc]`, the issuer, `client_id`, the
+  scopes and the audience
   the browser's authorization code flow with PKCE needs; `session` is the subject and role (`viewer`, `team_operator`, `operator`) and, with `[oidc]`, `groups`
   (sorted), and with a local account's session token `account: true`, `grant` (`"*"` or sorted
   identities, the union of the grant providers', which every
@@ -1073,6 +1092,23 @@ one for the area a change touches.
   expire. Each sign-in and change
   writes one line `ui: <subject or -> <action> <username or ->: accepted` or `refused (<reason>)`;
   no line, record or error holds a password, a hash or a token.
+  Break glass (#563, `[accounts] break_glass = true` beside `[oidc]`): `Local::break_glass`.
+  `Console::admit` asks `Console::admit_break_glass` first: the static files, `config` and
+  `login` need no token; a bearer whose `iss` is `[ui] public_url` (`accounts::issued_by`,
+  before any key is tried) is checked by `Keys::verify` alone and must be `local:admin`'s,
+  else the 401 of local accounts, so a colleague's token from before the switch admits
+  nothing; the change-required mark opens `account/password` alone; the session is the global
+  operator's (`Session::local`, no group, `*`), with no directory lookup. Any other request,
+  a bearer of another issuer included, goes to the OIDC branch unchanged, so the identity
+  provider's JWKS never sees a Meada token nor the signing key an identity provider's. With
+  break glass `operations` is checked before admission, as with `[oidc]`. `POST login` with
+  any username but `admin` is `Console::not_break_glass`: the dummy hashed under a permit, the
+  table never read, the one 401, recorded with no subject, role `none` and the reason
+  `not_break_glass` (`Refusal::NotBreakGlass`). The tokens it signs, and the password change's,
+  carry the role `operator` and no group (`Local::signed_as`). `login` and `account/password`
+  are the only routes of local accounts, the password change only for a local session (an
+  identity provider's gets the 404); nodes (`mcp`) and the proposal server, which has no
+  `Local`, never read `[accounts]` and admit only the identity provider.
   `meada ui reset-admin --workspace <bootstrap manifest>` (#555, `ui::reset_admin`, features
   `ui` and `accounts`; `UiCommand::ResetAdmin`, an optional subcommand of `meada ui` whose
   `--listen` and `--workspace` it negates) is the one CLI twin of account administration:

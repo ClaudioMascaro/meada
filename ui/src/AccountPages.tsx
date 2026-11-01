@@ -5,12 +5,35 @@ import { changeCheck, changeProblem, signInProblem } from './account';
 import type { Session } from './api';
 import { copy } from './i18n';
 import type { Language } from './i18n';
+import { BREAK_GLASS_PATH } from './local';
 import type { LocalAuth } from './local';
 import { sessionModel } from './models';
 import './account.css';
 
-/** The console's own sign-in page: two labelled fields, one generic refusal. */
-export function SignInPage({ auth, locale, expired }: { auth: LocalAuth; locale: Language; expired: boolean }) {
+/**
+ * Under break glass (#563), before the identity provider's sign-in: its button first, and a
+ * discreet link to the console's own page, which only the default account can pass.
+ */
+export function SignInChoicePage({ locale, onIdentityProvider }: { locale: Language; onIdentityProvider: () => Promise<void> }) {
+  const t = accountCopy[locale];
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function go() {
+    setBusy(true); setFailed(false);
+    try { await onIdentityProvider(); } catch { setFailed(true); setBusy(false); }
+  }
+
+  return <div className="account-form">
+    <h1>{t.chooseTitle}</h1><p className="intro">{t.chooseIntro}</p>
+    {failed && <p className="error" role="alert">{t.identityProviderFailed}</p>}
+    <button type="button" disabled={busy} onClick={() => { void go(); }}>{busy ? t.redirecting : t.identityProvider}</button>
+    <a className="discreet" href={BREAK_GLASS_PATH}>{t.breakGlassLink}</a>
+  </div>;
+}
+
+/** The console's own sign-in page: two labelled fields, one generic refusal; under break glass, the default account's door with a way back to the identity provider. */
+export function SignInPage({ auth, locale, expired, breakGlass = false }: { auth: LocalAuth; locale: Language; expired: boolean; breakGlass?: boolean }) {
   const t = accountCopy[locale];
   const username = useId();
   const password = useId();
@@ -26,7 +49,7 @@ export function SignInPage({ auth, locale, expired }: { auth: LocalAuth; locale:
   }
 
   return <form className="account-form" onSubmit={event => { void submit(event); }} aria-busy={busy}>
-    <h1>{t.signInTitle}</h1><p className="intro">{t.signInIntro}</p>
+    <h1>{breakGlass ? t.breakGlassTitle : t.signInTitle}</h1><p className="intro">{breakGlass ? t.breakGlassIntro : t.signInIntro}</p>
     {expired && !problem && <p className="notice" role="status">{t.sessionEnded}</p>}
     <label htmlFor={username}>{t.username}</label>
     <input id={username} name="username" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false} required autoFocus />
@@ -34,6 +57,7 @@ export function SignInPage({ auth, locale, expired }: { auth: LocalAuth; locale:
     <input id={password} name="password" type="password" autoComplete="current-password" required />
     {problem && <p className="error" role="alert">{problem}</p>}
     <button type="submit" disabled={busy}>{busy ? t.signingIn : t.signInTitle}</button>
+    {breakGlass && <a className="discreet" href="/config">{t.backToIdentityProvider}</a>}
   </form>;
 }
 

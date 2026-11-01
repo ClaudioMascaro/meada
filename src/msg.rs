@@ -1070,9 +1070,22 @@ pub enum Msg<'a> {
     /// A private key that does not sign what the public key verifies.
     #[cfg(feature = "accounts")]
     AccountsKeyMismatch,
-    /// `[accounts]` beside `[oidc]`: local sign-in is off once an identity provider is configured.
+    /// `[accounts]` beside `[oidc]` without `break_glass = true`: local sign-in is off once an
+    /// identity provider is configured.
     #[cfg(feature = "accounts")]
     AccountsBesideOidc,
+    /// `[accounts] break_glass` without `[oidc]`: it keeps the default account beside an identity
+    /// provider, and there is none.
+    #[cfg(feature = "accounts")]
+    AccountsBreakGlassNeedsOidc,
+    /// A table of `[accounts]` (`groups`, `github`) under `break_glass`: the break-glass account is
+    /// the global operator and needs no grant. The table's dotted name.
+    #[cfg(feature = "accounts")]
+    AccountsUnderBreakGlass(&'a str),
+    /// `[oidc] issuer` equal to `[ui] public_url` under break glass: a token's issuer could not
+    /// tell the identity provider's tokens from the console's own.
+    #[cfg(all(feature = "ui", feature = "accounts"))]
+    AccountsBreakGlassIssuer,
     /// The password policy's rules, each named, never the password.
     #[cfg(feature = "accounts")]
     AccountsPasswordShort(usize),
@@ -3570,10 +3583,39 @@ impl Msg<'_> {
             #[cfg(feature = "accounts")]
             Msg::AccountsBesideOidc => pick(
                 "[accounts] cannot sit beside [oidc]: local sign-in is off once an identity \
-                 provider is configured"
+                 provider is configured; only `break_glass = true` keeps the default account"
                     .into(),
                 "[accounts] não pode ficar junto de [oidc]: o login local fica desligado quando \
-                 há um provedor de identidade"
+                 há um provedor de identidade; só `break_glass = true` mantém a conta padrão"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsBreakGlassNeedsOidc => pick(
+                "needs [oidc]: break glass keeps the default account beside an identity provider, \
+                 and none is configured"
+                    .into(),
+                "precisa de [oidc]: o break glass mantém a conta padrão junto de um provedor de \
+                 identidade, e não há nenhum"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsUnderBreakGlass(table) => pick(
+                format!(
+                    "[{table}] cannot sit under `break_glass = true`: the break-glass account is \
+                     the global operator and needs no grant"
+                ),
+                format!(
+                    "[{table}] não pode ficar sob `break_glass = true`: a conta de break glass é \
+                     o operador global e não precisa de concessão"
+                ),
+            ),
+            #[cfg(all(feature = "ui", feature = "accounts"))]
+            Msg::AccountsBreakGlassIssuer => pick(
+                "the identity provider's issuer is the console's own public_url: under break glass \
+                 a token's issuer must tell the two apart"
+                    .into(),
+                "o emissor do provedor de identidade é a própria public_url da console: com break \
+                 glass o emissor de um token precisa distinguir os dois"
                     .into(),
             ),
             #[cfg(feature = "accounts")]

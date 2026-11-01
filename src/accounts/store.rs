@@ -34,6 +34,9 @@ pub enum Refusal {
     Locked,
     /// The password is not the account's, and this failure locked it.
     LockedNow,
+    /// Under break glass, a username other than the default account's: the table is not read and
+    /// the password not checked (#563).
+    NotBreakGlass,
 }
 
 impl Refusal {
@@ -45,6 +48,7 @@ impl Refusal {
             Refusal::Suspended => "suspended",
             Refusal::Locked => "locked",
             Refusal::LockedNow => "locked_now",
+            Refusal::NotBreakGlass => "not_break_glass",
         }
     }
 }
