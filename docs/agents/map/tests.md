@@ -1008,8 +1008,10 @@ and `refresh-lock` features). A deactivated user is a 403 `deprovisioned` on eve
 `config` (a global and a team operator, a read and a write), the static files unchanged, the
 audit holding no row for the refusal and a never-provisioned user admitted; a deleted user stays
 refused until it is provisioned active; an `externalId` lookup is exact where a `userName` lookup
-ignores case. With the relay closed, reads are admitted, a write is a 503 `audit_unavailable` with
-no audit insert and one stderr line that names the directory and never the claim. The picker lists
+ignores case. With the relay closed, reads (`workspace` among them) are admitted, the picker is a
+503 `unavailable` taken from the admission, a write is a 503 `audit_unavailable` with no audit
+insert, and each request writes exactly one stderr line, the directory's, which never names the
+claim (#451). The picker lists
 group names by exact prefix, sorted, an empty prefix the first 100, a prefix over 256 a 400, for
 the global operator alone (a team operator and a viewer are refused). `owner_missing` appears
 only when true in `workspace` and `workspace/versions/<id>`: nothing flagged before a group was

@@ -771,8 +771,9 @@ impl Scim {
 
     /// The answer to an admitted request: `method` on `path` (under `/scim/v2`) with `query`
     /// and `body`, at most `SCIM_BODY_MAX` bytes, within `bound`. A request still running then is
-    /// a 503 like an unreachable Postgres, and its connection is dropped, so Postgres rolls it
-    /// back and the directory's lock is released.
+    /// a 503 like an unreachable Postgres, and its client is dropped: the connection closes once
+    /// Postgres answers the statement it stalled on (tokio-postgres waits for a pending
+    /// response), so Postgres rolls the transaction back and the directory's lock is released.
     pub async fn answer(
         &self,
         method: &Method,

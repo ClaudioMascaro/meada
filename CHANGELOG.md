@@ -9,18 +9,17 @@ All notable changes to Meada are recorded here. The format follows
 ### Added
 
 - The export format and the indexed commit (#512, ADR 0004 "Canonical export"): every export
-  starts with `format` (`meada_core::export::FORMAT`, 1), which rises only when a reader of the previous shape would
-  misread the new one, never for an added optional field; then `repository`, then `commit` and
-  `dirty`, both optional and left out together. Locally `meada export` reads `HEAD` before and
+  starts with `format` (`meada_core::export::FORMAT`, 1), which rises only when a reader of the
+  previous shape would misread the new one, never for an added optional field; then
+  `repository`, then `commit` and `dirty`, both optional and left out together. Locally `meada export` reads `HEAD` before and
   after its refresh and the checkout's status after it (ignored files, `.meada/` among them, do
   not count), and names the commit only when `HEAD` did not move and the index is fresh; outside
   git or before the first commit both are left out. In server mode they come from the commit
   `meada index --workspace` recorded beside the index, or a generation's `head`, never from the
   mirror's live `HEAD`, with `dirty` false. For `meada-core` crate users: `Export` gains
-  `format`, `commit` and `dirty` (a minor change, the struct being `#[non_exhaustive]`, so the next `meada-core` release is
-  1.1.0), and
-  `export::parse` refuses a document without `format`, naming the field, so an export written
-  before this release no longer parses. Every `*.export.json` golden gained the three fields.
+  `format`, `commit` and `dirty` (a minor change, the struct being `#[non_exhaustive]`, so the
+  next `meada-core` release is 1.1.0), and `export::parse` refuses a document without `format`,
+  naming the field, so an export written before this release no longer parses. Every `*.export.json` golden gained the three fields.
 
 - Named workspaces and the proposal server with local accounts (#562, ADR 0024, from #551):
   `[catalog]` and `[workspaces]` (and so `[proposals]`) accept `[accounts.github]` in place of
