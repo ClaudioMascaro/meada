@@ -361,12 +361,19 @@ impl Server {
         match admitted {
             Ok((admitted, user)) => {
                 #[cfg(feature = "directory")]
-                if let Some((refused, _)) = console.directory_refusal(user.as_deref(), false) {
-                    return Err(refused);
-                }
+                let down = match console.directory_refusal(user.as_deref(), false) {
+                    Ok(down) => down,
+                    Err((refused, _)) => return Err(refused),
+                };
                 #[cfg(not(feature = "directory"))]
                 let _ = user;
-                Ok(Session::admitted(admitted, Vec::new()))
+                #[allow(unused_mut)]
+                let mut session = Session::admitted(admitted, Vec::new());
+                #[cfg(feature = "directory")]
+                {
+                    session.directory_down = down;
+                }
+                Ok(session)
             }
             Err((status, challenge)) => {
                 let metadata = format!(
