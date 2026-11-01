@@ -6,7 +6,10 @@ use crate::common;
 
 use std::fs;
 
-use common::{assert_golden, chain, decisions, fixture_repo, without_processes};
+use common::{
+    assert_golden, assert_golden_but_indexed_commit, chain, decisions, fixture_repo,
+    without_processes,
+};
 use meada::engine::{Direction, Engine, Start};
 
 #[test]
@@ -130,7 +133,7 @@ fn a_decision_that_no_longer_fits_is_ignored() {
 
     // Every decision is stale, so the rest of the export is the core's.
     let (core, _) = export.split_once(",\n  \"stale_decisions\"").unwrap();
-    assert_golden("chain-web.export.json", &format!("{core}\n}}\n"));
+    assert_golden_but_indexed_commit("chain-web.export.json", &format!("{core}\n}}\n"));
     assert_golden("chain-web.unfit.export.json", &without_processes(&export));
 }
 

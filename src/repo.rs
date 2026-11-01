@@ -56,6 +56,21 @@ pub fn unclean(root: &Path, submodules: bool) -> Result<String> {
     run(root, &args)
 }
 
+/// Whether the checkout at `root` differs from `HEAD`: a changed, deleted or untracked file, but
+/// not an ignored one (so never the index's own `.meada/`), unlike `unclean`. Untracked files
+/// count whatever `status.showUntrackedFiles` says, since the index reads them. It writes
+/// nothing, not even the index's stat cache.
+pub fn changed(root: &Path) -> Result<bool> {
+    let args = [
+        "--no-optional-locks",
+        "status",
+        "--porcelain",
+        "--untracked-files=normal",
+    ];
+    let status = run(root, &args)?;
+    Ok(!status.is_empty())
+}
+
 /// Lower-cased host and path, with no scheme, user, port or `.git` suffix, so the SSH and
 /// HTTPS forms of one remote are equal.
 pub fn normalize_remote(url: &str) -> String {

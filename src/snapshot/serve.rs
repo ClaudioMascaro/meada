@@ -38,6 +38,15 @@ pub struct Held {
 }
 
 impl Held {
+    /// The commit the generation records for the repository `identity` (its indexed commit:
+    /// the pull refused a mirror that was not clean at it), if the generation holds it.
+    pub(crate) fn head(&self, identity: &str) -> Option<String> {
+        (self.document.repositories.iter())
+            .chain(&self.document.members)
+            .find(|e| e.identity == identity)
+            .map(|e| e.head.clone())
+    }
+
     /// The ids of the contexts the generation records, sorted.
     pub fn context_ids(&self) -> Vec<&str> {
         self.document
@@ -392,6 +401,19 @@ mod tests {
         assert_eq!(current.get().unwrap().id, B);
         // The cache let go of the generation no longer current: only the call holds it.
         assert_eq!(Arc::strong_count(&routed), 1);
+    }
+
+    /// An export at a generation names the commit its document records, which the pull checked
+    /// the mirror was clean at (#512).
+    #[test]
+    fn an_export_at_a_generation_names_the_head_it_records() {
+        let local = scratch("head");
+        generation(&local, A, &[("a.ts", "export function alpha() {}\n")]);
+        point(&local, A);
+        let engine = Engine::open_held(&held(&local).unwrap(), REPO, &|_| true).unwrap();
+        let export = meada_core::export::parse(&engine.export().unwrap()).unwrap();
+        let head = "0".repeat(40);
+        assert_eq!((export.commit, export.dirty), (Some(head), Some(false)));
     }
 
     #[test]

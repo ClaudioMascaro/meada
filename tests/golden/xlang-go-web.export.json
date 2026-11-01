@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/xlang-go/web",
+  "commit": "c6a50c77a6c250b471a07ddf2dea04fd990986c3",
+  "dirty": false,
   "files": [
     {
       "path": "app/api/audit/route.ts",

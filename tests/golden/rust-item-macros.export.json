@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/conformance",
+  "commit": "87092475e18e0dd85866cc16d2a83c5f86d45c6e",
+  "dirty": false,
   "files": [
     {
       "path": "src/lib.rs",

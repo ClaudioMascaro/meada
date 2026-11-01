@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/conformance",
+  "commit": "76d5121c23b11626124a3ec528df422319c67311",
+  "dirty": false,
   "files": [
     {
       "path": "Sources/Checkout/Checkout.swift",

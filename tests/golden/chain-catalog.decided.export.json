@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/chain/catalog",
+  "commit": "663b4c5895e4860def61a2eaa2c047af7ea26428",
+  "dirty": false,
   "files": [
     {
       "path": "app/api/events/route.ts",

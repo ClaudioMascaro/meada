@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/conformance",
+  "commit": "5ab0f659c65e0c294c945296733510e9efed19c3",
+  "dirty": false,
   "files": [
     {
       "path": "gradle/src/main/java/example/Receipt.java",

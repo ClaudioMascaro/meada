@@ -78,7 +78,8 @@ this file, and a change to these modules updates it.
   `snapshot/serve.rs` is what serving reads from a node (`--generations`): `node` (the
   manifest's `[snapshot]` section and `local_dir`), `held` (the current generation: the
   pointer file through `pull::current`, then `generation.json`, bounded and checked as the
-  generation's own), `Current` (the last generation `held` read, kept while the pointer names
+  generation's own), `Held::head` (the commit the document records for an identity, an export's indexed
+  commit at that generation), `Current` (the last generation `held` read, kept while the pointer names
   it; `Current::pinned` keeps one `Held` per pinned id, read once while held and dropped once
   `ids` no longer lists it, so what it keeps is bounded by what the node holds; a read that fails
   because a pull deleted the directory after the listing is `None`, the pin's 404, through

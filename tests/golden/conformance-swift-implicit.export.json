@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/conformance",
+  "commit": "8a11226d24441603358de6858754aaf37c50fbfe",
+  "dirty": false,
   "files": [
     {
       "path": "Sources/Implicit.swift",

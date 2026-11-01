@@ -352,6 +352,8 @@ this file, and a change to these modules updates it.
   after a clean indexing pass; its commit is accepted only while its fingerprint of the
   index's existing metadata and file/document/manifest hashes matches. Older indexes,
   interrupted writes and stale sidecars give an unknown commit; the SQLite schema is unchanged.
+  `index::indexed_commit` reads and checks it in every build: a server-mode export names it as
+  its `commit` (#512).
   `GET credentials` uses `github_app::inspect` to read installations, token expiry and
   throttle expiry times from Valkey only, filtering owners by the granted workspace identities;
   expiry is extracted beside the token in Valkey, so no token or private key is read by the

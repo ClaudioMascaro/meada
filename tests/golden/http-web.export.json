@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/web",
+  "commit": "950d554ef0fc94e037ce94e4fc76b6c0f3cdcc7e",
+  "dirty": false,
   "files": [
     {
       "path": "src/unlinked.ts",

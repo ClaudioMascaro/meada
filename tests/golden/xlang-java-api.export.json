@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/xlang-java/api",
+  "commit": "4c9b053549a31106fa0b03d8148b630ead0ab573",
+  "dirty": false,
   "files": [
     {
       "path": "src/main/java/com/example/api/AuditClient.java",

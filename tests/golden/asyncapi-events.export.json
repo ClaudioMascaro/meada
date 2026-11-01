@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/asyncapi/events",
+  "commit": "f19441a3048aada02ee6b99fd2283718e0652664",
+  "dirty": false,
   "files": [
     {
       "path": "src/emit.ts",

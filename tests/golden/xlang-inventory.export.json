@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/xlang/inventory",
+  "commit": "11701c4829b6c8ec37c268e88caf099f3c2679af",
+  "dirty": false,
   "files": [
     {
       "path": "inventory/__init__.py",

@@ -13,6 +13,16 @@ En la raíz del repositorio:
 - `meada decide` resuelve enlaces ambiguos y URLs dinámicas, ver Decisiones;
 - `meada mcp` sirve las [herramientas MCP](mcp.md).
 
+El export empieza por tres campos que dicen de dónde viene. `format` nombra el formato del
+export (1 hoy): sube cuando quien lee el formato anterior lo leería mal (un campo renombrado o
+eliminado, un significado cambiado), nunca por un campo opcional añadido, y no es la versión del
+esquema del índice. `commit` es el commit al que apuntaba `HEAD` cuando se leyó el índice, y
+`dirty` dice si el checkout difería de él (archivos cambiados, eliminados o sin seguimiento; los
+ignorados, como `.meada/`, no cuentan). Los dos desaparecen juntos fuera de git, antes del primer
+commit y cuando `HEAD` o los archivos cambian durante la actualización. En modo servidor vienen de
+lo que registró `meada index --workspace`, o de la generación, nunca del `HEAD` actual del espejo,
+y allí `dirty` es siempre `false`.
+
 Meada solo escribe dentro de `.meada/`, que se ignora a sí mismo en git. Toda consulta primero
 actualiza el índice con lo que cambió en los archivos, incluso lo que aún no se hizo commit. Los
 mensajes de la línea de comandos siguen `LANG` (portugués o inglés); los del MCP son siempre en

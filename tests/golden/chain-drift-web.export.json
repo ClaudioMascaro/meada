@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/chain/web",
+  "commit": "61cffad426a1e62fdf84f5f3690f13ee402be9ef",
+  "dirty": false,
   "files": [
     {
       "path": "src/api/body.ts",

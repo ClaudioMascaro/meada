@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/pkg/mono",
+  "commit": "e7723c7b5c2eb0c762026fc8e22924097342b383",
+  "dirty": false,
   "files": [
     {
       "path": "packages/a/src/index.js",

@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/conformance",
+  "commit": "866c48a6dccf3f175e6fe6d1e994b41b8fca9f93",
+  "dirty": false,
   "files": [
     {
       "path": "billing/invoice/invoice.go",

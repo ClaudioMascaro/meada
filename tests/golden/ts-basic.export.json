@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/web",
+  "commit": "335c9144399c242f2d75155459bbc2db6004411b",
+  "dirty": true,
   "files": [
     {
       "path": "src/draft.ts",

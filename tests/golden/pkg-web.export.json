@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/pkg/web",
+  "commit": "097135b3f87e451e99b3493d777dcca75420d6f9",
+  "dirty": false,
   "files": [
     {
       "path": "e2e/smoke.ts",

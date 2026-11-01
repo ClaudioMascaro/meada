@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/client",
+  "commit": "e851c58df4d39df7b8c44f60e05b6d283f69c276",
+  "dirty": false,
   "files": [
     {
       "path": "src/client.ts",

@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/conformance",
+  "commit": "1f6ace2c73e6975f933673b0ba88172bf664ebc3",
+  "dirty": false,
   "files": [
     {
       "path": "legacy/Old.cs",
