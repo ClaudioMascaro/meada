@@ -1,6 +1,15 @@
 {
+  "extraKnownMarketplaces": {
+    "ponytail": {
+      "source": { "source": "github", "repo": "DietrichGebert/ponytail" }
+    }
+  },
   "enabledPlugins": {
-    "mattpocock-skills@claude-plugins-official": false
+    "mattpocock-skills@claude-plugins-official": false,
+    "ponytail@ponytail": true
+  },
+  "env": {
+    "PONYTAIL_DEFAULT_MODE": "lite"
   },
   "enabledMcpjsonServers": ["meada"],
   "permissions": {
