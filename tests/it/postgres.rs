@@ -624,11 +624,21 @@ impl Relay {
         });
     }
 
-    /// Opens the relay again, on its port, after `close`.
+    /// Opens the relay again, on its port, after `close`. The freed port can be held for a moment
+    /// by another test's socket under a loaded run, so the bind is retried for up to five seconds.
     #[cfg(feature = "github-app")]
     pub(crate) fn open(&self) {
         self.open.store(true, std::sync::atomic::Ordering::SeqCst);
-        let listener = TcpListener::bind(("127.0.0.1", self.port)).unwrap();
+        let start = Instant::now();
+        let listener = loop {
+            match TcpListener::bind(("127.0.0.1", self.port)) {
+                Ok(listener) => break listener,
+                Err(_) if start.elapsed() < Duration::from_secs(5) => {
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                Err(e) => panic!("the relay cannot bind its port again: {e}"),
+            }
+        };
         Self::serve(listener, self.to.clone(), self.open.clone());
     }
 
