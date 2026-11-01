@@ -111,8 +111,8 @@ Meada 1.0 entrega todo el alcance de la v1 del [ADR 0003](docs/adr/0003-v1-scope
 - **Niveles**: un nivel en cada enlace, cadenas que atraviesan repositorios y decisiones con
   decisor opcional (`meada decide`).
 - **Análisis**: drift de forma, comunidades y procesos.
-- **Lenguajes en 1.0**: TypeScript y JavaScript, Python, Go y Rust. Java, Kotlin, C# y Swift son
-  trabajo planificado de la Release 2 y llegan después como versiones 1.x (#26 a #29, ADR 0003).
+- **Lenguajes en 1.0**: nueve, TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, C# y
+  Swift (#26 a #29, ADR 0003).
 
 **Promesa de estabilidad.** Desde 1.0 rige semver: un cambio incompatible en alguno de estos
 elementos exige una versión major.
