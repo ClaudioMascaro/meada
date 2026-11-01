@@ -112,6 +112,8 @@ O par de chaves é Ed25519 em PEM (`openssl genpkey -algorithm ed25519 -out mead
 
 `POST /api/v1/login` recebe `{"username", "password"}` e responde `{"token", "expires_at", "change_required"}`: um token de sessão que a console assina e aceita por oito horas como bearer, em toda rota menos os arquivos estáticos, `config` e `login`. Um usuário desconhecido e uma senha errada recebem o mesmo 401 `invalid_credentials`. Com a troca pendente, só `POST /api/v1/account/password` (`{"current", "new"}`) aceita o token; ela devolve um token novo. `config` traz `"sign_in": "accounts"` e `session` traz `"account": true`. Cada login, recusa e troca de senha fica na auditoria (`account.login`, `account.password`) antes do token, sem senha nem token; sem o registro, a resposta é 503 `audit_unavailable`. Limite a taxa de `/api/v1/login` no proxy.
 
+No navegador, `"sign_in": "accounts"` faz a console mostrar a própria página de entrada em vez do redirecionamento do provedor de identidade. Uma entrada que precisa trocar a senha vai direto a uma página que pede a senha atual e a nova duas vezes, mostra a regra que a recusa nomeia e não oferece mais nada até a troca dar certo, e então abre o workspace. O token de sessão fica no `sessionStorage` da aba (nunca em `localStorage`, numa URL ou num log), é enviado como bearer e é esquecido ao sair, em qualquer 401 que não seja uma senha recusada (a console volta à entrada) e quando a aba fecha. A página de perfil oferece a troca voluntária de senha e a saída. O texto está em português e inglês.
+
 ## Frota e diagnóstico
 
 Cada `snapshot pull --every` envia um heartbeat, o registro periódico de estado do nó. Ele informa geração, fence, gerações locais, prontidão, versão e horário.

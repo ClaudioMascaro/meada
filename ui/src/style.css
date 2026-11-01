@@ -24,6 +24,7 @@ button.secondary { color: var(--accent); background: #fff; }
 button.secondary:hover { background: #eaf0eb; }
 select { padding: .35rem 2rem .35rem .65rem; border: 1px solid #aab7b2; border-radius: 4px; background: #fff; }
 .console-shell { min-height: 100dvh; display: grid; grid-template-columns: 240px minmax(0, 1fr); grid-template-rows: auto 1fr; }
+.console-shell.locked { grid-template-columns: minmax(0, 1fr); }
 .topbar { grid-column: 1 / -1; min-height: 84px; display: flex; justify-content: space-between; align-items: center; gap: 2rem; padding: 1rem 2rem; background: #fff; border-bottom: 1px solid var(--line); }
 .brand { font-size: 1.4rem; font-weight: 700; text-decoration: none; color: #193f36; display: flex; align-items: baseline; gap: 1.25rem; }
 .brand span { font-size: .9rem; font-weight: 400; color: var(--muted); }

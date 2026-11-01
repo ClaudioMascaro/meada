@@ -684,6 +684,24 @@ store too, the default account saves a workspace version after its change, audit
 `workspace.save` under `local:admin` and listed with that author. `tests/it/postgres.rs` holds
 migration 9's columns, and the tests that name the schema version moved to 9.
 
+### Local accounts: the console's pages (#556)
+
+`ui/tests/local.test.ts` holds the client: the sign-in posting to `login` and keeping the token in
+`sessionStorage` alone (no `localStorage`, cookie or address), the bearer on the next request, a
+change-required sign-in bound to the change also after a reload, an expired or malformed stored
+session dropped, a refused sign-in keeping nothing, sign-out, the password change's bearer and
+fresh token, a refused current password (401 `invalid_credentials`) keeping the session while any
+other 401 ends it, any 401 of the API ending it, a 403 `password_change_required` binding the tab to
+the forced change (kept across a reload), no `console` call carrying the token. `ui/tests/account.test.ts` is the view
+model (the one generic refusal, `busy` and `audit_unavailable` distinct, each password rule in
+both languages, the form's local checks) and the copy's parity. `ui/tests/AccountPages.test.tsx`
+is the DOM of each page in both languages (labels, input types and autocomplete, keyboard
+reachability, the locked shell with no link, the refusals, the unbinding change, the profile's
+voluntary change and sign-out); `ui/tests/LocalAccounts.test.tsx` runs the app over the built
+WebAssembly: the default account's first sign-in through the forced change to the workspace
+with no other request before the change, a 401 returning to the sign-in page with the token
+gone, the profile and sign-out in Portuguese, and the identity provider's flow unchanged.
+
 ### The directory (#334)
 
 `tests/it/ui/oidc/directory.rs` runs a console with `[oidc]` (the `oidc` module's loopback

@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { Config, Manifest, Session } from './api';
-import { Api, ApiError } from './api';
+import { Api, ApiError, isLocal } from './api';
+import type { Stage } from './local';
+import { ForcedChangePage, ProfilePage, SignInPage } from './AccountPages';
 import { copy } from './i18n';
 import type { Language } from './i18n';
 import { loadCore } from './core';
@@ -13,6 +15,8 @@ import { AuditPage } from './AuditPage';
 import { CatalogPage } from './CatalogPage';
 import { NamedWorkspacesPage } from './NamedWorkspacesPage';
 
+const noSubscription = () => () => {};
+
 export function App({ api, config, initialLanguage }: { api: Api; config: Config; initialLanguage: Language }) {
   const [locale, setLocale] = useState(initialLanguage);
   const [path, setPath] = useState(location.pathname === '/' ? '/config' : location.pathname);
@@ -22,6 +26,10 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
   const [attempt, setAttempt] = useState(0);
   const [signedOut, setSignedOut] = useState(false);
   const t = copy[locale];
+  // With local accounts the tab is signed out, signed in but bound to its password change, or in.
+  const local = isLocal(api.auth) ? api.auth : undefined;
+  const stage: Stage = useSyncExternalStore(local?.subscribe ?? noSubscription, () => local?.stage() ?? 'in');
+  const before = useRef(stage);
   const operational = (['fleet', 'store', 'repositories', 'credentials', 'admission'] as const).find(kind => path === `/${kind}`);
 
   function navigate(next: string) {
@@ -42,22 +50,34 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
     void loadCore(locale).catch(setError);
   }, [locale]);
 
+  // A session that ends (sign-out or a 401) returns to the first page and forgets what it read; the
+  // change that frees a bound session opens the workspace.
   useEffect(() => {
-    if (signedOut) return;
+    const was = before.current;
+    before.current = stage;
+    if (stage === 'out' && was !== 'out') {
+      history.replaceState(null, '', '/config'); setPath('/config'); setSession(undefined); setManifest(undefined); setError(undefined);
+    } else if (stage === 'in' && was === 'forced') {
+      navigate('/workspace');
+    }
+  }, [stage]);
+
+  useEffect(() => {
+    if (signedOut || stage !== 'in') return;
     let current = true;
     setError(undefined);
     api.session().then(value => { if (current) setSession(value); }).catch(problem => { if (current) setError(problem); });
     return () => { current = false; };
-  }, [api, attempt, signedOut]);
+  }, [api, attempt, signedOut, stage]);
 
   useEffect(() => {
-    if (path !== '/manifest' || !session || signedOut) return;
+    if (path !== '/manifest' || !session || signedOut || stage !== 'in') return;
     let current = true;
     setManifest(undefined);
     setError(undefined);
     api.manifest().then(value => { if (current) setManifest(value); }).catch(problem => { if (current) setError(problem); });
     return () => { current = false; };
-  }, [api, path, session, attempt, signedOut]);
+  }, [api, path, session, attempt, signedOut, stage]);
 
   useEffect(() => {
     const route = routes.find(route => route.path === path);
@@ -67,11 +87,19 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
 
   async function login() {
     setError(undefined);
+    if (isLocal(api.auth)) return;
     try { await api.auth.login(); } catch (problem) { setError(problem); }
   }
 
+  if (local && stage !== 'in') {
+    return <Shell path={path} locale={locale} onLanguage={setLocale} t={t} locked>
+      {stage === 'forced' ? <ForcedChangePage auth={local} locale={locale} />
+        : <SignInPage auth={local} locale={locale} expired={local.expired} />}
+    </Shell>;
+  }
+
   const failed = error instanceof ApiError ? error.code === 'session_expired' ? t.sessionExpired : error.message : t.loadError;
-  return <Shell path={path} locale={locale} onLanguage={setLocale} session={session} t={t} onNavigate={navigate} audit={config.audit === true} catalog={config.catalog === true} workspaces={config.workspaces !== undefined}>
+  return <Shell path={path} locale={locale} onLanguage={setLocale} session={session} t={t} onNavigate={navigate} audit={config.audit === true} catalog={config.catalog === true} workspaces={config.workspaces !== undefined} profile={local !== undefined}>
     {signedOut ? <>
       <h1>{t.session}</h1><button type="button" onClick={() => { void login(); }}>{t.signIn}</button>
       {error != null && <p className="error" role="alert">{t.loginError}</p>}
@@ -82,9 +110,10 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
       <h1>{t.loadError}</h1><p className="error" role="alert">{failed}</p>
       <button type="button" onClick={() => { setError(undefined); setAttempt(value => value + 1); }}>{t.retry}</button>
     </> : path === '/config' ? <ConfigPage config={config} t={t} />
-      : path === '/session' ? session ? <SessionPage session={session} t={t} onSignOut={config.issuer ? () => {
+      : path === '/session' ? session ? <SessionPage session={session} t={t} onSignOut={local ? () => local.clear() : config.issuer ? () => {
         api.auth.clear(); setSession(undefined); setSignedOut(true);
       } : undefined} /> : <p role="status">{t.loading}</p>
+      : path === '/profile' ? local ? session ? <ProfilePage auth={local} locale={locale} session={session} /> : <p role="status">{t.loading}</p> : <h1>{t.notFound}</h1>
       : path === '/manifest' ? manifest ? <ManifestPage manifest={manifest} t={t} /> : <p role="status">{t.loading}</p>
       : path === '/workspace' ? session ? <WorkspacePage api={api} locale={locale} session={session} config={config} onSession={setSession} /> : <p role="status">{t.loading}</p>
       : path === '/playground' ? <PlaygroundPage api={api} locale={locale} />

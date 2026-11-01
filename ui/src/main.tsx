@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { Api, loadConfig } from './api';
 import { Auth } from './auth';
+import { LocalAuth } from './local';
 import { copy, language } from './i18n';
 import { loadCore } from './core';
 import './style.css';
@@ -21,6 +22,12 @@ async function start() {
     sessionStorage.removeItem('meada.pkce.state');
     sessionStorage.removeItem('meada.pkce.verifier');
     location.replace(config.public_url);
+    return;
+  }
+  // Local accounts (ADR 0024): the console's own sign-in page, the token in this tab's sessionStorage.
+  if (config.sign_in === 'accounts') {
+    await loadCore(locale);
+    root.render(<App api={new Api(new LocalAuth(config))} config={config} initialLanguage={locale} />);
     return;
   }
   const auth = new Auth(config);

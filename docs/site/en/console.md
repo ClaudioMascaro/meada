@@ -112,6 +112,8 @@ The key pair is Ed25519 in PEM (`openssl genpkey -algorithm ed25519 -out meada-s
 
 `POST /api/v1/login` takes `{"username", "password"}` and answers `{"token", "expires_at", "change_required"}`: a session token the console signs and accepts for eight hours as a bearer on every route but the static files, `config` and `login`. An unknown username and a wrong password get the same 401 `invalid_credentials`. While a change is pending, only `POST /api/v1/account/password` (`{"current", "new"}`) accepts the token; it answers a fresh one. `config` carries `"sign_in": "accounts"` and `session` carries `"account": true`. Every sign-in, refusal and password change is audited (`account.login`, `account.password`) before the token, with no password or token; without the record, the answer is a 503 `audit_unavailable`. Rate-limit `/api/v1/login` at the proxy.
 
+In the browser, `"sign_in": "accounts"` makes the console show its own sign-in page instead of the identity provider's redirect. A sign-in that must change its password goes straight to a page that asks for the current password and the new one twice, shows the rule a refusal names and offers nothing else until the change succeeds, then opens the workspace. The session token lives in the tab's `sessionStorage` (never `localStorage`, a URL or a log), is sent as the bearer, and is forgotten on sign-out, on any 401 other than a refused password (the console returns to sign-in) and when the tab closes. The profile page offers the voluntary password change and sign-out. Copy is in Portuguese and English.
+
 ## Fleet and diagnostics
 
 Each `snapshot pull --every` sends a heartbeat, the node's periodic status record. It reports generation, fence, local generations, readiness, version and time.

@@ -245,6 +245,23 @@ role, owners, action, arguments, outcome and message into text, with copy in `au
 `pages.tsx`'s `offered` lists the page for the global operator alone when `config` says
 `"audit": true` (the console has `[postgres]`), and `App.tsx` answers its path with the
 not-found page otherwise.
+Local accounts (#556, ADR 0024): when `config` says `"sign_in": "accounts"`, `main.tsx` builds a
+`LocalAuth` (`local.ts`) instead of `Auth` and `App.tsx` follows its `stage` (`out`, `forced`,
+`in`) through `useSyncExternalStore`. `LocalAuth` posts `login` and `account/password` itself
+and keeps the session token and its marks (`{token, expires_at, change_required}`) under the one
+`sessionStorage` key `meada.session`, never `localStorage`, a URL or a log; a record past its
+`expires_at` or unreadable is dropped at load. `Api` (`isLocal`) clears the token on any 401
+(`LocalAuth.expire`, so the sign-in page returns, saying the session ended) and binds the tab to
+the forced change on a 403 `password_change_required` (`LocalAuth.requireChange`); the one 401
+that keeps the session is the `invalid_credentials` of a refused current password, which only
+`LocalAuth.changePassword` sees; sign-out is `LocalAuth.clear`. `AccountPages.tsx` holds
+`SignInPage` (labelled username and password, one generic refusal, `busy` and
+`audit_unavailable` named), `PasswordForm` (current password, the new one twice; the server's
+`rule` code shown as the page's own copy) with `ForcedChangePage` (a `Shell` with `locked`: no
+menu, no link, no session read, reached only while the stage is `forced`; the change opens the
+workspace) and `ProfilePage` (the session's fields, the voluntary change, sign-out), `account.ts`
+their view model and `account-i18n.ts` their pt-BR/en copy. The shell offers `/profile` with
+local accounts only. Agent tokens, the GitHub login and the accounts page are later tickets.
 The API reader preserves large JSON integers as decimal strings instead of rounding fences.
 `actions.ts` offers generation operations only to an operator while operations are enabled;
 `ActionControls.tsx` displays their CLI commands and the optional fence floor without rounding

@@ -26,6 +26,17 @@ All notable changes to Meada are recorded here. The format follows
   is audited (`account.login`, `account.password`, role `none` for an unknown username) before its
   token. The module table gains `accounts`; no golden changed.
 
+- The console's sign-in pages for local accounts (#556, from #551): when `config` says
+  `"sign_in": "accounts"` the console shows its own sign-in page (labelled username and password,
+  one generic refusal, `busy` and `audit_unavailable` shown as themselves) instead of the identity
+  provider's redirect. A change-required sign-in goes straight to a forced password change page
+  (the current password and the new one twice, the server's rule shown on a refusal) that offers
+  nothing to navigate to until it succeeds, and then opens the workspace. The session token lives
+  in `sessionStorage` for the tab's life, is sent as the bearer and is cleared on sign-out and on
+  any 401 (which returns to sign-in; a refused current password in the change is not one); it is never in `localStorage`, a URL
+  or a log. A profile page offers the voluntary password change and sign-out. pt-BR and English
+  copy; the identity provider flow is unchanged. Front end only: no golden changed.
+
 - `meada status` names a Kotlin file the grammar misreads (#546, from #434). A declaration read
   as an infix call leaves the file out of the index; the file now sets the new `Facts::misparsed`
   (absent from every other file's stored facts) instead of `unbuilt`, and a new status line,

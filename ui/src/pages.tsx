@@ -19,25 +19,29 @@ export const routes = [
   { path: '/audit', label: 'audit' },
   { path: '/catalog', label: 'catalog' },
   { path: '/workspaces', label: 'workspaces' },
+  { path: '/profile', label: 'profile' },
 ] as const;
 
-/** The pages `session` is offered: the audit, when the console has one, is the global operator's alone, and the catalog (#341) and the named workspaces (#342) are every admitted subject's when the console has them. */
-export function offered(session?: Session, audit = false, catalog = false, workspaces = false) {
-  return routes.filter(route => (route.path !== '/audit' || (audit && session?.role === 'operator')) && (route.path !== '/catalog' || catalog) && (route.path !== '/workspaces' || workspaces));
+/** The pages `session` is offered (the profile, with local accounts): the audit, when the console has one, is the global operator's alone, and the catalog (#341) and the named workspaces (#342) are every admitted subject's when the console has them. */
+export function offered(session?: Session, audit = false, catalog = false, workspaces = false, profile = false) {
+  return routes.filter(route => (route.path !== '/profile' || profile) && (route.path !== '/audit' || (audit && session?.role === 'operator')) && (route.path !== '/catalog' || catalog) && (route.path !== '/workspaces' || workspaces));
 }
 
-export function Shell({ path, locale, onLanguage, session, t, children, onNavigate, audit, catalog, workspaces }: {
+/** `locked`: the page offers nothing to navigate to (the sign-in and the forced password change), so no link and no menu. */
+export function Shell({ path, locale, onLanguage, session, t, children, onNavigate, audit, catalog, workspaces, profile, locked }: {
   path: string; locale: Language; onLanguage: (language: Language) => void;
   session?: Session; t: Copy; children: ReactNode; onNavigate?: (path: string) => void; audit?: boolean; catalog?: boolean; workspaces?: boolean;
+  profile?: boolean; locked?: boolean;
 }) {
   function follow(event: MouseEvent<HTMLAnchorElement>, target: string) {
     if (!onNavigate || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     event.preventDefault(); onNavigate(target);
   }
-  return <div className="console-shell">
+  return <div className={locked ? 'console-shell locked' : 'console-shell'}>
     <a className="skip-link" href="#main">{t.skip}</a>
     <header className="topbar">
-      <a className="brand" href="/config" onClick={event => follow(event, "/config")}>Meada<span>{t.console}</span></a>
+      {locked ? <span className="brand">Meada<span>{t.console}</span></span>
+        : <a className="brand" href="/config" onClick={event => follow(event, "/config")}>Meada<span>{t.console}</span></a>}
       <label className="language-picker">{t.language}
         <select value={locale} onChange={event => onLanguage(event.target.value === 'pt-BR' ? 'pt-BR' : 'en')}>
           <option value="pt-BR" lang="pt-BR">Português</option>
@@ -45,9 +49,9 @@ export function Shell({ path, locale, onLanguage, session, t, children, onNaviga
         </select>
       </label>
     </header>
-    <aside className="sidebar">
+    {!locked && <aside className="sidebar">
       <nav aria-label={t.navigation}>
-        {offered(session, audit, catalog, workspaces).map(route => <a key={route.path} href={route.path} onClick={event => follow(event, route.path)} aria-current={path === route.path ? 'page' : undefined}>
+        {offered(session, audit, catalog, workspaces, profile).map(route => <a key={route.path} href={route.path} onClick={event => follow(event, route.path)} aria-current={path === route.path ? 'page' : undefined}>
           {t[route.label]}
         </a>)}
       </nav>
@@ -55,7 +59,7 @@ export function Shell({ path, locale, onLanguage, session, t, children, onNaviga
         <span className="role">{t[session.role]}</span>
         <span className="subject">{session.subject ?? t.anonymous}</span>
       </div>}
-    </aside>
+    </aside>}
     <main id="main" tabIndex={-1}>{children}</main>
   </div>;
 }
