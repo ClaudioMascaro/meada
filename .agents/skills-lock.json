@@ -2,7 +2,7 @@
   "version": 1,
   "upstream": {
     "repo": "mattpocock/skills",
-    "commit": "49dd158d1076134a641b33efb035946536778336"
+    "commit": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d"
   },
   "skills": {
     "ask-matt": {
@@ -12,8 +12,8 @@
     },
     "chief-of-staff": {
       "path": "skills/in-progress/chief-of-staff",
-      "upstreamTree": "22d9deee06f8fe60b752ea386c5fa50312aa15c3",
-      "tree": "22d9deee06f8fe60b752ea386c5fa50312aa15c3"
+      "upstreamTree": "58e0a4122260ba45c150d8201dad2d6de4153d18",
+      "tree": "58e0a4122260ba45c150d8201dad2d6de4153d18"
     },
     "claude-handoff": {
       "path": "skills/in-progress/claude-handoff",
@@ -22,13 +22,13 @@
     },
     "code-review": {
       "path": "skills/engineering/code-review",
-      "upstreamTree": "fee7bb5fdddc069d58cbea09b2c36b5a859eac05",
-      "tree": "fee7bb5fdddc069d58cbea09b2c36b5a859eac05"
+      "upstreamTree": "a8ef561571acbb611de8ff19ba6da75b197c63a8",
+      "tree": "a8ef561571acbb611de8ff19ba6da75b197c63a8"
     },
     "codebase-design": {
       "path": "skills/engineering/codebase-design",
-      "upstreamTree": "07ba1cd60efc12d0d3a083005c1d9651cf15e39a",
-      "tree": "07ba1cd60efc12d0d3a083005c1d9651cf15e39a"
+      "upstreamTree": "4cbe1c131e1ea54109cb1e4e5f3c505810db6606",
+      "tree": "4cbe1c131e1ea54109cb1e4e5f3c505810db6606"
     },
     "diagnosing-bugs": {
       "path": "skills/engineering/diagnosing-bugs",
@@ -57,8 +57,8 @@
     },
     "grilling": {
       "path": "skills/productivity/grilling",
-      "upstreamTree": "28aceb4c9567b985cb47f7db88cf23c9f33af8b8",
-      "tree": "d56b94d60ef332d0b5f5514182965bdb4d703384"
+      "upstreamTree": "f551b6e0d219fdda0b6abf277f8f915b3127d1e9",
+      "tree": "7321147a23222c09e9a55eba0463ee35cc8bf14d"
     },
     "handoff": {
       "path": "skills/productivity/handoff",
@@ -72,13 +72,13 @@
     },
     "implement-spec": {
       "path": "skills/engineering/implement-spec",
-      "upstreamTree": "0cfefc751d0cb64f0c948ffcb17e13b94e778f08",
-      "tree": "194467392a5794a2baeaa5596be4297f024ea6d8"
+      "upstreamTree": "407c196f5c88af53c71efc8f31ee37c02dbb12e7",
+      "tree": "6655c7ddd7a351c05830d9c516e9cfad8bf41d99"
     },
     "improve-codebase-architecture": {
       "path": "skills/engineering/improve-codebase-architecture",
-      "upstreamTree": "39bd9cc130f7dfcc4e3ea0b3613f6ebed0d0ad2b",
-      "tree": "39bd9cc130f7dfcc4e3ea0b3613f6ebed0d0ad2b"
+      "upstreamTree": "587147dd230da299cc5e84971cb0a33f6676f8a6",
+      "tree": "587147dd230da299cc5e84971cb0a33f6676f8a6"
     },
     "loop-me": {
       "path": "skills/in-progress/loop-me",
@@ -102,8 +102,8 @@
     },
     "research": {
       "path": "skills/engineering/research",
-      "upstreamTree": "0a6796c5667e95ed2301ba7381c123b4acb2ae1a",
-      "tree": "7b60c507d99681865e538981abe4486d514e38e1"
+      "upstreamTree": "2f8f36af48796faed5c687c75bb650071631a984",
+      "tree": "c05e3566872b9d74b04d131d28154a41b5b01740"
     },
     "retro": {
       "path": "skills/engineering/retro",
@@ -117,8 +117,8 @@
     },
     "setup-matt-pocock-skills": {
       "path": "skills/engineering/setup-matt-pocock-skills",
-      "upstreamTree": "aafaabf96fa3945d8a4069317a7a6d36b7169670",
-      "tree": "aafaabf96fa3945d8a4069317a7a6d36b7169670"
+      "upstreamTree": "b644b684781fd5baae57f6be000a180a4d4448d7",
+      "tree": "b644b684781fd5baae57f6be000a180a4d4448d7"
     },
     "setup-pre-commit": {
       "path": "skills/misc/setup-pre-commit",
@@ -167,8 +167,8 @@
     },
     "wayfinder": {
       "path": "skills/engineering/wayfinder",
-      "upstreamTree": "32b0ce970b1394ede47116e1d3e07f9ccc87591f",
-      "tree": "32b0ce970b1394ede47116e1d3e07f9ccc87591f"
+      "upstreamTree": "25da74eadc3e388b2f2a2cc716f3d44b2fb9dfe0",
+      "tree": "25da74eadc3e388b2f2a2cc716f3d44b2fb9dfe0"
     },
     "wizard": {
       "path": "skills/engineering/wizard",
