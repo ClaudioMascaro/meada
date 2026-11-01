@@ -108,3 +108,29 @@ test('the identity provider flow is unchanged: no sign-in page, no profile and t
   expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe(copy.en.notFound);
   expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
 });
+
+test('the accounts page is the global operator\'s: listed and open for an operator, the not-found page for a viewer and under the identity provider', async () => {
+  const live = JSON.stringify({ token: 'live', expires_at: new Date(Date.now() + 3600_000).toISOString(), change_required: false });
+  const answers = (session: object) => vi.fn(async (url: string) => Response.json(url === '/api/v1/session' ? session : { accounts: [] }));
+  sessionStorage.setItem(SESSION_KEY, live);
+  vi.stubGlobal('fetch', answers(operator));
+  await mount(new LocalAuth(config));
+  await waitFor(() => expect(host.textContent).toContain('local:admin'));
+  await act(() => { fireEvent.click(getByRole(host, 'link', { name: copy.en.accounts })); });
+  expect(location.pathname).toBe('/accounts');
+  await waitFor(() => expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe('Accounts'));
+  await act(() => root.render(null));
+
+  vi.stubGlobal('fetch', answers({ subject: 'local:ana', role: 'viewer', account: true }));
+  await mount(new LocalAuth(config));
+  await waitFor(() => expect(host.textContent).toContain('local:ana'));
+  expect(queryByRole(host, 'link', { name: copy.en.accounts })).toBeNull();
+  expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe(copy.en.notFound);
+  await act(() => root.render(null));
+
+  vi.stubGlobal('fetch', answers({ subject: 'alice', role: 'operator' }));
+  await act(() => root.render(<App api={new Api(new Auth(oidc))} config={oidc} initialLanguage="en" />));
+  await waitFor(() => expect(host.textContent).toContain('alice'));
+  expect(queryByRole(host, 'link', { name: copy.en.accounts })).toBeNull();
+  expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe(copy.en.notFound);
+});

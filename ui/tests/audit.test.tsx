@@ -40,7 +40,7 @@ test('a sign-in refused for an unknown username shows no subject and the role no
     action: 'account.login', arguments: { reason: 'unknown' }, outcome: 'refused', message: 'the username or the password is wrong',
   }] };
   expect(auditModel(unknown, auditCopy.en)[0]).toMatchObject({
-    subject: 'None', role: 'None', action: 'account.login', arguments: 'reason: unknown', outcome: 'Refused',
+    subject: 'None', role: 'None', action: 'Sign-in (account.login)', arguments: 'reason: unknown', outcome: 'Refused',
   });
   expect(auditModel(unknown, auditCopy['pt-BR'])[0]).toMatchObject({ subject: 'Nenhum', role: 'Nenhum' });
 });

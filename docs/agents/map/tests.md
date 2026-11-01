@@ -747,6 +747,12 @@ voluntary change and sign-out); `ui/tests/LocalAccounts.test.tsx` runs the app o
 WebAssembly: the default account's first sign-in through the forced change to the workspace
 with no other request before the change, a 401 returning to the sign-in page with the token
 gone, the profile and sign-out in Portuguese, and the identity provider's flow unchanged.
+`ui/tests/AccountsPage.test.tsx` (#559) is the accounts page: the view model (suspended marked,
+a lock's end), the create form's local checks and its box checked by default, the server's rule
+and message shown on a refused creation, each change through the dialog (nothing sent before
+confirming, the payload, `last_operator` unchanged inside the dialog, a short password never
+sent), `offered` for the global operator alone, labelled and keyboard reachable controls in both
+languages, and the audit page's copy for every `account.*` action and the role `none`.
 
 ### Break glass beside the identity provider (#563)
 

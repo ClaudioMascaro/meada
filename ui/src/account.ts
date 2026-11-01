@@ -19,14 +19,19 @@ export function signInProblem(problem: unknown, t: AccountCopy): string {
   return t.signInFailed;
 }
 
+/** A 422 `password_policy`: the server's rule code as the page's own copy, the server text only for a rule this page does not know. */
+export function ruleProblem(problem: ApiError, t: Record<string, string>): string | undefined {
+  if (problem.status !== 422 || problem.code !== 'password_policy') return undefined;
+  const rule = problem.body.rule;
+  const known = typeof rule === 'string' ? t[`rule_${rule}`] : undefined;
+  return known ?? `${t['rule_unknown']} ${problem.message}`;
+}
+
 /** The message of a refused password change: the server's rule (its code, in the page's language), never the password. */
 export function changeProblem(problem: unknown, t: AccountCopy): string {
   if (problem instanceof ApiError) {
-    if (problem.status === 422 && problem.code === 'password_policy') {
-      const rule = problem.body.rule;
-      const known = typeof rule === 'string' ? t[`rule_${rule}` as keyof AccountCopy] : undefined;
-      return known ?? `${t.rule_unknown} ${problem.message}`;
-    }
+    const rule = ruleProblem(problem, t);
+    if (rule) return rule;
     if (problem.status === 401 && problem.code === 'invalid_credentials') return t.wrongCurrent;
     const shared = unavailable(problem, t);
     if (shared) return shared;

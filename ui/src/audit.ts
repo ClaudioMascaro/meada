@@ -22,7 +22,7 @@ export function auditModel(page: AuditPage, t: AuditCopy) {
     login: record.login ?? t.none,
     role: t[record.role],
     owners: record.owners?.join(', ') || t.none,
-    action: record.action,
+    action: t.actions[record.action] ? `${t.actions[record.action]} (${record.action})` : record.action,
     arguments: Object.entries(record.arguments).map(([name, value]) => `${name}: ${value}`).join(', ') || t.none,
     outcome: t[record.outcome],
     message: record.message ?? t.none,

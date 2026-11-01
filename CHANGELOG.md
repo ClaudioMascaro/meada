@@ -8,6 +8,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Accounts page in the console (#559, ADR 0024, from #551): the global operator of a console with
+  local accounts gets `/accounts`, listing every account (role, groups, state with a suspended
+  account marked and a locked one saying until when, change required, last password change), a
+  create form (username pattern and password length checked first, "change on first sign-in"
+  checked by default) and, per account, role, groups, suspend, reactivate and reset password,
+  each behind the shared confirmation dialog with the server's refusals (`last_operator` and the
+  rest) shown unchanged. Any other role, and a console under break glass, gets the not-found
+  page at that path. The audit page names every `account.*` action in Portuguese and English.
+  The password rule `common_password` now has its own copy. Front end only, no golden changed.
+
 - Groups of local accounts (#558, ADR 0024, from #551): the global operator gives accounts groups
   (`groups` on `POST /api/v1/accounts`, and the `groups` action of
   `POST /api/v1/accounts/<username>`, each an owner name, else a 422 `invalid_group`);

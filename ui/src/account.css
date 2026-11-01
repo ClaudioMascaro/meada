@@ -6,3 +6,8 @@
 .account-form button { justify-self: start; margin-top: .75rem; }
 .sign-out { margin-top: 1rem; }
 .account-form .discreet { justify-self: start; margin-top: 1.25rem; font-size: .85rem; color: var(--muted); }
+.account-form select { padding: .55rem .65rem; width: 100%; }
+.account-form .check { display: flex; align-items: center; gap: .5rem; font-weight: 400; }
+.account-form .check input { width: auto; }
+.account-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.confirmation .account-form { max-width: none; margin: 1rem 0 0; }

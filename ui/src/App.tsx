@@ -13,6 +13,7 @@ import { PlaygroundPage } from './PlaygroundPage';
 import { GraphPage } from './GraphPage';
 import { WorkspacePage } from './WorkspacePage';
 import { OperationalPage } from './OperationalPage';
+import { AccountsPage } from './AccountsPage';
 import { AuditPage } from './AuditPage';
 import { CatalogPage } from './CatalogPage';
 import { NamedWorkspacesPage } from './NamedWorkspacesPage';
@@ -28,6 +29,8 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
   const [attempt, setAttempt] = useState(0);
   const [signedOut, setSignedOut] = useState(false);
   const t = copy[locale];
+  // Account administration exists with local accounts alone (not under break glass, where `sign_in` is the identity provider's).
+  const administers = config.sign_in === 'accounts' && isLocal(api.auth);
   // With local accounts the tab is signed out, signed in but bound to its password change, or in.
   const local = isLocal(api.auth) ? api.auth : undefined;
   const stage: Stage = useSyncExternalStore(local?.subscribe ?? noSubscription, () => local?.stage() ?? 'in');
@@ -103,7 +106,7 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
   }
 
   const failed = error instanceof ApiError ? error.code === 'session_expired' ? t.sessionExpired : error.message : t.loadError;
-  return <Shell path={path} locale={locale} onLanguage={setLocale} session={session} t={t} onNavigate={navigate} audit={config.audit === true} catalog={config.catalog === true} workspaces={config.workspaces !== undefined} profile={local !== undefined}>
+  return <Shell path={path} locale={locale} onLanguage={setLocale} session={session} t={t} onNavigate={navigate} audit={config.audit === true} catalog={config.catalog === true} workspaces={config.workspaces !== undefined} profile={local !== undefined} accounts={administers}>
     {signedOut ? <>
       <h1>{t.session}</h1><button type="button" onClick={() => { void login(); }}>{t.signIn}</button>
       {error != null && <p className="error" role="alert">{t.loginError}</p>}
@@ -118,6 +121,7 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
         api.auth.clear(); setSession(undefined); setSignedOut(true);
       } : undefined} /> : <p role="status">{t.loading}</p>
       : path === '/profile' ? local ? session ? <ProfilePage auth={local} locale={locale} session={session} /> : <p role="status">{t.loading}</p> : <h1>{t.notFound}</h1>
+      : path === '/accounts' ? session ? administers && session.role === 'operator' ? <AccountsPage api={api} locale={locale} /> : <h1>{t.notFound}</h1> : <p role="status">{t.loading}</p>
       : path === '/manifest' ? manifest ? <ManifestPage manifest={manifest} t={t} /> : <p role="status">{t.loading}</p>
       : path === '/workspace' ? session ? <WorkspacePage api={api} locale={locale} session={session} config={config} onSession={setSession} /> : <p role="status">{t.loading}</p>
       : path === '/playground' ? <PlaygroundPage api={api} locale={locale} />

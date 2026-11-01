@@ -261,7 +261,20 @@ that keeps the session is the `invalid_credentials` of a refused current passwor
 menu, no link, no session read, reached only while the stage is `forced`; the change opens the
 workspace) and `ProfilePage` (the session's fields, the voluntary change, sign-out), `account.ts`
 their view model and `account-i18n.ts` their pt-BR/en copy. The shell offers `/profile` with
-local accounts only. Agent tokens, the GitHub login and the accounts page are later tickets.
+local accounts only. Agent tokens and the GitHub login are later tickets.
+The accounts page (#559, `AccountsPage.tsx`, view model `accounts.ts`, copy `accounts-i18n.ts`) is
+the global operator's: `pages.tsx`'s `offered` lists `/accounts` for the role `operator` when
+`App.tsx` says the console has account administration (`config.sign_in === "accounts"` with a
+`LocalAuth`, so never under break glass), and the path answers the not-found page to any other
+role. It reads `GET accounts`; the create form checks the username pattern and the password
+length (Unicode scalar values) before `POST accounts`, with `change_required` checked by default;
+role, groups, suspend, reactivate and reset password (the same checkbox) each open the shared
+`ConfirmDialog`, which asks what the change needs, sends `POST accounts/<username>` on confirm
+and shows a refusal inside it, the server's `password_policy` rule as the page's own copy
+(`ruleProblem`) and any other refusal (`last_operator`, `username_taken`, `invalid_group`) with
+the server's message unchanged. A suspended account is marked in text and a locked one says
+until when. The audit page's `audit-i18n.ts` names every `account.*` action (shown with its code)
+and the role `none` reads as the page's `none`.
 The admission page (#558, `operations.ts`): `Admission` is the identity provider's document
 (`OidcAdmission`, with `accounts` under break glass) or local accounts' alone (`AccountsAdmission`,
 told apart by `isOidcAdmission`); `admissionModel` adds the sign-in mode and the public key's
