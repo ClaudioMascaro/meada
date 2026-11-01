@@ -240,6 +240,16 @@ impl Providers {
     /// either, a local account reads every repository (ADR 0024).
     #[cfg(feature = "accounts")]
     #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    /// A local account's grant (ADR 0024): what its `groups` map to when a table bounds it
+    /// (`bounds`), every repository otherwise; no login yet.
+    #[cfg(feature = "accounts")]
+    pub fn local(&self, groups: &[String]) -> Grant {
+        match self.bounds() {
+            true => self.grant(groups, None).union(),
+            false => Grant::All,
+        }
+    }
+
     pub fn bounds(&self) -> bool {
         self.groups.is_some() || self.github().is_some()
     }

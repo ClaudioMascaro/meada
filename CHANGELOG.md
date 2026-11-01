@@ -8,6 +8,20 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Agent tokens for the nodes (#560, ADR 0024, from #551): a signed-in local account generates,
+  on its profile page or through `POST /api/v1/account/tokens` (`{surface: "nodes", hours}`, 1 to
+  168 hours, 8 by default), an agent token shown once (`{token, expires_at, surface}`), signed
+  with the account's role and groups as its row stands and a random token id, recorded
+  `account.token` (surface, hours, token id, never the token). A change-required account gets the
+  403 `password_change_required`, a suspended one the role refusal; the console answers an agent
+  token with 401. A node with `[accounts]` and no `[oidc]` (`meada mcp --listen`) now reads the
+  signing public key at start, and the console's `[ui] public_url` from a `[ui]` section its
+  manifest must carry, refusing to start without either; it admits only agent tokens for the
+  nodes (a 401 `Bearer` before routing for any other, a session token included) and answers
+  under the grant `[accounts.groups]` gives their groups (every repository without the table),
+  as an identity provider's token is answered. The `accounts` feature now implies `ui`. No golden
+  changed.
+
 - Accounts page in the console (#559, ADR 0024, from #551): the global operator of a console with
   local accounts gets `/accounts`, listing every account (role, groups, state with a suspended
   account marked and a locked one saying until when, change required, last password change), a

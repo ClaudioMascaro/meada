@@ -5,7 +5,7 @@
 //! refusals, and `reset-admin`'s refusals before Postgres, need no service; the rest run against
 //! the local Postgres of `MEADA_TEST_POSTGRES_URL`, each test in a schema of its own, and skip
 //! without it; the save as the global operator also needs the fleet's Valkey and store. Break
-//! glass beside `[oidc]` (#563) is `break_glass`.
+//! glass beside `[oidc]` (#563) is `break_glass`; agent tokens for the nodes (#560) `tokens`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -21,6 +21,7 @@ use crate::server::Server;
 mod administration;
 mod break_glass;
 mod groups;
+mod tokens;
 
 const EN: &str = "en_US.UTF-8";
 /// The variable every test here names for the initial password, so the runner's own
@@ -32,7 +33,7 @@ const CHOSEN: &str = "deployer chose this one";
 
 /// A fresh Ed25519 key pair in PEM, generated with ring: the private half (PKCS #8) and the
 /// public half (SPKI).
-fn pair() -> (String, String) {
+pub(crate) fn pair() -> (String, String) {
     use ring::signature::KeyPair;
     let rng = ring::rand::SystemRandom::new();
     let pkcs8 = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
@@ -200,25 +201,21 @@ fn the_console_refuses_a_missing_unreadable_foreign_or_mismatched_key() {
     );
 }
 
-/// A node parses `[accounts]` and reads no key: one naming a private key file that does not exist
-/// starts and answers.
+/// A node parses `[accounts]` and reads its public key alone (#560): one naming a private key file
+/// that does not exist starts and answers, a request without an agent token a 401.
 #[test]
 fn a_node_never_reads_the_private_key() {
     let dir = chain_manifest("accounts_node");
     let (_, stderr, ok) = run(&dir, "index");
     assert!(ok, "{stderr}");
-    let manifest = dir.join(MANIFEST);
-    let mut text = fs::read_to_string(&manifest).unwrap();
-    text += "\n[postgres]\nurl_env = \"MEADA_TEST_NO_POSTGRES_554\"\n\n[accounts]\n\
-             public_key_file = \"no-such-public.pem\"\nprivate_key_file = \"no-such-private.pem\"\n";
-    fs::write(&manifest, text).unwrap();
+    crate::oidc::accounts::with_accounts(&dir, MANIFEST, "");
     let node = Server::start_args(
         &dir,
         &["--listen", "127.0.0.1:0", "--workspace", MANIFEST],
         &[],
     );
     let (status, _, _) = crate::server::get(&node.url);
-    assert_ne!(status, 0);
+    assert_eq!(status, 401);
     let stderr = node.stderr();
     assert!(!stderr.contains("private"), "{stderr}");
 }

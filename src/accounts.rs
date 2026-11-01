@@ -20,9 +20,6 @@
 //! redo at the next sign-in. `store` is the accounts table, its lockout counted under the row's
 //! lock (`LOCKOUT_FAILURES`, `LOCKOUT_MINUTES`). `reset_admin` is `meada ui reset-admin`.
 
-// The console (feature `ui`) is the one reader of the keys, the policy and the store so far.
-#![cfg_attr(not(feature = "ui"), allow(dead_code))]
-
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::OnceLock;
@@ -46,8 +43,15 @@ pub const DEFAULT_PASSWORD: &str = "admin123";
 pub const ADMIN_PASSWORD_ENV: &str = "MEADA_ADMIN_PASSWORD";
 /// The audience of a session token: the console's surface.
 pub const CONSOLE: &str = "meada:console";
+/// The audience of an agent token for the nodes' surface (#560), and the surface's name in a
+/// request and its answer.
+pub const NODES: &str = "meada:nodes";
+pub const NODES_SURFACE: &str = "nodes";
 /// How long a session token lives.
 pub const SESSION_HOURS: u64 = 8;
+/// How long an agent token lives when its request names no validity, and the most it may.
+pub const AGENT_HOURS: u64 = 8;
+pub const AGENT_HOURS_MAX: u64 = 168;
 /// What a password holds, in Unicode scalar values (OWASP ASVS).
 pub const PASSWORD_MIN: usize = 12;
 pub const PASSWORD_MAX: usize = 128;
@@ -257,30 +261,47 @@ fn read(secret: &Secret, keys: (&'static str, &'static str), max: u64) -> Result
     }
 }
 
+/// The keys of the public and the private half.
+const PUBLIC: (&str, &str) = ("accounts.public_key_env", "accounts.public_key_file");
+const PRIVATE: (&str, &str) = ("accounts.private_key_env", "accounts.private_key_file");
+
+/// `secret`, the half of the pair `keys` names, or the problem that the section names none.
+fn named(
+    secret: &Option<Secret>,
+    keys: (&'static str, &'static str),
+    private: bool,
+) -> Result<Secret, Problem> {
+    secret.clone().ok_or_else(|| {
+        let missing = Msg::AccountsKeyMissing {
+            env: keys.0,
+            file: keys.1,
+            private,
+        };
+        ("accounts", missing.text())
+    })
+}
+
 impl Config {
+    /// The signing key's public half, read now: the start check of every surface that admits a
+    /// Meada-signed token. It must be named, read and Ed25519 in PEM; a problem names its key and
+    /// never the value. The private half is never read here.
+    pub fn public(&self) -> Result<Public, Problem> {
+        let public = named(&self.public_key, PUBLIC, false)?;
+        let key = key_of(&public, PUBLIC.0, PUBLIC.1);
+        let decoding = DecodingKey::from_ed_pem(read(&public, PUBLIC, KEY_MAX)?.as_bytes());
+        let not_ed25519 = || (key, Msg::AccountsNotEd25519 { private: false }.text());
+        decoding.map(Public).map_err(|_| not_ed25519())
+    }
+
     /// The signing key pair, read now: the console's start check. Each half must be named, read,
     /// Ed25519 in PEM, and the private half must sign what the public half verifies; a problem
     /// names its key and never the value.
     pub fn keys(&self) -> Result<Keys, Problem> {
-        const PUBLIC: (&str, &str) = ("accounts.public_key_env", "accounts.public_key_file");
-        const PRIVATE: (&str, &str) = ("accounts.private_key_env", "accounts.private_key_file");
-        let named = |secret: &Option<Secret>, keys: (&'static str, &'static str), private| {
-            secret.clone().ok_or_else(|| {
-                let missing = Msg::AccountsKeyMissing {
-                    env: keys.0,
-                    file: keys.1,
-                    private,
-                };
-                ("accounts", missing.text())
-            })
-        };
-        let public = named(&self.public_key, PUBLIC, false)?;
+        named(&self.public_key, PUBLIC, false)?;
         let private = named(&self.private_key, PRIVATE, true)?;
-        let public_key = key_of(&public, PUBLIC.0, PUBLIC.1);
         let private_key = key_of(&private, PRIVATE.0, PRIVATE.1);
+        let public = self.public()?;
         let not_ed25519 = |key, private| (key, Msg::AccountsNotEd25519 { private }.text());
-        let decoding = DecodingKey::from_ed_pem(read(&public, PUBLIC, KEY_MAX)?.as_bytes())
-            .map_err(|_| not_ed25519(public_key, false))?;
         let encoding = EncodingKey::from_ed_pem(read(&private, PRIVATE, KEY_MAX)?.as_bytes())
             .map_err(|_| not_ed25519(private_key, true))?;
         // The private half's own check happens when it signs: a probe signed now and verified
@@ -295,10 +316,18 @@ impl Config {
         validation.required_spec_claims.clear();
         validation.validate_exp = false;
         validation.validate_aud = false;
-        if jsonwebtoken::decode::<Probe>(&probe, &decoding, &validation).is_err() {
+        if jsonwebtoken::decode::<Probe>(&probe, &public.0, &validation).is_err() {
             return Err((private_key, Msg::AccountsKeyMismatch.text()));
         }
-        Ok(Keys { encoding, decoding })
+        Ok(Keys { encoding, public })
+    }
+
+    /// What a node admits with this section and no `[oidc]` (#560): the public half read now
+    /// (`public`), and the console's `[ui] public_url`, `issuer`, every token's issuer.
+    pub fn nodes(&self, issuer: &str) -> Result<Nodes, Problem> {
+        let public = self.public()?;
+        let issuer = issuer.trim_end_matches('/').to_string();
+        Ok(Nodes { public, issuer })
     }
 
     /// The default account's initial password the deployer set: `None` when the variable is
@@ -347,6 +376,9 @@ pub struct Claims {
     /// Set only while the password must be changed: the token then opens the change alone.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub change_required: bool,
+    /// An agent token's random id, which its audit record names (#560); a session token has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jti: Option<String>,
     pub iat: u64,
     pub exp: u64,
 }
@@ -361,7 +393,32 @@ impl Claims {
 /// The signing key pair, the console's alone.
 pub struct Keys {
     encoding: EncodingKey,
-    decoding: DecodingKey,
+    public: Public,
+}
+
+/// The signing key's public half, which every surface verifies a Meada-signed token with.
+pub struct Public(DecodingKey);
+
+/// A node's admission of agent tokens for the nodes (#560): the public half and the console's
+/// issuer.
+pub struct Nodes {
+    public: Public,
+    issuer: String,
+}
+
+impl Nodes {
+    /// The claims of `headers`' bearer when it is an agent token for the nodes of this console
+    /// (`Public::verify` with `NODES`), never one awaiting a password change; else whether a
+    /// bearer was sent, for the challenge of the 401.
+    pub fn admit(&self, headers: &hyper::HeaderMap) -> Result<Claims, bool> {
+        match crate::oidc::bearer(headers) {
+            Ok(Some(token)) => (self.public.verify(token, &self.issuer, NODES))
+                .filter(|claims| !claims.change_required)
+                .ok_or(true),
+            Ok(None) => Err(false),
+            Err(_) => Err(true),
+        }
+    }
 }
 
 impl Keys {
@@ -369,7 +426,7 @@ impl Keys {
     /// which key pair the console holds: `blake3:` and the hex BLAKE3 hash of the raw 32-byte
     /// Ed25519 public key (the last 32 bytes of its DER). Never a secret.
     pub fn fingerprint(&self) -> String {
-        let raw = (self.decoding.try_get_as_bytes())
+        let raw = (self.public.0.try_get_as_bytes())
             .expect("an Ed25519 key read from PEM holds its raw bytes");
         format!("blake3:{}", blake3::hash(raw).to_hex())
     }
@@ -385,7 +442,6 @@ impl Keys {
         change_required: bool,
     ) -> Result<(String, u64), String> {
         let iat = crate::modules::now();
-        let exp = iat + SESSION_HOURS * 3600;
         let claims = Claims {
             iss: issuer.to_string(),
             aud: CONSOLE.to_string(),
@@ -393,15 +449,60 @@ impl Keys {
             role,
             groups: groups.to_vec(),
             change_required,
+            jti: None,
             iat,
-            exp,
+            exp: iat + SESSION_HOURS * 3600,
         };
-        let header = Header::new(Algorithm::EdDSA);
-        let token = jsonwebtoken::encode(&header, &claims, &self.encoding);
-        Ok((token.map_err(|e| e.to_string())?, exp))
+        self.signed(&claims)
     }
 
-    /// The claims of `token` when it passes: EdDSA only, no `crit`, signed by this key pair,
+    /// An agent token for `username` from `issuer` for the surface `audience`, valid `hours`
+    /// from now (#560): the session token's claims with that audience, a random token id and
+    /// never a change-required mark. The token, its expiry in seconds since the epoch and its id.
+    pub fn agent(
+        &self,
+        issuer: &str,
+        username: &str,
+        role: Role,
+        groups: &[String],
+        audience: &str,
+        hours: u64,
+    ) -> Result<(String, u64, String), String> {
+        use password_hash::rand_core::RngCore;
+        let mut id = [0u8; 16];
+        OsRng.fill_bytes(&mut id);
+        let id: String = id.iter().map(|b| format!("{b:02x}")).collect();
+        let iat = crate::modules::now();
+        let claims = Claims {
+            iss: issuer.to_string(),
+            aud: audience.to_string(),
+            sub: subject(username),
+            role,
+            groups: groups.to_vec(),
+            change_required: false,
+            jti: Some(id.clone()),
+            iat,
+            exp: iat + hours * 3600,
+        };
+        let (token, exp) = self.signed(&claims)?;
+        Ok((token, exp, id))
+    }
+
+    /// `claims` signed with EdDSA, and their expiry.
+    fn signed(&self, claims: &Claims) -> Result<(String, u64), String> {
+        let header = Header::new(Algorithm::EdDSA);
+        let token = jsonwebtoken::encode(&header, claims, &self.encoding);
+        Ok((token.map_err(|e| e.to_string())?, claims.exp))
+    }
+
+    /// `Public::verify` with this pair's public half.
+    pub fn verify(&self, token: &str, issuer: &str, audience: &str) -> Option<Claims> {
+        self.public.verify(token, issuer, audience)
+    }
+}
+
+impl Public {
+    /// The claims of `token` when it passes: EdDSA only, no `crit`, signed by this key's pair,
     /// issued by `issuer` for `audience`, `exp` and `nbf` with the identity provider's leeway, a
     /// subject `local:<username>`, a role and groups that are owner names. Nothing says why a
     /// token fails: every failure is the same 401.
@@ -416,7 +517,7 @@ impl Keys {
         validation.set_issuer(&[issuer]);
         validation.set_audience(&[audience]);
         validation.set_required_spec_claims(&["exp", "iss", "aud", "sub"]);
-        let claims = jsonwebtoken::decode::<Claims>(token, &self.decoding, &validation).ok()?;
+        let claims = jsonwebtoken::decode::<Claims>(token, &self.0, &validation).ok()?;
         let claims = claims.claims;
         (username_of(&claims.sub).is_some() && groups_ok(&claims.groups)).then_some(claims)
     }
@@ -988,6 +1089,51 @@ mod tests {
         critical.crit = Some(vec!["exp".into()]);
         let crit = jsonwebtoken::encode(&critical, &base, &keys.encoding).unwrap();
         assert!(keys.verify(&crit, issuer, CONSOLE).is_none());
+    }
+
+    /// An agent token (#560) carries the session token's claims with its surface's audience, a
+    /// random id and no change-required mark, lives `hours`, and a node admits it with the public
+    /// half alone (the private file gone), the issuer's trailing slash aside; the console's
+    /// audience refuses it, and a node refuses a session token, no bearer and another scheme.
+    #[test]
+    fn an_agent_token_is_for_its_surface_alone_with_a_random_id() {
+        let (private, public) = pair();
+        let config = keyed("agent", &public, &private);
+        let keys = config.keys().unwrap();
+        let issuer = "https://console.example";
+        let groups = ["team-web".to_string()];
+        let (token, exp, id) =
+            (keys.agent(issuer, "alice", Role::Viewer, &groups, NODES, 24)).unwrap();
+        let dir = std::env::temp_dir().join(format!("meada-accounts-agent-{}", std::process::id()));
+        std::fs::remove_file(dir.join("private.pem")).unwrap();
+        let nodes = config.nodes(&format!("{issuer}/")).unwrap();
+        let mut headers = hyper::HeaderMap::new();
+        let mut send = |value: &str| {
+            let value = hyper::header::HeaderValue::from_str(value).unwrap();
+            headers.insert(hyper::header::AUTHORIZATION, value);
+            nodes.admit(&headers)
+        };
+        let claims = send(&format!("Bearer {token}")).unwrap();
+        assert_eq!(
+            (claims.sub.as_str(), claims.role, claims.groups.as_slice()),
+            ("local:alice", Role::Viewer, &groups[..])
+        );
+        assert_eq!(claims.jti.as_deref(), Some(id.as_str()));
+        assert!(!claims.change_required);
+        assert_eq!((claims.exp, exp - claims.iat), (exp, 24 * 3600));
+        assert!(
+            id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit()),
+            "{id}"
+        );
+        let again = keys.agent(issuer, "alice", Role::Viewer, &groups, NODES, 1);
+        assert_ne!(again.unwrap().2, id);
+        assert!(keys.verify(&token, issuer, CONSOLE).is_none());
+        let (session, _) = (keys.session(issuer, "alice", Role::Viewer, &groups, false)).unwrap();
+        assert_eq!(send(&format!("Bearer {session}")).err(), Some(true));
+        assert_eq!(send("Bearer ").err(), Some(true));
+        assert_eq!(send(&format!("Basic {token}")).err(), Some(false));
+        // The public half alone: a node never needs the private one.
+        assert!(config.keys().is_err());
     }
 
     /// A bearer is routed by its issuer read without a check: this console's session token by

@@ -7,6 +7,7 @@ import { Shell } from '../src/pages';
 import { accountCopy } from '../src/account-i18n';
 import { copy } from '../src/i18n';
 import { LocalAuth } from '../src/local';
+import { Api } from '../src/api';
 import type { Config } from '../src/api';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -109,7 +110,7 @@ test('the profile shows the subject and role, changes the password voluntarily a
   vi.stubGlobal('fetch', fetch);
   const auth = new LocalAuth(config);
   await auth.signIn('admin', 'x');
-  await act(() => root.render(<ProfilePage auth={auth} locale="en" session={{ subject: 'local:admin', role: 'operator', account: true }} />));
+  await act(() => root.render(<ProfilePage api={new Api(auth)} auth={auth} locale="en" session={{ subject: 'local:admin', role: 'operator', account: true }} />));
   expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe(t.profileTitle);
   expect(host.textContent).toContain('local:admin');
   expect(host.textContent).toContain(copy.en.operator);
@@ -120,4 +121,11 @@ test('the profile shows the subject and role, changes the password voluntarily a
   await act(() => { fireEvent.click(getByRole(host, 'button', { name: copy.en.signOut })); });
   expect(auth.stage()).toBe('out');
   expect(sessionStorage.length).toBe(0);
+});
+
+test('under break glass the profile offers no agent token, which does not exist there', async () => {
+  const auth = new LocalAuth({ ...config, break_glass: true });
+  await act(() => root.render(<ProfilePage api={new Api(auth)} auth={auth} locale="en" session={{ subject: 'local:admin', role: 'operator', account: true }} />));
+  expect(getByRole(host, 'heading', { level: 2, name: accountCopy.en.changeTitle })).toBeDefined();
+  expect(queryByRole(host, 'heading', { name: accountCopy.en.tokensTitle })).toBeNull();
 });

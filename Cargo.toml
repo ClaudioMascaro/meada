@@ -185,10 +185,11 @@ workspaces = [
 # The proposal server (ADR 0022, `[proposals]`, `meada workspaces mcp`): the named workspaces'
 # discovery, validation and stateless proposals over MCP, for agents. No crate of its own.
 proposals = ["workspaces"]
-# Local accounts (ADR 0024, `[accounts]`): the console's sign-in and its Ed25519 session tokens,
-# over the OIDC module's JWT code and grant providers and the data layer; `argon2` hashes the
-# passwords.
+# Local accounts (ADR 0024, `[accounts]`): the console's sign-in and its Ed25519 session and agent
+# tokens, over the OIDC module's JWT code and grant providers and the data layer; `argon2` hashes
+# the passwords. `ui` too: a node checks an agent token's issuer, the console's `[ui] public_url`.
 accounts = [
+    "ui",
     "oidc",
     "postgres",
     "dep:argon2",

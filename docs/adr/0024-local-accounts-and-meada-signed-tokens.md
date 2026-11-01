@@ -142,7 +142,10 @@ tickets build.
 - One verifier checks a Meada-signed token on every surface: EdDSA only, no `crit`, the
   configured public key, the issuer, the surface's audience, `exp` and `nbf` with the existing
   leeway. A token that fails is a 401 with `WWW-Authenticate: Bearer`, without
-  `resource_metadata` since there is no authorization server to discover, before routing.
+  `resource_metadata` since there is no authorization server to discover, before routing. (Amended
+  2026-11-01, #560: a node learns the issuer from the `[ui] public_url` of its own manifest,
+  which carries the console's `[ui]` section beside `[accounts]` as the refresh job's does, and
+  refuses to start without it; no key is added, so the cargo feature `accounts` implies `ui`.)
 - The private key lives only in the console, so a compromised node or proposal server cannot
   mint a token. Meada stores no session or agent token and keeps no revocation list: a token's
   expiry is its revocation. Suspension stops new tokens and every console write at once; tokens

@@ -45,3 +45,16 @@ export function changeCheck(current: string, next: string, repeat: string, t: Ac
   if (next !== repeat) return t.mismatch;
   return undefined;
 }
+
+/** `POST account/tokens`'s answer, shown once (#560). */
+export interface AgentToken { token: string; expires_at: string; surface: string }
+
+/** The message of a refused agent token: the validity's bounds, the role refusal of a suspended account, the server unavailable. */
+export function tokenProblem(problem: unknown, t: AccountCopy): string {
+  if (problem instanceof ApiError) {
+    if (problem.status === 422 && problem.code === 'invalid_hours') return t.tokenHours;
+    if (problem.status === 403 && problem.code === 'forbidden') return t.tokenRefused;
+    if (problem.status === 503 && problem.code === 'audit_unavailable') return t.signInAudit;
+  }
+  return t.tokenFailed;
+}

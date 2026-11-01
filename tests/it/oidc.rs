@@ -23,6 +23,10 @@ pub(crate) mod github;
 #[cfg(all(feature = "ui", feature = "directory"))]
 mod overage;
 
+/// A node with `[accounts]` and no `[oidc]`: the agent tokens for the nodes (#560).
+#[cfg(feature = "accounts")]
+pub(crate) mod accounts;
+
 const WEB: &str = "example.com/chain/web";
 const PUBLIC: &str = "https://meada.example";
 const METADATA: &str = "https://meada.example/.well-known/oauth-protected-resource";
@@ -164,16 +168,16 @@ fn start(dir: &Path) -> Server {
 }
 
 /// A tool and its arguments, `tools/call`ed alone.
-type Call = Option<(&'static str, Value)>;
+pub(crate) type Call = Option<(&'static str, Value)>;
 
 /// `trace` from `dashboard`, which crosses every link of the chain.
-fn trace() -> Call {
+pub(crate) fn trace() -> Call {
     Some(("trace", json!({"from": "dashboard"})))
 }
 
 /// What `url` answers with `token` and `headers` (values as bytes, so not always UTF-8): its
 /// status, `WWW-Authenticate` and body. With `call`, that tool call POSTed alone, else a GET.
-fn ask(url: &str, token: Option<&str>, headers: &[(&str, &[u8])], call: Call) -> Answer {
+pub(crate) fn ask(url: &str, token: Option<&str>, headers: &[(&str, &[u8])], call: Call) -> Answer {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .http_status_as_error(false)
         .build()
@@ -256,17 +260,17 @@ fn raw(url: &str, headers: &[&[u8]]) -> (u16, Option<String>) {
 }
 
 #[derive(Debug, PartialEq)]
-struct Answer {
-    status: u16,
+pub(crate) struct Answer {
+    pub(crate) status: u16,
     challenge: Option<String>,
     kind: String,
     /// Every header but `date`, in the order sent.
     headers: Vec<String>,
-    body: String,
+    pub(crate) body: String,
 }
 
 /// The text of a tool result POSTed alone.
-fn traced(answer: &Answer) -> String {
+pub(crate) fn traced(answer: &Answer) -> String {
     assert_eq!(answer.status, 200, "{answer:?}");
     let json: Value = serde_json::from_str(&answer.body).unwrap();
     json["result"]["content"][0]["text"]
@@ -300,7 +304,7 @@ fn answers(url: &str, token: &str) -> Vec<String> {
 
 /// Fails when `answer` names a chain repository other than `WEB`, a path only a peer holds, or
 /// a missing peer, or does not name `WEB` (an error would pass otherwise).
-fn web_only(answer: &str) {
+pub(crate) fn web_only(answer: &str) {
     assert!(answer.contains(WEB), "{answer}");
     for leak in [
         "example.com/chain/gateway",

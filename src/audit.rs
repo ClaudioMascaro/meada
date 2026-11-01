@@ -26,9 +26,10 @@ use crate::msg::Msg;
 
 /// The actions a record names: the operations, `pointer`, the route-level action of a pointer
 /// request refused before its body is read, and the local accounts' sign-in, password change,
-/// `meada ui reset-admin` and administration (ADR 0024, #557, `account.groups` #558), with
-/// `account`, the route-level action of an account change refused before its body is read.
-pub const ACTIONS: [&str; 25] = [
+/// `meada ui reset-admin`, administration (ADR 0024, #557, `account.groups` #558) and agent tokens
+/// (`account.token`, #560), with `account`, the route-level action of an account change refused
+/// before its body is read.
+pub const ACTIONS: [&str; 26] = [
     "workspace.save",
     "workspace.import",
     "workspace.apply",
@@ -53,6 +54,7 @@ pub const ACTIONS: [&str; 25] = [
     "account.suspend",
     "account.reactivate",
     "account.reset_password",
+    "account.token",
     "account",
 ];
 
@@ -348,6 +350,9 @@ fn record(row: &tokio_postgres::Row) -> Option<Value> {
         "role",
         "change_required",
         "groups",
+        "surface",
+        "hours",
+        "token_id",
     ];
     if !(arguments.iter()).all(|(k, v)| known.contains(&k.as_str()) && v.is_string()) {
         return None;

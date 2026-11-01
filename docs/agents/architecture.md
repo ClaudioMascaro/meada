@@ -529,9 +529,16 @@ one for the area a change touches.
   hidden `with_drain_bound` shortens it, `main.rs` reads `MEADA_DRAIN_MS` for it in debug builds only, a second signal ends the wait), then cancels
   rmcp's `cancellation_token` (earlier it would end calls in flight with an error), drops what
   is left and exits 0 without waiting for the runtime's threads. Every request goes through
-  `Gate` before routing, after the `Origin` check: in the default build, or with no `[oidc]`, it
-  lets everything through; with `[oidc]` (feature `oidc`) it is `oidc::Oidc::admit`, which
-  answers itself (the protected resource metadata, a 401) or hands routing a `Pass`, which
+  `Gate` before routing, after the `Origin` check: in the default build, or with neither
+  `[oidc]` nor `[accounts]`, it lets everything through; with `[oidc]` (feature `oidc`) it is
+  `oidc::Oidc::admit`, which answers itself (the protected resource metadata, a 401) or hands
+  routing a `Pass`; with `[accounts]` and no `[oidc]` (feature `accounts`, #560) it is
+  `accounts::Nodes::admit`, read at start by `mcp::local_admission` (the public half,
+  `accounts::Config::public`, and the issuer, the manifest's `[ui] public_url`, either missing
+  refusing the start, `Msg::AccountsNodeIssuer`), which admits an agent token for the nodes
+  (`accounts::NODES`) or answers 401 `Bearer` (`error="invalid_token"` for a token sent), and
+  whose grant is `Providers::grant` of the token's groups, or `*` when no table bounds it, the
+  403 `Bearer error="insufficient_scope"` (`mcp::challenged`, no `resource_metadata`). A `Pass`
   carries only a `grant::Grant`, whichever verifier produced it: routing checks it at an
   endpoint (`Gate::refused`, the 403 in the admitting verifier's words) and filters every 404
   listing through it (`Pass::reads`). The gate builds the node's grant providers once
@@ -871,13 +878,18 @@ one for the area a change touches.
   not named (`Msg::AccountsKeyMissing`), an unset variable, an unreadable file (`KEY_MAX`), a key
   that is no Ed25519 key in PEM (`jsonwebtoken`'s `from_ed_pem`) or a private key that does not
   sign what the public key verifies (a probe token) refuses the start naming the key, never its
-  value; nodes and the proposal server parse the section and read neither key.
+  value; the proposal server parses the section and reads neither key, and a node with no
+  `[oidc]` reads the public half alone (`Config::public`, `Config::nodes`, #560), never the
+  private one.
   `Config::admin_password` reads the initial password only when the default account is created
   (an unset or empty variable is none; a file past `PASSWORD_FILE_MAX` refused naming it). `Keys`
   signs and verifies session tokens: EdDSA, `iss` the console's `[ui] public_url`, `aud`
   `CONSOLE` (`meada:console`), `sub` `local:<username>` (`SUBJECT_PREFIX`), `role` (`Role`,
   `operator` or `viewer`), `groups`, `change_required` only when set, `iat`, `exp`
-  `SESSION_HOURS` (8) later; `verify` takes EdDSA alone, no `crit`, the issuer, the audience,
+  `SESSION_HOURS` (8) later; `Keys::agent` signs an agent token (#560): the same claims with the
+  surface's audience (`NODES`, `meada:nodes`), a random `jti` (16 bytes from `OsRng`, hex), no
+  change-required mark, `exp` the hours asked later; `Public::verify` (the public half, which
+  `Keys::verify` and `Nodes::admit` call) takes EdDSA alone, no `crit`, the issuer, the audience,
   `exp` and `nbf` with `oidc::LEEWAY`, a local subject whose username passes `username_ok` (1 to
   `USERNAME_MAX`, 64, lowercase ASCII letters, digits, `.`, `-`, `_`) and groups that are owner
   names. `policy(password, username)` is the password policy, one pure function returning the
@@ -1135,6 +1147,16 @@ one for the area a change touches.
   expire. Each sign-in and change
   writes one line `ui: <subject or -> <action> <username or ->: accepted` or `refused (<reason>)`;
   no line, record or error holds a password, a hash or a token.
+  `POST account/tokens` (#560, `Console::agent_token`, `TOKENS_BODY_MAX`, a fixed 400
+  `Msg::AccountsTokenBody`, absent under break glass): `{surface, hours}`, `surface` `nodes`
+  alone (else a 422 `invalid_surface`), `hours` 1 to `accounts::AGENT_HOURS_MAX` (168,
+  `AGENT_HOURS`, 8, when absent; else a 422 `invalid_hours`); the account's row read
+  (`store::standing`): suspended, unknown or hostile is the 403 `forbidden`
+  (`Msg::AccountsTokenRefused`), recorded `refused`; active, `Keys::agent` with the row's role
+  and groups, recorded `account.token` (`account`, `surface`, `hours`, `token_id`, never the
+  token, `Audit::record` before the answer, a failed insert the 503 `audit_unavailable`), then
+  `{token, expires_at, surface}`. The console admits no agent token (its audience is not
+  `CONSOLE`), and a change-required token never reaches the route (admission's 403).
   Break glass (#563, `[accounts] break_glass = true` beside `[oidc]`): `Local::break_glass`.
   `Console::admit` asks `Console::admit_break_glass` first: the static files, `config` and
   `login` need no token; a bearer whose `iss` is `[ui] public_url` (`accounts::issued_by`,
@@ -3131,7 +3153,8 @@ one for the area a change touches.
   19 MiB each (a further sign-in or password change is a 503 `busy`, nothing hashed), and
   `LOGIN_MAX` and `PASSWORD_BODY_MAX` (4 KiB each) the bodies of `login` and `account/password`
   (413 past them); `ui/accounts/administration.rs` (#557): `ADMIN_BODY_MAX` (4 KiB) the body of
-  an account's creation or change (413 past it). The lockout (#555, `accounts.rs`): `LOCKOUT_FAILURES` (10) consecutive failed
+  an account's creation or change (413 past it); `TOKENS_BODY_MAX` (1 KiB, #560) the body of
+  `account/tokens` (413 past it). The lockout (#555, `accounts.rs`): `LOCKOUT_FAILURES` (10) consecutive failed
   password checks, counted under the account row's lock, lock an account for `LOCKOUT_MINUTES`
   (15), never extended by an attempt while it holds; the hash bound is `HASHES_MAX` above, and
   `HASH_MEMORY_MAX_KIB`, `HASH_ITERATIONS_MAX` and `HASH_LANES_MAX` bound what a stored hash may

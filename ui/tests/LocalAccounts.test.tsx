@@ -109,6 +109,71 @@ test('the identity provider flow is unchanged: no sign-in page, no profile and t
   expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
 });
 
+const live = () => sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token: 'live', expires_at: new Date(Date.now() + 3600_000).toISOString(), change_required: false }));
+const agent = { token: 'eyJhbGciOiJFZERTQSJ9.agent.signature', expires_at: '2026-11-02T10:00:00Z', surface: 'nodes' };
+
+test('the profile generates an agent token for the nodes, shown once with its expiry and a copy control, gone on navigation', async () => {
+  live();
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+  const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url === '/api/v1/account/tokens') {
+      expect(init?.method).toBe('POST');
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer live');
+      expect(JSON.parse(String(init?.body))).toEqual({ surface: 'nodes', hours: 24 });
+      return Response.json(agent);
+    }
+    return Response.json(url === '/api/v1/session' ? operator : { file: 'ops/meada.workspace.toml', manifest: {}, modules: [], errors: [] });
+  });
+  vi.stubGlobal('fetch', fetch);
+  await mount(new LocalAuth(config));
+  await waitFor(() => expect(host.textContent).toContain('local:admin'));
+  await act(() => { fireEvent.click(getByRole(host, 'link', { name: copy.en.profile })); });
+  expect(getByRole(host, 'heading', { level: 2, name: t.tokensTitle })).toBeDefined();
+  expect((getByLabelText(host, t.surface) as HTMLSelectElement).value).toBe('nodes');
+  expect((getByLabelText(host, t.validity) as HTMLInputElement).value).toBe('8');
+  type(t.validity, '24');
+  await act(async () => { fireEvent.click(getByRole(host, 'button', { name: t.issue })); });
+  const shown = await waitFor(() => getByRole(host, 'region', { name: t.issuedToken }));
+  expect(shown.querySelector('output')?.textContent).toBe(agent.token);
+  expect(shown.querySelector('time')?.getAttribute('dateTime')).toBe(agent.expires_at);
+  await act(async () => { fireEvent.click(getByRole(host, 'button', { name: t.copyToken })); });
+  expect(writeText).toHaveBeenCalledWith(agent.token);
+  expect(host.textContent).toContain(t.copied);
+  // Never stored: neither the tab's storage nor the browser's holds it.
+  expect(JSON.stringify(sessionStorage)).not.toContain(agent.token);
+  expect(sessionStorage.getItem(SESSION_KEY)).not.toContain('agent');
+  expect(localStorage.length).toBe(0);
+  // Leaving the page clears it; coming back shows the form alone.
+  await act(() => { fireEvent.click(getByRole(host, 'link', { name: copy.en.manifest })); });
+  expect(host.textContent).not.toContain(agent.token);
+  await act(() => { fireEvent.click(getByRole(host, 'link', { name: copy.en.profile })); });
+  expect(host.textContent).not.toContain(agent.token);
+  expect(queryByRole(host, 'region', { name: t.issuedToken })).toBeNull();
+  expect(fetch.mock.calls.filter(call => call[0] === '/api/v1/account/tokens')).toHaveLength(1);
+});
+
+test('a refused agent token says why, in Portuguese too, and shows no token', async () => {
+  live();
+  const answers = [
+    Response.json({ error: { code: 'invalid_hours', message: 'an agent token is valid from 1 to 168 hours' } }, { status: 422 }),
+    Response.json({ error: { code: 'forbidden', message: 'suspended' } }, { status: 403 }),
+    Response.json({ error: { code: 'unavailable', message: 'down' } }, { status: 503 }),
+  ];
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/v1/account/tokens' ? answers.shift()! : Response.json(operator)));
+  await mount(new LocalAuth(config), 'pt-BR');
+  const pt = accountCopy['pt-BR'];
+  await waitFor(() => expect(host.textContent).toContain('local:admin'));
+  await act(() => { fireEvent.click(getByRole(host, 'link', { name: copy['pt-BR'].profile })); });
+  for (const expected of [pt.tokenHours, pt.tokenRefused, pt.tokenFailed]) {
+    await act(async () => { fireEvent.click(getByRole(host, 'button', { name: pt.issue })); });
+    await waitFor(() => expect(getByRole(host, 'alert').textContent).toBe(expected));
+    expect(queryByRole(host, 'region', { name: pt.issuedToken })).toBeNull();
+  }
+  // A refusal of the token keeps the session.
+  expect(sessionStorage.getItem(SESSION_KEY)).toContain('live');
+});
+
 test('the accounts page is the global operator\'s: listed and open for an operator, the not-found page for a viewer and under the identity provider', async () => {
   const live = JSON.stringify({ token: 'live', expires_at: new Date(Date.now() + 3600_000).toISOString(), change_required: false });
   const answers = (session: object) => vi.fn(async (url: string) => Response.json(url === '/api/v1/session' ? session : { accounts: [] }));

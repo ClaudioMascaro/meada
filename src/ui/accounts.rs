@@ -25,6 +25,13 @@
 //! - `POST account/password` (`Console::password`): `{current, new}`, the policy applied, the
 //!   current one checked (a wrong one counts toward the lockout), a fresh session token without
 //!   the mark on success.
+//! - `POST account/tokens` (`Console::agent_token`, #560): `{surface: "nodes", hours}` (1 to
+//!   `accounts::AGENT_HOURS_MAX`, `accounts::AGENT_HOURS` when absent) answers
+//!   `{token, expires_at, surface}` once: an agent token for the nodes signed with the account's
+//!   role and groups as its row stands now, a random token id, recorded `account.token` (surface,
+//!   hours, token id, never the token) before it is returned. A suspended or unknown account gets
+//!   the role refusal, a 403 `forbidden`, recorded; a change-required token never reaches it
+//!   (admission's 403). The console admits no agent token: its audience is not the console's.
 //! - Lockout (`store::attempt`): `accounts::LOCKOUT_FAILURES` consecutive wrong passwords, counted
 //!   under the account row's lock, lock it for `accounts::LOCKOUT_MINUTES`; while locked, an
 //!   attempt is refused without checking its password (the dummy hashed instead) and without
@@ -56,6 +63,8 @@ pub(super) use administration::{ADMIN_BODY_MAX, is_administration};
 pub(super) const LOGIN_MAX: usize = 4 << 10;
 // ponytail: the most bytes of a password change's body, two passwords; past it a 413.
 pub(super) const PASSWORD_BODY_MAX: usize = 4 << 10;
+// ponytail: the most bytes of an agent token's request, a surface and a number; past it a 413.
+pub(super) const TOKENS_BODY_MAX: usize = 1 << 10;
 // ponytail: the most password hashes the console computes at once, each 19 MiB of memory; a
 // further sign-in or password change is a 503 `busy` without hashing.
 pub(super) const HASHES_MAX: usize = 4;
@@ -63,6 +72,7 @@ pub(super) const HASHES_MAX: usize = 4;
 /// The routes of this module.
 pub(super) const LOGIN: &str = "login";
 pub(super) const PASSWORD: &str = "account/password";
+pub(super) const TOKENS: &str = "account/tokens";
 
 /// What the console holds for local accounts.
 pub(super) struct Local {
@@ -355,11 +365,7 @@ impl Console {
     ) -> Session {
         groups.sort();
         groups.dedup();
-        let granted = self.providers.grant(&groups, None);
-        let grant = match self.providers.bounds() {
-            true => granted.union(),
-            false => crate::grant::Grant::All,
-        };
+        let grant = self.providers.local(&groups);
         let teams = self.teams_on(route, operator, &groups, &grant);
         Session::local(subject, operator, groups, teams, grant)
     }
@@ -685,6 +691,79 @@ impl Console {
             Ok((token, expires)) => issued(token, expires, false),
             Err(_) => unsigned(),
         }
+    }
+}
+
+impl Console {
+    /// `POST account/tokens` (#560): an agent token for the session's own account, for the
+    /// surface `nodes`, valid `hours` (`accounts::AGENT_HOURS` when absent). The body's checks
+    /// (400, 413, 422) are not recorded, as for every body check. The account's row is read now,
+    /// as before every console write: suspended, unknown or hostile (one line naming the table) is
+    /// the role refusal, recorded; active, the token carries the row's role and groups. The record
+    /// `account.token` (the surface, the hours and the token id, never the token) is written
+    /// before the token is returned; one that cannot be written gives no token.
+    pub(super) fn agent_token(&self, local: &Local, body: &Body, session: &Session) -> Answer {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Asked {
+            surface: String,
+            hours: Option<u64>,
+        }
+        let asked = match parsed::<Asked>(
+            body,
+            TOKENS_BODY_MAX,
+            Msg::AccountsTokenBody(accounts::AGENT_HOURS_MAX),
+        ) {
+            Ok(asked) => asked,
+            Err(refused) => return *refused,
+        };
+        let unprocessable =
+            |code, message: String| error(StatusCode::UNPROCESSABLE_ENTITY, code, &message);
+        if asked.surface != accounts::NODES_SURFACE {
+            return unprocessable("invalid_surface", Msg::AccountsTokenSurface.text());
+        }
+        let hours = asked.hours.unwrap_or(accounts::AGENT_HOURS);
+        if !(1..=accounts::AGENT_HOURS_MAX).contains(&hours) {
+            let message = Msg::AccountsTokenHours(accounts::AGENT_HOURS_MAX).text();
+            return unprocessable("invalid_hours", message);
+        }
+        let subject = session.subject.as_deref().unwrap_or_default();
+        let username = accounts::username_of(subject).unwrap_or_default();
+        let action = "account.token";
+        let actor = write::actor(session, None);
+        let mut arguments = json!({"account": username, "surface": accounts::NODES_SURFACE, "hours": hours.to_string()});
+        let (role, groups) = match store::standing(&local.postgres, username) {
+            Ok(store::Standing::Active(role, groups)) => (role, groups),
+            Ok(standing) => {
+                if matches!(standing, store::Standing::Bad) {
+                    bad_row(local);
+                }
+                let message = Msg::AccountsTokenRefused.text();
+                write::audit(Some(subject), None, action, username, &message);
+                self.audit.refused(&actor, action, &arguments, &message);
+                return error(StatusCode::FORBIDDEN, "forbidden", &message);
+            }
+            Err(reason) => return unreachable(&reason),
+        };
+        let issuer = &self.ui.public_url;
+        let signed = (local.keys).agent(issuer, username, role, &groups, accounts::NODES, hours);
+        let Ok((token, expires, id)) = signed else {
+            return unsigned();
+        };
+        arguments["token_id"] = json!(id);
+        let message = Msg::AccountsTokenIssued.text();
+        if let Err(why) =
+            (self.audit).record(&actor, action, &arguments, Outcome::Accepted, &message)
+        {
+            return unavailable(&why, Some(subject), action, username);
+        }
+        write::audit(Some(subject), None, action, username, "accepted");
+        let document = json!({
+            "token": token,
+            "expires_at": crate::modules::rfc3339(expires),
+            "surface": accounts::NODES_SURFACE,
+        });
+        json_answer(StatusCode::OK, &document)
     }
 }
 

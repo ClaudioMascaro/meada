@@ -17,7 +17,7 @@ use crate::server::Server;
 
 /// With `[accounts]`: the console's own sign-in, the default account and its session tokens.
 #[cfg(feature = "accounts")]
-mod accounts;
+pub(crate) mod accounts;
 
 /// With `[oidc]`: the console's admission, its routes and the grant bounding every view.
 #[cfg(feature = "oidc")]

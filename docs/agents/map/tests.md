@@ -664,8 +664,8 @@ takes, never twice the same).
 through `meada status` (`[accounts]` without `[postgres]`, beside `[oidc]`, both keys of a pair,
 `operations = true` naming no further problem), the start refused on a mismatched, non-Ed25519,
 unreadable or missing key and, with a good pair, on the default account Postgres cannot take,
-never a key or the URL in stderr, and a node over the chain fixture whose `[accounts]` names key
-files that do not exist starting and answering. Against Postgres (`postgres::audited`, a schema
+never a key or the URL in stderr, and a node over the chain fixture whose `[accounts]` names a
+private key file that does not exist starting and answering 401 without a token (#560). Against Postgres (`postgres::audited`, a schema
 of each test's own behind the relay): the tracer bullet (`config`'s `sign_in`, the 401 before
 routing, the `Origin` 403s of `login`, fixed 400s and the 413, `admin123` giving a token that
 opens only the password change (a write without a token a 401, with that token a 403
@@ -753,6 +753,37 @@ and message shown on a refused creation, each change through the dialog (nothing
 confirming, the payload, `last_operator` unchanged inside the dialog, a short password never
 sent), `offered` for the global operator alone, labelled and keyboard reachable controls in both
 languages, and the audit page's copy for every `account.*` action and the role `none`.
+
+### Local accounts: agent tokens for the nodes (#560)
+
+`src/accounts.rs` holds the unit test of `Keys::agent` and `Nodes::admit`: the claims (the nodes'
+audience, the subject, role, groups, a 32-hex random `jti`, no mark, the hours asked), a node
+admitting it with the public half alone (the private file removed), the console's audience
+refusing it, a node refusing a session token, an empty bearer and another scheme.
+`tests/it/oidc/accounts.rs` runs a node over the chain fixture with `[accounts]`, `[ui]` and
+tokens the test signs, with no service: no token a 401 `Bearer`; another key, a session token,
+the proposal server's audience, expired, `nbf` ahead, another issuer, no `exp`, a non-local
+subject, a change-required mark, `crit`, ES256, HS256 and `alg: none` each a 401
+`invalid_token` before routing (two `Authorization` headers too); the group `web` reading `WEB`
+alone through `trace`, `search` and `context`, a 403 `insufficient_scope` on the catalog, the
+group `*` reading as the golden has it, the 404s listing what the token reads; the `Origin` 403
+first; no token part on stderr. Without `[accounts.groups]` a token reads everything. The start
+refused, nothing listening, on a public key missing, unreadable or no Ed25519 key and on a
+manifest with no `[ui]`. With `generation-pointer`, on a hand-made generation with pins: a pin
+and a named workspace's route admitted as their identity is, a pin not held only to a token
+reading it, and the 503 of no servable generation to an admitted token, the 401 without one.
+`tests/it/ui/accounts/tokens.rs` (Postgres, skipping without it) is the demo: a viewer issuing a
+24-hour token answered `{token, expires_at, surface}`, its claims, the 8-hour default and a new
+id each time, the console's 401 to it, a node holding the console's public key reading `WEB`
+with it and answering 403 on the catalog and 401 to the session token; the body refusals (0 and
+169 hours, another surface, an unknown field, no surface, no JSON, the 413); a change-required
+account's 403 `password_change_required`; a suspended account's role refusal with its live session
+token; the operator's token carrying its role; every `account.token` record with the surface,
+the hours and the token id; no token, password or key in the audit page or either stderr.
+`ui/tests/LocalAccounts.test.tsx` runs the profile's section over the built WebAssembly: the
+surface and the 8-hour default, the request's body and bearer, the token shown once with its
+expiry and copied, in no storage, gone after navigating away and back; the refusals (hours, the
+role refusal, any other) in Portuguese, the session kept.
 
 ### Break glass beside the identity provider (#563)
 

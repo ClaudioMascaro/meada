@@ -541,6 +541,8 @@ async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
         #[cfg(feature = "accounts")]
         "/api/v1/account/password" => accounts::PASSWORD_BODY_MAX,
         #[cfg(feature = "accounts")]
+        "/api/v1/account/tokens" => accounts::TOKENS_BODY_MAX,
+        #[cfg(feature = "accounts")]
         path if (path.strip_prefix("/api/v1/")).is_some_and(accounts::is_administration) => {
             accounts::ADMIN_BODY_MAX
         }
@@ -1096,15 +1098,20 @@ impl Console {
         if route == "query" && *method == Method::POST {
             return self.query(request.body(), session);
         }
-        // Under break glass these two are the only routes of local accounts: account
+        // Under break glass the first two are the only routes of local accounts: account
         // administration, agent tokens and login verification do not exist there (ADR 0024). The
-        // password change is a local account's own: an identity provider's session gets the 404.
+        // password change and agent tokens are a local account's own: an identity provider's
+        // session gets the 404.
         #[cfg(feature = "accounts")]
         if let Some(local) = &self.accounts {
             match (route, *method == Method::POST) {
                 (accounts::LOGIN, true) => return self.login(local, request.body()),
                 (accounts::PASSWORD, true) if session.account => {
                     return self.password(local, request.body(), session);
+                }
+                // Agent tokens do not exist under break glass (ADR 0024, #563).
+                (accounts::TOKENS, true) if session.account && !local.break_glass => {
+                    return self.agent_token(local, request.body(), session);
                 }
                 _ => {}
             }

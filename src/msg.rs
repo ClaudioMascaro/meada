@@ -1070,6 +1070,25 @@ pub enum Msg<'a> {
     /// A private key that does not sign what the public key verifies.
     #[cfg(feature = "accounts")]
     AccountsKeyMismatch,
+    /// A node with `[accounts]` and no `[oidc]` whose manifest has no `[ui]`: its `public_url` is
+    /// the issuer of every agent token (#560).
+    #[cfg(feature = "accounts")]
+    AccountsNodeIssuer,
+    /// `POST account/tokens` whose body does not parse (#560).
+    #[cfg(feature = "accounts")]
+    AccountsTokenBody(u64),
+    /// An agent token for a surface the console does not issue for.
+    #[cfg(feature = "accounts")]
+    AccountsTokenSurface,
+    /// An agent token's validity outside its bounds, in hours.
+    #[cfg(feature = "accounts")]
+    AccountsTokenHours(u64),
+    /// An agent token for a suspended or unknown account: the role refusal of the write.
+    #[cfg(feature = "accounts")]
+    AccountsTokenRefused,
+    /// The audit message of an agent token issued.
+    #[cfg(feature = "accounts")]
+    AccountsTokenIssued,
     /// `[accounts]` beside `[oidc]` without `break_glass = true`: local sign-in is off once an
     /// identity provider is configured.
     #[cfg(feature = "accounts")]
@@ -3621,6 +3640,40 @@ impl Msg<'_> {
                     .into(),
                 "não corresponde à chave pública: o que ela assina, a chave pública não verifica"
                     .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsNodeIssuer => pick(
+                "a node admits the agent tokens the console issues, whose issuer is its \
+                 `[ui] public_url`: copy the console's [ui] section into this manifest"
+                    .into(),
+                "um nó admite os tokens de agente que a console emite, cujo emissor é a \
+                 `[ui] public_url` dela: copie a seção [ui] da console para este manifesto"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsTokenBody(max) => pick(
+                format!("the body must be {{\"surface\": \"nodes\", \"hours\": <1 to {max}>}}"),
+                format!("o corpo deve ser {{\"surface\": \"nodes\", \"hours\": <1 a {max}>}}"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsTokenSurface => pick(
+                "agent tokens are issued for the surface `nodes`".into(),
+                "tokens de agente são emitidos para a superfície `nodes`".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsTokenHours(max) => pick(
+                format!("an agent token is valid from 1 to {max} hours"),
+                format!("um token de agente vale de 1 a {max} horas"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsTokenRefused => pick(
+                "this account may not issue agent tokens: it is suspended or unknown".into(),
+                "esta conta não pode emitir tokens de agente: está suspensa ou não existe".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsTokenIssued => pick(
+                "agent token issued".into(),
+                "token de agente emitido".into(),
             ),
             #[cfg(feature = "accounts")]
             Msg::AccountsBesideOidc => pick(
