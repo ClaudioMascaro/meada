@@ -655,7 +655,11 @@ refused naming the key and no value; a key file past `KEY_MAX` and a password fi
 expired and not yet valid past the leeway, a non-local subject, an unknown role, no `exp`,
 HS256, a `crit` header), the password policy table (every rule, characters not bytes) and
 argon2id (OWASP parameters in the PHC string, a fresh salt, a non-argon2id string matching
-nothing, a hash past one of the parameter ceilings neither a stored hash nor computed).
+nothing, a hash past one of the parameter ceilings neither a stored hash nor computed), the
+common-password list (sorted without repeats, lowercase, every entry within the length rule, its
+first and last entries refused ignoring case), `weaker` (less memory, fewer iterations or version
+0x10 weaker, the console's own and a costlier one not) and `generated` (24 symbols the policy
+takes, never twice the same).
 `tests/it/ui/accounts.rs` runs the console as a process. Without a service: the section rules
 through `meada status` (`[accounts]` without `[postgres]`, beside `[oidc]`, both keys of a pair,
 `operations = true` naming no further problem), the start refused on a mismatched, non-Ed25519,
@@ -681,7 +685,25 @@ never the value), and created once by two consoles started together; a burst of 
 `HASHES_MAX` answered 503 `busy`, no token when the audit table cannot take the record, and every
 sign-in and change a 503 `audit_unavailable` with the relay closed. With the fleet's Valkey and
 store too, the default account saves a workspace version after its change, audited as
-`workspace.save` under `local:admin` and listed with that author. `tests/it/postgres.rs` holds
+`workspace.save` under `local:admin` and listed with that author. The lockout and recovery (#555): nine
+failures on either side of a success never lock; fifteen wrong passwords sent at once are
+recorded nine `password`, one `locked_now` and five `locked` (a `busy` one sent again), each with
+the wrong password's body; the right password while locked gets that body too, its fastest
+answer at least six tenths of the fastest wrong one's; a lock shortened by SQL ends on time
+although an attempt came meanwhile (never extended); stderr names `locked_now` and `locked`.
+Nine wrong current passwords of a change and a wrong sign-in lock `admin`, then neither route
+admits the right password. A viewer seeded with a weak argon2id hash keeps it through a wrong
+password and has it redone at the console's parameters by the right one (the one test reading
+the hash column, since no route shows a hash). `meada ui reset-admin` after ten bad sign-ins:
+the generated password alone on stdout, a fixed stderr line, a sign-in with it that must change
+it, then the global operator; the record `account.reset_admin` `via` `cli`; a suspended viewer
+`admin` reactivated as an operator from the setting's value (its key named, never the value); a
+common password refused exit 1 naming the key; a missing audit table exit 1 with nothing changed;
+an empty table getting `admin` created; no generated or set password in any record or stderr.
+Without a service: `reset-admin` on a manifest without `[accounts]`, Postgres closed (exit 1, no
+password printed, no URL) and a short setting, and `meada ui --help` naming it.
+`tests/it/cli.rs` holds that a build with `ui` and without `accounts` has no `reset-admin`.
+`tests/it/postgres.rs` holds
 migration 9's columns, and the tests that name the schema version moved to 9.
 
 ### Local accounts: the console's pages (#556)

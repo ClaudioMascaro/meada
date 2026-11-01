@@ -25,9 +25,9 @@ use serde_json::json;
 use crate::msg::Msg;
 
 /// The actions a record names: the operations, `pointer`, the route-level action of a pointer
-/// request refused before its body is read, and the local accounts' sign-in and password change
-/// (ADR 0024).
-pub const ACTIONS: [&str; 17] = [
+/// request refused before its body is read, and the local accounts' sign-in, password change
+/// and `meada ui reset-admin` (ADR 0024).
+pub const ACTIONS: [&str; 18] = [
     "workspace.save",
     "workspace.import",
     "workspace.apply",
@@ -45,6 +45,7 @@ pub const ACTIONS: [&str; 17] = [
     "workspaces.operators",
     "account.login",
     "account.password",
+    "account.reset_admin",
 ];
 
 /// The outcome a finished write records.

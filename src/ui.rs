@@ -43,6 +43,8 @@ use crate::workspace::Manifest;
 
 #[cfg(feature = "accounts")]
 mod accounts;
+#[cfg(feature = "accounts")]
+pub use accounts::reset_admin;
 #[cfg(feature = "workspaces")]
 mod catalog;
 #[cfg(feature = "directory")]

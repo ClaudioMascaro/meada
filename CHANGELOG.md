@@ -8,6 +8,19 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Hardening of local sign-in (#555, ADR 0024, from #551): the password policy refuses an embedded
+  common-password list (SecLists, MIT, the entries of 12 to 128 characters, compared ignoring
+  case; rule `common_password`). Ten consecutive failed password checks, at sign-in or as a
+  password change's current password, lock an account for fifteen minutes, counted in a
+  transaction holding the account row so parallel attempts never pass ten; a success resets the
+  count. A locked account gets the wrong password's 401 at a hash's cost, its password unchecked
+  and its lock never extended, audited `locked_now` and then `locked`. A stored hash weaker than
+  the console's parameters is redone at the next successful sign-in. `meada ui reset-admin
+  --workspace <manifest>` (features `ui` and `accounts`) creates or reactivates `admin` as an
+  operator, clears its lock and sets the `MEADA_ADMIN_PASSWORD` value or a generated password
+  printed once on stdout, with a change required, recorded `account.reset_admin` `via` `cli`
+  before the write and refusing with exit 1 when the record cannot be written. No golden changed.
+
 - Local sign-in for the console (#554, ADR 0024, from #551): the new `accounts` cargo feature
   (enabled by `cloud`) and its `[accounts]` section, which needs `[postgres]` and never sits
   beside `[oidc]`, name the Ed25519 signing key pair and the default account's initial password,

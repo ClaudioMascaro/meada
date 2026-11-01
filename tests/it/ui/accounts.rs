@@ -1,11 +1,13 @@
-//! The console with `[accounts]` (#554, ADR 0024): its own sign-in, the default account, session
-//! tokens it signs with Ed25519, the forced password change and the audit of each. The section
-//! and key refusals need no service; the rest run against the local Postgres of
-//! `MEADA_TEST_POSTGRES_URL`, each test in a schema of its own, and skip without it; the save as
-//! the global operator also needs the fleet's Valkey and store.
+//! The console with `[accounts]` (#554, #555, ADR 0024): its own sign-in, the default account,
+//! session tokens it signs with Ed25519, the forced password change, the lockout, the rehash of a
+//! weaker hash, `meada ui reset-admin` and the audit of each. The section and key refusals, and
+//! `reset-admin`'s refusals before Postgres, need no service; the rest run against the local
+//! Postgres of `MEADA_TEST_POSTGRES_URL`, each test in a schema of its own, and skip without it;
+//! the save as the global operator also needs the fleet's Valkey and store.
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
@@ -19,6 +21,8 @@ const EN: &str = "en_US.UTF-8";
 /// `MEADA_ADMIN_PASSWORD` never reaches a console.
 const ADMIN_ENV: &str = "MEADA_TEST_ADMIN_PASSWORD_554";
 const CHANGED: &str = "correct horse battery staple";
+/// The initial password the lockout and recovery tests set, so `admin` needs no change first.
+const CHOSEN: &str = "deployer chose this one";
 
 /// A fresh Ed25519 key pair in PEM, generated with ring: the private half (PKCS #8) and the
 /// public half (SPKI).
@@ -827,4 +831,430 @@ fn the_global_operator_saves_a_workspace_version_audited_under_its_local_subject
         .filter_map(|v| v["author"].as_str())
         .collect();
     assert!(authors.contains(&"local:admin"), "{listed}");
+}
+
+/// `meada ui reset-admin` on `dir`'s manifest with `env`: stdout, stderr and the exit code.
+fn reset_admin(dir: &Path, env: &[(&str, &str)]) -> (String, String, i32) {
+    meada(
+        dir,
+        EN,
+        env,
+        &["ui", "reset-admin", "--workspace", MANIFEST],
+    )
+}
+
+/// An account `username` of `role` seeded beside `admin`, with `admin`'s hash and no change
+/// required.
+fn seed(local: &Local, username: &str, role: &str) {
+    local.audit.admin.run(&format!(
+        "INSERT INTO \"{0}\".accounts (username, password_hash, role, change_required) SELECT \
+         '{username}', password_hash, '{role}', false FROM \"{0}\".accounts WHERE username = 'admin'",
+        local.audit.schema
+    ));
+}
+
+/// The records of `action` on the account `account` the audit page lists, oldest first: each
+/// one's outcome and reason (`-` for none).
+fn outcomes(console: &Server, token: &str, action: &str, account: &str) -> Vec<(String, String)> {
+    let page = ask(console, "/api/v1/audit?limit=100", token);
+    assert_eq!(page.status, 200, "{}", page.body);
+    let records = page.json()["records"].as_array().unwrap().clone();
+    let text = |v: &Value| v.as_str().unwrap_or("-").to_string();
+    let mut found: Vec<(String, String)> = (records.iter())
+        .filter(|r| r["action"] == action && r["arguments"]["account"] == account)
+        .map(|r| (text(&r["outcome"]), text(&r["arguments"]["reason"])))
+        .collect();
+    found.reverse();
+    found
+}
+
+/// How many of `outcomes` are `(outcome, reason)`.
+fn count(outcomes: &[(String, String)], outcome: &str, reason: &str) -> usize {
+    (outcomes.iter())
+        .filter(|(o, r)| o == outcome && r == reason)
+        .count()
+}
+
+/// A sign-in and how long it took.
+fn timed(console: &Server, username: &str, password: &str) -> (Reply, Duration) {
+    let start = Instant::now();
+    let reply = login(console, username, password);
+    (reply, start.elapsed())
+}
+
+/// The lockout: a success clears the count, so failures on either side of it never lock; ten
+/// wrong passwords sent at once lock the account at exactly the tenth (the rest are refused
+/// `locked`, unchecked); while locked the right password gets the wrong one's 401, at a hash's
+/// cost, and an attempt never extends the lock, which ends on its own.
+#[test]
+fn ten_failures_lock_the_account_and_a_lock_is_neither_checked_nor_extended() {
+    let Some(local) = local("accounts_lockout", &[(ADMIN_ENV, CHOSEN)]) else {
+        return;
+    };
+    let console = &local.console;
+    seed(&local, "ops-1", "operator");
+    let operator = token(&login(console, "ops-1", CHOSEN));
+
+    // Nine failures, a success, nine more: the count starts again at the success.
+    let mut wrong = Vec::new();
+    let mut invalid = None;
+    for _ in 0..2 {
+        for i in 0..9 {
+            let (reply, took) = timed(console, "admin", &format!("not the password {i}"));
+            assert_eq!(refusal(&reply), (401, "invalid_credentials".into()));
+            invalid.get_or_insert(reply.body.clone());
+            wrong.push(took);
+        }
+        assert_eq!(login(console, "admin", CHOSEN).status, 200);
+    }
+    let invalid = invalid.unwrap();
+
+    // Fifteen wrong passwords at once: the row's lock counts them one after another. A request
+    // past the hash bound is a 503 `busy` that counts nothing, and is sent again.
+    let parallel: Vec<Reply> = std::thread::scope(|scope| {
+        let sent: Vec<_> = (0..15)
+            .map(|i| {
+                scope.spawn(move || {
+                    loop {
+                        let reply = login(console, "admin", &format!("a parallel guess {i}"));
+                        if refusal(&reply) != (503, "busy".into()) {
+                            return reply;
+                        }
+                        std::thread::sleep(Duration::from_millis(20));
+                    }
+                })
+            })
+            .collect();
+        sent.into_iter().map(|s| s.join().unwrap()).collect()
+    });
+    for reply in &parallel {
+        assert_eq!(reply.status, 401, "{}", reply.body);
+        assert_eq!(reply.body, invalid);
+    }
+    let logins = outcomes(console, &operator, "account.login", "admin");
+    assert_eq!(count(&logins, "refused", "password"), 18 + 9, "{logins:?}");
+    assert_eq!(count(&logins, "refused", "locked_now"), 1, "{logins:?}");
+    assert_eq!(count(&logins, "refused", "locked"), 5, "{logins:?}");
+
+    // Locked: the right password gets the wrong one's answer, at about a wrong one's cost.
+    let mut locked = Vec::new();
+    for _ in 0..6 {
+        let (reply, took) = timed(console, "admin", CHOSEN);
+        assert_eq!((reply.status, reply.body.as_str()), (401, invalid.as_str()));
+        locked.push(took);
+    }
+    let (fastest_wrong, fastest_locked) = (wrong.iter().min(), locked.iter().min());
+    let (fastest_wrong, fastest_locked) = (*fastest_wrong.unwrap(), *fastest_locked.unwrap());
+    assert!(
+        fastest_locked * 10 >= fastest_wrong * 6,
+        "a locked refusal took {fastest_locked:?}, a wrong password {fastest_wrong:?}"
+    );
+
+    // An attempt while locked never extends the lock: shortened to end in a moment, it ends then
+    // although an attempt came meanwhile, well inside the window.
+    local.audit.admin.run(&format!(
+        "UPDATE \"{}\".accounts SET locked_until = now() + interval '5 seconds' \
+         WHERE username = 'admin'",
+        local.audit.schema
+    ));
+    let reply = login(console, "admin", "a guess while locked");
+    assert_eq!(reply.body, invalid);
+    std::thread::sleep(Duration::from_millis(5500));
+    let back = login(console, "admin", CHOSEN);
+    assert_eq!(back.status, 200, "{}", back.body);
+
+    let logins = outcomes(console, &operator, "account.login", "admin");
+    assert_eq!(count(&logins, "refused", "locked_now"), 1, "{logins:?}");
+    assert_eq!(count(&logins, "refused", "locked"), 5 + 6 + 1, "{logins:?}");
+    assert_eq!(count(&logins, "accepted", "-"), 3, "{logins:?}");
+    let Local {
+        console,
+        audit,
+        keys,
+        ..
+    } = local;
+    let stderr = console.stderr();
+    assert!(
+        stderr.contains("ui: local:admin account.login admin: refused (locked_now)"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("ui: local:admin account.login admin: refused (locked)"),
+        "{stderr}"
+    );
+    assert_leaks_nothing(&audit, &keys, &stderr, &[CHOSEN, "a parallel guess"], &[]);
+}
+
+/// A password change's wrong current password counts toward the same lockout as a sign-in's, and
+/// a locked account can neither sign in nor change its password.
+#[test]
+fn a_wrong_current_password_counts_toward_the_lockout() {
+    let Some(local) = local("accounts_lockout_change", &[(ADMIN_ENV, CHOSEN)]) else {
+        return;
+    };
+    let console = &local.console;
+    seed(&local, "ops-1", "operator");
+    let operator = token(&login(console, "ops-1", CHOSEN));
+    let admin = token(&login(console, "admin", CHOSEN));
+    for i in 0..9 {
+        let reply = change(
+            console,
+            &admin,
+            &format!("not the current one {i}"),
+            CHANGED,
+        );
+        assert_eq!(refusal(&reply), (401, "invalid_credentials".into()));
+    }
+    // The tenth failure, through the sign-in: the count is the account's, whichever route.
+    let tenth = login(console, "admin", "not the password");
+    assert_eq!(refusal(&tenth), (401, "invalid_credentials".into()));
+    let reply = change(console, &admin, CHOSEN, CHANGED);
+    assert_eq!(refusal(&reply), (401, "invalid_credentials".into()));
+    assert_eq!(refusal(&login(console, "admin", CHOSEN)).0, 401);
+    let changes = outcomes(console, &operator, "account.password", "admin");
+    let mut expected = vec![("refused".to_string(), "password".to_string()); 9];
+    expected.push(("refused".into(), "locked".into()));
+    assert_eq!(changes, expected);
+    let logins = outcomes(console, &operator, "account.login", "admin");
+    assert_eq!(
+        logins,
+        [
+            ("accepted".to_string(), "-".to_string()),
+            ("refused".into(), "locked_now".into()),
+            ("refused".into(), "locked".into()),
+        ]
+    );
+}
+
+/// A stored hash weaker than the console's parameters is redone at the next sign-in that proves
+/// its password, and only then: a wrong password leaves it. No route shows a hash, so this test
+/// reads the column.
+#[test]
+fn a_weaker_hash_is_redone_at_the_next_successful_sign_in() {
+    use argon2::password_hash::{PasswordHasher, SaltString, rand_core::OsRng};
+    let Some(local) = local("accounts_rehash", &[(ADMIN_ENV, CHOSEN)]) else {
+        return;
+    };
+    let console = &local.console;
+    let params = argon2::Params::new(8 * 1024, 1, 1, None).unwrap();
+    let argon2 = argon2::Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
+    let salt = SaltString::generate(&mut OsRng);
+    let weak = argon2.hash_password(CHANGED.as_bytes(), &salt).unwrap();
+    let weak = weak.to_string();
+    local.audit.admin.run(&format!(
+        "INSERT INTO \"{}\".accounts (username, password_hash, role, change_required) \
+         VALUES ('viewer-1', '{weak}', 'viewer', false)",
+        local.audit.schema
+    ));
+    let stored = || {
+        local.audit.admin.texts(&format!(
+            "SELECT password_hash FROM \"{}\".accounts WHERE username = 'viewer-1'",
+            local.audit.schema
+        ))
+    };
+    assert_eq!(refusal(&login(console, "viewer-1", CHOSEN)).0, 401);
+    assert_eq!(stored(), std::slice::from_ref(&weak));
+    assert_eq!(login(console, "viewer-1", CHANGED).status, 200);
+    let redone = stored().remove(0);
+    assert!(
+        redone.starts_with("$argon2id$v=19$m=19456,t=2,p=1$"),
+        "{redone}"
+    );
+    assert_ne!(redone, weak);
+    assert_eq!(login(console, "viewer-1", CHANGED).status, 200);
+    assert_eq!(stored(), [redone]);
+}
+
+/// The demo: ten bad sign-ins lock `admin`, the eleventh with the right password is still
+/// refused; `meada ui reset-admin` clears the lock with a generated password, printed once on
+/// stdout and nowhere else, that must be changed; it reactivates a suspended or demoted `admin`
+/// as an operator from the setting's value, creates `admin` when there is none, and refuses, with
+/// nothing changed, a value the policy refuses and a record it cannot write.
+#[test]
+fn reset_admin_recovers_a_locked_default_account_with_a_forced_change() {
+    let Some(local) = local("accounts_reset_admin", &[(ADMIN_ENV, CHOSEN)]) else {
+        return;
+    };
+    let console = &local.console;
+    let schema = &local.audit.schema;
+    for i in 0..10 {
+        let reply = login(console, "admin", &format!("a bad sign-in {i}"));
+        assert_eq!(refusal(&reply), (401, "invalid_credentials".into()));
+    }
+    assert_eq!(refusal(&login(console, "admin", CHOSEN)).0, 401);
+
+    // A generated password: one line on stdout, never on stderr.
+    let (stdout, stderr, code) = reset_admin(&local.dir, &[]);
+    assert_eq!(code, 0, "{stderr}");
+    let generated = stdout.strip_suffix('\n').unwrap().to_string();
+    assert_eq!(generated.chars().count(), 24, "{stdout}");
+    assert!(!generated.contains('\n'));
+    assert_eq!(
+        stderr,
+        "meada: admin reactivated as an operator, its lock cleared, a password change \
+         required; its generated password is on stdout, shown once\n"
+    );
+    let first = login(console, "admin", &generated);
+    let changing = token(&first);
+    assert_eq!(first.json()["change_required"], true);
+    let reply = ask(console, "/api/v1/session", &changing);
+    assert_eq!(refusal(&reply), (403, "password_change_required".into()));
+    let operator = token(&change(console, &changing, &generated, CHANGED));
+    let session = ask(console, "/api/v1/session", &operator).json();
+    assert_eq!(
+        (&session["subject"], &session["role"]),
+        (&json!("local:admin"), &json!("operator"))
+    );
+    let all = records(console, &operator);
+    let reset: Vec<&Value> = all
+        .iter()
+        .filter(|r| r["action"] == "account.reset_admin")
+        .collect();
+    assert_eq!(reset.len(), 1, "{all:?}");
+    let subject = reset[0]["subject"].as_str().unwrap();
+    assert!(subject.starts_with("cli:"), "{subject}");
+    assert_eq!(
+        *reset[0],
+        json!({"via": "cli", "subject": subject, "login": null, "role": "operator",
+               "owners": null, "action": "account.reset_admin", "arguments": {"account": "admin"},
+               "outcome": "accepted",
+               "message": "admin reactivated as an operator, its lock cleared, a password change required"})
+    );
+
+    // Suspended and demoted: reactivated as an operator, from the setting's value, which is
+    // never printed.
+    local.audit.admin.run(&format!(
+        "UPDATE \"{schema}\".accounts SET suspended = true, role = 'viewer' WHERE username = 'admin'"
+    ));
+    assert_eq!(refusal(&login(console, "admin", CHANGED)).0, 401);
+    let chosen = "the setting's own value";
+    let (stdout, stderr, code) = reset_admin(&local.dir, &[(ADMIN_ENV, chosen)]);
+    assert_eq!((stdout.as_str(), code), ("", 0), "{stderr}");
+    assert!(
+        stderr.contains("its password is the one `accounts.admin_password_env` names"),
+        "{stderr}"
+    );
+    let again = login(console, "admin", chosen);
+    assert_eq!(again.json()["change_required"], true, "{}", again.body);
+    let operator = token(&change(console, &token(&again), chosen, CHANGED));
+    assert_eq!(
+        ask(console, "/api/v1/session", &operator).json()["role"],
+        "operator"
+    );
+
+    // A value the policy refuses: exit 1 naming the key, nothing recorded or changed.
+    let (stdout, stderr, code) = reset_admin(&local.dir, &[(ADMIN_ENV, "Password1234")]);
+    assert_eq!((stdout.as_str(), code), ("", 1), "{stderr}");
+    assert_eq!(
+        stderr,
+        "meada: `accounts.admin_password_env`: the password is on the list of common passwords\n"
+    );
+    // A record that cannot be written: exit 1, nothing changed, no password on stdout.
+    local.audit.admin.run(&format!(
+        "ALTER TABLE \"{schema}\".audit RENAME TO audit_gone"
+    ));
+    let (stdout, stderr, code) = reset_admin(&local.dir, &[]);
+    assert_eq!((stdout.as_str(), code), ("", 1), "{stderr}");
+    assert!(
+        stderr.contains("the audit record cannot be written to Postgres, so nothing was changed"),
+        "{stderr}"
+    );
+    local.audit.admin.run(&format!(
+        "ALTER TABLE \"{schema}\".audit_gone RENAME TO audit"
+    ));
+    assert_eq!(login(console, "admin", CHANGED).status, 200);
+    let resets = outcomes(console, &operator, "account.reset_admin", "admin");
+    assert_eq!(resets.len(), 2, "{resets:?}");
+
+    // No account at all: `admin` created.
+    local
+        .audit
+        .admin
+        .run(&format!("DELETE FROM \"{schema}\".accounts"));
+    let (created, stderr, code) = reset_admin(&local.dir, &[]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(
+        stderr.starts_with("meada: admin created as an operator, a password change required"),
+        "{stderr}"
+    );
+    let created = created.trim_end().to_string();
+    assert_eq!(
+        login(console, "admin", &created).json()["change_required"],
+        true
+    );
+
+    let rows = local.audit.admin.texts(&format!(
+        "SELECT row_to_json(a)::text FROM \"{schema}\".audit a"
+    ));
+    let passwords = [
+        generated.as_str(),
+        created.as_str(),
+        chosen,
+        CHOSEN,
+        "Password1234",
+    ];
+    assert_leaks_nothing(&local.audit, &local.keys, &rows.join("\n"), &passwords, &[]);
+    let Local {
+        console,
+        audit,
+        keys,
+        ..
+    } = local;
+    let stderr = console.stderr();
+    assert_leaks_nothing(&audit, &keys, &stderr, &passwords, &[]);
+}
+
+/// `meada ui reset-admin`'s refusals before any write, needing no service: a manifest without
+/// `[accounts]`, a setting the policy refuses (named by its key, never its value), and Postgres
+/// unreachable, where the record cannot be written, so nothing is and no password is printed.
+#[test]
+fn reset_admin_refuses_without_its_section_its_policy_or_its_record() {
+    let bare = console_dir("accounts_reset_bare", Some(VERSION), "", &ui_section());
+    let (stdout, stderr, code) = reset_admin(&bare, &[]);
+    assert_eq!((stdout.as_str(), code), ("", 1), "{stderr}");
+    assert!(
+        stderr.contains("has no [accounts] section: there is no default account to reset"),
+        "{stderr}"
+    );
+    let head = format!(
+        "\n[postgres]\nurl_env = \"MEADA_TEST_POSTGRES_URL_555\"\nconnect_timeout_seconds = 1\n{}",
+        section()
+    );
+    let dir = console_dir("accounts_reset_closed", Some(VERSION), &head, &ui_section());
+    let closed = "postgres://meada:pw-555@127.0.0.1:9/meada";
+    let env = [("MEADA_TEST_POSTGRES_URL_555", closed)];
+    let (stdout, stderr, code) = reset_admin(&dir, &env);
+    assert_eq!((stdout.as_str(), code), ("", 1), "{stderr}");
+    assert!(
+        stderr.contains("the audit record cannot be written to Postgres, so nothing was changed"),
+        "{stderr}"
+    );
+    assert!(!stderr.contains("pw-555"), "{stderr}");
+    let short = [env[0], (ADMIN_ENV, "admin1")];
+    let (stdout, stderr, code) = reset_admin(&dir, &short);
+    assert_eq!((stdout.as_str(), code), ("", 1), "{stderr}");
+    assert_eq!(
+        stderr,
+        "meada: `accounts.admin_password_env`: the password has fewer than 12 characters\n"
+    );
+    // A setting's file that cannot be read: named by its key, nothing else read or written.
+    let filed = "\n[postgres]\nurl_env = \"MEADA_TEST_POSTGRES_URL_555\"\n\n[accounts]\n\
+                 admin_password_file = \"no-such-password\"\n";
+    let unreadable = console_dir(
+        "accounts_reset_unreadable",
+        Some(VERSION),
+        filed,
+        &ui_section(),
+    );
+    let (stdout, stderr, code) = reset_admin(&unreadable, &env);
+    assert_eq!((stdout.as_str(), code), ("", 1), "{stderr}");
+    assert!(
+        stderr.starts_with("meada: `accounts.admin_password_file`: "),
+        "{stderr}"
+    );
+    assert!(!stderr.contains("audit"), "{stderr}");
+    // The help names the subcommand beside the listener.
+    let (help, _, code) = meada(&dir, EN, &[], &["ui", "--help"]);
+    assert_eq!(code, 0);
+    assert!(help.contains("reset-admin"), "{help}");
 }

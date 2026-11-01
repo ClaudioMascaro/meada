@@ -12,8 +12,11 @@
 //! `Keys` signs and verifies session tokens: EdDSA JWTs, issuer the console's `[ui] public_url`,
 //! audience `CONSOLE`, subject `local:<username>`, the role, the groups, a change-required mark
 //! when set, issued at and expiry `SESSION_HOURS` later. `policy` is the password policy, one
-//! pure function; `hash` and `verify` are argon2id at OWASP's parameters. `store` is the accounts
-//! table.
+//! pure function, over the common-password list embedded beside this file
+//! (`accounts/common-passwords.txt`, its source and licence in `accounts/common-passwords.md`);
+//! `hash` and `verify` are argon2id at OWASP's parameters, and `weaker` tells a stored hash to
+//! redo at the next sign-in. `store` is the accounts table, its lockout counted under the row's
+//! lock (`LOCKOUT_FAILURES`, `LOCKOUT_MINUTES`). `reset_admin` is `meada ui reset-admin`.
 
 // The console (feature `ui`) is the one reader of the keys, the policy and the store so far.
 #![cfg_attr(not(feature = "ui"), allow(dead_code))]
@@ -65,6 +68,20 @@ const ARGON2_LANES: u32 = 1;
 const HASH_MEMORY_MAX_KIB: u32 = 64 * 1024;
 const HASH_ITERATIONS_MAX: u32 = 8;
 const HASH_LANES_MAX: u32 = 4;
+// ponytail: the consecutive failed password checks that lock an account, counted in a
+// transaction holding its row, so parallel attempts never pass it; the lock then lasts
+// `LOCKOUT_MINUTES`, and the count starts again from none.
+pub const LOCKOUT_FAILURES: i32 = 10;
+// ponytail: how long a lock lasts, never extended by an attempt while it holds.
+pub const LOCKOUT_MINUTES: i32 = 15;
+/// The characters of a password `meada ui reset-admin` generates: 32 symbols, five bits each,
+/// none easily misread (no `l`, `o`, `0` or `1`).
+const GENERATED: &[u8; 32] = b"abcdefghijkmnpqrstuvwxyz23456789";
+/// How many characters it has: 24 of five bits, 120 bits.
+const GENERATED_LENGTH: usize = 24;
+/// The common-password list: lowercase, sorted by bytes, one entry per line
+/// (`accounts/common-passwords.md`).
+const COMMON: &str = include_str!("accounts/common-passwords.txt");
 
 /// A local account's role.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -364,6 +381,8 @@ pub enum Rule {
     Default,
     /// The username, ignoring case.
     Username,
+    /// An entry of the common-password list, ignoring case.
+    Common,
     /// The current password, in a change: not `policy`'s, which has no current password.
     Current,
 }
@@ -376,6 +395,7 @@ impl Rule {
             Rule::Long => "too_long",
             Rule::Default => "default_password",
             Rule::Username => "username",
+            Rule::Common => "common_password",
             Rule::Current => "current_password",
         }
     }
@@ -387,6 +407,7 @@ impl Rule {
             Rule::Long => Msg::AccountsPasswordLong(PASSWORD_MAX).text(),
             Rule::Default => Msg::AccountsPasswordDefault.text(),
             Rule::Username => Msg::AccountsPasswordUsername.text(),
+            Rule::Common => Msg::AccountsPasswordCommon.text(),
             Rule::Current => Msg::AccountsPasswordCurrent.text(),
         }
     }
@@ -394,20 +415,46 @@ impl Rule {
 
 /// The password policy (OWASP ASVS), shared by every route and the CLI: 12 to 128 characters
 /// counted as Unicode scalar values, any character, no composition rule and no truncation;
-/// refused when it is the default password or the username ignoring case. The first rule it
-/// fails, in that order.
+/// refused when it is the default password, the username ignoring case, or an entry of the
+/// common-password list ignoring case. The first rule it fails, in that order.
 pub fn policy(password: &str, username: &str) -> Result<(), Rule> {
     let length = password.chars().count();
+    let lower = password.to_lowercase();
     if length < PASSWORD_MIN {
         Err(Rule::Short)
     } else if length > PASSWORD_MAX {
         Err(Rule::Long)
     } else if password == DEFAULT_PASSWORD {
         Err(Rule::Default)
-    } else if password.to_lowercase() == username.to_lowercase() {
+    } else if lower == username.to_lowercase() {
         Err(Rule::Username)
+    } else if common().binary_search(&lower.as_str()).is_ok() {
+        Err(Rule::Common)
     } else {
         Ok(())
+    }
+}
+
+/// The entries of the common-password list, split once.
+fn common() -> &'static [&'static str] {
+    static LIST: OnceLock<Vec<&'static str>> = OnceLock::new();
+    LIST.get_or_init(|| COMMON.lines().collect())
+}
+
+/// A password for `meada ui reset-admin`: `GENERATED_LENGTH` characters of `GENERATED` from the
+/// operating system's generator, one the policy takes.
+pub fn generated() -> String {
+    use password_hash::rand_core::RngCore;
+    loop {
+        let mut bytes = [0u8; GENERATED_LENGTH];
+        OsRng.fill_bytes(&mut bytes);
+        // 256 is a multiple of 32: every symbol is as likely as every other.
+        let password: String = (bytes.iter())
+            .map(|b| GENERATED[usize::from(*b) % GENERATED.len()] as char)
+            .collect();
+        if policy(&password, DEFAULT_USERNAME).is_ok() {
+            return password;
+        }
     }
 }
 
@@ -450,6 +497,17 @@ fn stored(phc: &str) -> Option<PasswordHash<'_>> {
         && params.t_cost() <= HASH_ITERATIONS_MAX
         && params.p_cost() <= HASH_LANES_MAX;
     (parsed.algorithm.as_str() == "argon2id" && bounded).then_some(parsed)
+}
+
+/// Whether the stored hash `phc` is weaker than the console's own parameters (less memory, fewer
+/// iterations, or an older argon2 version), so a sign-in that proves its password redoes it.
+pub fn weaker(phc: &str) -> bool {
+    stored(phc).is_some_and(|parsed| {
+        let params = Params::try_from(&parsed).ok();
+        let version = parsed.version.and_then(|v| Version::try_from(v).ok());
+        params.is_none_or(|p| p.m_cost() < ARGON2_MEMORY_KIB || p.t_cost() < ARGON2_ITERATIONS)
+            || version != Some(Version::V0x13)
+    })
 }
 
 /// A fixed hash the sign-in checks an unknown username against, so that every refusal costs one
@@ -520,6 +578,8 @@ mod tests {
             ("elevenchars", "alice", Err(Rule::Short)),
             // Characters, not bytes: eleven two-byte characters are still short.
             ("ééééééééééé", "alice", Err(Rule::Short)),
+            // A common password too short to reach the list: the length rule names it.
+            ("password", "alice", Err(Rule::Short)),
             (long.as_str(), "alice", Err(Rule::Long)),
             (longest.as_str(), "alice", Ok(())),
             ("twelve chars", "alice", Ok(())),
@@ -527,21 +587,68 @@ mod tests {
             ("ALICE.SMITH-1", "alice.smith-1", Err(Rule::Username)),
             ("alice.smith-1", "alice.smith-1", Err(Rule::Username)),
             ("alice.smith-12", "alice.smith-1", Ok(())),
+            // The username comes before the list: a common username is named as the username.
+            ("password1234", "password1234", Err(Rule::Username)),
+            // The list's entries, ignoring case, and its first and last.
+            ("password1234", "alice", Err(Rule::Common)),
+            ("PassWord1234", "alice", Err(Rule::Common)),
+            ("QWERTYUIOPASDFGHJKL", "alice", Err(Rule::Common)),
+            ("123456789012", "alice", Err(Rule::Common)),
+            (common()[0], "alice", Err(Rule::Common)),
+            (common()[common().len() - 1], "alice", Err(Rule::Common)),
+            // Near an entry is not an entry.
+            ("password12345x", "alice", Ok(())),
+            ("password1234 ", "alice", Ok(())),
         ] {
             assert_eq!(policy(password, username), expected, "{password}");
         }
         // The default password is shorter than the minimum: the length rule names it first, and
-        // the default rule stands for a longer policy.
+        // the default rule stands for a longer default or a shorter minimum.
+        assert!(DEFAULT_PASSWORD.chars().count() < PASSWORD_MIN);
         assert_eq!(policy(DEFAULT_PASSWORD, "admin"), Err(Rule::Short));
-        for rule in [
+        let rules = [
             Rule::Short,
             Rule::Long,
             Rule::Default,
             Rule::Username,
+            Rule::Common,
             Rule::Current,
-        ] {
+        ];
+        let codes: std::collections::BTreeSet<&str> = rules.iter().map(|r| r.code()).collect();
+        assert_eq!(codes.len(), rules.len());
+        for rule in rules {
             assert!(!rule.text().is_empty() && !rule.code().is_empty());
         }
+        assert!(!Rule::Common.text().contains("password1234"));
+    }
+
+    /// The embedded list is what `common-passwords.md` says: sorted by bytes without repeats,
+    /// lowercase, each entry 12 to 128 characters with no whitespace at either end, so a
+    /// regenerated list that breaks the filter fails here.
+    #[test]
+    fn the_common_password_list_is_sorted_lowercase_and_past_the_length_rule() {
+        let list = common();
+        assert_eq!(list.len(), 46146);
+        assert!(COMMON.ends_with('\n') && !COMMON.contains('\r'));
+        assert!(list.windows(2).all(|w| w[0] < w[1]), "sorted, no repeats");
+        for entry in list {
+            assert_eq!(entry.to_lowercase(), *entry, "{entry}");
+            assert!(
+                (PASSWORD_MIN..=PASSWORD_MAX).contains(&entry.chars().count()),
+                "{entry}"
+            );
+            assert_eq!(entry.trim(), *entry, "{entry}");
+            assert!(!entry.chars().any(char::is_control), "{entry}");
+        }
+    }
+
+    #[test]
+    fn a_generated_password_passes_the_policy_and_is_never_the_same() {
+        let first = generated();
+        assert_eq!(first.chars().count(), GENERATED_LENGTH);
+        assert!(first.bytes().all(|b| GENERATED.contains(&b)), "{first}");
+        assert_eq!(policy(&first, DEFAULT_USERNAME), Ok(()));
+        assert_ne!(generated(), first);
     }
 
     #[test]
@@ -809,5 +916,33 @@ mod tests {
             assert!(!is_hash(&hostile), "{hostile}");
             assert!(!verify("correct horse battery", &hostile), "{hostile}");
         }
+    }
+
+    /// A stored hash with less memory, fewer iterations or an older version than the console's
+    /// own is weaker, and redone at the next sign-in; the console's own, or a costlier one within
+    /// the bounds, is not; a string that is no stored hash is not either (it admits nothing).
+    #[test]
+    fn a_hash_below_the_console_s_parameters_is_weaker() {
+        let salt = SaltString::generate(&mut OsRng);
+        let with = |version: Version, m: u32, t: u32, p: u32| {
+            let params = Params::new(m, t, p, None).unwrap();
+            let argon2 = Argon2::new(argon2::Algorithm::Argon2id, version, params);
+            let phc = argon2.hash_password(b"correct horse battery", &salt);
+            phc.unwrap().to_string()
+        };
+        let own = hash("correct horse battery").unwrap();
+        assert!(!weaker(&own));
+        assert!(!weaker(dummy()));
+        let (m, t, p) = (ARGON2_MEMORY_KIB, ARGON2_ITERATIONS, ARGON2_LANES);
+        assert!(!weaker(&with(Version::V0x13, m + 1024, t + 1, p + 1)));
+        for weak in [
+            with(Version::V0x13, m - 1024, t, p),
+            with(Version::V0x13, m, t - 1, p),
+            with(Version::V0x10, m, t, p),
+        ] {
+            assert!(is_hash(&weak) && weaker(&weak), "{weak}");
+            assert!(verify("correct horse battery", &weak), "{weak}");
+        }
+        assert!(!weaker("admin123") && !weaker(""));
     }
 }

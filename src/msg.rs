@@ -1084,6 +1084,28 @@ pub enum Msg<'a> {
     AccountsPasswordUsername,
     #[cfg(feature = "accounts")]
     AccountsPasswordCurrent,
+    #[cfg(feature = "accounts")]
+    AccountsPasswordCommon,
+    /// `meada ui reset-admin` on a manifest without `[accounts]`: the manifest.
+    #[cfg(all(feature = "ui", feature = "accounts"))]
+    AccountsResetNoSection(&'a str),
+    /// The audit message of `meada ui reset-admin`: whether it created `admin`.
+    #[cfg(all(feature = "ui", feature = "accounts"))]
+    AccountsResetAdmin {
+        created: bool,
+    },
+    /// `meada ui reset-admin` done, on stderr: whether it created `admin`, and the key whose
+    /// password it set (none: the generated one, on stdout).
+    #[cfg(all(feature = "ui", feature = "accounts"))]
+    AccountsResetDone {
+        created: bool,
+        from: Option<&'a str>,
+    },
+    /// `meada ui reset-admin`'s description and its `--workspace`.
+    #[cfg(all(feature = "ui", feature = "accounts"))]
+    UiResetAdmin,
+    #[cfg(all(feature = "ui", feature = "accounts"))]
+    UiResetAdminWorkspaceHelp,
     /// The default account could not be made at the console's start: Postgres's reason.
     #[cfg(feature = "accounts")]
     AccountsBootstrap(&'a str),
@@ -3578,6 +3600,59 @@ impl Msg<'_> {
             Msg::AccountsPasswordCurrent => pick(
                 "the new password is the current one".into(),
                 "a nova senha é a atual".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordCommon => pick(
+                "the password is on the list of common passwords".into(),
+                "a senha está na lista de senhas comuns".into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "accounts"))]
+            Msg::AccountsResetNoSection(file) => pick(
+                format!("{file} has no [accounts] section: there is no default account to reset"),
+                format!("{file} não tem a seção [accounts]: não há conta padrão a redefinir"),
+            ),
+            #[cfg(all(feature = "ui", feature = "accounts"))]
+            Msg::AccountsResetAdmin { created } => match created {
+                true => pick(
+                    "admin created as an operator, a password change required".into(),
+                    "admin criado como operador, com troca de senha obrigatória".into(),
+                ),
+                false => pick(
+                    "admin reactivated as an operator, its lock cleared, a password change \
+                     required"
+                        .into(),
+                    "admin reativado como operador, bloqueio removido, com troca de senha \
+                     obrigatória"
+                        .into(),
+                ),
+            },
+            #[cfg(all(feature = "ui", feature = "accounts"))]
+            Msg::AccountsResetDone { created, from } => {
+                let done = Msg::AccountsResetAdmin { created: *created }.text();
+                match from {
+                    Some(key) => pick(
+                        format!("{done}; its password is the one `{key}` names"),
+                        format!("{done}; a senha é a que `{key}` indica"),
+                    ),
+                    None => pick(
+                        format!("{done}; its generated password is on stdout, shown once"),
+                        format!("{done}; a senha gerada está na saída padrão, mostrada uma vez"),
+                    ),
+                }
+            }
+            #[cfg(all(feature = "ui", feature = "accounts"))]
+            Msg::UiResetAdmin => pick(
+                "Recover the default account: create or reactivate admin as an operator, clear \
+                 its lock and set a password that must be changed at the next sign-in."
+                    .into(),
+                "Recupera a conta padrão: cria ou reativa admin como operador, remove o bloqueio \
+                 e define uma senha que precisa ser trocada no próximo login."
+                    .into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "accounts"))]
+            Msg::UiResetAdminWorkspaceHelp => pick(
+                "The bootstrap manifest, with its [accounts] and [postgres] sections".into(),
+                "O manifesto de bootstrap, com as seções [accounts] e [postgres]".into(),
             ),
             #[cfg(feature = "accounts")]
             Msg::AccountsBootstrap(reason) => pick(

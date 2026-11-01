@@ -1,9 +1,9 @@
 //! The accounts table (ADR 0024, migration 9): one row per local account in `[postgres] schema`,
-//! read and written by the console alone. Each call opens its own connection through
-//! `postgres::connected`, so a schema version this binary does not know counts as unreachable,
-//! and is bounded as the audit's calls are. Every row is hostile when read: one that fails its
-//! checks admits nothing (`Found::Bad`), and its reader writes one line naming the table, never a
-//! value.
+//! read and written by the console, and by `meada ui reset-admin` (`reset_admin`). Each call
+//! opens its own connection through `postgres::connected`, so a schema version this binary does
+//! not know counts as unreachable, and is bounded as the audit's calls are. Every row is hostile when read: one that fails its
+//! checks admits nothing (`Attempt::Bad`), and its reader writes one line naming the table, never
+//! a value. A password attempt (`attempt`) holds the row while it checks and counts.
 
 use crate::accounts::{Role, groups_ok, is_hash, username_ok};
 use crate::modules::Problem;
@@ -21,13 +21,48 @@ pub struct Account {
     pub suspended: bool,
 }
 
-/// What a lookup by username finds.
-pub enum Found {
-    Account(Account),
+/// Why an attempt on an account's password is refused, as the audit records it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Refusal {
+    /// No account of that username, or a row that fails its checks.
+    Unknown,
+    /// The password is not the account's.
+    Password,
+    /// Suspended: the password was not checked.
+    Suspended,
+    /// Locked by earlier failures: the password was not checked.
+    Locked,
+    /// The password is not the account's, and this failure locked it.
+    LockedNow,
+}
+
+impl Refusal {
+    /// The `reason` of the audit record and the stderr line.
+    pub fn reason(self) -> &'static str {
+        match self {
+            Refusal::Unknown => "unknown",
+            Refusal::Password => "password",
+            Refusal::Suspended => "suspended",
+            Refusal::Locked => "locked",
+            Refusal::LockedNow => "locked_now",
+        }
+    }
+}
+
+/// What an attempt on the password of a username found and did.
+pub enum Attempt {
     /// No row of that username.
     Unknown,
-    /// A row that fails its checks.
+    /// A row that fails its checks: it admits nothing.
     Bad,
+    /// The check could not hash (no permit left): nothing counted.
+    Busy,
+    /// Refused before its password was checked (`Locked`, `Suspended`): the row released at once,
+    /// nothing counted, and the caller hashes the dummy so the refusal costs what any other does.
+    Unchecked(Account, Refusal),
+    /// The password checked under the row's lock: right (`None`, the count cleared), or wrong
+    /// (`Password`, or `LockedNow` for the failure that reached `LOCKOUT_FAILURES`).
+    Checked(Account, Option<Refusal>),
 }
 
 /// The table, as a stderr line names it.
@@ -35,23 +70,84 @@ pub fn table(config: &Config) -> String {
     format!("{}.accounts", config.quoted())
 }
 
-/// The account `username` names, read now.
-pub fn find(config: &Config, username: &str) -> Result<Found, String> {
+/// An attempt on the password of `username`, in one transaction that holds its row
+/// (`SELECT ... FOR UPDATE`), so attempts in parallel are counted one after another and never
+/// pass `LOCKOUT_FAILURES`: a locked or suspended account is `Unchecked` (a lock is never
+/// extended); otherwise `check` hashes the password against the stored hash (`None` when it
+/// cannot: `Busy`, nothing counted). A wrong one adds a failure, and the one that reaches
+/// `LOCKOUT_FAILURES` locks the account for `LOCKOUT_MINUTES` and starts the count again; a right
+/// one clears the count.
+pub fn attempt(
+    config: &Config,
+    username: &str,
+    check: impl FnOnce(&str) -> Option<bool>,
+) -> Result<Attempt, String> {
+    let quoted = config.quoted();
     let run = async {
-        let opened = crate::postgres::connected(config).await?;
+        let mut opened = crate::postgres::connected(config).await?;
+        let scrub = opened.scrubber();
+        let tx = opened.client.transaction().await.map_err(&scrub)?;
         let sql = format!(
-            "SELECT username, password_hash, role, groups, change_required, suspended FROM \
-             {}.accounts WHERE username = $1",
-            config.quoted()
+            "SELECT username, password_hash, role, groups, change_required, suspended, \
+             locked_until IS NOT NULL AND locked_until > now(), failures FROM {quoted}.accounts \
+             WHERE username = $1 FOR UPDATE"
         );
-        let rows = (opened.client).query(&sql, &[&username]).await;
-        let rows = rows.map_err(|e| opened.scrub(e))?;
-        Ok(match rows.first() {
-            None => Found::Unknown,
-            Some(row) => checked(row, username).map_or(Found::Bad, Found::Account),
-        })
+        let rows = tx.query(&sql, &[&username]).await.map_err(&scrub)?;
+        let Some(row) = rows.first() else {
+            return Ok(Attempt::Unknown);
+        };
+        let Some(account) = checked(row, username) else {
+            return Ok(Attempt::Bad);
+        };
+        let locked: bool = row.try_get(6).map_err(&scrub)?;
+        let failures: i32 = row.try_get(7).map_err(&scrub)?;
+        if locked {
+            return Ok(Attempt::Unchecked(account, Refusal::Locked));
+        }
+        if account.suspended {
+            return Ok(Attempt::Unchecked(account, Refusal::Suspended));
+        }
+        let Some(right) = check(&account.hash) else {
+            return Ok(Attempt::Busy);
+        };
+        let refusal = match (right, failures) {
+            (true, 0) => None,
+            (true, _) => {
+                let sql = format!(
+                    "UPDATE {quoted}.accounts SET failures = 0, locked_until = NULL \
+                     WHERE username = $1"
+                );
+                tx.execute(&sql, &[&username]).await.map_err(&scrub)?;
+                None
+            }
+            (false, _) => {
+                let sql = format!(
+                    "UPDATE {quoted}.accounts SET \
+                     locked_until = CASE WHEN failures + 1 >= $2 \
+                       THEN now() + make_interval(mins => $3) ELSE locked_until END, \
+                     failures = CASE WHEN failures + 1 >= $2 THEN 0 ELSE failures + 1 END \
+                     WHERE username = $1 RETURNING failures = 0"
+                );
+                let limits = (
+                    crate::accounts::LOCKOUT_FAILURES,
+                    crate::accounts::LOCKOUT_MINUTES,
+                );
+                let values: [&(dyn tokio_postgres::types::ToSql + Sync); 3] =
+                    [&username, &limits.0, &limits.1];
+                let row = tx.query_one(&sql, &values).await.map_err(&scrub)?;
+                let locked_now: bool = row.try_get(0).map_err(&scrub)?;
+                Some(if locked_now {
+                    Refusal::LockedNow
+                } else {
+                    Refusal::Password
+                })
+            }
+        };
+        tx.commit().await.map_err(&scrub)?;
+        Ok(Attempt::Checked(account, refusal))
     };
-    crate::modules::within(config.bound(3), run, Msg::PostgresTimeout)
+    // Waiting for the row is one statement's bound, the hash under it another.
+    crate::modules::within(config.bound(5), run, Msg::PostgresTimeout)
 }
 
 /// `row`, the one `username` named, when every column passes its check.
@@ -73,6 +169,24 @@ fn checked(row: &tokio_postgres::Row, username: &str) -> Option<Account> {
     })
 }
 
+/// Replaces the stored hash `old` of `username` by `new`, the same password under the console's
+/// own parameters (a sign-in that found `old` weaker): only while `old` is still the one stored,
+/// so a password changed meanwhile is never undone. Whether it was replaced.
+pub fn rehash(config: &Config, username: &str, old: &str, new: &str) -> Result<bool, String> {
+    let run = async {
+        let opened = crate::postgres::connected(config).await?;
+        let sql = format!(
+            "UPDATE {}.accounts SET password_hash = $3 WHERE username = $1 AND password_hash = $2",
+            config.quoted()
+        );
+        let done = (opened.client)
+            .execute(&sql, &[&username, &old, &new])
+            .await;
+        Ok(done.map_err(|e| opened.scrub(e))? == 1)
+    };
+    crate::modules::within(config.bound(1), run, Msg::PostgresTimeout)
+}
+
 /// Stores `hash` as the password of `username`, clears its change required and records the time:
 /// whether an active account took it.
 pub fn set_password(config: &Config, username: &str, hash: &str) -> Result<bool, String> {
@@ -87,6 +201,29 @@ pub fn set_password(config: &Config, username: &str, hash: &str) -> Result<bool,
         Ok(done.map_err(|e| opened.scrub(e))? == 1)
     };
     crate::modules::within(config.bound(3), run, Msg::PostgresTimeout)
+}
+
+/// `meada ui reset-admin`: `admin` created, or made an active operator again with its lock and
+/// count cleared, its password `hash` with a change required. Whether it was created.
+pub fn reset_admin(config: &Config, hash: &str) -> Result<bool, String> {
+    let run = async {
+        let opened = crate::postgres::connected(config).await?;
+        let sql = format!(
+            "INSERT INTO {}.accounts AS a (username, password_hash, role, change_required) \
+             VALUES ($1, $2, 'operator', true) ON CONFLICT (username) DO UPDATE SET \
+             password_hash = EXCLUDED.password_hash, role = 'operator', change_required = true, \
+             suspended = false, failures = 0, locked_until = NULL, password_changed = now() \
+             RETURNING a.xmax = 0",
+            // `xmax` is 0 on a row this statement inserted, the transaction's id on one it
+            // updated: Postgres's own way to tell the two arms of an upsert apart.
+            config.quoted()
+        );
+        let username = crate::accounts::DEFAULT_USERNAME;
+        let row = (opened.client).query_one(&sql, &[&username, &hash]).await;
+        let row = row.map_err(|e| opened.scrub(e))?;
+        row.try_get::<_, bool>(0).map_err(|e| opened.scrub(e))
+    };
+    crate::modules::within(config.bound(1), run, Msg::PostgresTimeout)
 }
 
 /// Why the default account could not be made at start.

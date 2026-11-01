@@ -11,10 +11,18 @@
 //!   groups, and the grant the grant providers compute from them, every repository with no
 //!   table.
 //! - `POST login` (`Console::login`): `{username, password}`, one 401 `invalid_credentials` for
-//!   an unknown username (hashed against `accounts::dummy`), a wrong password and a suspended
-//!   account; `{token, expires_at, change_required}` on success.
+//!   an unknown username (hashed against `accounts::dummy`), a wrong password, a suspended and a
+//!   locked account; `{token, expires_at, change_required}` on success, the stored hash redone
+//!   when its parameters are weaker than the console's.
 //! - `POST account/password` (`Console::password`): `{current, new}`, the policy applied, the
-//!   current one checked, a fresh session token without the mark on success.
+//!   current one checked (a wrong one counts toward the lockout), a fresh session token without
+//!   the mark on success.
+//! - Lockout (`store::attempt`): `accounts::LOCKOUT_FAILURES` consecutive wrong passwords, counted
+//!   under the account row's lock, lock it for `accounts::LOCKOUT_MINUTES`; while locked, an
+//!   attempt is refused without checking its password (the dummy hashed instead) and without
+//!   extending the lock, recorded `locked` (`locked_now` for the failure that locked it).
+//! - `meada ui reset-admin` (`reset_admin`): `admin` created or reactivated as an operator, its
+//!   lock cleared, a password with a change required, recorded `account.reset_admin` `via` `cli`.
 //!
 //! At most `HASHES_MAX` password hashes run at once; a further request is a 503 `busy` without
 //! hashing. Every sign-in and every password change leaves an audit record before its token is
@@ -27,7 +35,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use super::{Answer, Body, Console, Session, error, json_answer, write};
-use crate::accounts::store::{self, Found};
+use crate::accounts::store::{self, Attempt, Refusal};
 use crate::accounts::{self, Keys, Role, Rule};
 use crate::audit::{Actor, Outcome};
 use crate::msg::Msg;
@@ -97,11 +105,11 @@ enum Credentials {
     Busy,
     /// The table could not be read: Postgres's reason.
     Unreadable(String),
-    /// The account read (suspended included), and why it is refused (`unknown`, `password`,
-    /// `suspended`), none when the password is its own.
+    /// The account read (locked and suspended included), and why it is refused, none when the
+    /// password is its own.
     Checked {
         account: Option<store::Account>,
-        refusal: Option<&'static str>,
+        refusal: Option<Refusal>,
     },
 }
 
@@ -247,49 +255,71 @@ impl Console {
     }
 
     /// The account `username` names, checked for a sign-in or a password change with
-    /// `password`: the account when one is read (suspended included), and why it is refused
-    /// (`unknown`, `password`, `suspended`), none when `password` is its own. Exactly one hash
-    /// either way: the account's, or `accounts::dummy` for no account, a hostile row (one line
-    /// naming the table) and a suspended account, under a permit of `HASHES_MAX`.
+    /// `password` (`store::attempt`, which counts a wrong one toward the lockout under the row's
+    /// lock): the account when one is read, and why it is refused, none when `password` is its
+    /// own. Exactly one hash either way, under a permit of `HASHES_MAX`: the account's, or
+    /// `accounts::dummy` for no account, a hostile row (one line naming the table), a locked and a
+    /// suspended account, so every refusal costs about what a wrong password does.
     fn credentials(&self, local: &Local, username: &str, password: &str) -> Credentials {
-        let found = match accounts::username_ok(username) {
-            true => store::find(&local.postgres, username),
-            false => Ok(Found::Unknown),
+        let check = |phc: &str| {
+            let _permit = local.hashes.try_acquire().ok()?;
+            Some(accounts::verify(password, phc))
         };
-        let found = match found {
-            Ok(found) => found,
+        let attempt = match accounts::username_ok(username) {
+            true => store::attempt(&local.postgres, username, check),
+            false => Ok(Attempt::Unknown),
+        };
+        let (account, refusal) = match attempt {
             Err(reason) => return Credentials::Unreadable(reason),
-        };
-        let Ok(_permit) = local.hashes.try_acquire() else {
-            return Credentials::Busy;
-        };
-        let dummy = || accounts::verify(password, accounts::dummy());
-        let (account, refusal) = match found {
-            Found::Account(account) if account.suspended => {
-                dummy();
-                (Some(account), Some("suspended"))
+            Ok(Attempt::Busy) => return Credentials::Busy,
+            Ok(Attempt::Checked(account, refusal)) => {
+                return Credentials::Checked {
+                    account: Some(account),
+                    refusal,
+                };
             }
-            Found::Account(account) => {
-                let right = accounts::verify(password, &account.hash);
-                (Some(account), (!right).then_some("password"))
-            }
-            Found::Bad => {
+            Ok(Attempt::Unchecked(account, refusal)) => (Some(account), refusal),
+            Ok(Attempt::Bad) => {
                 let table = store::table(&local.postgres);
                 eprintln!("ui: {}", Msg::AccountsBadRow(&table).text());
-                dummy();
-                (None, Some("unknown"))
+                (None, Refusal::Unknown)
             }
-            Found::Unknown => {
-                dummy();
-                (None, Some("unknown"))
-            }
+            Ok(Attempt::Unknown) => (None, Refusal::Unknown),
         };
-        Credentials::Checked { account, refusal }
+        match check(accounts::dummy()) {
+            None => Credentials::Busy,
+            Some(_) => Credentials::Checked {
+                account,
+                refusal: Some(refusal),
+            },
+        }
+    }
+
+    /// After a sign-in that proved `password`: the account's stored hash redone under the
+    /// console's own parameters when it is weaker (`accounts::weaker`), under a permit of
+    /// `HASHES_MAX` (none left: the next sign-in does it). A failure leaves the old hash, which
+    /// still admits, and one line.
+    fn rehash(&self, local: &Local, account: &store::Account, password: &str) {
+        if !accounts::weaker(&account.hash) {
+            return;
+        }
+        let hashed = match local.hashes.try_acquire() {
+            Ok(_permit) => accounts::hash(password),
+            Err(_) => return,
+        };
+        let Ok(hashed) = hashed else {
+            return;
+        };
+        match store::rehash(&local.postgres, &account.username, &account.hash, &hashed) {
+            Ok(_) => {}
+            Err(reason) => postgres_line(&reason),
+        }
     }
 
     /// `POST login`: `{username, password}` signed in, or the one 401 for an unknown username, a
-    /// wrong password and a suspended account alike, each costing one hash; recorded
-    /// `account.login` with the reason a refusal had, before the answer.
+    /// wrong password, a suspended and a locked account alike, each costing one hash; recorded
+    /// `account.login` with the reason a refusal had, before the answer. A success redoes a
+    /// weaker stored hash (`rehash`).
     pub(super) fn login(&self, local: &Local, body: &Body) -> Answer {
         #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
@@ -321,6 +351,8 @@ impl Console {
         if let Some(account) = &account {
             arguments.insert("account".into(), json!(account.username));
         }
+        // A refusal's reason; with no account there is always one (`unknown`).
+        let reason = refusal.unwrap_or(Refusal::Unknown).reason();
         let (answer, outcome, message) = match (&account, refusal) {
             (Some(account), None) => {
                 let signed = local.keys.session(
@@ -336,30 +368,33 @@ impl Console {
                 let answer = issued(token, expires, account.change_required);
                 (answer, Outcome::Accepted, Msg::AccountsSignedIn.text())
             }
-            (_, refusal) => {
-                let reason = refusal.unwrap_or("unknown");
+            (_, Some(_)) | (None, None) => {
                 arguments.insert("reason".into(), json!(reason));
                 (invalid(), Outcome::Refused, Msg::AccountsInvalid.text())
             }
         };
         let arguments = Value::Object(arguments);
-        if let Err(reason) =
+        if let Err(why) =
             (self.audit).record(&actor, "account.login", &arguments, outcome, &message)
         {
-            return unavailable(&reason, subject.as_deref(), "account.login", shown);
+            return unavailable(&why, subject.as_deref(), "account.login", shown);
         }
-        match refusal {
-            None => write::audit(subject.as_deref(), None, "account.login", shown, "accepted"),
-            Some(reason) => refused_line(subject.as_deref(), "account.login", shown, reason),
+        match (refusal, &account) {
+            (None, Some(account)) => {
+                write::audit(subject.as_deref(), None, "account.login", shown, "accepted");
+                self.rehash(local, account, &login.password);
+            }
+            _ => refused_line(subject.as_deref(), "account.login", shown, reason),
         }
         answer
     }
 
     /// `POST account/password`: `{current, new}` for the session's own account. The new password
     /// passes the policy (a 422, not recorded, as every body check), the current one is checked
-    /// (one 401 `invalid_credentials` otherwise, recorded), the new one differs from it (a 422),
-    /// then the new hash is stored with no change required and a fresh session token without the
-    /// mark answers; recorded `account.password` before anything changes.
+    /// (one 401 `invalid_credentials` otherwise, recorded, a wrong one counting toward the
+    /// lockout), the new one differs from it (a 422), then the new hash is stored with no change
+    /// required and a fresh session token without the mark answers; recorded `account.password`
+    /// before anything changes.
     pub(super) fn password(&self, local: &Local, body: &Body, session: &Session) -> Answer {
         #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
@@ -386,7 +421,7 @@ impl Console {
         };
         let actor = write::actor(session, None);
         let mut arguments = json!({"account": username});
-        if let Some(reason) = reason {
+        if let Some(reason) = reason.map(Refusal::reason) {
             arguments["reason"] = json!(reason);
             let message = Msg::AccountsInvalid.text();
             let recorded =
@@ -447,4 +482,46 @@ impl Console {
             Err(_) => unsigned(),
         }
     }
+}
+
+/// `meada ui reset-admin --workspace <manifest>` (ADR 0024): the default account `admin` created,
+/// or reactivated as an operator with its lock cleared, its password the value of
+/// `admin_password_env` or `admin_password_file` when set (which must pass the policy), else one
+/// generated now, with a change required either way. The record `account.reset_admin`, `via`
+/// `cli`, is inserted before the account is written; one that cannot be written refuses with
+/// nothing changed. The generated password, the one thing it prints on stdout; never on stderr
+/// nor in the record.
+pub fn reset_admin(manifest: &std::path::Path) -> crate::Result<Option<String>> {
+    let read = crate::workspace::Manifest::read(manifest)?;
+    let Some(config) = read.accounts else {
+        let shown = manifest.display().to_string();
+        return Err(Msg::AccountsResetNoSection(&shown).text().into());
+    };
+    let postgres =
+        (config.postgres.clone()).expect("`Manifest::read` gives [accounts] its [postgres]");
+    let problem = |(key, problem): crate::modules::Problem| format!("`{key}`: {problem}");
+    // The password, and the key that names it (none: generated now).
+    let (password, from) = match config.admin_password().map_err(problem)? {
+        Some(password) => {
+            let key = config.admin_password_key();
+            (accounts::policy(&password, accounts::DEFAULT_USERNAME))
+                .map_err(|rule| problem((key, rule.text())))?;
+            (password, Some(key))
+        }
+        None => (accounts::generated(), None),
+    };
+    let hashed = accounts::hash(&password)?;
+    let subject = crate::modules::cli_author();
+    let arguments = json!({"account": accounts::DEFAULT_USERNAME});
+    let created = crate::audit::cli(
+        manifest,
+        &subject,
+        "account.reset_admin",
+        Some(arguments),
+        || store::reset_admin(&postgres, &hashed),
+        |created| Msg::AccountsResetAdmin { created: *created }.text(),
+        |_| false,
+    )?;
+    eprintln!("meada: {}", Msg::AccountsResetDone { created, from }.text());
+    Ok(from.is_none().then_some(password))
 }

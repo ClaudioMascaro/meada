@@ -232,3 +232,11 @@ rmcp = { version = "3.5.1", features = [
 [profile.dist]
 inherits = "release"
 lto = "thin"
+
+# The argon2id hashes of local accounts (ADR 0024) at full speed in debug builds too: unoptimised,
+# one 19 MiB hash takes a large part of a second, and the console's tests hash many, some in a row
+# under one account's lock.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3

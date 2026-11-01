@@ -844,18 +844,36 @@ one for the area a change touches.
   `USERNAME_MAX`, 64, lowercase ASCII letters, digits, `.`, `-`, `_`) and groups that are owner
   names. `policy(password, username)` is the password policy, one pure function returning the
   first `Rule` failed: fewer than `PASSWORD_MIN` (12) or more than `PASSWORD_MAX` (128) Unicode
-  scalar values, the default password, the username ignoring case (`Rule::Current`, the new
-  password equal to the current one, is the change route's own check); each rule has a `code`
-  and a message naming it, never the password. `hash` is argon2id at 19 MiB, two iterations, one
+  scalar values, the default password, the username ignoring case, an entry of the
+  common-password list ignoring case (`Rule::Common`, #555: `accounts/common-passwords.txt`,
+  embedded with `include_str!`, the entries of 12 to 128 characters of SecLists' million most
+  common passwords, lowercase and sorted by bytes for a binary search, its source, commit,
+  checksum, filter and MIT licence in `accounts/common-passwords.md` beside it); `Rule::Current`,
+  the new password equal to the current one, is the change route's own check; each rule has a
+  `code` and a message naming it, never the password. `hash` is argon2id at 19 MiB, two iterations, one
   lane, a fresh salt from `OsRng`, the parameters in the PHC string; `verify` checks with the
   stored string's own parameters, and `is_hash` is what a stored hash must be (argon2id, its
   parameters within `HASH_MEMORY_MAX_KIB`, `HASH_ITERATIONS_MAX` and `HASH_LANES_MAX`, so a
-  hostile row never costs more than a bounded hash, `verify` refusing any other); `dummy` is a fixed
-  hash computed once at start, which an unknown username is checked against. `store.rs` is the
+  hostile row never costs more than a bounded hash, `verify` refusing any other); `weaker` is a
+  stored hash with less memory, fewer iterations or an argon2 version before 0x13 than the
+  console's own, redone at the next sign-in that proves it; `dummy` is a fixed hash computed once
+  at start, which an unknown username, a locked and a suspended account are checked against;
+  `generated` is the password `meada ui reset-admin` makes when the setting names none
+  (`GENERATED_LENGTH`, 24, of 32 symbols from `OsRng`, 120 bits, one the policy takes). `store.rs` is the
   table, every call its own connection through `postgres::connected` bounded as the audit's:
-  `find` (a row is hostile: a username other than the one asked or failing `username_ok`, a hash
-  that is no argon2id string, a role or a group that fails its check is `Found::Bad`, admitting
-  nothing, its reader writing one `Msg::AccountsBadRow` line), `set_password` (the new hash, no
+  `attempt` (#555: one transaction holding the account's row, `SELECT ... FOR UPDATE`; a row is
+  hostile: a username other than the one asked or failing `username_ok`, a hash that is no
+  argon2id string, a role or a group that fails its check is `Attempt::Bad`, admitting nothing,
+  its reader writing one `Msg::AccountsBadRow` line; a lock in force (`locked_until` past
+  Postgres's `now()`) or a suspended account is `Attempt::Unchecked`, the row released at once,
+  nothing counted and the lock never extended; otherwise the caller's check hashes the password
+  under the row's lock, `Attempt::Busy` when it has no permit; a wrong one adds to `failures`,
+  and the one that reaches `LOCKOUT_FAILURES` (10) sets `locked_until` `LOCKOUT_MINUTES` (15)
+  later and `failures` back to 0, `Refusal::LockedNow`; a right one clears both, so parallel
+  attempts are counted one after another and never pass ten), `rehash` (the new hash only while
+  the weaker one is still stored), `reset_admin` (an upsert of `admin`: an operator, active, its
+  count and lock cleared, the given hash with a change required, `password_changed` now; whether
+  it created the row), `set_password` (the new hash, no
   change required, `password_changed` now, only on an account not suspended) and `bootstrap`
   (in one transaction under `pg_advisory_xact_lock` of the first eight bytes of BLAKE3 of
   `meada accounts <schema>`: when the table is empty, `admin`, an operator, with the hash and
@@ -978,7 +996,7 @@ one for the area a change touches.
   null), `action` (`audit::ACTIONS`: `workspace.save`, `workspace.import`, `workspace.apply`,
   `pointer.set`, `pointer.retain`, `pointer.drop`, `fence.recover`, and `pointer` for a pointer
   request refused before its body; the named workspaces' `workspaces.*`; `account.login` and
-  `account.password`, #554, below), `arguments` (`{"version", "message"}` for a save or an import,
+  `account.password`, #554, and `account.reset_admin`, #555, below), `arguments` (`{"version", "message"}` for a save or an import,
   the id of the entries as submitted; `{"version"}` for an apply; `{"generation"}` for the
   pointer actions; `{"at_least"}` for a recovery with a floor, its decimal digits; `{}` for a
   refusal before the body), `outcome` (`pending`, `accepted`, `refused`, `failed`) and `message`
@@ -1029,27 +1047,43 @@ one for the area a change touches.
   and one with a token awaiting its change a 403 `password_change_required` whatever
   `operations` says; with `[oidc]` the order is unchanged. `POST login` (`LOGIN_MAX`, a fixed
   400 `Msg::AccountsLoginBody` for a body that is not `{username, password}`, 413 past the cap):
-  `Console::credentials` reads the account (`store::find`; a username failing `username_ok` is
+  `Console::credentials` reads the account (`store::attempt`; a username failing `username_ok` is
   not looked up; Postgres unreachable is a 503 `audit_unavailable`), takes a hash permit of
   `HASHES_MAX` (`try_acquire`, else 503 `busy`, nothing hashed), then makes exactly one hash:
-  the account's, or `dummy` for an unknown username, a bad row and a suspended account; a
-  refusal is the one 401 `invalid_credentials` (`Msg::AccountsInvalid`). The record
+  the account's, under the row's lock of `store::attempt`, which counts a wrong one toward the
+  lockout (#555), or `dummy` for an unknown username, a bad row, a locked and a suspended
+  account, after the row is released, so a locked refusal costs about what a wrong password
+  does; a refusal is the one 401 `invalid_credentials` (`Msg::AccountsInvalid`). The record
   (`Audit::record`, the final outcome inserted at once) is written before the answer:
   `account.login`, `subject` `local:<username>` and the account's role, or no subject and the
   role `none` for an unknown username, `arguments` `{"account"}` (absent for an unknown
-  username) and for a refusal `"reason"` (`unknown`, `password`, `suspended`); an insert that
-  fails is a 503 `audit_unavailable` and no token. A success is
-  `{token, expires_at (RFC 3339), change_required}`. `POST account/password`
+  username) and for a refusal `"reason"` (`unknown`, `password`, `suspended`, `locked`,
+  `locked_now`); an insert that fails is a 503 `audit_unavailable` and no token. A success is
+  `{token, expires_at (RFC 3339), change_required}`, and then `Console::rehash` redoes a
+  `weaker` stored hash under a further permit (none left: the next sign-in does it) through
+  `store::rehash`. `POST account/password`
   (`PASSWORD_BODY_MAX`, `{current, new}`, `Msg::AccountsPasswordBody`): the policy on `new`, a
   422 `password_policy` with its `rule` (not recorded, as every body check), then
-  `Console::credentials` on the session's own account and `current`; a refusal is the 401
+  `Console::credentials` on the session's own account and `current` (a wrong one counts toward
+  the same lockout, a locked account is refused unchecked); a refusal is the 401
   `invalid_credentials`, recorded `refused` with its reason; `new` equal to `current`, once
   `current` is known right, is the 422 of the rule `current_password`; then a second permit for
   the new hash, `account.password` inserted `pending` before `store::set_password`, finished
-  `accepted`, and a fresh token without the mark.
-  without the mark. Tokens issued before stay valid until they expire. Each sign-in and change
+  `accepted`, and a fresh token without the mark. Tokens issued before stay valid until they
+  expire. Each sign-in and change
   writes one line `ui: <subject or -> <action> <username or ->: accepted` or `refused (<reason>)`;
   no line, record or error holds a password, a hash or a token.
+  `meada ui reset-admin --workspace <bootstrap manifest>` (#555, `ui::reset_admin`, features
+  `ui` and `accounts`; `UiCommand::ResetAdmin`, an optional subcommand of `meada ui` whose
+  `--listen` and `--workspace` it negates) is the one CLI twin of account administration:
+  `Manifest::read` (no `[accounts]` is `Msg::AccountsResetNoSection`), the password from
+  `Config::admin_password` through the policy (a refusal names the key and exits 1, nothing
+  recorded) or `accounts::generated`, its hash, then `audit::cli` (`account.reset_admin`,
+  `{"account": "admin"}`, `via` `cli`, the subject `modules::cli_author`, role `operator`):
+  the record inserted `pending` before `store::reset_admin`, a record that cannot be inserted
+  exiting 1 with `Msg::AuditCli` and nothing written. Its one stdout line is the generated
+  password; stderr names what it did (`Msg::AccountsResetDone`) and, for the setting's value,
+  only its key. It never reads the signing keys.
   Operational reads live in `ui/read.rs`: `GET fleet` reads the checked pointer/retained/kept
   state (`generations::inspect`), live heartbeats (`heartbeat::read`), holder and remaining
   lock TTL, and fence counter from Valkey; workspace ids come from generation documents and
@@ -2977,7 +3011,11 @@ one for the area a change touches.
   `ui/accounts.rs`: `HASHES_MAX` (4) bounds the argon2id hashes the console computes at once,
   19 MiB each (a further sign-in or password change is a 503 `busy`, nothing hashed), and
   `LOGIN_MAX` and `PASSWORD_BODY_MAX` (4 KiB each) the bodies of `login` and `account/password`
-  (413 past them).
+  (413 past them). The lockout (#555, `accounts.rs`): `LOCKOUT_FAILURES` (10) consecutive failed
+  password checks, counted under the account row's lock, lock an account for `LOCKOUT_MINUTES`
+  (15), never extended by an attempt while it holds; the hash bound is `HASHES_MAX` above, and
+  `HASH_MEMORY_MAX_KIB`, `HASH_ITERATIONS_MAX` and `HASH_LANES_MAX` bound what a stored hash may
+  cost.
 
 - `ui/workspaces/proposals.rs` (#346, ADR 0022): `BODY_MAX` (80 KiB) bounds a request's body
   (413), `OUTPUT_MAX` (192 KiB) a tool's answer (`too_large` with its counts, never cut),

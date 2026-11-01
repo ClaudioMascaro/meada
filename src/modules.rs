@@ -336,6 +336,30 @@ pub fn reachable(url: &str, shape: Shape) -> bool {
     }
 }
 
+/// Who runs a command that writes, as its record and its author name them: `cli:<login>@<host>`,
+/// the login and host from the system with the refresh lock's system calls, else from the
+/// environment.
+#[cfg(feature = "refresh-lock")]
+pub fn cli_author() -> String {
+    crate::snapshot::lock::cli_author()
+}
+
+/// Who runs a command that writes: `cli:<login>@<host>`, from the environment in a build without
+/// the refresh lock's system calls.
+#[cfg(all(
+    not(feature = "refresh-lock"),
+    any(
+        feature = "generation-pointer",
+        all(feature = "ui", feature = "accounts")
+    )
+))]
+pub fn cli_author() -> String {
+    let var = |names: [&str; 2]| names.iter().find_map(|n| std::env::var(n).ok());
+    let login = var(["USER", "USERNAME"]).unwrap_or_default();
+    let host = var(["HOSTNAME", "COMPUTERNAME"]).unwrap_or_default();
+    format!("cli:{login}@{}", host.to_lowercase())
+}
+
 /// The seconds since the Unix epoch.
 #[cfg(any(feature = "generation-pointer", feature = "oidc"))]
 pub fn now() -> u64 {

@@ -162,6 +162,24 @@ fn the_console_subcommand_is_absent_without_its_feature() {
     assert!(stderr.contains("unrecognized subcommand 'ui'"), "{stderr}");
 }
 
+/// `meada ui reset-admin` exists only in a build with the `accounts` feature (ADR 0024): a build
+/// with the console alone takes `reset-admin` for no argument it knows. Without `ui` there is no
+/// `meada ui` at all (`the_console_subcommand_is_absent_without_its_feature`).
+#[cfg(all(feature = "ui", not(feature = "accounts")))]
+#[test]
+fn the_default_account_recovery_is_absent_without_its_feature() {
+    let out = Command::new(env!("CARGO_BIN_EXE_meada"))
+        .args(["ui", "reset-admin", "--workspace", "meada.workspace.toml"])
+        .output()
+        .expect("meada runs");
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("unexpected argument 'reset-admin'"),
+        "{stderr}"
+    );
+}
+
 /// `meada workspaces mcp` exists only in a build with the `proposals` feature (ADR 0022): the
 /// default build has no `workspaces` at all, and a build with `workspaces` alone has no `mcp`.
 #[cfg(not(feature = "proposals"))]

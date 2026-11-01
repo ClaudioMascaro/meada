@@ -600,20 +600,9 @@ pub fn show(manifest: &Path, version: Option<&str>) -> crate::Result<String> {
 }
 
 /// The author of a version imported from the command line: `cli:<login>@<host>`, as the
-/// operations name theirs.
-#[cfg(feature = "refresh-lock")]
+/// operations name theirs (`modules::cli_author`).
 pub fn cli_author() -> String {
-    super::lock::cli_author()
-}
-
-/// The author of a version imported from the command line: `cli:<login>@<host>`, from the
-/// environment in a build without the refresh lock's system calls.
-#[cfg(not(feature = "refresh-lock"))]
-pub fn cli_author() -> String {
-    let var = |names: [&str; 2]| names.iter().find_map(|n| std::env::var(n).ok());
-    let login = var(["USER", "USERNAME"]).unwrap_or_default();
-    let host = var(["HOSTNAME", "COMPUTERNAME"]).unwrap_or_default();
-    format!("cli:{login}@{}", host.to_lowercase())
+    crate::modules::cli_author()
 }
 
 /// Why `apply` moved nothing, kept apart for the console's answer and audit.

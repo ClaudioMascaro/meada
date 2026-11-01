@@ -71,12 +71,17 @@ enum Command {
         #[command(subcommand)]
         command: GithubAppCommand,
     },
+    // With a subcommand (`reset-admin`), `--listen` and `--workspace` belong to it alone.
     #[cfg(feature = "ui")]
+    #[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
     Ui {
-        #[arg(long)]
-        listen: String,
-        #[arg(long)]
-        workspace: PathBuf,
+        #[cfg(feature = "accounts")]
+        #[command(subcommand)]
+        command: Option<UiCommand>,
+        #[arg(long, required = true)]
+        listen: Option<String>,
+        #[arg(long, required = true)]
+        workspace: Option<PathBuf>,
     },
     #[cfg(feature = "generation-pointer")]
     Workspace {
@@ -196,6 +201,18 @@ enum WorkspacesCommand {
 #[derive(Subcommand)]
 enum PostgresCommand {
     Migrate {
+        #[arg(long)]
+        workspace: PathBuf,
+    },
+}
+
+/// `meada ui reset-admin` (ADR 0024, feature `accounts`): the one CLI twin of account
+/// administration.
+#[cfg(all(feature = "ui", feature = "accounts"))]
+#[derive(Subcommand)]
+enum UiCommand {
+    // Recovers the default account `admin` (its help comes from the message catalog).
+    ResetAdmin {
         #[arg(long)]
         workspace: PathBuf,
     },
@@ -731,6 +748,14 @@ fn main() -> ExitCode {
             .mut_arg("listen", |a| a.help(Msg::UiListenHelp.text()))
             .mut_arg("workspace", |a| a.help(Msg::UiWorkspaceHelp.text()))
     });
+    #[cfg(all(feature = "ui", feature = "accounts"))]
+    let matches = matches.mut_subcommand("ui", |c| {
+        c.mut_subcommand("reset-admin", |c| {
+            (c.about(Msg::UiResetAdmin.text())).mut_arg("workspace", |a| {
+                a.help(Msg::UiResetAdminWorkspaceHelp.text())
+            })
+        })
+    });
     #[cfg(feature = "generation-pointer")]
     let matches = matches.mut_subcommand("workspace", |c| {
         let bootstrap = |a: clap::Arg| a.help(Msg::WorkspaceBootstrapHelp.text());
@@ -987,10 +1012,24 @@ fn main() -> ExitCode {
         Command::Postgres {
             command: PostgresCommand::Migrate { workspace },
         } => meada::postgres::migrate(&workspace).map(|version| println!("{version}")),
+        // The generated password, when there is one, is the only line on stdout.
+        #[cfg(all(feature = "ui", feature = "accounts"))]
+        Command::Ui {
+            command: Some(UiCommand::ResetAdmin { workspace }),
+            ..
+        } => meada::ui::reset_admin(&workspace).map(|generated| {
+            if let Some(password) = generated {
+                println!("{password}");
+            }
+        }),
         // Every problem that refuses the start on its own line. The API is English whatever
         // `LANG` says, as the MCP surface is (ADR 0008).
         #[cfg(feature = "ui")]
-        Command::Ui { listen, workspace } => {
+        Command::Ui {
+            listen: Some(listen),
+            workspace: Some(workspace),
+            ..
+        } => {
             msg::init(None);
             if let Err(e) = drained(|| meada::ui::listen(&listen, &workspace)) {
                 for line in e.to_string().lines() {
@@ -1000,6 +1039,9 @@ fn main() -> ExitCode {
             }
             Ok(())
         }
+        // Without a subcommand clap requires both `--listen` and `--workspace`.
+        #[cfg(feature = "ui")]
+        Command::Ui { .. } => unreachable!("`meada ui` without --listen or --workspace"),
         // The child's exit code, or 1 with the reason: the lock held elsewhere or lost.
         #[cfg(feature = "refresh-lock")]
         Command::Snapshot {
