@@ -530,7 +530,7 @@ struct Gate {
     #[cfg(feature = "oidc")]
     oidc: Option<Arc<crate::oidc::Oidc>>,
     #[cfg(feature = "accounts")]
-    local: Option<Arc<crate::accounts::Nodes>>,
+    local: Option<Arc<crate::accounts::Agents>>,
     #[cfg(feature = "oidc")]
     providers: Arc<crate::grant::Providers>,
 }
@@ -644,7 +644,7 @@ fn local_admission(
     manifest: &Manifest,
     accounts: &crate::accounts::Config,
     file: &Path,
-) -> crate::Result<crate::accounts::Nodes> {
+) -> crate::Result<crate::accounts::Agents> {
     let src = std::fs::read_to_string(file)?;
     let at = |(key, problem): crate::modules::Problem| {
         crate::config::error_at(file, &src, key, &problem)
@@ -652,7 +652,7 @@ fn local_admission(
     let Some(ui) = &manifest.ui else {
         return Err(at(("accounts", Msg::AccountsNodeIssuer.text())));
     };
-    accounts.nodes(&ui.public_url).map_err(at)
+    (accounts.agents(&ui.public_url, crate::accounts::NODES)).map_err(at)
 }
 
 /// The plain `status` answer of the agent tokens' gate with its `challenge`, as an identity

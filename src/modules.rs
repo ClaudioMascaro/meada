@@ -113,13 +113,25 @@ pub fn needs(file: &Path, src: &str, section: &str, missing: &[&str]) -> Result<
     if missing.is_empty() {
         return Ok(());
     }
-    let at = first_key(src, |key| (key == section).then_some(())).map_or(0, |(at, ())| at);
     let what = Msg::NeedsSections {
         section,
         needed: missing,
     }
     .text();
-    Err(located(file, src, at, &what))
+    Err(at_section(file, src, section, &what))
+}
+
+/// The error `what` at the line of `section` in `src`, the content of `file`: `needs`'s place,
+/// for a need its list cannot word (#562: one of two tables).
+#[cfg(any(
+    feature = "generation-pointer",
+    feature = "github-app",
+    feature = "directory",
+    feature = "accounts"
+))]
+pub fn at_section(file: &Path, src: &str, section: &str, what: &str) -> Box<dyn std::error::Error> {
+    let at = first_key(src, |key| (key == section).then_some(())).map_or(0, |(at, ())| at);
+    located(file, src, at, what)
 }
 
 /// The first top-level key of `src` that `pick` maps to something, with its offset; `None` for

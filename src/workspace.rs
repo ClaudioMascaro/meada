@@ -434,33 +434,40 @@ impl Manifest {
         };
         #[cfg(feature = "oidc")]
         let github = oidc.as_ref().is_some_and(|o| o.github.is_some());
-        // `[workspaces]` keeps needing `[oidc.github]` itself until named workspaces take local
-        // accounts (#562).
-        #[cfg(feature = "workspaces")]
-        let oidc_github = github;
-        // The GitHub grant provider of local accounts counts as the provider (#561).
+        // The GitHub grant provider of local accounts counts as the provider (#561), for named
+        // workspaces too (#562).
         #[cfg(feature = "accounts")]
         let github = github || accounts.as_ref().is_some_and(|a| a.github.is_some());
         #[cfg(not(feature = "oidc"))]
         let github = false;
-        // `[catalog]` (#341) names its patterns on `[oidc.github] host` and is read by the role
-        // check and the console beside it.
+        // `[catalog]` (#341) names its patterns on the GitHub grant provider's `host`
+        // (`[oidc.github]`, or `[accounts.github]`, #562) and is read by the role check and the
+        // console beside it.
+        #[cfg(all(feature = "workspaces", feature = "accounts"))]
+        let mut accounts = accounts;
         #[cfg(feature = "workspaces")]
         let catalog = {
-            let host = oidc
-                .as_ref()
-                .and_then(|o| o.github.as_ref())
-                .map(|g| g.host.clone());
+            let provider = oidc.as_mut().and_then(|o| o.github.as_mut());
+            #[cfg(feature = "accounts")]
+            let provider = provider.or(accounts.as_mut().and_then(|a| a.github.as_mut()));
+            let host = provider.as_ref().map(|g| g.host.clone());
             if parsed.catalog.is_some() && host.is_none() {
+                // Either table in a build with local accounts (#562).
+                #[cfg(feature = "accounts")]
+                {
+                    let what = Msg::NeedsGithubProvider("catalog").text();
+                    return Err(modules::at_section(file, &src, "catalog", &what));
+                }
+                #[cfg(not(feature = "accounts"))]
                 modules::needs(file, &src, "catalog", &["oidc.github"])?;
             }
             let host = host.unwrap_or_default();
-            modules::validated(file, &src, parsed.catalog, |c| c.validate(&host))?
+            let catalog = modules::validated(file, &src, parsed.catalog, |c| c.validate(&host))?;
+            if let Some(github) = provider {
+                github.catalog = catalog.is_some();
+            }
+            catalog
         };
-        #[cfg(feature = "workspaces")]
-        if let Some(github) = oidc.as_mut().and_then(|o| o.github.as_mut()) {
-            github.catalog = catalog.is_some();
-        }
         #[cfg(feature = "directory")]
         let directory = modules::validated(file, &src, parsed.directory, |d| d.validate(base))?;
         #[cfg(feature = "directory")]
@@ -515,17 +522,14 @@ impl Manifest {
                 return Err(config::error_at(file, &src, "repository", &beside));
             }
         }
-        // `[workspaces]` (#342) rides on the console's writes, the GitHub grant, the catalog and
-        // the managed workspace; each missing piece is an error naming both sections.
+        // `[workspaces]` (#342) rides on the console's writes, the catalog (and so the GitHub
+        // grant provider it needs) and the managed workspace; each missing piece is an error
+        // naming both sections.
         #[cfg(feature = "workspaces")]
         let workspaces = {
             let section = modules::validated(file, &src, parsed.workspaces, |w| w.validate())?;
             if section.is_some() {
-                let missing = [
-                    ("ui", ui.is_none()),
-                    ("oidc.github", !oidc_github),
-                    ("catalog", catalog.is_none()),
-                ];
+                let missing = [("ui", ui.is_none()), ("catalog", catalog.is_none())];
                 let missing: Vec<&str> = (missing.iter()).filter(|m| m.1).map(|m| m.0).collect();
                 modules::needs(file, &src, "workspaces", &missing)?;
                 if ui.as_ref().is_some_and(|u| !u.operations) {

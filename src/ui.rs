@@ -1170,9 +1170,10 @@ impl Console {
         }
     }
 
-    /// The console's version and `operations`; with `[accounts]`, `sign_in: "accounts"`; with
-    /// `[oidc]`, `sign_in: "oidc"`, `break_glass: true` under break glass, and what the browser logs
-    /// in with: the issuer, `[ui] client_id`, the scopes and the audience its token must carry.
+    /// The console's version and `operations`; with `[proposals]`, `proposals: true`; with
+    /// `[accounts]`, `sign_in: "accounts"`; with `[oidc]`, `sign_in: "oidc"`, `break_glass: true`
+    /// under break glass, and what the browser logs in with: the issuer, `[ui] client_id`, the
+    /// scopes and the audience its token must carry.
     /// The public URL fixes the browser's callback even when the listener was opened through
     /// loopback.
     fn config(&self) -> Value {
@@ -1196,6 +1197,11 @@ impl Console {
         #[cfg(feature = "workspaces")]
         if let Some(section) = &self.bootstrap.workspaces {
             config["workspaces"] = json!({"max_entries": section.max_entries});
+        }
+        // With `[proposals]` (#562), the profile offers agent tokens for the proposal server.
+        #[cfg(feature = "proposals")]
+        if self.bootstrap.proposals.is_some() {
+            config["proposals"] = true.into();
         }
         // How the browser signs in (ADR 0024): an identity provider's or the console's own.
         #[cfg(feature = "accounts")]

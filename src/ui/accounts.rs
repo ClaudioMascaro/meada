@@ -25,13 +25,14 @@
 //! - `POST account/password` (`Console::password`): `{current, new}`, the policy applied, the
 //!   current one checked (a wrong one counts toward the lockout), a fresh session token without
 //!   the mark on success.
-//! - `POST account/tokens` (`Console::agent_token`, #560): `{surface: "nodes", hours}` (1 to
-//!   `accounts::AGENT_HOURS_MAX`, `accounts::AGENT_HOURS` when absent) answers
-//!   `{token, expires_at, surface}` once: an agent token for the nodes signed with the account's
-//!   role and groups as its row stands now, a random token id, recorded `account.token` (surface,
-//!   hours, token id, never the token) before it is returned. A suspended or unknown account gets
-//!   the role refusal, a 403 `forbidden`, recorded; a change-required token never reaches it
-//!   (admission's 403). The console admits no agent token: its audience is not the console's.
+//! - `POST account/tokens` (`Console::agent_token`, #560): `{surface, hours}` (`nodes`, or
+//!   `proposals` beside `[proposals]`, #562; 1 to `accounts::AGENT_HOURS_MAX` hours,
+//!   `accounts::AGENT_HOURS` when absent) answers `{token, expires_at, surface}` once: an agent
+//!   token for that surface's audience signed with the account's role, groups and login as its
+//!   row stands now, a random token id, recorded `account.token` (surface, hours, token id, never
+//!   the token) before it is returned. A suspended or unknown account gets the role refusal, a
+//!   403 `forbidden`, recorded; a change-required token never reaches it (admission's 403). The
+//!   console admits no agent token: its audience is not the console's.
 //! - Lockout (`store::attempt`): `accounts::LOCKOUT_FAILURES` consecutive wrong passwords, counted
 //!   under the account row's lock, lock it for `accounts::LOCKOUT_MINUTES`; while locked, an
 //!   attempt is refused without checking its password (the dummy hashed instead) and without
@@ -715,8 +716,9 @@ impl Console {
 
 impl Console {
     /// `POST account/tokens` (#560): an agent token for the session's own account, for the
-    /// surface `nodes`, valid `hours` (`accounts::AGENT_HOURS` when absent). The body's checks
-    /// (400, 413, 422) are not recorded, as for every body check. The account's row is read now,
+    /// surface `nodes`, or `proposals` when the bootstrap has `[proposals]` (#562), valid `hours`
+    /// (`accounts::AGENT_HOURS` when absent). The body's checks (400, 413, 422) are not
+    /// recorded, as for every body check. The account's row is read now,
     /// as before every console write: suspended, unknown or hostile (one line naming the table) is
     /// the role refusal, recorded; active, the token carries the row's role and groups. The record
     /// `account.token` (the surface, the hours and the token id, never the token) is written
@@ -738,9 +740,21 @@ impl Console {
         };
         let unprocessable =
             |code, message: String| error(StatusCode::UNPROCESSABLE_ENTITY, code, &message);
-        if asked.surface != accounts::NODES_SURFACE {
-            return unprocessable("invalid_surface", Msg::AccountsTokenSurface.text());
-        }
+        // The proposal server's surface only beside its section (#562).
+        #[cfg(feature = "proposals")]
+        let proposals = self.bootstrap.proposals.is_some();
+        #[cfg(not(feature = "proposals"))]
+        let proposals = false;
+        let (surface, audience) = match asked.surface.as_str() {
+            accounts::NODES_SURFACE => (accounts::NODES_SURFACE, accounts::NODES),
+            accounts::PROPOSALS_SURFACE if proposals => {
+                (accounts::PROPOSALS_SURFACE, accounts::PROPOSALS)
+            }
+            _ => {
+                let message = Msg::AccountsTokenSurface(proposals).text();
+                return unprocessable("invalid_surface", message);
+            }
+        };
         let hours = asked.hours.unwrap_or(accounts::AGENT_HOURS);
         if !(1..=accounts::AGENT_HOURS_MAX).contains(&hours) {
             let message = Msg::AccountsTokenHours(accounts::AGENT_HOURS_MAX).text();
@@ -750,7 +764,8 @@ impl Console {
         let username = accounts::username_of(subject).unwrap_or_default();
         let action = "account.token";
         let actor = write::actor(session, None);
-        let mut arguments = json!({"account": username, "surface": accounts::NODES_SURFACE, "hours": hours.to_string()});
+        let mut arguments =
+            json!({"account": username, "surface": surface, "hours": hours.to_string()});
         let (role, groups, login) = match store::standing(&local.postgres, username) {
             Ok(store::Standing::Active(role, groups, login)) => (role, groups, login),
             Ok(standing) => {
@@ -771,7 +786,7 @@ impl Console {
             groups: &groups,
             login: login.as_deref(),
         };
-        let signed = (local.keys).agent(issuer, &holder, accounts::NODES, hours);
+        let signed = (local.keys).agent(issuer, &holder, audience, hours);
         let Ok((token, expires, id)) = signed else {
             return unsigned();
         };
@@ -786,7 +801,7 @@ impl Console {
         let document = json!({
             "token": token,
             "expires_at": crate::modules::rfc3339(expires),
-            "surface": accounts::NODES_SURFACE,
+            "surface": surface,
         });
         json_answer(StatusCode::OK, &document)
     }

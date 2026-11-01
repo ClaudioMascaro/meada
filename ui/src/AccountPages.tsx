@@ -116,11 +116,11 @@ export function ForcedChangePage({ auth, locale }: { auth: LocalAuth; locale: La
 }
 
 /**
- * An agent token for the nodes (#560): the surface and the validity, then the token shown once with
- * a copy control and its expiry. It lives in this component's state alone, so leaving the page
- * clears it.
+ * An agent token for the nodes (#560), or for the proposal server when the deployment runs one
+ * (`proposals`, #562): the surface and the validity, then the token shown once with a copy control
+ * and its expiry. It lives in this component's state alone, so leaving the page clears it.
  */
-export function AgentTokenForm({ api, locale }: { api: Api; locale: Language }) {
+export function AgentTokenForm({ api, locale, proposals = false }: { api: Api; locale: Language; proposals?: boolean }) {
   const t = accountCopy[locale];
   const surface = useId();
   const hours = useId();
@@ -148,7 +148,10 @@ export function AgentTokenForm({ api, locale }: { api: Api; locale: Language }) 
   return <form className="account-form" onSubmit={event => { void submit(event); }} aria-busy={busy}>
     <h2>{t.tokensTitle}</h2><p className="intro">{t.tokensIntro}</p>
     <label htmlFor={surface}>{t.surface}</label>
-    <select id={surface} name="surface" defaultValue="nodes"><option value="nodes">{t.surfaceNodes}</option></select>
+    <select id={surface} name="surface" defaultValue="nodes">
+      <option value="nodes">{t.surfaceNodes}</option>
+      {proposals && <option value="proposals">{t.surfaceProposals}</option>}
+    </select>
     <label htmlFor={hours}>{t.validity}</label>
     <input id={hours} name="hours" type="number" min={1} max={168} step={1} defaultValue={8} aria-describedby={hint} required />
     <p id={hint} className="hint">{t.validityHint}</p>
@@ -226,7 +229,7 @@ export function ProfilePage({ api, auth, locale, session, onSession }: {
       <dt>{field.label}</dt><dd>{field.value}</dd>
     </div>)}</dl>
     <PasswordForm auth={auth} locale={locale} title={t.changeTitle} level={2} />
-    {auth.config.break_glass !== true && <AgentTokenForm api={api} locale={locale} />}
+    {auth.config.break_glass !== true && <AgentTokenForm api={api} locale={locale} proposals={auth.config.proposals === true} />}
     {auth.config.break_glass !== true && session.github_host !== undefined &&
       <GithubLoginForm api={api} auth={auth} locale={locale} session={session} onSession={onSession} />}
     <button type="button" className="secondary sign-out" onClick={() => auth.clear()}>{common.signOut}</button>

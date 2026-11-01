@@ -398,6 +398,10 @@ pub enum Msg<'a> {
         section: &'a str,
         needed: &'a [&'a str],
     },
+    /// A section that needs the GitHub grant provider, in a build with local accounts (#562):
+    /// `[oidc.github]` or `[accounts.github]`.
+    #[cfg(all(feature = "workspaces", feature = "accounts"))]
+    NeedsGithubProvider(&'a str),
     #[cfg(any(
         feature = "generation-pointer",
         feature = "oidc",
@@ -1077,9 +1081,10 @@ pub enum Msg<'a> {
     /// `POST account/tokens` whose body does not parse (#560).
     #[cfg(feature = "accounts")]
     AccountsTokenBody(u64),
-    /// An agent token for a surface the console does not issue for.
+    /// An agent token for a surface the console does not issue for; whether it issues for the
+    /// proposal server's.
     #[cfg(feature = "accounts")]
-    AccountsTokenSurface,
+    AccountsTokenSurface(bool),
     /// An agent token's validity outside its bounds, in hours.
     #[cfg(feature = "accounts")]
     AccountsTokenHours(u64),
@@ -2226,11 +2231,16 @@ impl Msg<'_> {
                 format!("store: unreachable ({reason})"),
                 format!("store: inalcançável ({reason})"),
             ),
+            #[cfg(all(feature = "workspaces", feature = "accounts"))]
+            Msg::NeedsGithubProvider(section) => pick(
+                format!("[{section}] needs [oidc.github] or [accounts.github]"),
+                format!("[{section}] exige [oidc.github] ou [accounts.github]"),
+            ),
             #[cfg(any(
                 feature = "generation-pointer",
                 feature = "github-app",
                 feature = "directory",
-                                       all(feature = "oidc", feature = "postgres")
+                all(feature = "oidc", feature = "postgres")
             ))]
             Msg::NeedsSections { section, needed } => {
                 let needed: Vec<String> = needed.iter().map(|s| format!("[{s}]")).collect();
@@ -3682,13 +3692,18 @@ impl Msg<'_> {
             ),
             #[cfg(feature = "accounts")]
             Msg::AccountsTokenBody(max) => pick(
-                format!("the body must be {{\"surface\": \"nodes\", \"hours\": <1 to {max}>}}"),
-                format!("o corpo deve ser {{\"surface\": \"nodes\", \"hours\": <1 a {max}>}}"),
+                format!("the body must be {{\"surface\": <surface>, \"hours\": <1 to {max}>}}"),
+                format!("o corpo deve ser {{\"surface\": <superfície>, \"hours\": <1 a {max}>}}"),
             ),
             #[cfg(feature = "accounts")]
-            Msg::AccountsTokenSurface => pick(
+            Msg::AccountsTokenSurface(false) => pick(
                 "agent tokens are issued for the surface `nodes`".into(),
                 "tokens de agente são emitidos para a superfície `nodes`".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsTokenSurface(true) => pick(
+                "agent tokens are issued for the surfaces `nodes` and `proposals`".into(),
+                "tokens de agente são emitidos para as superfícies `nodes` e `proposals`".into(),
             ),
             #[cfg(feature = "accounts")]
             Msg::AccountsTokenHours(max) => pick(

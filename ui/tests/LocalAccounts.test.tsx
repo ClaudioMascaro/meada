@@ -131,6 +131,8 @@ test('the profile generates an agent token for the nodes, shown once with its ex
   await act(() => { fireEvent.click(getByRole(host, 'link', { name: copy.en.profile })); });
   expect(getByRole(host, 'heading', { level: 2, name: t.tokensTitle })).toBeDefined();
   expect((getByLabelText(host, t.surface) as HTMLSelectElement).value).toBe('nodes');
+  // Without a proposal server, the nodes are the one surface offered.
+  expect([...(getByLabelText(host, t.surface) as HTMLSelectElement).options].map(o => o.value)).toEqual(['nodes']);
   expect((getByLabelText(host, t.validity) as HTMLInputElement).value).toBe('8');
   type(t.validity, '24');
   await act(async () => { fireEvent.click(getByRole(host, 'button', { name: t.issue })); });
@@ -151,6 +153,27 @@ test('the profile generates an agent token for the nodes, shown once with its ex
   expect(host.textContent).not.toContain(agent.token);
   expect(queryByRole(host, 'region', { name: t.issuedToken })).toBeNull();
   expect(fetch.mock.calls.filter(call => call[0] === '/api/v1/account/tokens')).toHaveLength(1);
+});
+
+test('beside a proposal server the profile also issues agent tokens for it', async () => {
+  live();
+  const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url === '/api/v1/account/tokens') {
+      expect(JSON.parse(String(init?.body))).toEqual({ surface: 'proposals', hours: 8 });
+      return Response.json({ ...agent, surface: 'proposals' });
+    }
+    return Response.json(url === '/api/v1/session' ? operator : { file: 'ops/meada.workspace.toml', manifest: {}, modules: [], errors: [] });
+  });
+  vi.stubGlobal('fetch', fetch);
+  await mount(new LocalAuth({ ...config, proposals: true }));
+  await waitFor(() => expect(host.textContent).toContain('local:admin'));
+  await act(() => { fireEvent.click(getByRole(host, 'link', { name: copy.en.profile })); });
+  const surface = getByLabelText(host, t.surface) as HTMLSelectElement;
+  expect([...surface.options].map(o => [o.value, o.textContent])).toEqual([['nodes', t.surfaceNodes], ['proposals', t.surfaceProposals]]);
+  fireEvent.change(surface, { target: { value: 'proposals' } });
+  await act(async () => { fireEvent.click(getByRole(host, 'button', { name: t.issue })); });
+  const shown = await waitFor(() => getByRole(host, 'region', { name: t.issuedToken }));
+  expect(shown.querySelector('output')?.textContent).toBe(agent.token);
 });
 
 test('a refused agent token says why, in Portuguese too, and shows no token', async () => {

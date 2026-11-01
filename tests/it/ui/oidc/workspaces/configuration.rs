@@ -342,9 +342,24 @@ fn two_contexts_sharing_y_read_only_their_own_configuration() {
 /// preview of text shows the view before anything is saved and stores nothing.
 #[test]
 fn an_ignored_or_unsupported_declaration_never_looks_applied() {
-    let Some(case) = Case::new("ws_cfg_refusals") else {
-        return;
-    };
+    if let Some(case) = Case::new("ws_cfg_refusals") {
+        an_ignored_or_unsupported_declaration_never_looks_applied_as(case);
+    }
+}
+
+/// `an_ignored_or_unsupported_declaration_never_looks_applied` with local accounts (#562): the
+/// effective view and its stateless preview answer local sessions as they answer the issuer's.
+#[cfg(feature = "accounts")]
+#[test]
+fn local_accounts_an_ignored_or_unsupported_declaration_never_looks_applied() {
+    if let Some(case) = Case::local("ws_cfg_refusals_local") {
+        an_ignored_or_unsupported_declaration_never_looks_applied_as(case);
+    }
+}
+
+/// The body of `an_ignored_or_unsupported_declaration_never_looks_applied` and
+/// `local_accounts_an_ignored_or_unsupported_declaration_never_looks_applied`, over `case`.
+fn an_ignored_or_unsupported_declaration_never_looks_applied_as(case: Case) {
     case.bare("Y");
     case.refresh();
     case.ready();

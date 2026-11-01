@@ -8,6 +8,19 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Named workspaces and the proposal server with local accounts (#562, ADR 0024, from #551):
+  `[catalog]` and `[workspaces]` (and so `[proposals]`) accept `[accounts.github]` in place of
+  `[oidc.github]` and still need one of the two (`[catalog] needs [oidc.github] or
+  [accounts.github]`; `[workspaces]` now names `[ui]` and `[catalog]`, the catalog naming the
+  provider). Eligibility reads the account's verified login, an operator account is the platform
+  administrator, and workspace operator lists, version authors, history and audit records name
+  `local:` subjects. `POST /api/v1/account/tokens` takes `{"surface": "proposals"}` when the
+  console's bootstrap has `[proposals]` (audience `meada:proposals`; a 422 `invalid_surface`
+  without it), `config` carries `"proposals": true` and the profile page offers the surface. The
+  proposal server with `[accounts]` and no `[oidc]` reads the public key at start and admits only
+  those tokens (a session token or a node's agent token is a 401 with `WWW-Authenticate: Bearer`,
+  no protected resource metadata), deriving the subject, login, groups, grant and role from the
+  token alone. No golden changed.
 - The verified GitHub login of local accounts (#561, ADR 0024, from #551): `[accounts.github]`
   (`host`, `roles`, `max_age_seconds` as `[oidc.github]`, plus `api`, `https://api.github.com` by
   default on `github.com` and required on any other host) is the GitHub grant provider of local

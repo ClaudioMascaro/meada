@@ -47,6 +47,10 @@ pub const CONSOLE: &str = "meada:console";
 /// request and its answer.
 pub const NODES: &str = "meada:nodes";
 pub const NODES_SURFACE: &str = "nodes";
+/// The audience of an agent token for the proposal server's surface (#562), and the surface's
+/// name in a request and its answer.
+pub const PROPOSALS: &str = "meada:proposals";
+pub const PROPOSALS_SURFACE: &str = "proposals";
 /// How long a session token lives.
 pub const SESSION_HOURS: u64 = 8;
 /// How long an agent token lives when its request names no validity, and the most it may.
@@ -378,12 +382,18 @@ impl Config {
         Ok(Keys { encoding, public })
     }
 
-    /// What a node admits with this section and no `[oidc]` (#560): the public half read now
-    /// (`public`), and the console's `[ui] public_url`, `issuer`, every token's issuer.
-    pub fn nodes(&self, issuer: &str) -> Result<Nodes, Problem> {
+    /// What a surface that admits agent tokens admits with this section and no `[oidc]`: the
+    /// public half read now (`public`), the console's `[ui] public_url`, `issuer`, every token's
+    /// issuer, and the surface's `audience` (`NODES` for a node, #560; `PROPOSALS` for the
+    /// proposal server, #562).
+    pub fn agents(&self, issuer: &str, audience: &'static str) -> Result<Agents, Problem> {
         let public = self.public()?;
         let issuer = issuer.trim_end_matches('/').to_string();
-        Ok(Nodes { public, issuer })
+        Ok(Agents {
+            public,
+            issuer,
+            audience,
+        })
     }
 
     /// The default account's initial password the deployer set: `None` when the variable is
@@ -494,20 +504,21 @@ pub struct Keys {
 /// The signing key's public half, which every surface verifies a Meada-signed token with.
 pub struct Public(DecodingKey);
 
-/// A node's admission of agent tokens for the nodes (#560): the public half and the console's
-/// issuer.
-pub struct Nodes {
+/// A surface's admission of agent tokens for it: the public half, the console's issuer and the
+/// surface's audience (a node's, #560; the proposal server's, #562).
+pub struct Agents {
     public: Public,
     issuer: String,
+    audience: &'static str,
 }
 
-impl Nodes {
-    /// The claims of `headers`' bearer when it is an agent token for the nodes of this console
-    /// (`Public::verify` with `NODES`), never one awaiting a password change; else whether a
-    /// bearer was sent, for the challenge of the 401.
+impl Agents {
+    /// The claims of `headers`' bearer when it is an agent token for this surface of this
+    /// console (`Public::verify` with the surface's audience), never one awaiting a password
+    /// change; else whether a bearer was sent, for the challenge of the 401.
     pub fn admit(&self, headers: &hyper::HeaderMap) -> Result<Claims, bool> {
         match crate::oidc::bearer(headers) {
-            Ok(Some(token)) => (self.public.verify(token, &self.issuer, NODES))
+            Ok(Some(token)) => (self.public.verify(token, &self.issuer, self.audience))
                 .filter(|claims| !claims.change_required)
                 .ok_or(true),
             Ok(None) => Err(false),
@@ -1266,7 +1277,7 @@ mod tests {
         .unwrap();
         let dir = std::env::temp_dir().join(format!("meada-accounts-agent-{}", std::process::id()));
         std::fs::remove_file(dir.join("private.pem")).unwrap();
-        let nodes = config.nodes(&format!("{issuer}/")).unwrap();
+        let nodes = config.agents(&format!("{issuer}/"), NODES).unwrap();
         let mut headers = hyper::HeaderMap::new();
         let mut send = |value: &str| {
             let value = hyper::header::HeaderValue::from_str(value).unwrap();
@@ -1300,6 +1311,30 @@ mod tests {
         assert_eq!(send(&format!("Bearer {session}")).err(), Some(true));
         assert_eq!(send("Bearer ").err(), Some(true));
         assert_eq!(send(&format!("Basic {token}")).err(), Some(false));
+        // The proposal server's surface (#562) admits its own agent tokens alone, and a node
+        // refuses them.
+        let (proposal, _, _) = (keys.agent(
+            issuer,
+            &holder("alice", Role::Operator, &groups, Some("ana")),
+            PROPOSALS,
+            1,
+        ))
+        .unwrap();
+        assert_eq!(send(&format!("Bearer {proposal}")).err(), Some(true));
+        let proposals = config.agents(issuer, PROPOSALS).unwrap();
+        let bearer = |token: &str| {
+            let mut headers = hyper::HeaderMap::new();
+            let value = hyper::header::HeaderValue::from_str(&format!("Bearer {token}")).unwrap();
+            headers.insert(hyper::header::AUTHORIZATION, value);
+            proposals.admit(&headers)
+        };
+        let admitted = bearer(&proposal).unwrap();
+        assert_eq!(
+            (admitted.role, admitted.login.as_deref()),
+            (Role::Operator, Some("ana"))
+        );
+        assert_eq!(bearer(&token).err(), Some(true));
+        assert_eq!(bearer(&session).err(), Some(true));
         // The public half alone: a node never needs the private one.
         assert!(config.keys().is_err());
     }

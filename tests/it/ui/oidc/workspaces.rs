@@ -6,9 +6,19 @@
 //! `/-/workspaces/<id>/<identity>` to the same callers. What a caller may do is seen through
 //! statuses and answers, never the module's tables. Without a service the tests print why and
 //! skip; with `MEADA_TEST_SERVICES_REQUIRED=1` they fail.
+//!
+//! The tests named `local_accounts_*` run the same bodies with local accounts (#562, ADR 0024):
+//! no `[oidc]`, `[accounts]` with `[accounts.github]` in place of `[oidc.github]`, and the table's
+//! callers recreated through the console (`Case::local`): the default account creates each as
+//! an account (the platform administrator an operator, the claims caller in a group
+//! `[accounts.groups]` maps to its claims grant), each signs in and verifies its login with a
+//! personal access token the fake GitHub knows, and its node and proposal server tokens are agent
+//! tokens the console issues. Subjects are then `local:<name>` (`Case::subject`).
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use jsonwebtoken::{Algorithm, EncodingKey};
@@ -36,6 +46,30 @@ const INSTALLATION: u64 = 15;
 const NODE_MANIFEST: &str = "node/meada.workspace.toml";
 /// The SCIM token of the console of a case that has a `[directory]`.
 const SCIM_TOKEN: &str = "scim-334-token-0123456789abcdefghijklmno";
+/// With local accounts: the variable naming the default account's initial password, the
+/// password itself (chosen, so no change is required), and every caller's password.
+const ADMIN_ENV: &str = "MEADA_TEST_ADMIN_PASSWORD_562";
+const ADMIN_PASSWORD: &str = "the deployer chose this one";
+const CALLER_PASSWORD: &str = "a named workspaces passphrase";
+/// With local accounts: the surfaces of a caller's tokens, as `POST account/tokens` names them.
+const CONSOLE_SURFACE: &str = "console";
+const NODES_SURFACE: &str = "nodes";
+
+/// How the case's callers are admitted.
+#[derive(Clone, Copy, PartialEq)]
+enum Mode {
+    /// The loopback issuer's tokens, `[oidc.github]` granting from their login claim.
+    Oidc,
+    /// Local accounts (#562): the console's own tokens, `[accounts.github]` granting from each
+    /// account's verified login.
+    Local,
+}
+
+/// With local accounts, the personal access token of the table's caller `name` at the fake
+/// GitHub.
+fn pat(name: &str) -> String {
+    format!("ghp_{name}_562_0123456789abcdef")
+}
 
 fn table() -> Value {
     serde_json::from_str(include_str!("../../../fixtures/named-workspaces.json")).unwrap()
@@ -57,11 +91,35 @@ struct Case {
     issuer: Issuer,
     table: Value,
     name: String,
+    mode: Mode,
+    /// With local accounts, the tokens the console gave each caller, by caller and surface.
+    tokens: Mutex<HashMap<(String, &'static str), String>>,
 }
 
 impl Case {
     fn new(name: &str) -> Option<Self> {
         Self::start(name, false)
+    }
+
+    /// The case with local accounts (#562), every caller of the table recreated through the
+    /// console.
+    #[cfg_attr(not(feature = "accounts"), allow(dead_code))]
+    fn local(name: &str) -> Option<Self> {
+        Self::local_with(name, "")
+    }
+
+    /// `local`, `tail` appended to the console's manifest before it starts (a `[proposals]` the
+    /// console must read to issue agent tokens for the proposal server).
+    #[cfg_attr(not(feature = "accounts"), allow(dead_code))]
+    fn local_with(name: &str, tail: &str) -> Option<Self> {
+        let case = Self::with(name, Mode::Local, false, 3600, tail)?;
+        let callers: Vec<String> = (case.table["callers"].as_object().unwrap().keys())
+            .cloned()
+            .collect();
+        for caller in callers {
+            case.token(&caller);
+        }
+        Some(case)
     }
 
     /// The case, with the SCIM `[directory]` in the console's manifest when `directory`.
@@ -71,6 +129,13 @@ impl Case {
 
     /// `start`, a permissions set granting for `max_age` seconds.
     fn aged(name: &str, directory: bool, max_age: u64) -> Option<Self> {
+        Self::with(name, Mode::Oidc, directory, max_age, "")
+    }
+
+    /// The case in `mode`: `aged`'s, with local accounts in place of the issuer under
+    /// `Mode::Local` (never with a `[directory]`, an identity provider's), `tail` appended to the
+    /// console's manifest.
+    fn with(name: &str, mode: Mode, directory: bool, max_age: u64, tail: &str) -> Option<Self> {
         let github = Github::new(name)?;
         let endpoint = service()?;
         let bucket_id = bucket_name(name);
@@ -106,14 +171,30 @@ impl Case {
         github.list("acme/c", &[]);
         github.api.install(1, INSTALLATION, "acme");
         github.api.with(|s| s.covered.insert(INSTALLATION, covered));
+        // The personal access token of each caller with a login (local accounts).
+        for (caller, row) in table["callers"].as_object().unwrap() {
+            if let Some(login) = row["login"].as_str() {
+                github
+                    .api
+                    .with(|s| s.users.insert(pat(caller), login.to_string()));
+            }
+        }
         // The console's and the job's manifest: one file, as an operator's bootstrap is.
         let roles = "[\"write\", \"maintain\", \"admin\"]";
-        let head = format!(
-            "{}{}{}",
-            oidc(&issuer.base),
-            github.sections(HOST, roles, max_age),
-            github.job(HOST),
-        );
+        let admission = match mode {
+            Mode::Oidc => format!(
+                "{}{}",
+                oidc(&issuer.base),
+                github.sections(HOST, roles, max_age)
+            ),
+            Mode::Local => {
+                let keys = format!(
+                    "private_key_file = \"private.pem\"\nadmin_password_env = \"{ADMIN_ENV}\"\n"
+                );
+                accounts_sections(&github, &table, &keys, max_age)
+            }
+        };
+        let head = format!("{admission}{}", github.job(HOST));
         let head = format!(
             "{head}{}local_dir = \"../console-generations\"\n\n[generations]\nkeep = 5\n\n\
              [catalog]\nallow = [\"{HOST}/acme/*\"]\nmax_repositories = 10\n\n[workspaces]\n\
@@ -121,19 +202,30 @@ impl Case {
             crate::snapshot::section(&endpoint, &bucket_id),
             dir.join("mirrors").display(),
         );
+        let head = format!("{head}{tail}");
         let head = match directory {
             true => format!(
                 "{head}\n[directory]\nuser_claim = \"sub\"\nuser_attribute = \"userName\"\n"
             ),
             false => head,
         };
-        let ui = format!(
-            "{}operations = true\noperator_groups = [\"admins\"]\n",
-            ui_oidc()
-        );
+        let ui = match mode {
+            Mode::Oidc => format!(
+                "{}operations = true\noperator_groups = [\"admins\"]\n",
+                ui_oidc()
+            ),
+            Mode::Local => format!("{}operations = true\n", crate::ui::ui_section()),
+        };
         let made = console_dir(name, Some(VERSION), &head, &ui);
         assert_eq!(made, dir);
         fs::write(dir.join("ops/s3-secret"), format!("{SECRET}\n")).unwrap();
+        // The signing key pair of local accounts, beside the console's manifest.
+        #[cfg(feature = "accounts")]
+        if mode == Mode::Local {
+            let (private, public) = crate::ui::accounts::pair();
+            fs::write(dir.join("ops/private.pem"), private).unwrap();
+            fs::write(dir.join("ops/public.pem"), &public).unwrap();
+        }
         // The mirrors the table's repositories are cloned at, provisioned by the operator.
         for (short, fixture) in FIXTURES {
             let identity = table["identities"][short].as_str().unwrap();
@@ -152,6 +244,7 @@ impl Case {
                 ("MEADA_PERMISSIONS_POLL_MS", POLL_MS),
                 ("MEADA_TEST_S3_KEY", KEY_ID),
                 ("MEADA_SCIM_TOKEN", SCIM_TOKEN),
+                (ADMIN_ENV, ADMIN_PASSWORD),
             ],
         );
         Some(Self {
@@ -163,7 +256,89 @@ impl Case {
             issuer,
             table,
             name: name.into(),
+            mode,
+            tokens: Mutex::new(HashMap::new()),
         })
+    }
+
+    /// The subject the console records for the table's caller `name`: its own under the
+    /// issuer, `local:<name>` with local accounts.
+    fn subject(&self, name: &str) -> String {
+        match self.mode {
+            Mode::Oidc => name.to_string(),
+            Mode::Local => format!("local:{name}"),
+        }
+    }
+
+    /// With local accounts, the token of `name` for `surface`, once: a session token for the
+    /// console (`local_session`), else the agent token the console issues to that session.
+    fn local_token(&self, name: &str, surface: &'static str) -> String {
+        let key = (name.to_string(), surface);
+        if let Some(token) = self.tokens.lock().unwrap().get(&key) {
+            return token.clone();
+        }
+        let token = match surface {
+            CONSOLE_SURFACE => self.local_session(name),
+            surface => {
+                let session = self.local_token(name, CONSOLE_SURFACE);
+                let asked = json!({"surface": surface});
+                let reply = self.post("/api/v1/account/tokens", &session, &asked);
+                assert_eq!(reply.status, 200, "{name} {surface}: {}", reply.body);
+                assert_eq!(reply.json()["surface"], surface);
+                reply.json()["token"].as_str().unwrap().to_string()
+            }
+        };
+        self.tokens.lock().unwrap().insert(key, token.clone());
+        token
+    }
+
+    /// With local accounts, a session token of the table's caller `name`, recreated through the
+    /// console: the default account creates the account (an operator for the platform
+    /// administrator, a viewer in the group `claims` for a caller with a claims grant, a viewer
+    /// otherwise), the account signs in and, when the caller has a login, verifies it with its
+    /// personal access token; the token that verification answers carries the login.
+    fn local_session(&self, name: &str) -> String {
+        let sign_in = |username: &str, password: &str| {
+            let body = json!({"username": username, "password": password}).to_string();
+            let reply = send_body(
+                &self.console,
+                "POST",
+                "/api/v1/login",
+                &[("Origin", PUBLIC)],
+                &body,
+            );
+            assert_eq!(reply.status, 200, "{username}: {}", reply.body);
+            reply.json()["token"].as_str().unwrap().to_string()
+        };
+        if name == "admin" {
+            return sign_in(name, ADMIN_PASSWORD);
+        }
+        let caller = &self.table["callers"][name];
+        let role = match caller["platform_administrator"] == true {
+            true => "operator",
+            false => "viewer",
+        };
+        let groups: Vec<&str> = match caller["claims_grant"].as_array() {
+            Some(granted) if !granted.is_empty() => vec!["claims"],
+            _ => Vec::new(),
+        };
+        let admin = self.local_token("admin", CONSOLE_SURFACE);
+        let account = json!({"username": name, "role": role, "groups": groups,
+                             "password": CALLER_PASSWORD, "change_required": false});
+        let created = self.post("/api/v1/accounts", &admin, &account);
+        assert_eq!(created.status, 200, "{name}: {}", created.body);
+        let session = sign_in(name, CALLER_PASSWORD);
+        let Some(login) = caller["login"].as_str() else {
+            return session;
+        };
+        let verified = self.post(
+            "/api/v1/account/github",
+            &session,
+            &json!({"token": pat(name)}),
+        );
+        assert_eq!(verified.status, 200, "{name}: {}", verified.body);
+        assert_eq!(verified.json()["login"], login);
+        verified.json()["token"].as_str().unwrap().to_string()
     }
 
     /// `meada <args>` in the case's directory as the job runs it.
@@ -200,7 +375,10 @@ impl Case {
 
     /// A console token of the table's caller `name`.
     fn token(&self, name: &str) -> String {
-        self.token_for(name, PUBLIC)
+        match self.mode {
+            Mode::Oidc => self.token_for(name, PUBLIC),
+            Mode::Local => self.local_token(name, CONSOLE_SURFACE),
+        }
     }
 
     /// A token of the table's caller `name` for `audience`, with the console token's claims.
@@ -274,20 +452,36 @@ impl Case {
         ids
     }
 
-    /// The node's manifest and its serving process, over this case's store and Valkey.
+    /// The node's manifest and its serving process, over this case's store and Valkey. With
+    /// local accounts it admits the console's agent tokens for the nodes: the console's `[ui]
+    /// public_url` and `[accounts]` over the public half alone.
     fn node(&self) -> (Server, String) {
         let node = self.dir.join("node");
         fs::create_dir_all(&node).unwrap();
         fs::write(node.join("s3-secret"), format!("{SECRET}\n")).unwrap();
         fs::write(node.join("pg-url"), &self.github.url).unwrap();
+        let roles = "[\"write\", \"maintain\", \"admin\"]";
+        let admission = match self.mode {
+            Mode::Oidc => format!(
+                "\n[oidc]\nissuer = \"{}\"\npublic_url = \"{NODE}/\"\naudience = \"{NODE}\"\n\
+                 identities_claim = \"meada_repositories\"\nscopes = [\"meada:read\"]\n{}",
+                self.issuer.base,
+                self.github.sections(HOST, roles, 3600),
+            ),
+            Mode::Local => {
+                fs::copy(self.dir.join("ops/public.pem"), node.join("public.pem")).unwrap();
+                let private = "private_key_file = \"no-such-private.pem\"\n";
+                format!(
+                    "\n[ui]\n{}{}",
+                    crate::ui::ui_section(),
+                    accounts_sections(&self.github, &self.table, private, 3600)
+                )
+            }
+        };
         let toml = format!(
             "index_dir = \"indexes\"\n{}local_dir = \"generations\"\n\n[generations]\nkeep = 5\n\
-             \n[oidc]\nissuer = \"{}\"\npublic_url = \"{NODE}/\"\naudience = \"{NODE}\"\n\
-             identities_claim = \"meada_repositories\"\nscopes = [\"meada:read\"]\n{}{}",
+             {admission}{}",
             crate::snapshot::section(&self.endpoint, &bucket_name(&self.name)),
-            self.issuer.base,
-            self.github
-                .sections(HOST, "[\"write\", \"maintain\", \"admin\"]", 3600),
             self.github
                 .job(HOST)
                 .split("[[github_app]]")
@@ -314,8 +508,12 @@ impl Case {
         )
     }
 
-    /// A node token of the table's caller `name`: its login claim, no claims grant.
+    /// A node token of the table's caller `name`: its login claim, no claims grant; with local
+    /// accounts, the agent token for the nodes the console issues it.
     fn node_token(&self, name: &str) -> String {
+        if self.mode == Mode::Local {
+            return self.local_token(name, NODES_SURFACE);
+        }
         let mut claims = json!({
             "iss": self.issuer.base, "aud": NODE,
             "exp": jsonwebtoken::get_current_timestamp() + 300,
@@ -326,6 +524,36 @@ impl Case {
         }
         sign(&self.signing, "ws", Algorithm::ES256, &claims)
     }
+}
+
+/// `[accounts]` over the key files beside the manifest (`keys`: the private half's line, and the
+/// initial password's on the console), `[accounts.groups]` mapping `claims` to the claims grant of
+/// the table's `claims` caller,
+/// `[accounts.github]` on the table's host over the fake GitHub's API (`max_age` seconds) and
+/// `[postgres]`, as `Github::sections` gives `[oidc.github]` its own.
+fn accounts_sections(github: &Github, table: &Value, keys: &str, max_age: u64) -> String {
+    let granted: Vec<String> = (table["callers"]["claims"]["claims_grant"]
+        .as_array()
+        .unwrap())
+    .iter()
+    .map(|short| {
+        format!(
+            "{:?}",
+            table["identities"][short.as_str().unwrap()]
+                .as_str()
+                .unwrap()
+        )
+    })
+    .collect();
+    format!(
+        "\n[accounts]\npublic_key_file = \"public.pem\"\n{keys}\n[accounts.groups]\n\
+         claims = [{}]\n\n[accounts.github]\nhost = \"{HOST}\"\napi = \"{}\"\n\
+         roles = [\"write\", \"maintain\", \"admin\"]\nmax_age_seconds = {max_age}\n\n\
+         [postgres]\nurl_file = \"pg-url\"\nschema = \"{}\"\n",
+        granted.join(", "),
+        github.api.base,
+        github.schema,
+    )
 }
 
 /// What a node answers a `search` call at `path` for `token`: the status and the body.
@@ -370,9 +598,25 @@ fn until_status(node: &Server, path: &str, token: &str, status: u16) -> String {
 /// administrator selects the whole catalog. A caller-supplied actor or role is an unknown key.
 #[test]
 fn creation_follows_the_shared_table_and_trusts_no_asserted_identity() {
-    let Some(case) = Case::new("ws_create_table") else {
-        return;
-    };
+    if let Some(case) = Case::new("ws_create_table") {
+        creation_follows_the_shared_table_and_trusts_no_asserted_identity_as(case);
+    }
+}
+
+/// `creation_follows_the_shared_table_and_trusts_no_asserted_identity` with local accounts (#562):
+/// eligibility reads the verified login, the claims caller's group grant creates nothing and an
+/// account without a verified login is pending, as under an identity provider.
+#[cfg(feature = "accounts")]
+#[test]
+fn local_accounts_creation_follows_the_shared_table_and_trusts_no_asserted_identity() {
+    if let Some(case) = Case::local("ws_create_table_local") {
+        creation_follows_the_shared_table_and_trusts_no_asserted_identity_as(case);
+    }
+}
+
+/// The body of `creation_follows_the_shared_table_and_trusts_no_asserted_identity` and
+/// `local_accounts_creation_follows_the_shared_table_and_trusts_no_asserted_identity`, over `case`.
+fn creation_follows_the_shared_table_and_trusts_no_asserted_identity_as(case: Case) {
     // Before any set: pending, for everyone, nothing stored.
     let early = case.create("alice", "early", &["Y"]);
     assert_eq!(
@@ -381,7 +625,43 @@ fn creation_follows_the_shared_table_and_trusts_no_asserted_identity() {
     );
     case.refresh();
     case.ready();
-    let b = case.identity("B");
+    let (y, a, b) = (case.identity("Y"), case.identity("A"), case.identity("B"));
+    // The catalog and its check, as each caller may select: alice's login holds Y and A, the
+    // platform administrator selects the whole catalog, `acme/c` included.
+    let identities = |reply: &Reply| -> Vec<String> {
+        assert_eq!(reply.status, 200, "{}", reply.body);
+        (reply.json()["repositories"].as_array().unwrap().iter())
+            .map(|r| r["identity"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let alice = identities(&case.get("/api/v1/catalog", &case.token("alice")));
+    assert_eq!(alice, [a.clone(), y.clone()]);
+    let root = identities(&case.get("/api/v1/catalog", &case.token("root")));
+    assert_eq!(
+        root,
+        [a.clone(), b.clone(), "github.com/acme/c".into(), y.clone()]
+    );
+    let checked = case.post(
+        "/api/v1/catalog/check",
+        &case.token("alice"),
+        &json!({"identities": [y, b]}),
+    );
+    assert_eq!(checked.status, 200, "{}", checked.body);
+    let states: Vec<(String, String)> = (checked.json()["results"].as_array().unwrap().iter())
+        .map(|r| {
+            (
+                r["identity"].as_str().unwrap().into(),
+                r["state"].as_str().unwrap().into(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        states,
+        [
+            (y.clone(), "selectable".into()),
+            (b.clone(), "unavailable".into())
+        ]
+    );
     for row in case.table["creation"].as_array().unwrap() {
         let caller = row["caller"].as_str().unwrap();
         if case.table["callers"][caller]["platform_administrator"] == true {
@@ -479,9 +759,26 @@ fn creation_follows_the_shared_table_and_trusts_no_asserted_identity() {
 /// does not exist; the answers carry no operator list or editing control for a peer.
 #[test]
 fn peers_view_a_workspace_through_their_own_grants_and_operate_nothing() {
-    let Some(case) = Case::new("ws_peers") else {
-        return;
-    };
+    if let Some(case) = Case::new("ws_peers") {
+        peers_view_a_workspace_through_their_own_grants_and_operate_nothing_as(case);
+    }
+}
+
+/// `peers_view_a_workspace_through_their_own_grants_and_operate_nothing` with local accounts
+/// (#562): the same listings, views and refusals, the local operator being the platform
+/// administrator.
+#[cfg(feature = "accounts")]
+#[test]
+fn local_accounts_peers_view_a_workspace_through_their_own_grants_and_operate_nothing() {
+    if let Some(case) = Case::local("ws_peers_local") {
+        peers_view_a_workspace_through_their_own_grants_and_operate_nothing_as(case);
+    }
+}
+
+/// The body of `peers_view_a_workspace_through_their_own_grants_and_operate_nothing` and
+/// `local_accounts_peers_view_a_workspace_through_their_own_grants_and_operate_nothing`, over
+/// `case`.
+fn peers_view_a_workspace_through_their_own_grants_and_operate_nothing_as(case: Case) {
     case.refresh();
     case.ready();
     let id_of = |reply: &Reply| reply.json()["id"].as_str().unwrap().to_string();
@@ -575,9 +872,25 @@ fn peers_view_a_workspace_through_their_own_grants_and_operate_nothing() {
 /// pending until the generation records it.
 #[test]
 fn a_created_workspace_becomes_queryable_for_group_peers_only() {
-    let Some(case) = Case::new("ws_query") else {
-        return;
-    };
+    if let Some(case) = Case::new("ws_query") {
+        a_created_workspace_becomes_queryable_for_group_peers_only_as(case);
+    }
+}
+
+/// `a_created_workspace_becomes_queryable_for_group_peers_only` with local accounts (#562): the
+/// job's ingestion membership and the node route answer agent tokens for the nodes as they answer
+/// the issuer's tokens.
+#[cfg(feature = "accounts")]
+#[test]
+fn local_accounts_a_created_workspace_becomes_queryable_for_group_peers_only() {
+    if let Some(case) = Case::local("ws_query_local") {
+        a_created_workspace_becomes_queryable_for_group_peers_only_as(case);
+    }
+}
+
+/// The body of `a_created_workspace_becomes_queryable_for_group_peers_only` and
+/// `local_accounts_a_created_workspace_becomes_queryable_for_group_peers_only`, over `case`.
+fn a_created_workspace_becomes_queryable_for_group_peers_only_as(case: Case) {
     case.refresh();
     case.ready();
     let id_of = |reply: &Reply| reply.json()["id"].as_str().unwrap().to_string();

@@ -760,10 +760,12 @@ languages, and the audit page's copy for every `account.*` action and the role `
 
 ### Local accounts: agent tokens for the nodes (#560)
 
-`src/accounts.rs` holds the unit test of `Keys::agent` and `Nodes::admit`: the claims (the nodes'
+`src/accounts.rs` holds the unit test of `Keys::agent` and `Agents::admit`: the claims (the nodes'
 audience, the subject, role, groups, a 32-hex random `jti`, no mark, the hours asked), a node
 admitting it with the public half alone (the private file removed), the console's audience
-refusing it, a node refusing a session token, an empty bearer and another scheme.
+refusing it, a node refusing a session token, an empty bearer and another scheme; the proposal
+server's surface (#562) admitting its own token (role and login kept) and refusing the nodes'
+and a session token, a node refusing the proposal server's.
 `tests/it/oidc/accounts.rs` runs a node over the chain fixture with `[accounts]`, `[ui]` and
 tokens the test signs, with no service: no token a 401 `Bearer`; another key, a session token,
 the proposal server's audience, expired, `nbf` ahead, another issuer, no `exp`, a non-local
@@ -819,6 +821,31 @@ section (the token sent once in the body, the fresh session token kept, the sess
 the token in no storage, each refusal as the page's own copy, a 401 ending the session, the
 removal) and `ui/tests/AccountsPage.test.tsx` the accounts page's login column and its
 `remove_github` behind the dialog.
+
+### Named workspaces and the proposal server with local accounts (#562)
+
+`tests/it/ui/oidc/workspaces.rs`'s `Case::local` runs the named-workspace suites with local
+accounts (Valkey, the store, Postgres and the fake GitHub, skipping without them): no `[oidc]`,
+`[accounts]` with `[accounts.groups]` (`claims` mapped to the claims caller's grant) and
+`[accounts.github]` over the fake's API, `[ui] operations = true`; every caller of the Y/A/B table
+is created by the default account through `POST accounts` (the platform administrator an
+operator, the claims caller in the group `claims`), signs in and verifies its login with a
+personal access token the fake answers on `GET /user`; its node and proposal server tokens are
+agent tokens from `POST account/tokens`, and `Case::subject` is `local:<name>`. Each
+`local_accounts_*` test runs the body of its identity provider twin: the creation table with the
+catalog and its check (`creation_follows_...`), list, show and the peers' refusals
+(`peers_view_...`), the job's membership, the node route and its 404 listings
+(`a_created_workspace_becomes_queryable_...`), save, apply, rollback, rename, delete and
+operators with `local:` authors, operator lists, history actors and audit subjects
+(`versions_are_saved_...`), the effective view and the preview (`an_ignored_or_unsupported_...`)
+and the proposal server's table (`proposals_follow_...`: no metadata, a 401 `Bearer` to no token,
+a forged one, a session token and a node's agent token, the forged arguments invalid, the stderr
+line naming `local:alice`, and a suspended account's token still answering, since nothing but the
+token decides). `tests/it/manifest.rs` holds `[catalog]` checked against `[accounts.github] host`
+and `[workspaces]` accepted over local accounts, and the new needs text;
+`tests/it/ui/accounts/tokens.rs` the 422 `invalid_surface` for `proposals` without
+`[proposals]`; `ui/tests/LocalAccounts.test.tsx` the profile offering the proposal server's
+surface only with `config.proposals`.
 
 ### Break glass beside the identity provider (#563)
 

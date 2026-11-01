@@ -11,6 +11,8 @@ export interface Config {
   catalog?: boolean;
   /** With `[workspaces]` (#342): the named workspaces pages have their routes, and a selection holds at most `max_entries` repositories. */
   workspaces?: { max_entries: number };
+  /** With `[proposals]` (#562): agent tokens may also be issued for the proposal server. */
+  proposals?: boolean;
   /** How the browser signs in (ADR 0024): the identity provider's flow or the console's own page. */
   sign_in?: 'oidc' | 'accounts';
   /** Beside `sign_in: 'oidc'`, the break-glass account (#563): the default account may also sign in on the console's own page. */

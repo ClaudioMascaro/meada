@@ -347,6 +347,25 @@ of calls in flight, the body bound) and an rmcp `StreamableHttpService` of four 
 with the session in the request's extensions; a console answer becomes a tool's through
 `from_console`. The node's `mcp.rs` and the console's routes are unchanged.
 
+Delivered by #562 (named workspaces and the proposal server with local accounts, ADR 0024; no
+new module): `Manifest::read` takes the GitHub grant provider of either table for `[catalog]`
+(its `host`, the `catalog` flag set on whichever table it is, `workspace::PROVIDER` naming both
+tables in the error of a build with `accounts`) and `[workspaces]` needs `[ui]` and `[catalog]`
+(the catalog needing the provider), so `[proposals]` rides on either. The console code of
+ADR 0021 was already provider-blind (`Session` carries the login, the operator flag and the
+subject whichever verifier admitted it, #561), so eligibility reads the verified login, an
+operator account is the platform administrator and operators, authors and history are `local:`
+subjects with no change there. `POST account/tokens` (`Console::agent_token`) issues for
+`accounts::PROPOSALS` (`meada:proposals`, surface `proposals`) when the bootstrap has
+`[proposals]`, and `config` says `proposals: true`; `accounts::Agents` (formerly `Nodes`) is one
+surface's admission (public half, issuer, audience), built by `Config::agents`. The proposal
+server's `for_proposals` builds an `Agents` for `PROPOSALS` beside `[accounts]` with no `[oidc]`
+(the public half read at start, the issuer the bootstrap's `[ui] public_url`) and `Server::admit`
+hands it to `admit_agent`: a 401 `Bearer` (`error="invalid_token"` for a token sent) without
+`resource_metadata`, else `Session::local` of an `Admitted` built from the claims alone
+(subject, role, groups, login; `Providers::local` for the grant; no team, no row read). The
+metadata path is then a 404, as it is without `[oidc]`.
+
 Delivered by #345 (the guided controls; ADR 0021 "As built (#345)"), front end only plus two
 WebAssembly exports (`namedDiff` and `namedChanged` in `meada-core/src/wasm.rs`, over `named::diff`
 and `named::changed`): `EditWorkspace.tsx` is the operator's editor (it replaces #344's text-only
@@ -542,7 +561,8 @@ one for the area a change touches.
   `[oidc]` nor `[accounts]`, it lets everything through; with `[oidc]` (feature `oidc`) it is
   `oidc::Oidc::admit`, which answers itself (the protected resource metadata, a 401) or hands
   routing a `Pass`; with `[accounts]` and no `[oidc]` (feature `accounts`, #560) it is
-  `accounts::Nodes::admit`, read at start by `mcp::local_admission` (the public half,
+  `accounts::Agents::admit` for `accounts::NODES`, read at start by `mcp::local_admission` (the
+  public half,
   `accounts::Config::public`, and the issuer, the manifest's `[ui] public_url`, either missing
   refusing the start, `Msg::AccountsNodeIssuer`), which admits an agent token for the nodes
   (`accounts::NODES`) or answers 401 `Bearer` (`error="invalid_token"` for a token sent), and
@@ -897,7 +917,7 @@ one for the area a change touches.
   that is no Ed25519 key in PEM (`jsonwebtoken`'s `from_ed_pem`) or a private key that does not
   sign what the public key verifies (a probe token) refuses the start naming the key, never its
   value; the proposal server parses the section and reads neither key, and a node with no
-  `[oidc]` reads the public half alone (`Config::public`, `Config::nodes`, #560), never the
+  `[oidc]` reads the public half alone (`Config::public`, `Config::agents`, #560), never the
   private one.
   `Config::admin_password` reads the initial password only when the default account is created
   (an unset or empty variable is none; a file past `PASSWORD_FILE_MAX` refused naming it). `Keys`
@@ -909,7 +929,7 @@ one for the area a change touches.
   same claims with the surface's audience (`NODES`, `meada:nodes`), a random `jti` (16 bytes from
   `OsRng`, hex), no
   change-required mark, `exp` the hours asked later; `Public::verify` (the public half, which
-  `Keys::verify` and `Nodes::admit` call) takes EdDSA alone, no `crit`, the issuer, the audience,
+  `Keys::verify` and `Agents::admit` call) takes EdDSA alone, no `crit`, the issuer, the audience,
   `exp` and `nbf` with `oidc::LEEWAY`, a local subject whose username passes `username_ok` (1 to
   `USERNAME_MAX`, 64, lowercase ASCII letters, digits, `.`, `-`, `_`), groups that are owner
   names and a `login`, when present, that `grant::login_ok` takes (a lowercase GitHub login).

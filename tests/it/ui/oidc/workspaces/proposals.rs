@@ -50,9 +50,13 @@ impl Case {
         )
     }
 
-    /// An agent's token of the table's caller `name`, for the proposal server.
+    /// An agent's token of the table's caller `name`, for the proposal server; with local
+    /// accounts, the agent token for its surface the console issues it.
     fn agent(&self, name: &str) -> String {
-        self.token_for(name, PROPOSALS)
+        match self.mode {
+            Mode::Oidc => self.token_for(name, PROPOSALS),
+            Mode::Local => self.local_token(name, "proposals"),
+        }
     }
 
     /// What the console shows of every workspace and its versions and history, and the audit:
@@ -144,35 +148,68 @@ fn read_a_set(server: &Server, token: &str) {
 /// is pending, and the inputs are bounded. No call reaches GitHub or leaves a token on stderr.
 #[test]
 fn proposals_follow_the_shared_table_and_trust_no_asserted_identity() {
-    let Some(case) = Case::new("ws_proposals_table") else {
-        return;
-    };
-    // Without `[proposals]` the server refuses to start, naming the section.
-    let (_, stderr, code) = case.job(&[
-        "workspaces",
-        "mcp",
-        "--listen",
-        "127.0.0.1:0",
-        "--workspace",
-        MANIFEST,
-    ]);
-    assert_eq!(code, 1, "{stderr}");
-    assert!(stderr.contains("no [proposals] section"), "{stderr}");
+    if let Some(case) = Case::new("ws_proposals_table") {
+        proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case);
+    }
+}
+
+/// `proposals_follow_the_shared_table_and_trust_no_asserted_identity` with local accounts (#562):
+/// the proposal server admits only its own agent tokens (the console's session token and an agent
+/// token for the nodes are a 401 without `resource_metadata`, and there is no metadata to serve),
+/// derives everything from the token and keeps every refusal, forged arguments included.
+#[cfg(feature = "accounts")]
+#[test]
+fn local_accounts_proposals_follow_the_shared_table_and_trust_no_asserted_identity() {
+    let section = format!("\n[proposals]\npublic_url = \"{PROPOSALS}\"\n");
+    if let Some(case) = Case::local_with("ws_proposals_table_local", &section) {
+        proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case);
+    }
+}
+
+/// The body of `proposals_follow_the_shared_table_and_trust_no_asserted_identity` and
+/// `local_accounts_proposals_follow_the_shared_table_and_trust_no_asserted_identity`, over `case`.
+fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Case) {
+    // Without `[proposals]` the server refuses to start, naming the section (the local case's
+    // console started with one, to issue tokens for it).
+    if case.mode == Mode::Oidc {
+        let (_, stderr, code) = case.job(&[
+            "workspaces",
+            "mcp",
+            "--listen",
+            "127.0.0.1:0",
+            "--workspace",
+            MANIFEST,
+        ]);
+        assert_eq!(code, 1, "{stderr}");
+        assert!(stderr.contains("no [proposals] section"), "{stderr}");
+    }
     case.refresh();
     case.ready();
+    // The proposal server reads the public half alone: with local accounts the private one is
+    // gone before it starts (the console read it at its own start).
+    if case.mode == Mode::Local {
+        let ops = case.dir.join("ops");
+        fs::rename(ops.join("private.pem"), ops.join("private.pem.away")).unwrap();
+    }
     let server = case.proposals();
     read_a_set(&server, &case.agent("root"));
     let requests = case.github.api.with(|s| s.requests);
     let (y, a, b) = (case.identity("Y"), case.identity("A"), case.identity("B"));
 
-    // The metadata needs no token and names this server and the issuer.
+    // The metadata needs no token and names this server and the issuer; with local accounts
+    // there is no authorization server to discover, so none.
     let metadata = send(&server, "GET", "/.well-known/oauth-protected-resource", &[]);
-    assert_eq!(metadata.status, 200, "{}", metadata.body);
-    assert_eq!(metadata.json()["resource"], PROPOSALS);
-    assert_eq!(
-        metadata.json()["authorization_servers"],
-        json!([case.issuer.base])
-    );
+    match case.mode {
+        Mode::Oidc => {
+            assert_eq!(metadata.status, 200, "{}", metadata.body);
+            assert_eq!(metadata.json()["resource"], PROPOSALS);
+            assert_eq!(
+                metadata.json()["authorization_servers"],
+                json!([case.issuer.base])
+            );
+        }
+        Mode::Local => assert_eq!(metadata.status, 404, "{}", metadata.body),
+    }
     // No token, a forged one, a console token and a node token: 401 before any tool.
     let list = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"});
     let forged = format!("{}x", case.agent("alice"));
@@ -190,12 +227,21 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity() {
         let reply = rpc(&server, &headers, &list);
         assert_eq!(reply.status, 401, "{label}: {}", reply.body);
         let challenge = reply.header("www-authenticate").unwrap_or_default();
-        assert!(
-            challenge.contains(&format!(
-                "resource_metadata=\"{PROPOSALS}/.well-known/oauth-protected-resource\""
-            )),
-            "{label}: {challenge}"
-        );
+        match case.mode {
+            Mode::Oidc => assert!(
+                challenge.contains(&format!(
+                    "resource_metadata=\"{PROPOSALS}/.well-known/oauth-protected-resource\""
+                )),
+                "{label}: {challenge}"
+            ),
+            Mode::Local => {
+                let expected = match label {
+                    "none" => "Bearer",
+                    _ => "Bearer error=\"invalid_token\"",
+                };
+                assert_eq!(challenge, expected, "{label}");
+            }
+        }
     }
     // A browser is refused first; this server's token opens nothing on the console.
     let bearer = format!("Bearer {}", case.agent("alice"));
@@ -467,14 +513,47 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity() {
     );
     drop(full);
 
+    // With local accounts nothing but the token decides: alice's account suspended in the
+    // console, her agent token still answers as it did until it expires (ADR 0024: no row read).
+    if case.mode == Mode::Local {
+        // An issue for this surface is recorded with the surface, the hours and the token id,
+        // never the token.
+        let asked = json!({"surface": "proposals", "hours": 2});
+        let issued = case.post("/api/v1/account/tokens", &case.token("bob"), &asked);
+        assert_eq!(issued.status, 200, "{}", issued.body);
+        let token = issued.json()["token"].as_str().unwrap().to_string();
+        let audit = case.get("/api/v1/audit?limit=1", &case.token("root"));
+        assert!(!audit.body.contains(&token), "{}", audit.body);
+        let record = &audit.json()["records"][0];
+        assert_eq!(
+            (&record["action"], &record["subject"], &record["outcome"]),
+            (
+                &json!("account.token"),
+                &json!("local:bob"),
+                &json!("accepted")
+            ),
+            "{record}"
+        );
+        assert_eq!(record["arguments"]["surface"], "proposals", "{record}");
+        assert_eq!(record["arguments"]["hours"], "2", "{record}");
+        assert!(record["arguments"]["token_id"].is_string(), "{record}");
+        let admin = case.token("admin");
+        let suspend = json!({"action": "suspend"});
+        let suspended = case.post("/api/v1/accounts/alice", &admin, &suspend);
+        assert_eq!(suspended.status, 200, "{}", suspended.body);
+        let after = answer(&server, &case.agent("alice"), "catalog", json!({}));
+        assert_eq!(after["repositories"], catalog["repositories"]);
+    }
+
     // No call reached GitHub; nothing on stderr holds a token, a note or a manifest.
     assert_eq!(case.github.api.with(|s| s.requests), requests);
     let tokens = vec![case.agent("alice"), case.agent("root"), forged];
     let stderr = server.stderr();
-    assert!(
-        stderr.contains("proposals: alice propose -: entries_refused"),
-        "{stderr}"
+    let line = format!(
+        "proposals: {} propose -: entries_refused",
+        case.subject("alice")
     );
+    assert!(stderr.contains(&line), "{stderr}");
     assert!(
         !stderr.contains(note) && !stderr.contains("repository"),
         "{stderr}"
