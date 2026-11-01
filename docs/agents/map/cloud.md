@@ -122,7 +122,9 @@ section of `meada.workspace.toml`:
   version that set checked and only after the grant bounded the entries; the field is present
   only when true, so without `[oidc.github]` every body is as before) and `with_directory_counts`
   (`GET /api/v1/admission` gains `directory`: `users`,
-  `groups`, `last_write`; `null` when unreadable, absent without `[directory]`).
+  `groups`, `last_write`; `null` when unreadable, absent without `[directory]`). A read whose
+  admission found the directory unreadable sets `Session::directory_down` (#451): the flags, the
+  counts and the picker take that answer without asking again, so a request writes one line.
 - `directory.rs`, `directory/scim.rs` (feature `directory`, implying `postgres`, enabled by
   `cloud`, no crate beyond `postgres`'s; ADR 0016's `directory` row of ADR 0012's module table;
   #334): the directory, users and groups the identity provider pushes in over SCIM 2.0.

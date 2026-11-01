@@ -306,6 +306,10 @@ fn an_unreadable_directory_admits_reads_and_refuses_writes() {
         let reply = ask(&console, &format!("/api/v1/{route}"), &root);
         assert_eq!(reply.status, 200, "{route}: {}", reply.body);
     }
+    // The owner picker answers its 503 from the admission's answer.
+    let picker = ask(&console, "/api/v1/directory/groups", &root);
+    assert_eq!(picker.status, 503, "{}", picker.body);
+    assert_eq!(picker.json()["error"]["code"], "unavailable");
     let unavailable = "the audit in Postgres is unavailable: no write is made without its record";
     let sent = writes(&team, &g1);
     for (route, body) in &sent {
@@ -321,9 +325,9 @@ fn an_unreadable_directory_admits_reads_and_refuses_writes() {
     assert!(audit.records().is_empty());
     let stderr = console.stderr();
     let lines: Vec<&str> = stderr.lines().filter(|l| l.starts_with("ui: ")).collect();
-    // One line per request, writes included: every line names the directory, so the insert was
-    // not attempted (no line of the audit's own) and no later read in a request wrote a second.
-    assert_eq!(lines.len(), reads.len() + sent.len(), "{lines:?}");
+    // One line per request (the reads, the picker, the writes): every line names the directory, so
+    // the insert was not attempted (no line of the audit's own) and no later read wrote a second.
+    assert_eq!(lines.len(), reads.len() + 1 + sent.len(), "{lines:?}");
     assert!(
         lines
             .iter()

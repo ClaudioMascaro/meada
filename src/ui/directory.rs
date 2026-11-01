@@ -97,11 +97,12 @@ impl Console {
             return json_answer(StatusCode::OK, &json!({"groups": []}));
         }
         // Down at admission: the same 503, with no second line.
-        if session.directory_down {
-            let message = Msg::DirectoryUnavailable.text();
-            return error(StatusCode::SERVICE_UNAVAILABLE, "unavailable", &message);
-        }
-        match blocking(directory, directory.groups(&prefix)) {
+        let groups = if session.directory_down {
+            None
+        } else {
+            blocking(directory, directory.groups(&prefix))
+        };
+        match groups {
             Some(groups) => json_answer(StatusCode::OK, &json!({"groups": groups})),
             None => {
                 let message = Msg::DirectoryUnavailable.text();
