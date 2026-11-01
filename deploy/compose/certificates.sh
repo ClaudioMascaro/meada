@@ -38,6 +38,19 @@ if ! test -s /postgres/cert.pem || ! test -s /postgres/key.pem; then
   openssl x509 -req -in /tmp/service.csr -CA "$ca" -CAkey /tmp/ca.key -set_serial 4 -days 365 \
     -extfile /tmp/service.ext -out /postgres/cert.pem
 fi
+# The signing key pair of the local accounts (ADR 0024), where compose.accounts.yaml mounts its
+# two volumes. It is made once and kept; the private half goes to a file the console alone
+# mounts, and neither half is ever printed. Rotating it means removing both volumes.
+if test -d /accounts-private && test -d /accounts-public; then
+  if ! test -s /accounts-private/private.pem || ! test -s /accounts-public/public.pem; then
+    rm -f /accounts-private/private.pem /accounts-public/public.pem
+    openssl genpkey -algorithm ed25519 -out /accounts-private/private.pem
+    openssl pkey -in /accounts-private/private.pem -pubout -out /accounts-public/public.pem
+  fi
+  chmod 400 /accounts-private/private.pem
+  chmod 444 /accounts-public/public.pem
+  chown 10001:10001 /accounts-private /accounts-private/private.pem
+fi
 digest=$(printf %s "$VALKEY_PASSWORD" | openssl dgst -sha256)
 digest=${digest##* }
 printf 'user default off\nuser meada on #%s ~{meada:compose}:* ~meada:compose:* +@all -@admin -@dangerous -scan\n' "$digest" > /valkey/users.acl

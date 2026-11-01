@@ -1,0 +1,43 @@
+index_dir = "/var/lib/meada/indexes"
+
+[[repository]]
+repo = "github.com/claudiomascaro/meada"
+path = "/srv/mirrors/github.com/claudiomascaro/meada"
+
+[snapshot]
+endpoint = "https://store:9000"
+region = "us-east-1"
+bucket = "meada-compose"
+prefix = "prod"
+path_style = true
+credentials = "static"
+access_key_id_env = "AWS_ACCESS_KEY_ID"
+secret_access_key_env = "AWS_SECRET_ACCESS_KEY"
+ca_file = "/etc/meada/ca/ca.pem"
+local_dir = "/var/lib/meada/generations"
+
+[valkey]
+url = "rediss://meada@valkey:6379"
+password_env = "VALKEY_PASSWORD"
+key_prefix = "meada:compose"
+ca_file = "/etc/meada/ca/ca.pem"
+
+[generations]
+keep = 3
+
+[refresh_lock]
+ttl_seconds = 300
+
+# Local accounts (ADR 0024, compose.accounts.yaml): the node holds the signing key's public half
+# only and admits the agent tokens the console issues. [ui] public_url is that console's: the
+# issuer every token names. A node reads Postgres with the read role.
+[postgres]
+url_env = "MEADA_POSTGRES_READ_URL"
+ca_file = "/etc/meada/ca/ca.pem"
+
+[accounts]
+public_key_file = "/etc/meada/accounts/public.pem"
+
+[ui]
+dir = "/usr/share/meada/ui"
+public_url = "https://localhost:8444"

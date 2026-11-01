@@ -469,6 +469,15 @@ optional Ingress when enabled. Neither profile mounts a node's data into the con
 console's public assets, config and PKCE callback reach its listener before OIDC admission;
 its proxy preserves Host, Origin and Authorization. MCP keeps its separate admission rules.
 
+`compose.accounts.yaml` (with `.env.accounts.example`, whose `COMPOSE_FILE` and `COMPOSE_PROFILES`
+select the whole recipe) is the local accounts proof of concept (ADR 0024, #564): the
+`certificates` step also makes the Ed25519 pair (`accounts-private` mounted in the console alone,
+`accounts-public` in the nodes and the console), `console.accounts.workspace.toml` and
+`generations.accounts.workspace.toml` carry `[accounts]` (the nodes the public half and the
+console's `[ui] public_url` as issuer), `seed.sh` applies the first workspace version only while
+the store has none, and `Caddyfile.accounts` forwards `Authorization` without the static bearer.
+`scripts/compose-check` renders it and checks the order, the mounts and the manifests.
+
 Managed writers pull the workspace before the external fetch, index and publish, inside one
 refresh lock. A failed stage ends the job before publish, so the pointer stays (#316, ADR
 0012): the compose `fetch.sh` and `fetch-pulled.sh` and the chart's default `workspace.fetch`

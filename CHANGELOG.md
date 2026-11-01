@@ -8,6 +8,18 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- One-command proof of concept in the Compose recipe (#564, ADR 0024, from #551):
+  `cp .env.accounts.example .env && docker compose up -d` starts the generations fleet, Valkey,
+  the store, Postgres with its migration, a writable console with local accounts and nodes that
+  admit agent tokens. `compose.accounts.yaml` adds the Ed25519 key pair (made once by the
+  `certificates` step, never printed, the private key mounted read-only in the console alone and
+  the public one in the nodes), the console's and the nodes' `[accounts]` manifests, a one-shot
+  `seed` of the first workspace version (only while the store has none) and a node proxy that
+  forwards `Authorization` with no static bearer. The other profiles are unchanged, and
+  `scripts/compose-check` covers the new one. The Compose README (pt, en, es) starts with it and
+  covers `MEADA_ADMIN_PASSWORD`, `meada ui reset-admin`, key rotation and rate limiting the
+  sign-in route at the proxy.
+
 - Agent tokens for the nodes (#560, ADR 0024, from #551): a signed-in local account generates,
   on its profile page or through `POST /api/v1/account/tokens` (`{surface: "nodes", hours}`, 1 to
   168 hours, 8 by default), an agent token shown once (`{token, expires_at, surface}`), signed

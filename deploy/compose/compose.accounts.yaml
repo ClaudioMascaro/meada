@@ -1,0 +1,76 @@
+# The local accounts proof of concept (ADR 0024): one command after .env is filled in.
+#   cp .env.accounts.example .env && docker compose up -d
+# .env.accounts.example sets COMPOSE_FILE to compose.yaml, compose.console.yaml,
+# compose.postgres.yaml and this file, and COMPOSE_PROFILES to generations,console. It adds the
+# signing key pair (made once by the certificates step), a console with [accounts] and
+# operations = true, nodes that admit the console's agent tokens, a node proxy without the static
+# bearer, and a one-shot seed of the first workspace version. The other profiles are unchanged.
+x-accounts-node: &accounts-node
+  depends_on:
+    certificates:
+      condition: service_completed_successfully
+  volumes:
+    - ./generations.accounts.workspace.toml:/etc/meada/meada.workspace.toml:ro
+    - accounts-public:/etc/meada/accounts:ro
+
+services:
+  certificates:
+    volumes:
+      - accounts-private:/accounts-private
+      - accounts-public:/accounts-public
+
+  # The private key is mounted here and nowhere else; the nodes mount the public one.
+  console:
+    environment:
+      MEADA_ADMIN_PASSWORD: ${MEADA_ADMIN_PASSWORD:-}
+    depends_on:
+      certificates:
+        condition: service_completed_successfully
+    volumes:
+      - ./console.accounts.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - accounts-public:/etc/meada/accounts:ro
+      - accounts-private:/etc/meada/accounts-private:ro
+
+  generation-one: *accounts-node
+
+  generation-two: *accounts-node
+
+  # The Caddyfile of this profile forwards Authorization and admits nothing itself.
+  proxy:
+    environment: !reset {}
+    volumes:
+      - ./Caddyfile.accounts:/etc/caddy/Caddyfile:ro
+
+  # The job needs a workspace version and the console needs the job's first generation: this step
+  # imports the first one, only while the store has none.
+  seed:
+    image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-1.0.0}-cloud
+    profiles: [console]
+    entrypoint: [sh, /etc/meada/seed.sh]
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in .env}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in .env}
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:?Set VALKEY_PASSWORD in .env}
+    depends_on:
+      bucket:
+        condition: service_completed_successfully
+      valkey:
+        condition: service_healthy
+    volumes:
+      - ./job.workspace.toml:/etc/meada/meada.workspace.toml:ro
+      - ./console.repositories.toml:/etc/meada/repositories.toml:ro
+      - ./seed.sh:/etc/meada/seed.sh:ro
+      - ca:/etc/meada/ca:ro
+    read_only: true
+    tmpfs: [/tmp]
+    restart: "no"
+    mem_limit: 256m
+
+  generation-indexer:
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+volumes:
+  accounts-private:
+  accounts-public:
