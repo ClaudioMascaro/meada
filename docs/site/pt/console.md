@@ -2,7 +2,7 @@
 
 A console usa a feature `ui`, incluída em `cloud`, e roda em um processo próprio. Ela tem editor, diff, playground e grafo. O editor salva versões de configuração; aplicar uma versão e publicar os índices são etapas separadas.
 
-Proteja o acesso antes de expor a console. Sem `[oidc]`, o proxy controla a admissão: quem alcançar a console fora dessa proteção poderá ler o grafo. O proxy deve preservar `Host`, `Origin` e `Authorization`. A console aceita apenas seu Host público e, se houver Origin, sua própria origem.
+Proteja o acesso antes de expor a console. Sem `[oidc]` nem `[accounts]` ([contas locais](#contas-locais)), o proxy controla a admissão: quem alcançar a console fora dessa proteção poderá ler o grafo. Para começar, ligue as contas locais; para produção, o provedor de identidade. O proxy deve preservar `Host`, `Origin` e `Authorization`. A console aceita apenas seu Host público e, se houver Origin, sua própria origem.
 
 <!-- meada-graph:console-authoring -->
 
@@ -169,6 +169,28 @@ private_key_file = "/run/secrets/meada-signing.pem"
 
 `break_glass` sem `[oidc]` é um erro, e `[accounts.groups]` e `[accounts.github]` não podem ficar sob ele: a conta de break glass não precisa de concessão. Qualquer outro nome de usuário recebe o mesmo 401 de uma senha errada, e a auditoria registra `not_break_glass`. A console separa os bearers pelo emissor antes de tentar qualquer chave: um token cujo `iss` é a `public_url` da console só é conferido com a chave Ed25519 (e só vale o de `admin`), qualquer outro só com as chaves do provedor de identidade; por isso a console recusa a partida se o `issuer` de `[oidc]` for a sua própria `public_url`. A conta de break glass troca a própria senha; administração de contas, tokens de agente e verificação de login não existem (404). Nós e o servidor de propostas ignoram `[accounts]` quando há `[oidc]` e nunca leem a chave privada. `config` traz `"sign_in": "oidc"` com `"break_glass": true`, e o navegador, em vez de redirecionar direto ao provedor de identidade, mostra o botão dele e, discreto, o link para `/break-glass`, a página de entrada da conta padrão; o link continua lá quando o provedor de identidade não responde.
 
+### Segurança das contas locais
+
+- **Senhas:** guardadas com argon2id (19 MiB, duas iterações, uma lane; os parâmetros ficam no hash e um hash mais fraco é refeito no próximo login). Só um número pequeno de hashes roda ao mesmo tempo: o excedente recebe 503 `busy` sem calcular nada.
+- **Bloqueio:** dez falhas seguidas bloqueiam a conta por quinze minutos; uma redefinição pelo operador global ou `meada ui reset-admin` remove o bloqueio.
+- **Duração dos tokens:** o token de sessão vale oito horas; o de agente, de 1 a 168 horas (8 por padrão).
+- **Sem lista de revogação:** a Meada não guarda tokens de agente, então a validade é a revogação. Suspender ou rebaixar uma conta barra as escritas dela na console na hora (a linha é lida a cada escrita) e a emissão de tokens novos, mas trocar a senha não invalida nada, e um token já emitido continua admitido nos nós e no servidor de propostas até expirar.
+- **Rotação de chaves como parada de emergência:** troque o par Ed25519 e reinicie a console, os nós e o servidor de propostas: todo token em circulação, de sessão ou de agente, deixa de valer de uma vez. Não há rotação com chaves sobrepostas. Só a console lê a chave privada.
+- **Token de acesso pessoal do GitHub:** lido uma vez, para obter o login em `GET /user`, e descartado; nunca é guardado, registrado em log ou na auditoria.
+- **Limite de taxa no proxy:** a console não limita por endereço. Limite `POST /api/v1/login` (e, se quiser, `account/password`) no proxy, por exemplo com `limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;` e `limit_req zone=login burst=5;` no `location` do login no nginx. As falhas de nomes desconhecidos entram na auditoria e a fazem crescer sem limite, e o bloqueio por conta não as freia.
+- **O que não existe:** e-mail, cadastro próprio, "esqueci a senha", autenticação multifator, lista de revogação, listagem de tokens emitidos, e apagar ou renomear contas. Quem perde a senha do `admin` usa `meada ui reset-admin`.
+
+### Migrar das contas locais para o provedor de identidade
+
+Ao configurar `[oidc]`, o login local desliga para todas as contas (veja [Break glass](#break-glass)). Passos:
+
+1. Configure `[oidc]` na console e nos nós ([Autenticação e grants](admission.md)) e acrescente `break_glass = true` a `[accounts]`, para manter a conta padrão como saída de emergência. Remova `[accounts.groups]` e `[accounts.github]`: sob break glass elas são um erro.
+2. Copie a tabela de `[accounts.groups]` para `[oidc.groups]`, trocando o nome de cada grupo local pelo valor que a claim `groups_claim` do provedor de identidade carrega (no Entra, o id do grupo). Os grupos locais e os do provedor são nomes independentes: o mapeamento é manual, e a concessão de um token passa a ser a dos grupos que o provedor emite. Os `owner` das entradas do workspace são nomes de grupo e continuam valendo se o provedor usar os mesmos nomes; senão, atualize-os.
+3. Passe `[accounts.github]` para `[oidc.github]`: `host`, `roles` e `max_age_seconds` ficam, `api` sai, e o `login_claim` substitui o login verificado, que agora o administrador do provedor mapeia (veja [receitas](identity-providers.md)).
+4. Quem era operador local passa a ser operador por `ui.operator_groups` ou `ui.operator_claim`.
+
+O que deixa de funcionar: a entrada de qualquer conta que não seja `admin`; os tokens de sessão e de agente das contas locais (os nós e o servidor de propostas passam a admitir só os tokens do provedor, e os agentes passam a usar tokens do provedor de identidade); a página de contas, a emissão de tokens de agente e a verificação do login (404); e os sujeitos `local:<usuário>` registrados como autores, operadores de workspaces nomeados e registros de auditoria, que nunca coincidem com os do provedor, então refaça a lista de operadores de cada workspace nomeado. As contas continuam na tabela, inertes. Nenhuma conta ou grupo é migrado sozinho.
+
 ## Frota e diagnóstico
 
 Cada `snapshot pull --every` envia um heartbeat, o registro periódico de estado do nó. Ele informa geração, fence, gerações locais, prontidão, versão e horário.
@@ -183,12 +205,12 @@ Com OIDC, leitores veem somente as identidades admitidas pelo token. Para conced
 
 Com `[workspace] source = "store"`, `operations = true` e `oidc.groups_claim`, quem tem um grupo que é dono (`owner = "<grupo>"`) de uma entrada da versão atual do workspace que o seu token lê é operador de time. Vê o que um leitor com o mesmo grant vê e pode salvar e aplicar mudanças nas entradas do seu time; mudar qualquer outra entrada, um owner ou uma entrada sem owner é recusado com um 403 `entries_refused` que nomeia as entradas (um apply conta as que estão fora do grant). Pointer e fence continuam com o operador. Mapeie o grupo do time para as identidades dele em `[oidc.groups]`: ser dono nunca amplia o que um token lê. A página de versões mostra o time responsável por cada entrada a todos os papéis, e o editor do operador de time contém só as entradas que seu token lê, marca uma alteração que a API recusaria (com o motivo) antes de ela poder ser salva e nomeia os times que a autorizam nas confirmações, em vez de um comando da CLI.
 
-As quatro operações HTTP exigem OIDC e `operations = true`. Cada ação mostra o comando CLI e pede confirmação. Se recusada, mostra a mensagem do CLI, incluindo o titular de uma trava ocupada. Cada tentativa gera uma linha de auditoria em stderr, sem tokens nem bodies.
+As quatro operações HTTP exigem `operations = true` e um papel de operador, que vem do OIDC ou de uma [conta local](#contas-locais) (nunca só do proxy). Cada ação mostra o comando CLI e pede confirmação. Se recusada, mostra a mensagem do CLI, incluindo o titular de uma trava ocupada. Cada tentativa gera uma linha de auditoria em stderr, sem tokens nem bodies.
 
 <details markdown="1" class="reference-details">
 <summary>Grant, login e limites da recuperação</summary>
 
-As operações da console exigem OIDC e ficam desligadas por padrão. Quando habilitadas, usam a mesma trava e as mesmas verificações do CLI para alterar o ponteiro, recuperar o fence e gerenciar versões. Cada tentativa gera uma linha de auditoria. O grant também limita grupos e erros do manifesto; o login preserva os parâmetros do issuer, e a recuperação respeita o relógio e o limite do contador do Valkey.
+As operações da console exigem `[oidc]` ou `[accounts]` e ficam desligadas por padrão. Quando habilitadas, usam a mesma trava e as mesmas verificações do CLI para alterar o ponteiro, recuperar o fence e gerenciar versões. Cada tentativa gera uma linha de auditoria. O grant também limita grupos e erros do manifesto; o login preserva os parâmetros do issuer, e a recuperação respeita o relógio e o limite do contador do Valkey.
 
 </details>
 
@@ -198,7 +220,7 @@ Com `[postgres]` no bootstrap (e o schema em dia com `meada postgres migrate`), 
 
 ## Catálogo de repositórios
 
-Com `[catalog]` no bootstrap (feature `workspaces`, junto de `[oidc.github]`; veja [o catálogo](github-app.md#o-catalogo-de-repositorios)),
+Com `[catalog]` no bootstrap (feature `workspaces`, junto de `[oidc.github]` ou `[accounts.github]`; veja [o catálogo](github-app.md#o-catalogo-de-repositorios)),
 a console oferece o **Catálogo de repositórios** a todo sujeito admitido, e `GET /api/v1/config` traz `"catalog": true`.
 É o seletor que vem antes de qualquer manifesto: lista só os repositórios que a pessoa pode selecionar, ou seja, que o
 catálogo contém e nos quais o login dela tem um papel aceito no conjunto de permissões mais recente (o administrador da
@@ -224,7 +246,7 @@ mostra `catalog.allow` ao operador global.
 
 ## Workspaces nomeados
 
-Com `[workspaces]` no bootstrap (feature `workspaces`, junto de `[ui] operations = true`, `[oidc.github]`, `[catalog]` e `[workspace] source = "store"`; `mirrors` é a raiz absoluta onde ficam os espelhos dos repositórios que só workspaces nomeados selecionam, `max_workspaces` tem padrão 200 e `max_entries` 100), `GET /api/v1/config` traz `"workspaces": {"max_entries": n}` e a console oferece a página **Workspaces nomeados** a todo sujeito admitido.
+Com `[workspaces]` no bootstrap (feature `workspaces`, junto de `[ui] operations = true`, `[oidc.github]` (ou `[accounts.github]`), `[catalog]` e `[workspace] source = "store"`; `mirrors` é a raiz absoluta onde ficam os espelhos dos repositórios que só workspaces nomeados selecionam, `max_workspaces` tem padrão 200 e `max_entries` 100), `GET /api/v1/config` traz `"workspaces": {"max_entries": n}` e a console oferece a página **Workspaces nomeados** a todo sujeito admitido.
 
 - `POST /api/v1/workspaces` recebe `{"name", "description"?, "entries", "message"}` (80 KiB), sendo `entries` o texto do manifesto com entradas `[[repository]]` que têm `repo` e, no máximo, blocos `serve`, `resource` e `peer` (`path`, `owner`, `added_by` e `serve.documents` são recusados, 422 `invalid_entries`). O criador é o sujeito autenticado: `actor`, `role` ou qualquer outra chave no corpo é um 400. Responde 201 `{"id", "version", "created": true}`, ou 200 com `created: false` quando o mesmo criador, nome e entradas já o criaram. Uma seleção com repositório fora da elegibilidade da pessoa é um 403 `entries_refused` (`refused`: as identidades que a concessão da pessoa lê, `hidden`: quantas outras) e não grava nada; um conjunto que não consegue decidir é um 409 `pending` com `reason` (`no_set`, `stale_set`, `missing_login`). A criação é registrada na auditoria como `workspaces.create`, recusas incluídas.
 - `GET /api/v1/workspaces?limit=&after=` lista os workspaces que o sujeito vê, ordenados por id (`limit` de 1 a 100, 25 por padrão), e `GET /api/v1/workspaces/<id>` mostra um com sua `base`, seu `state` (`applied`: gravado, ingestão pendente; `live`: a geração atual o registra) e a `ingestion` de cada entrada (`pending`, `ready` ou `excluded`). Um workspace é visível aos seus operadores, ao administrador da plataforma e a quem tem concessão que lê todos os seus repositórios; para os demais responde o mesmo 404 de um id que não existe. Os operadores também recebem a lista de operadores.

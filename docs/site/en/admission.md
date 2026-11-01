@@ -1,8 +1,22 @@
 # Authentication and grants
 
-The token proves identity; the grant determines which repositories may appear in an answer. OIDC is opt-in. Without it, admission belongs to the proxy. Even after a call is admitted, a cross-repository link appears only when the grant includes both ends.
+The token proves identity; the grant determines which repositories may appear in an answer. There are two opt-in modules: local accounts, to get started, and OIDC, for production. Without either, admission belongs to the proxy. Even after a call is admitted, a cross-repository link appears only when the grant includes both ends.
 
 <!-- meada-graph:admission -->
+
+## Local accounts
+
+**Local accounts** (feature `accounts`, part of `cloud`; ADR 0024) admit the nodes without an identity provider. With `[accounts]` and no `[oidc]`, the node (`meada mcp --listen`) reads the Ed25519 public key at start (never the private one) and requires `Authorization: Bearer <agent token>`. The person generates the token on the [console](console.md#local-accounts) profile (surface `nodes`, 1 to 168 hours): it carries the account's role and groups and, with `[accounts.github]`, the verified login, and the node computes the grant from them, as it does with an identity provider's token. The node manifest carries `[accounts]` with `public_key_file` (or `public_key_env`), `[postgres]` and the console's `[ui] public_url`, which is the issuer:
+
+```toml
+[accounts]
+public_key_file = "/run/secrets/meada-signing.pub.pem"
+
+[accounts.groups]                          # optional; without the table, every account reads every repository
+"payments-team" = ["github.example.internal/acme/payments-api"]
+```
+
+A missing or expired token, one from another key or from another surface (a session token included) gets a 401 `Bearer`, without `resource_metadata`, since there is no authorization server to discover. There is no revocation list: the token is valid until it expires, and replacing the key pair ends them all ([security notes](console.md#local-account-security)). The [named workspaces](named-workspaces.md) proposal server admits tokens of the `proposals` surface, and only those. With `[oidc]`, nodes ignore `[accounts]`; to move off local accounts, see the [migration](console.md#migrating-from-local-accounts-to-the-identity-provider).
 
 ## Configure OIDC
 
@@ -11,7 +25,7 @@ the reverse proxy, as [server mode](server.md) explains; the OIDC module is the
 alternative for operators who want Meada itself to check who calls. With an `[oidc]` section the
 server becomes an OAuth 2.1 resource server, as the MCP authorization specification
 (2026-07-28) describes: every request carries `Authorization: Bearer <JWT>` issued by the
-operator's identity provider. Meada issues no token, registers no client and never forwards a token.
+operator's identity provider. Meada registers no client and never forwards a token; the only tokens it issues are those of [local accounts](#local-accounts), never with `[oidc]`.
 
 ```toml
 [oidc]

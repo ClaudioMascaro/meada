@@ -2,7 +2,13 @@
 
 Three recipes to set up Meada's [identity provider](enterprise.md#identity-provider): Entra ID, Okta and Keycloak. Each lists the bootstrap manifest keys, the steps on the provider's side and the provider's documentation. The claim and mapping names below come from what Meada requires and what each product documents; check them against the provider's current documentation before applying them, since products rename screens and options.
 
+Start with [local accounts](console.md#local-accounts) if you do not have an identity provider yet; these recipes are the next step, and the [migration](console.md#migrating-from-local-accounts-to-the-identity-provider) says what changes (`break_glass`, groups, tokens).
+
 In all of them the SCIM URL is `<the console's public URL>/scim/v2/`, with the SCIM token as the bearer, and the GitHub login reaches the token through a claim that **the provider's administrator maps from a verified attribute**, never one the user edits.
+
+## From local accounts to the identity provider
+
+Each recipe below is the `[oidc]` that replaces `[accounts]`. Keep `[accounts] break_glass = true` with the keys, so that `admin` can sign in when the provider is down; `[accounts.groups]` and `[accounts.github]` go away, and the groups become the recipe's `[oidc.groups]`, with the values the provider's `groups_claim` claim carries. The full steps are in [Migrating from local accounts](console.md#migrating-from-local-accounts-to-the-identity-provider).
 
 ## Entra ID
 

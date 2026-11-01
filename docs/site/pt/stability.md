@@ -103,7 +103,7 @@ O manifesto de workspace do [modo servidor](server.md), lido pelo build padrão:
 | `[workspace]` | `source` | texto, opcional | `file` (padrão) ou `store`; `store` exige um build com a feature `generation-pointer`, e o build padrão o recusa com um erro. |
 | `[[repository]]` | `repo` | texto, obrigatório | Identidade do repositório. |
 | `[[repository]]` | `path` | texto, obrigatório | Onde está o mirror. |
-| `[[repository]]` | `owner` | texto, opcional | Grupo OIDC responsável; metadado da entrada. |
+| `[[repository]]` | `owner` | texto, opcional | Grupo (do OIDC ou de uma conta local) responsável; metadado da entrada. |
 | `[[repository]]` | `added_by` | texto, opcional | Login do GitHub que acrescentou a entrada; metadado. |
 | `[repository.serve]` | `hosts`, `prefix`, `strip`, `documents` | | Como em `[serve]` de `meada.toml`. |
 | `[[repository.resource]]` | `kind`, `id`, `role`, `via` | | Como em `[[resource]]` de `meada.toml`. |

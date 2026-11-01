@@ -103,7 +103,7 @@ The workspace manifest of [server mode](server.md), read by the default build:
 | `[workspace]` | `source` | string, optional | `file` (default) or `store`; `store` needs a build with the `generation-pointer` feature, and the default build refuses it with an error. |
 | `[[repository]]` | `repo` | string, required | The repository's identity. |
 | `[[repository]]` | `path` | string, required | Where the mirror is. |
-| `[[repository]]` | `owner` | string, optional | The OIDC group that answers for the repository; entry metadata. |
+| `[[repository]]` | `owner` | string, optional | The group (from the identity provider or a local account) that answers for the repository; entry metadata. |
 | `[[repository]]` | `added_by` | string, optional | The GitHub login that added the entry; metadata. |
 | `[repository.serve]` | `hosts`, `prefix`, `strip`, `documents` | | As `[serve]` in `meada.toml`. |
 | `[[repository.resource]]` | `kind`, `id`, `role`, `via` | | As `[[resource]]` in `meada.toml`. |

@@ -2,7 +2,13 @@
 
 Tres recetas para configurar el [proveedor de identidad](enterprise.md#proveedor-de-identidad) de Meada: Entra ID, Okta y Keycloak. Cada una lista las claves del manifiesto de bootstrap, los pasos del lado del proveedor y su documentación. Los nombres de claim y de mapeo de abajo salen de lo que Meada exige y de lo que cada producto documenta; contrástalos con la documentación vigente del proveedor antes de aplicarlos, porque los productos renombran pantallas y opciones.
 
+Empieza por las [cuentas locales](console.md#cuentas-locales) si aún no tienes un proveedor de identidad; estas recetas son el paso siguiente, y la [migración](console.md#migrar-de-las-cuentas-locales-al-proveedor-de-identidad) dice qué cambia (`break_glass`, grupos, tokens).
+
 En todas, la URL SCIM es `<URL pública de la consola>/scim/v2/`, con el token SCIM como bearer, y el login de GitHub llega al token por una claim que **el administrador del proveedor mapea desde un atributo verificado**, nunca uno que el usuario edite.
+
+## De las cuentas locales al proveedor de identidad
+
+Cada receta de abajo es el `[oidc]` que reemplaza a `[accounts]`. Mantén `[accounts] break_glass = true` con las claves, para que `admin` entre cuando el proveedor esté caído; `[accounts.groups]` y `[accounts.github]` salen, y los grupos pasan a ser el `[oidc.groups]` de la receta, con los valores que la claim `groups_claim` del proveedor lleva. Los pasos completos están en [Migrar de las cuentas locales](console.md#migrar-de-las-cuentas-locales-al-proveedor-de-identidad).
 
 ## Entra ID
 

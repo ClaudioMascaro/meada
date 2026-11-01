@@ -36,6 +36,8 @@ docker compose up -d
 docker compose ps       # espera a que los servidores estén healthy
 ```
 
+Para la prueba de concepto con [cuentas locales](console.md#cuentas-locales), copia `.env.accounts.example` a `.env` y ejecuta `docker compose up -d`: la misma pila gana Postgres, la consola con escritura con `[accounts]` y el par de claves Ed25519, que el paso `certificates` genera una vez (la clave privada solo en la consola; la pública en la consola y en los nodos). Entra como `admin` con `admin123` (o el valor de `MEADA_ADMIN_PASSWORD`), cambia la contraseña, genera un token de agente en el perfil y úsalo como bearer en los nodos. Los nodos admiten ese token en lugar del bearer compartido del proxy. Eliminar los dos volúmenes de claves genera un par nuevo y termina todos los tokens.
+
 La prueba con `curl` por TLS, la actualización de los índices y los otros perfiles están en el
 [README de Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/README.es.md).
 `scripts/compose-check` valida todos los perfiles con `docker compose config`.
@@ -62,7 +64,7 @@ curl -s http://127.0.0.1:7333/github.com/claudiomascaro/meada \
   --data '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search","arguments":{"query":"main"}}}'
 ```
 
-Cambia los dos bloques de `values-minimal.yaml` por tus repositorios. Sin OIDC el servidor admite
+Cambia los dos bloques de `values-minimal.yaml` por tus repositorios. Sin OIDC ni cuentas locales el servidor admite
 a quien alcanza el Service: configura la admisión ([Autenticación y grants](admission.md)) antes
 de activar el Ingress. Generaciones, consola, cuentas locales (consola con escritura sin proveedor de identidad,
 `values-accounts.yaml`) e identidad empresarial están en el

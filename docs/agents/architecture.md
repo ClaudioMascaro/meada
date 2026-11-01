@@ -261,7 +261,11 @@ that keeps the session is the `invalid_credentials` of a refused current passwor
 menu, no link, no session read, reached only while the stage is `forced`; the change opens the
 workspace) and `ProfilePage` (the session's fields, the voluntary change, sign-out), `account.ts`
 their view model and `account-i18n.ts` their pt-BR/en copy. The shell offers `/profile` with
-local accounts only. Agent tokens and the GitHub login are later tickets.
+local accounts only. `AgentTokenForm` (#560, #562: the surface, `nodes` or `proposals` when `config` says
+`proposals: true`, the validity, the token shown once with a copy control and its expiry, gone when
+the page is left) and `GithubLoginForm` (#561: the session's login, a personal access token sent
+once and cleared, the removal) sit on the profile page; each success of the second swaps the session
+token.
 The accounts page (#559, `AccountsPage.tsx`, view model `accounts.ts`, copy `accounts-i18n.ts`) is
 the global operator's: `pages.tsx`'s `offered` lists `/accounts` for the role `operator` when
 `App.tsx` says the console has account administration (`config.sign_in === "accounts"` with a
@@ -1143,6 +1147,17 @@ one for the area a change touches.
   unreachable a 503 `audit_unavailable`. Every row is hostile: one whose columns fail their
   checks (`audit::record`) is left out with one stderr line naming the table
   (`Msg::AuditBadRecord`), never a value. Records are never deleted by Meada.
+  Local accounts at a glance (ADR 0024; the entries below carry the detail). Routes: `POST login`
+  and `POST account/password` (#554, #555; no token, then a session token), `POST account/tokens`
+  (#560), `POST account/github` and `POST account/github/remove` (#561), `GET accounts`, `POST
+  accounts` and `POST accounts/<username>` (#557, #558), and `GET admission` (#558, which stays under break glass and shows
+  its mode). Under break glass (#563) every route but `login`, `account/password` and `admission`
+  is absent: administration, the token route and the GitHub routes. Seams: `accounts.rs` (keys, tokens, the
+  policy, one `Keys::verify` for every surface), `accounts/store.rs` (the one table, the only SQL),
+  `ui/accounts.rs` and `ui/accounts/` (the console's routes), `mcp.rs`'s gate and the proposal
+  server's `admit` (agent tokens, public half only), `Providers::local` (the grant from a token's
+  groups and login), `ui::reset_admin` (the CLI twin), and `Audit` (every route writes before it
+  answers).
   Local accounts (#554, ADR 0024, `ui/accounts.rs`, feature `accounts`): with `[accounts]`,
   `Console::start` runs `accounts::Local::start` once every other check passed: the key pair
   (`Config::keys`), `accounts::dummy`, then `store::bootstrap`, whose initial password is
@@ -1193,7 +1208,8 @@ one for the area a change touches.
   no line, record or error holds a password, a hash or a token.
   `POST account/tokens` (#560, `Console::agent_token`, `TOKENS_BODY_MAX`, a fixed 400
   `Msg::AccountsTokenBody`, absent under break glass): `{surface, hours}`, `surface` `nodes`
-  alone (else a 422 `invalid_surface`), `hours` 1 to `accounts::AGENT_HOURS_MAX` (168,
+  (or `proposals` when the bootstrap has `[proposals]`, #562, audience `accounts::PROPOSALS`; else a
+  422 `invalid_surface`), `hours` 1 to `accounts::AGENT_HOURS_MAX` (168,
   `AGENT_HOURS`, 8, when absent; else a 422 `invalid_hours`); the account's row read
   (`store::standing`): suspended, unknown or hostile is the 403 `forbidden`
   (`Msg::AccountsTokenRefused`), recorded `refused`; active, `Keys::agent` with the row's role
