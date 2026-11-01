@@ -205,6 +205,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- The console writes one `ui: directory: unreadable` stderr line per request when the directory
+  cannot be read (#451, after #335): the request's session remembers the failure at admission,
+  so the flags, the admission counts and the owner picker take that answer and write no second
+  line (`workspace` wrote two). Reads still answer with the flags unavailable, the counts null
+  and the picker a 503; writes still refuse as before. No golden changed.
 - A server-mode mirror's `meada.toml` and `meada.decisions.toml` are read through no symbolic
   link (#547, after #506), as a pulled generation's are: `mirror()`, behind `Manifest::read`
   (`mcp --listen`, snapshot pull, the lock and pointer operations, workspace versions, the

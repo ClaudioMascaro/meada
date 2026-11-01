@@ -289,8 +289,9 @@ fn an_external_id_lookup_does_not_ignore_case() {
 
 /// With Postgres stopped (the relay closed), reads are admitted and every write is a 503
 /// `audit_unavailable` whose audit insert is not attempted, with nothing written in Valkey or the
-/// store; each request leaves one stderr line naming the directory, and no line carries a token,
-/// the URL or a claim.
+/// store; each request, read or write, leaves exactly one stderr line, naming the directory (the
+/// session remembers the failure, so the flags and counts write none), and no line carries a
+/// token, the URL or a claim.
 #[test]
 fn an_unreadable_directory_admits_reads_and_refuses_writes() {
     let Some((team, audit, console)) = directed("ui_deprovision_down") else {
@@ -300,7 +301,7 @@ fn an_unreadable_directory_admits_reads_and_refuses_writes() {
     let g1 = crate::refresh_lock::locked_publish(&team.fleet.dir);
     let before = state(&console, &root);
     audit.relay.close();
-    let reads = ["session", "fleet", "workspace/versions"];
+    let reads = ["session", "fleet", "workspace/versions", "workspace"];
     for route in reads {
         let reply = ask(&console, &format!("/api/v1/{route}"), &root);
         assert_eq!(reply.status, 200, "{route}: {}", reply.body);
@@ -315,20 +316,18 @@ fn an_unreadable_directory_admits_reads_and_refuses_writes() {
             json!({"code": "audit_unavailable", "message": unavailable})
         );
     }
-    // `workspace` asks the directory twice, at admission and for the flags.
-    assert_eq!(ask(&console, "/api/v1/workspace", &root).status, 200);
+    // `config` is open: no admission, no directory read, no line.
     assert_eq!(ask(&console, "/api/v1/config", &root).status, 200);
     assert!(audit.records().is_empty());
     let stderr = console.stderr();
     let lines: Vec<&str> = stderr.lines().filter(|l| l.starts_with("ui: ")).collect();
-    let named = lines
-        .iter()
-        .filter(|l| l.starts_with("ui: directory: unreadable ("))
-        .count();
-    assert_eq!(named, reads.len() + 2 + sent.len(), "{lines:?}");
-    // The insert was not attempted: no line of the audit's own.
+    // One line per request, writes included: every line names the directory, so the insert was
+    // not attempted (no line of the audit's own) and no later read in a request wrote a second.
+    assert_eq!(lines.len(), reads.len() + sent.len(), "{lines:?}");
     assert!(
-        lines.iter().all(|l| !l.starts_with("ui: postgres: ")),
+        lines
+            .iter()
+            .all(|l| l.starts_with("ui: directory: unreadable (")),
         "{lines:?}"
     );
     assert_leaks_nothing(&audit, &stderr, &[&root], &["root"]);
