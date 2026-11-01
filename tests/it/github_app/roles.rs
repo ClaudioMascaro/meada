@@ -744,6 +744,46 @@ fn a_failed_or_stale_check_never_leaves_exclusions_a_reader_admits() {
     assert_eq!(case.excluded().as_deref(), Some(high.as_str()));
 }
 
+/// A Postgres that takes the connection and then answers nothing (the server's own
+/// `statement_timeout` never fires on it): the role check ends with exit 1 once its bound passes,
+/// one connect timeout and three statements (the version check's two and the fence's) of one
+/// second each, naming the wait, and the exclusions file of the pulled version is gone. None of
+/// this needs a service.
+#[test]
+fn a_postgres_that_stops_answering_fails_the_role_check_within_its_bound() {
+    let stalled = crate::postgres::Stalled::start();
+    let dir = chain_manifest("roles_stalled");
+    fs::write(dir.join("ops/s3-secret"), "x\n").unwrap();
+    fs::write(dir.join("ops/pg-url"), &stalled.url).unwrap();
+    let bootstrap = format!(
+        "index_dir = \"../store-indexes\"\n{}\n[valkey]\nurl = \"redis://127.0.0.1:9\"\n\n\
+         [generations]\nkeep = 3\n\n[workspace]\nsource = \"store\"\n\n[postgres]\n\
+         url_file = \"pg-url\"\nconnect_timeout_seconds = 1\nstatement_timeout_seconds = 1\n\n\
+         [oidc]\nissuer = \"https://id.example\"\npublic_url = \"https://meada.example\"\n\n\
+         [oidc.github]\nhost = \"{HOST}\"\nlogin_claim = \"github_login\"\nmax_age_seconds = \
+         5400\n\n[[github_app]]\nhost = \"{HOST}\"\napi = \"http://127.0.0.1:9\"\napp_id = 1\n\
+         private_key_file = \"{}\"\n",
+        crate::snapshot::section("http://127.0.0.1:9", "offline"),
+        fixture("app1.pem").display()
+    );
+    fs::write(dir.join(BOOTSTRAP), bootstrap).unwrap();
+    let _ = fs::remove_dir_all(dir.join("store-indexes"));
+    let version = pull_version(&dir, &chain([None, Some("bia_acme"), None, None]));
+    let excluded = dir.join(PULLED).join("excluded");
+    fs::write(&excluded, format!("{version}\n{GATEWAY}\n")).unwrap();
+    let started = Instant::now();
+    let args = ["github-app", "roles", "--workspace", BOOTSTRAP];
+    let (stdout, stderr, code) = meada(&dir, &args, &[("MEADA_REFRESH_FENCE", "1")]);
+    let took = started.elapsed();
+    assert_eq!((stdout.as_str(), code), ("", Some(1)), "{stderr}");
+    assert!(stderr.contains("no answer within 4000 ms"), "{stderr}");
+    assert!(
+        took >= Duration::from_secs(3) && took < Duration::from_secs(12),
+        "{took:?}"
+    );
+    assert!(!excluded.exists());
+}
+
 /// `meada github-app roles --workspace ops/bootstrap.toml` at `fence`, started.
 fn spawn_roles(dir: &Path, fence: u64) -> std::process::Child {
     let fence = fence.to_string();

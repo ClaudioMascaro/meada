@@ -666,6 +666,10 @@ async fn stored(opened: &Opened, config: &Config) -> Result<i32, String> {
     Ok(row.map_err(|e| opened.scrub(e))?.get(0))
 }
 
+/// The statements of `stored` (the table's lookup, then the version), which every `connected`
+/// runs before the caller's own.
+const VERSION_STATEMENTS: u32 = 2;
+
 /// The version check every connection but `migrate`'s makes: `stored` must be `known`. Lower
 /// (an absent schema included) names `meada postgres migrate`; higher names both versions.
 fn check(schema: &str, stored: i32, known: i32) -> Result<(), String> {
@@ -696,11 +700,15 @@ pub async fn connect(config: &Config) -> Result<(tokio_postgres::Client, i32), S
 }
 
 impl Config {
-    /// How long a connection and `statements` statements on it may take, all told: what a
-    /// caller with no one waiting on it bounds itself by, since a peer that stops answering
-    /// without closing the connection would hold it forever.
+    /// How long a connection through `connected` and `statements` statements of the caller's own
+    /// on it may take, all told: the connect timeout, one statement timeout per statement and
+    /// `VERSION_STATEMENTS` more for the version check `connected` makes first. What a caller
+    /// with no one waiting on it bounds itself by, since a peer that stops answering without
+    /// closing the connection would hold it forever (the server's `statement_timeout` does not
+    /// fire then). A call site counts its own statements, a transaction's begin and commit
+    /// included, and says so beside the call.
     pub(crate) fn bound(&self, statements: u32) -> Duration {
-        self.connect_timeout + self.statement_timeout * statements
+        self.connect_timeout + self.statement_timeout * (statements + VERSION_STATEMENTS)
     }
 }
 
@@ -719,18 +727,20 @@ pub(crate) async fn versioned(config: &Config) -> Result<Opened, (String, bool)>
 }
 
 /// The console's start check: the version refusal when Postgres answers with a version this
-/// binary does not know; Postgres unreachable passes (the console starts anyway).
+/// binary does not know; Postgres unreachable passes (the console starts anyway), one that
+/// accepts the connection and stops answering included, after `bound(0)`: the connection and the
+/// version check's own statements, none of the caller's.
 pub fn probe(config: &Config) -> Result<(), String> {
     let run = async {
         let Ok(opened) = open(config).await else {
-            return Ok(());
+            return Ok(Ok(()));
         };
-        match stored(&opened, config).await {
+        Ok(match stored(&opened, config).await {
             Ok(version) => check(&config.schema, version, known()),
             Err(_) => Ok(()),
-        }
+        })
     };
-    crate::modules::block_on(run).unwrap_or(Ok(()))
+    crate::modules::within(config.bound(0), run, Msg::PostgresTimeout).unwrap_or(Ok(()))
 }
 
 /// Whether `text` is a time as Meada's statements answer one (`to_char` of a `timestamptz` at
@@ -849,6 +859,14 @@ mod tests {
     fn section(toml: &str) -> Result<Config, Problem> {
         let file: File = toml::from_str(toml).unwrap();
         file.validate(Path::new("/etc/meada"))
+    }
+
+    #[test]
+    fn a_bound_counts_the_connection_the_version_check_and_the_callers_statements() {
+        let config = section("").unwrap();
+        // 5 s to connect, then 10 s for each of the version check's two and the caller's own.
+        assert_eq!(config.bound(0), Duration::from_secs(25));
+        assert_eq!(config.bound(1), Duration::from_secs(35));
     }
 
     #[test]

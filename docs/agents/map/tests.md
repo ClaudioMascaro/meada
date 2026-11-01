@@ -286,7 +286,8 @@ all repository fixtures; it contains no private corpus data. Existing tests own 
   the command's line, its fence refusal and the readers, never the tables: every page of a
   250-collaborator repository, each request with `affiliation=all` and `per_page=100`, a login
   checked ignoring case, a 404 and an uncovered owner each a warning and no rows, the exclusions
-  file holding the version id alone, a second run a new set id; with `source = "file"` no
+  file holding the version id alone, a second run a new set id; against `postgres::Stalled`
+  (no service) a Postgres that stops answering fails the run in `bound(1)` with the file gone; with `source = "file"` no
   exclusions file, `MEADA_REFRESH_FENCE` required under `[refresh_lock]`, a lower fence refused
   naming the higher (also in `pt_BR`), a 403 without `retry-after` passing to the next
   installation, a 429 with it leaving every one throttled and the run failing naming the
@@ -964,7 +965,9 @@ out, back to the break-glass page, never the local accounts' copy.
 `tests/it/ui/oidc/directory.rs` runs a console with `[oidc]` (the `oidc` module's loopback
 issuer), `[postgres]` and `[directory]`. Against the local Postgres (a schema of each test's
 own through `postgres::audited` and its relay; skipped without `MEADA_TEST_POSTGRES_URL`,
-failed with `MEADA_TEST_SERVICES_REQUIRED=1`): an Entra ID sequence (the `userName` lookup,
+failed with `MEADA_TEST_SERVICES_REQUIRED=1`; the stalled-peer case points `ops/pg-url` at
+`postgres::Stalled` first, a Postgres that starts up and answers no statement, and back at the
+relay once the 503 has come after 15 s): an Entra ID sequence (the `userName` lookup,
 `POST` with its id, `Location` and `meta`, a `PATCH` of attributes through a filtered path, a
 sub-attribute and the enterprise extension, `PATCH active` with `"False"`, the user shown
 inactive, a group with members added and removed by path and by value list answered 204,
