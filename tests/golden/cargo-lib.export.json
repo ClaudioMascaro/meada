@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/cargo/lib",
+  "commit": "5789a8b7119651f43f3b7a4f42d6668c53801eff",
+  "dirty": false,
   "files": [
     {
       "path": "app/src/main.rs",

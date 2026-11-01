@@ -49,12 +49,29 @@ impl Level {
     }
 }
 
+/// The shape of the export `meada export` writes (ADR 0004, #512). It rises when a reader of
+/// the previous shape would misread the new one (a field renamed or removed, a meaning
+/// changed), never for an added optional field.
+pub const FORMAT: u32 = 1;
+
 /// One repository's index content with the links from its consumers and to its providers, every
-/// list sorted. A list that is empty is left out, but for the first six and `links`.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+/// list sorted. An empty list is left out, but for `files`, `symbols`, `calls`, `providers`,
+/// `consumers` and `links`.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct Export {
+    /// The export's shape, [`FORMAT`] as written; required, so an export that predates it is
+    /// refused.
+    pub format: u32,
     pub repository: String,
+    /// The indexed commit: the commit `HEAD` named when the index's content was read, in hex.
+    /// Left out when nothing trustworthy is known (outside git, before the first commit).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commit: Option<String>,
+    /// Whether the checkout differed from `commit` (changed, deleted or untracked files; ignored
+    /// ones do not count). Present exactly when `commit` is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dirty: Option<bool>,
     pub files: Vec<File>,
     pub symbols: Vec<Symbol>,
     pub calls: Vec<CallSite>,
@@ -89,6 +106,32 @@ pub struct Export {
     /// The repository's decisions that do not apply, each with its cause.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stale_decisions: Vec<Stale>,
+}
+
+impl Default for Export {
+    fn default() -> Self {
+        Self {
+            format: FORMAT,
+            repository: String::new(),
+            commit: None,
+            dirty: None,
+            files: Vec::new(),
+            symbols: Vec::new(),
+            calls: Vec::new(),
+            providers: Vec::new(),
+            consumers: Vec::new(),
+            bindings: Vec::new(),
+            documents: Vec::new(),
+            publishes: Vec::new(),
+            packages: Vec::new(),
+            dependencies: Vec::new(),
+            imports: Vec::new(),
+            communities: Vec::new(),
+            links: Vec::new(),
+            processes: Vec::new(),
+            stale_decisions: Vec::new(),
+        }
+    }
 }
 
 impl Export {

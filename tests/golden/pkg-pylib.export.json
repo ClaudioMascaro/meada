@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/pkg/pylib",
+  "commit": "3ae32dbc3fda7f7c1c89145cca85b62777d90321",
+  "dirty": false,
   "files": [
     {
       "path": "src/shared_lib/__init__.py",

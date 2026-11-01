@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/xlang/storefront",
+  "commit": "36d29bf53fcfac4254cb0845ccbecdfb594055b9",
+  "dirty": false,
   "files": [
     {
       "path": "app/api/audit/route.ts",

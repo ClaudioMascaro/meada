@@ -222,33 +222,33 @@ pub(crate) fn record_commit(db: &Connection, index: &Path, head: Option<&str>) -
 
 // ponytail: the optional provenance sidecar contains two hashes only; a longer document is
 // untrusted and has no indexed commit.
-#[cfg(feature = "ui")]
 const PROVENANCE_MAX: u64 = 4096;
 
-/// The schema and optional indexed commit, read without creating files. A sidecar is accepted
-/// only when its fingerprint still matches the index, including after a crash/rebuild.
+/// The schema and optional indexed commit, read without creating files.
 #[cfg(feature = "ui")]
 pub(crate) fn provenance(index: &Path) -> Result<(i32, Option<String>)> {
     let db = read_only(index)?;
     db.execute_batch("BEGIN")?;
     let schema = db.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-    let commit = (|| {
-        let bytes =
-            crate::config::read_bounded(&index.with_extension("commit.json"), PROVENANCE_MAX)
-                .ok()?;
-        let written: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
-        let head = written["head"].as_str()?;
-        if ![40, 64].contains(&head.len())
-            || !head
-                .bytes()
-                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
-        {
-            return None;
-        }
-        (written["fingerprint"].as_str()? == provenance_fingerprint(&db).ok()?)
-            .then(|| head.to_string())
-    })();
-    Ok((schema, commit))
+    Ok((schema, indexed_commit(&db, index)))
+}
+
+/// The commit `meada index --workspace` recorded beside the index at `index`, read through
+/// `db`, its open connection. A sidecar is accepted only when it names a full commit id and its
+/// fingerprint still matches the index, including after a crash or a rebuild.
+pub(crate) fn indexed_commit(db: &Connection, index: &Path) -> Option<String> {
+    let bytes =
+        crate::config::read_bounded(&index.with_extension("commit.json"), PROVENANCE_MAX).ok()?;
+    let written: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    let head = written["head"].as_str()?;
+    if ![40, 64].contains(&head.len())
+        || !head
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    {
+        return None;
+    }
+    (written["fingerprint"].as_str()? == provenance_fingerprint(db).ok()?).then(|| head.to_string())
 }
 
 /// How long a read waits for a commit in progress on an index before it fails (ADR 0011).

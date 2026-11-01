@@ -683,8 +683,10 @@ meada export > web.export.json
 - **Sin texto fuente**: quien necesita el fragmento lee el `span` en el archivo.
 - **Un repositorio por export**: una organización ejecuta `meada export` en cada repositorio y
   une los resultados por la identidad de los símbolos.
-- **Sin campo de versión del formato.** Quien lee debe ignorar los campos que no conoce: un campo
-  nuevo es un cambio menor.
+- **Con el formato del export y el commit indexado**: `format` (1 hoy) solo sube cuando quien lee el
+  formato anterior lo leería mal, así que quien lee debe ignorar los campos que no conoce: un campo
+  opcional nuevo es un cambio menor. `commit` y `dirty` dicen de qué estado del repositorio se leyó
+  el índice (ver [Uso](https://claudiomascaro.github.io/meada/es/cli/)).
 
 Las recetas con `jq` (un registro por símbolo, duplicados, fan-in entre repositorios) están en el
 [README](../README.es.md#alimentar-una-base-de-conocimiento).
@@ -696,7 +698,9 @@ Las listas vacías se omiten, salvo `files`, `symbols`, `calls`, `providers`, `c
 
 | Campo | Contenido |
 | --- | --- |
+| `format` | El formato del export, hoy 1 |
 | `repository` | La identidad del repositorio (`example.com/acme/web`) |
+| `commit`, `dirty` | El commit indexado y si el checkout difería de él; se omiten juntos fuera de git, antes del primer commit y cuando no se sabe nada fiable |
 | `files` | Los archivos leídos: `path` y `hash` |
 | `symbols` | Los símbolos: `id`, `span` (`path`, `start`, `end`, desplazamientos en bytes) y `hash` (BLAKE3 en hexadecimal de los bytes del span) |
 | `calls` | Los call sites: `id`, `caller`, `target` y `level` (vacíos mientras no resuelve), `candidates` (si es ambigua), `span`, `narrowed` y `decorates` |

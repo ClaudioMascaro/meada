@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/gopkg/lib",
+  "commit": "86ef12afc617b915ea190a6063fe3004add899fb",
+  "dirty": false,
   "files": [
     {
       "path": "api/client.go",

@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/xlang-rust/api",
+  "commit": "9aac77c08327da10f0889bea4a6ed1208e26d992",
+  "dirty": false,
   "files": [
     {
       "path": "src/audit.rs",

@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/jvm/maven",
+  "commit": "6557cbc5154f4e8633910623645726766af55df0",
+  "dirty": false,
   "files": [
     {
       "path": "models/src/main/java/example/models/Base.java",

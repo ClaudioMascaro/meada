@@ -268,13 +268,27 @@ fn clear(local: &Path, doomed: impl Fn(&str) -> bool) {
 
 /// `current.new` written with `<id> <fence>` and renamed over the pointer file.
 pub(super) fn swap(local: &Path, id: &str, fence: u64) -> std::result::Result<(), String> {
-    let new = local.join("current.new");
-    let at = io_at(&new);
-    let mut file = File::create(&new).map_err(&at)?;
-    (file.write_all(format!("{id} {fence}\n").as_bytes()))
-        .and_then(|()| file.sync_all())
-        .map_err(&at)?;
-    fs::rename(&new, local.join(POINTER)).map_err(at)
+    replace(&local.join(POINTER), format!("{id} {fence}\n").as_bytes())
+}
+
+/// `bytes` written to `<target>.new`, synced and renamed over `target`, so a crash leaves the old
+/// file or the whole new one; `<target>.new` is removed when a step fails. A write error names
+/// `<target>.new`, a rename error `target`.
+pub(crate) fn replace(target: &Path, bytes: &[u8]) -> std::result::Result<(), String> {
+    let mut name = target.as_os_str().to_owned();
+    name.push(".new");
+    let new = std::path::PathBuf::from(name);
+    let written = (File::create(&new).map_err(io_at(&new)))
+        .and_then(|mut file| {
+            (file.write_all(bytes))
+                .and_then(|()| file.sync_all())
+                .map_err(io_at(&new))
+        })
+        .and_then(|()| fs::rename(&new, target).map_err(io_at(target)));
+    if written.is_err() {
+        let _ = fs::remove_file(&new);
+    }
+    written
 }
 
 pub(crate) fn io_at(path: &Path) -> impl Fn(io::Error) -> String + use<> {
@@ -810,6 +824,21 @@ mod tests {
             node_name: None,
             ca_file: None,
         }
+    }
+
+    #[test]
+    fn replace_swaps_content_and_cleans_up_on_failure() {
+        let dir = scratch("replace");
+        let file = dir.join("f");
+        fs::write(&file, "old").unwrap();
+        replace(&file, b"new").unwrap();
+        assert_eq!(fs::read_to_string(&file).unwrap(), "new");
+        assert!(!dir.join("f.new").exists());
+        let target = dir.join("d");
+        fs::create_dir(&target).unwrap();
+        let e = replace(&target, b"x").unwrap_err();
+        assert!(e.starts_with(&format!("{}: ", target.display())), "{e}");
+        assert!(!dir.join("d.new").exists());
     }
 
     fn scratch(case: &str) -> PathBuf {

@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/xlang-rust/web",
+  "commit": "deb7710dadcd89074b6735a477274fe29dc44f84",
+  "dirty": false,
   "files": [
     {
       "path": "app/api/audit/route.ts",

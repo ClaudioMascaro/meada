@@ -218,7 +218,8 @@ impl Audit {
                     .await;
                 done.map(|_| ()).map_err(|e| opened.scrub(e))
             };
-            let _ = crate::modules::within(config.bound(2), update, Msg::PostgresTimeout);
+            // One statement of its own: the update.
+            let _ = crate::modules::within(config.bound(1), update, Msg::PostgresTimeout);
         }
         let _ = (pending, outcome, message, owners);
     }
@@ -288,7 +289,8 @@ fn insert(
             .await;
         Ok(row.map_err(|e| opened.scrub(e))?.get::<_, i64>(0))
     };
-    crate::modules::within(config.bound(2), run, Msg::PostgresTimeout)
+    // One statement of its own: the insert.
+    crate::modules::within(config.bound(1), run, Msg::PostgresTimeout)
 }
 
 #[cfg(feature = "postgres")]
@@ -306,7 +308,8 @@ fn page(config: &crate::postgres::Config, before: Option<i64>, limit: i64) -> Re
         let rows = (opened.client).query(&sql, &[&before, &(limit + 1)]).await;
         rows.map_err(|e| opened.scrub(e))
     };
-    let rows = crate::modules::within(config.bound(2), run, Msg::PostgresTimeout)?;
+    // One statement of its own: the page.
+    let rows = crate::modules::within(config.bound(1), run, Msg::PostgresTimeout)?;
     let more = rows.len() as i64 > limit;
     let rows = &rows[..rows.len().min(limit as usize)];
     let next = match more {

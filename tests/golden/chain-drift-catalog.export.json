@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/chain/catalog",
+  "commit": "18fc98b3e15813c34774544704aec74db7896c81",
+  "dirty": false,
   "files": [
     {
       "path": "app/api/batches/route.ts",

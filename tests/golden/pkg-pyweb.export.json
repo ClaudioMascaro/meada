@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/pkg/pyweb",
+  "commit": "2f61b48947f5419413449d2663f920d0886e06a3",
+  "dirty": false,
   "files": [
     {
       "path": "app/main.py",

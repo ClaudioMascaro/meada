@@ -676,8 +676,10 @@ meada export > web.export.json
 - **No source text**: whoever needs the excerpt reads the `span` in the file.
 - **One repository per export**: an organisation runs `meada export` on each repository and joins
   the results by symbol identity.
-- **No format version field.** Readers must ignore the fields they do not know: a new field is a
-  minor change.
+- **With the export format and the indexed commit**: `format` (1 today) rises only when a reader of the
+  previous format would misread the new one, so readers must ignore the fields they do not know:
+  a new optional field is a minor change. `commit` and `dirty` say which state of the repository
+  the index was read from (see [Usage](https://claudiomascaro.github.io/meada/en/cli/)).
 
 `jq` recipes (one record per symbol, duplicates, fan-in across repositories) are in the
 [README](../README.en.md#feed-a-knowledge-base).
@@ -689,7 +691,9 @@ which always appear (like `repository`, which is text).
 
 | Field | Content |
 | --- | --- |
+| `format` | The export format, 1 today |
 | `repository` | The repository's identity (`example.com/acme/web`) |
+| `commit`, `dirty` | The indexed commit and whether the checkout differed from it; left out together outside git, before the first commit and when nothing trustworthy is known |
 | `files` | The files read: `path` and `hash` |
 | `symbols` | The symbols: `id`, `span` (`path`, `start`, `end`, byte offsets) and `hash` (hexadecimal BLAKE3 of the span's bytes) |
 | `calls` | The call sites: `id`, `caller`, `target` and `level` (empty until resolved), `candidates` (if ambiguous), `span`, `narrowed` and `decorates` |

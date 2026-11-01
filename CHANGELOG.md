@@ -8,6 +8,20 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The export format and the indexed commit (#512, ADR 0004 "Canonical export"): every export
+  starts with `format` (`meada_core::export::FORMAT`, 1), which rises only when a reader of the previous shape would
+  misread the new one, never for an added optional field; then `repository`, then `commit` and
+  `dirty`, both optional and left out together. Locally `meada export` reads `HEAD` before and
+  after its refresh and the checkout's status after it (ignored files, `.meada/` among them, do
+  not count), and names the commit only when `HEAD` did not move and the index is fresh; outside
+  git or before the first commit both are left out. In server mode they come from the commit
+  `meada index --workspace` recorded beside the index, or a generation's `head`, never from the
+  mirror's live `HEAD`, with `dirty` false. For `meada-core` crate users: `Export` gains
+  `format`, `commit` and `dirty` (a minor change, the struct being `#[non_exhaustive]`, so the next `meada-core` release is
+  1.1.0), and
+  `export::parse` refuses a document without `format`, naming the field, so an export written
+  before this release no longer parses. Every `*.export.json` golden gained the three fields.
+
 - Named workspaces and the proposal server with local accounts (#562, ADR 0024, from #551):
   `[catalog]` and `[workspaces]` (and so `[proposals]`) accept `[accounts.github]` in place of
   `[oidc.github]` and still need one of the two (`[catalog] needs [oidc.github] or
@@ -210,6 +224,19 @@ All notable changes to Meada are recorded here. The format follows
   so the flags, the admission counts and the owner picker take that answer and write no second
   line (`workspace` wrote two). Reads still answer with the flags unavailable, the counts null
   and the picker a 503; writes still refuse as before. No golden changed.
+- Postgres calls that had no client-side deadline now have one (#447): a SCIM request (under the
+  directory's one write lock), the role check's fence read and write transaction, and the
+  console's start check, so a Postgres that accepts the connection and stops answering ends in a
+  503, an exit 1 with no exclusions file a reader admits, and a console that starts, instead of
+  holding them forever. `postgres::Config::bound(n)` now adds the version check's two statements
+  itself and every call site counts only its own (the audit and directory reads and the overage
+  lookup moved accordingly; the accounts' calls, which undercounted, and the permissions poll
+  gained the two). No golden changed.
+- A crash after the pointer swap can no longer leave `current` naming a version document that
+  never reached the disk (#518): the pointer, the version document `meada workspace pull` writes,
+  the pulled contexts file and the exclusions file are replaced through one helper
+  (`pull::replace`) that syncs the new file before the rename and removes `<name>.new` when a
+  step fails. A failed pointer rename now names `current`, not `current.new`.
 - A server-mode mirror's `meada.toml` and `meada.decisions.toml` are read through no symbolic
   link (#547, after #506), as a pulled generation's are: `mirror()`, behind `Manifest::read`
   (`mcp --listen`, snapshot pull, the lock and pointer operations, workspace versions, the

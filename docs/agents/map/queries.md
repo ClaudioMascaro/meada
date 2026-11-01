@@ -8,7 +8,10 @@ this file, and a change to these modules updates it.
 
 - `engine.rs`: `Engine`, the one query seam (`open`, `refresh`, `export`, `search`, `context`,
   `trace`, open items, decisions, `status`); it builds the results of `search` and `context`,
-  which `meada-core` renders. `items.rs`: open items, derived in one place. `trace.rs`: the
+  which `meada-core` renders. `Engine::export` names the indexed commit from its `CommitSource`
+  (#512): a local engine reads `HEAD` around its refresh and `repo::changed` after it, keeping
+  both only when `HEAD` stayed and the index is fresh; a manifest's engine reads
+  `index::indexed_commit`, and one at a generation the `head` `Held::head` gives. `items.rs`: open items, derived in one place. `trace.rs`: the
   `Graph`, the walk and the process walk (`Graph::process`, the step list `trace` renders and the
   export carries); `meada-core`'s `trace.rs` closes the chain with its footer.
   `entry.rs`: entry points (spec #31), found when an index is written.

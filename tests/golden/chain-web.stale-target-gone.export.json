@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/chain/web",
+  "commit": "5b8bf66aff52eeb2e0e256394b71473bad1908d2",
+  "dirty": true,
   "files": [
     {
       "path": "src/api/client.ts",

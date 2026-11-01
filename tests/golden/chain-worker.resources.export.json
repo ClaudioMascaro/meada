@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/chain/worker",
+  "commit": "158a958291d07108fb48b66cf1500ef7841efbab",
+  "dirty": true,
   "files": [
     {
       "path": "src/consumer.ts",

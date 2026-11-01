@@ -735,6 +735,55 @@ fn unreachable_console(case: &str, issuer: &Issuer, directory: &str) -> PathBuf 
 
 const CLOSED: &str = "postgres://meada:pg-secret-334@127.0.0.1:1/meada";
 
+/// A Postgres that takes the connection and then answers nothing (the server's own
+/// `statement_timeout` never fires on it): a SCIM write is a 503 once the request's bound passes,
+/// one connect timeout and fourteen statements (the request's twelve and the version check's two)
+/// of one second each, and the console goes on: with the local Postgres (`MEADA_TEST_POSTGRES_URL`)
+/// pointed back at, the write that follows is a 201.
+#[test]
+fn a_scim_write_to_a_postgres_that_stops_answering_is_a_503_within_its_bound() {
+    use std::time::{Duration, Instant};
+    let (_, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let dir = console_dir(
+        "ui_directory_stalled",
+        Some(VERSION),
+        &head(&issuer.base),
+        &ui_oidc(),
+    );
+    let real = audited(&dir, "ui_directory_stalled");
+    let postgres = match &real {
+        Some(audit) => audit.section.clone(),
+        None => "\n[postgres]\nurl_file = \"pg-url\"\nschema = \"meada_stalled\"\n".into(),
+    };
+    let timeouts = "connect_timeout_seconds = 1\nstatement_timeout_seconds = 1\n";
+    append(&dir, &format!("{postgres}{timeouts}{DIRECTORY}"));
+    let stalled = crate::postgres::Stalled::start();
+    fs::write(dir.join("ops/pg-url"), &stalled.url).unwrap();
+    let console = start(&dir, &[("MEADA_SCIM_TOKEN", TOKEN)]);
+    let alice = json!({"schemas": [USER], "userName": "alice@contoso.example"});
+    let started = Instant::now();
+    let reply = scim(&console, "POST", "/Users", Some(&alice));
+    let took = started.elapsed();
+    assert_eq!(scim_type(&reply).0, 503, "{}", reply.body);
+    assert!(
+        reply
+            .body
+            .contains("the directory in Postgres is unavailable")
+    );
+    assert!(
+        took >= Duration::from_secs(14) && took < Duration::from_secs(25),
+        "{took:?}"
+    );
+    if let Some(audit) = real {
+        fs::write(dir.join("ops/pg-url"), &audit.relay.url).unwrap();
+        expect(&console, "POST", "/Users", Some(&alice), 201);
+    }
+    let stderr = console.stderr();
+    assert!(stderr.contains("no answer within 15000 ms"), "{stderr}");
+    assert!(!lines(&stderr).is_empty(), "{stderr}");
+}
+
 /// Admission: no token, a console token, a wrong token and the token one character short each
 /// get a 401 with `WWW-Authenticate: Bearer`; any request carrying `Origin` gets a 403 before the
 /// token is read; the SCIM token under `/api/v1/session` is a 401; a body of another media type

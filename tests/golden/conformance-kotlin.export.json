@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/conformance",
+  "commit": "04130327b2862947f87405c6ff0c392267d5f0a6",
+  "dirty": false,
   "files": [
     {
       "path": "scripts/run.kts",

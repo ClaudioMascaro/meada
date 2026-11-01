@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/kotlin/lib",
+  "commit": "7eae2643e682d647342334b8ad466b9d4ead1776",
+  "dirty": false,
   "files": [
     {
       "path": "core/loose/dev/kt/core/Loose.kt",

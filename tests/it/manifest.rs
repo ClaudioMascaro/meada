@@ -11,7 +11,10 @@ use std::process::Command;
 
 use crate::freshness::edit_chain;
 use common::without_processes;
-use common::{age, assert_golden, chain, decisions, documented_chain, fixture_repo, git};
+use common::{
+    age, assert_golden, assert_golden_but_indexed_commit, chain, decisions, documented_chain,
+    fixture_repo, git,
+};
 use meada::engine::{Direction, Engine, Start};
 
 pub(crate) const CHAIN: [(&str, &str); 4] = [
@@ -1228,7 +1231,7 @@ fn a_meada_directory_inside_a_mirror_is_ignored() {
         .unwrap()
         .export()
         .unwrap();
-    assert_golden("chain-web.export.json", &export);
+    assert_golden_but_indexed_commit("chain-web.export.json", &export);
     assert_eq!(
         fs::read_to_string(stray.join("index.db")).unwrap(),
         "not an index\n"
@@ -1520,7 +1523,7 @@ fn entry_blocks_configure_a_mirror_with_no_meada_toml_as_the_file_would() {
     for (repo, path) in CHAIN {
         assert!(!dir.join(path).join("meada.toml").exists());
         let (stdout, stderr, _) = run_export(&dir, repo);
-        assert_golden(&format!("{path}.export.json"), &stdout);
+        assert_golden_but_indexed_commit(&format!("{path}.export.json"), &stdout);
         assert_eq!(stderr, "");
     }
 
@@ -1532,7 +1535,7 @@ fn entry_blocks_configure_a_mirror_with_no_meada_toml_as_the_file_would() {
     for (repo, name) in [CHAIN[0], CHAIN[1]] {
         let export = run_export(dir, repo).0;
         let golden = name.replace("chain-", "chain-documents-");
-        assert_golden(
+        assert_golden_but_indexed_commit(
             &format!("{golden}.export.json"),
             &without_processes(&export),
         );
@@ -1556,7 +1559,10 @@ fn entry_blocks_configure_a_mirror_with_no_meada_toml_as_the_file_would() {
     assert!(run(&dir, "index").2);
     for (repo, name) in [repos[1], repos[3]] {
         let export = run_export(&dir, repo).0;
-        assert_golden(&format!("{name}.export.json"), &without_processes(&export));
+        assert_golden_but_indexed_commit(
+            &format!("{name}.export.json"),
+            &without_processes(&export),
+        );
     }
 }
 
@@ -1606,7 +1612,7 @@ fn each_mirrors_decisions_are_replayed_and_the_stale_ones_reported() {
 
     let (stdout, stderr, _) = run_export(&dir, "example.com/chain/web");
 
-    assert_golden("chain-web.decided.export.json", &without_processes(&stdout));
+    assert_golden_but_indexed_commit("chain-web.decided.export.json", &without_processes(&stdout));
     assert_eq!(stderr, "");
     decisions(&web, "chain-web-unfit");
     let (status, _, _) = run(&dir, "status");

@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/pkg/shared",
+  "commit": "38244d59ac655fe86bc1791a07e7737f20d9b9e4",
+  "dirty": false,
   "files": [
     {
       "path": "bare/src/thing.ts",

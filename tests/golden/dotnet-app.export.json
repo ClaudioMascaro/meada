@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/dotnet/app",
+  "commit": "d614f216688a6bd4e9204815bde46acaa3a468af",
+  "dirty": false,
   "files": [
     {
       "path": "src/Jobs/Report.cs",

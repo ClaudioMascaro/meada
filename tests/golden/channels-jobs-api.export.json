@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/jobs/api",
+  "commit": "67abc678592c48af296f0eef02629d155f2eaf86",
+  "dirty": false,
   "files": [
     {
       "path": "src/bullmq.ts",

@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/asyncapi/services",
+  "commit": "d3745b6c99dac749252c78020bf734eab9ceab5b",
+  "dirty": false,
   "files": [
     {
       "path": "src/kafka.ts",

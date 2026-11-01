@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/xlang-java/web",
+  "commit": "486cc9bc9bbae7b880ee4d024a651eac0b00c224",
+  "dirty": false,
   "files": [
     {
       "path": "app/api/audit/route.ts",

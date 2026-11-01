@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/chain/gateway",
+  "commit": "ca67db522d71c5993695a90d0d6ade3f4ab4642c",
+  "dirty": false,
   "files": [
     {
       "path": "src/catalog.ts",

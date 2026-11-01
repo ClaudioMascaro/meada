@@ -867,12 +867,8 @@ pub fn pull(manifest: &Path) -> crate::Result<Pulled> {
         }
     }
     let had = document.is_file();
-    let new = dir.join(format!("{id}.json.new"));
-    let written = (fs::write(&new, &bytes).map_err(pull::io_at(&new)))
-        .and_then(|()| fs::rename(&new, &document).map_err(pull::io_at(&document)))
-        .and_then(|()| pull::swap(&dir, &id, fence));
+    let written = pull::replace(&document, &bytes).and_then(|()| pull::swap(&dir, &id, fence));
     if let Err(e) = written {
-        let _ = fs::remove_file(&new);
         if !had {
             let _ = fs::remove_file(&document);
         }
@@ -1136,13 +1132,7 @@ pub fn write_excluded_with(
         );
     }
     let text: String = lines.into_iter().map(|line| format!("{line}\n")).collect();
-    let (file, new) = (dir.join(EXCLUDED), dir.join(format!("{EXCLUDED}.new")));
-    let written = (fs::write(&new, text).map_err(pull::io_at(&new)))
-        .and_then(|()| fs::rename(&new, &file).map_err(pull::io_at(&file)));
-    if written.is_err() {
-        let _ = fs::remove_file(&new);
-    }
-    written
+    pull::replace(&dir.join(EXCLUDED), text.as_bytes())
 }
 
 /// `meada workspace show --pulled --workspace <manifest>`: the version `meada workspace pull` left
