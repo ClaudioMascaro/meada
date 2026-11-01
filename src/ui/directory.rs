@@ -34,7 +34,8 @@ impl Console {
     /// whatever its role. A token without the claim, or a user the directory never held, is
     /// admitted. When the directory cannot be read, reads are admitted and a `write` is the 503
     /// `audit_unavailable`, since the console cannot tell whether the subject is deprovisioned;
-    /// the audit insert is not attempted. The second item is the line the audit prints. `Ok(true)`
+    /// the audit insert is not attempted, and its line is empty (#451): the directory's own line
+    /// stands for the request. The second item is the line the audit prints. `Ok(true)`
     /// is an admitted read whose lookup failed: the `Session` remembers it (`directory_down`), so
     /// the request's later directory reads take that answer and write no second line.
     #[cfg_attr(not(feature = "oidc"), allow(dead_code))]
@@ -56,10 +57,8 @@ impl Console {
             None if write => {
                 let message = Msg::AuditUnavailable.text();
                 let status = StatusCode::SERVICE_UNAVAILABLE;
-                Err((
-                    Box::new(error(status, "audit_unavailable", &message)),
-                    message,
-                ))
+                let answer = error(status, "audit_unavailable", &message);
+                Err((Box::new(answer), String::new()))
             }
             None => Ok(true),
         }

@@ -222,8 +222,9 @@ All notable changes to Meada are recorded here. The format follows
 - The console writes one `ui: directory: unreadable` stderr line per request when the directory
   cannot be read (#451, after #335): the request's session remembers the failure at admission,
   so the flags, the admission counts and the owner picker take that answer and write no second
-  line (`workspace` wrote two). Reads still answer with the flags unavailable, the counts null
-  and the picker a 503; writes still refuse as before. No golden changed.
+  line (`workspace` wrote two), and a write it refuses as 503 `audit_unavailable` prints no
+  pre-authentication audit line beside it. Reads still answer with the flags unavailable, the
+  counts null and the picker a 503; writes still refuse as before. No golden changed.
 - Postgres calls that had no client-side deadline now have one (#447): a SCIM request (under the
   directory's one write lock), the role check's fence read and write transaction, and the
   console's start check, so a Postgres that accepts the connection and stops answering ends in a

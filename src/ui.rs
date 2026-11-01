@@ -912,7 +912,10 @@ impl Console {
         let session = match self.admit(headers, route, writes) {
             Ok(session) => session,
             Err((refused, message)) => {
-                audit(None, &message);
+                // Empty when the directory's line already stands for the request (#451).
+                if !message.is_empty() {
+                    audit(None, &message);
+                }
                 return Err(refused);
             }
         };
@@ -991,7 +994,7 @@ impl Console {
     /// token for `[ui] audience`, except for the static files and `config`, which the browser
     /// needs to log in. With `[directory]`, the token's `user_claim` is then
     /// looked up (`deprovisioned`) before any role is computed. A refusal comes with the line
-    /// the pre-authentication audit prints.
+    /// the pre-authentication audit prints, empty when the directory's line stands for it.
     fn admit(
         self: &Arc<Self>,
         headers: &HeaderMap,
