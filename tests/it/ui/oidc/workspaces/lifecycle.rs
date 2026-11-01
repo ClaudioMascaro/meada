@@ -152,6 +152,44 @@ fn local_accounts_versions_are_saved_applied_and_rolled_back_along_the_base() {
     }
 }
 
+/// A suspended local account stops operating its named workspaces at once (ADR 0024): its
+/// unexpired session token still reads the workspace, but a rename, which no eligibility check
+/// guards, is refused: written as a viewer with no group, alice neither operates nor sees it, so
+/// the write answers the one 404 an outsider gets; reactivated, the same token renames again.
+#[cfg(feature = "accounts")]
+#[test]
+fn local_accounts_a_suspended_operator_operates_no_workspace() {
+    let Some(case) = Case::local("ws_suspended_local") else {
+        return;
+    };
+    case.refresh();
+    case.ready();
+    let ya = id_of(&case.create("alice", "Y and A", &["Y", "A"]));
+    let admin = case.token("admin");
+    let set = |action: &str| {
+        let body = json!({"action": action});
+        let reply = case.post("/api/v1/accounts/alice", &admin, &body);
+        assert_eq!(reply.status, 200, "{action}: {}", reply.body);
+    };
+    let rename = |name: &str, base: i64| {
+        let body = json!({"name": name, "base": base});
+        let path = format!("/api/v1/workspaces/{ya}/rename");
+        case.post(&path, &case.token("alice"), &body)
+    };
+    set("suspend");
+    assert_eq!(case.show("alice", &ya).status, 200);
+    let refused = rename("Suspended", 1);
+    assert_eq!(
+        (refused.status, code(&refused)),
+        (404, "not_found".into()),
+        "{}",
+        refused.body
+    );
+    set("reactivate");
+    let renamed = rename("Reactivated", 1);
+    assert_eq!(renamed.status, 200, "{}", renamed.body);
+}
+
 /// The body of `versions_are_saved_applied_and_rolled_back_along_the_base` and
 /// `local_accounts_versions_are_saved_applied_and_rolled_back_along_the_base`, over `case`.
 fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {

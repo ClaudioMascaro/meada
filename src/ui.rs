@@ -319,6 +319,10 @@ struct Session {
     /// Admitted by a local account's session token (ADR 0024).
     #[cfg(feature = "accounts")]
     account: bool,
+    /// A local account whose row, read before a write, no longer stands (suspended, unknown or
+    /// hostile, `Console::standing`): its subject operates no named workspace (ADR 0024).
+    #[cfg(feature = "accounts")]
+    suspended: bool,
 }
 
 impl Session {
@@ -336,6 +340,8 @@ impl Session {
             github: admitted.github,
             #[cfg(feature = "accounts")]
             account: false,
+            #[cfg(feature = "accounts")]
+            suspended: false,
         }
     }
 
@@ -364,6 +370,8 @@ impl Session {
             github: None,
             #[cfg(feature = "accounts")]
             account: false,
+            #[cfg(feature = "accounts")]
+            suspended: false,
         }
     }
 

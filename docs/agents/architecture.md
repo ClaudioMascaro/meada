@@ -3249,9 +3249,7 @@ one for the area a change touches.
   `GITHUB_ANSWER_MAX` (64 KiB) its answer (a 503 `github_unavailable` past either). The lockout
   (#555, `accounts.rs`): `LOCKOUT_FAILURES` (10) consecutive failed password checks, counted under
   the account row's lock, lock an account for `LOCKOUT_MINUTES` (15), never extended by an attempt
-  while it holds; the hash bound is `HASHES_MAX` above, and
-  `HASH_MEMORY_MAX_KIB`, `HASH_ITERATIONS_MAX` and `HASH_LANES_MAX` bound what a stored hash may
-  cost.
+  while it holds.
 
 - `ui/workspaces/proposals.rs` (#346, ADR 0022): `BODY_MAX` (80 KiB) bounds a request's body
   (413), `OUTPUT_MAX` (192 KiB) a tool's answer (`too_large` with its counts, never cut),

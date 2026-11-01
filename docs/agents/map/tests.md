@@ -841,7 +841,11 @@ operators with `local:` authors, operator lists, history actors and audit subjec
 and the proposal server's table (`proposals_follow_...`: no metadata, a 401 `Bearer` to no token,
 a forged one, a session token and a node's agent token, the forged arguments invalid, the stderr
 line naming `local:alice`, and a suspended account's token still answering, since nothing but the
-token decides). `tests/it/manifest.rs` holds `[catalog]` checked against `[accounts.github] host`
+token decides). `local_accounts_a_suspended_operator_operates_no_workspace` (`lifecycle.rs`, no
+twin) has the default account suspend alice: her unexpired token still shows her workspace, its
+rename is the outsider's 404 `not_found` (a viewer with no group sees nothing), and once
+reactivated the same token renames it.
+`tests/it/manifest.rs` holds `[catalog]` checked against `[accounts.github] host`
 and `[workspaces]` accepted over local accounts, and the new needs text;
 `tests/it/ui/accounts/tokens.rs` the 422 `invalid_surface` for `proposals` without
 `[proposals]`; `ui/tests/LocalAccounts.test.tsx` the profile offering the proposal server's

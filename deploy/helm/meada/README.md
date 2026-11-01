@@ -211,8 +211,7 @@ public-key`):
 Os nós leem o emissor dos tokens em `[ui] public_url`, que o chart preenche com `console.publicUrl`, e
 precisam de `[postgres]` (`read-url`). `modules.accounts.groups` mapeia grupos de contas locais a
 identidades, como `modules.oidc.groups`; `modules.accounts.github` liga o grant do GitHub por login
-verificado e exige `modules.githubApp` (e `api` para um host que não seja `github.com`), numa Meada que já leia
-`[accounts.github]` (#561; antes disso, a imagem recusa a seção e o pod não inicia). Sem grupos nem
+verificado e exige `modules.githubApp` (e `api` para um host que não seja `github.com`). Sem grupos nem
 GitHub, toda conta local lê todos os repositórios. O refresh roda `meada github-app roles` também com
 `modules.accounts.github`. Para o caminho de produção, configure `modules.oidc` e ligue
 `modules.accounts.breakGlass`: só a console mantém `[accounts]`, com a conta `admin` como porta de

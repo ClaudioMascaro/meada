@@ -216,8 +216,7 @@ modules:
     # The GitHub grant provider for local accounts (a verified login reads what it reads on GitHub).
     # It needs modules.postgres and modules.githubApp, as modules.oidc.github does. `api` is the
     # REST endpoint of the host: empty keeps https://api.github.com for github.com, and any other
-    # host needs it. Refused under breakGlass. A Meada image parses [accounts.github] from #561 on;
-    # leave it off before that.
+    # host needs it. Refused under breakGlass.
     github:
       enabled: false
       host: github.com

@@ -527,6 +527,16 @@ impl Agents {
     }
 }
 
+/// The `WWW-Authenticate` value of a 401 for a missing or refused bearer: `Bearer`, with
+/// `error="invalid_token"` when one was `sent` (RFC 6750). Every surface of local accounts
+/// answers with it: the console, a node and the proposal server.
+pub fn challenge(sent: bool) -> &'static str {
+    match sent {
+        false => "Bearer",
+        true => "Bearer error=\"invalid_token\"",
+    }
+}
+
 impl Keys {
     /// The public key's fingerprint (#558), which the admission view shows so an operator can tell
     /// which key pair the console holds: `blake3:` and the hex BLAKE3 hash of the raw 32-byte

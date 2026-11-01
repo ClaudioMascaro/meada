@@ -592,10 +592,7 @@ impl Gate {
         #[cfg(feature = "accounts")]
         if let Some(local) = &self.local {
             let claims = local.admit(request.headers()).map_err(|sent| {
-                let challenge = match sent {
-                    false => "Bearer",
-                    true => "Bearer error=\"invalid_token\"",
-                };
+                let challenge = crate::accounts::challenge(sent);
                 Box::new(challenged(StatusCode::UNAUTHORIZED, challenge))
             })?;
             let login = claims.login.as_deref();

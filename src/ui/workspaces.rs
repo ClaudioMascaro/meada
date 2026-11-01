@@ -93,8 +93,12 @@ impl Console {
     }
 
     /// Whether `session` operates workspace `record`: the platform administrator, or an operator
-    /// of it by subject.
+    /// of it by subject, unless the subject is a local account whose row no longer stands.
     fn operates(session: &Session, record: &Record) -> bool {
+        #[cfg(feature = "accounts")]
+        if session.suspended {
+            return false;
+        }
         session.operator
             || (session.subject.as_deref())
                 .is_some_and(|s| record.operators.iter().any(|(subject, _)| subject == s))

@@ -215,8 +215,7 @@ Los nodos leen el emisor de los tokens en `[ui] public_url`, que el chart rellen
 `console.publicUrl`, y necesitan `[postgres]` (`read-url`). `modules.accounts.groups` asigna grupos de
 cuentas locales a identidades, como `modules.oidc.groups`; `modules.accounts.github` activa el grant de
 GitHub por login verificado y exige `modules.githubApp` (y `api` para un host distinto de
-`github.com`), en una Meada que ya lea `[accounts.github]` (#561; antes, la imagen rechaza la
-sección y el pod no arranca). Sin grupos ni GitHub, toda cuenta local lee todos los repositorios. El refresh ejecuta
+`github.com`). Sin grupos ni GitHub, toda cuenta local lee todos los repositorios. El refresh ejecuta
 `meada github-app roles` también con `modules.accounts.github`. Para el camino de producción, configure
 `modules.oidc` y active `modules.accounts.breakGlass`: solo la consola conserva `[accounts]`, con la
 cuenta `admin` como puerta de emergencia, y los nodos ignoran las cuentas locales y no reciben ninguna

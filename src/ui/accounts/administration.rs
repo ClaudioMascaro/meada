@@ -36,8 +36,8 @@ use crate::accounts::{self, Role};
 use crate::audit::{Outcome, Pending};
 use crate::msg::Msg;
 
-// ponytail: the most bytes of an account creation's or change's body: a username and a
-// password of at most 128 characters, each escaped, with room to spare; past it a 413.
+// ponytail: the most bytes of an account creation's or change's body: a username, a password
+// of at most 128 characters and a list of groups, each escaped, with room to spare; past it a 413.
 pub(in crate::ui) const ADMIN_BODY_MAX: usize = 4 << 10;
 
 /// The list and the creation.

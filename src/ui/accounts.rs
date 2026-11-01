@@ -183,10 +183,7 @@ fn invalid() -> Answer {
 fn unauthorized(sent: bool) -> (Box<Answer>, String) {
     let message = Msg::AccountsUnauthorized.text();
     let mut answer = error(StatusCode::UNAUTHORIZED, "unauthorized", &message);
-    let challenge = match sent {
-        false => "Bearer",
-        true => "Bearer error=\"invalid_token\"",
-    };
+    let challenge = accounts::challenge(sent);
     let challenge = header::HeaderValue::from_static(challenge);
     answer
         .headers_mut()
@@ -396,8 +393,9 @@ impl Console {
     /// token's until it expires. An active account's role, groups and verified login come from
     /// its row (under
     /// break glass the session stands as admitted, the global operator's); a suspended, unknown
-    /// or hostile one (one line naming the table) writes as a viewer with no group, and so gets
-    /// the role refusal its write already has. `login` and the password change are no such
+    /// or hostile one (one line naming the table) writes as a viewer with no group that operates
+    /// no named workspace (`Session::suspended`), and so gets the role refusal its write already
+    /// has. `login` and the password change are no such
     /// write: they read the row themselves. Postgres unreachable is a 503 `unavailable`, with its
     /// line, and the write's message.
     pub(super) fn standing(
@@ -419,7 +417,9 @@ impl Console {
             // role (`Local::signed_as`), with every repository: only its suspension takes a write.
             Ok(store::Standing::Active(..)) if local.break_glass => return Ok(session),
             Ok(store::Standing::Active(role, groups, login)) => {
-                (role == Role::Operator, groups, login)
+                let session =
+                    self.local_session(subject, role == Role::Operator, groups, login, route);
+                return Ok(session);
             }
             Ok(store::Standing::Suspended | store::Standing::Unknown) => (false, Vec::new(), None),
             Ok(store::Standing::Bad) => {
@@ -431,7 +431,10 @@ impl Console {
                 return Err((Box::new(answer), Msg::AccountsUnavailable.text()));
             }
         };
-        Ok(self.local_session(subject, operator, groups, login, route))
+        // The subject stays for the record of the refusal, but operates no named workspace.
+        let mut session = self.local_session(subject, operator, groups, login, route);
+        session.suspended = true;
+        Ok(session)
     }
 
     /// Admission under break glass (`[oidc]` beside, #563) of a request to the API route `route`

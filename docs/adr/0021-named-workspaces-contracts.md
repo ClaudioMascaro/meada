@@ -114,7 +114,7 @@ workspace and not an index.
   whose owner some `allow` pattern names. An App with no installations held and no recent
   listing (throttled, or another run's listing unfinished when the lock expires) fails the run;
   while it is throttled, the installations it holds (at most an hour old) are used, as for the
-  selected repositories. `Permissions` (`oidc/permissions.rs`) loads the catalog
+  selected repositories. `Permissions` (`grant/permissions.rs` since #553) loads the catalog
   with the rows only when `[catalog]` is present, and answers per subject; its identities are at
   most 192 bytes (the cursor is base64url of the identity within the 256 characters above). A
   `check` repeating an identity answers it once, and a body or query past its bounds is one fixed

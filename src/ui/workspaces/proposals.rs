@@ -403,10 +403,7 @@ impl Server {
         headers: &HeaderMap,
     ) -> Result<Session, Box<Answer>> {
         let claims = agents.admit(headers).map_err(|sent| {
-            let challenge = match sent {
-                false => "Bearer",
-                true => "Bearer error=\"invalid_token\"",
-            };
+            let challenge = crate::accounts::challenge(sent);
             let mut answer = plain(StatusCode::UNAUTHORIZED, "unauthorized\n");
             let value = header::HeaderValue::from_static(challenge);
             answer.headers_mut().insert(header::WWW_AUTHENTICATE, value);

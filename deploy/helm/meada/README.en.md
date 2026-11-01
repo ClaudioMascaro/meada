@@ -213,8 +213,7 @@ The nodes read the issuer of the tokens from `[ui] public_url`, which the chart 
 `console.publicUrl`, and need `[postgres]` (`read-url`). `modules.accounts.groups` maps groups of local
 accounts to identities, as `modules.oidc.groups` does; `modules.accounts.github` turns on the GitHub
 grant through a verified login and needs `modules.githubApp` (and `api` for a host other than
-`github.com`), on a Meada that already reads `[accounts.github]` (#561; before that, the image
-refuses the section and the pod does not start). Without groups or GitHub, every local account reads every repository. The refresh runs
+`github.com`). Without groups or GitHub, every local account reads every repository. The refresh runs
 `meada github-app roles` under `modules.accounts.github` too. For the production path, configure
 `modules.oidc` and turn on `modules.accounts.breakGlass`: only the console keeps `[accounts]`, with the
 `admin` account as the break-glass door, and the nodes ignore local accounts and get no key at all

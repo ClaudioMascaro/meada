@@ -200,7 +200,9 @@ tickets build.
 - A login another account holds is a 409 `login_taken`. GitHub's refusal or unreachability is a
   fixed 422 or 503 naming GitHub, never its body.
 - A person removes their own verified login; the global operator removes anyone's. A token issued
-  before a removal keeps the login until it expires.
+  before a removal keeps the login until it expires. (Amended 2026-11-01, #561: a person's own
+  verification or removal answers a fresh session token from the account's row, so their own
+  session shows the change at once; other tokens keep what they carry.)
 - The GitHub grant provider then grants from the verified login as it grants from `login_claim`
   under an identity provider, which brings named workspaces, their catalog and eligibility, and
   the proposal server to deployments with local accounts. The job's role check and the
@@ -269,7 +271,9 @@ tickets build.
 - New actions: `account.login`, `account.password`, `account.create`, `account.role`,
   `account.groups`, `account.suspend`, `account.reactivate`, `account.reset_password`,
   `account.remove_github`, `account.github`, `account.token` and `account.reset_admin`; `via` is
-  `console` or `cli`. Arguments name the account, the fields changed, a token's surface, validity
+  `console` or `cli`. (Amended 2026-11-01, #557: a thirteenth action, `account`, records an
+  account change refused before its body is read, so before its action is known, as `pointer`
+  records an operation's.) Arguments name the account, the fields changed, a token's surface, validity
   and id, the verified login, and a refused sign-in's reason (`unknown`, `password`, `suspended`,
   `locked`, `locked_now`, `not_break_glass`). An attempt naming no account has no subject and the
   role `none`. No password, hash, personal access token or token appears in a record, a stderr
