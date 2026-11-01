@@ -76,3 +76,78 @@ migrate = tomllib.loads((DEPLOY / "postgres.workspace.toml").read_text())
 assert list(migrate) == ["postgres"] and migrate["postgres"]["url_env"] == "MEADA_POSTGRES_MIGRATE_URL"
 assert not any("postgres://" in line for path in DEPLOY.glob("*.toml") for line in path.read_text().splitlines() if not line.startswith("#")), "no URL in a manifest"
 print("compose-check: opt-in Postgres service, migrate step order and roles passed")
+
+# The local accounts proof of concept (ADR 0024): one env file selects the whole recipe.
+env = dict(line.split("=", 1) for line in (DEPLOY / ".env.accounts.example").read_text().splitlines()
+           if line and not line.startswith("#"))
+assert env["COMPOSE_FILE"].split(":") == ["compose.yaml", "compose.console.yaml", "compose.postgres.yaml", "compose.accounts.yaml"]
+assert env["COMPOSE_PROFILES"].split(",") == ["generations", "console"]
+poc = json.loads(subprocess.check_output(
+    ["docker", "compose", "--env-file", ".env.accounts.example", "config", "--format", "json"],
+    cwd=DEPLOY, text=True))["services"]
+
+
+def reaches(services, start, goal, seen=()):
+    """Whether `start` waits, directly or not, for `goal`."""
+    return any(dep == goal or (dep not in seen and reaches(services, dep, goal, seen + (dep,)))
+               for dep in services[start].get("depends_on", {}))
+
+
+# The order: certificates, Postgres, migrate, store and Valkey, the seed, the job, the console and the nodes.
+for later, earlier in [("postgres", "certificates"), ("postgres-migrate", "postgres"), ("seed", "bucket"), ("seed", "valkey"),
+                       ("bucket", "store"), ("store", "certificates"), ("valkey", "certificates"),
+                       ("generation-indexer", "seed"), ("generation-indexer", "postgres-migrate"),
+                       ("console", "console-first-pull"), ("console", "postgres-migrate"), ("console", "certificates"),
+                       ("console-first-pull", "generation-indexer"), ("generation-one", "first-pull-one"),
+                       ("generation-two", "first-pull-two"), ("generation-one", "postgres-migrate"),
+                       ("generation-one", "certificates"), ("generation-two", "certificates"),
+                       ("first-pull-one", "generation-indexer"), ("first-pull-two", "generation-indexer")]:
+    assert reaches(poc, later, earlier), f"{later} must wait for {earlier}"
+assert poc["seed"]["depends_on"]["bucket"]["condition"] == "service_completed_successfully"
+assert poc["generation-indexer"]["depends_on"]["seed"]["condition"] == "service_completed_successfully"
+
+# The key pair: the private half in the console's and the certificates step's mounts, no other.
+def volumes(name):
+    return {mount["source"]: mount for mount in poc[name]["volumes"] if mount["type"] == "volume"}
+
+
+assert [name for name in poc if "accounts-private" in volumes(name)] == ["certificates", "console"]
+assert volumes("console")["accounts-private"]["read_only"]
+for name in ["generation-one", "generation-two", "console"]:
+    assert volumes(name)["accounts-public"]["read_only"], name
+assert "accounts-public" not in volumes("generation-indexer")
+script = (DEPLOY / "certificates.sh").read_text()
+assert "openssl genpkey -algorithm ed25519 -out /accounts-private/private.pem" in script
+assert not any(word in line for line in script.splitlines() if "accounts-private" in line for word in ["cat ", "echo ", "printf "]), "the key is never printed"
+
+# The manifests: the console signs and keeps accounts, the nodes hold the public half only.
+mounted = lambda name: {pathlib.Path(m["source"]).name for m in poc[name]["volumes"] if m["type"] == "bind"}
+assert "console.accounts.workspace.toml" in mounted("console")
+assert all("generations.accounts.workspace.toml" in mounted(name) for name in ["generation-one", "generation-two"])
+poc_console = tomllib.loads((DEPLOY / "console.accounts.workspace.toml").read_text())
+poc_node = tomllib.loads((DEPLOY / "generations.accounts.workspace.toml").read_text())
+assert poc_console["ui"]["operations"] is True and "oidc" not in poc_console and "oidc" not in poc_node
+assert poc_console["accounts"] == {"public_key_file": "/etc/meada/accounts/public.pem", "private_key_file": "/etc/meada/accounts-private/private.pem"}
+assert poc_console["postgres"]["url_env"] == "MEADA_POSTGRES_URL"
+assert poc_node["accounts"] == {"public_key_file": "/etc/meada/accounts/public.pem"}
+assert poc_node["postgres"]["url_env"] == "MEADA_POSTGRES_READ_URL"
+assert poc_node["ui"]["public_url"] == poc_console["ui"]["public_url"], "the nodes' issuer is the console's public_url"
+for bootstrap in [poc_console, poc_node]:
+    for section in ["valkey", "generations", "refresh_lock"]:
+        assert bootstrap[section] == node_bootstrap[section]
+    for key in ["endpoint", "region", "bucket", "prefix", "credentials", "ca_file"]:
+        assert bootstrap["snapshot"][key] == node_bootstrap["snapshot"][key]
+assert poc["console"]["environment"]["MEADA_POSTGRES_URL"].startswith("postgres://meada_write:")
+assert "MEADA_ADMIN_PASSWORD" in poc["console"]["environment"]
+assert all("MEADA_ADMIN_PASSWORD" not in poc[name]["environment"] for name in ["generation-one", "generation-two"])
+
+# The proxy of the nodes forwards Authorization and holds no bearer; the other profiles' keep theirs.
+caddyfile = (DEPLOY / "Caddyfile.accounts").read_text()
+assert "MEADA_TOKEN" not in caddyfile and "header_up" not in caddyfile and "reverse_proxy backend-one:7333 backend-two:7333" in caddyfile
+assert "environment" not in poc["proxy"] and "Caddyfile.accounts" in mounted("proxy")
+for profile in [local, generations]:
+    assert "MEADA_TOKEN" in profile["services"]["proxy"]["environment"]
+    assert "Caddyfile" in {pathlib.Path(m["source"]).name for m in profile["services"]["proxy"]["volumes"] if m["type"] == "bind"}
+assert "MEADA_TOKEN" in (DEPLOY / "Caddyfile").read_text()
+assert "accounts" not in "".join(console_bootstrap) and "accounts" not in "".join(node_bootstrap)
+print("compose-check: local accounts profile, key pair, manifests, proxy and order passed")

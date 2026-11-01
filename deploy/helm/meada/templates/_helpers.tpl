@@ -84,9 +84,42 @@ app.kubernetes.io/component: server
 {{- if and .Values.postgres.enabled (not .Values.modules.postgres.enabled) -}}
 {{- fail "postgres.enabled requires modules.postgres" -}}
 {{- end -}}
+{{- with .Values.modules.accounts -}}
+{{- if .enabled -}}
+{{- if not $.Values.modules.postgres.enabled -}}
+{{- fail "modules.accounts requires modules.postgres" -}}
+{{- end -}}
+{{- if not $.Values.console.enabled -}}
+{{- fail "modules.accounts requires console.enabled: the console holds the accounts and signs the tokens" -}}
+{{- end -}}
+{{- if not (and .publicKeySecret .privateKeySecret) -}}
+{{- fail "modules.accounts requires publicKeySecret and privateKeySecret" -}}
+{{- end -}}
+{{- if eq .publicKeySecret .privateKeySecret -}}
+{{- fail "modules.accounts.publicKeySecret and privateKeySecret must be different Secrets: the nodes mount the public one" -}}
+{{- end -}}
+{{- if and $.Values.modules.oidc.enabled (not .breakGlass) -}}
+{{- fail "modules.accounts beside modules.oidc requires modules.accounts.breakGlass" -}}
+{{- end -}}
+{{- if and .breakGlass (not $.Values.modules.oidc.enabled) -}}
+{{- fail "modules.accounts.breakGlass requires modules.oidc" -}}
+{{- end -}}
+{{- if and .breakGlass (or .groups .github.enabled) -}}
+{{- fail "modules.accounts.groups and modules.accounts.github are refused under breakGlass: the break-glass account is the global operator" -}}
+{{- end -}}
+{{- if and .github.enabled (not (and $.Values.modules.githubApp.enabled .github.host)) -}}
+{{- fail "modules.accounts.github requires modules.githubApp and a host" -}}
+{{- end -}}
+{{- if and .github.enabled (ne .github.host "github.com") (not .github.api) -}}
+{{- fail "modules.accounts.github.api is required for a host other than github.com" -}}
+{{- end -}}
+{{- else if or .breakGlass .groups .github.enabled -}}
+{{- fail "modules.accounts.breakGlass, groups and github require modules.accounts.enabled" -}}
+{{- end -}}
+{{- end -}}
 {{- if .Values.modules.workspaces.enabled -}}
-{{- if not (and .Values.console.enabled .Values.console.operations .Values.modules.oidc.github.enabled) -}}
-{{- fail "modules.workspaces requires console.enabled, console.operations and modules.oidc.github" -}}
+{{- if not (and .Values.console.enabled .Values.console.operations (or .Values.modules.oidc.github.enabled .Values.modules.accounts.github.enabled)) -}}
+{{- fail "modules.workspaces requires console.enabled, console.operations and modules.oidc.github or modules.accounts.github" -}}
 {{- end -}}
 {{- if not .Values.modules.workspaces.allow -}}
 {{- fail "modules.workspaces.allow must list at least one pattern" -}}
@@ -100,13 +133,16 @@ app.kubernetes.io/component: server
 {{- if not (and .Values.image.cloud .Values.modules.snapshot.enabled .Values.modules.generations.enabled .Values.modules.valkey.enabled) -}}
 {{- fail "console requires image.cloud and snapshot, valkey and generations" -}}
 {{- end -}}
-{{- if and (or .Values.console.operations .Values.console.operatorGroups .Values.console.operatorClaim) (not .Values.modules.oidc.enabled) -}}
-{{- fail "console operations and operator selectors require modules.oidc" -}}
+{{- if and (or .Values.console.operatorGroups .Values.console.operatorClaim) (not .Values.modules.oidc.enabled) -}}
+{{- fail "console operator selectors require modules.oidc" -}}
+{{- end -}}
+{{- if and .Values.console.operations (not (or .Values.modules.oidc.enabled .Values.modules.accounts.enabled)) -}}
+{{- fail "console.operations requires modules.oidc or modules.accounts" -}}
 {{- end -}}
 {{- if and .Values.console.operatorGroups .Values.console.operatorClaim -}}
 {{- fail "choose console.operatorGroups or console.operatorClaim" -}}
 {{- end -}}
-{{- if and .Values.console.operations (not (or .Values.console.operatorGroups .Values.console.operatorClaim)) -}}
+{{- if and .Values.console.operations .Values.modules.oidc.enabled (not (or .Values.console.operatorGroups .Values.console.operatorClaim)) -}}
 {{- fail "console.operations requires an operator selector" -}}
 {{- end -}}
 {{- if and .Values.console.operatorGroups (not .Values.modules.oidc.groupsClaim) -}}
@@ -182,6 +218,14 @@ app.kubernetes.io/component: console
     name: {{ include "meada.consoleName" . }}
 - name: data
   emptyDir: {}
+{{- if .Values.modules.accounts.enabled }}
+- name: accounts-public
+  secret:
+    secretName: {{ .Values.modules.accounts.publicKeySecret }}
+- name: accounts-private
+  secret:
+    secretName: {{ .Values.modules.accounts.privateKeySecret }}
+{{- end }}
 {{- if .Values.tls.caSecret }}
 - name: ca
   secret:
@@ -228,5 +272,70 @@ app.kubernetes.io/component: console
 {{- define "meada.refresh" -}}
 {{- $ws := include "meada.jobWorkspace" . -}}
 {{- if eq .Values.workspace.source "store" }}meada workspace pull --workspace {{ $ws }} && {{ end -}}
-{{- if .Values.modules.oidc.github.enabled }}meada github-app roles --workspace {{ $ws }} && meada workspace show --pulled --workspace {{ $ws }} > /data/pulled.toml && /bin/sh /etc/meada/fetch.sh /data/pulled.toml{{ else }}/bin/sh /etc/meada/fetch.sh{{ end }} && meada index --workspace {{ $ws }} && meada snapshot publish --workspace {{ $ws }}
+{{- if or .Values.modules.oidc.github.enabled .Values.modules.accounts.github.enabled }}meada github-app roles --workspace {{ $ws }} && meada workspace show --pulled --workspace {{ $ws }} > /data/pulled.toml && /bin/sh /etc/meada/fetch.sh /data/pulled.toml{{ else }}/bin/sh /etc/meada/fetch.sh{{ end }} && meada index --workspace {{ $ws }} && meada snapshot publish --workspace {{ $ws }}
+{{- end -}}
+{{- /* [accounts] and its tables (ADR 0024) for one process: "console" names both key files and the break-glass flag, "node" the public key and the grant tables (a node ignores [accounts] beside [oidc], so under breakGlass it gets none), "job" only the GitHub grant provider the role check reads, with no key. */ -}}
+{{- define "meada.accounts" -}}
+{{- $role := .role -}}
+{{- with .Values.modules.accounts }}
+{{- if and .enabled (or (eq $role "console") (not .breakGlass)) (or (ne $role "job") .github.enabled) }}
+
+[accounts]
+{{- if ne $role "job" }}
+public_key_file = "/etc/meada-accounts/public/public-key"
+{{- end }}
+{{- if eq $role "console" }}
+private_key_file = "/etc/meada-accounts/private/private-key"
+{{- with .adminPasswordSecret }}
+admin_password_env = "MEADA_ADMIN_PASSWORD"
+{{- end }}
+{{- if .breakGlass }}
+break_glass = true
+{{- end }}
+{{- end }}
+{{- if and .groups (ne $role "job") }}
+
+[accounts.groups]
+{{- range $group, $identities := .groups }}
+{{ $group | toJson }} = {{ $identities | toJson }}
+{{- end }}
+{{- end }}
+{{- with .github }}
+{{- if .enabled }}
+
+[accounts.github]
+host = {{ .host | toJson }}
+{{- with .api }}
+api = {{ . | toJson }}
+{{- end }}
+{{- if .roles }}
+roles = {{ .roles | toJson }}
+{{- end }}
+max_age_seconds = {{ .maxAgeSeconds }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end -}}
+{{- /* A node's [ui] under local accounts: only the console's public_url, the issuer of every token it admits (ADR 0024). */ -}}
+{{- define "meada.nodeUi" -}}
+{{- if and .Values.modules.accounts.enabled (not .Values.modules.accounts.breakGlass) }}
+
+[ui]
+dir = "/usr/share/meada/ui"
+public_url = {{ .Values.console.publicUrl | toJson }}
+{{- end }}
+{{- end -}}
+{{- /* The Secrets of the keys as volumes: the public one in the console and the nodes, the private one in the console only. */ -}}
+{{- define "meada.accountsPublicVolume" -}}
+{{- if and .Values.modules.accounts.enabled (not .Values.modules.accounts.breakGlass) }}
+- name: accounts-public
+  secret:
+    secretName: {{ .Values.modules.accounts.publicKeySecret }}
+{{- end }}
+{{- end -}}
+{{- define "meada.accountsPublicMount" -}}
+- name: accounts-public
+  mountPath: /etc/meada-accounts/public
+  readOnly: true
 {{- end -}}

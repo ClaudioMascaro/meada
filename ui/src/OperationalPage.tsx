@@ -11,7 +11,7 @@ import { actionsCopy } from './actions-i18n';
 import type { ActionButtonsProps } from './ActionControls';
 import { copy } from './i18n';
 import type { Language } from './i18n';
-import { admissionModel, checkModel, credentialsModel, fleetModel, missingSections, repositoriesModel, storeModel } from './operations';
+import { admissionModel, checkModel, isOidcAdmission, credentialsModel, fleetModel, missingSections, repositoriesModel, storeModel } from './operations';
 import type { Admission, CheckResult, Credentials, Fleet, Generation, Missing, Repositories, Store } from './operations';
 import { operationsCopy } from './operations-i18n';
 import type { OperationsCopy } from './operations-i18n';
@@ -171,15 +171,16 @@ function AdmissionView({ data, api, t, locale }: { data: Admission; api: Api; t:
   const checked = result && checkModel(result, t);
   return <>
     <Fields rows={admissionModel(data, t)} />
-    {data.failed && <p className="error">{data.failed.time}: {data.failed.reason}</p>}
+    {isOidcAdmission(data) && data.failed && <p className="error">{data.failed.time}: {data.failed.reason}</p>}
     <Table label={t.groups} t={t} headers={[t.group, t.identities]} rows={Object.entries(data.groups ?? {}).map(([group, identities]) => [group, identities.join(', ') || t.none])} />
-    <h2>{t.metadata}</h2><pre className="configuration" role="region" aria-label={t.metadata} tabIndex={0}>{JSON.stringify(data.metadata, null, 2)}</pre>
+    {/* The token check and the issuer's metadata are the identity provider's alone. */}
+    {isOidcAdmission(data) && <><h2>{t.metadata}</h2><pre className="configuration" role="region" aria-label={t.metadata} tabIndex={0}>{JSON.stringify(data.metadata, null, 2)}</pre>
     <form className="token-check" aria-label={t.checkToken} onSubmit={event => { event.preventDefault(); void check(); }}>
       <label htmlFor="check-token">{t.token}</label>
       <p id="token-hint">{t.tokenHint}</p>
       <textarea id="check-token" ref={token} required autoComplete="off" spellCheck={false} aria-describedby="token-hint" disabled={busy} />
       <button type="submit" disabled={busy}>{busy ? t.checking : t.checkToken}</button>
-    </form>
+    </form></>}
     {problem != null && <p className="error" role="alert">{problem instanceof ApiError ? problem.message : copy[locale].loadError}</p>}
     {checked && <>
       <Table label={t.checkToken} t={t} headers={[t.check, t.outcome]} rows={checked.checks.map(row => [row.name, row.outcome])} />

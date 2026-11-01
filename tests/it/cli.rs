@@ -162,6 +162,24 @@ fn the_console_subcommand_is_absent_without_its_feature() {
     assert!(stderr.contains("unrecognized subcommand 'ui'"), "{stderr}");
 }
 
+/// `meada ui reset-admin` exists only in a build with the `accounts` feature (ADR 0024): a build
+/// with the console alone takes `reset-admin` for no argument it knows. Without `ui` there is no
+/// `meada ui` at all (`the_console_subcommand_is_absent_without_its_feature`).
+#[cfg(all(feature = "ui", not(feature = "accounts")))]
+#[test]
+fn the_default_account_recovery_is_absent_without_its_feature() {
+    let out = Command::new(env!("CARGO_BIN_EXE_meada"))
+        .args(["ui", "reset-admin", "--workspace", "meada.workspace.toml"])
+        .output()
+        .expect("meada runs");
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("unexpected argument 'reset-admin'"),
+        "{stderr}"
+    );
+}
+
 /// `meada workspaces mcp` exists only in a build with the `proposals` feature (ADR 0022): the
 /// default build has no `workspaces` at all, and a build with `workspaces` alone has no `mcp`.
 #[cfg(not(feature = "proposals"))]
@@ -370,8 +388,8 @@ fn oidc_github_and_role_check_refusals_follow_lang() {
         cases.push((
             format!("{oidc}identities_claim = \"r\"\n{postgres}"),
             roles,
-            "meada: ops/meada.workspace.toml: meada github-app roles needs [oidc.github]\n".into(),
-            "meada: ops/meada.workspace.toml: meada github-app roles exige [oidc.github]\n".into(),
+            "meada: ops/meada.workspace.toml: meada github-app roles needs [oidc.github] or [accounts.github]\n".into(),
+            "meada: ops/meada.workspace.toml: meada github-app roles exige [oidc.github] ou [accounts.github]\n".into(),
         ));
         cases.push((
             format!("{oidc}{table}{postgres}"),
@@ -1278,26 +1296,26 @@ fn postgres_refusals_follow_lang() {
     assert_eq!(
         line(en, "9"),
         format!(
-            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 8: \
+            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 9: \
              run meada postgres migrate)"
         )
     );
     assert_eq!(
         line(pt, "9"),
         format!(
-            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da 8 deste Meada: \
+            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da 9 deste Meada: \
              rode meada postgres migrate)"
         )
     );
-    assert_eq!(meada(&dir, en, &at("9"), &MIGRATE).0, "8\n");
+    assert_eq!(meada(&dir, en, &at("9"), &MIGRATE).0, "9\n");
     for (lang, expected) in [
         (
             en,
-            format!("the schema {schema} is at version 8, above this Meada's 0: upgrade Meada"),
+            format!("the schema {schema} is at version 9, above this Meada's 0: upgrade Meada"),
         ),
         (
             pt,
-            format!("o schema {schema} está na versão 8, acima da 0 deste Meada: atualize o Meada"),
+            format!("o schema {schema} está na versão 9, acima da 0 deste Meada: atualize o Meada"),
         ),
     ] {
         let (_, stderr, code) = meada(&dir, lang, &at("0"), &MIGRATE);

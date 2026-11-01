@@ -1,0 +1,8 @@
+https://localhost {
+	tls internal
+	# No static bearer: the nodes admit the agent tokens the console issues (ADR 0024), and answer
+	# 401 to a request without a valid one. Authorization reaches them unchanged.
+	reverse_proxy backend-one:7333 backend-two:7333 {
+		lb_policy round_robin
+	}
+}

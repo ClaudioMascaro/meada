@@ -32,6 +32,7 @@ const en = {
   githubGrant: 'GitHub grant', github_current: 'Current', github_expired: 'Expired: the permissions set is older than allowed', github_unread: 'Not read yet',
   permissionsSet: 'Permissions set', setFinished: 'Set finished (UTC)', setAge: 'Set age', setRepositories: 'Repositories listed',
   setRows: 'Role rows', setExclusions: 'Exclusions', fromClaims: 'From the claims', fromGithub: 'From GitHub', everyIdentity: 'Every identity (*)',
+  signIn: 'Sign-in', signIn_accounts: 'Local accounts', signIn_break_glass: 'Identity provider, with the break-glass account', publicKey: 'Signing public key fingerprint',
 };
 export type OperationsCopy = { [K in keyof typeof en]: string };
 export const operationsCopy: Record<Language, OperationsCopy> = {
@@ -68,5 +69,6 @@ export const operationsCopy: Record<Language, OperationsCopy> = {
     githubGrant: 'Grant do GitHub', github_current: 'Atual', github_expired: 'Expirado: o conjunto de permissões é mais antigo que o permitido', github_unread: 'Ainda não lido',
     permissionsSet: 'Conjunto de permissões', setFinished: 'Conjunto concluído (UTC)', setAge: 'Idade do conjunto', setRepositories: 'Repositórios listados',
     setRows: 'Linhas de papéis', setExclusions: 'Exclusões', fromClaims: 'Das claims', fromGithub: 'Do GitHub', everyIdentity: 'Todas as identidades (*)',
+    signIn: 'Login', signIn_accounts: 'Contas locais', signIn_break_glass: 'Provedor de identidade, com a conta de break glass', publicKey: 'Impressão digital da chave pública de assinatura',
   },
 };

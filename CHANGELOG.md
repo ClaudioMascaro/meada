@@ -8,6 +8,177 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Named workspaces and the proposal server with local accounts (#562, ADR 0024, from #551):
+  `[catalog]` and `[workspaces]` (and so `[proposals]`) accept `[accounts.github]` in place of
+  `[oidc.github]` and still need one of the two (`[catalog] needs [oidc.github] or
+  [accounts.github]`; `[workspaces]` now names `[ui]` and `[catalog]`, the catalog naming the
+  provider). Eligibility reads the account's verified login, an operator account is the platform
+  administrator, and workspace operator lists, version authors, history and audit records name
+  `local:` subjects. `POST /api/v1/account/tokens` takes `{"surface": "proposals"}` when the
+  console's bootstrap has `[proposals]` (audience `meada:proposals`; a 422 `invalid_surface`
+  without it), `config` carries `"proposals": true` and the profile page offers the surface. The
+  proposal server with `[accounts]` and no `[oidc]` reads the public key at start and admits only
+  those tokens (a session token or a node's agent token is a 401 with `WWW-Authenticate: Bearer`,
+  no protected resource metadata), deriving the subject, login, groups, grant and role from the
+  token alone. No golden changed.
+- The verified GitHub login of local accounts (#561, ADR 0024, from #551): `[accounts.github]`
+  (`host`, `roles`, `max_age_seconds` as `[oidc.github]`, plus `api`, `https://api.github.com` by
+  default on `github.com` and required on any other host) is the GitHub grant provider of local
+  accounts. A person pastes a GitHub personal access token on their profile page or sends it to
+  `POST /api/v1/account/github`; the console calls `GET /user` on `api` once, keeps the lowercase
+  login and drops the token, and answers a fresh session token carrying the login. A login
+  another account holds is a 409 `login_taken`, GitHub's refusal a 422, GitHub out of reach a
+  503. `POST /api/v1/account/github/remove` and the accounts page's `remove_github` action remove
+  it. Session and agent tokens carry the verified login, so the GitHub grant joins the groups
+  grant in the console (`session` shows `login`, `github_host` and `github_grant`), on nodes, in
+  a team operator's additions (`added_by`), in the audit's `login` column and in the exclusions
+  marks; `meada github-app roles` reads `[accounts.github]`. Recorded `account.github` and
+  `account.remove_github`; the personal access token is never stored, logged or audited. No
+  golden changed.
+
+- Helm chart support for local accounts (#565, ADR 0024, from #551): `modules.accounts` renders
+  `[accounts]` from values, with `values-accounts.yaml` as the proof-of-concept shape (a writable
+  console with `operations = true`, Postgres and no identity provider). The Ed25519 private key
+  comes from its own Secret and is mounted only in the console's `console` container, the public
+  key from another Secret in the console and the nodes (a node also gets `[ui] public_url`, the
+  token issuer, and `[postgres]`), the initial admin password from an optional Secret in the
+  console. `modules.accounts.groups` and `modules.accounts.github` carry `[accounts.groups]` and
+  `[accounts.github]` (the refresh job, with `modules.githubApp`, gets the GitHub grant provider and runs the role check, and
+  `modules.workspaces` accepts it in place of `modules.oidc.github`); `modules.accounts.breakGlass`
+  keeps `[accounts]` in the console alone beside `modules.oidc`. The chart refuses a missing
+  Postgres or console, equal key Secrets, accounts beside OIDC without break glass, and groups or
+  GitHub under break glass. `scripts/helm-check` covers the sections, the mounts and the refusals;
+  the chart READMEs (pt-BR, English, Spanish) no longer say a writable console needs OIDC. The
+  proposal server is not part of the chart. `[accounts.github]` renders as the spec names it and
+  is parsed once #561 lands. No golden changed.
+
+- One-command proof of concept in the Compose recipe (#564, ADR 0024, from #551):
+  `cp .env.accounts.example .env && docker compose up -d` starts the generations fleet, Valkey,
+  the store, Postgres with its migration, a writable console with local accounts and nodes that
+  admit agent tokens. `compose.accounts.yaml` adds the Ed25519 key pair (made once by the
+  `certificates` step, never printed, the private key mounted read-only in the console alone and
+  the public one in the nodes), the console's and the nodes' `[accounts]` manifests, a one-shot
+  `seed` of the first workspace version (only while the store has none) and a node proxy that
+  forwards `Authorization` with no static bearer. The other profiles are unchanged, and
+  `scripts/compose-check` covers the new one. The Compose README (pt, en, es) starts with it and
+  covers `MEADA_ADMIN_PASSWORD`, `meada ui reset-admin`, key rotation and rate limiting the
+  sign-in route at the proxy.
+
+- Agent tokens for the nodes (#560, ADR 0024, from #551): a signed-in local account generates,
+  on its profile page or through `POST /api/v1/account/tokens` (`{surface: "nodes", hours}`, 1 to
+  168 hours, 8 by default), an agent token shown once (`{token, expires_at, surface}`), signed
+  with the account's role and groups as its row stands and a random token id, recorded
+  `account.token` (surface, hours, token id, never the token). A change-required account gets the
+  403 `password_change_required`, a suspended one the role refusal; the console answers an agent
+  token with 401. A node with `[accounts]` and no `[oidc]` (`meada mcp --listen`) now reads the
+  signing public key at start, and the console's `[ui] public_url` from a `[ui]` section its
+  manifest must carry, refusing to start without either; it admits only agent tokens for the
+  nodes (a 401 `Bearer` before routing for any other, a session token included) and answers
+  under the grant `[accounts.groups]` gives their groups (every repository without the table),
+  as an identity provider's token is answered. The `accounts` feature now implies `ui`. No golden
+  changed.
+
+- Accounts page in the console (#559, ADR 0024, from #551): the global operator of a console with
+  local accounts gets `/accounts`, listing every account (role, groups, state with a suspended
+  account marked and a locked one saying until when, change required, last password change), a
+  create form (username pattern and password length checked first, "change on first sign-in"
+  checked by default) and, per account, role, groups, suspend, reactivate and reset password,
+  each behind the shared confirmation dialog with the server's refusals (`last_operator` and the
+  rest) shown unchanged. Any other role, and a console under break glass, gets the not-found
+  page at that path. The audit page names every `account.*` action in Portuguese and English.
+  The password rule `common_password` now has its own copy. Front end only, no golden changed.
+
+- Groups of local accounts (#558, ADR 0024, from #551): the global operator gives accounts groups
+  (`groups` on `POST /api/v1/accounts`, and the `groups` action of
+  `POST /api/v1/accounts/<username>`, each an owner name, else a 422 `invalid_group`);
+  `GET /api/v1/accounts` lists them, and each change is recorded `account.groups`.
+  `[accounts.groups]` maps groups to identities as `[oidc.groups]` does: once it exists, a local
+  session's grant is what its groups map to, and it bounds every view (the manifest, the
+  workspace and its versions, the store, the repositories, the credentials, the playground, the
+  exports and the graph views) as an identity provider's grant does; without it every local
+  account still reads every repository. A local viewer whose group owns an entry of the current
+  workspace version its grant reads is a team operator (ADR 0015). Session tokens carry the
+  groups, so a change reaches reads at the next sign-in and writes at once (the account row is
+  read before each). `GET /api/v1/admission` with `[accounts]` now answers: `accounts` (the mode,
+  `accounts` or `break_glass`, and the signing public key's fingerprint, `blake3:` and the hex
+  BLAKE3 hash of the raw Ed25519 key) and, without `[oidc]`, the groups table bounded by the
+  caller's grant. No golden changed.
+
+- Account administration for local accounts (#557, ADR 0024, from #551): the global operator
+  lists every account (`GET /api/v1/accounts`: username, role, state, the end of a lock, change
+  required, last password change, created and created by, never a hash), creates one
+  (`POST /api/v1/accounts`, `{username, role, password, change_required}`, the policy applied to
+  the temporary password, a change required unless the body turns it off; a malformed username a
+  422 `invalid_username`, a taken one a 409 `username_taken`) and changes one
+  (`POST /api/v1/accounts/<username>`, one `action`: `role`, `suspend`, `reactivate` or
+  `reset_password`, which clears a lock and requires a change unless told not to; an unknown
+  account a 404). Suspending or demoting the last active operator is a 409 `last_operator`,
+  decided under the schema's advisory lock so two requests at once never leave none. Anyone else
+  gets a 403. The routes answer whatever `[ui] operations` says; workspace and generation writes
+  keep requiring it. Every console write of a local account now reads the account's row first,
+  so a suspended or demoted account loses its writes at once, while its reads last until its
+  token expires. Audit actions `account.create`, `account.role`, `account.suspend`,
+  `account.reactivate` and `account.reset_password` name the account and the fields changed,
+  never a password, written before the change (503 `audit_unavailable` otherwise); `account` is
+  the route-level action of a change refused before its body is read. No route deletes or
+  renames an account; under `[accounts] break_glass` (#563) none of these routes exists, each a
+  404. No golden changed.
+
+- Break-glass account beside the identity provider (#563, ADR 0024, from #551): `[accounts]
+  break_glass = true` lets the section sit beside `[oidc]`; without `[oidc]` it is an error, and
+  `[accounts.groups]` or `[accounts.github]` under it is an error naming the table. The console
+  then signs in only the default account (any other username gets the wrong password's 401,
+  audited `not_break_glass`, the table never read) as the global operator, and admits its session
+  token beside the identity provider's, each bearer routed by its issuer to one verifier, so the
+  identity provider's keys never check a console token and the signing key never checks an
+  identity provider's; a console whose `[oidc] issuer` is its own `public_url` refuses to start.
+  The password change works; no other route of local accounts exists. Nodes and the proposal
+  server keep admitting only the identity provider and read no key. `config` adds `break_glass:
+  true`, and the front end offers a discreet break-glass sign-in (`/break-glass`) beside the
+  identity provider's, which now waits for a click under break glass. No golden changed.
+
+- Hardening of local sign-in (#555, ADR 0024, from #551): the password policy refuses an embedded
+  common-password list (SecLists, MIT, the entries of 12 to 128 characters, compared ignoring
+  case; rule `common_password`). Ten consecutive failed password checks, at sign-in or as a
+  password change's current password, lock an account for fifteen minutes, counted in a
+  transaction holding the account row so parallel attempts never pass ten; a success resets the
+  count. A locked account gets the wrong password's 401 at a hash's cost, its password unchecked
+  and its lock never extended, audited `locked_now` and then `locked`. A stored hash weaker than
+  the console's parameters is redone at the next successful sign-in. `meada ui reset-admin
+  --workspace <manifest>` (features `ui` and `accounts`) creates or reactivates `admin` as an
+  operator, clears its lock and sets the `MEADA_ADMIN_PASSWORD` value or a generated password
+  printed once on stdout, with a change required, recorded `account.reset_admin` `via` `cli`
+  before the write and refusing with exit 1 when the record cannot be written. No golden changed.
+
+- Local sign-in for the console (#554, ADR 0024, from #551): the new `accounts` cargo feature
+  (enabled by `cloud`) and its `[accounts]` section, which needs `[postgres]` and never sits
+  beside `[oidc]`, name the Ed25519 signing key pair and the default account's initial password,
+  each from a variable or a file. Migration 9 adds the `accounts` table, so `meada postgres
+  migrate` reaches version 9. On its start the console checks the key pair and creates the
+  default account `admin` (password `admin123` with a change required, or the policy-checked
+  `MEADA_ADMIN_PASSWORD` without) once, under an advisory lock. `POST /api/v1/login` answers a
+  session token the console signs with EdDSA for eight hours; a token carrying the change-required
+  mark opens only `POST /api/v1/account/password`. Every route but the static files, `config` and
+  `login` then needs a session token; `[ui] operations = true` is accepted with `[accounts]` and
+  no `[oidc]`; `config` names the sign-in mode (`sign_in`: `accounts`, or `oidc` with an identity
+  provider), `session` adds `account: true`, and
+  every account reads every repository while no groups table bounds it. Passwords are argon2id at
+  OWASP's parameters under a policy of 12 to 128 characters that refuses the default password and
+  the username, at most four hashes run at once, and every sign-in, refusal and password change
+  is audited (`account.login`, `account.password`, role `none` for an unknown username) before its
+  token. The module table gains `accounts`; no golden changed.
+
+- The console's sign-in pages for local accounts (#556, from #551): when `config` says
+  `"sign_in": "accounts"` the console shows its own sign-in page (labelled username and password,
+  one generic refusal, `busy` and `audit_unavailable` shown as themselves) instead of the identity
+  provider's redirect. A change-required sign-in goes straight to a forced password change page
+  (the current password and the new one twice, the server's rule shown on a refusal) that offers
+  nothing to navigate to until it succeeds, and then opens the workspace. The session token lives
+  in `sessionStorage` for the tab's life, is sent as the bearer and is cleared on sign-out and on
+  any 401 (which returns to sign-in; a refused current password in the change is not one); it is never in `localStorage`, a URL
+  or a log. A profile page offers the voluntary password change and sign-out. pt-BR and English
+  copy; the identity provider flow is unchanged. Front end only: no golden changed.
+
 - `meada status` names a Kotlin file the grammar misreads (#546, from #434). A declaration read
   as an infix call leaves the file out of the index; the file now sets the new `Facts::misparsed`
   (absent from every other file's stored facts) instead of `unbuilt`, and a new status line,
@@ -17,6 +188,14 @@ All notable changes to Meada are recorded here. The format follows
   after deleting `.meada/index.db`. The `cli.status-budget` goldens gained the new line.
 
 ### Changed
+
+- The grant providers take neutral inputs (#553, from #551): the new `grant` module computes a
+  subject's grant from its groups and its GitHub login (`Providers::grant`), with no reference
+  to a token, and holds the GitHub grant provider's permissions cache, which moved out of the
+  OIDC module; the OIDC module feeds it from a token's claims. Every reader of `[oidc.github]`
+  goes through `Manifest::github`, the console and the proposal server build their sessions
+  from a neutral admitted subject (`grant::Admitted`), and a node's pass carries only a grant.
+  Nothing a caller sees changes; no golden changed.
 
 - The axum provider reader walks each value once per file (#431): the values a file's rebound
   `let`s reach share one `seen` set, and `Code::origins` is not asked for a call whose builder

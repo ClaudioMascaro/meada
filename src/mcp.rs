@@ -522,33 +522,53 @@ enum Routes {
 }
 
 /// What admits a request before routing: the OIDC module when the manifest has `[oidc]`
-/// (feature `oidc`), else nothing, the operator's proxy admitting clients (ADR 0011).
+/// (feature `oidc`), else, with `[accounts]` (feature `accounts`, #560), the agent tokens for the
+/// nodes the console signs, else nothing, the operator's proxy admitting clients (ADR 0011). The
+/// verifier feeds the node's grant providers, `providers`.
 #[derive(Clone)]
 struct Gate {
     #[cfg(feature = "oidc")]
     oidc: Option<Arc<crate::oidc::Oidc>>,
+    #[cfg(feature = "accounts")]
+    local: Option<Arc<crate::accounts::Agents>>,
+    #[cfg(feature = "oidc")]
+    providers: Arc<crate::grant::Providers>,
 }
 
-/// What a request `Gate` let through may read: every identity, or those its token grants.
-/// Routing hands it to the endpoint in the request's extensions, so a call's workspace holds
-/// only what it may read.
+/// What a request `Gate` let through may read: every identity, or those its grant reads,
+/// whichever verifier admitted it. Routing hands it to the endpoint in the request's
+/// extensions, so a call's workspace holds only what it may read.
 #[derive(Clone)]
 struct Pass {
     #[cfg(feature = "oidc")]
-    token: Option<(Arc<crate::oidc::Oidc>, crate::oidc::Grant)>,
+    grant: Option<crate::grant::Grant>,
 }
 
 impl Gate {
-    /// The gate of `manifest`: with `[oidc]`, the issuer's metadata and JWKS read now, a start
-    /// check before the listener binds.
-    fn new(manifest: &Manifest) -> crate::Result<Self> {
+    /// The gate of `manifest`, read from `file`: with `[oidc]`, the issuer's metadata and JWKS
+    /// read now, a start check before the listener binds; with `[accounts]` and no `[oidc]`, the
+    /// signing key's public half read now (`local`).
+    fn new(manifest: &Manifest, file: &Path) -> crate::Result<Self> {
         #[cfg(feature = "oidc")]
-        let oidc = (manifest.oidc.clone().map(crate::oidc::Oidc::start)).transpose()?;
-        #[cfg(not(feature = "oidc"))]
-        let _ = manifest;
+        let providers = Arc::new(crate::grant::Providers::of(manifest));
+        #[cfg(feature = "oidc")]
+        let start = |config| crate::oidc::Oidc::start(config, providers.clone());
+        #[cfg(feature = "oidc")]
+        let oidc = (manifest.oidc.clone().map(start)).transpose()?;
+        #[cfg(feature = "accounts")]
+        let local = match (&manifest.accounts, &oidc) {
+            (Some(accounts), None) => Some(Arc::new(local_admission(manifest, accounts, file)?)),
+            // With `[oidc]` a node ignores `[accounts]` (ADR 0024).
+            _ => None,
+        };
+        let _ = (manifest, file);
         Ok(Self {
             #[cfg(feature = "oidc")]
             oidc,
+            #[cfg(feature = "accounts")]
+            local,
+            #[cfg(feature = "oidc")]
+            providers,
         })
     }
 
@@ -564,22 +584,96 @@ impl Gate {
         if let Some(oidc) = &self.oidc {
             let admit = || oidc.admit(request.headers(), path, identity);
             let grant = tokio::task::block_in_place(admit)?;
-            let token = Some((oidc.clone(), grant));
-            return Ok(Pass { token });
+            return Ok(Pass { grant: Some(grant) });
+        }
+        // An agent token for the nodes: its groups and verified login (#561) through the grant
+        // providers, every repository with no table, as the console computes a local session's
+        // grant (ADR 0024).
+        #[cfg(feature = "accounts")]
+        if let Some(local) = &self.local {
+            let claims = local.admit(request.headers()).map_err(|sent| {
+                let challenge = crate::accounts::challenge(sent);
+                Box::new(challenged(StatusCode::UNAUTHORIZED, challenge))
+            })?;
+            let login = claims.login.as_deref();
+            let grant = self.providers.local(&claims.groups, login).union();
+            return Ok(Pass { grant: Some(grant) });
         }
         let _ = (request, path, identity);
         Ok(Pass {
             #[cfg(feature = "oidc")]
-            token: None,
+            grant: None,
         })
     }
+
+    /// The 403 for `path`, an endpoint of `identity`, when `pass` may not read it: the challenge
+    /// of the verifier that admitted it.
+    fn refused(
+        &self,
+        pass: &Pass,
+        path: &str,
+        identity: &str,
+    ) -> Option<Response<BoxBody<Bytes, Infallible>>> {
+        #[cfg(feature = "oidc")]
+        if let (Some(oidc), Some(grant)) = (&self.oidc, &pass.grant)
+            && !grant.reads(identity)
+        {
+            return Some(oidc.forbidden(path));
+        }
+        #[cfg(feature = "accounts")]
+        if let (Some(_), Some(grant)) = (&self.local, &pass.grant)
+            && !grant.reads(identity)
+        {
+            let challenge = "Bearer error=\"insufficient_scope\"";
+            return Some(challenged(StatusCode::FORBIDDEN, challenge));
+        }
+        let _ = (pass, path, identity);
+        None
+    }
+}
+
+/// The node's admission of agent tokens of `[accounts]` beside no `[oidc]` (#560), in `manifest`
+/// read from `file`: the public half read now and the console's `[ui] public_url`, the issuer of
+/// every token, which the node's manifest carries as the refresh job's does. Either missing or
+/// unreadable refuses the start, naming its key and never a value.
+#[cfg(feature = "accounts")]
+fn local_admission(
+    manifest: &Manifest,
+    accounts: &crate::accounts::Config,
+    file: &Path,
+) -> crate::Result<crate::accounts::Agents> {
+    let src = std::fs::read_to_string(file)?;
+    let at = |(key, problem): crate::modules::Problem| {
+        crate::config::error_at(file, &src, key, &problem)
+    };
+    let Some(ui) = &manifest.ui else {
+        return Err(at(("accounts", Msg::AccountsNodeIssuer.text())));
+    };
+    (accounts.agents(&ui.public_url, crate::accounts::NODES)).map_err(at)
+}
+
+/// The plain `status` answer of the agent tokens' gate with its `challenge`, as an identity
+/// provider's refusal reads, without `resource_metadata`: there is no authorization server to
+/// discover (ADR 0024).
+#[cfg(feature = "accounts")]
+fn challenged(status: StatusCode, challenge: &'static str) -> Response<BoxBody<Bytes, Infallible>> {
+    let body = match status {
+        StatusCode::UNAUTHORIZED => "unauthorized\n",
+        _ => "forbidden\n",
+    };
+    Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+        .header(header::WWW_AUTHENTICATE, challenge)
+        .body(Full::from(body).boxed())
+        .expect("a valid response")
 }
 
 impl Pass {
     /// Whether the request may read `identity`.
     fn reads(&self, identity: &str) -> bool {
         #[cfg(feature = "oidc")]
-        if let Some((_, grant)) = &self.token {
+        if let Some(grant) = &self.grant {
             return grant.reads(identity);
         }
         let _ = identity;
@@ -590,22 +684,10 @@ impl Pass {
     #[cfg(feature = "snapshot")]
     fn grant(&self) -> meada_core::authorize::Grant {
         #[cfg(feature = "oidc")]
-        if let Some((_, grant)) = &self.token {
+        if let Some(grant) = &self.grant {
             return grant.core();
         }
         meada_core::authorize::Grant::All
-    }
-
-    /// The 403 for `path`, an endpoint of `identity`, when the request may not read it.
-    fn refused(&self, path: &str, identity: &str) -> Option<Response<BoxBody<Bytes, Infallible>>> {
-        #[cfg(feature = "oidc")]
-        if let Some((oidc, grant)) = &self.token
-            && !grant.reads(identity)
-        {
-            return Some(oidc.forbidden(path));
-        }
-        let _ = (path, identity);
-        None
     }
 }
 
@@ -641,7 +723,7 @@ pub fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
         return Err(Msg::WorkspaceStoreRefused(&shown).text().into());
     }
     let listed = Arc::new(engine::served(manifest)?);
-    let gate = Gate::new(&listed)?;
+    let gate = Gate::new(&listed, manifest)?;
     let served: Vec<String> = listed.entries.iter().map(|l| l.repo.clone()).collect();
     let manifest: Arc<Path> = manifest.into();
     run(address, gate, move |config| {
@@ -672,7 +754,7 @@ pub fn listen_generations(listen: &str, manifest: &Path) -> crate::Result<()> {
     let pins = read.generations.is_some();
     #[cfg(not(feature = "generation-pointer"))]
     let pins = false;
-    let gate = Gate::new(&read)?;
+    let gate = Gate::new(&read, manifest)?;
     run(address, gate, move |config| Routes::Generation {
         current: crate::snapshot::serve::Current::new(local_dir),
         config: config.clone(),
@@ -689,9 +771,7 @@ fn run(
 ) -> crate::Result<()> {
     serve_http(address, move |_, config| {
         #[cfg(feature = "oidc")]
-        if let Some(oidc) = &gate.oidc {
-            oidc.listening();
-        }
+        gate.providers.listening();
         let routes = Arc::new(routes(config));
         move |request| {
             let (routes, gate) = (routes.clone(), gate.clone());
@@ -889,7 +969,7 @@ async fn route(
             endpoints,
             listing: all,
         } => match endpoints.get(identity) {
-            Some(endpoint) => match pass.refused(identity, identity) {
+            Some(endpoint) => match gate.refused(&pass, identity, identity) {
                 Some(refused) => refused,
                 None => {
                     request.extensions_mut().insert(pass.clone());
@@ -969,7 +1049,7 @@ async fn route(
                     if workspace.is_none()
                         && held.listed.entries.iter().any(|l| l.repo == target) =>
                 {
-                    if let Some(refused) = pass.refused(identity, target) {
+                    if let Some(refused) = gate.refused(&pass, identity, target) {
                         return refused;
                     }
                     let id = held.id.clone();
@@ -992,7 +1072,7 @@ async fn route(
                     // A workspace route answers 404 where the plain route would say 403: a 403
                     // would confirm that the id exists.
                     if workspace.is_none()
-                        && let Some(refused) = pass.refused(identity, target)
+                        && let Some(refused) = gate.refused(&pass, identity, target)
                     {
                         return refused;
                     }

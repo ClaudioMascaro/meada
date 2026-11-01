@@ -398,6 +398,10 @@ pub enum Msg<'a> {
         section: &'a str,
         needed: &'a [&'a str],
     },
+    /// A section that needs the GitHub grant provider, in a build with local accounts (#562):
+    /// `[oidc.github]` or `[accounts.github]`.
+    #[cfg(all(feature = "workspaces", feature = "accounts"))]
+    NeedsGithubProvider(&'a str),
     #[cfg(any(
         feature = "generation-pointer",
         feature = "oidc",
@@ -1007,6 +1011,9 @@ pub enum Msg<'a> {
     /// Console operator configuration requires OIDC.
     #[cfg(feature = "ui")]
     UiNeedsOidc,
+    /// Console writes need an admission that names an operator: `[oidc]` or `[accounts]`.
+    #[cfg(all(feature = "ui", feature = "accounts"))]
+    UiNeedsAdmission,
     /// Enabled writes require one operator admission key.
     #[cfg(feature = "ui")]
     UiOperatorNeeded,
@@ -1043,6 +1050,207 @@ pub enum Msg<'a> {
     /// A subject the identity provider deactivated (#335): the 403 `deprovisioned`.
     #[cfg(all(feature = "ui", feature = "directory"))]
     UiDeprovisioned,
+    /// `[accounts]` with both keys of a pair: the other key's name (ADR 0024).
+    #[cfg(feature = "accounts")]
+    AccountsBoth(&'a str),
+    /// A variable `[accounts]` names that is not set.
+    #[cfg(feature = "accounts")]
+    AccountsUnset(&'a str),
+    /// A variable `[accounts]` names whose value is not UTF-8.
+    #[cfg(feature = "accounts")]
+    AccountsNotUtf8,
+    /// `[accounts]` naming no public or private key, at the console's start.
+    #[cfg(feature = "accounts")]
+    AccountsKeyMissing {
+        env: &'a str,
+        file: &'a str,
+        private: bool,
+    },
+    /// A key of `[accounts]` that is no Ed25519 key in PEM.
+    #[cfg(feature = "accounts")]
+    AccountsNotEd25519 {
+        private: bool,
+    },
+    /// A private key that does not sign what the public key verifies.
+    #[cfg(feature = "accounts")]
+    AccountsKeyMismatch,
+    /// A node with `[accounts]` and no `[oidc]` whose manifest has no `[ui]`: its `public_url` is
+    /// the issuer of every agent token (#560).
+    #[cfg(feature = "accounts")]
+    AccountsNodeIssuer,
+    /// `POST account/tokens` whose body does not parse (#560).
+    #[cfg(feature = "accounts")]
+    AccountsTokenBody(u64),
+    /// An agent token for a surface the console does not issue for; whether it issues for the
+    /// proposal server's.
+    #[cfg(feature = "accounts")]
+    AccountsTokenSurface(bool),
+    /// An agent token's validity outside its bounds, in hours.
+    #[cfg(feature = "accounts")]
+    AccountsTokenHours(u64),
+    /// An agent token for a suspended or unknown account: the role refusal of the write.
+    #[cfg(feature = "accounts")]
+    AccountsTokenRefused,
+    /// The audit message of an agent token issued.
+    #[cfg(feature = "accounts")]
+    AccountsTokenIssued,
+    /// `POST account/github` whose body does not parse (#561).
+    #[cfg(feature = "accounts")]
+    AccountsGithubBody,
+    /// A pasted personal access token that is no header value.
+    #[cfg(feature = "accounts")]
+    AccountsGithubToken,
+    /// A verified login change of a suspended or unknown account: the role refusal of the write.
+    #[cfg(feature = "accounts")]
+    AccountsGithubForbidden,
+    /// GitHub refused the pasted personal access token.
+    #[cfg(feature = "accounts")]
+    AccountsGithubRefused,
+    /// GitHub's `login` that is no login.
+    #[cfg(feature = "accounts")]
+    AccountsGithubLogin,
+    /// The stderr line of GitHub out of reach, with the reason (never the token nor the body).
+    #[cfg(feature = "accounts")]
+    AccountsGithubUnreachable(&'a str),
+    /// The answer of GitHub out of reach.
+    #[cfg(feature = "accounts")]
+    AccountsGithubUnavailable,
+    /// A login another account holds.
+    #[cfg(feature = "accounts")]
+    AccountsLoginTaken,
+    /// The audit message of a verified login stored.
+    #[cfg(feature = "accounts")]
+    AccountsGithubVerified,
+    /// The audit message of a verified login removed.
+    #[cfg(feature = "accounts")]
+    AccountsGithubRemoved,
+    /// `[accounts]` beside `[oidc]` without `break_glass = true`: local sign-in is off once an
+    /// identity provider is configured.
+    #[cfg(feature = "accounts")]
+    AccountsBesideOidc,
+    /// `[accounts] break_glass` without `[oidc]`: it keeps the default account beside an identity
+    /// provider, and there is none.
+    #[cfg(feature = "accounts")]
+    AccountsBreakGlassNeedsOidc,
+    /// A table of `[accounts]` (`groups`, `github`) under `break_glass`: the break-glass account is
+    /// the global operator and needs no grant. The table's dotted name.
+    #[cfg(feature = "accounts")]
+    AccountsUnderBreakGlass(&'a str),
+    /// `[oidc] issuer` equal to `[ui] public_url` under break glass: a token's issuer could not
+    /// tell the identity provider's tokens from the console's own.
+    #[cfg(all(feature = "ui", feature = "accounts"))]
+    AccountsBreakGlassIssuer,
+    /// The password policy's rules, each named, never the password.
+    #[cfg(feature = "accounts")]
+    AccountsPasswordShort(usize),
+    #[cfg(feature = "accounts")]
+    AccountsPasswordLong(usize),
+    #[cfg(feature = "accounts")]
+    AccountsPasswordDefault,
+    #[cfg(feature = "accounts")]
+    AccountsPasswordUsername,
+    #[cfg(feature = "accounts")]
+    AccountsPasswordCurrent,
+    #[cfg(feature = "accounts")]
+    AccountsPasswordCommon,
+    /// `meada ui reset-admin` on a manifest without `[accounts]`: the manifest.
+    #[cfg(all(feature = "ui", feature = "accounts"))]
+    AccountsResetNoSection(&'a str),
+    /// The audit message of `meada ui reset-admin`: whether it created `admin`.
+    #[cfg(all(feature = "ui", feature = "accounts"))]
+    AccountsResetAdmin {
+        created: bool,
+    },
+    /// `meada ui reset-admin` done, on stderr: whether it created `admin`, and the key whose
+    /// password it set (none: the generated one, on stdout).
+    #[cfg(all(feature = "ui", feature = "accounts"))]
+    AccountsResetDone {
+        created: bool,
+        from: Option<&'a str>,
+    },
+    /// `meada ui reset-admin`'s description and its `--workspace`.
+    #[cfg(all(feature = "ui", feature = "accounts"))]
+    UiResetAdmin,
+    #[cfg(all(feature = "ui", feature = "accounts"))]
+    UiResetAdminWorkspaceHelp,
+    /// The default account could not be made at the console's start: Postgres's reason.
+    #[cfg(feature = "accounts")]
+    AccountsBootstrap(&'a str),
+    /// The 503 `busy` of a hash past the console's bound.
+    #[cfg(feature = "accounts")]
+    AccountsBusy,
+    /// The one 401 `invalid_credentials` of a sign-in or a password change.
+    #[cfg(feature = "accounts")]
+    AccountsInvalid,
+    /// A request to the console with no valid session token.
+    #[cfg(feature = "accounts")]
+    AccountsUnauthorized,
+    /// A session token with the change-required mark, on any route but the password change.
+    #[cfg(feature = "accounts")]
+    AccountsChangeRequired,
+    /// A sign-in whose body is no `{"username", "password"}`.
+    #[cfg(feature = "accounts")]
+    AccountsLoginBody,
+    /// A password change whose body is no `{"current", "new"}`.
+    #[cfg(feature = "accounts")]
+    AccountsPasswordBody,
+    /// An accounts row that fails its checks, naming the table and never its values.
+    #[cfg(feature = "accounts")]
+    AccountsBadRow(&'a str),
+    /// The audit message of an accepted sign-in.
+    #[cfg(feature = "accounts")]
+    AccountsSignedIn,
+    /// The audit message of a password change.
+    #[cfg(feature = "accounts")]
+    AccountsPasswordChanged,
+    /// The accounts table could not be written.
+    #[cfg(feature = "accounts")]
+    AccountsUnavailable,
+    /// A session token the console could not sign.
+    #[cfg(feature = "accounts")]
+    AccountsUnsigned,
+    /// Account administration by anyone but the global operator (#557).
+    #[cfg(feature = "accounts")]
+    AccountsOperatorRequired,
+    /// An account creation whose body is no `{"username", "role", "password"}`.
+    #[cfg(feature = "accounts")]
+    AccountsCreateBody,
+    /// An account change whose body is no one action with its fields.
+    #[cfg(feature = "accounts")]
+    AccountsChangeBody,
+    /// A username that is not 1 to 64 of the allowed characters.
+    #[cfg(feature = "accounts")]
+    AccountsUsernameInvalid,
+    /// An account's group that is no name an entry's owner may be (#558).
+    #[cfg(feature = "accounts")]
+    AccountsGroupInvalid,
+    /// A creation's username another account holds.
+    #[cfg(feature = "accounts")]
+    AccountsTaken,
+    /// No account of that username.
+    #[cfg(feature = "accounts")]
+    AccountsUnknown,
+    /// A suspension or a demotion of the last active operator.
+    #[cfg(feature = "accounts")]
+    AccountsLastOperator,
+    /// The audit message of an account created.
+    #[cfg(feature = "accounts")]
+    AccountsCreated,
+    /// The audit message of an account's role changed.
+    #[cfg(feature = "accounts")]
+    AccountsRoleChanged,
+    /// The audit message of an account's groups changed (#558).
+    #[cfg(feature = "accounts")]
+    AccountsGroupsChanged,
+    /// The audit message of an account suspended.
+    #[cfg(feature = "accounts")]
+    AccountsSuspended,
+    /// The audit message of an account reactivated.
+    #[cfg(feature = "accounts")]
+    AccountsReactivated,
+    /// The audit message of an account's password reset.
+    #[cfg(feature = "accounts")]
+    AccountsPasswordReset,
     /// The directory could not be read: the stderr line, naming the directory and never a claim.
     #[cfg(all(feature = "ui", feature = "directory"))]
     DirectoryUnreadable(&'a str),
@@ -2023,11 +2231,16 @@ impl Msg<'_> {
                 format!("store: unreachable ({reason})"),
                 format!("store: inalcançável ({reason})"),
             ),
+            #[cfg(all(feature = "workspaces", feature = "accounts"))]
+            Msg::NeedsGithubProvider(section) => pick(
+                format!("[{section}] needs [oidc.github] or [accounts.github]"),
+                format!("[{section}] exige [oidc.github] ou [accounts.github]"),
+            ),
             #[cfg(any(
                 feature = "generation-pointer",
                 feature = "github-app",
                 feature = "directory",
-                                       all(feature = "oidc", feature = "postgres")
+                all(feature = "oidc", feature = "postgres")
             ))]
             Msg::NeedsSections { section, needed } => {
                 let needed: Vec<String> = needed.iter().map(|s| format!("[{s}]")).collect();
@@ -2670,8 +2883,8 @@ impl Msg<'_> {
             ),
             #[cfg(feature = "github-app")]
             Msg::RolesNoGithub(manifest) => pick(
-                format!("{manifest}: meada github-app roles needs [oidc.github]"),
-                format!("{manifest}: meada github-app roles exige [oidc.github]"),
+                format!("{manifest}: meada github-app roles needs [oidc.github] or [accounts.github]"),
+                format!("{manifest}: meada github-app roles exige [oidc.github] ou [accounts.github]"),
             ),
             #[cfg(feature = "github-app")]
             Msg::RolesFenceEnv => pick(
@@ -3356,6 +3569,11 @@ impl Msg<'_> {
             ),
             #[cfg(feature = "ui")]
             Msg::UiNeedsOidc => pick("requires [oidc]".into(), "exige [oidc]".into()),
+            #[cfg(all(feature = "ui", feature = "accounts"))]
+            Msg::UiNeedsAdmission => pick(
+                "requires [oidc] or [accounts]".into(),
+                "exige [oidc] ou [accounts]".into(),
+            ),
             #[cfg(feature = "ui")]
             Msg::UiOperatorNeeded => pick(
                 "set `ui.operator_groups` or `ui.operator_claim`".into(),
@@ -3418,6 +3636,384 @@ impl Msg<'_> {
                 "the identity provider deactivated this account".into(),
                 "o provedor de identidade desativou esta conta".into(),
             ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsBoth(other) => pick(
+                format!("is set together with {other}: use one of the two"),
+                format!("está junto de {other}: use um dos dois"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsNotUtf8 => pick(
+                "names a variable whose value is not UTF-8".into(),
+                "nomeia uma variável cujo valor não é UTF-8".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsUnset(var) => pick(
+                format!("the variable {var} is not set"),
+                format!("a variável {var} não está definida"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsKeyMissing {
+                env,
+                file,
+                private,
+            } => {
+                let (en, pt_br) = half_of(*private);
+                pick(
+                    format!("names no {en} key of the signing key pair: set `{env}` or `{file}`"),
+                    format!(
+                        "não nomeia a chave {pt_br} do par de chaves de assinatura: defina \
+                         `{env}` ou `{file}`"
+                    ),
+                )
+            }
+            #[cfg(feature = "accounts")]
+            Msg::AccountsNotEd25519 { private } => {
+                let (en, pt_br) = half_of(*private);
+                pick(
+                    format!("is not an Ed25519 {en} key in PEM"),
+                    format!("não é uma chave {pt_br} Ed25519 em PEM"),
+                )
+            }
+            #[cfg(feature = "accounts")]
+            Msg::AccountsKeyMismatch => pick(
+                "does not match the public key: what it signs, the public key does not verify"
+                    .into(),
+                "não corresponde à chave pública: o que ela assina, a chave pública não verifica"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsNodeIssuer => pick(
+                "a node admits the agent tokens the console issues, whose issuer is its \
+                 `[ui] public_url`: copy the console's [ui] section into this manifest"
+                    .into(),
+                "um nó admite os tokens de agente que a console emite, cujo emissor é a \
+                 `[ui] public_url` dela: copie a seção [ui] da console para este manifesto"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsTokenBody(max) => pick(
+                format!("the body must be {{\"surface\": <surface>, \"hours\": <1 to {max}>}}"),
+                format!("o corpo deve ser {{\"surface\": <superfície>, \"hours\": <1 a {max}>}}"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsTokenSurface(false) => pick(
+                "agent tokens are issued for the surface `nodes`".into(),
+                "tokens de agente são emitidos para a superfície `nodes`".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsTokenSurface(true) => pick(
+                "agent tokens are issued for the surfaces `nodes` and `proposals`".into(),
+                "tokens de agente são emitidos para as superfícies `nodes` e `proposals`".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsTokenHours(max) => pick(
+                format!("an agent token is valid from 1 to {max} hours"),
+                format!("um token de agente vale de 1 a {max} horas"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsTokenRefused => pick(
+                "this account may not issue agent tokens: it is suspended or unknown".into(),
+                "esta conta não pode emitir tokens de agente: está suspensa ou não existe".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsTokenIssued => pick(
+                "agent token issued".into(),
+                "token de agente emitido".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubBody => pick(
+                "the body must be {\"token\": \"<a GitHub personal access token>\"}".into(),
+                "o corpo deve ser {\"token\": \"<um token de acesso pessoal do GitHub>\"}".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubToken => pick(
+                "a GitHub personal access token is visible ASCII characters, with no space".into(),
+                "um token de acesso pessoal do GitHub é feito de caracteres ASCII visíveis, sem \
+                 espaço"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubForbidden => pick(
+                "this account may not change its GitHub login: it is suspended or unknown".into(),
+                "esta conta não pode mudar seu login do GitHub: está suspensa ou não existe".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubRefused => pick(
+                "GitHub refused this personal access token".into(),
+                "o GitHub recusou este token de acesso pessoal".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubLogin => pick(
+                "GitHub answered with a login Meada does not take".into(),
+                "o GitHub respondeu com um login que o Meada não aceita".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubUnreachable(reason) => pick(
+                format!("GitHub out of reach for a login verification: {reason}"),
+                format!("GitHub fora de alcance para uma verificação de login: {reason}"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubUnavailable => pick(
+                "GitHub could not be reached; try again later".into(),
+                "não foi possível alcançar o GitHub; tente de novo mais tarde".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsLoginTaken => pick(
+                "another account already verified this GitHub login".into(),
+                "outra conta já verificou este login do GitHub".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubVerified => pick(
+                "GitHub login verified".into(),
+                "login do GitHub verificado".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubRemoved => pick(
+                "GitHub login removed".into(),
+                "login do GitHub removido".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsBesideOidc => pick(
+                "[accounts] cannot sit beside [oidc]: local sign-in is off once an identity \
+                 provider is configured; only `break_glass = true` keeps the default account"
+                    .into(),
+                "[accounts] não pode ficar junto de [oidc]: o login local fica desligado quando \
+                 há um provedor de identidade; só `break_glass = true` mantém a conta padrão"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsBreakGlassNeedsOidc => pick(
+                "needs [oidc]: break glass keeps the default account beside an identity provider, \
+                 and none is configured"
+                    .into(),
+                "precisa de [oidc]: o break glass mantém a conta padrão junto de um provedor de \
+                 identidade, e não há nenhum"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsUnderBreakGlass(table) => pick(
+                format!(
+                    "[{table}] cannot sit under `break_glass = true`: the break-glass account is \
+                     the global operator and needs no grant"
+                ),
+                format!(
+                    "[{table}] não pode ficar sob `break_glass = true`: a conta de break glass é \
+                     o operador global e não precisa de concessão"
+                ),
+            ),
+            #[cfg(all(feature = "ui", feature = "accounts"))]
+            Msg::AccountsBreakGlassIssuer => pick(
+                "the identity provider's issuer is the console's own public_url: under break glass \
+                 a token's issuer must tell the two apart"
+                    .into(),
+                "o emissor do provedor de identidade é a própria public_url da console: com break \
+                 glass o emissor de um token precisa distinguir os dois"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordShort(min) => pick(
+                format!("the password has fewer than {min} characters"),
+                format!("a senha tem menos de {min} caracteres"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordLong(max) => pick(
+                format!("the password has more than {max} characters"),
+                format!("a senha tem mais de {max} caracteres"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordDefault => pick(
+                "the password is the published default password".into(),
+                "a senha é a senha padrão publicada".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordUsername => pick(
+                "the password is the username".into(),
+                "a senha é o nome de usuário".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordCurrent => pick(
+                "the new password is the current one".into(),
+                "a nova senha é a atual".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordCommon => pick(
+                "the password is on the list of common passwords".into(),
+                "a senha está na lista de senhas comuns".into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "accounts"))]
+            Msg::AccountsResetNoSection(file) => pick(
+                format!("{file} has no [accounts] section: there is no default account to reset"),
+                format!("{file} não tem a seção [accounts]: não há conta padrão a redefinir"),
+            ),
+            #[cfg(all(feature = "ui", feature = "accounts"))]
+            Msg::AccountsResetAdmin { created } => match created {
+                true => pick(
+                    "admin created as an operator, a password change required".into(),
+                    "admin criado como operador, com troca de senha obrigatória".into(),
+                ),
+                false => pick(
+                    "admin reactivated as an operator, its lock cleared, a password change \
+                     required"
+                        .into(),
+                    "admin reativado como operador, bloqueio removido, com troca de senha \
+                     obrigatória"
+                        .into(),
+                ),
+            },
+            #[cfg(all(feature = "ui", feature = "accounts"))]
+            Msg::AccountsResetDone { created, from } => {
+                let done = Msg::AccountsResetAdmin { created: *created }.text();
+                match from {
+                    Some(key) => pick(
+                        format!("{done}; its password is the one `{key}` names"),
+                        format!("{done}; a senha é a que `{key}` indica"),
+                    ),
+                    None => pick(
+                        format!("{done}; its generated password is on stdout, shown once"),
+                        format!("{done}; a senha gerada está na saída padrão, mostrada uma vez"),
+                    ),
+                }
+            }
+            #[cfg(all(feature = "ui", feature = "accounts"))]
+            Msg::UiResetAdmin => pick(
+                "Recover the default account: create or reactivate admin as an operator, clear \
+                 its lock and set a password that must be changed at the next sign-in."
+                    .into(),
+                "Recupera a conta padrão: cria ou reativa admin como operador, remove o bloqueio \
+                 e define uma senha que precisa ser trocada no próximo login."
+                    .into(),
+            ),
+            #[cfg(all(feature = "ui", feature = "accounts"))]
+            Msg::UiResetAdminWorkspaceHelp => pick(
+                "The bootstrap manifest, with its [accounts] and [postgres] sections".into(),
+                "O manifesto de bootstrap, com as seções [accounts] e [postgres]".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsBootstrap(reason) => pick(
+                format!("the default account cannot be created: {reason}"),
+                format!("a conta padrão não pode ser criada: {reason}"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsBusy => pick(
+                "too many sign-ins at once: try again".into(),
+                "logins demais ao mesmo tempo: tente de novo".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsInvalid => pick(
+                "the username or the password is wrong".into(),
+                "o nome de usuário ou a senha está errado".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsUnauthorized => pick(
+                "a valid session token is needed: sign in".into(),
+                "é preciso um token de sessão válido: entre".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsChangeRequired => pick(
+                "the password must be changed first".into(),
+                "a senha precisa ser trocada antes".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsLoginBody => pick(
+                "the body must be {\"username\", \"password\"}".into(),
+                "o corpo deve ser {\"username\", \"password\"}".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordBody => pick(
+                "the body must be {\"current\", \"new\"}".into(),
+                "o corpo deve ser {\"current\", \"new\"}".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsBadRow(table) => pick(
+                format!("accounts: a row of {table} fails its checks and admits nothing"),
+                format!("contas: uma linha de {table} falha nas verificações e não admite nada"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsSignedIn => pick("signed in".into(), "entrou".into()),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordChanged => pick("password changed".into(), "senha trocada".into()),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsUnavailable => pick(
+                "the accounts in Postgres are unavailable".into(),
+                "as contas no Postgres estão indisponíveis".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsUnsigned => pick(
+                "the session token could not be signed".into(),
+                "o token de sessão não pôde ser assinado".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsOperatorRequired => pick(
+                "account administration needs the global operator".into(),
+                "a administração de contas exige o operador global".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsCreateBody => pick(
+                "the body must be {\"username\", \"role\", \"password\"}, with optional \
+                 \"groups\" and \"change_required\""
+                    .into(),
+                "o corpo deve ser {\"username\", \"role\", \"password\"}, com \"groups\" e \
+                 \"change_required\" opcionais"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsChangeBody => pick(
+                "the body must be one {\"action\"} (`role`, `groups`, `suspend`, `reactivate` \
+                 or `reset_password`) with that action's fields"
+                    .into(),
+                "o corpo deve ser uma {\"action\"} (`role`, `groups`, `suspend`, `reactivate` \
+                 ou `reset_password`) com os campos dessa ação"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsUsernameInvalid => {
+                let max = crate::accounts::USERNAME_MAX;
+                pick(
+                    format!("a username is 1 to {max} lowercase ASCII letters, digits, `.`, `-` and `_`"),
+                    format!("um nome de usuário tem de 1 a {max} letras ASCII minúsculas, dígitos, `.`, `-` e `_`"),
+                )
+            }
+            #[cfg(feature = "accounts")]
+            Msg::AccountsTaken => pick(
+                "another account has that username".into(),
+                "outra conta tem esse nome de usuário".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsUnknown => pick(
+                "no account has that username".into(),
+                "nenhuma conta tem esse nome de usuário".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsLastOperator => pick(
+                "this would leave no active operator account".into(),
+                "isto deixaria a console sem nenhuma conta de operador ativa".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsCreated => pick("account created".into(), "conta criada".into()),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsRoleChanged => pick("role changed".into(), "papel trocado".into()),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGroupsChanged => pick("groups changed".into(), "grupos trocados".into()),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGroupInvalid => {
+                let max = meada_core::manifest::OWNER_MAX;
+                pick(
+                    format!(
+                        "a group is a name an entry's owner may be: 1 to {max} characters, no \
+                         control character, no leading or trailing space"
+                    ),
+                    format!(
+                        "um grupo é um nome que o dono de uma entrada pode ter: de 1 a {max} \
+                         caracteres, sem caractere de controle nem espaço no início ou no fim"
+                    ),
+                )
+            }
+            #[cfg(feature = "accounts")]
+            Msg::AccountsSuspended => pick("account suspended".into(), "conta suspensa".into()),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsReactivated => pick("account reactivated".into(), "conta reativada".into()),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordReset => pick("password reset".into(), "senha redefinida".into()),
             #[cfg(all(feature = "ui", feature = "directory"))]
             Msg::DirectoryUnreadable(reason) => pick(
                 format!("directory: unreadable ({reason})"),
@@ -3960,5 +4556,14 @@ fn confidence_of(confidence: Option<f64>) -> (String, String) {
             format!(", confiança {c:.2}"),
         ),
         None => Default::default(),
+    }
+}
+
+/// The half of the signing key pair a message names, in English and in pt-BR.
+#[cfg(feature = "accounts")]
+fn half_of(private: bool) -> (&'static str, &'static str) {
+    match private {
+        true => ("private", "privada"),
+        false => ("public", "pública"),
     }
 }

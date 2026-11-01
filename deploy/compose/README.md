@@ -2,6 +2,124 @@
 
 [English](README.en.md) | [Español](README.es.md)
 
+## Prova de conceito com contas locais
+
+Um comando sobe a frota de gerações, Valkey, o store, o Postgres com sua migração, uma console
+gravável com contas locais e nós que admitem tokens de agente (ADR 0024). Não precisa de
+provedor de identidade. Somente `127.0.0.1:8443` (nós) e `127.0.0.1:8444` (console) ficam
+publicados.
+
+```sh
+cd deploy/compose
+cp .env.accounts.example .env
+# Edite .env: senhas aleatórias (só letras e dígitos nas do Postgres) e as credenciais do store.
+docker compose up -d
+docker compose ps
+```
+
+Requer Docker Compose v2.24 ou mais novo (`!reset`) e imagens que já tragam `[accounts]` (ADR 0024,
+em `[Unreleased]` no CHANGELOG; a 1.0.0 publicada não as tem). Enquanto não há release com elas,
+construa as duas imagens deste checkout e aponte `MEADA_VERSION` para a tag:
+
+```sh
+docker build --target runtime -t ghcr.io/claudiomascaro/meada:local ../..
+docker build --target cloud -t ghcr.io/claudiomascaro/meada:local-cloud ../..
+# No .env: MEADA_VERSION=local
+```
+
+`MEADA_TOKEN=unused` fica no `.env.accounts.example` só porque o `compose.yaml` o exige ao
+interpolar; o proxy deste perfil não o recebe nem o confere.
+
+O `.env` escolhe os arquivos (`COMPOSE_FILE`) e os perfis (`COMPOSE_PROFILES`) da receita, então
+`docker compose up -d` basta. A ordem é garantida por `depends_on`: certificados, Postgres,
+`postgres-migrate`, store e Valkey, o passo `seed`, o job, a console e os nós. O `seed` importa e
+aplica `console.repositories.toml` como primeira versão do workspace, só enquanto o store não tem
+versão atual (a console não sobe antes da primeira geração do job, e o job precisa de uma versão);
+um restart nunca substitui o que a console salvou depois.
+
+O demo, do checkout limpo:
+
+1. Copie a CA do proxy da console e confie nela no browser, ou use `curl --cacert`:
+   `docker compose cp console-proxy:/data/caddy/pki/authorities/local/root.crt ./console-ca.crt`.
+2. Abra `https://localhost:8444` e entre com `admin` / `admin123`. A conta padrão só pode trocar a
+   senha: a console leva direto à troca (12 a 128 caracteres, fora a lista de senhas comuns).
+3. No perfil, gere um token de agente para os nós (de 1 a 168 horas, 8 por padrão). Ele aparece
+   uma vez; copie-o.
+4. Consulte um nó pelo proxy, que repassa `Authorization` e não tem bearer estático:
+
+```sh
+docker compose cp proxy:/data/caddy/pki/authorities/local/root.crt ./ca.crt
+curl --cacert ca.crt -i https://localhost:8443/github.com/claudiomascaro/meada
+# Esperado: HTTP 401, sem token.
+printf 'Agent token: '; read -r -s MEADA_AGENT_TOKEN; printf '\n'; export MEADA_AGENT_TOKEN
+curl --cacert ca.crt -i https://localhost:8443/github.com/claudiomascaro/meada \
+  -H "Authorization: Bearer $MEADA_AGENT_TOKEN" -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' -H 'MCP-Protocol-Version: 2025-03-26' \
+  --data '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search","arguments":{"query":"main"}}}'
+```
+
+Esperado: HTTP 200 com o resultado de `search`, nos repositórios que o grant da conta lê (todos,
+enquanto o manifesto não tem `[accounts.groups]` nem `[accounts.github]`). Não registre o token
+em traces do shell.
+
+Esta receita altera pouco do resto: `console.accounts.workspace.toml` (com `[accounts]`,
+`[postgres]` e `operations = true`) e `generations.accounts.workspace.toml` (nós, com `[accounts]`
+só com a chave pública, `[postgres]` com o papel de leitura e o `[ui] public_url` da console, que é
+o emissor dos tokens) substituem os manifestos por mounts; os perfis abaixo não mudam.
+
+### `MEADA_ADMIN_PASSWORD`
+
+Vazia (o padrão do `.env.accounts.example`), a conta `admin` nasce com `admin123` e uma troca
+obrigatória no primeiro acesso. Com um valor (12 a 128 caracteres, fora a lista de senhas comuns),
+essa é a primeira senha e nenhuma troca é exigida: uma instalação automatizada nunca expõe o
+padrão publicado. A variável é lida só quando a console cria a conta, com a tabela vazia; um
+valor inválido recusa o início, nomeando `accounts.admin_password_env`.
+
+### Recuperar a conta padrão: `meada ui reset-admin`
+
+Senha perdida ou conta bloqueada (dez falhas bloqueiam por quinze minutos) se recuperam sem SQL:
+
+```sh
+docker compose run --rm --no-deps --entrypoint meada console ui reset-admin \
+  --workspace /etc/meada/meada.workspace.toml
+```
+
+Cria ou reativa `admin` como operador, limpa o bloqueio e define uma senha com troca obrigatória:
+o valor de `MEADA_ADMIN_PASSWORD` quando definido, senão uma senha aleatória impressa uma vez na
+saída padrão. Deixa um registro de auditoria (`via` `cli`) e sai com 1 se não puder escrevê-lo.
+
+### Chaves de assinatura e sua rotação
+
+O job `certificates` gera o par Ed25519 uma única vez: a chave privada no volume
+`accounts-private`, montado somente leitura **só na console**, e a pública em `accounts-public`,
+montado nos nós e na console. Ele não imprime nenhuma das duas, e um restart mantém o par. Rotacionar
+é recriar o par, o que invalida todos os tokens em circulação de uma vez (não há lista de
+revogação):
+
+```sh
+docker compose down
+docker volume rm meada_accounts-private meada_accounts-public
+docker compose up -d
+```
+
+Todo mundo entra de novo, e cada agente precisa de um token novo.
+
+### Limite de tentativas na rota de entrada
+
+O Meada bloqueia uma conta após dez falhas seguidas, mas não limita por endereço: nomes
+desconhecidos ainda custam um hash cada e crescem a auditoria. Limite `POST /api/v1/login` por
+endereço de cliente no proxy que fica na frente da console (o Caddy desta receita, sem módulo de
+limite, não o faz: use uma build com `caddy-ratelimit` ou um nginx com `limit_req`), preservando
+`Host`, `Origin` e `Authorization`.
+
+### Rumo a um provedor de identidade
+
+Configurar `[oidc]` desliga a entrada local de todas as contas. `[accounts]` ao lado de `[oidc]`
+exige `break_glass = true`, que mantém só a conta `admin` entrando na console. Os guias de
+identidade do site seguem daí.
+
+## Perfis com bearer estático
+
 Exemplo local com dois nós, um Caddy com TLS e admissão por bearer token. Requer Docker
 Compose v2 e imagens da mesma versão publicada. Somente `127.0.0.1:8443` fica publicado.
 Os serviços não usam OIDC e a console fica desligada por padrão. Para acesso remoto, configure DNS,
@@ -95,7 +213,8 @@ no proxy; uma console exposta além dessa admissão revela o grafo.
 Execute no diretório deste exemplo, com `.env` configurado. Edite `console.repositories.toml`
 para o seed inicial, `REPOSITORIES` para o fetch e os bootstraps `job.workspace.toml` e
 `console.workspace.toml` para o mesmo store, Valkey, prefixos e CA dos nós. O seed é uma ação
-explícita do operador, feita uma vez; o deploy nunca reaplica uma versão automaticamente:
+explícita do operador, feita uma vez; o deploy nunca reaplica uma versão automaticamente (a exceção é o passo `seed` da prova de
+conceito com contas locais, só com o store sem versão atual):
 
 ```sh
 compose_console() {

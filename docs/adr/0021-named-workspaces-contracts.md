@@ -44,9 +44,12 @@ Current behavior without `[workspaces]` is ADR 0014's one workspace per deployme
   repositories only named workspaces select), `max_workspaces` (default 200, 1 to 2000) and
   `max_entries` (default 100, 1 to 500, per workspace). It needs `[ui]` with `operations =
   true`, `[oidc.github]` (so `[postgres]`), `[catalog]` and `[workspace] source = "store"`, each
-  error naming both sections.
+  error naming both sections. (Amended 2026-11-01, #562: the GitHub grant provider is
+  `[oidc.github]` or, with ADR 0024's local accounts, `[accounts.github]`; `[workspaces]` names
+  `[catalog]`, which needs the provider, and `[proposals]` follows `[workspaces]`.)
 - `[catalog]` holds `allow` (required, non-empty: patterns of the form `<host>/<owner>/*` or
-  `<host>/<owner>/<repo>`, compared exactly; the host is `[oidc.github] host`) and
+  `<host>/<owner>/<repo>`, compared exactly; the host is `[oidc.github] host`, or
+  `[accounts.github] host` with local accounts, #562) and
   `max_repositories` (required, 1 to 5000, no default, since the cost of expanded coverage is
   unmeasured).
 - Without `[workspaces]` every process behaves as ADR 0014, 0015 and 0016 leave it, byte for
@@ -111,7 +114,7 @@ workspace and not an index.
   whose owner some `allow` pattern names. An App with no installations held and no recent
   listing (throttled, or another run's listing unfinished when the lock expires) fails the run;
   while it is throttled, the installations it holds (at most an hour old) are used, as for the
-  selected repositories. `Permissions` (`oidc/permissions.rs`) loads the catalog
+  selected repositories. `Permissions` (`grant/permissions.rs` since #553) loads the catalog
   with the rows only when `[catalog]` is present, and answers per subject; its identities are at
   most 192 bytes (the cursor is base64url of the identity within the 256 characters above). A
   `check` repeating an identity answers it once, and a body or query past its bounds is one fixed

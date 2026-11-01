@@ -44,6 +44,9 @@ interface) and #347 (acceptance).
   sets, operators, workspaces, the directory), the snapshot store (version documents), Valkey and
   the generations it holds for the effective configuration, and the issuer's metadata and JWKS.
   It never calls GitHub, a node or the identity provider's API, and holds no GitHub App key.
+  (Amended 2026-10-31; #551: with ADR 0024's `[accounts]` and no `[oidc]`, it reads the signing
+  key's public half at start instead of the issuer's metadata and JWKS, and still calls
+  nothing else.)
 
 ### Authentication and admission
 
@@ -52,12 +55,19 @@ interface) and #347 (acceptance).
   metadata (RFC 9728) served without a token. A token for a node or for the console is not
   accepted here and this server's token is accepted nowhere else, which closes the confused
   deputy. A missing or invalid token is a 401 before any routing or tool name is resolved.
+  (Amended 2026-10-31; #551: with `[accounts]` and no `[oidc]`, ADR 0024 admits instead a Meada
+  agent token for the proposal server's surface, an Ed25519 JWT the console signed, checked with
+  the public key alone; an agent token for the nodes and a session token are refused here, and
+  this one is refused by the nodes and the console. The 401 carries no `resource_metadata`.)
 - Meada derives, server-side and from this token only, the subject, its login (`login_claim`),
   its groups, its grant, its role, the workspaces it operates and its eligibility (ADR 0020).
   A subject without a login gets `pending` with `missing_login`; a subject the directory
   deprovisioned is refused, since this server reads Postgres as the console does (a node's
   statelessness does not apply). A deleted user stays blocked until an explicit active
-  reprovisioning, as in the console.
+  reprovisioning, as in the console. (Amended 2026-10-31; #551: under an ADR 0024 agent token,
+  the subject is `local:<username>`, the login is the account's verified login and the groups and
+  role are the token's, all from the token alone; the grant is computed from them through
+  `[accounts.groups]` and `[accounts.github]`.)
 - No tool has a parameter naming an actor, owner, role, grant, login, group, token or
   permission. Every tool's input schema is closed (`additionalProperties: false`) and a
   property that is not declared is refused (`invalid_params`), not ignored, so a forged

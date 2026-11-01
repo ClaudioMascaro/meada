@@ -6,8 +6,11 @@
 //! `Access-Control-*` header.
 //!
 //! Admission: behind the operator's proxy every request is a viewer's that reads everything.
-//! With `[oidc]` (feature `oidc`) the console is a resource server as a node is: a bearer token
-//! for `[ui] audience`, checked by the nodes' own module (`Oidc::admit_console`), except for the
+//! With `[accounts]` (feature `accounts`, ADR 0024) the console signs in local accounts itself and
+//! admits its own session tokens (`accounts`); beside `[oidc]`, with `break_glass = true`, only the
+//! default account's, told apart from the identity provider's tokens by issuer. With `[oidc]`
+//! (feature `oidc`) the console is a resource server as a node is: a bearer token for
+//! `[ui] audience`, checked by the nodes' own module (`Oidc::admit_console`), except for the
 //! static files and `config`, which the browser needs to log in. Every admitted subject is a
 //! viewer unless its verified groups or boolean claim admit it as an operator, or one of its
 //! groups owns an entry of the current workspace version its grant reads (a team operator, ADR
@@ -39,6 +42,10 @@ use crate::modules::{self, Problem, Shape};
 use crate::msg::Msg;
 use crate::workspace::Manifest;
 
+#[cfg(feature = "accounts")]
+mod accounts;
+#[cfg(feature = "accounts")]
+pub use accounts::reset_admin;
 #[cfg(feature = "workspaces")]
 mod catalog;
 #[cfg(feature = "directory")]
@@ -118,18 +125,26 @@ pub struct Config {
 }
 
 impl File {
-    /// The section checked, every problem at once; `dir` is relative to `base`.
+    /// The section checked, every problem at once; `dir` is relative to `base`. With
+    /// `accounts` (the manifest has `[accounts]`, ADR 0024) and no `[oidc]`, `operations` needs no
+    /// operator key: a local account's role is its own.
     fn validate(
         self,
         base: &Path,
         oidc: Option<&toml::Table>,
+        accounts: bool,
     ) -> std::result::Result<Config, Vec<Problem>> {
         let mut problems = Vec::new();
-        if self.operations && oidc.is_none() {
-            problems.push(("ui.operations", Msg::UiNeedsOidc.text()));
+        let local = accounts && oidc.is_none();
+        if self.operations && oidc.is_none() && !local {
+            #[cfg(feature = "accounts")]
+            let needs = Msg::UiNeedsAdmission;
+            #[cfg(not(feature = "accounts"))]
+            let needs = Msg::UiNeedsOidc;
+            problems.push(("ui.operations", needs.text()));
         }
         match (&self.operator_groups, &self.operator_claim) {
-            (None, None) if self.operations => {
+            (None, None) if self.operations && !local => {
                 problems.push(("ui.operations", Msg::UiOperatorNeeded.text()));
             }
             (Some(_), Some(_)) => {
@@ -195,12 +210,17 @@ pub(crate) fn validated(
     };
     let table: toml::Table = toml::from_str(src)?;
     let oidc = table.get("oidc").and_then(toml::Value::as_table);
-    section.validate(base, oidc).map(Some).map_err(|problems| {
-        let lines: Vec<String> = (problems.iter())
-            .map(|(key, problem)| crate::config::error_at(file, src, key, problem).to_string())
-            .collect();
-        lines.join("\n").into()
-    })
+    // Without the `accounts` feature, `[accounts]` was already the error naming it.
+    let accounts = table.contains_key("accounts");
+    section
+        .validate(base, oidc, accounts)
+        .map(Some)
+        .map_err(|problems| {
+            let lines: Vec<String> = (problems.iter())
+                .map(|(key, problem)| crate::config::error_at(file, src, key, problem).to_string())
+                .collect();
+            lines.join("\n").into()
+        })
 }
 
 /// The console: what it started with.
@@ -224,6 +244,10 @@ struct Console {
     /// The nodes' OIDC module, with `[oidc]`: the console's admission.
     #[cfg(feature = "oidc")]
     oidc: Option<Arc<crate::oidc::Oidc>>,
+    /// The grant providers (`grant::Providers::of` the bootstrap manifest), which the OIDC module
+    /// feeds and the catalog, the exclusions and the admission view read.
+    #[cfg(feature = "oidc")]
+    providers: Arc<crate::grant::Providers>,
     /// What the playground and the exports answer from.
     holds: Holds,
     /// The entries of the last current workspace version a role was computed from, by id: a
@@ -232,6 +256,10 @@ struct Console {
     entries: std::sync::Mutex<Option<(String, Arc<Vec<Value>>)>>,
     /// The audit of every write, with `[postgres]` (#328).
     audit: crate::audit::Audit,
+    /// Local accounts, with `[accounts]` (ADR 0024): the signing key pair, the accounts table and
+    /// the bound on password hashes.
+    #[cfg(feature = "accounts")]
+    accounts: Option<accounts::Local>,
     /// The SCIM endpoint under `/scim/v2/`, with `[directory]` (#334).
     #[cfg(feature = "directory")]
     scim: Option<crate::directory::scim::Scim>,
@@ -280,25 +308,28 @@ struct Session {
     groups: Vec<String>,
     /// A team operator's teams, sorted (ADR 0015, #324); empty for everyone else.
     teams: Vec<String>,
-    /// The token's grant; none behind the proxy, where every identity is read.
+    /// The subject's grant; none behind the proxy, where every identity is read.
     #[cfg(feature = "oidc")]
-    grant: Option<crate::oidc::Grant>,
-    /// The token's GitHub login, when `[oidc.github] login_claim` holds a valid one (#332).
+    grant: Option<crate::grant::Grant>,
+    /// The subject's GitHub login, under the GitHub grant provider, when it is a valid one (#332).
     login: Option<String>,
-    /// With `[oidc.github]`, its host and the GitHub grant's state at admission.
+    /// Under the GitHub grant provider, its host and the GitHub grant's state at admission.
     #[cfg(feature = "oidc")]
     github: Option<(String, &'static str)>,
+    /// Admitted by a local account's session token (ADR 0024).
+    #[cfg(feature = "accounts")]
+    account: bool,
+    /// A local account whose row, read before a write, no longer stands (suspended, unknown or
+    /// hostile, `Console::standing`): its subject operates no named workspace (ADR 0024).
+    #[cfg(feature = "accounts")]
+    suspended: bool,
 }
 
 impl Session {
-    /// The session of a token `oidc` admitted, with a team operator's `teams`: the console's,
-    /// and the proposal server's with none (ADR 0022).
+    /// The session of an admitted subject, whichever verifier admitted it, with a team
+    /// operator's `teams`: the console's, and the proposal server's with none (ADR 0022).
     #[cfg(feature = "oidc")]
-    fn admitted(
-        admitted: crate::oidc::Admitted,
-        teams: Vec<String>,
-        oidc: &crate::oidc::Oidc,
-    ) -> Self {
+    fn admitted(admitted: crate::grant::Admitted, teams: Vec<String>) -> Self {
         Session {
             subject: admitted.subject,
             grant: Some(admitted.grant),
@@ -306,10 +337,41 @@ impl Session {
             groups: admitted.groups,
             teams,
             login: admitted.login,
-            github: oidc
-                .github()
-                .zip(admitted.github_state)
-                .map(|(host, state)| (host.to_string(), state)),
+            github: admitted.github,
+            #[cfg(feature = "accounts")]
+            account: false,
+            #[cfg(feature = "accounts")]
+            suspended: false,
+        }
+    }
+
+    /// The session of a local account's session token (ADR 0024): the account as the grant
+    /// providers admitted it (its verified login among it, #561), with a team operator's `teams`.
+    #[cfg(feature = "accounts")]
+    fn local(admitted: crate::grant::Admitted, teams: Vec<String>) -> Self {
+        Session {
+            account: true,
+            ..Session::admitted(admitted, teams)
+        }
+    }
+
+    /// The session behind the operator's proxy, and of a route that needs no token: a viewer
+    /// with no subject that reads everything.
+    fn anonymous() -> Self {
+        Session {
+            subject: None,
+            operator: false,
+            groups: Vec::new(),
+            teams: Vec::new(),
+            #[cfg(feature = "oidc")]
+            grant: None,
+            login: None,
+            #[cfg(feature = "oidc")]
+            github: None,
+            #[cfg(feature = "accounts")]
+            account: false,
+            #[cfg(feature = "accounts")]
+            suspended: false,
         }
     }
 
@@ -348,7 +410,7 @@ impl Session {
         meada_core::authorize::Grant::All
     }
 
-    /// `[oidc.github] host`, under the GitHub grant provider.
+    /// The GitHub grant provider's host, under it.
     #[cfg(feature = "refresh-lock")]
     fn github_host(&self) -> Option<&str> {
         #[cfg(feature = "oidc")]
@@ -367,9 +429,10 @@ impl Session {
         }
     }
 
-    /// The `session` answer: the subject and role; with `[oidc]`, `groups` and `grant` (the
-    /// union of the grant providers'), and `teams` for a team operator; with `[oidc.github]`,
-    /// `login` when the token has a valid one, `github_host` and `github_grant` (#332).
+    /// The `session` answer: the subject and role; with `[oidc]` or `[accounts]`, `groups` and
+    /// `grant` (the union of the grant providers'), and `teams` for a team operator; with
+    /// `[oidc.github]`, `login` when the token has a valid one, `github_host` and `github_grant`
+    /// (#332); with a local account's session token, `account: true` (ADR 0024).
     fn document(&self) -> Value {
         #[allow(unused_mut)]
         let mut document = json!({"subject": self.subject, "role": self.role()});
@@ -377,8 +440,8 @@ impl Session {
         if let Some(grant) = &self.grant {
             document["groups"] = json!(self.groups);
             document["grant"] = match grant {
-                crate::oidc::Grant::All => json!("*"),
-                crate::oidc::Grant::Only(identities) => {
+                crate::grant::Grant::All => json!("*"),
+                crate::grant::Grant::Only(identities) => {
                     let mut identities: Vec<_> = identities.iter().collect();
                     identities.sort();
                     json!(identities)
@@ -395,6 +458,10 @@ impl Session {
                 document["github_grant"] = json!(state);
             }
         }
+        #[cfg(feature = "accounts")]
+        if self.account {
+            document["account"] = true.into();
+        }
         document
     }
 
@@ -405,7 +472,7 @@ impl Session {
         }
         #[cfg(feature = "oidc")]
         if let Some(grant) = &self.grant {
-            return matches!(grant, crate::oidc::Grant::All);
+            return matches!(grant, crate::grant::Grant::All);
         }
         true
     }
@@ -421,9 +488,7 @@ pub fn listen(listen: &str, manifest: &Path) -> Result<()> {
     let console = Arc::new(Console::start(manifest)?);
     crate::mcp::serve_http(address, move |bound, _| {
         #[cfg(feature = "oidc")]
-        if let Some(oidc) = &console.oidc {
-            oidc.listening();
-        }
+        console.providers.listening();
         move |request: Request<Incoming>| {
             let console = console.clone();
             async move {
@@ -467,6 +532,18 @@ async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
         #[cfg(feature = "workspaces")]
         "/api/v1/workspaces" | "/api/v1/workspaces/effective" => workspaces::CREATE_MAX,
         QUERY => QUERY_MAX,
+        #[cfg(feature = "accounts")]
+        "/api/v1/login" => accounts::LOGIN_MAX,
+        #[cfg(feature = "accounts")]
+        "/api/v1/account/password" => accounts::PASSWORD_BODY_MAX,
+        #[cfg(feature = "accounts")]
+        "/api/v1/account/tokens" => accounts::TOKENS_BODY_MAX,
+        #[cfg(feature = "accounts")]
+        "/api/v1/account/github" => accounts::GITHUB_BODY_MAX,
+        #[cfg(feature = "accounts")]
+        path if (path.strip_prefix("/api/v1/")).is_some_and(accounts::is_administration) => {
+            accounts::ADMIN_BODY_MAX
+        }
         "/api/v1/pointer" => write::POINTER_MAX,
         "/api/v1/fence/recover" => write::FENCE_MAX,
         "/api/v1/workspace/versions" => write::SAVE_MAX,
@@ -525,13 +602,27 @@ impl Console {
         }
         // As a node does: the issuer's metadata and JWKS read now, a start check.
         #[cfg(feature = "oidc")]
-        let oidc = match read.oidc.clone().map(crate::oidc::Oidc::start).transpose() {
+        let providers = Arc::new(crate::grant::Providers::of(&read));
+        #[cfg(feature = "oidc")]
+        let start = |config| crate::oidc::Oidc::start(config, providers.clone());
+        #[cfg(feature = "oidc")]
+        let oidc = match read.oidc.clone().map(start).transpose() {
             Ok(oidc) => oidc,
             Err(e) => {
                 problems.push(e);
                 None
             }
         };
+        // Under break glass a bearer goes to one verifier by its issuer (ADR 0024): the identity
+        // provider's must not be the console's own.
+        #[cfg(feature = "accounts")]
+        if let (Some(oidc), Some(accounts)) = (&oidc, &read.accounts)
+            && accounts.break_glass
+            && oidc.login().0.trim_end_matches('/') == ui.public_url
+        {
+            let problem = Msg::AccountsBreakGlassIssuer.text();
+            problems.push(at("accounts.break_glass", problem));
+        }
         // The audit (#328): a version this binary does not know refuses the start; Postgres
         // unreachable does not (reads are served, writes answer 503 naming why on stderr).
         #[cfg(feature = "postgres")]
@@ -560,6 +651,20 @@ impl Console {
         };
         #[cfg(feature = "directory")]
         let directory = Self::directory_of(&read);
+        // Local accounts (ADR 0024): the key pair read now, once, then the default account
+        // created when the table is empty; only once every other check passed, so a refused start
+        // touches no table.
+        #[cfg(feature = "accounts")]
+        let accounts = match (&read.accounts, problems.is_empty()) {
+            (Some(section), true) => match accounts::Local::start(section) {
+                Ok(local) => Some(local),
+                Err((key, problem)) => {
+                    problems.push(at(key, problem));
+                    None
+                }
+            },
+            _ => None,
+        };
         #[cfg(feature = "postgres")]
         let audit = crate::audit::Audit::new(read.postgres.clone());
         #[cfg(not(feature = "postgres"))]
@@ -595,10 +700,14 @@ impl Console {
             csp: header::HeaderValue::from_str(&csp(issuer))?,
             #[cfg(feature = "oidc")]
             oidc,
+            #[cfg(feature = "oidc")]
+            providers,
             holds,
             #[cfg(all(feature = "oidc", feature = "generation-pointer"))]
             entries: std::sync::Mutex::new(None),
             audit,
+            #[cfg(feature = "accounts")]
+            accounts,
             #[cfg(feature = "directory")]
             scim,
             #[cfg(feature = "directory")]
@@ -765,14 +874,25 @@ impl Console {
             }
             _ => {}
         }
-        if operation.is_some() && !self.ui.operations {
+        let disabled = |subject: Option<&str>| {
             let message = Msg::UiWritesDisabled.text();
-            audit(None, &message);
-            return Err(Box::new(error(
+            audit(subject, &message);
+            Err(Box::new(error(
                 StatusCode::FORBIDDEN,
                 "forbidden",
                 &message,
-            )));
+            )))
+        };
+        // With local accounts (ADR 0024), a token is checked before anything else of a write, so
+        // a request without one is a 401 and a token awaiting its password change a 403
+        // `password_change_required`, whatever `operations` says.
+        #[cfg(feature = "accounts")]
+        let admitted_first = (self.accounts.as_ref()).is_some_and(|local| !local.break_glass);
+        #[cfg(not(feature = "accounts"))]
+        let admitted_first = false;
+        let writes_off = operation.is_some() && !self.ui.operations;
+        if writes_off && !admitted_first {
+            return disabled(None);
         }
         // A named workspace's creation (#342) is a write too: a directory that cannot say whether
         // the subject was deprovisioned refuses it as it refuses an operation.
@@ -788,6 +908,28 @@ impl Console {
                 return Err(refused);
             }
         };
+        if writes_off {
+            return disabled(session.subject.as_deref());
+        }
+        // A local account's write (an operation, a named workspace's, account administration)
+        // acts as its row stands now, not as its token says (ADR 0024); a read, the playground's
+        // `query` included, keeps the token's session.
+        #[cfg(feature = "accounts")]
+        let subject = session.subject.clone();
+        #[cfg(feature = "accounts")]
+        let administering = write && route.is_some_and(|r| self.has_administration(r));
+        #[cfg(feature = "accounts")]
+        let session = match self.standing(session, route, writes || administering) {
+            Ok(session) => session,
+            Err((refused, message)) => {
+                audit(subject.as_deref(), &message);
+                return Err(refused);
+            }
+        };
+        #[cfg(feature = "accounts")]
+        if let Some(refused) = self.administration_refused(&session, route, &request.method) {
+            return Err(refused);
+        }
         if let Some(operation) = operation {
             // A team operator saves and applies workspace versions; the generation operations
             // stay the global operator's (ADR 0015).
@@ -835,8 +977,11 @@ impl Console {
 
     /// Admission of a request to the API route `route` (`None`: a static file), `write` when it
     /// is one of the audited operations. Behind the proxy every request is a viewer's; with
-    /// `[oidc]`, a bearer token for `[ui] audience`, except for the static files and `config`,
-    /// which the browser needs to log in. With `[directory]`, the token's `user_claim` is then
+    /// `[accounts]`, a session token of this console (`admit_local`); under break glass, the
+    /// default account's session token when the bearer's issuer is this console, else the
+    /// identity provider's admission (`admit_break_glass`); with `[oidc]`, a bearer
+    /// token for `[ui] audience`, except for the static files and `config`, which the browser
+    /// needs to log in. With `[directory]`, the token's `user_claim` is then
     /// looked up (`deprovisioned`) before any role is computed. A refusal comes with the line
     /// the pre-authentication audit prints.
     fn admit(
@@ -845,6 +990,15 @@ impl Console {
         route: Option<&str>,
         write: bool,
     ) -> std::result::Result<Session, (Box<Answer>, String)> {
+        #[cfg(feature = "accounts")]
+        if let Some(local) = &self.accounts {
+            if !local.break_glass {
+                return self.admit_local(local, headers, route);
+            }
+            if let Some(admitted) = self.admit_break_glass(local, headers, route) {
+                return admitted;
+            }
+        }
         let open = matches!(route, None | Some("config"));
         #[cfg(feature = "oidc")]
         if let Some(oidc) = &self.oidc
@@ -857,20 +1011,16 @@ impl Console {
                 self.ui.operator_claim.as_deref(),
                 self.user_claim(),
             ) {
-                Ok(admitted) => {
+                Ok((admitted, user)) => {
                     #[cfg(feature = "directory")]
-                    if let Some(refused) = self.directory_refusal(admitted.user.as_deref(), write) {
+                    if let Some(refused) = self.directory_refusal(user.as_deref(), write) {
                         return Err(refused);
                     }
-                    // A team operator reads what a viewer reads: only `session` and the writes
-                    // need the role, so only they read the current version.
-                    let role_route =
-                        route == Some("session") || route.and_then(write::operation).is_some();
-                    let teams = match admitted.operator || !role_route {
-                        true => Vec::new(),
-                        false => self.teams(&admitted.groups, &admitted.grant),
-                    };
-                    Ok(Session::admitted(admitted, teams, oidc))
+                    #[cfg(not(feature = "directory"))]
+                    let _ = user;
+                    let teams =
+                        self.teams_on(route, admitted.operator, &admitted.groups, &admitted.grant);
+                    Ok(Session::admitted(admitted, teams))
                 }
                 Err((status, challenge)) => {
                     let (code, message) = match status {
@@ -888,17 +1038,25 @@ impl Console {
             };
         }
         let _ = (headers, open, write);
-        Ok(Session {
-            subject: None,
-            operator: false,
-            groups: Vec::new(),
-            teams: Vec::new(),
-            #[cfg(feature = "oidc")]
-            grant: None,
-            login: None,
-            #[cfg(feature = "oidc")]
-            github: None,
-        })
+        Ok(Session::anonymous())
+    }
+
+    /// A team operator's teams for a request to `route` by a subject with `groups` and `grant`,
+    /// `operator` when it is the global operator. A team operator reads what a viewer reads: only
+    /// `session` and the writes need the role, so only they read the current version.
+    #[cfg(feature = "oidc")]
+    fn teams_on(
+        self: &Arc<Self>,
+        route: Option<&str>,
+        operator: bool,
+        groups: &[String],
+        grant: &crate::grant::Grant,
+    ) -> Vec<String> {
+        let role_route = route == Some("session") || route.and_then(write::operation).is_some();
+        match operator || !role_route {
+            true => Vec::new(),
+            false => self.teams(groups, grant),
+        }
     }
 
     /// The token claim naming a user, with `[directory]`.
@@ -938,6 +1096,36 @@ impl Console {
         if route == "query" && *method == Method::POST {
             return self.query(request.body(), session);
         }
+        // Under break glass the first two are the only routes of local accounts: account
+        // administration, agent tokens and login verification do not exist there (ADR 0024). The
+        // password change, agent tokens and the verified login are a local account's own: an
+        // identity provider's session gets the 404.
+        #[cfg(feature = "accounts")]
+        if let Some(local) = &self.accounts {
+            match (route, *method == Method::POST) {
+                (accounts::LOGIN, true) => return self.login(local, request.body()),
+                (accounts::PASSWORD, true) if session.account => {
+                    return self.password(local, request.body(), session);
+                }
+                // Agent tokens do not exist under break glass (ADR 0024, #563).
+                (accounts::TOKENS, true) if session.account && !local.break_glass => {
+                    return self.agent_token(local, request.body(), session);
+                }
+                // The verified login (#561), with `[accounts.github]` alone: never under break
+                // glass, which refuses the table.
+                (accounts::GITHUB, true) if session.account && !local.break_glass => {
+                    return self.verify_github(local, request.body(), session);
+                }
+                (accounts::GITHUB_REMOVE, true) if session.account && !local.break_glass => {
+                    return self.remove_own_github(local, session);
+                }
+                _ => {}
+            }
+            let body = request.body();
+            if let Some(answer) = self.administer(local, method, route, body, session) {
+                return answer;
+            }
+        }
         #[cfg(feature = "workspaces")]
         if route == "catalog" && read {
             return self.catalog(request.uri().query(), session);
@@ -961,13 +1149,22 @@ impl Console {
             "session" if read => Some(session.document()),
             "manifest" if read => Some(self.manifest(session)),
             #[cfg(feature = "oidc")]
-            "admission" if read => (self.oidc.as_ref()).map(|o| {
-                #[allow(unused_mut)]
-                let mut document = o.admission(&|i| session.reads(i));
-                #[cfg(feature = "directory")]
-                self.with_directory_counts(&mut document);
+            "admission" if read => {
+                let document = (self.oidc.as_ref()).map(|o| {
+                    #[allow(unused_mut)]
+                    let mut document = o.admission(&|i| session.reads(i));
+                    #[cfg(feature = "directory")]
+                    self.with_directory_counts(&mut document);
+                    document
+                });
+                // With `[accounts]`, its mode and key beside, or alone without `[oidc]` (#558).
+                #[cfg(feature = "accounts")]
+                let document = match &self.accounts {
+                    Some(local) => Some(self.accounts_admission(local, document, session)),
+                    None => document,
+                };
                 document
-            }),
+            }
             #[cfg(feature = "oidc")]
             "admission/check" if *method == Method::POST => match &self.oidc {
                 Some(oidc) => return self.check(oidc, request.body(), session),
@@ -981,9 +1178,12 @@ impl Console {
         }
     }
 
-    /// The console's version and `operations`; with `[oidc]`, what the browser logs in with: the
-    /// issuer, `[ui] client_id`, the scopes and the audience its token must carry. The public
-    /// URL fixes the browser's callback even when the listener was opened through loopback.
+    /// The console's version and `operations`; with `[proposals]`, `proposals: true`; with
+    /// `[accounts]`, `sign_in: "accounts"`; with `[oidc]`, `sign_in: "oidc"`, `break_glass: true`
+    /// under break glass, and what the browser logs in with: the issuer, `[ui] client_id`, the
+    /// scopes and the audience its token must carry.
+    /// The public URL fixes the browser's callback even when the listener was opened through
+    /// loopback.
     fn config(&self) -> Value {
         #[allow(unused_mut)]
         let mut config = json!({
@@ -997,7 +1197,7 @@ impl Console {
         }
         // With `[catalog]` (#341), the picker has its routes.
         #[cfg(feature = "workspaces")]
-        if self.bootstrap.catalog.is_some() && self.oidc.is_some() {
+        if self.bootstrap.catalog.is_some() && self.providers.github().is_some() {
             config["catalog"] = true.into();
         }
         // With `[workspaces]` (#342), the workspaces pages have their routes and the bound the
@@ -1006,9 +1206,22 @@ impl Console {
         if let Some(section) = &self.bootstrap.workspaces {
             config["workspaces"] = json!({"max_entries": section.max_entries});
         }
+        // With `[proposals]` (#562), the profile offers agent tokens for the proposal server.
+        #[cfg(feature = "proposals")]
+        if self.bootstrap.proposals.is_some() {
+            config["proposals"] = true.into();
+        }
+        // How the browser signs in (ADR 0024): an identity provider's or the console's own.
+        #[cfg(feature = "accounts")]
+        match &self.accounts {
+            Some(local) if local.break_glass => config["break_glass"] = true.into(),
+            Some(_) => config["sign_in"] = "accounts".into(),
+            None => {}
+        }
         #[cfg(feature = "oidc")]
         if let Some(oidc) = &self.oidc {
             let (issuer, scopes) = oidc.login();
+            config["sign_in"] = "oidc".into();
             config["issuer"] = issuer.into();
             config["client_id"] = self.ui.client_id.clone().into();
             config["scopes"] = scopes.into();
@@ -1044,10 +1257,10 @@ impl Console {
             if let Some(Value::Array(entries)) = loaded.get_mut("repository") {
                 read::filter_entries(entries, "repo", session);
             }
-            if let Some(groups) = loaded
-                .pointer_mut("/oidc/groups")
-                .and_then(Value::as_object_mut)
-            {
+            for table in GROUP_TABLES {
+                let Some(groups) = loaded.pointer_mut(table).and_then(Value::as_object_mut) else {
+                    continue;
+                };
                 for identities in groups.values_mut().filter_map(Value::as_array_mut) {
                     identities.retain(|identity| {
                         identity
@@ -1127,7 +1340,7 @@ impl Console {
             "scopes": checked.scopes,
         });
         let mut answer = json!({"checks": checks, "identities": identities});
-        if oidc.github().is_some() {
+        if self.providers.github().is_some() {
             let sorted = |reads: &dyn Fn(&str) -> bool| {
                 let mut identities = admitted(reads);
                 identities.sort();
@@ -1137,7 +1350,7 @@ impl Console {
                 None => Value::Null,
                 Some((claims, github)) => json!({
                     "claims": match claims {
-                        crate::oidc::Grant::All => json!("*"),
+                        crate::grant::Grant::All => json!("*"),
                         claims => json!(sorted(&|i| claims.reads(i))),
                     },
                     "github": sorted(&|i| github.iter().any(|g| g == i)),
@@ -1429,6 +1642,10 @@ fn origin(url: &str) -> &str {
     &url[..end]
 }
 
+/// The groups tables of a manifest as JSON: the identity provider's and the local accounts'
+/// (#558), each bounded alike.
+const GROUP_TABLES: [&str; 2] = ["/oidc/groups", "/accounts/groups"];
+
 /// Repository, peer and group identities, including identities not listed as entries.
 fn identities(manifest: &Value) -> impl Iterator<Item = &str> {
     let entries = manifest.get("repository").and_then(Value::as_array);
@@ -1442,10 +1659,8 @@ fn identities(manifest: &Value) -> impl Iterator<Item = &str> {
             .filter_map(|peer| peer.get("repo").and_then(Value::as_str));
         own.into_iter().chain(peers)
     });
-    let groups = manifest
-        .pointer("/oidc/groups")
-        .and_then(Value::as_object)
-        .into_iter()
+    let groups = (GROUP_TABLES.iter())
+        .filter_map(|table| manifest.pointer(table).and_then(Value::as_object))
         .flat_map(|groups| groups.values())
         .flat_map(|value| {
             value.as_str().into_iter().chain(

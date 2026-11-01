@@ -24,9 +24,13 @@ use serde_json::json;
 
 use crate::msg::Msg;
 
-/// The actions a record names: the operations, and `pointer`, the route-level action of a
-/// pointer request refused before its body is read.
-pub const ACTIONS: [&str; 15] = [
+/// The actions a record names: the operations, `pointer`, the route-level action of a pointer
+/// request refused before its body is read, and the local accounts' sign-in, password change,
+/// `meada ui reset-admin`, administration (ADR 0024, #557, `account.groups` #558) and agent tokens
+/// (`account.token`, #560) and the verified login (`account.github`, `account.remove_github`,
+/// #561), with `account`, the route-level action of an account change refused before its body is
+/// read.
+pub const ACTIONS: [&str; 28] = [
     "workspace.save",
     "workspace.import",
     "workspace.apply",
@@ -42,6 +46,19 @@ pub const ACTIONS: [&str; 15] = [
     "workspaces.rename",
     "workspaces.delete",
     "workspaces.operators",
+    "account.login",
+    "account.password",
+    "account.reset_admin",
+    "account.create",
+    "account.role",
+    "account.groups",
+    "account.suspend",
+    "account.reactivate",
+    "account.reset_password",
+    "account.token",
+    "account.github",
+    "account.remove_github",
+    "account",
 ];
 
 /// The outcome a finished write records.
@@ -74,7 +91,8 @@ impl Outcome {
 }
 
 /// Who acts and through what: `via` is `console` or `cli`, `role` `viewer`, `operator` or
-/// `team_operator`, `owners` a team operator's owner groups.
+/// `team_operator` (or `none`, for a sign-in naming no account), `owners` a team operator's owner
+/// groups.
 pub struct Actor<'a> {
     pub via: &'static str,
     pub subject: Option<&'a str>,
@@ -145,6 +163,25 @@ impl Audit {
         }
         let _ = (actor, action, arguments);
         Ok(Pending(None))
+    }
+
+    /// Inserts the record of an action already decided, with its outcome and message, before its
+    /// answer is given (a sign-in, ADR 0024): the reason Postgres cannot be reached when the insert
+    /// fails, and then the answer is a 503 that gives nothing.
+    #[cfg(feature = "accounts")]
+    pub fn record(
+        &self,
+        actor: &Actor,
+        action: &str,
+        arguments: &Value,
+        outcome: Outcome,
+        message: &str,
+    ) -> Result<(), String> {
+        if let Some(config) = &self.config {
+            let (outcome, message) = (outcome.name(), Some(message));
+            return insert(config, actor, action, arguments, outcome, message).map(|_| ());
+        }
+        Ok(())
     }
 
     /// Inserts a refusal found before the write; one that finds Postgres unreachable leaves no
@@ -296,7 +333,7 @@ fn record(row: &tokio_postgres::Row) -> Option<Value> {
     if (login.as_deref()).is_some_and(|l| meada_core::manifest::added_by_problem(l).is_some()) {
         return None;
     }
-    let role = one_of(5, &["viewer", "operator", "team_operator"])?;
+    let role = one_of(5, &["viewer", "operator", "team_operator", "none"])?;
     let owners = match text(6)? {
         None => Value::Null,
         Some(json) => serde_json::from_str::<Vec<String>>(&json).ok()?.into(),
@@ -311,6 +348,16 @@ fn record(row: &tokio_postgres::Row) -> Option<Value> {
         "workspace",
         "authority",
         "base",
+        "account",
+        "reason",
+        "role",
+        "change_required",
+        "groups",
+        "surface",
+        "hours",
+        "token_id",
+        // The verified login a verification stores (#561).
+        "login",
     ];
     if !(arguments.iter()).all(|(k, v)| known.contains(&k.as_str()) && v.is_string()) {
         return None;

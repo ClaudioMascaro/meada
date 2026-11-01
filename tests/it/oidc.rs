@@ -23,6 +23,10 @@ pub(crate) mod github;
 #[cfg(all(feature = "ui", feature = "directory"))]
 mod overage;
 
+/// A node with `[accounts]` and no `[oidc]`: the agent tokens for the nodes (#560).
+#[cfg(feature = "accounts")]
+pub(crate) mod accounts;
+
 const WEB: &str = "example.com/chain/web";
 const PUBLIC: &str = "https://meada.example";
 const METADATA: &str = "https://meada.example/.well-known/oauth-protected-resource";
@@ -108,6 +112,25 @@ pub(crate) fn sign(key: &EncodingKey, kid: &str, alg: Algorithm, claims: &Value)
     jsonwebtoken::encode(&header, claims, key).unwrap()
 }
 
+/// A token of the console's local accounts (ADR 0024) for `issuer` and `audience`, with
+/// `claims` added: the default account's, signed with an Ed25519 key generated now, which no
+/// identity provider holds.
+#[cfg(feature = "accounts")]
+pub(crate) fn ed25519_token(issuer: &str, audience: &str, claims: Value) -> String {
+    let rng = ring::rand::SystemRandom::new();
+    let pkcs8 = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
+    let now = jsonwebtoken::get_current_timestamp();
+    let mut all = json!({
+        "iss": issuer, "aud": audience, "sub": "local:admin", "role": "operator",
+        "groups": [], "iat": now, "exp": now + 300,
+    });
+    for (key, value) in claims.as_object().into_iter().flatten() {
+        all[key] = value.clone();
+    }
+    let key = EncodingKey::from_ed_der(pkcs8.as_ref());
+    jsonwebtoken::encode(&Header::new(Algorithm::EdDSA), &all, &key).unwrap()
+}
+
 /// The scope every server here requires.
 const SCOPE: &str = "meada:read";
 
@@ -145,16 +168,16 @@ fn start(dir: &Path) -> Server {
 }
 
 /// A tool and its arguments, `tools/call`ed alone.
-type Call = Option<(&'static str, Value)>;
+pub(crate) type Call = Option<(&'static str, Value)>;
 
 /// `trace` from `dashboard`, which crosses every link of the chain.
-fn trace() -> Call {
+pub(crate) fn trace() -> Call {
     Some(("trace", json!({"from": "dashboard"})))
 }
 
 /// What `url` answers with `token` and `headers` (values as bytes, so not always UTF-8): its
 /// status, `WWW-Authenticate` and body. With `call`, that tool call POSTed alone, else a GET.
-fn ask(url: &str, token: Option<&str>, headers: &[(&str, &[u8])], call: Call) -> Answer {
+pub(crate) fn ask(url: &str, token: Option<&str>, headers: &[(&str, &[u8])], call: Call) -> Answer {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .http_status_as_error(false)
         .build()
@@ -237,17 +260,17 @@ fn raw(url: &str, headers: &[&[u8]]) -> (u16, Option<String>) {
 }
 
 #[derive(Debug, PartialEq)]
-struct Answer {
-    status: u16,
+pub(crate) struct Answer {
+    pub(crate) status: u16,
     challenge: Option<String>,
     kind: String,
     /// Every header but `date`, in the order sent.
     headers: Vec<String>,
-    body: String,
+    pub(crate) body: String,
 }
 
 /// The text of a tool result POSTed alone.
-fn traced(answer: &Answer) -> String {
+pub(crate) fn traced(answer: &Answer) -> String {
     assert_eq!(answer.status, 200, "{answer:?}");
     let json: Value = serde_json::from_str(&answer.body).unwrap();
     json["result"]["content"][0]["text"]
@@ -281,7 +304,7 @@ fn answers(url: &str, token: &str) -> Vec<String> {
 
 /// Fails when `answer` names a chain repository other than `WEB`, a path only a peer holds, or
 /// a missing peer, or does not name `WEB` (an error would pass otherwise).
-fn web_only(answer: &str) {
+pub(crate) fn web_only(answer: &str) {
     assert!(answer.contains(WEB), "{answer}");
     for leak in [
         "example.com/chain/gateway",
@@ -561,6 +584,47 @@ fn a_rotated_key_is_picked_up_on_its_first_token() {
             "{kid}"
         );
     }
+}
+
+/// With `[oidc]`, a node ignores `[accounts]` under break glass (#563, ADR 0024): it starts though
+/// neither key file exists, reads neither, admits the identity provider's token as before, and
+/// refuses a token signed with Ed25519 for the console's issuer, whether its audience is this
+/// node's resource or the nodes' agent surface, as any token the identity provider did not sign.
+#[cfg(feature = "accounts")]
+#[test]
+fn a_node_with_oidc_ignores_accounts_under_break_glass() {
+    let (signing, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let dir = oidc_manifest("oidc_break_glass", &issuer.base);
+    let file = dir.join(MANIFEST);
+    let section = "\n[postgres]\nurl_env = \"MEADA_TEST_NO_POSTGRES_563\"\n\n[accounts]\n\
+                   break_glass = true\npublic_key_file = \"no-such-public.pem\"\n\
+                   private_key_file = \"no-such-private.pem\"\n";
+    fs::write(&file, fs::read_to_string(&file).unwrap() + section).unwrap();
+    let server = start(&dir);
+    let at = format!("{}/{WEB}", server.url);
+    let token = sign(
+        &signing,
+        "k1",
+        Algorithm::ES256,
+        &claims(&issuer.base, WEB, &["*"]),
+    );
+    assert_eq!(traced(&ask(&at, Some(&token), &[], trace())), golden());
+    for audience in [format!("{PUBLIC}/{WEB}"), "meada:nodes".to_string()] {
+        let extra = json!({"meada_repositories": ["*"], "scope": format!("openid {SCOPE}")});
+        let local = ed25519_token("http://localhost:7999", &audience, extra);
+        let answer = ask(&at, Some(&local), &[], trace());
+        assert_eq!(
+            (answer.status, answer.challenge),
+            (401, invalid(WEB)),
+            "{audience}"
+        );
+    }
+    let stderr = server.stderr();
+    assert!(
+        !stderr.contains("private") && !stderr.contains("accounts"),
+        "{stderr}"
+    );
 }
 
 /// Behind `/WEB`, a token reads only the repositories its claim lists (#290): listing all four,

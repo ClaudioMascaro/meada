@@ -87,6 +87,11 @@ github-app roles`, which also needs `postgres`.) (Amended 2026-10-30; #340: ADR 
 `workspaces`, implying `ui`, `oidc`, `postgres`, `github-app`, `generation-pointer` and
 `refresh-lock`, with the sections `[workspaces]` and `[catalog]`; ADR 0022 adds `proposals`,
 implying `workspaces`, with `[proposals]` and `meada workspaces mcp`. `cloud` enables both.)
+(Amended 2026-10-31; #551: ADR 0024 adds the row `accounts`, implying `oidc` and `postgres`,
+section `[accounts]` (with `[accounts.groups]` and `[accounts.github]`), needing `[postgres]`,
+adding local accounts, the console's sign-in and Meada-signed session and agent tokens admitted
+by the console, the nodes and the proposal server, and `meada ui reset-admin`; it brings the
+crate `argon2`. `cloud` enables it.)
 
 - `valkey` is internal: it is enabled through the modules that need it, and `[valkey]` alone
   only makes `meada status` report the connection.
@@ -118,7 +123,11 @@ implying `workspaces`, with `[proposals]` and `meada workspaces mcp`. `cloud` en
   which the console, the nodes that read a GitHub grant or an overage lookup, the job's `meada
   github-app roles` and the CLI twins that write connect to; and, on each `[[github_app]]`
   block's `api`, the collaborators listing of `meada github-app roles`, beside the job's other
-  calls. The SCIM directory is inbound, on the console's listener.) No client follows a
+  calls. The SCIM directory is inbound, on the console's listener.) (Amended 2026-10-31; #551:
+  ADR 0024 adds `[accounts.github] api`, the GitHub REST endpoint of the GitHub grant provider's
+  host, which the console calls once per login verification (`GET /user`, with the personal
+  access token the person pastes for that request only); on github.com it lies outside the
+  operator's boundary, accepted for the reason ADR 0013 gives.) No client follows a
   redirect to another host, with one exception: a Valkey cluster client follows the cluster's
   `MOVED` and `ASK` to the nodes the cluster announces, always over TLS (the section requires a
   `rediss` seed when `cluster` is on).
@@ -279,7 +288,10 @@ to the client, so it keeps no channel back to it.
   token's claim lists, the named one first, then manifest order. A repository outside the grant
   is absent from every answer, as if the manifest did not list it: no identity, symbol, path,
   source line or link of it, and it is not reported missing. A `*` grant, and server mode
-  without `[oidc]`, keep the whole workspace.
+  without `[oidc]`, keep the whole workspace. (Amended 2026-10-31; #551: with ADR 0024's
+  `[accounts]` and `[accounts.groups]` or `[accounts.github]`, an agent token's grant bounds the
+  answers as an identity provider's token's does; `[accounts]` with neither table keeps the
+  whole workspace.)
 - A token may also be granted through its groups (amended 2026-10-22, #291): `groups_claim`
   names a top-level claim holding group names, and the manifest's `[oidc.groups]` table maps
   each group to identities (`*` for all), set together. The grant is the union of the
@@ -293,7 +305,13 @@ to the client, so it keeps no channel back to it.
   also reads what its GitHub login holds an accepted role on, in the newest permissions set the
   job wrote. `[oidc]` becomes the identity provider, typed, with every key unchanged.)
 - No token passthrough: Meada never forwards a token, issues none, registers no client and is no
-  authorization server. No stderr line or error carries a token or any part of it.
+  authorization server. No stderr line or error carries a token or any part of it. (Amended
+  2026-10-31; #551: with `[accounts]`, ADR 0024's console issues Meada-signed tokens, Ed25519
+  JWTs from its own sign-in for its own three surfaces (session tokens for the console, agent
+  tokens for the nodes or the proposal server), which the same module verifies with the public
+  key alone. Meada still forwards no token, registers no client and is no OAuth authorization
+  server: no discovery, no client and no authorization flow. A Meada-signed token that fails is
+  a 401 without `resource_metadata`.)
 - The issuer's metadata and JWKS are read at start, before the listener binds, through the HTTP
   client the binary already has; a failure refuses the start.
 - The reverse proxy stays the documented default admission. The documentation states it first,
@@ -353,7 +371,8 @@ to the client, so it keeps no channel back to it.
 - **Secrets in the manifest.** The manifest is reviewed in pull requests.
 - **Token introspection (RFC 7662) instead of JWT validation.** An outbound call per request.
 - **Meada as an authorization server, or with dynamic client registration.** A security surface
-  the operator's provider already covers.
+  the operator's provider already covers. (Amended 2026-10-31; #551: still rejected; ADR 0024's
+  local accounts sign tokens for Meada's own surfaces without becoming one.)
 - **ElastiCache IAM authentication now.** Left open (above).
 - **A container image with this ADR.** Distribution is ADR 0010's; an image is a separate
   decision.

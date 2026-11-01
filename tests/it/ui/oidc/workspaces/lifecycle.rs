@@ -137,9 +137,62 @@ fn code(reply: &Reply) -> String {
 /// and its workspace.
 #[test]
 fn versions_are_saved_applied_and_rolled_back_along_the_base() {
-    let Some(case) = Case::new("ws_life") else {
+    if let Some(case) = Case::new("ws_life") {
+        versions_are_saved_applied_and_rolled_back_along_the_base_as(case);
+    }
+}
+
+/// `versions_are_saved_applied_and_rolled_back_along_the_base` with local accounts (#562): the same
+/// moves and refusals, with `local:` subjects as authors, operators and audited actors.
+#[cfg(feature = "accounts")]
+#[test]
+fn local_accounts_versions_are_saved_applied_and_rolled_back_along_the_base() {
+    if let Some(case) = Case::local("ws_life_local") {
+        versions_are_saved_applied_and_rolled_back_along_the_base_as(case);
+    }
+}
+
+/// A suspended local account stops operating its named workspaces at once (ADR 0024): its
+/// unexpired session token still reads the workspace, but a rename, which no eligibility check
+/// guards, is refused: written as a viewer with no group, alice neither operates nor sees it, so
+/// the write answers the one 404 an outsider gets; reactivated, the same token renames again.
+#[cfg(feature = "accounts")]
+#[test]
+fn local_accounts_a_suspended_operator_operates_no_workspace() {
+    let Some(case) = Case::local("ws_suspended_local") else {
         return;
     };
+    case.refresh();
+    case.ready();
+    let ya = id_of(&case.create("alice", "Y and A", &["Y", "A"]));
+    let admin = case.token("admin");
+    let set = |action: &str| {
+        let body = json!({"action": action});
+        let reply = case.post("/api/v1/accounts/alice", &admin, &body);
+        assert_eq!(reply.status, 200, "{action}: {}", reply.body);
+    };
+    let rename = |name: &str, base: i64| {
+        let body = json!({"name": name, "base": base});
+        let path = format!("/api/v1/workspaces/{ya}/rename");
+        case.post(&path, &case.token("alice"), &body)
+    };
+    set("suspend");
+    assert_eq!(case.show("alice", &ya).status, 200);
+    let refused = rename("Suspended", 1);
+    assert_eq!(
+        (refused.status, code(&refused)),
+        (404, "not_found".into()),
+        "{}",
+        refused.body
+    );
+    set("reactivate");
+    let renamed = rename("Reactivated", 1);
+    assert_eq!(renamed.status, 200, "{}", renamed.body);
+}
+
+/// The body of `versions_are_saved_applied_and_rolled_back_along_the_base` and
+/// `local_accounts_versions_are_saved_applied_and_rolled_back_along_the_base`, over `case`.
+fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
     case.refresh();
     case.ready();
     let ya = id_of(&case.create("alice", "Y and A", &["Y", "A"]));
@@ -175,7 +228,7 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base() {
     let current: Vec<&Value> = versions.iter().filter(|v| v["current"] == true).collect();
     assert_eq!(current.len(), 1);
     assert_eq!(current[0]["version"], json!(v1));
-    assert_eq!(versions[0]["author"], "alice");
+    assert_eq!(versions[0]["author"], json!(case.subject("alice")));
     let peer = case.get(
         &format!("/api/v1/workspaces/{ya}/versions"),
         &case.token("dave"),
@@ -275,6 +328,11 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base() {
         .map(|h| h["action"].as_str().unwrap().to_string())
         .collect();
     assert_eq!(actions, ["rename", "rollback", "apply", "create"]);
+    // Each entry names its actor by subject (`local:<name>` with local accounts, #562).
+    let actors: Vec<String> = (history.json()["history"].as_array().unwrap().iter())
+        .map(|h| h["actor"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(actors, vec![case.subject("alice"); 4]);
     let denied = case.get(
         &format!("/api/v1/workspaces/{ya}/history"),
         &case.token("dave"),
@@ -286,7 +344,7 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base() {
         let path = format!("/api/v1/workspaces/{ya}/operators");
         case.post(&path, &case.token(caller), &body)
     };
-    let add = json!({"add": [{"subject": "dave", "login": "dave"}], "base": 4});
+    let add = json!({"add": [{"subject": case.subject("dave"), "login": "dave"}], "base": 4});
     let denied = operators("alice", add.clone());
     assert_eq!(
         (denied.status, code(&denied)),
@@ -297,10 +355,22 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base() {
     assert_eq!(delegated.json()["base"], 5);
     let shown = case.show("dave", &ya).json();
     assert_eq!(shown["operate"], true);
-    assert_eq!(shown["operators"].as_array().unwrap().len(), 2);
-    let last = operators("root", json!({"remove": ["alice", "dave"], "base": 5}));
+    let mut listed: Vec<Value> = shown["operators"].as_array().unwrap().clone();
+    listed.sort_by_key(|o| o["subject"].as_str().unwrap().to_string());
+    assert_eq!(
+        listed,
+        [
+            json!({"subject": case.subject("alice"), "login": "alice"}),
+            json!({"subject": case.subject("dave"), "login": "dave"}),
+        ]
+    );
+    let both = [case.subject("alice"), case.subject("dave")];
+    let last = operators("root", json!({"remove": both, "base": 5}));
     assert_eq!((last.status, code(&last)), (422, "last_operator".into()));
-    let dropped = operators("root", json!({"remove": ["alice"], "base": 5}));
+    let dropped = operators(
+        "root",
+        json!({"remove": [case.subject("alice")], "base": 5}),
+    );
     assert_eq!(dropped.status, 200, "{}", dropped.body);
     // The creator, no longer an operator, is a viewer of its own workspace now; the delegate edits.
     let refused = case.apply("alice", &ya, &v2, 6);
@@ -345,17 +415,94 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base() {
     };
     let lines: Vec<String> = records.iter().map(line).collect();
     let count = |needle: &str| lines.iter().filter(|l| l.as_str() == needle).count();
-    assert_eq!(count("workspaces.create alice accepted"), 1, "{lines:?}");
-    assert_eq!(count("workspaces.save alice accepted"), 2, "{lines:?}");
-    assert_eq!(count("workspaces.apply alice accepted"), 1, "{lines:?}");
-    assert_eq!(count("workspaces.rollback alice accepted"), 1, "{lines:?}");
-    assert_eq!(count("workspaces.rollback dave accepted"), 1, "{lines:?}");
-    assert_eq!(count("workspaces.rename alice accepted"), 1, "{lines:?}");
-    assert_eq!(count("workspaces.rename dave refused"), 1, "{lines:?}");
-    assert_eq!(count("workspaces.operators root accepted"), 2, "{lines:?}");
-    assert_eq!(count("workspaces.operators root refused"), 1, "{lines:?}");
-    assert_eq!(count("workspaces.operators alice refused"), 1, "{lines:?}");
-    assert_eq!(count("workspaces.delete dave accepted"), 1, "{lines:?}");
+    assert_eq!(
+        count(&format!(
+            "workspaces.create {} accepted",
+            case.subject("alice")
+        )),
+        1,
+        "{lines:?}"
+    );
+    assert_eq!(
+        count(&format!(
+            "workspaces.save {} accepted",
+            case.subject("alice")
+        )),
+        2,
+        "{lines:?}"
+    );
+    assert_eq!(
+        count(&format!(
+            "workspaces.apply {} accepted",
+            case.subject("alice")
+        )),
+        1,
+        "{lines:?}"
+    );
+    assert_eq!(
+        count(&format!(
+            "workspaces.rollback {} accepted",
+            case.subject("alice")
+        )),
+        1,
+        "{lines:?}"
+    );
+    assert_eq!(
+        count(&format!(
+            "workspaces.rollback {} accepted",
+            case.subject("dave")
+        )),
+        1,
+        "{lines:?}"
+    );
+    assert_eq!(
+        count(&format!(
+            "workspaces.rename {} accepted",
+            case.subject("alice")
+        )),
+        1,
+        "{lines:?}"
+    );
+    assert_eq!(
+        count(&format!(
+            "workspaces.rename {} refused",
+            case.subject("dave")
+        )),
+        1,
+        "{lines:?}"
+    );
+    assert_eq!(
+        count(&format!(
+            "workspaces.operators {} accepted",
+            case.subject("root")
+        )),
+        2,
+        "{lines:?}"
+    );
+    assert_eq!(
+        count(&format!(
+            "workspaces.operators {} refused",
+            case.subject("root")
+        )),
+        1,
+        "{lines:?}"
+    );
+    assert_eq!(
+        count(&format!(
+            "workspaces.operators {} refused",
+            case.subject("alice")
+        )),
+        1,
+        "{lines:?}"
+    );
+    assert_eq!(
+        count(&format!(
+            "workspaces.delete {} accepted",
+            case.subject("dave")
+        )),
+        1,
+        "{lines:?}"
+    );
     assert!(records.iter().all(|r| r["via"] == "console"));
     let accepted = records
         .iter()

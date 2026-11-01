@@ -1,0 +1,13 @@
+.account-form { display: grid; gap: .5rem; max-width: 26rem; margin: 0 0 2rem; }
+.account-form label { font-weight: 600; margin-top: .5rem; }
+.account-form input, .account-form select { width: 100%; padding: .55rem .65rem; font: inherit; border: 1px solid #aab7b2; border-radius: 4px; background: #fff; color: inherit; }
+.account-form .hint { margin: 0; font-size: .85rem; color: var(--muted); }
+.account-form .error, .account-form .notice { margin: .25rem 0 0; }
+.account-form button { justify-self: start; margin-top: .75rem; }
+.sign-out { margin-top: 1rem; }
+.account-form .discreet { justify-self: start; margin-top: 1.25rem; font-size: .85rem; color: var(--muted); }
+.account-form .token { display: block; padding: .55rem .65rem; font-family: ui-monospace, monospace; font-size: .85rem; overflow-wrap: anywhere; border: 1px solid #aab7b2; border-radius: 4px; }
+.account-form .check { display: flex; align-items: center; gap: .5rem; font-weight: 400; }
+.account-form .check input { width: auto; }
+.account-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.confirmation .account-form { max-width: none; margin: 1rem 0 0; }

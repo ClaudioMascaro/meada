@@ -2,7 +2,7 @@
 
 A console usa a feature `ui`, incluída em `cloud`, e roda em um processo próprio. Ela tem editor, diff, playground e grafo. O editor salva versões de configuração; aplicar uma versão e publicar os índices são etapas separadas.
 
-Proteja o acesso antes de expor a console. Sem `[oidc]`, o proxy controla a admissão: quem alcançar a console fora dessa proteção poderá ler o grafo. O proxy deve preservar `Host`, `Origin` e `Authorization`. A console aceita apenas seu Host público e, se houver Origin, sua própria origem.
+Proteja o acesso antes de expor a console. Sem `[oidc]` nem `[accounts]` ([contas locais](#contas-locais)), o proxy controla a admissão: quem alcançar a console fora dessa proteção poderá ler o grafo. Para começar, ligue as contas locais; para produção, o provedor de identidade. O proxy deve preservar `Host`, `Origin` e `Authorization`. A console aceita apenas seu Host público e, se houver Origin, sua própria origem.
 
 <!-- meada-graph:console-authoring -->
 
@@ -97,6 +97,100 @@ Registre no issuer um cliente público, sem segredo, com Authorization Code e PK
 
 O navegador precisa alcançar os metadados e o endpoint de token do issuer, com CORS para a origem da console. Ele troca o código diretamente com o issuer. O bearer fica na memória; `state` e `verifier` ficam em sessionStorage até o callback removê-los. Recarregar a página reinicia o login.
 
+## Contas locais
+
+Sem um provedor de identidade, a console pode autenticar as próprias contas (feature `accounts`, parte de `cloud`; ADR 0024). `[accounts]` exige `[postgres]` e só fica junto de `[oidc]` como break glass (abaixo):
+
+```toml
+[accounts]
+public_key_file = "/run/secrets/meada-signing.pub.pem"   # ou public_key_env
+private_key_file = "/run/secrets/meada-signing.pem"      # ou private_key_env; só a console lê
+# admin_password_env = "MEADA_ADMIN_PASSWORD"            # o padrão; ou admin_password_file
+```
+
+O par de chaves é Ed25519 em PEM (`openssl genpkey -algorithm ed25519 -out meada-signing.pem` e `openssl pkey -in meada-signing.pem -pubout -out meada-signing.pub.pem`). A console recusa a partida com uma chave ausente, ilegível, que não seja Ed25519 ou que não corresponda à outra, nomeando a chave e nunca o valor. Rode `meada postgres migrate` antes: na primeira partida com a tabela vazia, a console cria a conta padrão `admin` com a senha `admin123`, que precisa ser trocada antes de qualquer outra coisa, ou com o valor de `MEADA_ADMIN_PASSWORD`, sem troca obrigatória, se ele passar pela política de senhas (de 12 a 128 caracteres, nem a senha padrão, nem o nome de usuário, nem uma senha comum). Com `[accounts]`, `operations = true` não precisa de `[oidc]` nem de chave de operador: o papel é o da conta.
+
+`POST /api/v1/login` recebe `{"username", "password"}` e responde `{"token", "expires_at", "change_required"}`: um token de sessão que a console assina e aceita por oito horas como bearer, em toda rota menos os arquivos estáticos, `config` e `login`. Um usuário desconhecido, uma senha errada e uma conta bloqueada recebem o mesmo 401 `invalid_credentials`. Com a troca pendente, só `POST /api/v1/account/password` (`{"current", "new"}`) aceita o token; ela devolve um token novo. `config` traz `"sign_in": "accounts"` e `session` traz `"account": true`. Cada login, recusa e troca de senha fica na auditoria (`account.login`, `account.password`) antes do token, sem senha nem token; sem o registro, a resposta é 503 `audit_unavailable`. Limite a taxa de `/api/v1/login` no proxy.
+
+A política de senhas recusa as senhas de uma lista de senhas comuns embutida no binário (da SecLists, licença MIT, só as entradas de 12 caracteres ou mais), sem diferenciar maiúsculas, com a regra `common_password`. Dez falhas seguidas, no login ou na senha atual de uma troca, bloqueiam a conta por quinze minutos; a contagem é feita no Postgres segurando a linha da conta, então tentativas em paralelo nunca passam de dez, e um sucesso zera a contagem. Enquanto bloqueada, a conta recebe a mesma resposta de uma senha errada, no mesmo tempo, sem que a senha seja conferida e sem estender o bloqueio; a auditoria registra `locked_now` na falha que bloqueia e `locked` depois. Uma senha guardada com parâmetros mais fracos que os da console é refeita no próximo login que a acerta.
+
+Para recuperar a conta padrão (senha perdida ou bloqueio), rode `meada ui reset-admin --workspace <manifesto de bootstrap>`: ele cria ou reativa `admin` como operador, remove o bloqueio e define o valor de `MEADA_ADMIN_PASSWORD` (ou de `admin_password_file`) como senha, ou, sem ele, uma senha aleatória mostrada uma vez na saída padrão; a troca fica obrigatória no próximo login. O comando grava `account.reset_admin` com `via` `cli` na auditoria antes de mudar a conta e sai com 1, sem mudar nada, se não puder gravar o registro.
+
+O operador global administra as contas pela API, com `operations` ligado ou não, para que uma console só de leitura também tenha leitores. `GET /api/v1/accounts` lista todas (nome de usuário, papel, estado `active`, `suspended` ou `locked`, o fim de um bloqueio, se a troca é obrigatória, a última troca de senha, quando e por quem foi criada), nunca com o hash. `POST /api/v1/accounts` com `{"username", "role", "password", "change_required"}` cria uma conta `operator` ou `viewer` com uma senha temporária que passa pela política; `change_required` é verdadeiro se omitido. Um nome de usuário malformado recebe 422 `invalid_username` e um já usado 409 `username_taken`. `POST /api/v1/accounts/<usuário>` faz uma ação por vez: `{"action": "role", "role"}`, `{"action": "suspend"}`, `{"action": "reactivate"}` ou `{"action": "reset_password", "password", "change_required"}`, que também remove o bloqueio e torna a troca obrigatória se `change_required` for omitido; uma conta desconhecida recebe 404. Suspender ou rebaixar o último operador ativo recebe 409 `last_operator`, mesmo com duas requisições ao mesmo tempo. Nenhuma rota apaga ou renomeia uma conta. Quem não é o operador global recebe 403. Cada escrita da console lê a linha da conta antes de agir: uma conta suspensa ou rebaixada perde as escritas na hora, e as leituras continuam até o token expirar; uma conta suspensa recebe no login o mesmo 401 de uma senha errada. Cada mudança fica na auditoria (`account.create`, `account.role`, `account.suspend`, `account.reactivate`, `account.reset_password`) com a conta e os campos mudados, nunca uma senha, antes de ser feita; sem o registro, a resposta é 503 `audit_unavailable` e nada muda.
+
+Os grupos de uma conta vêm do operador global (`"groups"` na criação, e `{"action": "groups", "groups"}`, que substitui a lista; cada grupo é um nome que o dono de uma entrada pode ter, senão 422 `invalid_group`), aparecem na lista e ficam na auditoria como `account.groups`. `[accounts.groups]` liga cada grupo às identidades que ele concede, como `[oidc.groups]` (`*` para todas):
+
+```toml
+[accounts.groups]
+"team-billing" = ["github.com/acme/billing", "github.com/acme/ledger"]
+"platform" = ["*"]
+```
+
+Sem a tabela, toda conta local lê todos os repositórios. Com ela, a concessão de uma sessão local é o que os grupos do token concedem, e limita cada visão (o manifesto, o workspace e as versões, o store, os repositórios, as credenciais, o playground, os exports e o grafo) como a de um provedor de identidade; o operador global lê tudo. Um leitor cujo grupo é dono de uma entrada da versão atual do workspace que a sua concessão lê é operador de time (ADR 0015): `session` lista os times, e ele salva e aplica as entradas do time. O token de sessão leva os grupos: uma mudança vale para as escritas na hora (a linha da conta é lida antes) e para as leituras no próximo login. Com `[accounts]`, `GET /api/v1/admission` mostra o modo (`accounts` ou `break_glass`), a impressão digital da chave pública (`blake3:` e o hash BLAKE3 da chave Ed25519 crua, como `openssl pkey -pubin -in meada-signing.pub.pem -outform DER | tail -c 32 | b3sum` calcula) e a tabela de grupos limitada pela concessão de quem pergunta.
+
+No navegador, `"sign_in": "accounts"` faz a console mostrar a própria página de entrada em vez do redirecionamento do provedor de identidade. Uma entrada que precisa trocar a senha vai direto a uma página que pede a senha atual e a nova duas vezes, mostra a regra que a recusa nomeia e não oferece mais nada até a troca dar certo, e então abre o workspace. O token de sessão fica no `sessionStorage` da aba (nunca em `localStorage`, numa URL ou num log), é enviado como bearer e é esquecido ao sair, em qualquer 401 que não seja uma senha recusada (a console volta à entrada) e quando a aba fecha. A página de perfil oferece a troca voluntária de senha e a saída. O texto está em português e inglês.
+
+A página de contas (`/accounts`) é listada só para o operador global quando `config` diz `"sign_in": "accounts"`; qualquer outro papel, e uma console em break glass, recebe a página de não encontrado nesse caminho. Ela lista cada conta com papel, grupos, estado (a conta suspensa é marcada em texto, a bloqueada diz até quando), se precisa trocar a senha e quando trocou por último. O formulário de criação (nome de usuário, papel, grupos, senha temporária e "deve trocar a senha na primeira entrada", marcado por padrão) confere o padrão do nome e o tamanho da senha antes de perguntar ao servidor, e mostra a regra do servidor numa recusa. Papel, grupos, suspender, reativar e redefinir a senha (com a mesma caixa) passam cada um pelo diálogo de confirmação compartilhado, e as recusas do servidor, como `last_operator`, aparecem sem alteração. A página de auditoria nomeia cada ação `account.*` nos dois idiomas.
+
+### Tokens de agente
+
+Uma pessoa com sessão aberta gera tokens de agente para os seus agentes, para que cada agente consulte os nós sob a concessão do seu dono em vez de um bearer compartilhado. `POST /api/v1/account/tokens` com `{"surface": "nodes", "hours": 24}` (de 1 a 168 horas, 8 quando `hours` falta) responde `{"token", "expires_at", "surface"}` uma vez só: a Meada não guarda token de agente nem o mostra de novo. O token leva a audiência dos nós (`meada:nodes`), o sujeito, o papel e os grupos como a linha da conta está agora, e um id aleatório. Uma sessão que precisa trocar a senha recebe o 403 `password_change_required`, e uma conta suspensa a recusa de papel (403 `forbidden`). Cada emissão fica registrada como `account.token` com a superfície, as horas e o id do token, nunca o token. A console recusa tokens de agente (401): um token que vive até sete dias e que nada revoga nunca faz escritas na console. A página de perfil oferece a superfície e a validade e depois mostra o token com um controle de cópia e a sua expiração; sair da página o apaga. Quando o manifesto de bootstrap da console tem `[proposals]`, `{"surface": "proposals"}` emite em vez disso um token de agente para o [servidor de propostas](named-workspaces.md#rodar-o-servidor-de-propostas) (audiência `meada:proposals`), que só esse servidor admite, e o `config` traz `"proposals": true` para o perfil oferecê-lo; sem a seção é um 422 `invalid_surface`.
+
+Um nó com `[accounts]` e sem `[oidc]` admite esses tokens no `meada mcp --listen`. Ele lê a chave pública na partida (nunca a privada) e confere o emissor, a `[ui] public_url` da console, então o manifesto dele traz a seção `[ui]` da console junto de `[accounts]` e `[postgres]`, como o do job de atualização; uma chave ausente ou ilegível, ou a falta de `[ui]`, recusa a partida. Um token ausente, expirado, ainda não válido, assinado por outra chave ou que não seja EdDSA, um com `crit`, e um token de outra superfície (um token de sessão inclusive) recebem 401 com `WWW-Authenticate: Bearer` antes do roteamento. A concessão é o que `[accounts.groups]` dá aos grupos do token (todo repositório sem a tabela), e ela limita o roteamento (403 fora da concessão), as listagens 404 e toda resposta, pins e rotas de workspaces nomeados inclusive, como faz o token de um provedor de identidade. Trocar o par de chaves encerra todos os tokens em circulação de uma vez; sem isso, um token dura até expirar, mesmo depois de a conta ser suspensa. Configure um cliente MCP com o token como bearer:
+
+```json
+{"mcpServers": {"meada": {"type": "http", "url": "https://nodes.example/github.com/acme/web",
+  "headers": {"Authorization": "Bearer <token de agente>"}}}}
+```
+
+### Login do GitHub verificado
+
+Com `[accounts.github]`, o provedor de concessão do GitHub das contas locais, uma pessoa comprova o seu login do GitHub uma vez e os seus papéis no GitHub passam a lhe conceder repositórios, como o `login_claim` faz com um provedor de identidade. A seção tem as chaves de `[oidc.github]` sem `login_claim` (`host`, `roles`, `max_age_seconds`) e `api`, o endpoint REST do GitHub desse host (`https://api.github.com` por padrão em `github.com`, obrigatório em qualquer outro host, `https` ou `http` em loopback):
+
+```toml
+[accounts.github]
+host = "github.com"
+roles = ["write", "maintain", "admin"]
+max_age_seconds = 5400
+```
+
+Na página de perfil, a pessoa cola um token de acesso pessoal do GitHub (um de granularidade fina sem nenhuma permissão basta). `POST /api/v1/account/github` com `{"token": "..."}` faz a console chamar `GET /user` em `api` uma vez só, guardar o login em minúsculas e descartar o token: ele nunca é guardado, registrado em log ou na auditoria, nem enviado a outro lugar. A resposta traz o login e um token de sessão novo que o carrega. Um login que outra conta já verificou é um 409 `login_taken`; a recusa do GitHub é um 422 `github_refused`, e o GitHub fora de alcance um 503 `github_unavailable`, nenhum dos dois repetindo a resposta do GitHub. `POST /api/v1/account/github/remove` remove o próprio login, e o operador global remove o de qualquer conta pela ação `remove_github` da página de contas. Os tokens de sessão e de agente levam o login verificado, e a concessão do GitHub, lida no conjunto de permissões que a checagem de papéis do job grava (`meada github-app roles` lê `[accounts.github]`), se junta à dos grupos na console, nos nós, nas adições de um operador de time (`added_by`) e na coluna `login` da auditoria. Um token emitido antes de uma remoção mantém o login até expirar. Cada verificação e remoção fica registrada como `account.github` (com o login) e `account.remove_github`.
+
+### Break glass
+
+Ao configurar `[oidc]`, o login local desliga para todas as contas: `[accounts]` junto de `[oidc]` é um erro, a menos que traga `break_glass = true`. Então só a conta padrão `admin` entra na console, como operador global, ao lado dos tokens do provedor de identidade, para quando ele está fora do ar:
+
+```toml
+[accounts]
+break_glass = true
+public_key_file = "/run/secrets/meada-signing.pub.pem"
+private_key_file = "/run/secrets/meada-signing.pem"
+```
+
+`break_glass` sem `[oidc]` é um erro, e `[accounts.groups]` e `[accounts.github]` não podem ficar sob ele: a conta de break glass não precisa de concessão. Qualquer outro nome de usuário recebe o mesmo 401 de uma senha errada, e a auditoria registra `not_break_glass`. A console separa os bearers pelo emissor antes de tentar qualquer chave: um token cujo `iss` é a `public_url` da console só é conferido com a chave Ed25519 (e só vale o de `admin`), qualquer outro só com as chaves do provedor de identidade; por isso a console recusa a partida se o `issuer` de `[oidc]` for a sua própria `public_url`. A conta de break glass troca a própria senha; administração de contas, tokens de agente e verificação de login não existem (404). Nós e o servidor de propostas ignoram `[accounts]` quando há `[oidc]` e nunca leem a chave privada. `config` traz `"sign_in": "oidc"` com `"break_glass": true`, e o navegador, em vez de redirecionar direto ao provedor de identidade, mostra o botão dele e, discreto, o link para `/break-glass`, a página de entrada da conta padrão; o link continua lá quando o provedor de identidade não responde.
+
+### Segurança das contas locais
+
+- **Senhas:** guardadas com argon2id (19 MiB, duas iterações, uma lane; os parâmetros ficam no hash e um hash mais fraco é refeito no próximo login). Só um número pequeno de hashes roda ao mesmo tempo: o excedente recebe 503 `busy` sem calcular nada.
+- **Bloqueio:** dez falhas seguidas bloqueiam a conta por quinze minutos; uma redefinição pelo operador global ou `meada ui reset-admin` remove o bloqueio.
+- **Duração dos tokens:** o token de sessão vale oito horas; o de agente, de 1 a 168 horas (8 por padrão).
+- **Sem lista de revogação:** a Meada não guarda tokens de agente, então a validade é a revogação. Suspender ou rebaixar uma conta barra as escritas dela na console na hora (a linha é lida a cada escrita) e a emissão de tokens novos, mas trocar a senha não invalida nada, e um token já emitido continua admitido nos nós e no servidor de propostas até expirar.
+- **Rotação de chaves como parada de emergência:** troque o par Ed25519 e reinicie a console, os nós e o servidor de propostas: todo token em circulação, de sessão ou de agente, deixa de valer de uma vez. Não há rotação com chaves sobrepostas. Só a console lê a chave privada.
+- **Token de acesso pessoal do GitHub:** lido uma vez, para obter o login em `GET /user`, e descartado; nunca é guardado, registrado em log ou na auditoria.
+- **Limite de taxa no proxy:** a console não limita por endereço. Limite `POST /api/v1/login` (e, se quiser, `account/password`) no proxy, por exemplo com `limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;` e `limit_req zone=login burst=5;` no `location` do login no nginx. As falhas de nomes desconhecidos entram na auditoria e a fazem crescer sem limite, e o bloqueio por conta não as freia.
+- **O que não existe:** e-mail, cadastro próprio, "esqueci a senha", autenticação multifator, lista de revogação, listagem de tokens emitidos, e apagar ou renomear contas. Quem perde a senha do `admin` usa `meada ui reset-admin`.
+
+### Migrar das contas locais para o provedor de identidade
+
+Ao configurar `[oidc]`, o login local desliga para todas as contas (veja [Break glass](#break-glass)). Passos:
+
+1. Configure `[oidc]` na console e nos nós ([Autenticação e grants](admission.md)) e acrescente `break_glass = true` a `[accounts]`, para manter a conta padrão como saída de emergência. Remova `[accounts.groups]` e `[accounts.github]`: sob break glass elas são um erro.
+2. Copie a tabela de `[accounts.groups]` para `[oidc.groups]`, trocando o nome de cada grupo local pelo valor que a claim `groups_claim` do provedor de identidade carrega (no Entra, o id do grupo). Os grupos locais e os do provedor são nomes independentes: o mapeamento é manual, e a concessão de um token passa a ser a dos grupos que o provedor emite. Os `owner` das entradas do workspace são nomes de grupo e continuam valendo se o provedor usar os mesmos nomes; senão, atualize-os.
+3. Passe `[accounts.github]` para `[oidc.github]`: `host`, `roles` e `max_age_seconds` ficam, `api` sai, e o `login_claim` substitui o login verificado, que agora o administrador do provedor mapeia (veja [receitas](identity-providers.md)).
+4. Quem era operador local passa a ser operador por `ui.operator_groups` ou `ui.operator_claim`.
+
+O que deixa de funcionar: a entrada de qualquer conta que não seja `admin`; os tokens de sessão e de agente das contas locais (os nós e o servidor de propostas passam a admitir só os tokens do provedor, e os agentes passam a usar tokens do provedor de identidade); a página de contas, a emissão de tokens de agente e a verificação do login (404); e os sujeitos `local:<usuário>` registrados como autores, operadores de workspaces nomeados e registros de auditoria, que nunca coincidem com os do provedor, então refaça a lista de operadores de cada workspace nomeado. As contas continuam na tabela, inertes. Nenhuma conta ou grupo é migrado sozinho.
+
 ## Frota e diagnóstico
 
 Cada `snapshot pull --every` envia um heartbeat, o registro periódico de estado do nó. Ele informa geração, fence, gerações locais, prontidão, versão e horário.
@@ -111,12 +205,12 @@ Com OIDC, leitores veem somente as identidades admitidas pelo token. Para conced
 
 Com `[workspace] source = "store"`, `operations = true` e `oidc.groups_claim`, quem tem um grupo que é dono (`owner = "<grupo>"`) de uma entrada da versão atual do workspace que o seu token lê é operador de time. Vê o que um leitor com o mesmo grant vê e pode salvar e aplicar mudanças nas entradas do seu time; mudar qualquer outra entrada, um owner ou uma entrada sem owner é recusado com um 403 `entries_refused` que nomeia as entradas (um apply conta as que estão fora do grant). Pointer e fence continuam com o operador. Mapeie o grupo do time para as identidades dele em `[oidc.groups]`: ser dono nunca amplia o que um token lê. A página de versões mostra o time responsável por cada entrada a todos os papéis, e o editor do operador de time contém só as entradas que seu token lê, marca uma alteração que a API recusaria (com o motivo) antes de ela poder ser salva e nomeia os times que a autorizam nas confirmações, em vez de um comando da CLI.
 
-As quatro operações HTTP exigem OIDC e `operations = true`. Cada ação mostra o comando CLI e pede confirmação. Se recusada, mostra a mensagem do CLI, incluindo o titular de uma trava ocupada. Cada tentativa gera uma linha de auditoria em stderr, sem tokens nem bodies.
+As quatro operações HTTP exigem `operations = true` e um papel de operador, que vem do OIDC ou de uma [conta local](#contas-locais) (nunca só do proxy). Cada ação mostra o comando CLI e pede confirmação. Se recusada, mostra a mensagem do CLI, incluindo o titular de uma trava ocupada. Cada tentativa gera uma linha de auditoria em stderr, sem tokens nem bodies.
 
 <details markdown="1" class="reference-details">
 <summary>Grant, login e limites da recuperação</summary>
 
-As operações da console exigem OIDC e ficam desligadas por padrão. Quando habilitadas, usam a mesma trava e as mesmas verificações do CLI para alterar o ponteiro, recuperar o fence e gerenciar versões. Cada tentativa gera uma linha de auditoria. O grant também limita grupos e erros do manifesto; o login preserva os parâmetros do issuer, e a recuperação respeita o relógio e o limite do contador do Valkey.
+As operações da console exigem `[oidc]` ou `[accounts]` e ficam desligadas por padrão. Quando habilitadas, usam a mesma trava e as mesmas verificações do CLI para alterar o ponteiro, recuperar o fence e gerenciar versões. Cada tentativa gera uma linha de auditoria. O grant também limita grupos e erros do manifesto; o login preserva os parâmetros do issuer, e a recuperação respeita o relógio e o limite do contador do Valkey.
 
 </details>
 
@@ -126,7 +220,7 @@ Com `[postgres]` no bootstrap (e o schema em dia com `meada postgres migrate`), 
 
 ## Catálogo de repositórios
 
-Com `[catalog]` no bootstrap (feature `workspaces`, junto de `[oidc.github]`; veja [o catálogo](github-app.md#o-catalogo-de-repositorios)),
+Com `[catalog]` no bootstrap (feature `workspaces`, junto de `[oidc.github]` ou `[accounts.github]`; veja [o catálogo](github-app.md#o-catalogo-de-repositorios)),
 a console oferece o **Catálogo de repositórios** a todo sujeito admitido, e `GET /api/v1/config` traz `"catalog": true`.
 É o seletor que vem antes de qualquer manifesto: lista só os repositórios que a pessoa pode selecionar, ou seja, que o
 catálogo contém e nos quais o login dela tem um papel aceito no conjunto de permissões mais recente (o administrador da
@@ -152,7 +246,7 @@ mostra `catalog.allow` ao operador global.
 
 ## Workspaces nomeados
 
-Com `[workspaces]` no bootstrap (feature `workspaces`, junto de `[ui] operations = true`, `[oidc.github]`, `[catalog]` e `[workspace] source = "store"`; `mirrors` é a raiz absoluta onde ficam os espelhos dos repositórios que só workspaces nomeados selecionam, `max_workspaces` tem padrão 200 e `max_entries` 100), `GET /api/v1/config` traz `"workspaces": {"max_entries": n}` e a console oferece a página **Workspaces nomeados** a todo sujeito admitido.
+Com `[workspaces]` no bootstrap (feature `workspaces`, junto de `[ui] operations = true`, `[oidc.github]` (ou `[accounts.github]`), `[catalog]` e `[workspace] source = "store"`; `mirrors` é a raiz absoluta onde ficam os espelhos dos repositórios que só workspaces nomeados selecionam, `max_workspaces` tem padrão 200 e `max_entries` 100), `GET /api/v1/config` traz `"workspaces": {"max_entries": n}` e a console oferece a página **Workspaces nomeados** a todo sujeito admitido.
 
 - `POST /api/v1/workspaces` recebe `{"name", "description"?, "entries", "message"}` (80 KiB), sendo `entries` o texto do manifesto com entradas `[[repository]]` que têm `repo` e, no máximo, blocos `serve`, `resource` e `peer` (`path`, `owner`, `added_by` e `serve.documents` são recusados, 422 `invalid_entries`). O criador é o sujeito autenticado: `actor`, `role` ou qualquer outra chave no corpo é um 400. Responde 201 `{"id", "version", "created": true}`, ou 200 com `created: false` quando o mesmo criador, nome e entradas já o criaram. Uma seleção com repositório fora da elegibilidade da pessoa é um 403 `entries_refused` (`refused`: as identidades que a concessão da pessoa lê, `hidden`: quantas outras) e não grava nada; um conjunto que não consegue decidir é um 409 `pending` com `reason` (`no_set`, `stale_set`, `missing_login`). A criação é registrada na auditoria como `workspaces.create`, recusas incluídas.
 - `GET /api/v1/workspaces?limit=&after=` lista os workspaces que o sujeito vê, ordenados por id (`limit` de 1 a 100, 25 por padrão), e `GET /api/v1/workspaces/<id>` mostra um com sua `base`, seu `state` (`applied`: gravado, ingestão pendente; `live`: a geração atual o registra) e a `ingestion` de cada entrada (`pending`, `ready` ou `excluded`). Um workspace é visível aos seus operadores, ao administrador da plataforma e a quem tem concessão que lê todos os seus repositórios; para os demais responde o mesmo 404 de um id que não existe. Os operadores também recebem a lista de operadores.

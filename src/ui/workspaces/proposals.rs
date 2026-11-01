@@ -14,6 +14,14 @@
 //! tool takes an argument naming any of them, every input schema is closed, and an undeclared
 //! property is `invalid_params`.
 //!
+//! With `[accounts]` and no `[oidc]` (ADR 0024, #562), admission is instead an agent token for
+//! the proposal server's surface (`accounts::PROPOSALS`) the console signed, checked with the
+//! signing key's public half alone against the console's `[ui] public_url`: the subject
+//! (`local:<username>`), the verified login, the groups and the role are the token's, the grant
+//! the grant providers compute from them, and no account row is read. There is no protected
+//! resource metadata (no authorization server to discover), so its path is a 404 and a 401 names
+//! none. With `[oidc]` (break glass beside it) only the identity provider admits.
+//!
 //! Nothing here writes: every Postgres session is read-only (`default_transaction_read_only`),
 //! the audit is off, no store or Valkey write is called, and the only trace of a call is one
 //! stderr line, `proposals: <subject> <tool> <workspace or -> : <outcome>`, with no token,
@@ -149,20 +157,27 @@ struct Server {
     section: crate::proposals::Config,
     endpoint: Endpoint,
     calls: Arc<tokio::sync::Semaphore>,
+    /// With `[accounts]` and no `[oidc]`: the admission of agent tokens for this surface (#562).
+    #[cfg(feature = "accounts")]
+    agents: Option<Arc<crate::accounts::Agents>>,
 }
 
 /// `meada workspaces mcp`: refuses to start, listing every problem, without `[proposals]` (and
-/// so `[workspaces]` and `[oidc.github]`), when the issuer's metadata or JWKS cannot be read, or
-/// when the Postgres schema is another version; then serves at `listen` until SIGINT or SIGTERM,
-/// as `meada mcp --listen` does.
+/// so `[workspaces]` and the GitHub grant provider), when the issuer's metadata or JWKS cannot be
+/// read, when the signing key's public half cannot (local accounts, #562), or when the Postgres
+/// schema is another version; then serves at `listen` until SIGINT or SIGTERM, as
+/// `meada mcp --listen` does.
 pub(in crate::ui) fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
     let address = crate::mcp::address(listen)?;
-    let console = Arc::new(Console::for_proposals(manifest)?);
+    let (console, agents) = Console::for_proposals(manifest)?;
+    let console = Arc::new(console);
+    #[cfg(feature = "accounts")]
+    let agents = agents.map(Arc::new);
+    #[cfg(not(feature = "accounts"))]
+    let () = agents;
     let section = (console.bootstrap.proposals.clone()).expect("checked at start");
     crate::mcp::serve_http(address, move |_, config| {
-        if let Some(oidc) = &console.oidc {
-            oidc.listening();
-        }
+        console.providers.listening();
         let tools = Tools::new(console.clone());
         let server = Arc::new(Server {
             console: console.clone(),
@@ -173,6 +188,8 @@ pub(in crate::ui) fn listen(listen: &str, manifest: &Path) -> crate::Result<()> 
                 config.clone(),
             ),
             calls: Arc::new(tokio::sync::Semaphore::new(calls_max())),
+            #[cfg(feature = "accounts")]
+            agents: agents.clone(),
         });
         move |request| {
             let server = server.clone();
@@ -181,30 +198,57 @@ pub(in crate::ui) fn listen(listen: &str, manifest: &Path) -> crate::Result<()> 
     })
 }
 
+/// What admits agent tokens for the proposal server (#562): `accounts::Agents` in a build with
+/// local accounts, none without.
+#[cfg(feature = "accounts")]
+type Admission = Option<crate::accounts::Agents>;
+#[cfg(not(feature = "accounts"))]
+type Admission = ();
+
 impl Console {
     /// The console the tools answer from: the bootstrap's sections as the console reads them,
     /// with every Postgres session read-only, the audit off, no SCIM endpoint, no front end and
-    /// no GitHub App.
-    fn for_proposals(file: &Path) -> crate::Result<Self> {
+    /// no GitHub App; and with `[accounts]` and no `[oidc]`, the admission of agent tokens for
+    /// this surface, the signing key's public half read now (never the private one).
+    fn for_proposals(file: &Path) -> crate::Result<(Self, Admission)> {
         let read = Manifest::read(file)?;
         let shown = file.display().to_string();
         let no_section = || format!("{shown}: {}", Msg::ProposalsNoSection.text());
         if read.proposals.is_none() {
             return Err(no_section().into());
         }
-        // `[proposals]` needs `[workspaces]`, which needs `[ui]`, `[oidc.github]` and `[postgres]`.
+        // `[proposals]` needs `[workspaces]`, which needs `[ui]`, the GitHub grant provider and
+        // `[postgres]`.
         let ui = read.ui.clone().ok_or_else(no_section)?;
         let read = read.read_only();
         let src = fs::read_to_string(file).map_err(|e| format!("{shown}: {e}"))?;
         let at = |key: &str, problem: String| crate::config::error_at(file, &src, key, &problem);
         let mut problems: Vec<String> = Vec::new();
-        let oidc = match read.oidc.clone().map(crate::oidc::Oidc::start).transpose() {
+        let providers = Arc::new(crate::grant::Providers::of(&read));
+        let start = |config| crate::oidc::Oidc::start(config, providers.clone());
+        let oidc = match read.oidc.clone().map(start).transpose() {
             Ok(oidc) => oidc,
             Err(e) => {
                 problems.push(e.to_string());
                 None
             }
         };
+        // With `[oidc]` (break glass beside it) only the identity provider admits (ADR 0024).
+        #[cfg(feature = "accounts")]
+        let agents = match (&read.accounts, &oidc, &problems[..]) {
+            (Some(accounts), None, []) => {
+                match accounts.agents(&ui.public_url, crate::accounts::PROPOSALS) {
+                    Ok(agents) => Some(agents),
+                    Err(problem) => {
+                        problems.push(at(problem.0, problem.1).to_string());
+                        None
+                    }
+                }
+            }
+            _ => None,
+        };
+        #[cfg(not(feature = "accounts"))]
+        let agents = ();
         if let Some(postgres) = &read.postgres
             && let Err(version) = crate::postgres::probe(postgres)
         {
@@ -213,7 +257,7 @@ impl Console {
         if !problems.is_empty() {
             return Err(problems.join("\n").into());
         }
-        Ok(Self {
+        let console = Self {
             file: file.to_path_buf(),
             bootstrap: read.clone(),
             readers: Arc::new(tokio::sync::Semaphore::new(super::super::read::READERS_MAX)),
@@ -223,14 +267,19 @@ impl Console {
             loaded: Value::Null,
             csp: header::HeaderValue::from_str(&csp(None))?,
             oidc,
+            providers,
             holds: Holds::of(file, &read),
             entries: std::sync::Mutex::new(None),
             audit: crate::audit::Audit::default(),
+            // The proposal server signs no session token: it never reads `[accounts]`'s keys.
+            #[cfg(feature = "accounts")]
+            accounts: None,
             #[cfg(feature = "directory")]
             scim: None,
             #[cfg(feature = "directory")]
             directory: Self::directory_of(&read),
-        })
+        };
+        Ok((console, agents))
     }
 }
 
@@ -292,8 +341,12 @@ impl Server {
 
     /// The session of a request's bearer token for `[proposals] audience`, checked by the nodes'
     /// module as the console's is; a subject the directory deprovisioned is refused. Otherwise
-    /// the 401 or 403 with a challenge naming the metadata.
+    /// the 401 or 403 with a challenge naming the metadata. With local accounts, `admit_agent`.
     fn admit(&self, headers: &HeaderMap) -> Result<Session, Box<Answer>> {
+        #[cfg(feature = "accounts")]
+        if let Some(agents) = &self.agents {
+            return self.admit_agent(agents, headers);
+        }
         let console = &self.console;
         let Some(oidc) = &console.oidc else {
             return Err(Box::new(plain(StatusCode::UNAUTHORIZED, "unauthorized\n")));
@@ -306,14 +359,14 @@ impl Server {
             console.user_claim(),
         );
         match admitted {
-            Ok(admitted) => {
+            Ok((admitted, user)) => {
                 #[cfg(feature = "directory")]
-                if let Some((refused, _)) =
-                    console.directory_refusal(admitted.user.as_deref(), false)
-                {
+                if let Some((refused, _)) = console.directory_refusal(user.as_deref(), false) {
                     return Err(refused);
                 }
-                Ok(Session::admitted(admitted, Vec::new(), oidc))
+                #[cfg(not(feature = "directory"))]
+                let _ = user;
+                Ok(Session::admitted(admitted, Vec::new()))
             }
             Err((status, challenge)) => {
                 let metadata = format!(
@@ -335,6 +388,32 @@ impl Server {
                 Err(Box::new(answer))
             }
         }
+    }
+}
+
+impl Server {
+    /// The session of a request's agent token for this surface (#562, ADR 0024): its subject,
+    /// verified login, groups and role from the token alone, its grant computed from them by the
+    /// grant providers (every repository with no table), no team and no account row read. A
+    /// missing or failing token is the 401 a node answers, without `resource_metadata`.
+    #[cfg(feature = "accounts")]
+    fn admit_agent(
+        &self,
+        agents: &crate::accounts::Agents,
+        headers: &HeaderMap,
+    ) -> Result<Session, Box<Answer>> {
+        let claims = agents.admit(headers).map_err(|sent| {
+            let challenge = crate::accounts::challenge(sent);
+            let mut answer = plain(StatusCode::UNAUTHORIZED, "unauthorized\n");
+            let value = header::HeaderValue::from_static(challenge);
+            answer.headers_mut().insert(header::WWW_AUTHENTICATE, value);
+            Box::new(answer)
+        })?;
+        let operator = claims.role == crate::accounts::Role::Operator;
+        let granted = (self.console.providers).local(&claims.groups, claims.login.as_deref());
+        let admitted =
+            crate::grant::Admitted::new(Some(claims.sub), operator, claims.groups, granted);
+        Ok(Session::local(admitted, Vec::new()))
     }
 }
 

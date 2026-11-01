@@ -18,7 +18,7 @@
 //! console refuses on that error; a node writes it once on stderr and treats Postgres as
 //! unreachable, keeping its readiness.
 //!
-//! Who connects: the console (audit, directory, permissions, overage), nodes with
+//! Who connects: the console (audit, directory, permissions, overage, local accounts), nodes with
 //! `[oidc.github]` or overage through the directory (reads only), the job's `meada github-app
 //! roles` and the CLI twins that write. `meada index` never does. Three Postgres roles are
 //! recommended: one for `migrate`, which owns the schema; one that writes (the console, the role
@@ -224,6 +224,25 @@ const MIGRATIONS: &[&str] = &[
      UPDATE {schema}.workspace_versions v SET entries = w.entries
        FROM {schema}.workspaces w WHERE w.id = v.workspace_id AND w.current = v.version;
      ALTER TABLE {schema}.workspace_versions ALTER COLUMN entries SET NOT NULL;",
+    // 9: local accounts (#554, ADR 0024): one row per account, never deleted or renamed by Meada.
+    // A username is 1 to 64 lowercase ASCII letters, digits, `.`, `-` and `_`; the hash an
+    // argon2id PHC string; the role `operator` or `viewer`; the groups owner names. The lockout
+    // (`failures`, `locked_until`) and the verified GitHub login, unique when present, are the
+    // later tickets' columns, created here so the table moves once.
+    "CREATE TABLE {schema}.accounts (
+       username text PRIMARY KEY,
+       password_hash text NOT NULL,
+       role text NOT NULL,
+       groups text[] NOT NULL DEFAULT '{}',
+       change_required boolean NOT NULL DEFAULT true,
+       suspended boolean NOT NULL DEFAULT false,
+       failures integer NOT NULL DEFAULT 0,
+       locked_until timestamptz,
+       password_changed timestamptz NOT NULL DEFAULT now(),
+       github_login text UNIQUE,
+       created timestamptz NOT NULL DEFAULT now(),
+       created_by text
+     );",
 ];
 
 /// The `[postgres]` section as written.
@@ -410,6 +429,12 @@ impl Config {
             (Err(problem), _) => return Err(named(problem)),
         };
         parse(&text).map_err(|reason| named(reason.text()))
+    }
+
+    /// The schema, as written.
+    #[cfg(feature = "accounts")]
+    pub(crate) fn schema(&self) -> &str {
+        &self.schema
     }
 
     /// The schema, quoted for a statement (`schema_ok` leaves nothing to escape).

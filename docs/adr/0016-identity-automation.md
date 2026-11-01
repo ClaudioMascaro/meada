@@ -52,7 +52,10 @@ build, and wins where the two could disagree.
   keeps its readiness, as an unreachable store or Valkey changes no readiness today.
 - Who connects: the console (audit, directory, permissions, overage), nodes with `[oidc.github]`
   or overage through the directory (reads only), the job's `meada github-app roles`, and the
-  CLI twins that write. Nothing else connects, and `meada index` never does. Three Postgres
+  CLI twins that write. Nothing else connects, and `meada index` never does. (Amended
+  2026-10-31; #551: ADR 0024 adds the local accounts to what the console keeps there, nodes with
+  `[accounts.github]` read the permissions set as nodes with `[oidc.github]` do, and `meada ui
+  reset-admin` is a CLI twin that writes.) Three Postgres
   roles are recommended: one for `migrate`, one that writes, one that reads. Backups and
   availability are the operator's, as for Valkey and the store: a lost database costs the
   audit's only copy, while the directory and the permissions come back with the next push and
@@ -80,7 +83,11 @@ build, and wins where the two could disagree.
 - `[oidc]` is the identity provider: the one token issuer of the deployment, now typed
   (`generic`, `entra`, `okta`, `keycloak`) with a table of settings per type that needs one
   (`[oidc.entra]`). Every key it takes today keeps its name, meaning and default, so no bootstrap
-  manifest changes and there is no migration.
+  manifest changes and there is no migration. (Amended 2026-10-31; #551: still the one external
+  token issuer. Without `[oidc]`, ADR 0024's console signs session and agent tokens for local
+  accounts, with `[accounts.groups]` and `[accounts.github]` as their grant providers; with
+  `[oidc]`, the only Meada-signed token is the break-glass account's session token, which the
+  console tells apart by issuer.)
 - The claims grant (`identities_claim` and `[oidc.groups]`) is the identity provider's grant and
   stays where it is. A grant provider is a source of a token's grant; `[oidc.github]` adds the
   second one. A token's grant is the union of every configured grant provider's identities, `*`
@@ -121,7 +128,10 @@ build, and wins where the two could disagree.
 - The console never calls GitHub: it would need the App's private key in a browser-facing
   process and call a host outside the operator's boundary (ADR 0012, ADR 0014). The job already
   holds the credentials and runs at every refresh, so one check feeds the grant, the exclusions
-  and the views.
+  and the views. (Amended 2026-10-31; #551: the role check stays the job's. ADR 0024 adds one
+  call, `GET /user` on `[accounts.github] api`, which the console makes once per login
+  verification of a local account, with the personal access token the person pastes and no App
+  key; the GitHub grant provider then grants from that verified login as from `login_claim`.)
 
 ### Additions under the GitHub grant provider
 
@@ -140,7 +150,9 @@ build, and wins where the two could disagree.
   the grant is refused `outside_grant`, which tells the team operator it is present. ADR 0015
   avoided that; it is accepted under shared trust, and it is the one refusal the editor cannot
   predict. Authorization and composition stay one pure function pair of `meada-core`, given the
-  login and the host, so the browser and the server answer alike.
+  login and the host, so the browser and the server answer alike. (Amended 2026-10-31; #551:
+  under ADR 0024's local accounts, the saver's login is the account's verified login, read from
+  its session token; an account without one adds as a subject without a login does.)
 - The job leaves unverified additions out before the fetch: the role check computes, from the
   rows it just listed, every addition whose `added_by` holds no accepted role, writes them into
   the set and into an exclusions file beside the pulled version, and every reader of the pulled
@@ -212,7 +224,9 @@ build, and wins where the two could disagree.
   break every S2 and S3 deployment and tie the console to a database it may not need. A module
   in ADR 0012's shape, with the audit only when `[postgres]` is present, keeps those as they are.
 - **Several token issuers.** One audience, one JWKS and one grant per deployment keep admission
-  one function; a second issuer is out of scope.
+  one function; a second issuer is out of scope. (Amended 2026-10-31; #551: still so for
+  external issuers. ADR 0024's console signs Meada's own tokens instead of an identity provider,
+  and beside one only for the break-glass account's console session.)
 - **A partial permissions set on a throttled listing.** It would revoke every repository left
   unlisted, or mix stale rows with fresh ones; failing the run keeps the previous set, which
   ages out on its own.

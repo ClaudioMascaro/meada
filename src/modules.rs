@@ -19,7 +19,7 @@ pub struct Module {
     pub built: bool,
 }
 
-pub const MODULES: [Module; 12] = [
+pub const MODULES: [Module; 13] = [
     Module {
         section: "valkey",
         feature: "valkey",
@@ -80,6 +80,11 @@ pub const MODULES: [Module; 12] = [
         feature: "proposals",
         built: cfg!(feature = "proposals"),
     },
+    Module {
+        section: "accounts",
+        feature: "accounts",
+        built: cfg!(feature = "accounts"),
+    },
 ];
 
 /// The first section of `src`, the content of `file`, whose feature this build lacks. A file
@@ -101,19 +106,32 @@ pub fn check(file: &Path, src: &str) -> Result<()> {
 #[cfg(any(
     feature = "generation-pointer",
     feature = "github-app",
-    feature = "directory"
+    feature = "directory",
+    feature = "accounts"
 ))]
 pub fn needs(file: &Path, src: &str, section: &str, missing: &[&str]) -> Result<()> {
     if missing.is_empty() {
         return Ok(());
     }
-    let at = first_key(src, |key| (key == section).then_some(())).map_or(0, |(at, ())| at);
     let what = Msg::NeedsSections {
         section,
         needed: missing,
     }
     .text();
-    Err(located(file, src, at, &what))
+    Err(at_section(file, src, section, &what))
+}
+
+/// The error `what` at the line of `section` in `src`, the content of `file`: `needs`'s place,
+/// for a need its list cannot word (#562: one of two tables).
+#[cfg(any(
+    feature = "generation-pointer",
+    feature = "github-app",
+    feature = "directory",
+    feature = "accounts"
+))]
+pub fn at_section(file: &Path, src: &str, section: &str, what: &str) -> Box<dyn std::error::Error> {
+    let at = first_key(src, |key| (key == section).then_some(())).map_or(0, |(at, ())| at);
+    located(file, src, at, what)
 }
 
 /// The first top-level key of `src` that `pick` maps to something, with its offset; `None` for
@@ -330,6 +348,30 @@ pub fn reachable(url: &str, shape: Shape) -> bool {
     }
 }
 
+/// Who runs a command that writes, as its record and its author name them: `cli:<login>@<host>`,
+/// the login and host from the system with the refresh lock's system calls, else from the
+/// environment.
+#[cfg(feature = "refresh-lock")]
+pub fn cli_author() -> String {
+    crate::snapshot::lock::cli_author()
+}
+
+/// Who runs a command that writes: `cli:<login>@<host>`, from the environment in a build without
+/// the refresh lock's system calls.
+#[cfg(all(
+    not(feature = "refresh-lock"),
+    any(
+        feature = "generation-pointer",
+        all(feature = "ui", feature = "accounts")
+    )
+))]
+pub fn cli_author() -> String {
+    let var = |names: [&str; 2]| names.iter().find_map(|n| std::env::var(n).ok());
+    let login = var(["USER", "USERNAME"]).unwrap_or_default();
+    let host = var(["HOSTNAME", "COMPUTERNAME"]).unwrap_or_default();
+    format!("cli:{login}@{}", host.to_lowercase())
+}
+
 /// The seconds since the Unix epoch.
 #[cfg(any(feature = "generation-pointer", feature = "oidc"))]
 pub fn now() -> u64 {
@@ -433,6 +475,17 @@ mod tests {
         assert_eq!(
             err,
             "m.toml:4: [postgres] needs a Meada built with the postgres feature"
+        );
+    }
+
+    #[cfg(not(feature = "accounts"))]
+    #[test]
+    fn the_accounts_section_without_its_feature_names_it() {
+        let src = "index_dir = \"i\"\n[accounts]\npublic_key_file = \"k.pem\"\n";
+        let err = check(Path::new("m.toml"), src).unwrap_err().to_string();
+        assert_eq!(
+            err,
+            "m.toml:2: [accounts] needs a Meada built with the accounts feature"
         );
     }
 

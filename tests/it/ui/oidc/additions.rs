@@ -355,3 +355,213 @@ fn an_excluded_addition_is_marked_in_the_views_of_the_version_checked() {
     );
     case.github.clean(&case.console.stderr(), &[root, bia, ana]);
 }
+
+/// Local accounts (#561): a console with `[accounts]`, `[accounts.groups]` granting `team-billing`
+/// what `[oidc.groups]` grants it here, and `[accounts.github]` on `HOST`, over the team fixture's
+/// store. A local viewer of `team-billing` is a team operator; before it verifies a login its
+/// addition on the host is `unattributed`, after it the addition is stored with `added_by` set
+/// from the verified login over a forged value, and the audit's `login` column carries it. The
+/// role check reads `[accounts.github]`: once it excludes the addition, the global operator and a
+/// local viewer whose verified login reads the entry see the mark. No stderr line carries a token,
+/// a login or a personal access token.
+#[cfg(feature = "accounts")]
+#[test]
+fn a_local_team_operator_s_addition_is_attributed_from_its_verified_login() {
+    use super::PUBLIC;
+    use crate::manifest::MANIFEST;
+
+    const ADMIN: &str = "MEADA_TEST_ADMIN_PASSWORD_561";
+    const CHOSEN: &str = "deployer chose this one";
+    const PASSWORD: &str = "a long team passphrase";
+    const ANA_PAT: &str = "ghp_ana0123456789abcdef561t";
+    const BIA_PAT: &str = "ghp_bia0123456789abcdef561t";
+    let name = "ui_additions_local";
+    let Some(team) = super::team::team(name, true) else {
+        return;
+    };
+    let Some(github) = Github::new(name) else {
+        return;
+    };
+    let dir = &team.fleet.dir;
+    let (private, public) = crate::ui::accounts::pair();
+    fs::write(dir.join("ops/public.pem"), &public).unwrap();
+    fs::write(dir.join("ops/private.pem"), &private).unwrap();
+    let source = fs::read_to_string(dir.join(MANIFEST)).unwrap();
+    let sections = source.split_once("[snapshot]").unwrap().1;
+    let local = format!(
+        "index_dir = \"../local-indexes\"\n[workspace]\nsource = \"store\"\n[snapshot]{sections}\n\
+         \n[postgres]\nurl_file = \"pg-url\"\nschema = \"{schema}\"\n\
+         \n[accounts]\npublic_key_file = \"public.pem\"\nprivate_key_file = \"private.pem\"\n\
+         admin_password_env = \"{ADMIN}\"\n\
+         \n[accounts.groups]\n\"team-billing\" = [\"{BILLING}\", \"{LEDGER}\", \"{SHARED}\", \
+         \"{JOINT}\", \"{INVOICES}\"]\n\
+         \n[accounts.github]\nhost = \"{HOST}\"\napi = \"{api}\"\nroles = [\"write\"]\n\
+         max_age_seconds = 3600\n\
+         \n[ui]\ndir = \"../ui\"\npublic_url = \"{PUBLIC}\"\noperations = true\n",
+        schema = github.schema,
+        api = github.api.base,
+    );
+    let job = local.replacen("../local-indexes", "../roles-indexes", 1) + &github.app(HOST);
+    fs::write(dir.join("ops/roles.toml"), job).unwrap();
+    github.migrate(dir, "ops/roles.toml", &github.url);
+    fs::write(dir.join("ops/local.toml"), local).unwrap();
+    github.api.with(|state| {
+        state.users.insert(ANA_PAT.into(), "Ana-Souza".into());
+        state.users.insert(BIA_PAT.into(), "bia_acme".into());
+    });
+    let console = Server::start_command(
+        dir,
+        "ui",
+        &["--listen", "127.0.0.1:0", "--workspace", "ops/local.toml"],
+        &[
+            ("MEADA_TEST_S3_KEY", KEY_ID),
+            ("MEADA_PERMISSIONS_POLL_MS", POLL_MS),
+            (ADMIN, CHOSEN),
+        ],
+    );
+    let signed_in = |username: &str, password: &str| {
+        let body = json!({"username": username, "password": password});
+        let reply = post(&console, "login", "", body);
+        assert_eq!(reply.status, 200, "{}", reply.body);
+        reply.json()["token"].as_str().unwrap().to_string()
+    };
+    let root = signed_in("admin", CHOSEN);
+    for (username, groups) in [("ana", json!(["team-billing"])), ("bia", json!([]))] {
+        let body = json!({"username": username, "role": "viewer", "groups": groups,
+                          "password": PASSWORD, "change_required": false});
+        let reply = post(&console, "accounts", &root, body);
+        assert_eq!(reply.status, 200, "{}", reply.body);
+    }
+    let verify = |token: &str, pat: &str| {
+        let reply = post(&console, "account/github", token, json!({"token": pat}));
+        assert_eq!(reply.status, 200, "{}", reply.body);
+        reply.json()["token"].as_str().unwrap().to_string()
+    };
+    let save = |token: &str, text: &str| {
+        let body = json!({"entries": text, "message": "m"});
+        post(&console, "workspace/versions", token, body)
+    };
+    let versions = |token: &str| get(&console, "workspace/versions", token);
+
+    // Before a verified login: the team operator's addition on the host is unattributed.
+    let anon = signed_in("ana", PASSWORD);
+    assert_eq!(
+        get(&console, "session", &anon)["teams"],
+        json!(["team-billing"])
+    );
+    let base = seen();
+    let forged = "added_by = \"mallory\"\n";
+    let before = versions(&root);
+    let (refused, hidden) = refusals(&save(&anon, &with(&base, FRESH, forged)));
+    assert_eq!(
+        (refused, hidden),
+        (
+            json!([{"identity": FRESH, "change": "add", "reason": "unattributed"}]),
+            json!(0)
+        )
+    );
+    assert_eq!(versions(&root), before);
+
+    // After it: attributed from the verified login, the forged value ignored.
+    let ana = verify(&anon, ANA_PAT);
+    let session = get(&console, "session", &ana);
+    assert_eq!(
+        (&session["login"], &session["teams"]),
+        (&json!("ana-souza"), &json!(["team-billing"]))
+    );
+    let reply = save(&ana, &with(&base, FRESH, forged));
+    assert_eq!(reply.status, 200, "{}", reply.body);
+    let saved = reply.json()["result"].as_str().unwrap().to_string();
+    let version = get(&console, &format!("workspace/versions/{saved}"), &root);
+    let fresh = (version["repositories"].as_array().unwrap().iter())
+        .find(|e| e["repo"] == FRESH)
+        .cloned();
+    assert_eq!(
+        fresh,
+        Some(
+            json!({"repo": FRESH, "path": "../v", "owner": "team-billing",
+                    "added_by": "ana-souza"})
+        )
+    );
+    let records = get(&console, "audit?limit=100", &root)["records"].clone();
+    let saves: Vec<_> = (records.as_array().unwrap().iter())
+        .filter(|r| r["action"] == "workspace.save")
+        .map(|r| {
+            (
+                r["subject"].clone(),
+                r["outcome"].clone(),
+                r["login"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        saves,
+        [
+            (json!("local:ana"), json!("accepted"), json!("ana-souza")),
+            (json!("local:ana"), json!("refused"), Value::Null),
+        ]
+    );
+
+    // The role check reads `[accounts.github]` and excludes the addition: the marks.
+    let applied = post(
+        &console,
+        "workspace/apply",
+        &root,
+        json!({"version": saved}),
+    );
+    assert_eq!(applied.status, 200, "{}", applied.body);
+    github.list("team/fresh", &[("bia_acme", "write")]);
+    let env = [
+        ("MEADA_TEST_S3_KEY", KEY_ID),
+        ("MEADA_REFRESH_FENCE", "1"),
+        ("MEADA_PERMISSIONS_POLL_MS", POLL_MS),
+    ];
+    for args in [
+        ["workspace", "pull", "--workspace", "ops/roles.toml"],
+        ["github-app", "roles", "--workspace", "ops/roles.toml"],
+    ] {
+        let (stdout, stderr, code) = crate::postgres::meada(dir, "en_US.UTF-8", &env, &args);
+        assert_eq!(code, 0, "{stderr}");
+        if args[0] == "github-app" {
+            assert!(stdout.ends_with(", 1 exclusions\n"), "{stdout}");
+            github.clean(&stderr, &[]);
+        }
+    }
+    let start = Instant::now();
+    let workspace = loop {
+        let workspace = get(&console, "workspace", &root);
+        if workspace.to_string().contains("excluded") {
+            break workspace;
+        }
+        assert!(start.elapsed() < Duration::from_secs(20), "{workspace}");
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    let marked: Vec<_> = (workspace["version"]["repositories"]
+        .as_array()
+        .unwrap()
+        .iter())
+    .filter(|e| e.get("excluded").is_some())
+    .map(|e| e["repo"].clone())
+    .collect();
+    assert_eq!(marked, [json!(FRESH)]);
+    let bia = verify(&signed_in("bia", PASSWORD), BIA_PAT);
+    let start = Instant::now();
+    while get(&console, "session", &bia)["github_grant"] != "current" {
+        assert!(start.elapsed() < Duration::from_secs(20));
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let seen_by_bia = get(&console, "workspace", &bia)["version"]["repositories"].clone();
+    assert_eq!(
+        seen_by_bia,
+        json!([{"repo": FRESH, "path": "../v", "owner": "team-billing",
+                "added_by": "ana-souza", "excluded": true}])
+    );
+
+    let stderr = console.stderr();
+    github.clean(&stderr, &[root, anon, ana, bia]);
+    for pat in [ANA_PAT, BIA_PAT] {
+        assert!(!stderr.contains(pat), "{stderr}");
+        assert!(!records.to_string().contains(pat), "{records}");
+    }
+    assert!(!stderr.contains("mallory"), "{stderr}");
+}

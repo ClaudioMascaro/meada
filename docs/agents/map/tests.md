@@ -31,7 +31,11 @@ all repository fixtures; it contains no private corpus data. Existing tests own 
 - `scripts/compose-check` checks the local, generations and explicit console profiles without
   starting them, including parsed bootstraps, independent console storage and proxy admission.
   `scripts/helm-check` covers default and enabled console resources, optional Ingress, private
-  CA and OIDC values, negative module/operation combinations and managed refresh ordering.
+  CA and OIDC values, negative module/operation combinations and managed refresh ordering. It
+  also renders `values-accounts.yaml` (#565): the `[accounts]` sections of the console, the nodes
+  and the refresh job, the private key mounted in the console's container alone (and in no other
+  pod spec), the public key and admin password mounts, groups and GitHub from values, break glass
+  and the chart's refusals.
 - `src/package/hostile.rs` (unit, `cfg(test)`): the table `probes` of the readers of manifests and
   configurations, a row each for `package.json`, `tsconfig.json`, `pyproject.toml`,
   `requirements.txt`, `Cargo.toml`, `go.mod`, `pom.xml`, Gradle builds, `.csproj` and
@@ -645,6 +649,234 @@ ceilings through CLI and HTTP, and live-heartbeat selection with a controlled RE
 response while all other commands reach the real Valkey fixture. The ceiling tests preserve
 one final locked publish and compare English and Brazilian Portuguese refusals.
 
+### Local accounts: sign-in and session tokens (#554)
+
+`src/accounts.rs` holds the unit tests of the section (one key of each pair, names only), the
+key pair (a ring-generated Ed25519 pair accepted; a mismatched pair, a public key that is a
+private one, a garbage private key, a key not named, an unset variable and an unreadable file
+refused naming the key and no value; a key file past `KEY_MAX` and a password file past
+`PASSWORD_FILE_MAX` refused naming the file), the session token (issuer, audience, other key,
+expired and not yet valid past the leeway, a non-local subject, an unknown role, no `exp`,
+HS256, a `crit` header), the password policy table (every rule, characters not bytes) and
+argon2id (OWASP parameters in the PHC string, a fresh salt, a non-argon2id string matching
+nothing, a hash past one of the parameter ceilings neither a stored hash nor computed), the
+common-password list (sorted without repeats, lowercase, every entry within the length rule, its
+first and last entries refused ignoring case), `weaker` (less memory, fewer iterations or version
+0x10 weaker, the console's own and a costlier one not) and `generated` (24 symbols the policy
+takes, never twice the same).
+`tests/it/ui/accounts.rs` runs the console as a process. Without a service: the section rules
+through `meada status` (`[accounts]` without `[postgres]`, beside `[oidc]`, both keys of a pair,
+`operations = true` naming no further problem), the start refused on a mismatched, non-Ed25519,
+unreadable or missing key and, with a good pair, on the default account Postgres cannot take,
+never a key or the URL in stderr, and a node over the chain fixture whose `[accounts]` names a
+private key file that does not exist starting and answering 401 without a token (#560). Against Postgres (`postgres::audited`, a schema
+of each test's own behind the relay): the tracer bullet (`config`'s `sign_in`, the 401 before
+routing, the `Origin` 403s of `login`, fixed 400s and the 413, `admin123` giving a token that
+opens only the password change (a write without a token a 401, with that token a 403
+`password_change_required`, the change's body past its cap a 413), one body for an unknown
+username and a wrong password, a
+tampered token's `invalid_token`, a token another key signed and an expired one each an
+`invalid_token` 401 where the console's key signing the same claims passes, the policy's 422
+and the wrong current password's 401, then a
+fresh operator token whose `session` is `local:admin`, an old token keeping its mark, a viewer
+seeded with the same hash reading, refused the audit page and a write, and refused reusing its
+password), the audit page listing every sign-in, refusal and change, a hostile row (an unknown
+role) answering as an unknown username with one line naming the table, no cookie or CORS header
+and no password, token part, hash, key or URL in any error body, record or stderr line; the
+default account created from the deployer's password without a change required, never touched
+once the table holds a row, refused at start for a password failing the policy (the key named,
+never the value), and created once by two consoles started together; a burst of sign-ins past
+`HASHES_MAX` answered 503 `busy`, no token when the audit table cannot take the record, and every
+sign-in and change a 503 `audit_unavailable` with the relay closed. With the fleet's Valkey and
+store too, the default account saves a workspace version after its change, audited as
+`workspace.save` under `local:admin` and listed with that author. The lockout and recovery (#555): nine
+failures on either side of a success never lock; fifteen wrong passwords sent at once are
+recorded nine `password`, one `locked_now` and five `locked` (a `busy` one sent again), each with
+the wrong password's body; the right password while locked gets that body too, its fastest
+answer at least six tenths of the fastest wrong one's; a lock shortened by SQL ends on time
+although an attempt came meanwhile (never extended); stderr names `locked_now` and `locked`.
+Nine wrong current passwords of a change and a wrong sign-in lock `admin`, then neither route
+admits the right password. A viewer seeded with a weak argon2id hash keeps it through a wrong
+password and has it redone at the console's parameters by the right one (the one test reading
+the hash column, since no route shows a hash). `meada ui reset-admin` after ten bad sign-ins:
+the generated password alone on stdout, a fixed stderr line, a sign-in with it that must change
+it, then the global operator; the record `account.reset_admin` `via` `cli`; a suspended viewer
+`admin` reactivated as an operator from the setting's value (its key named, never the value); a
+common password refused exit 1 naming the key; a missing audit table exit 1 with nothing changed;
+an empty table getting `admin` created; no generated or set password in any record or stderr.
+Without a service: `reset-admin` on a manifest without `[accounts]`, Postgres closed (exit 1, no
+password printed, no URL) and a short setting, and `meada ui --help` naming it.
+`tests/it/cli.rs` holds that a build with `ui` and without `accounts` has no `reset-admin`.
+`tests/it/postgres.rs` holds
+migration 9's columns, and the tests that name the schema version moved to 9.
+
+### Local accounts: account administration (#557)
+
+`src/ui/accounts/administration.rs` holds the unit tests of the bodies: each action parses with
+its own fields and none other (an unknown action, a deletion or rename among them, an unknown
+field beside `suspend`, a role that is neither `operator` nor `viewer`, a missing field are
+refused), a creation's fields, and which routes are administration's.
+`tests/it/ui/accounts/administration.rs` runs the console against Postgres (skipping without it):
+the list's fields and its default account (no hash, no creator); a creation's 400s, 413, 422s
+(`invalid_username`, the policy against the new username), a change required by default, a
+taken username's 409; an unknown or malformed account's 404, no action, method (`DELETE`,
+`PUT`, `PATCH`) or rename route that removes or renames; the role both ways; a lock listed with
+its end and cleared by a reset that requires a change by default (and not when told not to);
+suspension and reactivation; a viewer's 403s on the list, a creation and a change, the last two
+recorded; every record's action, arguments and outcome; no password, token, hash or key in any
+answer, record or stderr line. The demo: a suspended viewer's next write is the role refusal
+and its sign-in the one 401, recorded `suspended`, its token still reading; a suspended, then
+demoted operator's writes are a viewer's refusal at once (recorded as `viewer`), its token still
+saying operator, writing again once reactivated. The last active operator: alone beside a hostile
+operator row (no hash), its own suspension and demotion are 409 `last_operator`; two operators removing themselves at once, five
+rounds, one passes and the other is the 409, leaving one active operator each time. With
+`operations = false` the routes answer and the four operations are the 403 naming
+`ui.operations`. A change whose record cannot be inserted changes nothing (503
+`audit_unavailable`), and with Postgres gone a write and the list are a 503 `unavailable`.
+
+### Local accounts: the console's pages (#556)
+
+`ui/tests/local.test.ts` holds the client: the sign-in posting to `login` and keeping the token in
+`sessionStorage` alone (no `localStorage`, cookie or address), the bearer on the next request, a
+change-required sign-in bound to the change also after a reload, an expired or malformed stored
+session dropped, a refused sign-in keeping nothing, sign-out, the password change's bearer and
+fresh token, a refused current password (401 `invalid_credentials`) keeping the session while any
+other 401 ends it, any 401 of the API ending it, a 403 `password_change_required` binding the tab to
+the forced change (kept across a reload), no `console` call carrying the token. `ui/tests/account.test.ts` is the view
+model (the one generic refusal, `busy` and `audit_unavailable` distinct, each password rule in
+both languages, the form's local checks) and the copy's parity. `ui/tests/AccountPages.test.tsx`
+is the DOM of each page in both languages (labels, input types and autocomplete, keyboard
+reachability, the locked shell with no link, the refusals, the unbinding change, the profile's
+voluntary change and sign-out); `ui/tests/LocalAccounts.test.tsx` runs the app over the built
+WebAssembly: the default account's first sign-in through the forced change to the workspace
+with no other request before the change, a 401 returning to the sign-in page with the token
+gone, the profile and sign-out in Portuguese, and the identity provider's flow unchanged.
+`ui/tests/AccountsPage.test.tsx` (#559) is the accounts page: the view model (suspended marked,
+a lock's end), the create form's local checks and its box checked by default, the server's rule
+and message shown on a refused creation, each change through the dialog (nothing sent before
+confirming, the payload, `last_operator` unchanged inside the dialog, a short password never
+sent), `offered` for the global operator alone, labelled and keyboard reachable controls in both
+languages, and the audit page's copy for every `account.*` action and the role `none`.
+
+### Local accounts: agent tokens for the nodes (#560)
+
+`src/accounts.rs` holds the unit test of `Keys::agent` and `Agents::admit`: the claims (the nodes'
+audience, the subject, role, groups, a 32-hex random `jti`, no mark, the hours asked), a node
+admitting it with the public half alone (the private file removed), the console's audience
+refusing it, a node refusing a session token, an empty bearer and another scheme; the proposal
+server's surface (#562) admitting its own token (role and login kept) and refusing the nodes'
+and a session token, a node refusing the proposal server's.
+`tests/it/oidc/accounts.rs` runs a node over the chain fixture with `[accounts]`, `[ui]` and
+tokens the test signs, with no service: no token a 401 `Bearer`; another key, a session token,
+the proposal server's audience, expired, `nbf` ahead, another issuer, no `exp`, a non-local
+subject, a change-required mark, `crit`, ES256, HS256 and `alg: none` each a 401
+`invalid_token` before routing (two `Authorization` headers too); the group `web` reading `WEB`
+alone through `trace`, `search` and `context`, a 403 `insufficient_scope` on the catalog, the
+group `*` reading as the golden has it, the 404s listing what the token reads; the `Origin` 403
+first; no token part on stderr. Without `[accounts.groups]` a token reads everything. The start
+refused, nothing listening, on a public key missing, unreadable or no Ed25519 key and on a
+manifest with no `[ui]`. With `generation-pointer`, on a hand-made generation with pins: a pin
+and a named workspace's route admitted as their identity is, a pin not held only to a token
+reading it, and the 503 of no servable generation to an admitted token, the 401 without one.
+`tests/it/ui/accounts/tokens.rs` (Postgres, skipping without it) is the demo: a viewer issuing a
+24-hour token answered `{token, expires_at, surface}`, its claims, the 8-hour default and a new
+id each time, the console's 401 to it, a node holding the console's public key reading `WEB`
+with it and answering 403 on the catalog and 401 to the session token; the body refusals (0 and
+169 hours, another surface, an unknown field, no surface, no JSON, the 413); a change-required
+account's 403 `password_change_required`; a suspended account's role refusal with its live session
+token; the operator's token carrying its role; every `account.token` record with the surface,
+the hours and the token id; no token, password or key in the audit page or either stderr.
+`ui/tests/LocalAccounts.test.tsx` runs the profile's section over the built WebAssembly: the
+surface and the 8-hour default, the request's body and bearer, the token shown once with its
+expiry and copied, in no storage, gone after navigating away and back; the refusals (hours, the
+role refusal, any other) in Portuguese, the session kept.
+
+### The verified login of `[accounts.github]` (#561)
+
+`src/accounts.rs` holds the unit test of `[accounts.github]` (its defaults, `api` GitHub's on
+`github.com` and required elsewhere, `https` or loopback `http`, each bad key named with the
+table's prefix, `login_claim` refused) and the `login` claim (carried by an agent token, a token
+whose login is no lowercase login refused). `src/ui/accounts/github.rs` holds the unit tests of
+the pasted token's shape and of `GET /user` against a one-shot loopback server: the login
+lowercased, a 401 or 403 refused, a 429, a 502, an answer with no `login` and one past
+`GITHUB_ANSWER_MAX` unavailable, a `login` that is no login invalid, nothing listening
+unavailable, the token sent as the bearer and in no reason. `tests/it/github_app.rs`'s fake
+answers `GET /user` for the tokens a test registers (`users`, `user_status`) and logs every
+bearer it saw (`bearers`). `tests/it/ui/accounts/github.rs` (Postgres, Valkey and the fake,
+skipping without them) is the demo: the role check reading `[accounts.github]`; ana's session
+before and after the verification (`login`, `github_host`, `github_grant`), her grant bounding
+the manifest view and the repositories, the admission view's `github`; a fresh agent token
+carrying the login answered by a node on the web and refused on the catalog; GitHub's refusal,
+GitHub failing, another account's login, the body checks; ana's own removal and the global
+operator's `remove_github`; the `account.github` and `account.remove_github` records with the
+actor's `login` column; the personal access tokens in `GET /user` alone and in no answer,
+record or stderr line. `tests/it/ui/oidc/additions.rs`'s
+`a_local_team_operator_s_addition_is_attributed_from_its_verified_login` (Valkey, the store,
+Postgres and the fake) runs a local team operator's additions on the team fixture: `unattributed`
+before a verified login, `added_by` from it after (the audit's `login` column too), and the
+exclusions mark the role check over `[accounts.github]` leaves, for the global operator and a
+viewer whose verified login reads the entry. `tests/it/ui/accounts.rs` names the two
+`[accounts.github]` manifest errors. `ui/tests/AccountPages.test.tsx` drives the profile's
+section (the token sent once in the body, the fresh session token kept, the session read again,
+the token in no storage, each refusal as the page's own copy, a 401 ending the session, the
+removal) and `ui/tests/AccountsPage.test.tsx` the accounts page's login column and its
+`remove_github` behind the dialog.
+
+### Named workspaces and the proposal server with local accounts (#562)
+
+`tests/it/ui/oidc/workspaces.rs`'s `Case::local` runs the named-workspace suites with local
+accounts (Valkey, the store, Postgres and the fake GitHub, skipping without them): no `[oidc]`,
+`[accounts]` with `[accounts.groups]` (`claims` mapped to the claims caller's grant) and
+`[accounts.github]` over the fake's API, `[ui] operations = true`; every caller of the Y/A/B table
+is created by the default account through `POST accounts` (the platform administrator an
+operator, the claims caller in the group `claims`), signs in and verifies its login with a
+personal access token the fake answers on `GET /user`; its node and proposal server tokens are
+agent tokens from `POST account/tokens`, and `Case::subject` is `local:<name>`. Each
+`local_accounts_*` test runs the body of its identity provider twin: the creation table with the
+catalog and its check (`creation_follows_...`), list, show and the peers' refusals
+(`peers_view_...`), the job's membership, the node route and its 404 listings
+(`a_created_workspace_becomes_queryable_...`), save, apply, rollback, rename, delete and
+operators with `local:` authors, operator lists, history actors and audit subjects
+(`versions_are_saved_...`), the effective view and the preview (`an_ignored_or_unsupported_...`)
+and the proposal server's table (`proposals_follow_...`: no metadata, a 401 `Bearer` to no token,
+a forged one, a session token and a node's agent token, the forged arguments invalid, the stderr
+line naming `local:alice`, and a suspended account's token still answering, since nothing but the
+token decides). `local_accounts_a_suspended_operator_operates_no_workspace` (`lifecycle.rs`, no
+twin) has the default account suspend alice: her unexpired token still shows her workspace, its
+rename is the outsider's 404 `not_found` (a viewer with no group sees nothing), and once
+reactivated the same token renames it.
+`tests/it/manifest.rs` holds `[catalog]` checked against `[accounts.github] host`
+and `[workspaces]` accepted over local accounts, and the new needs text;
+`tests/it/ui/accounts/tokens.rs` the 422 `invalid_surface` for `proposals` without
+`[proposals]`; `ui/tests/LocalAccounts.test.tsx` the profile offering the proposal server's
+surface only with `config.proposals`.
+
+### Break glass beside the identity provider (#563)
+
+`src/accounts.rs` holds the unit tests of `break_glass` (off by default) and `under_break_glass`
+(the grant tables refused only under `break_glass = true`), and `issued_by` routing a token by
+its unchecked issuer. `tests/it/ui/accounts/break_glass.rs` runs the console. Without a service:
+the section rules through `meada status` (`break_glass` without `[oidc]`, `[accounts]` beside
+`[oidc]` with `break_glass = false`, `[accounts.groups]` and `[accounts.github]` under it, each
+one line; the accepted section stopping only at Postgres) and the start refused for an
+`[oidc] issuer` equal to `[ui] public_url`, before any key is read. Against the local Postgres
+(skipped without it): `config` naming `oidc` with `break_glass`, the identity provider's viewer
+and operator tokens admitted as before, `admin` through `admin123` and its forced change to the
+global operator's session (`account: true`), a colleague's seeded account and an unknown username
+answered with the wrong password's body and recorded `not_break_glass` with no subject, the
+routes of account administration, agent tokens and login verification answering 404, a fence
+recovery authorized and recorded as `local:admin` (feature `refresh-lock`), and the crossed
+bearers refused (an identity provider's signature on the console's issuer, the console's key on
+the identity provider's issuer, a colleague's session token, a nodes token, an expired one); no
+password, hash, token or key in any answer, record or stderr line. `tests/it/oidc.rs` holds a
+node with `[oidc]` and `[accounts]` under break glass naming missing key files: it starts,
+answers the identity provider's token as the golden has it and refuses Ed25519 tokens of the
+console's issuer. `tests/it/ui/oidc/workspaces/proposals.rs` holds the proposal server's twin
+(the local services). `ui/tests/BreakGlass.test.tsx` holds `breakGlassTab`, the choice page (the
+identity provider first, the discreet link kept after a failure, both languages), and the app
+on `/break-glass`: the default account through its forced change to the workspace and, signed
+out, back to the break-glass page, never the local accounts' copy.
+
 ### The directory (#334)
 
 `tests/it/ui/oidc/directory.rs` runs a console with `[oidc]` (the `oidc` module's loopback
@@ -730,9 +962,14 @@ grant empty and `*` whole; over a schema one version newer than `MEADA_POSTGRES_
 names both versions on exactly one stderr line. Hostile rows (written by the test): a set whose
 `finished` is ahead of Postgres's clock grants nothing and is named by its table, and once valid
 a `*` row and an off-host row are skipped with one line each naming `permission_rows`. No
-stderr line carries a token part, a login or the Postgres URL. `src/oidc/permissions.rs`'s unit
+stderr line carries a token part, a login or the Postgres URL. `src/grant/permissions.rs`'s unit
 tests hold the exact expiry (`max_age_seconds` grants, a millisecond past it does not), an age
-that never moves back when Postgres's clock does, the login's shape and the row identity check.
+that never moves back when Postgres's clock does, the login's shape and the row identity check,
+and `Providers::grant` with a GitHub grant provider (the union of the groups side and the login's
+rows, `*` from a group, an unmapped group, a missing or malformed login, an expired and an unread
+set); `src/grant.rs`'s own tests hold the groups side without one (the union of the groups, `*`,
+an unmapped group, no table, a login kept only under the GitHub grant provider) and the
+identities a verifier grants by name (`Granted::listing`).
 
 `tests/it/ui/oidc/github.rs` runs the team fixture's console with `[oidc.github]` and
 `[postgres]`: the session is `unread` with the login lowercased before any set, then `current`
@@ -759,7 +996,7 @@ prefix; a set past `max_age_seconds` pending `stale_set` for everyone, the admin
 included, a failed run leaving the set to age, a new set restoring it; `config` naming the
 picker, `manifest` hiding `catalog.allow` from everyone but the global operator, `admission`
 counting the catalog, and the fake seeing no request while the console answers. The
-`oidc::permissions` unit test reads the same table against the cache. In
+`grant::permissions` unit test reads the same table against the cache. In
 `tests/it/github_app/roles.rs` the catalog cases check the installation listing (the owners a
 pattern names, every page, the allow list, names compared lowercase, an owner no pattern names
 never asked, a repository the list refuses never listed for collaborators), the cap (the count and

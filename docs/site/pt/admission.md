@@ -1,8 +1,22 @@
 # Autenticação e grants
 
-O token prova a identidade; o grant define os repositórios que podem aparecer na resposta. OIDC é opt-in. Sem ele, a admissão é responsabilidade do proxy. Mesmo após uma chamada ser admitida, links entre repositórios só aparecem quando o grant inclui as duas pontas.
+O token prova a identidade; o grant define os repositórios que podem aparecer na resposta. Há dois módulos opt-in: as contas locais, para começar, e o OIDC, para produção. Sem nenhum, a admissão é responsabilidade do proxy. Mesmo após uma chamada ser admitida, links entre repositórios só aparecem quando o grant inclui as duas pontas.
 
 <!-- meada-graph:admission -->
+
+## Contas locais
+
+**Contas locais** (feature `accounts`, parte de `cloud`; ADR 0024) admitem os nós sem provedor de identidade. Com `[accounts]` e sem `[oidc]`, o nó (`meada mcp --listen`) lê a chave pública Ed25519 na partida (nunca a privada) e exige `Authorization: Bearer <token de agente>`. A pessoa gera o token no perfil da [console](console.md#contas-locais) (superfície `nodes`, de 1 a 168 horas): ele leva o papel e os grupos da conta e, com `[accounts.github]`, o login verificado, e o nó calcula a concessão a partir deles, como faz com o token de um provedor de identidade. O manifesto do nó traz `[accounts]` com `public_key_file` (ou `public_key_env`), `[postgres]` e a `[ui] public_url` da console, que é o emissor:
+
+```toml
+[accounts]
+public_key_file = "/run/secrets/meada-signing.pub.pem"
+
+[accounts.groups]                          # opcional; sem a tabela, toda conta lê todos os repositórios
+"time-pagamentos" = ["github.exemplo.internal/acme/payments-api"]
+```
+
+Token ausente, expirado, de outra chave ou de outra superfície (um token de sessão inclusive) recebe 401 `Bearer`, sem `resource_metadata`, pois não há servidor de autorização a descobrir. Não há lista de revogação: o token vale até expirar, e trocar o par de chaves encerra todos ([notas de segurança](console.md#seguranca-das-contas-locais)). O servidor de propostas de [workspaces nomeados](named-workspaces.md) admite tokens da superfície `proposals`, e só eles. Com `[oidc]`, os nós ignoram `[accounts]`; para sair das contas locais, veja a [migração](console.md#migrar-das-contas-locais-para-o-provedor-de-identidade).
 
 ## Configurar o OIDC
 
@@ -11,7 +25,7 @@ sendo o proxy reverso, como diz o aviso no início desta seção; o módulo OIDC
 para quem quer que o próprio Meada confira quem chama. Com a seção `[oidc]`, o servidor vira um
 resource server OAuth 2.1, como a especificação de autorização do MCP (2026-07-28) descreve:
 toda requisição leva `Authorization: Bearer <JWT>` emitido pelo provedor de identidade do operador. O Meada
-não emite token, não registra cliente e nunca repassa um token.
+não registra cliente e nunca repassa um token; os únicos tokens que ele emite são os das [contas locais](#contas-locais), nunca com `[oidc]`.
 
 ```toml
 [oidc]

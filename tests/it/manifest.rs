@@ -965,9 +965,11 @@ fn directory_section_errors_name_the_file_the_line_and_the_keys() {
     }
 }
 
-/// The `[catalog]` section (#341): without `[oidc.github]`, with an allow list that is not
-/// patterns on its host, with a missing or out-of-range cap and with an unknown key, each error
-/// names the file, the line and the key, and never a pattern.
+/// The `[catalog]` section (#341): without the GitHub grant provider (`[oidc.github]`, or
+/// `[accounts.github]` since #562), with an allow list that is not patterns on its host, with a
+/// missing or out-of-range cap and with an unknown key, each error names the file, the line and
+/// the key, and never a pattern. Under `[accounts.github]` the patterns are checked against its
+/// host as under `[oidc.github]`.
 #[cfg(feature = "workspaces")]
 #[test]
 fn catalog_section_errors_name_the_file_the_line_and_the_keys() {
@@ -982,11 +984,13 @@ fn catalog_section_errors_name_the_file_the_line_and_the_keys() {
     let allow = "allow = [\"github.com/secret-owner/*\"]";
     let line = full.lines().position(|l| l == "[catalog]").unwrap() + 1;
     let keyed = |at_line: usize, key: &str, why: &str| format!("{at}:{at_line}: `{key}`: {why}\n");
-    for (toml, expected) in [
-        (
-            format!("{head}{catalog}"),
-            format!("{at}:3: [catalog] needs [oidc.github]\n"),
-        ),
+    #[cfg(feature = "accounts")]
+    let needs = "[catalog] needs [oidc.github] or [accounts.github]";
+    #[cfg(not(feature = "accounts"))]
+    let needs = "[catalog] needs [oidc.github]";
+    #[allow(unused_mut)]
+    let mut cases = vec![
+        (format!("{head}{catalog}"), format!("{at}:3: {needs}\n")),
         (
             full.replace(allow, "allow = [\"gitlab.com/secret-owner/*\"]"),
             keyed(
@@ -1024,7 +1028,30 @@ fn catalog_section_errors_name_the_file_the_line_and_the_keys() {
                 line + 3
             ),
         ),
-    ] {
+    ];
+    // `[accounts.github]` in place of `[oidc.github]` (#562): the catalog is checked against its
+    // host, so a pattern on another host is the same error.
+    #[cfg(feature = "accounts")]
+    {
+        let accounts = "\n[accounts]\npublic_key_env = \"A\"\nprivate_key_env = \"B\"\n\n\
+                        [accounts.github]\nmax_age_seconds = 600\n\n[postgres]\nschema = \"m\"\n";
+        let local = format!("{head}{accounts}{catalog}");
+        let line = local.lines().position(|l| l == "[catalog]").unwrap() + 1;
+        cases.push((
+            local.replace(allow, "allow = [\"gitlab.com/secret-owner/*\"]"),
+            keyed(
+                line + 1,
+                "catalog.allow",
+                "must be a non-empty array of distinct lowercase patterns, each \
+                 github.com/<owner>/* or github.com/<owner>/<repo>",
+            ),
+        ));
+        cases.push((
+            local.replace("= 50", "= 5001"),
+            keyed(line + 2, "catalog.max_repositories", "must be at most 5000"),
+        ));
+    }
+    for (toml, expected) in cases {
         write_manifest(&dir, &toml);
         let (stdout, stderr, ok) = run(&dir, "status");
         assert!(!ok && stdout.is_empty(), "{toml}");
@@ -1659,7 +1686,8 @@ fn a_bad_node_name_names_the_file_the_line_and_the_key() {
 
 /// `[workspaces]` (#342) needs the sections it rides on, each error naming both, and its keys
 /// are checked: the file, the line and the key are named, and the mirrors root is a path, not a
-/// value anyone may read back from an answer.
+/// value anyone may read back from an answer. The GitHub grant provider is `[catalog]`'s need;
+/// `[accounts.github]` with local accounts (#562) satisfies it as `[oidc.github]` does.
 #[cfg(feature = "workspaces")]
 #[test]
 fn workspaces_section_errors_name_the_file_the_line_and_the_sections() {
@@ -1675,10 +1703,16 @@ fn workspaces_section_errors_name_the_file_the_line_and_the_sections() {
               operations = true\noperator_claim = \"op\"\n";
     let full = format!("{head}{section}{oidc}{ui}");
     let line = full.lines().position(|l| l == "[workspaces]").unwrap() + 1;
+    #[cfg(feature = "accounts")]
+    let accounts = "\n[accounts]\npublic_key_env = \"A\"\nprivate_key_env = \"B\"\n\n\
+                    [accounts.github]\nmax_age_seconds = 600\n\n[postgres]\nschema = \"m\"\n\n\
+                    [catalog]\nallow = [\"github.com/a/*\"]\nmax_repositories = 5\n";
+    #[cfg(feature = "accounts")]
+    let local_ui = "\n[ui]\ndir = \"u\"\npublic_url = \"https://c.example\"\noperations = true\n";
     for (toml, expected) in [
         (
             format!("{head}{section}"),
-            format!("{at}:3: [workspaces] needs [ui] and [oidc.github] and [catalog]\n"),
+            format!("{at}:3: [workspaces] needs [ui] and [catalog]\n"),
         ),
         (
             full.replace("operations = true", "operations = false"),
@@ -1686,6 +1720,15 @@ fn workspaces_section_errors_name_the_file_the_line_and_the_sections() {
         ),
         (
             full.clone(),
+            format!(
+                "{at}:{line}: `workspaces`: [workspaces] needs [workspace] source = \"store\"\n"
+            ),
+        ),
+        // Local accounts with `[accounts.github]` and a writable console: every section need
+        // holds, so the next check is the managed workspace's.
+        #[cfg(feature = "accounts")]
+        (
+            format!("{head}{section}{accounts}{local_ui}"),
             format!(
                 "{at}:{line}: `workspaces`: [workspaces] needs [workspace] source = \"store\"\n"
             ),

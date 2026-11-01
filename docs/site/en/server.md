@@ -2,7 +2,7 @@
 
 > **Warning.** In server mode Meada returns source code to whoever can connect, and by default
 > it authenticates nobody: the operator's reverse proxy admits the clients (TLS, tokens, SSO,
-> network policy); the [OIDC module](admission.md) is the opt-in alternative. With no host the server listens on the loopback interface only; listening
+> network policy). The opt-in [admission](admission.md) modules are local accounts, to get started, and OIDC, for production. With no host the server listens on the loopback interface only; listening
 > beyond it is the operator's explicit choice, and a misconfigured proxy exposes source.
 > The MCP server checks no `Host` header (a proxy with a real hostname works) and answers 403 to any
 > request carrying `Origin` (browser and DNS-rebinding protection), on every path and before
@@ -80,6 +80,10 @@ refused.
 - `meada status --workspace <manifest>` shows each index's state, and
   `meada export --workspace <manifest> --repo <identity>` prints one repository's index, for
   instance to feed a knowledge base.
+
+## Admission and console
+
+To get started, turn on [local accounts](console.md#local-accounts): the console writes with `[accounts]` and `[postgres]`, with no identity provider, and each person generates [agent tokens](admission.md#local-accounts) that the nodes admit. The proxy stops being the only barrier, but it remains the place for TLS and for rate-limiting `POST /api/v1/login`. In production, [configure the identity provider](identity-providers.md) and keep the default account only as [break glass](console.md#migrating-from-local-accounts-to-the-identity-provider).
 
 ## Decide in a pipeline
 

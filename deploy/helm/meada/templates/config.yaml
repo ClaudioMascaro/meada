@@ -12,6 +12,8 @@ data:
     {{- .Values.workspace.repositories | nindent 4 }}
   meada.workspace.toml: |
     {{- include "meada.nodeBootstrap" . | nindent 4 }}
+    {{- include "meada.accounts" (dict "Values" .Values "role" "node") | nindent 4 }}
+    {{- include "meada.nodeUi" . | nindent 4 }}
   {{- if .Values.modules.githubApp.enabled }}
   job.workspace.toml: |
     {{- include "meada.nodeBootstrap" . | nindent 4 }}
@@ -25,6 +27,7 @@ data:
     {{- end }}
     {{- include "meada.namedWorkspaces" . | nindent 4 }}
     {{- include "meada.jobUi" . | nindent 4 }}
+    {{- include "meada.accounts" (dict "Values" .Values "role" "job") | nindent 4 }}
   {{- end }}
   {{- if .Values.modules.postgres.enabled }}
   postgres.workspace.toml: |

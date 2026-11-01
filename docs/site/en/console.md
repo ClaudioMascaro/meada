@@ -2,7 +2,7 @@
 
 The console uses the `ui` feature, included in `cloud`, and runs as its own process. It has an editor, diff, playground and graph. The editor saves configuration versions; applying a version and publishing indexes are separate steps.
 
-Protect access before exposing the console. Without `[oidc]`, the proxy controls admission: anyone reaching the console outside that protection can read the graph. The proxy must preserve `Host`, `Origin` and `Authorization`. The console accepts only its public Host and, if Origin is present, its own origin.
+Protect access before exposing the console. Without `[oidc]` or `[accounts]` ([local accounts](#local-accounts)), the proxy controls admission: anyone reaching the console outside that protection can read the graph. To get started, turn on local accounts; for production, the identity provider. The proxy must preserve `Host`, `Origin` and `Authorization`. The console accepts only its public Host and, if Origin is present, its own origin.
 
 <!-- meada-graph:console-authoring -->
 
@@ -97,6 +97,100 @@ Register a public client at the issuer, without a secret, using Authorization Co
 
 The browser must reach the issuer's metadata and token endpoint, with CORS for the console origin. It exchanges the code directly with the issuer. The bearer stays in memory; `state` and `verifier` stay in sessionStorage until the callback removes them. Reloading the page restarts login.
 
+## Local accounts
+
+Without an identity provider, the console can sign in its own accounts (feature `accounts`, part of `cloud`; ADR 0024). `[accounts]` needs `[postgres]` and sits beside `[oidc]` only as break glass (below):
+
+```toml
+[accounts]
+public_key_file = "/run/secrets/meada-signing.pub.pem"   # or public_key_env
+private_key_file = "/run/secrets/meada-signing.pem"      # or private_key_env; only the console reads it
+# admin_password_env = "MEADA_ADMIN_PASSWORD"            # the default; or admin_password_file
+```
+
+The key pair is Ed25519 in PEM (`openssl genpkey -algorithm ed25519 -out meada-signing.pem` and `openssl pkey -in meada-signing.pem -pubout -out meada-signing.pub.pem`). The console refuses to start with a key that is missing, unreadable, not Ed25519 or not matching the other, naming the key and never its value. Run `meada postgres migrate` first: on the first start with an empty table, the console creates the default account `admin` with the password `admin123`, which must be changed before anything else, or with the value of `MEADA_ADMIN_PASSWORD`, with no change required, when it passes the password policy (12 to 128 characters, neither the default password, the username nor a common password). With `[accounts]`, `operations = true` needs no `[oidc]` and no operator key: the role is the account's.
+
+`POST /api/v1/login` takes `{"username", "password"}` and answers `{"token", "expires_at", "change_required"}`: a session token the console signs and accepts for eight hours as a bearer on every route but the static files, `config` and `login`. An unknown username, a wrong password and a locked account get the same 401 `invalid_credentials`. While a change is pending, only `POST /api/v1/account/password` (`{"current", "new"}`) accepts the token; it answers a fresh one. `config` carries `"sign_in": "accounts"` and `session` carries `"account": true`. Every sign-in, refusal and password change is audited (`account.login`, `account.password`) before the token, with no password or token; without the record, the answer is a 503 `audit_unavailable`. Rate-limit `/api/v1/login` at the proxy.
+
+The password policy refuses the passwords of a common-password list embedded in the binary (from SecLists, MIT licence, only the entries of 12 characters or more), ignoring case, with the rule `common_password`. Ten consecutive failures, at sign-in or as the current password of a change, lock the account for fifteen minutes; they are counted in Postgres holding the account's row, so parallel attempts never pass ten, and a success resets the count. While locked, the account gets the answer of a wrong password, in about the same time, without its password being checked and without the lock being extended; the audit records `locked_now` on the failure that locks and `locked` afterwards. A password stored with weaker parameters than the console's is rehashed at the next sign-in that proves it.
+
+To recover the default account (a lost password or a lock), run `meada ui reset-admin --workspace <bootstrap manifest>`: it creates or reactivates `admin` as an operator, clears its lock and sets the value of `MEADA_ADMIN_PASSWORD` (or of `admin_password_file`) as its password, or, without one, a random password shown once on stdout; a change is then required at the next sign-in. The command records `account.reset_admin` with `via` `cli` in the audit before it changes the account, and exits 1, changing nothing, when the record cannot be written.
+
+The global operator administers accounts through the API, whatever `operations` says, so a read-only console can still have viewers. `GET /api/v1/accounts` lists every account (username, role, state `active`, `suspended` or `locked`, when a lock ends, whether a change is required, the last password change, when and by whom it was created), never its hash. `POST /api/v1/accounts` with `{"username", "role", "password", "change_required"}` creates an `operator` or `viewer` account with a temporary password that passes the policy; `change_required` is true when omitted. A malformed username gets a 422 `invalid_username` and a taken one a 409 `username_taken`. `POST /api/v1/accounts/<username>` takes one action at a time: `{"action": "role", "role"}`, `{"action": "suspend"}`, `{"action": "reactivate"}` or `{"action": "reset_password", "password", "change_required"}`, which also clears a lock and requires a change when `change_required` is omitted; an unknown account gets a 404. Suspending or demoting the last active operator gets a 409 `last_operator`, even from two requests at once. No route deletes or renames an account. Anyone but the global operator gets a 403. Every console write reads the account's row before it acts: a suspended or demoted account loses its writes at once, and its reads last until its token expires; a suspended account's sign-in gets the same 401 as a wrong password. Each change is recorded in the audit (`account.create`, `account.role`, `account.suspend`, `account.reactivate`, `account.reset_password`) with the account and the fields changed, never a password, before it is made; without the record, the answer is a 503 `audit_unavailable` and nothing changes.
+
+An account's groups come from the global operator (`"groups"` on creation, and `{"action": "groups", "groups"}`, which replaces the list; each group is a name an entry's owner may have, else a 422 `invalid_group`), are listed, and are recorded as `account.groups`. `[accounts.groups]` maps each group to the identities it grants, as `[oidc.groups]` does (`*` for all):
+
+```toml
+[accounts.groups]
+"team-billing" = ["github.com/acme/billing", "github.com/acme/ledger"]
+"platform" = ["*"]
+```
+
+Without the table, every local account reads every repository. With it, a local session's grant is what its token's groups grant, and it bounds every view (the manifest, the workspace and its versions, the store, the repositories, the credentials, the playground, the exports and the graph) as an identity provider's does; the global operator reads everything. A viewer whose group owns an entry of the current workspace version its grant reads is a team operator (ADR 0015): `session` lists its teams, and it saves and applies its teams' entries. The session token carries the groups: a change takes effect for writes at once (the account row is read first) and for reads at the next sign-in. With `[accounts]`, `GET /api/v1/admission` shows the mode (`accounts` or `break_glass`), the public key's fingerprint (`blake3:` and the BLAKE3 hash of the raw Ed25519 key, as `openssl pkey -pubin -in meada-signing.pub.pem -outform DER | tail -c 32 | b3sum` computes it) and the groups table bounded by the caller's grant.
+
+In the browser, `"sign_in": "accounts"` makes the console show its own sign-in page instead of the identity provider's redirect. A sign-in that must change its password goes straight to a page that asks for the current password and the new one twice, shows the rule a refusal names and offers nothing else until the change succeeds, then opens the workspace. The session token lives in the tab's `sessionStorage` (never `localStorage`, a URL or a log), is sent as the bearer, and is forgotten on sign-out, on any 401 other than a refused password (the console returns to sign-in) and when the tab closes. The profile page offers the voluntary password change and sign-out. Copy is in Portuguese and English.
+
+The accounts page (`/accounts`) is listed for the global operator alone when `config` says `"sign_in": "accounts"`; any other role, and a console under break glass, gets the not-found page at that path. It lists every account with its role, groups, state (a suspended account is marked in text, a locked one says until when), whether it must change its password and when it last did. The create form (username, role, groups, temporary password, and "must change the password on first sign-in", checked by default) checks the username pattern and the password length before asking the server, and shows the server's rule on a refusal. Role, groups, suspend, reactivate and reset password (with the same checkbox) each go through the shared confirmation dialog, and the server's refusals, such as `last_operator`, are shown unchanged. The audit page names every `account.*` action in both languages.
+
+### Agent tokens
+
+A signed-in person generates agent tokens for their agents, so that each agent queries the nodes under its owner's grant instead of a shared bearer. `POST /api/v1/account/tokens` with `{"surface": "nodes", "hours": 24}` (1 to 168 hours, 8 when `hours` is omitted) answers `{"token", "expires_at", "surface"}` once: Meada stores no agent token and shows it never again. The token carries the nodes' audience (`meada:nodes`), the subject, the role and the groups as the account's row stands now, and a random token id. A session that must change its password gets the 403 `password_change_required`, and a suspended account the role refusal (403 `forbidden`). Each issue is recorded as `account.token` with the surface, the hours and the token id, never the token. The console refuses agent tokens (401): a token that lives up to seven days and that nothing revokes never makes console writes. The profile page offers the surface and the validity, then shows the token with a copy control and its expiry; leaving the page clears it. When the console's bootstrap manifest has `[proposals]`, `{"surface": "proposals"}` issues an agent token for the [proposal server](named-workspaces.md#running-the-proposal-server) instead (audience `meada:proposals`), which only that server admits, and `config` carries `"proposals": true` so the profile offers it; without the section it is a 422 `invalid_surface`.
+
+A node with `[accounts]` and no `[oidc]` admits these tokens on `meada mcp --listen`. It reads the public key at start (never the private one) and checks the issuer, the console's `[ui] public_url`, so its manifest carries the console's `[ui]` section beside `[accounts]` and `[postgres]`, as the refresh job's does; a missing or unreadable key, or no `[ui]`, refuses the start. A missing, expired, not yet valid, wrongly signed or non-EdDSA token, one with `crit`, and a token for another surface (a session token included) get a 401 with `WWW-Authenticate: Bearer` before routing. The grant is what `[accounts.groups]` maps the token's groups to (every repository without the table), and it bounds routing (403 outside the grant), the 404 listings and every answer, pins and named workspaces' routes included, as an identity provider's token does. Rotating the key pair ends every outstanding token at once; without it, a token lasts until it expires, even after its account is suspended. Configure an MCP client with the token as its bearer:
+
+```json
+{"mcpServers": {"meada": {"type": "http", "url": "https://nodes.example/github.com/acme/web",
+  "headers": {"Authorization": "Bearer <agent token>"}}}}
+```
+
+### Verified GitHub login
+
+With `[accounts.github]`, the GitHub grant provider of local accounts, a person proves their GitHub login once and their GitHub roles then grant them repositories, as `login_claim` does under an identity provider. The section takes `[oidc.github]`'s keys without `login_claim` (`host`, `roles`, `max_age_seconds`) and `api`, the GitHub REST endpoint of that host (`https://api.github.com` by default on `github.com`, required on any other host, `https` or loopback `http`):
+
+```toml
+[accounts.github]
+host = "github.com"
+roles = ["write", "maintain", "admin"]
+max_age_seconds = 5400
+```
+
+On the profile page, the person pastes a GitHub personal access token (a fine-grained one with no permission is enough). `POST /api/v1/account/github` with `{"token": "..."}` makes the console call `GET /user` on `api` once, keep the login in lowercase and discard the token: it is never stored, logged, audited or sent anywhere else. The answer carries the login and a fresh session token that holds it. A login another account already verified is a 409 `login_taken`; GitHub's refusal is a 422 `github_refused`, and GitHub out of reach a 503 `github_unavailable`, neither echoing GitHub's answer. `POST /api/v1/account/github/remove` removes one's own login, and the global operator removes anyone's with the accounts page's `remove_github` action. Session and agent tokens carry the verified login, and the GitHub grant, read from the permissions set the job's role check writes (`meada github-app roles` reads `[accounts.github]`), joins the groups grant in the console, on nodes, in a team operator's additions (`added_by`) and in the audit's `login` column. A token issued before a removal keeps the login until it expires. Each verification and removal is recorded `account.github` (with the login) and `account.remove_github`.
+
+### Break glass
+
+Configuring `[oidc]` turns local sign-in off for every account: `[accounts]` beside `[oidc]` is an error unless it carries `break_glass = true`. Then only the default account `admin` signs in to the console, as the global operator, beside the identity provider's tokens, for when the identity provider is down:
+
+```toml
+[accounts]
+break_glass = true
+public_key_file = "/run/secrets/meada-signing.pub.pem"
+private_key_file = "/run/secrets/meada-signing.pem"
+```
+
+`break_glass` without `[oidc]` is an error, and `[accounts.groups]` and `[accounts.github]` cannot sit under it: the break-glass account needs no grant. Any other username gets the same 401 as a wrong password, and the audit records `not_break_glass`. The console tells bearers apart by issuer before any key is tried: a token whose `iss` is the console's `public_url` is checked against the Ed25519 key alone (and only `admin`'s passes), any other against the identity provider's keys alone; so the console refuses to start when `[oidc] issuer` is its own `public_url`. The break-glass account changes its own password; account administration, agent tokens and login verification do not exist (404). Nodes and the proposal server ignore `[accounts]` beside `[oidc]` and never read the private key. `config` carries `"sign_in": "oidc"` with `"break_glass": true`, and the browser, instead of redirecting straight to the identity provider, shows its button and, discreetly, a link to `/break-glass`, the default account's sign-in page; the link stays when the identity provider does not answer.
+
+### Local account security
+
+- **Passwords:** stored with argon2id (19 MiB, two iterations, one lane; the parameters live in the hash and a weaker hash is redone at the next sign-in). Only a small number of hashes run at once: the excess gets 503 `busy` without computing anything.
+- **Lockout:** ten consecutive failures lock the account for fifteen minutes; a reset by the global operator or `meada ui reset-admin` removes the lock.
+- **Token lifetime:** the session token is valid for eight hours; the agent token for 1 to 168 hours (8 by default).
+- **No revocation list:** Meada does not store agent tokens, so expiry is the revocation. Suspending or demoting an account bars its console writes at once (the row is read on every write) and the issuing of new tokens, but changing the password invalidates nothing, and a token already issued stays admitted on the nodes and the proposal server until it expires.
+- **Key rotation as an emergency stop:** replace the Ed25519 pair and restart the console, the nodes and the proposal server: every token in circulation, session or agent, stops being valid at once. There is no rotation with overlapping keys. Only the console reads the private key.
+- **GitHub personal access token:** read once, to obtain the login from `GET /user`, and discarded; it is never stored or written to a log or the audit.
+- **Rate limit at the proxy:** the console does not limit by address. Limit `POST /api/v1/login` (and, if you like, `account/password`) at the proxy, for example with `limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;` and `limit_req zone=login burst=5;` in the login `location` in nginx. Failures for unknown names enter the audit and make it grow without bound, and the per-account lockout does not slow them.
+- **What does not exist:** email, self-registration, "forgot password", multi-factor authentication, a revocation list, a listing of issued tokens, and deleting or renaming accounts. Whoever loses the `admin` password uses `meada ui reset-admin`.
+
+### Migrating from local accounts to the identity provider
+
+When you configure `[oidc]`, local sign-in turns off for every account (see [Break glass](#break-glass)). Steps:
+
+1. Configure `[oidc]` on the console and the nodes ([Authentication and grants](admission.md)) and add `break_glass = true` to `[accounts]`, to keep the default account as the emergency exit. Remove `[accounts.groups]` and `[accounts.github]`: under break glass they are an error.
+2. Copy the `[accounts.groups]` table to `[oidc.groups]`, replacing each local group name with the value the identity provider's `groups_claim` carries (in Entra, the group id). Local groups and the provider's are independent names: the mapping is manual, and a token's grant becomes that of the groups the provider issues. The `owner`s of the workspace entries are group names and stay valid if the provider uses the same names; otherwise, update them.
+3. Move `[accounts.github]` to `[oidc.github]`: `host`, `roles` and `max_age_seconds` stay, `api` goes, and `login_claim` replaces the verified login, which the provider's administrator now maps (see the [recipes](identity-providers.md)).
+4. Whoever was a local operator becomes an operator through `ui.operator_groups` or `ui.operator_claim`.
+
+What stops working: sign-in for any account other than `admin`; the session and agent tokens of the local accounts (the nodes and the proposal server admit only the provider's tokens, and agents use identity provider tokens instead); the accounts page, agent token issuing and login verification (404); and the `local:<username>` subjects recorded as authors, named-workspace operators and audit records, which never match the provider's, so redo the operator list of each named workspace. The accounts stay in the table, inert. No account or group is migrated on its own.
+
 ## Fleet and diagnostics
 
 Each `snapshot pull --every` sends a heartbeat, the node's periodic status record. It reports generation, fence, local generations, readiness, version and time.
@@ -111,12 +205,12 @@ With OIDC, viewers see only identities admitted by their token. To grant the ope
 
 With `[workspace] source = "store"`, `operations = true` and `oidc.groups_claim`, a subject one of whose groups owns (`owner = "<group>"`) an entry of the current workspace version that its token reads is a team operator. It sees what a viewer with its grant sees and may save and apply changes to its team's entries; a change to any other entry, to an owner or to an entry without an owner is refused with a 403 `entries_refused` that names the entries (an apply counts the ones outside the grant). Pointer and fence operations stay with the operator. Map the team's group to its identities in `[oidc.groups]`: ownership never widens what a token reads. The versions page shows each entry's owner to every role, and the team operator's editor holds only the entries its token reads, marks a change the API would refuse (with its reason) before it can be saved, and names the authorizing teams in its confirmations instead of a CLI command.
 
-The four HTTP operations require OIDC and `operations = true`. Each action shows its CLI command and asks for confirmation. Refusals show the CLI message, including a busy lock's holder. Every attempt writes an audit line to stderr, without tokens or bodies.
+The four HTTP operations require `operations = true` and an operator role, which comes from OIDC or from a [local account](#local-accounts) (never from the proxy alone). Each action shows its CLI command and asks for confirmation. Refusals show the CLI message, including a busy lock's holder. Every attempt writes an audit line to stderr, without tokens or bodies.
 
 <details markdown="1" class="reference-details">
 <summary>Grant, login and recovery limits</summary>
 
-Console operations require OIDC and are off by default. When enabled, they use the CLI's lock and checks to change the pointer, recover the fence and manage versions. Each attempt writes an audit line. Grants also bound manifest groups and errors; login preserves issuer parameters, and recovery respects Valkey's clock and counter ceiling.
+Console operations require `[oidc]` or `[accounts]` and are off by default. When enabled, they use the CLI's lock and checks to change the pointer, recover the fence and manage versions. Each attempt writes an audit line. Grants also bound manifest groups and errors; login preserves issuer parameters, and recovery respects Valkey's clock and counter ceiling.
 
 </details>
 
@@ -126,7 +220,7 @@ With `[postgres]` in the bootstrap (and the schema up to date through `meada pos
 
 ## Repository catalog
 
-With `[catalog]` in the bootstrap (feature `workspaces`, beside `[oidc.github]`; see [the catalog](github-app.md#the-repository-catalog)),
+With `[catalog]` in the bootstrap (feature `workspaces`, beside `[oidc.github]` or `[accounts.github]`; see [the catalog](github-app.md#the-repository-catalog)),
 the console offers the **Repository catalog** to every admitted subject, and `GET /api/v1/config` carries `"catalog": true`.
 It is the picker that comes before any manifest: it lists only the repositories the person may select, that is, those
 the catalog holds and on which their login holds an accepted role in the newest permissions set (the platform
@@ -152,7 +246,7 @@ answers them from the set it already holds in memory, calling neither GitHub nor
 
 ## Named workspaces
 
-With `[workspaces]` in the bootstrap (feature `workspaces`, beside `[ui] operations = true`, `[oidc.github]`, `[catalog]` and `[workspace] source = "store"`; `mirrors` is the absolute root where the repositories only named workspaces select are mirrored, `max_workspaces` defaults to 200 and `max_entries` to 100), `GET /api/v1/config` carries `"workspaces": {"max_entries": n}` and the console offers the **Named workspaces** page to every admitted subject.
+With `[workspaces]` in the bootstrap (feature `workspaces`, beside `[ui] operations = true`, `[oidc.github]` (or `[accounts.github]`), `[catalog]` and `[workspace] source = "store"`; `mirrors` is the absolute root where the repositories only named workspaces select are mirrored, `max_workspaces` defaults to 200 and `max_entries` to 100), `GET /api/v1/config` carries `"workspaces": {"max_entries": n}` and the console offers the **Named workspaces** page to every admitted subject.
 
 - `POST /api/v1/workspaces` takes `{"name", "description"?, "entries", "message"}` (80 KiB), `entries` being the manifest text of `[[repository]]` entries with a `repo` and, at most, `serve`, `resource` and `peer` blocks (`path`, `owner`, `added_by` and `serve.documents` are refused, 422 `invalid_entries`). The creator is the authenticated subject: an `actor`, `role` or any other key in the body is a 400. It answers 201 `{"id", "version", "created": true}`, or 200 with `created: false` when the same creator, name and entries made it already. A selection with a repository outside the person's eligibility is a 403 `entries_refused` (`refused`: the identities the person's grant reads, `hidden`: how many others) and stores nothing; a set that cannot decide is a 409 `pending` with `reason` (`no_set`, `stale_set`, `missing_login`). Creation is recorded in the audit as `workspaces.create`, refusals included.
 - `GET /api/v1/workspaces?limit=&after=` lists the workspaces the subject sees, ordered by id (`limit` 1 to 100, 25 by default), and `GET /api/v1/workspaces/<id>` shows one with its `base`, its `state` (`applied`: stored, ingestion pending; `live`: the current generation records it) and each entry's `ingestion` (`pending`, `ready` or `excluded`, the last shown to the operators). A workspace is visible to its operators, the platform administrator, and whoever's grant reads every one of its repositories; for anyone else it answers the same 404 as an id that does not exist. Operators also get the operator list.

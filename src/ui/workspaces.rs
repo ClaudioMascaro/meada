@@ -78,10 +78,11 @@ impl Console {
         )
     }
 
-    /// The postgres section and `[oidc.github]` the routes read: `[workspaces]` required both.
+    /// The postgres section and the GitHub grant provider the routes read: `[workspaces]`
+    /// required both.
     fn workspace_policy(&self) -> Option<Policy<'_>> {
         let postgres = self.bootstrap.postgres.as_ref()?;
-        let github = (self.bootstrap.oidc.as_ref()).and_then(|o| o.github.as_ref())?;
+        let github = self.bootstrap.github()?;
         let section = self.bootstrap.workspaces.as_ref()?;
         Some(Policy {
             postgres,
@@ -92,8 +93,12 @@ impl Console {
     }
 
     /// Whether `session` operates workspace `record`: the platform administrator, or an operator
-    /// of it by subject.
+    /// of it by subject, unless the subject is a local account whose row no longer stands.
     fn operates(session: &Session, record: &Record) -> bool {
+        #[cfg(feature = "accounts")]
+        if session.suspended {
+            return false;
+        }
         session.operator
             || (session.subject.as_deref())
                 .is_some_and(|s| record.operators.iter().any(|(subject, _)| subject == s))
@@ -256,8 +261,7 @@ impl Console {
         selected: &[String],
         grant: &Grant,
     ) -> Option<(Answer, String)> {
-        let oidc = self.oidc.as_ref()?;
-        let catalog = oidc.catalog(session.login.as_deref(), session.operator)?;
+        let catalog = (self.providers).catalog(session.login.as_deref(), session.operator)?;
         if let Some(reason) = catalog.reason {
             return Some((pending(reason), format!("pending ({reason})")));
         }
@@ -503,10 +507,7 @@ impl Console {
         let operates = Self::operates(session, &record);
         let held = self.held_generation();
         let live = Self::state(&record, held.as_deref()) == "live";
-        let excluded: BTreeSet<String> = match &self.oidc {
-            Some(oidc) => oidc.excluded_in(&record.id),
-            None => BTreeSet::new(),
-        };
+        let excluded: BTreeSet<String> = self.providers.excluded_in(&record.id);
         let recorded: Vec<&str> = held
             .as_ref()
             .and_then(|h| h.context_repositories(&record.id))

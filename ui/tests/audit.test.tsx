@@ -34,6 +34,17 @@ test('the view model shows every field of a record, absent ones as none', () => 
   expect(auditRoute(11)).toBe('audit?before=11');
 });
 
+test('a sign-in refused for an unknown username shows no subject and the role none', () => {
+  const unknown: Page = { next: null, records: [{
+    id: 13, time: '2026-10-31T12:00:00Z', via: 'console', subject: null, login: null, role: 'none', owners: null,
+    action: 'account.login', arguments: { reason: 'unknown' }, outcome: 'refused', message: 'the username or the password is wrong',
+  }] };
+  expect(auditModel(unknown, auditCopy.en)[0]).toMatchObject({
+    subject: 'None', role: 'None', action: 'Sign-in (account.login)', arguments: 'reason: unknown', outcome: 'Refused',
+  });
+  expect(auditModel(unknown, auditCopy['pt-BR'])[0]).toMatchObject({ subject: 'Nenhum', role: 'Nenhum' });
+});
+
 test('only the global operator is offered the audit page, and only when the console has one', () => {
   const paths = (role?: 'viewer' | 'team_operator' | 'operator', audit = true) => offered(role && { subject: 's', role }, audit).map(route => route.path);
   expect(paths('operator')).toContain('/audit');

@@ -36,6 +36,8 @@ docker compose up -d
 docker compose ps       # espere os servidores ficarem healthy
 ```
 
+Para a prova de conceito com [contas locais](console.md#contas-locais), copie `.env.accounts.example` para `.env` e rode `docker compose up -d`: a mesma pilha ganha Postgres, a console gravável com `[accounts]` e o par de chaves Ed25519, que o passo `certificates` gera uma vez (a chave privada só na console; a pública na console e nos nós). Entre como `admin` com `admin123` (ou o valor de `MEADA_ADMIN_PASSWORD`), troque a senha, gere um token de agente no perfil e use-o como bearer nos nós. Os nós admitem esse token em vez do bearer compartilhado do proxy. Remover os dois volumes de chaves gera um par novo e encerra todos os tokens.
+
 O teste com `curl` pelo TLS, a atualização dos índices e os outros perfis estão no
 [README do Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/README.md).
 `scripts/compose-check` valida todos os perfis com `docker compose config`.
@@ -62,9 +64,10 @@ curl -s http://127.0.0.1:7333/github.com/claudiomascaro/meada \
   --data '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search","arguments":{"query":"main"}}}'
 ```
 
-Troque os dois blocos de `values-minimal.yaml` pelos seus repositórios. Sem OIDC o servidor
+Troque os dois blocos de `values-minimal.yaml` pelos seus repositórios. Sem OIDC nem contas locais o servidor
 admite quem alcança o Service: configure a admissão ([Autenticação e grants](admission.md))
-antes de ligar o Ingress. Gerações, console e identidade empresarial estão no
+antes de ligar o Ingress. Gerações, console, contas locais (console gravável sem provedor de identidade,
+`values-accounts.yaml`) e identidade empresarial estão no
 [README do chart](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/README.md).
 `scripts/helm-check` passa o `helm lint` e confere o que o chart renderiza com cada arquivo de
 valores, este incluído.

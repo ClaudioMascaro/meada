@@ -2,7 +2,7 @@
 
 > **Atención.** En modo servidor Meada devuelve fragmentos de código fuente a quien logre
 > conectarse, y por defecto no autentica a nadie: el proxy inverso del operador admite a los
-> clientes (TLS, tokens, SSO, política de red); el [módulo OIDC](admission.md) es la alternativa opt-in. Sin host, el servidor escucha solo en el loopback; escuchar
+> clientes (TLS, tokens, SSO, política de red). Los módulos opt-in de [admisión](admission.md) son las cuentas locales, para empezar, y OIDC, para producción. Sin host, el servidor escucha solo en el loopback; escuchar
 > más allá es una elección explícita del operador, y un proxy mal configurado expone el código.
 > El servidor MCP no revisa el encabezado `Host` (un proxy con nombre propio funciona) y responde 403 a
 > cualquier solicitud con `Origin` (protección contra navegadores y DNS rebinding), en
@@ -81,6 +81,10 @@ Un espejo es un checkout con árbol de trabajo; un clon bare no tiene qué index
 - `meada status --workspace <manifiesto>` muestra el estado de cada índice, y
   `meada export --workspace <manifiesto> --repo <identidad>` imprime el índice de un
   repositorio, por ejemplo para alimentar una base de conocimiento.
+
+## Admisión y consola
+
+Para empezar, activa las [cuentas locales](console.md#cuentas-locales): la consola escribe con `[accounts]` y `[postgres]`, sin proveedor de identidad, y cada persona genera [tokens de agente](admission.md#cuentas-locales) que los nodos admiten. El proxy deja de ser la única barrera, pero sigue siendo el lugar del TLS y de limitar la tasa de `POST /api/v1/login`. En producción, [configura el proveedor de identidad](identity-providers.md) y mantén la cuenta predeterminada solo como [break glass](console.md#migrar-de-las-cuentas-locales-al-proveedor-de-identidad).
 
 ## Decidir en un pipeline
 
