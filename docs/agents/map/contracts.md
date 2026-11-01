@@ -1,8 +1,33 @@
 # Contract kinds
 
 Detail behind the [architecture map](../architecture.md), which keeps the flow, identities,
-seams, invariants and Known ceilings. The code wins over this file, and a change to these
-modules updates it.
+seams and invariants (the limits are in [Known ceilings](../ceilings.md)). The code wins over
+this file, and a change to these modules updates it.
+
+## Modules in brief
+
+- `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs` and its `channel/` submodules
+  (`channel/message.rs`: the message types and broker helpers; `channel/{ts,python,rust,go,java,csharp}.rs`:
+  the message libraries of each language): the
+  `ContractKind` trait and the HTTP kind (`http.rs`: the contract and path rules, the mount
+  machinery and the shared consumer readers; one submodule per language: `http/ts.rs` and
+  `http/ts/clients.rs`, Express and Next.js route-file providers and `fetch` consumers;
+  `http/python.rs` and `http/python/clients.rs`, FastAPI, Flask and Django providers and the
+  requests, httpx and aiohttp consumers, whose rows also list reqwest and ureq; `http/rust.rs`
+  and `http/rust/axum.rs`, actix-web, Rocket and axum providers; `http/go.rs` and
+  `http/go/clients.rs`, net/http, gin, echo, chi and gorilla/mux providers and their consumers
+  with resty; `http/java.rs` and `http/java/clients.rs`, Spring MVC providers and the
+  RestTemplate, WebClient, `java.net.http` and OkHttp consumers, whose bases come from the
+  Spring configuration `jvm/spring.rs` reads for the JVM packs' kinds; `http/kotlin.rs`, Ktor
+  providers, and `http/kotlin/client.rs`, Ktor client consumers; `http/csharp.rs`, ASP.NET Core
+  controller providers, `http/csharp/minimal.rs`, minimal API providers,
+  `http/csharp/clients.rs`, HttpClient and typed client consumers, and `http/csharp/refit.rs`,
+  Refit consumers; `http/swift.rs`, `http/swift/vapor.rs`, Vapor providers, `http/swift/hummingbird.rs`,
+  Hummingbird providers, and `http/swift/client.rs`, URLSession,
+  Alamofire and AsyncHTTPClient consumers), resource and channel
+  kinds. `package.rs` and `package/`: npm, PyPI, Cargo, Go, Maven, NuGet and SwiftPM packages as
+  contracts (specs #22, #24, #30, #25, #26, #28 and #29), the shared steps and one module per ecosystem behind
+  the `Ecosystem` trait (spec #225).
 
 - `contract.rs`: `ContractKind` trait, the whole interface of a kind: `prefix`, `extract` and
   `link` are required, every other question (see "New contract kind" in the architecture map)

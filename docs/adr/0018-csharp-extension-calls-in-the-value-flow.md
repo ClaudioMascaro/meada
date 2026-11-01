@@ -41,6 +41,6 @@ Meada does not read for outside types.
   method called on two groups serves under both.
 - An outside type's instance member of the same name as a repository extension method is
   missed: C# prefers the member, and the value flow takes the extension. This is a known
-  ceiling (`docs/agents/architecture.md`), rare in practice, and the reason the rule is kept to
+  ceiling (`docs/agents/ceilings.md`), rare in practice, and the reason the rule is kept to
   a unique name match with the declaring class in scope.
 - Two extension methods of one name in scope (an ambiguous match) feed nothing.
