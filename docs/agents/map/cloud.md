@@ -385,7 +385,7 @@ section of `meada.workspace.toml`:
   at start, which an unknown username, a locked and a suspended account are checked against;
   `generated` is the password `meada ui reset-admin` makes when the setting names none
   (`GENERATED_LENGTH`, 24, of 32 symbols from `OsRng`, 120 bits, one the policy takes). `store.rs` is the
-  table, every call its own connection through `postgres::connected` bounded as the audit's:
+  table, every call its own connection through `postgres::connected` within `Config::bound`, each call saying its own statement count:
   `attempt` (#555: one transaction holding the account's row, `SELECT ... FOR UPDATE`; a row is
   hostile: a username other than the one asked or failing `username_ok`, a hash that is no
   argon2id string, a role or a group that fails its check is `Attempt::Bad`, admitting nothing,

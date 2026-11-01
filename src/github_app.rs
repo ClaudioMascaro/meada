@@ -1311,10 +1311,10 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     // version that did not change admits no previous check's exclusions.
     // One statement of its own, the fence's: a Postgres that stops answering after it accepted
     // the connection must not hold the run (the server's `statement_timeout` does not fire then).
-    let bound = postgres.bound(1);
-    let late = |bound: Duration| Msg::PostgresTimeout(bound.as_millis() as u64).text();
-    let reached = tokio::time::timeout(bound, reached);
-    let (mut client, scrub, row) = match reached.await.unwrap_or_else(|_| Err(late(bound))) {
+    let one = postgres.bound(1);
+    let late = |after: Duration| Msg::PostgresTimeout(after.as_millis() as u64).text();
+    let reached = tokio::time::timeout(one, reached);
+    let (mut client, scrub, row) = match reached.await.unwrap_or_else(|_| Err(late(one))) {
         Ok(reached) => reached,
         Err(why) => {
             remove_excluded()?;
@@ -1525,8 +1525,8 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         let newest = format!("SELECT EXISTS (SELECT 1 FROM {q}.permission_sets WHERE id = $1)");
         // One statement of its own.
         let params: [&(dyn tokio_postgres::types::ToSql + Sync); 1] = [&id];
-        let ask = tokio::time::timeout(bound, client.query_one(&newest, &params));
-        let newest: bool = ask.await.map_err(|_| late(bound))?.map_err(&scrub)?.get(0);
+        let ask = tokio::time::timeout(one, client.query_one(&newest, &params));
+        let newest: bool = ask.await.map_err(|_| late(one))?.map_err(&scrub)?.get(0);
         if !newest {
             return Err(Msg::RolesReplaced.text());
         }

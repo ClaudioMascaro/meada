@@ -1,7 +1,7 @@
 //! The accounts table (ADR 0024, migration 9): one row per local account in `[postgres] schema`,
 //! read and written by the console, and by `meada ui reset-admin` (`reset_admin`). Each call
 //! opens its own connection through `postgres::connected`, so a schema version this binary does
-//! not know counts as unreachable, and is bounded as the audit's calls are. Every row is hostile
+//! not know counts as unreachable, and runs within `postgres::Config::bound`. Every row is hostile
 //! when read: one that fails its checks admits nothing (`Attempt::Bad`), and its reader writes one
 //! line naming the table, never a value. A password attempt (`attempt`) holds the row while it
 //! checks and counts. Account administration (`list`, `create`, `change`, #557, groups #558) is
