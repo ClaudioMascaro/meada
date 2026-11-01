@@ -8,6 +8,22 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Helm chart support for local accounts (#565, ADR 0024, from #551): `modules.accounts` renders
+  `[accounts]` from values, with `values-accounts.yaml` as the proof-of-concept shape (a writable
+  console with `operations = true`, Postgres and no identity provider). The Ed25519 private key
+  comes from its own Secret and is mounted only in the console's `console` container, the public
+  key from another Secret in the console and the nodes (a node also gets `[ui] public_url`, the
+  token issuer, and `[postgres]`), the initial admin password from an optional Secret in the
+  console. `modules.accounts.groups` and `modules.accounts.github` carry `[accounts.groups]` and
+  `[accounts.github]` (the refresh job, with `modules.githubApp`, gets the GitHub grant provider and runs the role check, and
+  `modules.workspaces` accepts it in place of `modules.oidc.github`); `modules.accounts.breakGlass`
+  keeps `[accounts]` in the console alone beside `modules.oidc`. The chart refuses a missing
+  Postgres or console, equal key Secrets, accounts beside OIDC without break glass, and groups or
+  GitHub under break glass. `scripts/helm-check` covers the sections, the mounts and the refusals;
+  the chart READMEs (pt-BR, English, Spanish) no longer say a writable console needs OIDC. The
+  proposal server is not part of the chart. `[accounts.github]` renders as the spec names it and
+  is parsed once #561 lands. No golden changed.
+
 - One-command proof of concept in the Compose recipe (#564, ADR 0024, from #551):
   `cp .env.accounts.example .env && docker compose up -d` starts the generations fleet, Valkey,
   the store, Postgres with its migration, a writable console with local accounts and nodes that

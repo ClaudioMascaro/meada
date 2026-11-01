@@ -61,7 +61,20 @@ spec:
                   name: {{ .Values.modules.directory.tokenSecret }}
                   key: token
             {{- end }}
+            {{- if and .Values.modules.accounts.enabled .Values.modules.accounts.adminPasswordSecret }}
+            - name: MEADA_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.modules.accounts.adminPasswordSecret }}
+                  key: password
+            {{- end }}
           volumeMounts: {{ include "meada.mounts" . | nindent 12 }}
+            {{- if .Values.modules.accounts.enabled }}
+            {{- include "meada.accountsPublicMount" . | nindent 12 }}
+            - name: accounts-private
+              mountPath: /etc/meada-accounts/private
+              readOnly: true
+            {{- end }}
           resources: {{ toYaml .Values.console.resources | nindent 12 }}
         - name: pull
           image: {{ include "meada.image" . }}

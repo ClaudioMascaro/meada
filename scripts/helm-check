@@ -304,3 +304,115 @@ for arguments, problem in [
                             capture_output=True, text=True)
     assert failed.returncode and problem in failed.stderr
 print("helm-check: named workspaces sections for the console and the job, never the nodes, passed")
+
+# Local accounts (ADR 0024): [accounts] from values, the private key in the console only.
+accounts = render("-f", str(CHART / "values-accounts.yaml"), "--set", "modules.accounts.adminPasswordSecret=meada-admin")
+accounts_console = tomllib.loads(resource(accounts, "ConfigMap", console=True)["data"]["meada.workspace.toml"])
+accounts_nodes = tomllib.loads(manifest(accounts))
+assert accounts_console["accounts"] == {
+    "public_key_file": "/etc/meada-accounts/public/public-key",
+    "private_key_file": "/etc/meada-accounts/private/private-key",
+    "admin_password_env": "MEADA_ADMIN_PASSWORD"}
+assert accounts_nodes["accounts"] == {"public_key_file": "/etc/meada-accounts/public/public-key"}, \
+    "a node holds the public key only"
+assert "oidc" not in accounts_console and "oidc" not in accounts_nodes, "local accounts need no identity provider"
+assert accounts_console["ui"]["operations"] and "operator_groups" not in accounts_console["ui"]
+assert accounts_console["postgres"] == accounts_nodes["postgres"]
+# A node reads the issuer of every token from its own [ui]: the console's public_url (#560).
+assert accounts_nodes["ui"]["public_url"] == accounts_console["ui"]["public_url"] == "https://console.example.internal"
+
+
+def accounts_pods(items):
+    return [item for item in items if item["kind"] in ("Deployment", "CronJob", "StatefulSet", "Job")]
+
+
+def containers(item):
+    template = item["spec"]["jobTemplate"]["spec"]["template"] if item["kind"] == "CronJob" else item["spec"]["template"]
+    return template["spec"], template["spec"].get("initContainers", []) + template["spec"]["containers"]
+
+
+for item in accounts_pods(accounts):
+    spec, every = containers(item)
+    private = [volume for volume in spec.get("volumes", []) if volume.get("secret", {}).get("secretName") == "meada-accounts-private"]
+    public = [volume for volume in spec.get("volumes", []) if volume.get("secret", {}).get("secretName") == "meada-accounts-public"]
+    is_console = item["metadata"].get("labels", {}).get("app.kubernetes.io/component") == "console"
+    mounts = {container["name"]: [m["mountPath"] for m in container.get("volumeMounts", [])] for container in every}
+    env = {container["name"]: str(container.get("env", [])) for container in every}
+    if is_console:
+        assert len(private) == len(public) == 1
+        assert [name for name, paths in mounts.items() if "/etc/meada-accounts/private" in paths] == ["console"], \
+            "only the console container mounts the private key"
+        assert [name for name, paths in mounts.items() if "/etc/meada-accounts/public" in paths] == ["console"]
+        assert "MEADA_ADMIN_PASSWORD" in env["console"] and "meada-admin" in env["console"]
+        assert not any("MEADA_ADMIN_PASSWORD" in text for name, text in env.items() if name != "console")
+    elif item["metadata"]["name"] == "check-meada":
+        assert not private and len(public) == 1, "the private key never appears in a node's pod spec"
+        assert [name for name, paths in mounts.items() if "/etc/meada-accounts/public" in paths] == ["meada"]
+        assert "MEADA_ADMIN_PASSWORD" not in env["meada"]
+    else:
+        assert not private and not public, "the refresh job and the example Postgres hold no key"
+assert "meada-accounts-private" not in yaml.dump([item for item in accounts if not (
+    item["kind"] == "Deployment" and item["metadata"].get("labels", {}).get("app.kubernetes.io/component") == "console")])
+# Groups, the GitHub grant provider and the key Secrets' names come from values.
+granted = render("-f", str(CHART / "values-accounts.yaml"), "-f", str(CHART / "values-identity.yaml"), "-f", str(CHART / "values-workspaces.yaml"),
+                 "--set", "modules.oidc.enabled=false", "--set", "modules.oidc.github.enabled=false", "--set", "modules.directory.enabled=false",
+                 "--set-json", 'modules.accounts.groups={"readers":["github.com/acme/web"],"operators":["*"]}',
+                 "--set", "modules.accounts.github.enabled=true", "--set", "modules.accounts.github.host=ghe.example.internal",
+                 "--set", "modules.accounts.github.api=https://ghe.example.internal/api/v3",
+                 "--set", "modules.accounts.publicKeySecret=pub", "--set", "modules.accounts.privateKeySecret=priv",
+                 "--set", "console.operatorGroups=null")
+for name, config in [("console", tomllib.loads(resource(granted, "ConfigMap", console=True)["data"]["meada.workspace.toml"])),
+                     ("node", tomllib.loads(manifest(granted)))]:
+    assert config["accounts"]["groups"] == {"readers": ["github.com/acme/web"], "operators": ["*"]}, name
+    assert config["accounts"]["github"] == {"host": "ghe.example.internal", "api": "https://ghe.example.internal/api/v3",
+                                            "max_age_seconds": 5400}, name
+granted_job = tomllib.loads(resource(granted, "ConfigMap")["data"]["job.workspace.toml"])
+assert granted_job["accounts"] == {"github": {"host": "ghe.example.internal", "api": "https://ghe.example.internal/api/v3",
+                                              "max_age_seconds": 5400}}, "the refresh job gets the grant provider, never a key or the groups"
+assert granted_job["catalog"]["allow"] == ["github.com/acme/*"] and granted_job["ui"]["operations"]
+assert "oidc" not in granted_job
+refresh_steps = resource(granted, "CronJob")["spec"]["jobTemplate"]["spec"]["template"]["spec"]["containers"][0]["args"][-1].split(" && ")
+assert ["meada", "github-app", "roles"] in [step.split()[:3] for step in refresh_steps], "the role check runs under accounts.github"
+assert "catalog" not in accounts_nodes and "workspaces" not in accounts_nodes
+assert pod(granted)["volumes"][-1]["secret"]["secretName"] == "pub"
+assert any(volume.get("secret", {}).get("secretName") == "priv" for volume in
+           resource(granted, "Deployment", console=True)["spec"]["template"]["spec"]["volumes"])
+assert "priv" not in str(pod(granted))
+
+# Break glass: only beside the identity provider, the console alone reads [accounts], nodes get nothing.
+glass = render("-f", str(CHART / "values-console.yaml"), "--set", "modules.postgres.enabled=true",
+               "--set", "modules.accounts.enabled=true", "--set", "modules.accounts.breakGlass=true")
+glass_console = tomllib.loads(resource(glass, "ConfigMap", console=True)["data"]["meada.workspace.toml"])
+assert glass_console["accounts"]["break_glass"] is True and "oidc" in glass_console
+assert "accounts" not in tomllib.loads(manifest(glass)) and "ui" not in tomllib.loads(manifest(glass))
+assert "meada-accounts" not in str(pod(glass)), "a node gets no key under break glass"
+assert "accounts-private" in str(resource(glass, "Deployment", console=True)["spec"]["template"]["spec"]["volumes"])
+
+# Disabled by default: nothing of local accounts renders.
+for profile in [default, generations, console_profile, identity, workspaces]:
+    text = yaml.dump(profile)
+    assert "meada-accounts" not in text and "[accounts" not in text and "MEADA_ADMIN_PASSWORD" not in text
+
+accounts_flags = ["-f", str(CHART / "values-accounts.yaml")]
+for arguments, problem in [
+    (["--set", "modules.postgres.enabled=false"], "modules.accounts requires modules.postgres"),
+    (["--set", "console.enabled=false"], "modules.accounts requires console.enabled"),
+    (["--set", "modules.accounts.privateKeySecret="], "publicKeySecret and privateKeySecret"),
+    (["--set", "modules.accounts.privateKeySecret=meada-accounts-public"], "must be different Secrets"),
+    (["--set", "modules.oidc.enabled=true"], "requires modules.accounts.breakGlass"),
+    (["--set", "modules.accounts.breakGlass=true"], "breakGlass requires modules.oidc"),
+    (["--set", "modules.oidc.enabled=true", "--set", "modules.accounts.breakGlass=true",
+      "--set-json", 'modules.accounts.groups={"a":["*"]}'], "refused under breakGlass"),
+    (["--set", "modules.accounts.github.enabled=true"], "modules.accounts.github requires modules.githubApp"),
+    (["--set", "modules.accounts.github.enabled=true", "--set", "modules.githubApp.enabled=true",
+      "--set", "modules.accounts.github.host=ghe.example.internal"], "github.api is required"),
+    (["--set", "modules.accounts.enabled=false", "--set", "modules.accounts.breakGlass=true"], "require modules.accounts.enabled"),
+    (["--set", "modules.accounts.enabled=false", "--set-json", 'modules.accounts.groups={"a":["*"]}'], "require modules.accounts.enabled"),
+    (["--set", "image.cloud=false"], "image.cloud"),
+    (["--set", "console.operatorGroups={ops}"], "operator selectors require modules.oidc"),
+    (["--set", "modules.workspaces.enabled=true", "--set", "modules.workspaces.allow={github.com/acme/*}",
+      "--set", "modules.workspaces.maxRepositories=10"], "modules.accounts.github"),
+]:
+    failed = subprocess.run(["helm", "template", "check", str(CHART), *accounts_flags, *arguments], capture_output=True, text=True)
+    assert failed.returncode and problem in failed.stderr, (arguments, failed.stderr)
+print("helm-check: local accounts sections, key mounts in the console only, break glass and refusals passed")

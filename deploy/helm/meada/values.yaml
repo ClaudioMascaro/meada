@@ -178,8 +178,9 @@ modules:
     userAttribute: externalId   # or userName
     groupAttribute: displayName # or externalId
   # Named workspaces over shared indexing (ADR 0020 to 0022, spec S5): the [catalog] and [workspaces]
-  # sections of the console and of the refresh job (never the nodes'). It needs modules.oidc.github,
-  # console.enabled with console.operations, and a Postgres at schema version 8 (the migrate step).
+  # sections of the console and of the refresh job (never the nodes'). It needs modules.oidc.github or
+  # modules.accounts.github, console.enabled with console.operations, and a Postgres at schema
+  # version 8 (the migrate step).
   # `allow` lists patterns `<host>/<owner>/*` or `<host>/<owner>/<repo>`; `maxRepositories` has no
   # default because the cost of expanded coverage is yours (docs: discovery evidence). `mirrors` is
   # the root where workspace.fetch clones the repositories only named workspaces select: it receives
@@ -191,6 +192,38 @@ modules:
     mirrors: /data/mirrors
     maxWorkspaces: 200
     maxEntries: 100
+  # Local accounts (ADR 0024): usernames and passwords in Meada's own Postgres schema, for a
+  # proof of concept with no identity provider. It needs modules.postgres and console.enabled; the
+  # console signs session tokens and issues agent tokens, the nodes admit agent tokens. Create the
+  # Secrets first (no key or password lives in these values):
+  #   privateKeySecret    key private-key  (Ed25519, PEM): mounted only in the console pod
+  #   publicKeySecret     key public-key   (the matching public PEM): mounted in the console and the nodes
+  #   adminPasswordSecret key password     (optional): the default account's initial password
+  # The two key Secrets must be different Secrets: the nodes mount the public one. Rotate the pair
+  # by replacing both Secrets and restarting the pods: every outstanding token ends. The proposal
+  # server is not part of this chart; give it the public key yourself.
+  accounts:
+    enabled: false
+    publicKeySecret: meada-accounts-public
+    privateKeySecret: meada-accounts-private
+    adminPasswordSecret: ""
+    # Beside modules.oidc only: keeps the default account as the console's break-glass door.
+    # Nodes ignore [accounts] then, so they get no key and no [accounts] section.
+    breakGlass: false
+    # A group of local accounts to the identities it grants ("*" for all), as modules.oidc.groups.
+    # Without groups and github, every local account reads every repository. Refused under breakGlass.
+    groups: {}
+    # The GitHub grant provider for local accounts (a verified login reads what it reads on GitHub).
+    # It needs modules.postgres and modules.githubApp, as modules.oidc.github does. `api` is the
+    # REST endpoint of the host: empty keeps https://api.github.com for github.com, and any other
+    # host needs it. Refused under breakGlass. A Meada image parses [accounts.github] from #561 on;
+    # leave it off before that.
+    github:
+      enabled: false
+      host: github.com
+      api: ""
+      roles: []
+      maxAgeSeconds: 5400
 # An example Postgres for evaluation, off by default and not for production: a single replica.
 # Use your own Postgres 15 or later in production. It needs modules.postgres and the Secrets:
 # passwordsSecret (keys postgres-password, migrate-password, write-password, read-password) and

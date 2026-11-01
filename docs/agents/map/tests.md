@@ -31,7 +31,11 @@ all repository fixtures; it contains no private corpus data. Existing tests own 
 - `scripts/compose-check` checks the local, generations and explicit console profiles without
   starting them, including parsed bootstraps, independent console storage and proxy admission.
   `scripts/helm-check` covers default and enabled console resources, optional Ingress, private
-  CA and OIDC values, negative module/operation combinations and managed refresh ordering.
+  CA and OIDC values, negative module/operation combinations and managed refresh ordering. It
+  also renders `values-accounts.yaml` (#565): the `[accounts]` sections of the console, the nodes
+  and the refresh job, the private key mounted in the console's container alone (and in no other
+  pod spec), the public key and admin password mounts, groups and GitHub from values, break glass
+  and the chart's refusals.
 - `src/package/hostile.rs` (unit, `cfg(test)`): the table `probes` of the readers of manifests and
   configurations, a row each for `package.json`, `tsconfig.json`, `pyproject.toml`,
   `requirements.txt`, `Cargo.toml`, `go.mod`, `pom.xml`, Gradle builds, `.csproj` and

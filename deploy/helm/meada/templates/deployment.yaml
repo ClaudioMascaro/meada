@@ -79,6 +79,9 @@ spec:
               exec:
                 command: ["sleep", {{ .Values.preStop.sleepSeconds | quote }}]
           volumeMounts: {{ include "meada.mounts" . | nindent 12 }}
+            {{- if and .Values.modules.accounts.enabled (not .Values.modules.accounts.breakGlass) }}
+            {{- include "meada.accountsPublicMount" . | nindent 12 }}
+            {{- end }}
           env: {{ include "meada.env" . | nindent 12 }}
             {{- include "meada.postgresEnv" (dict "root" . "key" "read-url") | nindent 12 }}
           resources: {{ toYaml .Values.resources | nindent 12 }}
@@ -92,6 +95,7 @@ spec:
           resources: {{ toYaml .Values.resources | nindent 12 }}
         {{- end }}
       volumes: {{ include "meada.volumes" . | nindent 8 }}
+        {{- include "meada.accountsPublicVolume" . | nindent 8 }}
       {{- with .Values.nodeSelector }}
       nodeSelector: {{ toYaml . | nindent 8 }}
       {{- end }}

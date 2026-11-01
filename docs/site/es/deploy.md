@@ -64,7 +64,8 @@ curl -s http://127.0.0.1:7333/github.com/claudiomascaro/meada \
 
 Cambia los dos bloques de `values-minimal.yaml` por tus repositorios. Sin OIDC el servidor admite
 a quien alcanza el Service: configura la admisión ([Autenticación y grants](admission.md)) antes
-de activar el Ingress. Generaciones, consola e identidad empresarial están en el
+de activar el Ingress. Generaciones, consola, cuentas locales (consola con escritura sin proveedor de identidad,
+`values-accounts.yaml`) e identidad empresarial están en el
 [README del chart](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/README.es.md).
 `scripts/helm-check` pasa `helm lint` y comprueba lo que el chart renderiza con cada archivo de
 valores, este incluido.

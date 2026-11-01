@@ -1,4 +1,6 @@
-{{- if .Values.modules.oidc.enabled }}
+{{- if and .Values.modules.accounts.enabled (not .Values.modules.accounts.breakGlass) }}
+Local accounts are enabled. The nodes admit agent tokens issued by the console; your Ingress must forward Authorization unchanged.
+{{- else if .Values.modules.oidc.enabled }}
 OIDC admission is enabled. Your Ingress must forward Authorization unchanged.
 {{- else }}
 Configure admission in your Ingress or auth proxy before exposing this service.

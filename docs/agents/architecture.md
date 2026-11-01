@@ -3046,6 +3046,12 @@ one for the area a change touches.
 - The chart's ConfigMap owns the workspace manifest. Disabled modules emit no TOML section;
   external store and Valkey endpoints require TLS, credentials come from Secrets or platform
   identity, and the optional Ingress leaves admission and header forwarding to the controller.
+- Local accounts (#565): `modules.accounts` (`values-accounts.yaml`, `_helpers.tpl`'s
+  `meada.accounts` per process) renders `[accounts]` with the key Secrets as file mounts: the private
+  key only in the console container, the public key in the console and the nodes, none in the
+  refresh job (with `modules.githubApp` it gets `job.workspace.toml` with only `[accounts.github]` for
+  the role check, else the nodes' bootstrap, which names the public key's file and mounts none); under break glass only the
+  console reads `[accounts]`. A node's `[ui]` carries `console.publicUrl`, its tokens' issuer.
 - `scripts/helm-check` checks public renders with Helm and parses the resulting TOML. The
   Helm workflow runs it without a cluster; a local kind smoke checks MCP search after install.
 - The job's refresh under `[oidc.github]` (#331), under `meada snapshot lock`: `meada workspace

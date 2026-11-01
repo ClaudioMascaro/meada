@@ -1,0 +1,42 @@
+# Local accounts (ADR 0024), the proof-of-concept shape: a writable console and nodes that admit
+# agent tokens, with no identity provider.
+#   helm upgrade --install meada deploy/helm/meada -f deploy/helm/meada/values-accounts.yaml -f my-values.yaml
+# Create the Secrets first; no key, password or URL lives in these values:
+#   meada-accounts-private   private-key  (Ed25519 PEM): mounted only in the console pod
+#   meada-accounts-public    public-key   (the matching public PEM): the console and the nodes
+#   meada-postgres           migrate-url, write-url, read-url   (postgres:// URLs)
+# Optional: modules.accounts.adminPasswordSecret (key password) sets the default account's initial
+# password; without it the console creates `admin` with the published default, which the account
+# must change at its first sign-in. Generate the pair with:
+#   openssl genpkey -algorithm ed25519 -out private-key
+#   openssl pkey -in private-key -pubout -out public-key
+# Own the store (modules.snapshot), Valkey and Postgres as in values-console.yaml and
+# values-identity.yaml; `postgres.enabled=true` renders an example Postgres for evaluation.
+# Move to production with modules.oidc (values-console.yaml) and modules.accounts.breakGlass.
+image:
+  cloud: true
+workspace:
+  source: store
+modules:
+  snapshot:
+    enabled: true
+  valkey:
+    enabled: true
+  generations:
+    enabled: true
+  refreshLock:
+    enabled: true
+  postgres:
+    enabled: true
+  accounts:
+    enabled: true
+    # Groups of local accounts to the identities they read; without groups and github, every
+    # local account reads every repository.
+    # groups:
+    #   readers: [github.com/claudiomascaro/meada]
+    #   operators: ["*"]
+console:
+  enabled: true
+  operations: true
+  ingress:
+    enabled: true

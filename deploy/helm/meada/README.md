@@ -4,7 +4,8 @@
 
 Configure a admissão no Ingress ou no proxy de autenticação antes de expor o serviço.
 Sem `[oidc]`, esse componente admite os clientes; uma configuração incorreta expõe o grafo
-de código. Com OIDC, preserve `Authorization`. Preserve também os headers SEP-2243
+de código. Com OIDC, preserve `Authorization`; com contas locais (`modules.accounts`, abaixo), os nós admitem
+tokens de agente e nenhum bearer estático é necessário. Preserve também os headers SEP-2243
 `MCP-Protocol-Version`, `MCP-Session-Id`, `Mcp-Method`, `Mcp-Name` e `Mcp-Param-*`,
 devolva `Meada-Generation` e nunca acrescente `Origin` nas rotas MCP.
 O chart não fixa annotations de um controller: configure a autenticação do seu Ingress.
@@ -97,7 +98,8 @@ A console tem Deployment, ConfigMap de bootstrap, Service e Ingress próprios, c
 herde um bearer estático que bloqueie assets, `/api/v1/config` ou `/auth/callback` antes do
 login. Registre o redirect URI `<console.publicUrl>/auth/callback` no cliente público do issuer,
 sem segredo, com PKCE S256; discovery e token endpoint devem aceitar o browser com CORS para
-a origem configurada. A API exige OIDC; o browser troca o código diretamente com o issuer.
+a origem configurada. A API exige OIDC ou contas locais (seção abaixo); com OIDC, o browser troca o código diretamente
+com o issuer.
 O init faz snapshot pull, e um companion pull periódico usa o mesmo `local_dir` exclusivo do
 pod da console. A readiness verifica o listener TCP. O hostname único do pod nomeia o heartbeat.
 
@@ -177,8 +179,43 @@ papéis, e a mesma `tls.caSecret` valida o certificado (`ca_file`).
 `values-workspaces.yaml` (sobre `values-console.yaml` e `values-identity.yaml`) habilita
 `modules.workspaces`: as seções `[catalog]` e `[workspaces]` entram no bootstrap da console e no
 `job.workspace.toml` do job de refresh, com o bloco `[ui]` de que o job passa a precisar, e nunca no
-de um nó. O chart a recusa sem `console.operations`, `modules.oidc.github`, um `allow` não vazio e um
+de um nó. O chart a recusa sem `console.operations`, `modules.oidc.github` (ou `modules.accounts.github`), um `allow` não vazio e um
 `maxRepositories` definido por você (não tem padrão). Atualize todas as imagens, nós incluídos, antes
 do primeiro refresh que registre um workspace. Seu `workspace.fetch` deve clonar os repositórios que
 só workspaces nomeados selecionam sob `modules.workspaces.mirrors`, nos caminhos que `meada workspace
 show --pulled` lista. O servidor de propostas não faz parte do chart.
+
+## Contas locais, opcional
+
+Uma console gravável não exige provedor de identidade (ADR 0024). `values-accounts.yaml`, usado sozinho
+(`values-console.yaml` liga o OIDC), liga `modules.accounts`, `modules.postgres` e `console.operations`:
+usuários e senhas ficam no Postgres da Meada, a console assina tokens de sessão e emite tokens de
+agente, e os nós os admitem sem bearer estático.
+
+```sh
+helm upgrade --install meada deploy/helm/meada -f deploy/helm/meada/values-accounts.yaml -f meus-valores.yaml
+```
+
+Crie os Secrets antes; nenhum valor guarda chave ou senha. O par de chaves é Ed25519 em PEM
+(`openssl genpkey -algorithm ed25519 -out private-key` e `openssl pkey -in private-key -pubout -out
+public-key`):
+
+- `meada-accounts-private` (chave `private-key`): montado só no contêiner `console` do pod da console.
+  Nenhum nó, o job de refresh nem o Postgres de exemplo o monta, e o chart recusa usar o mesmo Secret
+  nos dois nomes.
+- `meada-accounts-public` (chave `public-key`): montado na console e nos nós, que só verificam tokens.
+- `modules.accounts.adminPasswordSecret` (chave `password`, opcional): a senha inicial da conta `admin`,
+  só na console. Sem ela, a console cria `admin` com a senha publicada, que a conta precisa trocar no
+  primeiro acesso.
+
+Os nós leem o emissor dos tokens em `[ui] public_url`, que o chart preenche com `console.publicUrl`, e
+precisam de `[postgres]` (`read-url`). `modules.accounts.groups` mapeia grupos de contas locais a
+identidades, como `modules.oidc.groups`; `modules.accounts.github` liga o grant do GitHub por login
+verificado e exige `modules.githubApp` (e `api` para um host que não seja `github.com`), numa Meada que já leia
+`[accounts.github]` (#561; antes disso, a imagem recusa a seção e o pod não inicia). Sem grupos nem
+GitHub, toda conta local lê todos os repositórios. O refresh roda `meada github-app roles` também com
+`modules.accounts.github`. Para o caminho de produção, configure `modules.oidc` e ligue
+`modules.accounts.breakGlass`: só a console mantém `[accounts]`, com a conta `admin` como porta de
+emergência, e os nós ignoram contas locais e não recebem chave alguma (`groups` e `github` são
+recusados nesse modo). Para girar o par, troque os dois Secrets e reinicie os pods: todo token emitido
+deixa de valer. O servidor de propostas não faz parte do chart; entregue a ele a chave pública.
