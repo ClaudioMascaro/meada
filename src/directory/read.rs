@@ -53,9 +53,10 @@ impl Directory {
         }
     }
 
-    /// How long one call (a connection, the version read and one statement) may take, all told.
+    /// How long one call (a connection, the version check and one statement of its own) may take,
+    /// all told.
     pub fn bound(&self) -> std::time::Duration {
-        self.postgres.bound(2)
+        self.postgres.bound(1)
     }
 
     async fn connect(&self) -> Result<(crate::postgres::Opened, String), String> {

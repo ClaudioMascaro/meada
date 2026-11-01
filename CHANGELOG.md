@@ -205,6 +205,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Postgres calls that had no client-side deadline now have one (#447): a SCIM request (under the
+  directory's one write lock), the role check's fence read and write transaction, and the
+  console's start check, so a Postgres that accepts the connection and stops answering ends in a
+  503, an exit 1 with no exclusions file a reader admits, and a console that starts, instead of
+  holding them forever. `postgres::Config::bound(n)` now adds the version check's two statements
+  itself and every call site counts only its own (the audit and directory reads and the overage
+  lookup moved accordingly; the accounts' calls, which undercounted, and the permissions poll
+  gained the two). No golden changed.
 - A server-mode mirror's `meada.toml` and `meada.decisions.toml` are read through no symbolic
   link (#547, after #506), as a pulled generation's are: `mirror()`, behind `Manifest::read`
   (`mcp --listen`, snapshot pull, the lock and pointer operations, workspace versions, the

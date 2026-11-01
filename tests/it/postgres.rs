@@ -648,6 +648,61 @@ impl Relay {
     }
 }
 
+/// A Postgres that stops answering without closing the connection: it takes the connection,
+/// completes the startup (no password asked) and then reads every statement and answers none, so
+/// only the client's own deadline ends a call (the server's `statement_timeout` never fires).
+#[cfg(any(
+    feature = "directory",
+    all(
+        feature = "github-app",
+        feature = "oidc",
+        feature = "generation-pointer"
+    )
+))]
+pub(crate) struct Stalled {
+    /// A URL naming it.
+    pub(crate) url: String,
+}
+
+#[cfg(any(
+    feature = "directory",
+    all(
+        feature = "github-app",
+        feature = "oidc",
+        feature = "generation-pointer"
+    )
+))]
+impl Stalled {
+    pub(crate) fn start() -> Self {
+        use std::io::{Read, Write};
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("postgres://meada@{}/meada", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            for mut stream in listener.incoming().flatten() {
+                std::thread::spawn(move || {
+                    // The startup message: its length, itself included, then the rest.
+                    let mut length = [0u8; 4];
+                    if stream.read_exact(&mut length).is_err() {
+                        return;
+                    }
+                    let rest = (u32::from_be_bytes(length) as usize).saturating_sub(4);
+                    if stream.read_exact(&mut vec![0u8; rest]).is_err() {
+                        return;
+                    }
+                    // AuthenticationOk, then ReadyForQuery (idle).
+                    let ready = [b'R', 0, 0, 0, 8, 0, 0, 0, 0, b'Z', 0, 0, 0, 5, b'I'];
+                    if stream.write_all(&ready).is_err() {
+                        return;
+                    }
+                    let mut sink = [0u8; 4096];
+                    while stream.read(&mut sink).is_ok_and(|n| n > 0) {}
+                });
+            }
+        });
+        Self { url }
+    }
+}
+
 /// The audit (#328) of a test's manifests in `dir`: `[postgres]` (`section`, to append to each)
 /// reading its URL, the relay's, from `ops/pg-url`, in a schema of `case`'s own, migrated.
 #[cfg(any(

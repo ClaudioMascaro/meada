@@ -28,8 +28,8 @@ use crate::msg::Msg;
 // this long after the refresh that recorded it; `MEADA_PERMISSIONS_POLL_MS` shortens it in debug
 // builds.
 const PERMISSIONS_POLL: Duration = Duration::from_secs(60);
-/// The statements of one read: the version, the newest set, its counts, its rows and its
-/// exclusions, and with `[catalog]` its catalog.
+/// The statements of one read besides the version check's: the transaction's begin, the newest
+/// set, its counts, its rows and its exclusions, and with `[catalog]` its catalog.
 const STATEMENTS: u32 = 5 + cfg!(feature = "workspaces") as u32;
 
 // ponytail: the longest identity the catalog holds, in bytes, so that its pagination cursor (the

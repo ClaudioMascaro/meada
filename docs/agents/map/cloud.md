@@ -61,7 +61,16 @@ section of `meada.workspace.toml`:
   `runtime` feature) with its own `TlsConnect` over tokio-rustls and ring (no channel binding),
   the URL read, the TCP connection and the handshake bounded together by
   `connect_timeout_seconds`, every statement bounded by `statement_timeout_seconds`
-  (`-c statement_timeout`), the password scrubbed from every error. Every table lives in
+  (`-c statement_timeout`), the password scrubbed from every error. A peer that accepts the
+  connection and stops answering never trips that server-side timeout, so each call also runs
+  within `Config::bound(n)`: the connect timeout plus one statement timeout for each of `n`
+  statements of the caller's own and the two of the version check (`VERSION_STATEMENTS`, which
+  `connected` runs first), the caller counting its transaction's begin and commit and saying
+  how many beside the call (audit 1, directory reads 1, overage 1, permissions
+  `STATEMENTS`, accounts 1 to 6, SCIM `directory/scim.rs::STATEMENTS` 12, the role check's
+  fence read 1 and write transaction 9, `probe` 0). Every call of the console and the job has
+  one but `migrate` (its lock wait is unbounded by design), `status_line` (the connect timeout)
+  and the named workspaces' store and lifecycle. Every table lives in
   `[postgres] schema` and every statement names it, quoted (`Config::quoted`): Meada writes
   nothing outside it (ADR 0002, invariant 3). `MIGRATIONS` lists the migrations in order; a
   ticket appends the next number when it integrates, never editing one before it. Migration 1
@@ -183,8 +192,11 @@ section of `meada.workspace.toml`:
   Errors are RFC 7644's, with `scimType` (`invalidFilter`,
   `invalidPath`, `invalidValue`, `noTarget`, `uniqueness`, `invalidSyntax`) for a 400 or 409, an
   unknown id a 404, and a fixed detail that echoes no value; a value Postgres cannot store
-  (SQLSTATE class 22, as a NUL) is a 400 `invalidValue`. Postgres unreachable, or a schema
-  version this binary does not know (`postgres::connected`), is a 503 in the same schema after
+  (SQLSTATE class 22, as a NUL) is a 400 `invalidValue`. Postgres unreachable, a schema
+  version this binary does not know (`postgres::connected`) or a request still running past
+  `Scim::bound` (the connection, the version check and twelve statements, the longest request,
+  a group `PATCH`; the future is dropped, so Postgres rolls the transaction back and releases the
+  advisory lock) is a 503 in the same schema after
   one `ui: postgres: unreachable (<reason>)` line; the console's other routes are unaffected.
   Each `POST`, `PUT`, `PATCH` or `DELETE` under the prefix leaves one stderr line `scim:
   <method> <resource> <id>: <status>`, `<resource>` `Users`, `Groups` or `-`, `<id>` the stored
@@ -439,8 +451,9 @@ section of `meada.workspace.toml`:
   and takes its fence from `MEADA_REFRESH_FENCE` under `[refresh_lock]` (`run_fence`, a positive
   decimal within `bigint`, else `Msg::RolesFenceEnv`), 0 without. `check` then runs in this
   order: `postgres::connected` (the schema version refusal), the newest set's fence read with
-  Postgres's `now()` as `started` and a higher one refused (`Msg::RolesFenceBelow`); the
-  exclusions file removed; every identity on the host listed (`listed`: the owner's
+  Postgres's `now()` as `started` and a higher one refused (`Msg::RolesFenceBelow`), both under
+  one `bound(1)` (a Postgres that stops answering is `Msg::PostgresTimeout`, the file removed
+  and the run failed like an unreachable one); the exclusions file removed; every identity on the host listed (`listed`: the owner's
   installations in `Run::rotation`'s order, the round robin `get` shares; a 403 or 429 marks the
   installation and passes to the next, every one throttled, a 5xx, a timeout, an answer past
   `ANSWER_MAX` or a page that is not a JSON array fails the run with `Msg::RolesFailed` naming the
@@ -464,7 +477,9 @@ section of `meada.workspace.toml`:
   its rows (`unnest` of three arrays) and its exclusions with their reason (`no_role`,
   `role_not_accepted`) and deleting every older set, all under
   `<index_dir>/workspace/excluded.lock` (`versions::lock_excluded`; the file is removed again
-  once the fence passes, a refused run leaving it as it is), held until the file is written by rename (`versions::write_excluded`) only while
+  once the fence passes, a refused run leaving it as it is), the transaction's nine statements
+  under one `bound(9)` (past it the run fails with the file still removed) and the `newest` read
+  after it under `bound(1)`, held until the file is written by rename (`versions::write_excluded`) only while
   the set still exists, else `Msg::RolesReplaced`: on one machine a file is always that of the
   last run to commit. Postgres and the file are never
   written atomically together: a run that fails anywhere after the removal leaves no file, so no
