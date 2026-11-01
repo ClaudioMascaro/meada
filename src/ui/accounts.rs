@@ -51,12 +51,14 @@ use serde_json::{Value, json};
 
 use super::{Answer, Body, Console, Session, error, json_answer, write};
 use crate::accounts::store::{self, Attempt, Refusal};
-use crate::accounts::{self, Keys, Role, Rule};
+use crate::accounts::{self, Holder, Keys, Role, Rule};
 use crate::audit::{Actor, Outcome};
 use crate::msg::Msg;
 
 mod administration;
+mod github;
 pub(super) use administration::{ADMIN_BODY_MAX, is_administration};
+pub(super) use github::{GITHUB, GITHUB_BODY_MAX, GITHUB_REMOVE};
 
 // ponytail: the most bytes of a sign-in's body: a username and a password of at most 128
 // characters, each escaped, with room to spare; past it a 413.
@@ -81,6 +83,9 @@ pub(super) struct Local {
     hashes: tokio::sync::Semaphore,
     /// Beside `[oidc]`: the default account alone, as the global operator (#563).
     pub(super) break_glass: bool,
+    /// With `[accounts.github]` (#561): its `api`, the one endpoint the console calls, and the
+    /// agent it calls it with.
+    github: Option<github::Verifier>,
 }
 
 impl Local {
@@ -114,6 +119,7 @@ impl Local {
                 postgres,
                 hashes: tokio::sync::Semaphore::new(HASHES_MAX),
                 break_glass: config.break_glass,
+                github: config.api.clone().map(github::Verifier::new),
             }),
             Err(store::Refused::Password(problem)) => Err(problem),
             Err(store::Refused::Postgres(reason)) => {
@@ -122,12 +128,24 @@ impl Local {
         }
     }
 
-    /// The role and the groups a session token of `account` carries: its own, or under break
-    /// glass the global operator's with no group, which is what admission makes of it anyway.
-    fn signed_as<'a>(&self, account: &'a store::Account) -> (Role, &'a [String]) {
+    /// Whom a session token of `account` is for: its role, groups and verified login, or under
+    /// break glass the global operator with no group and no login, which is what admission makes
+    /// of it anyway.
+    fn signed_as<'a>(&self, account: &'a store::Account) -> Holder<'a> {
+        let username = &account.username;
         match self.break_glass {
-            true => (Role::Operator, &[]),
-            false => (account.role, &account.groups),
+            true => Holder {
+                username,
+                role: Role::Operator,
+                groups: &[],
+                login: None,
+            },
+            false => Holder {
+                username,
+                role: account.role,
+                groups: &account.groups,
+                login: account.login.as_deref(),
+            },
         }
     }
 }
@@ -350,30 +368,32 @@ impl Console {
             return Err(change_required());
         }
         let operator = claims.role == Role::Operator;
-        Ok(self.local_session(claims.sub, operator, claims.groups, route))
+        Ok(self.local_session(claims.sub, operator, claims.groups, claims.login, route))
     }
 
     /// The session of the local account `subject` on `route`: global operator when `operator`,
-    /// its `groups` sorted, the grant the grant providers compute from them (every repository
-    /// with no table, ADR 0024) and a team operator's teams.
+    /// its `groups` sorted, the grant the grant providers compute from them and its verified
+    /// `login` (#561; every repository with no table, ADR 0024), the login, the GitHub grant's
+    /// state, and a team operator's teams.
     fn local_session(
         self: &std::sync::Arc<Self>,
         subject: String,
         operator: bool,
-        mut groups: Vec<String>,
+        groups: Vec<String>,
+        login: Option<String>,
         route: Option<&str>,
     ) -> Session {
-        groups.sort();
-        groups.dedup();
-        let grant = self.providers.local(&groups);
-        let teams = self.teams_on(route, operator, &groups, &grant);
-        Session::local(subject, operator, groups, teams, grant)
+        let granted = self.providers.local(&groups, login.as_deref());
+        let admitted = crate::grant::Admitted::new(Some(subject), operator, groups, granted);
+        let teams = self.teams_on(route, operator, &admitted.groups, &admitted.grant);
+        Session::local(admitted, teams)
     }
 
     /// Before a console write of a local account (`write`: an operation, a named workspace's
     /// write, account administration; ADR 0024, #557): the session as the account's row stands
     /// now, so a suspension or a role change takes effect on writes at once, while reads keep the
-    /// token's until it expires. An active account's role and groups come from its row (under
+    /// token's until it expires. An active account's role, groups and verified login come from
+    /// its row (under
     /// break glass the session stands as admitted, the global operator's); a suspended, unknown
     /// or hostile one (one line naming the table) writes as a viewer with no group, and so gets
     /// the role refusal its write already has. `login` and the password change are no such
@@ -393,22 +413,24 @@ impl Console {
         }
         let subject = session.subject.clone().unwrap_or_default();
         let username = accounts::username_of(&subject).unwrap_or_default();
-        let (operator, groups) = match store::standing(&local.postgres, username) {
+        let (operator, groups, login) = match store::standing(&local.postgres, username) {
             // Under break glass the default account is the global operator whatever its row's
             // role (`Local::signed_as`), with every repository: only its suspension takes a write.
             Ok(store::Standing::Active(..)) if local.break_glass => return Ok(session),
-            Ok(store::Standing::Active(role, groups)) => (role == Role::Operator, groups),
-            Ok(store::Standing::Suspended | store::Standing::Unknown) => (false, Vec::new()),
+            Ok(store::Standing::Active(role, groups, login)) => {
+                (role == Role::Operator, groups, login)
+            }
+            Ok(store::Standing::Suspended | store::Standing::Unknown) => (false, Vec::new(), None),
             Ok(store::Standing::Bad) => {
                 bad_row(local);
-                (false, Vec::new())
+                (false, Vec::new(), None)
             }
             Err(reason) => {
                 let answer = unreachable(&reason);
                 return Err((Box::new(answer), Msg::AccountsUnavailable.text()));
             }
         };
-        Ok(self.local_session(subject, operator, groups, route))
+        Ok(self.local_session(subject, operator, groups, login, route))
     }
 
     /// Admission under break glass (`[oidc]` beside, #563) of a request to the API route `route`
@@ -443,13 +465,17 @@ impl Console {
             Some(claims) if claims.change_required && route != Some(PASSWORD) => {
                 Err(change_required())
             }
-            Some(claims) => Ok(Session::local(
-                claims.sub,
-                true,
-                Vec::new(),
-                Vec::new(),
-                crate::grant::Grant::All,
-            )),
+            Some(claims) => {
+                let admitted = crate::grant::Admitted {
+                    subject: Some(claims.sub),
+                    operator: true,
+                    groups: Vec::new(),
+                    login: None,
+                    grant: crate::grant::Grant::All,
+                    github: None,
+                };
+                Ok(Session::local(admitted, Vec::new()))
+            }
         })
     }
 
@@ -571,14 +597,9 @@ impl Console {
         let reason = refusal.unwrap_or(Refusal::Unknown).reason();
         let (answer, outcome, message) = match (&account, refusal) {
             (Some(account), None) => {
-                let (role, groups) = local.signed_as(account);
-                let signed = local.keys.session(
-                    &self.ui.public_url,
-                    &account.username,
-                    role,
-                    groups,
-                    account.change_required,
-                );
+                let holder = local.signed_as(account);
+                let signed =
+                    (local.keys).session(&self.ui.public_url, &holder, account.change_required);
                 let Ok((token, expires)) = signed else {
                     return unsigned();
                 };
@@ -683,10 +704,8 @@ impl Console {
         self.audit
             .finish(pending, Outcome::Accepted, &changed, None);
         write::audit(Some(subject), None, action, username, "accepted");
-        let (role, groups) = local.signed_as(&account);
-        let signed = local
-            .keys
-            .session(&self.ui.public_url, username, role, groups, false);
+        let holder = local.signed_as(&account);
+        let signed = (local.keys).session(&self.ui.public_url, &holder, false);
         match signed {
             Ok((token, expires)) => issued(token, expires, false),
             Err(_) => unsigned(),
@@ -732,8 +751,8 @@ impl Console {
         let action = "account.token";
         let actor = write::actor(session, None);
         let mut arguments = json!({"account": username, "surface": accounts::NODES_SURFACE, "hours": hours.to_string()});
-        let (role, groups) = match store::standing(&local.postgres, username) {
-            Ok(store::Standing::Active(role, groups)) => (role, groups),
+        let (role, groups, login) = match store::standing(&local.postgres, username) {
+            Ok(store::Standing::Active(role, groups, login)) => (role, groups, login),
             Ok(standing) => {
                 if matches!(standing, store::Standing::Bad) {
                     bad_row(local);
@@ -746,7 +765,13 @@ impl Console {
             Err(reason) => return unreachable(&reason),
         };
         let issuer = &self.ui.public_url;
-        let signed = (local.keys).agent(issuer, username, role, &groups, accounts::NODES, hours);
+        let holder = Holder {
+            username,
+            role,
+            groups: &groups,
+            login: login.as_deref(),
+        };
+        let signed = (local.keys).agent(issuer, &holder, accounts::NODES, hours);
         let Ok((token, expires, id)) = signed else {
             return unsigned();
         };

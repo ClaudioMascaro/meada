@@ -120,7 +120,7 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
       : path === '/session' ? session ? <SessionPage session={session} t={t} onSignOut={local ? () => local.clear() : config.issuer ? () => {
         api.auth.clear(); setSession(undefined); setSignedOut(true);
       } : undefined} /> : <p role="status">{t.loading}</p>
-      : path === '/profile' ? local ? session ? <ProfilePage api={api} auth={local} locale={locale} session={session} /> : <p role="status">{t.loading}</p> : <h1>{t.notFound}</h1>
+      : path === '/profile' ? local ? session ? <ProfilePage api={api} auth={local} locale={locale} session={session} onSession={setSession} /> : <p role="status">{t.loading}</p> : <h1>{t.notFound}</h1>
       : path === '/accounts' ? session ? administers && session.role === 'operator' ? <AccountsPage api={api} locale={locale} /> : <h1>{t.notFound}</h1> : <p role="status">{t.loading}</p>
       : path === '/manifest' ? manifest ? <ManifestPage manifest={manifest} t={t} /> : <p role="status">{t.loading}</p>
       : path === '/workspace' ? session ? <WorkspacePage api={api} locale={locale} session={session} config={config} onSession={setSession} /> : <p role="status">{t.loading}</p>

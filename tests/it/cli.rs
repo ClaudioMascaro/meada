@@ -388,8 +388,8 @@ fn oidc_github_and_role_check_refusals_follow_lang() {
         cases.push((
             format!("{oidc}identities_claim = \"r\"\n{postgres}"),
             roles,
-            "meada: ops/meada.workspace.toml: meada github-app roles needs [oidc.github]\n".into(),
-            "meada: ops/meada.workspace.toml: meada github-app roles exige [oidc.github]\n".into(),
+            "meada: ops/meada.workspace.toml: meada github-app roles needs [oidc.github] or [accounts.github]\n".into(),
+            "meada: ops/meada.workspace.toml: meada github-app roles exige [oidc.github] ou [accounts.github]\n".into(),
         ));
         cases.push((
             format!("{oidc}{table}{postgres}"),

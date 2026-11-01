@@ -789,6 +789,37 @@ surface and the 8-hour default, the request's body and bearer, the token shown o
 expiry and copied, in no storage, gone after navigating away and back; the refusals (hours, the
 role refusal, any other) in Portuguese, the session kept.
 
+### The verified login of `[accounts.github]` (#561)
+
+`src/accounts.rs` holds the unit test of `[accounts.github]` (its defaults, `api` GitHub's on
+`github.com` and required elsewhere, `https` or loopback `http`, each bad key named with the
+table's prefix, `login_claim` refused) and the `login` claim (carried by an agent token, a token
+whose login is no lowercase login refused). `src/ui/accounts/github.rs` holds the unit tests of
+the pasted token's shape and of `GET /user` against a one-shot loopback server: the login
+lowercased, a 401 or 403 refused, a 429, a 502, an answer with no `login` and one past
+`GITHUB_ANSWER_MAX` unavailable, a `login` that is no login invalid, nothing listening
+unavailable, the token sent as the bearer and in no reason. `tests/it/github_app.rs`'s fake
+answers `GET /user` for the tokens a test registers (`users`, `user_status`) and logs every
+bearer it saw (`bearers`). `tests/it/ui/accounts/github.rs` (Postgres, Valkey and the fake,
+skipping without them) is the demo: the role check reading `[accounts.github]`; ana's session
+before and after the verification (`login`, `github_host`, `github_grant`), her grant bounding
+the manifest view and the repositories, the admission view's `github`; a fresh agent token
+carrying the login answered by a node on the web and refused on the catalog; GitHub's refusal,
+GitHub failing, another account's login, the body checks; ana's own removal and the global
+operator's `remove_github`; the `account.github` and `account.remove_github` records with the
+actor's `login` column; the personal access tokens in `GET /user` alone and in no answer,
+record or stderr line. `tests/it/ui/oidc/additions.rs`'s
+`a_local_team_operator_s_addition_is_attributed_from_its_verified_login` (Valkey, the store,
+Postgres and the fake) runs a local team operator's additions on the team fixture: `unattributed`
+before a verified login, `added_by` from it after (the audit's `login` column too), and the
+exclusions mark the role check over `[accounts.github]` leaves, for the global operator and a
+viewer whose verified login reads the entry. `tests/it/ui/accounts.rs` names the two
+`[accounts.github]` manifest errors. `ui/tests/AccountPages.test.tsx` drives the profile's
+section (the token sent once in the body, the fresh session token kept, the session read again,
+the token in no storage, each refusal as the page's own copy, a 401 ending the session, the
+removal) and `ui/tests/AccountsPage.test.tsx` the accounts page's login column and its
+`remove_github` behind the dialog.
+
 ### Break glass beside the identity provider (#563)
 
 `src/accounts.rs` holds the unit tests of `break_glass` (off by default) and `under_break_glass`

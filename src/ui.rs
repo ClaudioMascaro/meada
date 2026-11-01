@@ -339,25 +339,13 @@ impl Session {
         }
     }
 
-    /// The session of a local account's session token (ADR 0024): `subject`, global operator
-    /// when `operator`, its sorted `groups`, a team operator's `teams` and the grant.
+    /// The session of a local account's session token (ADR 0024): the account as the grant
+    /// providers admitted it (its verified login among it, #561), with a team operator's `teams`.
     #[cfg(feature = "accounts")]
-    fn local(
-        subject: String,
-        operator: bool,
-        groups: Vec<String>,
-        teams: Vec<String>,
-        grant: crate::grant::Grant,
-    ) -> Self {
+    fn local(admitted: crate::grant::Admitted, teams: Vec<String>) -> Self {
         Session {
-            subject: Some(subject),
-            operator,
-            groups,
-            teams,
-            grant: Some(grant),
-            login: None,
-            github: None,
             account: true,
+            ..Session::admitted(admitted, teams)
         }
     }
 
@@ -542,6 +530,8 @@ async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
         "/api/v1/account/password" => accounts::PASSWORD_BODY_MAX,
         #[cfg(feature = "accounts")]
         "/api/v1/account/tokens" => accounts::TOKENS_BODY_MAX,
+        #[cfg(feature = "accounts")]
+        "/api/v1/account/github" => accounts::GITHUB_BODY_MAX,
         #[cfg(feature = "accounts")]
         path if (path.strip_prefix("/api/v1/")).is_some_and(accounts::is_administration) => {
             accounts::ADMIN_BODY_MAX
@@ -1100,8 +1090,8 @@ impl Console {
         }
         // Under break glass the first two are the only routes of local accounts: account
         // administration, agent tokens and login verification do not exist there (ADR 0024). The
-        // password change and agent tokens are a local account's own: an identity provider's
-        // session gets the 404.
+        // password change, agent tokens and the verified login are a local account's own: an
+        // identity provider's session gets the 404.
         #[cfg(feature = "accounts")]
         if let Some(local) = &self.accounts {
             match (route, *method == Method::POST) {
@@ -1112,6 +1102,14 @@ impl Console {
                 // Agent tokens do not exist under break glass (ADR 0024, #563).
                 (accounts::TOKENS, true) if session.account && !local.break_glass => {
                     return self.agent_token(local, request.body(), session);
+                }
+                // The verified login (#561), with `[accounts.github]` alone: never under break
+                // glass, which refuses the table.
+                (accounts::GITHUB, true) if session.account && !local.break_glass => {
+                    return self.verify_github(local, request.body(), session);
+                }
+                (accounts::GITHUB_REMOVE, true) if session.account && !local.break_glass => {
+                    return self.remove_own_github(local, session);
                 }
                 _ => {}
             }

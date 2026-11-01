@@ -105,7 +105,7 @@ const OVERAGES: [&str; 2] = ["ignore", "directory"];
 
 /// `[oidc.github] roles` by default: GitHub's five built-in repository roles, as `role_name`
 /// spells them.
-const ROLES: [&str; 5] = ["read", "triage", "write", "maintain", "admin"];
+pub(crate) const ROLES: [&str; 5] = ["read", "triage", "write", "maintain", "admin"];
 /// The shortest `[oidc.github] max_age_seconds`.
 const MAX_AGE_MIN: i64 = 60;
 
@@ -167,20 +167,61 @@ struct GithubFile {
     max_age_seconds: Option<i64>,
 }
 
+/// The keys of a GitHub grant provider's table, as its errors name them: the table, `host`,
+/// `roles` and `max_age_seconds`. `[oidc.github]`'s, and `[accounts.github]`'s (#561).
+pub(crate) type GithubKeys = [&'static str; 4];
+
+/// The GitHub grant provider a table configures with `host`, `roles` and `max_age_seconds`
+/// (ADR 0016), whichever table it is (`keys`): `[oidc.github]` or `[accounts.github]` (#561).
+pub(crate) fn github_provider(
+    keys: GithubKeys,
+    host: Option<String>,
+    roles: Option<Vec<String>>,
+    max_age_seconds: Option<i64>,
+) -> Result<Github, crate::modules::Problem> {
+    let [table, host_key, roles_key, max_age_key] = keys;
+    // Without the data layer there is no permissions set to read or write.
+    if !cfg!(feature = "postgres") {
+        let (section, feature) = (table, "postgres");
+        return Err((table, Msg::NeedsFeature { section, feature }.text()));
+    }
+    let host = host.unwrap_or_else(|| "github.com".into());
+    let named = !host.is_empty()
+        && (host.bytes()).all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.'));
+    if !named {
+        return Err((host_key, Msg::OidcGithubHost.text()));
+    }
+    let roles = roles.unwrap_or_else(|| ROLES.map(str::to_string).to_vec());
+    let distinct = (roles.iter().enumerate()).all(|(n, r)| !roles[..n].contains(r));
+    if roles.is_empty() || !roles.iter().all(|r| role_ok(r)) || !distinct {
+        return Err((roles_key, Msg::OidcGithubRoles(ROLE_MAX).text()));
+    }
+    let Some(max_age) = max_age_seconds else {
+        return Err((table, Msg::KeyMissing(max_age_key).text()));
+    };
+    let floor = max_age_min();
+    let max_age = crate::modules::at_least(max_age_key, Some(max_age), floor, floor)?;
+    Ok(Github {
+        host,
+        roles,
+        max_age: Duration::from_secs(max_age),
+        #[cfg(feature = "postgres")]
+        postgres: None,
+        #[cfg(feature = "workspaces")]
+        catalog: false,
+    })
+}
+
 impl GithubFile {
     /// The `login_claim` and the GitHub grant provider the table configures.
     fn validate(self) -> Result<(String, Github), crate::modules::Problem> {
-        // Without the data layer there is no permissions set to read or write.
-        if !cfg!(feature = "postgres") {
-            let (section, feature) = ("oidc.github", "postgres");
-            return Err(("oidc.github", Msg::NeedsFeature { section, feature }.text()));
-        }
-        let host = self.host.unwrap_or_else(|| "github.com".into());
-        let named = !host.is_empty()
-            && (host.bytes()).all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.'));
-        if !named {
-            return Err(("oidc.github.host", Msg::OidcGithubHost.text()));
-        }
+        let keys = [
+            "oidc.github",
+            "oidc.github.host",
+            "oidc.github.roles",
+            "oidc.github.max_age_seconds",
+        ];
+        let github = github_provider(keys, self.host, self.roles, self.max_age_seconds)?;
         let login_claim = match self.login_claim {
             None => {
                 let missing = Msg::KeyMissing("oidc.github.login_claim").text();
@@ -190,26 +231,6 @@ impl GithubFile {
                 return Err(("oidc.github.login_claim", Msg::OidcEmpty.text()));
             }
             Some(claim) => claim,
-        };
-        let roles = (self.roles).unwrap_or_else(|| ROLES.map(str::to_string).to_vec());
-        let distinct = (roles.iter().enumerate()).all(|(n, r)| !roles[..n].contains(r));
-        if roles.is_empty() || !roles.iter().all(|r| role_ok(r)) || !distinct {
-            return Err(("oidc.github.roles", Msg::OidcGithubRoles(ROLE_MAX).text()));
-        }
-        let key = "oidc.github.max_age_seconds";
-        let Some(max_age) = self.max_age_seconds else {
-            return Err(("oidc.github", Msg::KeyMissing(key).text()));
-        };
-        let floor = max_age_min();
-        let max_age = crate::modules::at_least(key, Some(max_age), floor, floor)?;
-        let github = Github {
-            host,
-            roles,
-            max_age: Duration::from_secs(max_age),
-            #[cfg(feature = "postgres")]
-            postgres: None,
-            #[cfg(feature = "workspaces")]
-            catalog: false,
         };
         Ok((login_claim, github))
     }

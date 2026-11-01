@@ -145,6 +145,7 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
             "change_required",
             "created",
             "created_by",
+            "github_login",
             "groups",
             "locked_until",
             "password_changed",

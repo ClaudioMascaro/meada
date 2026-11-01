@@ -46,6 +46,20 @@ export function changeCheck(current: string, next: string, repeat: string, t: Ac
   return undefined;
 }
 
+/** The message of a refused login verification or removal (#561): each refusal the server names, never GitHub's own text. */
+export function githubProblem(problem: unknown, t: AccountCopy): string {
+  if (problem instanceof ApiError) {
+    const known: Record<string, string | undefined> = {
+      '422 github_refused': t.githubRefused, '422 invalid_token': t.githubInvalidToken, '422 invalid_login': t.githubInvalidLogin,
+      '409 login_taken': t.githubTaken, '503 github_unavailable': t.githubUnavailable, '503 audit_unavailable': t.signInAudit,
+      '403 forbidden': t.githubForbidden,
+    };
+    const found = known[`${problem.status} ${problem.code}`];
+    if (found) return found;
+  }
+  return t.githubFailed;
+}
+
 /** `POST account/tokens`'s answer, shown once (#560). */
 export interface AgentToken { token: string; expires_at: string; surface: string }
 

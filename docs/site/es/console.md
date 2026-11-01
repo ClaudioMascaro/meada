@@ -143,6 +143,19 @@ Un nodo con `[accounts]` y sin `[oidc]` admite estos tokens en `meada mcp --list
   "headers": {"Authorization": "Bearer <token de agente>"}}}}
 ```
 
+### Login de GitHub verificado
+
+Con `[accounts.github]`, el proveedor de concesión de GitHub de las cuentas locales, una persona prueba su login de GitHub una vez y sus roles en GitHub pasan a concederle repositorios, como lo hace `login_claim` con un proveedor de identidad. La sección tiene las claves de `[oidc.github]` sin `login_claim` (`host`, `roles`, `max_age_seconds`) y `api`, el endpoint REST de GitHub de ese host (`https://api.github.com` por defecto en `github.com`, obligatorio en cualquier otro host, `https` o `http` en loopback):
+
+```toml
+[accounts.github]
+host = "github.com"
+roles = ["write", "maintain", "admin"]
+max_age_seconds = 5400
+```
+
+En la página de perfil, la persona pega un token de acceso personal de GitHub (basta uno de granularidad fina sin ningún permiso). `POST /api/v1/account/github` con `{"token": "..."}` hace que la consola llame a `GET /user` en `api` una sola vez, guarde el login en minúsculas y descarte el token: nunca se guarda, se registra en logs ni en la auditoría, ni se envía a otro lugar. La respuesta trae el login y un token de sesión nuevo que lo lleva. Un login que otra cuenta ya verificó es un 409 `login_taken`; el rechazo de GitHub es un 422 `github_refused`, y GitHub fuera de alcance un 503 `github_unavailable`, ninguno repitiendo la respuesta de GitHub. `POST /api/v1/account/github/remove` quita el propio login, y el operador global quita el de cualquier cuenta con la acción `remove_github` de la página de cuentas. Los tokens de sesión y de agente llevan el login verificado, y la concesión de GitHub, leída del conjunto de permisos que graba la comprobación de roles del job (`meada github-app roles` lee `[accounts.github]`), se suma a la de los grupos en la consola, en los nodos, en las adiciones de un operador de equipo (`added_by`) y en la columna `login` de la auditoría. Un token emitido antes de una remoción mantiene el login hasta expirar. Cada verificación y remoción queda registrada como `account.github` (con el login) y `account.remove_github`.
+
 ### Break glass
 
 Al configurar `[oidc]`, el inicio de sesión local se apaga para todas las cuentas: `[accounts]` junto a `[oidc]` es un error, salvo que lleve `break_glass = true`. Entonces solo la cuenta predeterminada `admin` entra en la consola, como operador global, junto a los tokens del proveedor de identidad, para cuando este está caído:

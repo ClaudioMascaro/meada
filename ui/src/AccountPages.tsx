@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import { accountCopy } from './account-i18n';
-import { changeCheck, changeProblem, signInProblem, tokenProblem } from './account';
+import { changeCheck, changeProblem, githubProblem, signInProblem, tokenProblem } from './account';
 import type { AgentToken } from './account';
 import type { Api, Session } from './api';
 import { copy } from './i18n';
@@ -164,8 +164,60 @@ export function AgentTokenForm({ api, locale }: { api: Api; locale: Language }) 
   </form>;
 }
 
-/** The profile: who the session is, the voluntary password change, agent tokens (never under break glass, which has none) and sign-out. */
-export function ProfilePage({ api, auth, locale, session }: { api: Api; auth: LocalAuth; locale: Language; session: Session }) {
+/**
+ * The verified GitHub login (#561), with the GitHub grant provider of local accounts: the login the
+ * session carries, a personal access token pasted to verify one (sent once, held in the form alone
+ * and cleared after), and its removal. Each success swaps the session token and reads the session
+ * again, so the page shows the login, the host and the grant's state at once.
+ */
+export function GithubLoginForm({ api, auth, locale, session, onSession }: {
+  api: Api; auth: LocalAuth; locale: Language; session: Session; onSession: (session: Session) => void;
+}) {
+  const t = accountCopy[locale];
+  const token = useId();
+  const hint = useId();
+  // Which request runs: the verification or the removal, so each button names its own.
+  const [pending, setPending] = useState<'verify' | 'remove'>();
+  const busy = pending !== undefined;
+  const [problem, setProblem] = useState<string>();
+  const [done, setDone] = useState<string>();
+
+  async function run(pasted: string | undefined, message: string) {
+    setPending(pasted === undefined ? 'remove' : 'verify'); setProblem(undefined); setDone(undefined);
+    try {
+      await auth.github(pasted);
+      onSession(await api.session());
+      setDone(message);
+    } catch (error) { setProblem(githubProblem(error, t)); }
+    setPending(undefined);
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const pasted = String(new FormData(form).get('token') ?? '');
+    form.reset();
+    await run(pasted, t.githubVerified);
+  }
+
+  return <form className="account-form" onSubmit={event => { void submit(event); }} aria-busy={busy}>
+    <h2>{t.githubTitle}</h2><p className="intro">{t.githubIntro}</p>
+    <p role="status">{session.login ? `${t.githubVerifiedAs} ${session.login}` : t.githubNone}</p>
+    <label htmlFor={token}>{t.githubToken}</label>
+    <input id={token} name="token" type="password" autoComplete="off" spellCheck={false} aria-describedby={hint} required />
+    <p id={hint} className="hint">{t.githubTokenHint}</p>
+    {problem && <p className="error" role="alert">{problem}</p>}
+    {done && <p className="notice" role="status">{done}</p>}
+    <button type="submit" disabled={busy}>{pending === 'verify' ? t.githubVerifying : t.githubVerify}</button>
+    {session.login && <button type="button" className="secondary" disabled={busy}
+      onClick={() => { void run(undefined, t.githubRemoved); }}>{pending === 'remove' ? t.githubRemoving : t.githubRemove}</button>}
+  </form>;
+}
+
+/** The profile: who the session is, the voluntary password change, agent tokens and the verified GitHub login (never under break glass, which has neither) and sign-out. */
+export function ProfilePage({ api, auth, locale, session, onSession }: {
+  api: Api; auth: LocalAuth; locale: Language; session: Session; onSession: (session: Session) => void;
+}) {
   const t = accountCopy[locale];
   const common = copy[locale];
   return <>
@@ -175,6 +227,8 @@ export function ProfilePage({ api, auth, locale, session }: { api: Api; auth: Lo
     </div>)}</dl>
     <PasswordForm auth={auth} locale={locale} title={t.changeTitle} level={2} />
     {auth.config.break_glass !== true && <AgentTokenForm api={api} locale={locale} />}
+    {auth.config.break_glass !== true && session.github_host !== undefined &&
+      <GithubLoginForm api={api} auth={auth} locale={locale} session={session} onSession={onSession} />}
     <button type="button" className="secondary sign-out" onClick={() => auth.clear()}>{common.signOut}</button>
   </>;
 }

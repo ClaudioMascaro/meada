@@ -1,12 +1,13 @@
 //! The accounts table (ADR 0024, migration 9): one row per local account in `[postgres] schema`,
 //! read and written by the console, and by `meada ui reset-admin` (`reset_admin`). Each call
 //! opens its own connection through `postgres::connected`, so a schema version this binary does
-//! not know counts as unreachable, and is bounded as the audit's calls are. Every row is hostile when read: one that fails its
-//! checks admits nothing (`Attempt::Bad`), and its reader writes one line naming the table, never
-//! a value. A password attempt (`attempt`) holds the row while it checks and counts. Account
-//! administration (`list`, `create`, `change`, #557, groups #558) is the global operator's; a
-//! change that could leave no active operator runs under the schema's advisory lock, so two at
-//! once never do.
+//! not know counts as unreachable, and is bounded as the audit's calls are. Every row is hostile
+//! when read: one that fails its checks admits nothing (`Attempt::Bad`), and its reader writes one
+//! line naming the table, never a value. A password attempt (`attempt`) holds the row while it
+//! checks and counts. Account administration (`list`, `create`, `change`, #557, groups #558) is
+//! the global operator's; a person's own verified login (`Change::Github`, `Change::RemoveGithub`,
+//! #561) goes through `change` too. A change that could leave no active operator runs under the
+//! schema's advisory lock, so two at once never do.
 //! A console write first reads its account's `standing`.
 
 use crate::accounts::{Role, groups_ok, is_hash, username_of, username_ok};
@@ -23,6 +24,8 @@ pub struct Account {
     pub groups: Vec<String>,
     pub change_required: bool,
     pub suspended: bool,
+    /// Its verified GitHub login (#561), lowercase.
+    pub login: Option<String>,
 }
 
 /// Why an attempt on an account's password is refused, as the audit records it.
@@ -97,8 +100,8 @@ pub fn attempt(
         let tx = opened.client.transaction().await.map_err(&scrub)?;
         let sql = format!(
             "SELECT username, password_hash, role, groups, change_required, suspended, \
-             locked_until IS NOT NULL AND locked_until > now(), failures FROM {quoted}.accounts \
-             WHERE username = $1 FOR UPDATE"
+             github_login, locked_until IS NOT NULL AND locked_until > now(), failures \
+             FROM {quoted}.accounts WHERE username = $1 FOR UPDATE"
         );
         let rows = tx.query(&sql, &[&username]).await.map_err(&scrub)?;
         let Some(row) = rows.first() else {
@@ -107,8 +110,8 @@ pub fn attempt(
         let Some(account) = checked(row, username) else {
             return Ok(Attempt::Bad);
         };
-        let locked: bool = row.try_get(6).map_err(&scrub)?;
-        let failures: i32 = row.try_get(7).map_err(&scrub)?;
+        let locked: bool = row.try_get(7).map_err(&scrub)?;
+        let failures: i32 = row.try_get(8).map_err(&scrub)?;
         if locked {
             return Ok(Attempt::Unchecked(account, Refusal::Locked));
         }
@@ -158,12 +161,14 @@ pub fn attempt(
     crate::modules::within(config.bound(5), run, Msg::PostgresTimeout)
 }
 
-/// `row`, the one `username` named, when every column passes its check.
+/// `row`, the one `username` named, when every column passes its check: its first seven columns
+/// are `username, password_hash, role, groups, change_required, suspended, github_login`.
 fn checked(row: &tokio_postgres::Row, username: &str) -> Option<Account> {
     let name: String = row.try_get(0).ok()?;
     let hash: String = row.try_get(1).ok()?;
     let role = Role::of(&row.try_get::<_, String>(2).ok()?)?;
     let groups: Vec<String> = row.try_get(3).ok()?;
+    let login = login_of(row, 6)?;
     if name != username || !username_ok(&name) || !is_hash(&hash) || !groups_ok(&groups) {
         return None;
     }
@@ -174,7 +179,18 @@ fn checked(row: &tokio_postgres::Row, username: &str) -> Option<Account> {
         groups,
         change_required: row.try_get(4).ok()?,
         suspended: row.try_get(5).ok()?,
+        login,
     })
+}
+
+/// The verified login in column `i` of `row`: `Some(None)` when there is none, `None` when it is
+/// no login as the GitHub grant provider stores one (a hostile row).
+fn login_of(row: &tokio_postgres::Row, i: usize) -> Option<Option<String>> {
+    let login: Option<String> = row.try_get(i).ok()?;
+    match login {
+        Some(login) if !crate::grant::login_ok(&login) => None,
+        login => Some(login),
+    }
 }
 
 /// Replaces the stored hash `old` of `username` by `new`, the same password under the console's
@@ -304,7 +320,8 @@ fn listed_columns() -> String {
         "username, role, suspended, CASE WHEN locked_until > now() THEN \
          to_char(locked_until AT TIME ZONE 'UTC', {TIME}) END, change_required, \
          to_char(password_changed AT TIME ZONE 'UTC', {TIME}), \
-         to_char(created AT TIME ZONE 'UTC', {TIME}), created_by, password_hash, groups"
+         to_char(created AT TIME ZONE 'UTC', {TIME}), created_by, password_hash, groups, \
+         github_login"
     )
 }
 
@@ -324,6 +341,8 @@ pub struct Listed {
     pub created_by: Option<String>,
     /// Its groups, as stored (#558).
     pub groups: Vec<String>,
+    /// Its verified GitHub login (#561).
+    pub github_login: Option<String>,
 }
 
 impl Listed {
@@ -351,6 +370,7 @@ fn listed(row: &tokio_postgres::Row) -> Option<Listed> {
     let created_by: Option<String> = row.try_get(7).ok()?;
     let hash: String = row.try_get(8).ok()?;
     let groups: Vec<String> = row.try_get(9).ok()?;
+    let github_login = login_of(row, 10)?;
     let creator_ok = created_by
         .as_deref()
         .is_none_or(|s| username_of(s).is_some());
@@ -367,6 +387,7 @@ fn listed(row: &tokio_postgres::Row) -> Option<Listed> {
         created: time(6)??,
         created_by,
         groups,
+        github_login,
     })
 }
 
@@ -440,6 +461,10 @@ pub enum Change {
         hash: String,
         change_required: bool,
     },
+    /// The verified login set (#561): lowercase, a login.
+    Github(String),
+    /// The verified login removed (#561); none already is no error.
+    RemoveGithub,
 }
 
 /// What a creation or a change found and did.
@@ -453,6 +478,10 @@ pub enum Changed {
     Bad,
     /// The change would leave no active operator: nothing changed.
     LastOperator,
+    /// The login another account holds (#561): nothing changed.
+    LoginTaken,
+    /// A verified login set on a suspended account (#561): nothing changed.
+    Suspended,
     /// Done: the account as listed after it, `None` when that row fails its checks.
     Done(Option<Listed>),
 }
@@ -482,13 +511,19 @@ pub fn change(config: &Config, username: &str, change: &Change) -> Result<Change
         let (Some(role), Some(suspended)) = (role, suspended) else {
             return Ok(Changed::Bad);
         };
+        // A login is verified by its own account, which may have been suspended since the console
+        // read its row (the call to GitHub lies between).
+        if suspended && matches!(change, Change::Github(_)) {
+            return Ok(Changed::Suspended);
+        }
         let removes = matches!(change, Change::Role(Role::Viewer) | Change::Suspend);
         if removes && role == Role::Operator && !suspended {
             // The other active operators that can sign in: a row failing its checks admits
             // nothing, so it never counts as one.
             let others = format!(
-                "SELECT username, password_hash, role, groups, change_required, suspended \
-                 FROM {quoted}.accounts WHERE role = $2 AND NOT suspended AND username <> $1"
+                "SELECT username, password_hash, role, groups, change_required, suspended, \
+                 github_login FROM {quoted}.accounts \
+                 WHERE role = $2 AND NOT suspended AND username <> $1"
             );
             let operator = Role::Operator.name();
             let others = tx.query(&others, &[&username, &operator]).await;
@@ -525,6 +560,22 @@ pub fn change(config: &Config, username: &str, change: &Change) -> Result<Change
                     [&username, hash, change_required];
                 tx.query_one(&sql, &values).await
             }
+            Change::Github(login) => {
+                let row = tx
+                    .query_one(&set("github_login = $2"), &[&username, login])
+                    .await;
+                // The column is unique: another account's login is no change (the transaction
+                // rolls back when it is dropped).
+                let unique = Some(&tokio_postgres::error::SqlState::UNIQUE_VIOLATION);
+                if row.as_ref().is_err_and(|e| e.code() == unique) {
+                    return Ok(Changed::LoginTaken);
+                }
+                row
+            }
+            Change::RemoveGithub => {
+                let sql = set("github_login = NULL");
+                tx.query_one(&sql, &[&username]).await
+            }
         };
         let done = listed(&row.map_err(&scrub)?);
         tx.commit().await.map_err(&scrub)?;
@@ -542,8 +593,8 @@ pub enum Standing {
     /// A row that fails its checks: it admits nothing.
     Bad,
     Suspended,
-    /// Active, with its role and groups now.
-    Active(Role, Vec<String>),
+    /// Active, with its role, groups and verified login (#561) now.
+    Active(Role, Vec<String>, Option<String>),
 }
 
 /// The standing of the account `username` now.
@@ -551,7 +602,7 @@ pub fn standing(config: &Config, username: &str) -> Result<Standing, String> {
     let run = async {
         let opened = crate::postgres::connected(config).await?;
         let sql = format!(
-            "SELECT role, groups, suspended FROM {}.accounts WHERE username = $1",
+            "SELECT role, groups, suspended, github_login FROM {}.accounts WHERE username = $1",
             config.quoted()
         );
         let rows = (opened.client).query(&sql, &[&username]).await;
@@ -564,11 +615,12 @@ pub fn standing(config: &Config, username: &str) -> Result<Standing, String> {
     let role = row.try_get::<_, String>(0).ok().and_then(|r| Role::of(&r));
     let groups = row.try_get::<_, Vec<String>>(1).ok();
     let suspended = row.try_get::<_, bool>(2).ok();
-    Ok(match (role, groups, suspended) {
-        (Some(role), Some(groups), Some(false)) if groups_ok(&groups) => {
-            Standing::Active(role, groups)
+    let login = login_of(row, 3);
+    Ok(match (role, groups, suspended, login) {
+        (Some(role), Some(groups), Some(false), Some(login)) if groups_ok(&groups) => {
+            Standing::Active(role, groups, login)
         }
-        (Some(_), Some(groups), Some(true)) if groups_ok(&groups) => Standing::Suspended,
+        (Some(_), Some(groups), Some(true), Some(_)) if groups_ok(&groups) => Standing::Suspended,
         _ => Standing::Bad,
     })
 }

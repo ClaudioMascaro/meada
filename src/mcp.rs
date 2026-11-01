@@ -586,8 +586,9 @@ impl Gate {
             let grant = tokio::task::block_in_place(admit)?;
             return Ok(Pass { grant: Some(grant) });
         }
-        // An agent token for the nodes: its groups through the grant providers, every repository
-        // with no table, as the console computes a local session's grant (ADR 0024).
+        // An agent token for the nodes: its groups and verified login (#561) through the grant
+        // providers, every repository with no table, as the console computes a local session's
+        // grant (ADR 0024).
         #[cfg(feature = "accounts")]
         if let Some(local) = &self.local {
             let claims = local.admit(request.headers()).map_err(|sent| {
@@ -597,7 +598,8 @@ impl Gate {
                 };
                 Box::new(challenged(StatusCode::UNAUTHORIZED, challenge))
             })?;
-            let grant = self.providers.local(&claims.groups);
+            let login = claims.login.as_deref();
+            let grant = self.providers.local(&claims.groups, login).union();
             return Ok(Pass { grant: Some(grant) });
         }
         let _ = (request, path, identity);

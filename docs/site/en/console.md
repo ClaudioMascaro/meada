@@ -143,6 +143,19 @@ A node with `[accounts]` and no `[oidc]` admits these tokens on `meada mcp --lis
   "headers": {"Authorization": "Bearer <agent token>"}}}}
 ```
 
+### Verified GitHub login
+
+With `[accounts.github]`, the GitHub grant provider of local accounts, a person proves their GitHub login once and their GitHub roles then grant them repositories, as `login_claim` does under an identity provider. The section takes `[oidc.github]`'s keys without `login_claim` (`host`, `roles`, `max_age_seconds`) and `api`, the GitHub REST endpoint of that host (`https://api.github.com` by default on `github.com`, required on any other host, `https` or loopback `http`):
+
+```toml
+[accounts.github]
+host = "github.com"
+roles = ["write", "maintain", "admin"]
+max_age_seconds = 5400
+```
+
+On the profile page, the person pastes a GitHub personal access token (a fine-grained one with no permission is enough). `POST /api/v1/account/github` with `{"token": "..."}` makes the console call `GET /user` on `api` once, keep the login in lowercase and discard the token: it is never stored, logged, audited or sent anywhere else. The answer carries the login and a fresh session token that holds it. A login another account already verified is a 409 `login_taken`; GitHub's refusal is a 422 `github_refused`, and GitHub out of reach a 503 `github_unavailable`, neither echoing GitHub's answer. `POST /api/v1/account/github/remove` removes one's own login, and the global operator removes anyone's with the accounts page's `remove_github` action. Session and agent tokens carry the verified login, and the GitHub grant, read from the permissions set the job's role check writes (`meada github-app roles` reads `[accounts.github]`), joins the groups grant in the console, on nodes, in a team operator's additions (`added_by`) and in the audit's `login` column. A token issued before a removal keeps the login until it expires. Each verification and removal is recorded `account.github` (with the login) and `account.remove_github`.
+
 ### Break glass
 
 Configuring `[oidc]` turns local sign-in off for every account: `[accounts]` beside `[oidc]` is an error unless it carries `break_glass = true`. Then only the default account `admin` signs in to the console, as the global operator, beside the identity provider's tokens, for when the identity provider is down:

@@ -5,7 +5,9 @@
 //! refusals, and `reset-admin`'s refusals before Postgres, need no service; the rest run against
 //! the local Postgres of `MEADA_TEST_POSTGRES_URL`, each test in a schema of its own, and skip
 //! without it; the save as the global operator also needs the fleet's Valkey and store. Break
-//! glass beside `[oidc]` (#563) is `break_glass`; agent tokens for the nodes (#560) `tokens`.
+//! glass beside `[oidc]` (#563) is `break_glass`; agent tokens for the nodes (#560) `tokens`; the
+//! verified login of `[accounts.github]` (#561) `github`, and a local team operator's additions
+//! under it `ui::oidc::additions`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -20,6 +22,8 @@ use crate::server::Server;
 
 mod administration;
 mod break_glass;
+#[cfg(feature = "github-app")]
+mod github;
 mod groups;
 mod tokens;
 
@@ -112,6 +116,26 @@ fn the_section_s_rules_name_their_sections_and_keys() {
             format!("{postgres}{both}"),
             ui.clone(),
             "`accounts.public_key_file`: is set together with public_key_env",
+        ),
+        // `[accounts.github]` (#561): `api` is GitHub's by default on `github.com` alone.
+        (
+            "accounts_github_no_api",
+            format!(
+                "{postgres}{}[accounts.github]\nhost = \"ghe.example\"\nmax_age_seconds = 60\n",
+                section()
+            ),
+            ui.clone(),
+            "`accounts.github`: `accounts.github.api` is missing",
+        ),
+        (
+            "accounts_github_plain_api",
+            format!(
+                "{postgres}{}[accounts.github]\napi = \"http://api.github.com\"\n\
+                 max_age_seconds = 60\n",
+                section()
+            ),
+            ui.clone(),
+            "`accounts.github.api`: must be an https:// URL",
         ),
     ] {
         let dir = console_dir(case, Some(VERSION), &head, &ui);

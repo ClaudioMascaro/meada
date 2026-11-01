@@ -39,6 +39,13 @@ pub(crate) fn role_ok(role: &str) -> bool {
     (1..=ROLE_MAX).contains(&role.chars().count()) && !role.chars().any(char::is_control)
 }
 
+/// Whether `login` is a GitHub login as the GitHub grant provider stores and compares it: 1 to 39
+/// ASCII letters, digits, `-` and `_`, already lowercase. A verified login (#561) is one.
+#[cfg(feature = "accounts")]
+pub fn login_ok(login: &str) -> bool {
+    permissions::login(Some(login)).as_deref() == Some(login)
+}
+
 /// What an admitted subject may read.
 #[derive(Clone)]
 pub enum Grant {
@@ -236,20 +243,24 @@ impl Providers {
         }
     }
 
-    /// Whether a table bounds the grant: the groups table or the GitHub grant provider. Without
-    /// either, a local account reads every repository (ADR 0024).
+    /// A local account's grant by side (ADR 0024): what its `groups` map to and, with the GitHub
+    /// grant provider (`[accounts.github]`, #561), the GitHub grant of its verified `login`, when
+    /// a table bounds it (`bounds`); every repository otherwise.
     #[cfg(feature = "accounts")]
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
-    /// A local account's grant (ADR 0024): what its `groups` map to when a table bounds it
-    /// (`bounds`), every repository otherwise; no login yet.
-    #[cfg(feature = "accounts")]
-    pub fn local(&self, groups: &[String]) -> Grant {
+    pub fn local(&self, groups: &[String], login: Option<&str>) -> Granted {
         match self.bounds() {
-            true => self.grant(groups, None).union(),
-            false => Grant::All,
+            true => self.grant(groups, login),
+            false => Granted {
+                claims: Grant::All,
+                login: None,
+                github: None,
+            },
         }
     }
 
+    /// Whether a table bounds the grant: the groups table or the GitHub grant provider. Without
+    /// either, a local account reads every repository (ADR 0024).
+    #[cfg(feature = "accounts")]
     pub fn bounds(&self) -> bool {
         self.groups.is_some() || self.github().is_some()
     }

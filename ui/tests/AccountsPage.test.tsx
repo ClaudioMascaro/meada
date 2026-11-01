@@ -49,10 +49,11 @@ const type = (label: string, value: string) => fireEvent.change(getByLabelText(h
 test('the view model marks suspended accounts in text and says until when a locked one is locked', () => {
   const t = accountsCopy.en;
   expect(accountsModel([ana, bob, cy], t)).toEqual([
-    { username: 'ana', role: 'Viewer', groups: 'team-web, team-ui', state: 'Active', change: 'Yes', changed: '2026-10-30T10:00:00Z' },
-    { username: 'bob', role: 'Operator', groups: 'None', state: 'Suspended', change: 'No', changed: '2026-10-30T10:00:00Z' },
-    { username: 'cy', role: 'Viewer', groups: 'team-web, team-ui', state: 'Locked until 2026-11-01T12:15:00Z', change: 'Yes', changed: '2026-10-30T10:00:00Z' },
+    { username: 'ana', role: 'Viewer', groups: 'team-web, team-ui', state: 'Active', change: 'Yes', changed: '2026-10-30T10:00:00Z', login: 'None' },
+    { username: 'bob', role: 'Operator', groups: 'None', state: 'Suspended', change: 'No', changed: '2026-10-30T10:00:00Z', login: 'None' },
+    { username: 'cy', role: 'Viewer', groups: 'team-web, team-ui', state: 'Locked until 2026-11-01T12:15:00Z', change: 'Yes', changed: '2026-10-30T10:00:00Z', login: 'None' },
   ]);
+  expect(accountsModel([{ ...ana, github_login: 'ana-souza' }], t)[0]!.login).toBe('ana-souza');
   expect(accountsModel([cy], accountsCopy['pt-BR'])[0]!.state).toBe('Bloqueada até 2026-11-01T12:15:00Z');
 });
 
@@ -194,4 +195,29 @@ test('the audit page projects every account action in both languages and the rol
     rows.forEach((row, i) => { expect(row.action).toBe(`${auditCopy[locale].actions[actions[i]!]} (${actions[i]})`); expect(row.role).toBe(auditCopy[locale].none); });
   }
   expect(auditModel({ records: [{ ...records[0]!, action: 'workspace.save' }], next: null }, auditCopy.en)[0]!.action).toBe('workspace.save');
+});
+
+test.each(['en', 'pt-BR'] as const)('the list shows each verified GitHub login and offers its removal through the dialog in %s', async locale => {
+  const t = accountsCopy[locale];
+  const verified = { ...ana, github_login: 'ana-souza' };
+  const fetch = vi.fn().mockResolvedValueOnce(Response.json({ accounts: [verified, bob] }))
+    .mockResolvedValueOnce(Response.json({ account: { ...ana, github_login: null } }));
+  fetch.mockImplementation(() => Promise.resolve(Response.json({ accounts: [{ ...ana, github_login: null }, bob] })));
+  vi.stubGlobal('fetch', fetch);
+  await open(locale);
+  expect(getByRole(host, 'columnheader', { name: t.login })).toBeDefined();
+  const rows = getAllByRole(host, 'row').slice(1);
+  expect(rows[0]!.textContent).toContain('ana-souza');
+  expect(rows[1]!.textContent).toContain(t.none);
+  // Only an account with a verified login offers its removal.
+  expect(within(rows[1]!).queryByRole('button', { name: `${t.removeGithub}: bob` })).toBeNull();
+  await act(async () => { fireEvent.click(getByRole(host, 'button', { name: `${t.removeGithub}: ana` })); });
+  const dialog = getByRole(host, 'dialog', { hidden: true });
+  expect(within(dialog).getByRole('heading', { hidden: true }).textContent).toBe(`${t.removeGithubTitle} ana`);
+  expect(dialog.textContent).toContain(t.removeGithubNote);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: t.confirm, hidden: true })); });
+  expect(sent(fetch, 1)).toEqual({ route: '/api/v1/accounts/ana', body: { action: 'remove_github' } });
+  await waitFor(() => expect(queryByRole(host, 'dialog', { hidden: true })).toBeNull());
+  await waitFor(() => expect(queryByRole(host, 'button', { name: `${t.removeGithub}: ana` })).toBeNull());
 });

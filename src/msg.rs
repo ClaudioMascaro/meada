@@ -1089,6 +1089,36 @@ pub enum Msg<'a> {
     /// The audit message of an agent token issued.
     #[cfg(feature = "accounts")]
     AccountsTokenIssued,
+    /// `POST account/github` whose body does not parse (#561).
+    #[cfg(feature = "accounts")]
+    AccountsGithubBody,
+    /// A pasted personal access token that is no header value.
+    #[cfg(feature = "accounts")]
+    AccountsGithubToken,
+    /// A verified login change of a suspended or unknown account: the role refusal of the write.
+    #[cfg(feature = "accounts")]
+    AccountsGithubForbidden,
+    /// GitHub refused the pasted personal access token.
+    #[cfg(feature = "accounts")]
+    AccountsGithubRefused,
+    /// GitHub's `login` that is no login.
+    #[cfg(feature = "accounts")]
+    AccountsGithubLogin,
+    /// The stderr line of GitHub out of reach, with the reason (never the token nor the body).
+    #[cfg(feature = "accounts")]
+    AccountsGithubUnreachable(&'a str),
+    /// The answer of GitHub out of reach.
+    #[cfg(feature = "accounts")]
+    AccountsGithubUnavailable,
+    /// A login another account holds.
+    #[cfg(feature = "accounts")]
+    AccountsLoginTaken,
+    /// The audit message of a verified login stored.
+    #[cfg(feature = "accounts")]
+    AccountsGithubVerified,
+    /// The audit message of a verified login removed.
+    #[cfg(feature = "accounts")]
+    AccountsGithubRemoved,
     /// `[accounts]` beside `[oidc]` without `break_glass = true`: local sign-in is off once an
     /// identity provider is configured.
     #[cfg(feature = "accounts")]
@@ -2843,8 +2873,8 @@ impl Msg<'_> {
             ),
             #[cfg(feature = "github-app")]
             Msg::RolesNoGithub(manifest) => pick(
-                format!("{manifest}: meada github-app roles needs [oidc.github]"),
-                format!("{manifest}: meada github-app roles exige [oidc.github]"),
+                format!("{manifest}: meada github-app roles needs [oidc.github] or [accounts.github]"),
+                format!("{manifest}: meada github-app roles exige [oidc.github] ou [accounts.github]"),
             ),
             #[cfg(feature = "github-app")]
             Msg::RolesFenceEnv => pick(
@@ -3674,6 +3704,58 @@ impl Msg<'_> {
             Msg::AccountsTokenIssued => pick(
                 "agent token issued".into(),
                 "token de agente emitido".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubBody => pick(
+                "the body must be {\"token\": \"<a GitHub personal access token>\"}".into(),
+                "o corpo deve ser {\"token\": \"<um token de acesso pessoal do GitHub>\"}".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubToken => pick(
+                "a GitHub personal access token is visible ASCII characters, with no space".into(),
+                "um token de acesso pessoal do GitHub é feito de caracteres ASCII visíveis, sem \
+                 espaço"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubForbidden => pick(
+                "this account may not change its GitHub login: it is suspended or unknown".into(),
+                "esta conta não pode mudar seu login do GitHub: está suspensa ou não existe".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubRefused => pick(
+                "GitHub refused this personal access token".into(),
+                "o GitHub recusou este token de acesso pessoal".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubLogin => pick(
+                "GitHub answered with a login Meada does not take".into(),
+                "o GitHub respondeu com um login que o Meada não aceita".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubUnreachable(reason) => pick(
+                format!("GitHub out of reach for a login verification: {reason}"),
+                format!("GitHub fora de alcance para uma verificação de login: {reason}"),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubUnavailable => pick(
+                "GitHub could not be reached; try again later".into(),
+                "não foi possível alcançar o GitHub; tente de novo mais tarde".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsLoginTaken => pick(
+                "another account already verified this GitHub login".into(),
+                "outra conta já verificou este login do GitHub".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubVerified => pick(
+                "GitHub login verified".into(),
+                "login do GitHub verificado".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGithubRemoved => pick(
+                "GitHub login removed".into(),
+                "login do GitHub removido".into(),
             ),
             #[cfg(feature = "accounts")]
             Msg::AccountsBesideOidc => pick(

@@ -422,11 +422,25 @@ impl Manifest {
                     return Err(config::error_at(file, &src, key, &needs));
                 }
                 accounts.postgres = postgres.clone();
+                // `[accounts.github]` (#561) keeps its permissions set in the data layer, as
+                // `[oidc.github]` does; `[accounts]` already needed `[postgres]`. It never sits
+                // beside `[oidc.github]`: `[accounts]` beside `[oidc]` is break glass, which
+                // refuses the table.
+                if let Some(github) = accounts.github.as_mut() {
+                    github.postgres = postgres.clone();
+                }
             }
             section
         };
         #[cfg(feature = "oidc")]
         let github = oidc.as_ref().is_some_and(|o| o.github.is_some());
+        // `[workspaces]` keeps needing `[oidc.github]` itself until named workspaces take local
+        // accounts (#562).
+        #[cfg(feature = "workspaces")]
+        let oidc_github = github;
+        // The GitHub grant provider of local accounts counts as the provider (#561).
+        #[cfg(feature = "accounts")]
+        let github = github || accounts.as_ref().is_some_and(|a| a.github.is_some());
         #[cfg(not(feature = "oidc"))]
         let github = false;
         // `[catalog]` (#341) names its patterns on `[oidc.github] host` and is read by the role
@@ -509,7 +523,7 @@ impl Manifest {
             if section.is_some() {
                 let missing = [
                     ("ui", ui.is_none()),
-                    ("oidc.github", !github),
+                    ("oidc.github", !oidc_github),
                     ("catalog", catalog.is_none()),
                 ];
                 let missing: Vec<&str> = (missing.iter()).filter(|m| m.1).map(|m| m.0).collect();
@@ -566,7 +580,8 @@ impl Manifest {
         #[cfg(feature = "generation-pointer")]
         if store && pulled {
             let dir = index_dir.join(crate::snapshot::versions::DIR);
-            // Under `[oidc.github]` without the additions the role check left out (#331).
+            // Under the GitHub grant provider without the additions the role check left out
+            // (#331).
             let read = match github {
                 true => crate::snapshot::versions::eligible(&dir)?,
                 false => crate::snapshot::versions::pulled(&dir)?,
@@ -747,8 +762,9 @@ impl Manifest {
         Self::read_from(file, true)
     }
 
-    /// Whether the readers of the pulled version leave out what the exclusions file names:
-    /// `[oidc.github]` with `source = "store"` (#331).
+    /// Whether the readers of the pulled version leave out what the exclusions file names: the
+    /// GitHub grant provider (`[oidc.github]` or `[accounts.github]`) with `source = "store"`
+    /// (#331).
     #[cfg(feature = "generation-pointer")]
     pub(crate) fn excludes(&self) -> bool {
         #[cfg(feature = "oidc")]
@@ -759,18 +775,28 @@ impl Manifest {
     }
 
     /// The GitHub grant provider (ADR 0016), as `read` validated it with its `[postgres]` and
-    /// `[catalog]`: `[oidc.github]`. Every reader of the provider's settings (the grant at
-    /// admission, the role check, the catalog, named workspaces, the proposal server, `status`)
-    /// reaches it here.
+    /// `[catalog]`: `[oidc.github]`, or `[accounts.github]` (#561, never both). Every reader of
+    /// the provider's settings (the grant at admission, the role check, the catalog, named
+    /// workspaces, the proposal server, `status`) reaches it here.
     #[cfg(feature = "oidc")]
     pub(crate) fn github(&self) -> Option<&crate::grant::Github> {
-        self.oidc.as_ref().and_then(|oidc| oidc.github.as_ref())
+        let github = self.oidc.as_ref().and_then(|oidc| oidc.github.as_ref());
+        #[cfg(feature = "accounts")]
+        let github = github.or_else(|| self.accounts.as_ref()?.github.as_ref());
+        github
     }
 
     /// `github`, to change.
     #[cfg(feature = "proposals")]
     fn github_mut(&mut self) -> Option<&mut crate::grant::Github> {
-        self.oidc.as_mut().and_then(|oidc| oidc.github.as_mut())
+        if let Some(github) = self.oidc.as_mut().and_then(|oidc| oidc.github.as_mut()) {
+            return Some(github);
+        }
+        #[cfg(feature = "accounts")]
+        if let Some(github) = self.accounts.as_mut().and_then(|a| a.github.as_mut()) {
+            return Some(github);
+        }
+        None
     }
 
     /// The `[valkey]` section and the `[[github_app]]` blocks of the manifest at `file`,

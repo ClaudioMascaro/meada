@@ -546,7 +546,9 @@ one for the area a change touches.
   `accounts::Config::public`, and the issuer, the manifest's `[ui] public_url`, either missing
   refusing the start, `Msg::AccountsNodeIssuer`), which admits an agent token for the nodes
   (`accounts::NODES`) or answers 401 `Bearer` (`error="invalid_token"` for a token sent), and
-  whose grant is `Providers::grant` of the token's groups, or `*` when no table bounds it, the
+  whose grant is `Providers::local` of the token's groups and verified login (#561: the GitHub
+  grant of its `login` claim from the node's permissions cache under `[accounts.github]`), or `*`
+  when no table bounds it, the
   403 `Bearer error="insufficient_scope"` (`mcp::challenged`, no `resource_metadata`). A `Pass`
   carries only a `grant::Grant`, whichever verifier produced it: routing checks it at an
   endpoint (`Gate::refused`, the 403 in the admitting verifier's words) and filters every 404
@@ -873,7 +875,14 @@ one for the area a change touches.
   of each pair (`Msg::AccountsBoth`), names only, `break_glass` (false by default, #563) and
   `groups` (`[accounts.groups]`, #558: a group to the identities it grants, `*` for all, read as
   `[oidc.groups]` is and handed to `grant::Providers::of`; without it, nor the GitHub grant
-  provider, every local account reads every repository).
+  provider, every local account reads every repository) and `github` (`[accounts.github]`, #561:
+  `host`, `roles` and `max_age_seconds` checked by `oidc::github_provider`, the one check
+  `[oidc.github]` shares, with this table's keys in its errors, and `api`, `GITHUB_API` by default
+  on `github.com` and required on any other host (`Msg::KeyMissing` at `accounts.github`), `https`
+  or loopback `http` (`modules::reachable`, `Msg::OidcUrl` at `accounts.github.api`), kept without
+  its trailing slash in `Config::api`; `Manifest::read` gives `Config::github` its `[postgres]`,
+  and `Manifest::github` returns it when there is no `[oidc.github]`, so the grant, the role
+  check, the exclusions, `status` and the console read either table, never both).
   `Manifest::read` refuses, before the sections are parsed, `[accounts.groups]` or
   `[accounts.github]` under `break_glass = true` (`under_break_glass`,
   `Msg::AccountsUnderBreakGlass`, naming the table); then the section without `[postgres]`
@@ -894,15 +903,18 @@ one for the area a change touches.
   (an unset or empty variable is none; a file past `PASSWORD_FILE_MAX` refused naming it). `Keys`
   signs and verifies session tokens: EdDSA, `iss` the console's `[ui] public_url`, `aud`
   `CONSOLE` (`meada:console`), `sub` `local:<username>` (`SUBJECT_PREFIX`), `role` (`Role`,
-  `operator` or `viewer`), `groups`, `change_required` only when set, `iat`, `exp`
-  `SESSION_HOURS` (8) later; `Keys::agent` signs an agent token (#560): the same claims with the
-  surface's audience (`NODES`, `meada:nodes`), a random `jti` (16 bytes from `OsRng`, hex), no
+  `operator` or `viewer`), `groups`, `login` (the verified login, #561) only when the account has
+  one, `change_required` only when set, `iat`, `exp` `SESSION_HOURS` (8) later, for an
+  `accounts::Holder` (username, role, groups, login); `Keys::agent` signs an agent token (#560): the
+  same claims with the surface's audience (`NODES`, `meada:nodes`), a random `jti` (16 bytes from
+  `OsRng`, hex), no
   change-required mark, `exp` the hours asked later; `Public::verify` (the public half, which
   `Keys::verify` and `Nodes::admit` call) takes EdDSA alone, no `crit`, the issuer, the audience,
   `exp` and `nbf` with `oidc::LEEWAY`, a local subject whose username passes `username_ok` (1 to
-  `USERNAME_MAX`, 64, lowercase ASCII letters, digits, `.`, `-`, `_`) and groups that are owner
-  names. `policy(password, username)` is the password policy, one pure function returning the
-  first `Rule` failed: fewer than `PASSWORD_MIN` (12) or more than `PASSWORD_MAX` (128) Unicode
+  `USERNAME_MAX`, 64, lowercase ASCII letters, digits, `.`, `-`, `_`), groups that are owner
+  names and a `login`, when present, that `grant::login_ok` takes (a lowercase GitHub login).
+  `policy(password, username)` is the password policy, one pure function returning the first `Rule`
+  failed: fewer than `PASSWORD_MIN` (12) or more than `PASSWORD_MAX` (128) Unicode
   scalar values, the default password, the username ignoring case, an entry of the
   common-password list ignoring case (`Rule::Common`, #555: `accounts/common-passwords.txt`,
   embedded with `include_str!`, the entries of 12 to 128 characters of SecLists' million most
@@ -1077,8 +1089,9 @@ one for the area a change touches.
   request refused before its body; the named workspaces' `workspaces.*`; `account.login` and
   `account.password`, #554, `account.reset_admin`, #555, and account administration's
   `account.create`, `account.role`, `account.suspend`, `account.reactivate`,
-  `account.reset_password` and the route-level `account`, #557, and `account.groups`, #558,
-  below), `arguments`
+  `account.reset_password` and the route-level `account`, #557, `account.groups`, #558,
+  `account.token`, #560, and `account.github` and `account.remove_github`, #561, below),
+  `arguments`
   (`{"version", "message"}` for a save or an import,
   the id of the entries as submitted; `{"version"}` for an apply; `{"generation"}` for the
   pointer actions; `{"at_least"}` for a recovery with a floor, its decimal digits; `{}` for a
@@ -1123,10 +1136,12 @@ one for the area a change touches.
   "invalid_token"` when a token was sent) before routing; a token with `change_required` opens
   `account/password` alone, every other route a 403 `password_change_required`. The session is
   the token's: operator for the role `operator`, its groups sorted, the grant
-  `Providers::grant` of its groups with no login, or `*` when no table bounds it
-  (`Providers::bounds`), a team operator's teams as with `[oidc]` (`Console::teams_on`),
-  `account: true` (`Session::local`). A write keeps every check it has, but with `[accounts]`
-  admission runs before `operations` (`Console::checked`), so a write without a token is a 401
+  `Providers::local` of its groups and its verified login (#561; the login, `github_host` and
+  `github_grant` in `session` as an identity provider's session has them), or `*` when no table
+  bounds it (`Providers::bounds`), a team operator's teams as with `[oidc]` (`Console::teams_on`),
+  `account: true` (`Session::local`, built from a `grant::Admitted`). A write keeps every check it
+  has, but with `[accounts]` admission runs before `operations` (`Console::checked`), so a write
+  without a token is a 401
   and one with a token awaiting its change a 403 `password_change_required` whatever
   `operations` says; with `[oidc]` the order is unchanged. `POST login` (`LOGIN_MAX`, a fixed
   400 `Msg::AccountsLoginBody` for a body that is not `{username, password}`, 413 past the cap):
@@ -1166,6 +1181,26 @@ one for the area a change touches.
   token, `Audit::record` before the answer, a failed insert the 503 `audit_unavailable`), then
   `{token, expires_at, surface}`. The console admits no agent token (its audience is not
   `CONSOLE`), and a change-required token never reaches the route (admission's 403).
+  The verified login (#561, `ui/accounts/github.rs`, with `[accounts.github]` alone and never
+  under break glass; without the table both routes are the 404): `POST account/github`
+  (`GITHUB_BODY_MAX`, `{token}`, a fixed 400 `Msg::AccountsGithubBody`, a 422 `invalid_token`
+  for a token that is not visible ASCII, neither recorded) reads the account's row first
+  (`store::standing`: suspended, unknown or hostile is the 403 `forbidden`,
+  `Msg::AccountsGithubForbidden`, recorded), then `Verifier::login` calls `GET <api>/user` once
+  through `modules::agent` (`GITHUB_TIMEOUT`, at most `GITHUB_ANSWER_MAX` bytes), the pasted
+  token as its bearer and nowhere else (scrubbed from ureq's error); a 4xx but a 429 is the 422
+  `github_refused`, a `login` `grant::login_ok` refuses once lowercased the 422 `invalid_login`,
+  anything else (unreachable, a 429, a 5xx, no `{login}`, past the cap) the 503
+  `github_unavailable` with one `Msg::AccountsGithubUnreachable` line naming the URL and the
+  reason, never the body; each recorded `account.github` with its `reason`. A login is recorded
+  `pending` (`{"account", "login"}`) before `store::change` (`Change::Github`, the column's
+  unique violation `Changed::LoginTaken`, the 409 `login_taken`; a row suspended since it was
+  read `Changed::Suspended`, the 403 `forbidden`); a success answers `{login, token, expires_at,
+  change_required}`, a fresh session token signed from the row the change returned, so a
+  suspension or a role change made while GitHub answered is never signed over.
+  `POST account/github/remove` does the same with `Change::RemoveGithub`, recorded
+  `account.remove_github`, and answers a token without a login. A token issued before either
+  keeps its login until it expires; a console write reads the row's login (`Console::standing`).
   Break glass (#563, `[accounts] break_glass = true` beside `[oidc]`): `Local::break_glass`.
   `Console::admit` asks `Console::admit_break_glass` first: the static files, `config` and
   `login` need no token; a bearer whose `iss` is `[ui] public_url` (`accounts::issued_by`,
@@ -1196,7 +1231,8 @@ one for the area a change touches.
   only its key. It never reads the signing keys.
   Every console write of a local account acts as its row stands (#557, `Console::standing`, in
   `Console::checked` after `operations` and before any role check): `store::standing` reads the
-  role, groups and suspension of the session's username; an active account's session is rebuilt
+  role, groups, verified login and suspension of the session's username; an active account's
+  session is rebuilt
   from them (`Console::local_session`, as `admit_local` builds one from a token; under break
   glass an active row keeps the global operator's session `admit_break_glass` made), a suspended,
   unknown or hostile one (one `Msg::AccountsBadRow` line) writes as a viewer with no group and so
@@ -1210,7 +1246,8 @@ one for the area a change touches.
   checks it again), a write's refusal printed and recorded `refused` as `account.create`, or
   `account` for a change (its `{"account"}` when the route names a valid username).
   `GET accounts` lists `store::list` (`{"accounts": [{username, role, state (active, suspended,
-  locked), locked_until, change_required, password_changed, created, created_by, groups}]}`,
+  locked), locked_until, change_required, password_changed, created, created_by, groups,
+  github_login}]}`,
   never a hash; a row failing its checks left out with one line). `POST accounts`
   (`ADMIN_BODY_MAX`, `{username, role, groups, password, change_required}`, `groups` optional, a
   fixed 400 `Msg::AccountsCreateBody` for any other shape, a 422 `invalid_username` for a
@@ -1224,7 +1261,8 @@ one for the area a change touches.
   `refused`; `created_by` the session's subject). `POST accounts/<username>` (a username failing
   `username_ok` a 404 before the body is read; `{"action": "role", "role"}`, `{"action":
   "groups", "groups"}` (#558, replacing the list, checked as a creation's), `suspend`,
-  `reactivate` or `{"action": "reset_password", "password", "change_required"}`, each refused a
+  `reactivate`, `{"action": "reset_password", "password", "change_required"}` or `{"action":
+  "remove_github"}` (#561, `account.remove_github`, the verified login cleared), each refused a
   fixed 400 `Msg::AccountsChangeBody` with any other field, so no body deletes or renames) records
   `account.<action>` `pending` (`{"account"}`, with `"role"`, `"groups"` or
   `"change_required"`) before
@@ -1320,7 +1358,8 @@ one for the area a change touches.
   protocol line. Errors carry an HTTP status or a URL, never a body, and the bearer (the JWT, or
   an installation token) is scrubbed from ureq's (`valkey::scrub`).
   The role check (#331, features `github-app`, `postgres` and `oidc`): `roles` (`meada
-  github-app roles --workspace <bootstrap manifest>`) needs `[oidc.github]` (`Msg::RolesNoGithub`)
+  github-app roles --workspace <bootstrap manifest>`) needs `[oidc.github]` or `[accounts.github]`
+  (#561, through `Manifest::github`; `Msg::RolesNoGithub`)
   and a `[[github_app]]` block for its `host` (`Msg::RolesNoApp`, at the table's line), reads
   the workspace as `index --workspace` does but whole (`checked_entries`: with `source = "store"`
   the pulled version through `versions::pulled`, never `eligible`, its id the set's `version`),
@@ -3169,9 +3208,12 @@ one for the area a change touches.
   `LOGIN_MAX` and `PASSWORD_BODY_MAX` (4 KiB each) the bodies of `login` and `account/password`
   (413 past them); `ui/accounts/administration.rs` (#557): `ADMIN_BODY_MAX` (4 KiB) the body of
   an account's creation or change (413 past it); `TOKENS_BODY_MAX` (1 KiB, #560) the body of
-  `account/tokens` (413 past it). The lockout (#555, `accounts.rs`): `LOCKOUT_FAILURES` (10) consecutive failed
-  password checks, counted under the account row's lock, lock an account for `LOCKOUT_MINUTES`
-  (15), never extended by an attempt while it holds; the hash bound is `HASHES_MAX` above, and
+  `account/tokens` (413 past it); `ui/accounts/github.rs` (#561): `GITHUB_BODY_MAX` (1 KiB) the
+  body of `account/github` (413 past it), `GITHUB_TIMEOUT` (10 s) the one call to GitHub and
+  `GITHUB_ANSWER_MAX` (64 KiB) its answer (a 503 `github_unavailable` past either). The lockout
+  (#555, `accounts.rs`): `LOCKOUT_FAILURES` (10) consecutive failed password checks, counted under
+  the account row's lock, lock an account for `LOCKOUT_MINUTES` (15), never extended by an attempt
+  while it holds; the hash bound is `HASHES_MAX` above, and
   `HASH_MEMORY_MAX_KIB`, `HASH_ITERATIONS_MAX` and `HASH_LANES_MAX` bound what a stored hash may
   cost.
 

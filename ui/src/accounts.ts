@@ -7,6 +7,8 @@ export type AccountRole = 'operator' | 'viewer';
 export interface ManagedAccount {
   username: string; role: AccountRole; state: 'active' | 'suspended' | 'locked'; locked_until: string | null;
   change_required: boolean; password_changed: string; created: string; created_by: string | null; groups: string[];
+  /** The verified GitHub login (#561), when the account has one. */
+  github_login?: string | null;
 }
 
 const PASSWORD_MIN = 12;
@@ -46,6 +48,7 @@ export function accountsModel(accounts: ManagedAccount[], t: AccountsCopy) {
     state: stateText(account, t),
     change: account.change_required ? t.yes : t.no,
     changed: account.password_changed,
+    login: account.github_login ?? t.none,
   }));
 }
 
@@ -53,7 +56,8 @@ export type Change =
   | { action: 'role'; role: AccountRole }
   | { action: 'groups'; groups: string[] }
   | { action: 'suspend' } | { action: 'reactivate' }
-  | { action: 'reset_password'; password: string; change_required: boolean };
+  | { action: 'reset_password'; password: string; change_required: boolean }
+  | { action: 'remove_github' };
 
 /** The route of one account's change: the username is the validated pattern, but is encoded all the same. */
 export function changeRoute(username: string): string { return `accounts/${encodeURIComponent(username)}`; }

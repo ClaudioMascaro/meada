@@ -155,6 +155,49 @@ pub struct File {
     break_glass: bool,
     /// `[accounts.groups]`: a group to the identities it grants, as `[oidc.groups]` (#558).
     groups: Option<HashMap<String, Vec<String>>>,
+    /// `[accounts.github]`: the GitHub grant provider of local accounts (#561).
+    github: Option<GithubFile>,
+}
+
+/// `[accounts.github]` as written: `[oidc.github]`'s keys without `login_claim`, plus `api`.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GithubFile {
+    host: Option<String>,
+    api: Option<String>,
+    roles: Option<Vec<String>>,
+    max_age_seconds: Option<i64>,
+}
+
+/// The GitHub REST endpoint `[accounts.github] api` defaults to on `github.com`.
+pub const GITHUB_API: &str = "https://api.github.com";
+
+impl GithubFile {
+    /// The GitHub grant provider the table configures, and the REST endpoint of its host the
+    /// console verifies a login on: `GITHUB_API` by default on `github.com`, required on any other
+    /// host, `https` or loopback `http` as every module endpoint.
+    fn validate(self) -> Result<(crate::grant::Github, String), Problem> {
+        let keys = [
+            "accounts.github",
+            "accounts.github.host",
+            "accounts.github.roles",
+            "accounts.github.max_age_seconds",
+        ];
+        let github =
+            crate::oidc::github_provider(keys, self.host, self.roles, self.max_age_seconds)?;
+        let api = match (self.api, github.host.as_str()) {
+            (Some(api), _) => api,
+            (None, "github.com") => GITHUB_API.to_string(),
+            (None, _) => {
+                let missing = Msg::KeyMissing("accounts.github.api").text();
+                return Err(("accounts.github", missing));
+            }
+        };
+        if !crate::modules::reachable(&api, crate::modules::Shape::Path) {
+            return Err(("accounts.github.api", Msg::OidcUrl { bare: false }.text()));
+        }
+        Ok((github, api.trim_end_matches('/').to_string()))
+    }
 }
 
 /// The validated section: where each secret comes from, never a value.
@@ -170,6 +213,13 @@ pub struct Config {
     /// all, with `[oidc.groups]`'s rules and comparison; without it (and `[accounts.github]`)
     /// every local account reads every repository.
     pub groups: Option<HashMap<String, Vec<String>>>,
+    /// `[accounts.github]` (#561), the GitHub grant provider of local accounts, which grants from
+    /// a verified login: every reader outside `Manifest::read` reaches it through
+    /// `Manifest::github`, which gives it its `[postgres]`.
+    pub github: Option<crate::grant::Github>,
+    /// `[accounts.github] api`, without a trailing slash: the one endpoint the console calls, to
+    /// verify a login (`GET <api>/user`). Set exactly when `github` is.
+    pub api: Option<String>,
     /// The manifest's `[postgres]`, where the accounts live: `Manifest::read` sets it, and
     /// refuses the section without it.
     pub postgres: Option<crate::postgres::Config>,
@@ -197,12 +247,18 @@ impl File {
             self.admin_password_file,
             ("accounts.admin_password_file", "admin_password_env"),
         )?;
+        let (github, api) = match self.github.map(GithubFile::validate).transpose()? {
+            Some((github, api)) => (Some(github), Some(api)),
+            None => (None, None),
+        };
         Ok(Config {
             public_key,
             private_key,
             admin_password: admin_password.unwrap_or(Secret::Env(ADMIN_PASSWORD_ENV.into())),
             break_glass: self.break_glass,
             groups: self.groups,
+            github,
+            api,
             postgres: None,
         })
     }
@@ -373,6 +429,9 @@ pub struct Claims {
     pub sub: String,
     pub role: Role,
     pub groups: Vec<String>,
+    /// The account's verified GitHub login (#561), lowercase, when it has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub login: Option<String>,
     /// Set only while the password must be changed: the token then opens the change alone.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub change_required: bool,
@@ -387,6 +446,42 @@ impl Claims {
     /// The username the subject names.
     pub fn username(&self) -> &str {
         username_of(&self.sub).unwrap_or_default()
+    }
+}
+
+/// Whom a token is signed for: an account's username, its role, its groups and its verified
+/// login, as its row (or break glass) stands when the token is issued.
+pub struct Holder<'a> {
+    pub username: &'a str,
+    pub role: Role,
+    pub groups: &'a [String],
+    pub login: Option<&'a str>,
+}
+
+impl Holder<'_> {
+    /// The claims of a token for this holder from `issuer` for `audience`, issued now and valid
+    /// `hours`.
+    fn claims(
+        &self,
+        issuer: &str,
+        audience: &str,
+        hours: u64,
+        change_required: bool,
+        jti: Option<String>,
+    ) -> Claims {
+        let iat = crate::modules::now();
+        Claims {
+            iss: issuer.to_string(),
+            aud: audience.to_string(),
+            sub: subject(self.username),
+            role: self.role,
+            groups: self.groups.to_vec(),
+            login: self.login.map(str::to_string),
+            change_required,
+            jti,
+            iat,
+            exp: iat + hours * 3600,
+        }
     }
 }
 
@@ -431,40 +526,25 @@ impl Keys {
         format!("blake3:{}", blake3::hash(raw).to_hex())
     }
 
-    /// A session token for `username` from `issuer`, now: the token and its expiry in seconds
+    /// A session token for `holder` from `issuer`, now: the token and its expiry in seconds
     /// since the epoch.
     pub fn session(
         &self,
         issuer: &str,
-        username: &str,
-        role: Role,
-        groups: &[String],
+        holder: &Holder,
         change_required: bool,
     ) -> Result<(String, u64), String> {
-        let iat = crate::modules::now();
-        let claims = Claims {
-            iss: issuer.to_string(),
-            aud: CONSOLE.to_string(),
-            sub: subject(username),
-            role,
-            groups: groups.to_vec(),
-            change_required,
-            jti: None,
-            iat,
-            exp: iat + SESSION_HOURS * 3600,
-        };
+        let claims = holder.claims(issuer, CONSOLE, SESSION_HOURS, change_required, None);
         self.signed(&claims)
     }
 
-    /// An agent token for `username` from `issuer` for the surface `audience`, valid `hours`
-    /// from now (#560): the session token's claims with that audience, a random token id and
-    /// never a change-required mark. The token, its expiry in seconds since the epoch and its id.
+    /// An agent token for `holder` from `issuer` for the surface `audience`, valid `hours` from
+    /// now (#560): the session token's claims with that audience, a random token id and never a
+    /// change-required mark. The token, its expiry in seconds since the epoch and its id.
     pub fn agent(
         &self,
         issuer: &str,
-        username: &str,
-        role: Role,
-        groups: &[String],
+        holder: &Holder,
         audience: &str,
         hours: u64,
     ) -> Result<(String, u64, String), String> {
@@ -472,18 +552,7 @@ impl Keys {
         let mut id = [0u8; 16];
         OsRng.fill_bytes(&mut id);
         let id: String = id.iter().map(|b| format!("{b:02x}")).collect();
-        let iat = crate::modules::now();
-        let claims = Claims {
-            iss: issuer.to_string(),
-            aud: audience.to_string(),
-            sub: subject(username),
-            role,
-            groups: groups.to_vec(),
-            change_required: false,
-            jti: Some(id.clone()),
-            iat,
-            exp: iat + hours * 3600,
-        };
+        let claims = holder.claims(issuer, audience, hours, false, Some(id.clone()));
         let (token, exp) = self.signed(&claims)?;
         Ok((token, exp, id))
     }
@@ -504,8 +573,9 @@ impl Keys {
 impl Public {
     /// The claims of `token` when it passes: EdDSA only, no `crit`, signed by this key's pair,
     /// issued by `issuer` for `audience`, `exp` and `nbf` with the identity provider's leeway, a
-    /// subject `local:<username>`, a role and groups that are owner names. Nothing says why a
-    /// token fails: every failure is the same 401.
+    /// subject `local:<username>`, a role, groups that are owner names, and a verified login that
+    /// is a login when there is one (#561). Nothing says why a token fails: every failure is the
+    /// same 401.
     pub fn verify(&self, token: &str, issuer: &str, audience: &str) -> Option<Claims> {
         let header = jsonwebtoken::decode_header(token).ok()?;
         if header.alg != Algorithm::EdDSA || header.crit.is_some() {
@@ -519,7 +589,9 @@ impl Public {
         validation.set_required_spec_claims(&["exp", "iss", "aud", "sub"]);
         let claims = jsonwebtoken::decode::<Claims>(token, &self.0, &validation).ok()?;
         let claims = claims.claims;
-        (username_of(&claims.sub).is_some() && groups_ok(&claims.groups)).then_some(claims)
+        let login_ok = claims.login.as_deref().is_none_or(crate::grant::login_ok);
+        (username_of(&claims.sub).is_some() && groups_ok(&claims.groups) && login_ok)
+            .then_some(claims)
     }
 }
 
@@ -722,6 +794,67 @@ mod tests {
         }
     }
 
+    /// `[accounts.github]` (#561): `[oidc.github]`'s keys without `login_claim`, plus `api`,
+    /// GitHub's by default on `github.com` and required on another host, `https` or loopback
+    /// `http`; each bad key named with this table's prefix.
+    #[test]
+    fn the_github_table_defaults_its_api_on_github_com_and_names_each_bad_key() {
+        let table = |rest: &str| format!("[github]\n{rest}");
+        let config = section(&table("max_age_seconds = 5400\n")).unwrap();
+        let github = config.github.unwrap();
+        assert_eq!(github.host, "github.com");
+        assert_eq!(github.roles, crate::oidc::ROLES);
+        assert_eq!(github.max_age, std::time::Duration::from_secs(5400));
+        assert_eq!(config.api.as_deref(), Some(GITHUB_API));
+        let custom = "host = \"ghe.example\"\napi = \"https://ghe.example/api/v3/\"\n\
+                      roles = [\"read\"]\nmax_age_seconds = 60\n";
+        let config = section(&table(custom)).unwrap();
+        assert_eq!(config.github.unwrap().host, "ghe.example");
+        assert_eq!(config.api.as_deref(), Some("https://ghe.example/api/v3"));
+        let loopback = "api = \"http://127.0.0.1:9/\"\nmax_age_seconds = 60\n";
+        let config = section(&table(loopback)).unwrap();
+        assert_eq!(config.api.as_deref(), Some("http://127.0.0.1:9"));
+        assert!(section("").unwrap().github.is_none());
+        assert!(section("").unwrap().api.is_none());
+        for (rest, key) in [
+            ("", "accounts.github"),
+            ("max_age_seconds = 59\n", "accounts.github.max_age_seconds"),
+            (
+                "host = \"ghe.example\"\nmax_age_seconds = 60\n",
+                "accounts.github",
+            ),
+            (
+                "host = \"GHE.example\"\nmax_age_seconds = 60\n",
+                "accounts.github.host",
+            ),
+            (
+                "roles = []\nmax_age_seconds = 60\n",
+                "accounts.github.roles",
+            ),
+            (
+                "api = \"http://api.github.com\"\nmax_age_seconds = 60\n",
+                "accounts.github.api",
+            ),
+            (
+                "api = \"https://api.github.com?x=1\"\nmax_age_seconds = 60\n",
+                "accounts.github.api",
+            ),
+            (
+                "api = \"https://u@api.github.com\"\nmax_age_seconds = 60\n",
+                "accounts.github.api",
+            ),
+        ] {
+            assert_eq!(
+                section(&table(rest)).err().map(|e| e.0),
+                Some(key),
+                "{rest}"
+            );
+        }
+        // `login_claim` belongs to an identity provider's token, which local accounts have not.
+        let claim = "login_claim = \"login\"\nmax_age_seconds = 60\n";
+        assert!(toml::from_str::<File>(&table(claim)).is_err());
+    }
+
     /// `break_glass` is off unless set; set, it refuses the grant tables, named before the section
     /// is read; without it they are left to the section (#563).
     #[test]
@@ -854,6 +987,20 @@ mod tests {
             &"a".repeat(USERNAME_MAX + 1),
         ] {
             assert!(!username_ok(name), "{name}");
+        }
+    }
+
+    fn holder<'a>(
+        username: &'a str,
+        role: Role,
+        groups: &'a [String],
+        login: Option<&'a str>,
+    ) -> Holder<'a> {
+        Holder {
+            username,
+            role,
+            groups,
+            login,
         }
     }
 
@@ -1011,7 +1158,7 @@ mod tests {
         let issuer = "https://console.example";
         let groups = ["team-web".to_string()];
         let (token, exp) = keys
-            .session(issuer, "alice", Role::Viewer, &groups, true)
+            .session(issuer, &holder("alice", Role::Viewer, &groups, None), true)
             .unwrap();
         let claims = keys.verify(&token, issuer, CONSOLE).unwrap();
         assert_eq!(
@@ -1040,7 +1187,7 @@ mod tests {
         assert!(other.verify(&token, issuer, CONSOLE).is_none());
         // Without the mark, the claim is absent.
         let (plain, _) = keys
-            .session(issuer, "alice", Role::Operator, &[], false)
+            .session(issuer, &holder("alice", Role::Operator, &[], None), false)
             .unwrap();
         let payload = plain.split('.').nth(1).unwrap();
         assert!(!payload.is_empty());
@@ -1060,12 +1207,20 @@ mod tests {
             "groups": [], "iat": now, "exp": now + 60,
         });
         assert!(keys.verify(&sign(base.clone()), issuer, CONSOLE).is_some());
+        let mut with_login = base.clone();
+        with_login["login"] = serde_json::json!("ana-1");
+        let claims = keys.verify(&sign(with_login), issuer, CONSOLE).unwrap();
+        assert_eq!(claims.login.as_deref(), Some("ana-1"));
         for edit in [
             ("exp", serde_json::json!(now - 2 * crate::oidc::LEEWAY)),
             ("nbf", serde_json::json!(now + 2 * crate::oidc::LEEWAY)),
             ("sub", serde_json::json!("alice")),
             ("sub", serde_json::json!("local:Alice")),
             ("role", serde_json::json!("root")),
+            // A login claim that is no stored login (#561): uppercase, a bad character, a number.
+            ("login", serde_json::json!("Ana")),
+            ("login", serde_json::json!("ana smith")),
+            ("login", serde_json::json!(7)),
         ] {
             let mut claims = base.clone();
             claims[edit.0] = edit.1.clone();
@@ -1102,8 +1257,13 @@ mod tests {
         let keys = config.keys().unwrap();
         let issuer = "https://console.example";
         let groups = ["team-web".to_string()];
-        let (token, exp, id) =
-            (keys.agent(issuer, "alice", Role::Viewer, &groups, NODES, 24)).unwrap();
+        let (token, exp, id) = (keys.agent(
+            issuer,
+            &holder("alice", Role::Viewer, &groups, Some("ana")),
+            NODES,
+            24,
+        ))
+        .unwrap();
         let dir = std::env::temp_dir().join(format!("meada-accounts-agent-{}", std::process::id()));
         std::fs::remove_file(dir.join("private.pem")).unwrap();
         let nodes = config.nodes(&format!("{issuer}/")).unwrap();
@@ -1119,16 +1279,24 @@ mod tests {
             ("local:alice", Role::Viewer, &groups[..])
         );
         assert_eq!(claims.jti.as_deref(), Some(id.as_str()));
+        // The verified login rides in the token (#561).
+        assert_eq!(claims.login.as_deref(), Some("ana"));
         assert!(!claims.change_required);
         assert_eq!((claims.exp, exp - claims.iat), (exp, 24 * 3600));
         assert!(
             id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit()),
             "{id}"
         );
-        let again = keys.agent(issuer, "alice", Role::Viewer, &groups, NODES, 1);
+        let again = keys.agent(
+            issuer,
+            &holder("alice", Role::Viewer, &groups, None),
+            NODES,
+            1,
+        );
         assert_ne!(again.unwrap().2, id);
         assert!(keys.verify(&token, issuer, CONSOLE).is_none());
-        let (session, _) = (keys.session(issuer, "alice", Role::Viewer, &groups, false)).unwrap();
+        let (session, _) =
+            (keys.session(issuer, &holder("alice", Role::Viewer, &groups, None), false)).unwrap();
         assert_eq!(send(&format!("Bearer {session}")).err(), Some(true));
         assert_eq!(send("Bearer ").err(), Some(true));
         assert_eq!(send(&format!("Basic {token}")).err(), Some(false));
@@ -1144,7 +1312,7 @@ mod tests {
         let keys = keyed("issued", &public, &private).keys().unwrap();
         let issuer = "https://console.example";
         let (token, _) = keys
-            .session(issuer, "admin", Role::Operator, &[], false)
+            .session(issuer, &holder("admin", Role::Operator, &[], None), false)
             .unwrap();
         assert!(issued_by(&token, issuer));
         assert!(!issued_by(&token, "https://console.example/"));

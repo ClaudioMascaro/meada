@@ -8,6 +8,21 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The verified GitHub login of local accounts (#561, ADR 0024, from #551): `[accounts.github]`
+  (`host`, `roles`, `max_age_seconds` as `[oidc.github]`, plus `api`, `https://api.github.com` by
+  default on `github.com` and required on any other host) is the GitHub grant provider of local
+  accounts. A person pastes a GitHub personal access token on their profile page or sends it to
+  `POST /api/v1/account/github`; the console calls `GET /user` on `api` once, keeps the lowercase
+  login and drops the token, and answers a fresh session token carrying the login. A login
+  another account holds is a 409 `login_taken`, GitHub's refusal a 422, GitHub out of reach a
+  503. `POST /api/v1/account/github/remove` and the accounts page's `remove_github` action remove
+  it. Session and agent tokens carry the verified login, so the GitHub grant joins the groups
+  grant in the console (`session` shows `login`, `github_host` and `github_grant`), on nodes, in
+  a team operator's additions (`added_by`), in the audit's `login` column and in the exclusions
+  marks; `meada github-app roles` reads `[accounts.github]`. Recorded `account.github` and
+  `account.remove_github`; the personal access token is never stored, logged or audited. No
+  golden changed.
+
 - Helm chart support for local accounts (#565, ADR 0024, from #551): `modules.accounts` renders
   `[accounts]` from values, with `values-accounts.yaml` as the proof-of-concept shape (a writable
   console with `operations = true`, Postgres and no identity provider). The Ed25519 private key

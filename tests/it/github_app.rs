@@ -83,6 +83,13 @@ pub(crate) struct State {
     /// The next listing request waits while `holding` is set, which it sets itself.
     hold_next: bool,
     holding: bool,
+    /// Per personal access token: the login `GET /user` answers for it (#561); any other bearer
+    /// is a 401.
+    pub(crate) users: HashMap<String, String>,
+    /// The status every `GET /user` answers, when set, with a body naming it.
+    pub(crate) user_status: Option<u16>,
+    /// Every request that carried a bearer: its path and the bearer, in order.
+    pub(crate) bearers: Vec<(String, String)>,
 }
 
 /// A GitHub API on loopback: `GET /app/installations` and `POST
@@ -214,6 +221,24 @@ fn answer(
     let Some(jwt) = jwt else {
         return (401, String::new(), String::new());
     };
+    state.bearers.push((path.to_string(), jwt.clone()));
+    // A login verification (#561): the login of a known personal access token.
+    if path == "/user" {
+        if let Some(status) = state.user_status {
+            let body = json!({"message": format!("fake status {status}")}).to_string();
+            return (status, String::new(), body);
+        }
+        return match (method, state.users.get(&jwt)) {
+            ("GET", Some(login)) => {
+                let body = json!({"login": login, "id": 7, "type": "User"});
+                (200, String::new(), body.to_string())
+            }
+            _ => {
+                let body = json!({"message": "Bad credentials"}).to_string();
+                (401, String::new(), body)
+            }
+        };
+    }
     if let Some(listing) =
         (path.strip_prefix("/repos/")).and_then(|rest| rest.split_once("/collaborators?"))
     {

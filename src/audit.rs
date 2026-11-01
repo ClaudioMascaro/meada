@@ -27,9 +27,10 @@ use crate::msg::Msg;
 /// The actions a record names: the operations, `pointer`, the route-level action of a pointer
 /// request refused before its body is read, and the local accounts' sign-in, password change,
 /// `meada ui reset-admin`, administration (ADR 0024, #557, `account.groups` #558) and agent tokens
-/// (`account.token`, #560), with `account`, the route-level action of an account change refused
-/// before its body is read.
-pub const ACTIONS: [&str; 26] = [
+/// (`account.token`, #560) and the verified login (`account.github`, `account.remove_github`,
+/// #561), with `account`, the route-level action of an account change refused before its body is
+/// read.
+pub const ACTIONS: [&str; 28] = [
     "workspace.save",
     "workspace.import",
     "workspace.apply",
@@ -55,6 +56,8 @@ pub const ACTIONS: [&str; 26] = [
     "account.reactivate",
     "account.reset_password",
     "account.token",
+    "account.github",
+    "account.remove_github",
     "account",
 ];
 
@@ -353,6 +356,8 @@ fn record(row: &tokio_postgres::Row) -> Option<Value> {
         "surface",
         "hours",
         "token_id",
+        // The verified login a verification stores (#561).
+        "login",
     ];
     if !(arguments.iter()).all(|(k, v)| known.contains(&k.as_str()) && v.is_string()) {
         return None;

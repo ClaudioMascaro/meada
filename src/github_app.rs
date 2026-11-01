@@ -1175,7 +1175,14 @@ pub fn roles(manifest: &Path) -> crate::Result<Reply> {
     let (Some(valkey), false) = (valkey, apps.is_empty()) else {
         let src = std::fs::read_to_string(manifest).map_err(|e| format!("{shown}: {e}"))?;
         let why = Msg::RolesNoApp(&github.host).text();
-        return Err(crate::config::error_at(manifest, &src, "oidc.github", &why));
+        // The table the provider came from (#561): `[oidc.github]`, else `[accounts.github]`.
+        #[allow(unused_mut)]
+        let mut table = "oidc.github";
+        #[cfg(feature = "accounts")]
+        if read.oidc.as_ref().is_none_or(|o| o.github.is_none()) {
+            table = "accounts.github";
+        }
+        return Err(crate::config::error_at(manifest, &src, table, &why));
     };
     // `Manifest::read` refuses `[oidc.github]` without `[postgres]`.
     let postgres = read

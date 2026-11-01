@@ -111,4 +111,19 @@ export class LocalAuth {
       throw problem;
     }
   }
+
+  /**
+   * `POST account/github` with a GitHub personal access token, or `account/github/remove` without
+   * one (#561): a fresh session token carrying the verified login, or none. The personal access
+   * token goes in that one request's body and is kept nowhere. A 401 means the session ended.
+   */
+  async github(token?: string): Promise<void> {
+    const route = token === undefined ? 'account/github/remove' : 'account/github';
+    try {
+      this.keep(await this.post(route, token === undefined ? {} : { token }, this.token));
+    } catch (problem) {
+      if (problem instanceof ApiError && problem.status === 401) this.expire();
+      throw problem;
+    }
+  }
 }

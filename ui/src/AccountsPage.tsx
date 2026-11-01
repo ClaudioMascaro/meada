@@ -11,7 +11,7 @@ import type { Language } from './i18n';
 import './operations.css';
 import './account.css';
 
-type Kind = 'role' | 'groups' | 'suspend' | 'reactivate' | 'reset';
+type Kind = 'role' | 'groups' | 'suspend' | 'reactivate' | 'reset' | 'removeGithub';
 interface Target { account: ManagedAccount; kind: Kind }
 const post = (body: object): RequestInit => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
@@ -42,6 +42,7 @@ export function AccountsPage({ api, locale }: { api: Api; locale: Language }) {
       {open('role', t.setRole)}{open('groups', t.setGroups)}
       {account.state === 'suspended' ? open('reactivate', t.reactivate) : open('suspend', t.suspend)}
       {open('reset', t.resetPassword)}
+      {account.github_login && open('removeGithub', t.removeGithub)}
     </div>;
   };
 
@@ -58,9 +59,9 @@ export function AccountsPage({ api, locale }: { api: Api; locale: Language }) {
         {rows.length === 0 ? <p className="notice">{t.empty}</p> :
           <div className="table-scroll" role="region" aria-label={t.list} tabIndex={0}>
             <table aria-label={t.list}>
-              <thead><tr>{(['username', 'role', 'groups', 'state', 'change', 'changed', 'actions'] as const).map(column => <th scope="col" key={column}>{t[column]}</th>)}</tr></thead>
+              <thead><tr>{(['username', 'role', 'groups', 'state', 'change', 'changed', 'login', 'actions'] as const).map(column => <th scope="col" key={column}>{t[column]}</th>)}</tr></thead>
               <tbody>{rows.map((row, i) => <tr key={row.username}>
-                <th scope="row">{row.username}</th><td>{row.role}</td><td>{row.groups}</td><td>{row.state}</td><td>{row.change}</td><td>{row.changed}</td>
+                <th scope="row">{row.username}</th><td>{row.role}</td><td>{row.groups}</td><td>{row.state}</td><td>{row.change}</td><td>{row.changed}</td><td>{row.login}</td>
                 <td>{buttons(accounts[i]!)}</td>
               </tr>)}</tbody>
             </table>
@@ -132,13 +133,14 @@ function ChangeDialog({ api, locale, target, onDone, onCancel }: { api: Api; loc
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string>();
 
-  const title = { role: t.roleTitle, groups: t.groupsTitle, suspend: t.suspendTitle, reactivate: t.reactivateTitle, reset: t.resetTitle }[kind];
-  const note = { role: t.roleNote, groups: t.groupsNote, suspend: t.suspendNote, reactivate: t.reactivateNote, reset: t.resetNote }[kind];
+  const title = { role: t.roleTitle, groups: t.groupsTitle, suspend: t.suspendTitle, reactivate: t.reactivateTitle, reset: t.resetTitle, removeGithub: t.removeGithubTitle }[kind];
+  const note = { role: t.roleNote, groups: t.groupsNote, suspend: t.suspendNote, reactivate: t.reactivateNote, reset: t.resetNote, removeGithub: t.removeGithubNote }[kind];
 
   async function confirm() {
     const change: Change = kind === 'role' ? { action: 'role', role: pickedRole }
       : kind === 'groups' ? { action: 'groups', groups: parseGroups(groupsText) }
       : kind === 'suspend' ? { action: 'suspend' } : kind === 'reactivate' ? { action: 'reactivate' }
+      : kind === 'removeGithub' ? { action: 'remove_github' }
       : { action: 'reset_password', password: temporary, change_required: changeRequired };
     const refused = change.action === 'reset_password' ? passwordCheck(change.password, t) : undefined;
     if (refused) { setProblem(refused); return; }

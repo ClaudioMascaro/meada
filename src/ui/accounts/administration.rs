@@ -9,7 +9,8 @@
 //! - `POST accounts/<username>`: one action, `{"action": "role", "role"}`, `{"action": "groups",
 //!   "groups"}` (#558: each an owner name, ADR 0015, sorted without repeats), `suspend`,
 //!   `reactivate`, or `{"action": "reset_password", "password", "change_required"}`, which also
-//!   clears a lock and requires a change unless the body turns it off. An unknown account is a
+//!   clears a lock and requires a change unless the body turns it off, or `{"action":
+//!   "remove_github"}` (#561), which removes its verified GitHub login. An unknown account is a
 //!   404; a suspension or a demotion of the last active operator a 409 `last_operator`, decided
 //!   under the schema's advisory lock (`store::change`). No route deletes or renames an account.
 //!
@@ -18,7 +19,8 @@
 //! `account.create`, or the route's own `account` for a change whose action is still unread. A
 //! change passes its body's checks
 //! (400, 413, 422, not recorded), then is recorded `pending` (`account.create`, `account.role`,
-//! `account.groups`, `account.suspend`, `account.reactivate`, `account.reset_password`, naming the
+//! `account.groups`, `account.suspend`, `account.reactivate`, `account.reset_password`,
+//! `account.remove_github`, naming the
 //! account and the fields changed, the groups as a JSON array in a string, never a password)
 //! before the table is touched, and finished with its outcome;
 //! a record that cannot be inserted is a 503 `audit_unavailable` and nothing changes.
@@ -81,6 +83,8 @@ enum Action {
         password: String,
         change_required: Option<bool>,
     },
+    /// The account's verified GitHub login removed (#561).
+    RemoveGithub {},
 }
 
 impl Action {
@@ -92,6 +96,7 @@ impl Action {
             Action::Suspend {} => "account.suspend",
             Action::Reactivate {} => "account.reactivate",
             Action::ResetPassword { .. } => "account.reset_password",
+            Action::RemoveGithub {} => "account.remove_github",
         }
     }
 
@@ -103,6 +108,7 @@ impl Action {
             Action::Suspend {} => Msg::AccountsSuspended.text(),
             Action::Reactivate {} => Msg::AccountsReactivated.text(),
             Action::ResetPassword { .. } => Msg::AccountsPasswordReset.text(),
+            Action::RemoveGithub {} => Msg::AccountsGithubRemoved.text(),
         }
     }
 }
@@ -119,6 +125,7 @@ fn document(account: &Listed) -> Value {
         "password_changed": account.password_changed,
         "created": account.created,
         "created_by": account.created_by,
+        "github_login": account.github_login,
     })
 }
 
@@ -296,6 +303,17 @@ impl Console {
                 "last_operator",
                 Msg::AccountsLastOperator.text(),
             ),
+            // Only a verification sets a login: no administration change meets these.
+            Ok(Changed::Suspended) => (
+                StatusCode::FORBIDDEN,
+                "forbidden",
+                Msg::AccountsGithubForbidden.text(),
+            ),
+            Ok(Changed::LoginTaken) => (
+                StatusCode::CONFLICT,
+                "login_taken",
+                Msg::AccountsLoginTaken.text(),
+            ),
             // A row that fails its checks admits nothing, as no row does.
             Ok(Changed::Unknown | Changed::Bad) => (
                 StatusCode::NOT_FOUND,
@@ -401,6 +419,7 @@ impl Console {
             }
             Action::Suspend {} => Change::Suspend,
             Action::Reactivate {} => Change::Reactivate,
+            Action::RemoveGithub {} => Change::RemoveGithub,
             Action::ResetPassword {
                 password,
                 change_required,
@@ -459,6 +478,10 @@ mod tests {
             Ok(Action::Reactivate {})
         ));
         assert!(matches!(
+            parse(r#"{"action": "remove_github"}"#),
+            Ok(Action::RemoveGithub {})
+        ));
+        assert!(matches!(
             parse(r#"{"action": "reset_password", "password": "p"}"#),
             Ok(Action::ResetPassword {
                 change_required: None,
@@ -483,6 +506,8 @@ mod tests {
             r#"{"action": "groups", "groups": "team-billing"}"#,
             r#"{"action": "groups", "groups": [], "role": "viewer"}"#,
             r#"{"action": "reset_password"}"#,
+            r#"{"action": "remove_github", "login": "ana"}"#,
+            r#"{"action": "github", "login": "ana"}"#,
             r#"{"role": "viewer"}"#,
         ] {
             assert!(parse(refused).is_err(), "{refused}");
