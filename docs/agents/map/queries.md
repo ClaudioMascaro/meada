@@ -1,8 +1,80 @@
 # Queries and rendering
 
 Detail behind the [architecture map](../architecture.md), which keeps the flow, identities,
-seams, invariants and Known ceilings. The code wins over this file, and a change to these
-modules updates it.
+seams and invariants (the limits are in [Known ceilings](../ceilings.md)). The code wins over
+this file, and a change to these modules updates it.
+
+## Modules in brief
+
+- `engine.rs`: `Engine`, the one query seam (`open`, `refresh`, `export`, `search`, `context`,
+  `trace`, open items, decisions, `status`); it builds the results of `search` and `context`,
+  which `meada-core` renders. `items.rs`: open items, derived in one place. `trace.rs`: the
+  `Graph`, the walk and the process walk (`Graph::process`, the step list `trace` renders and the
+  export carries); `meada-core`'s `trace.rs` closes the chain with its footer.
+  `entry.rs`: entry points (spec #31), found when an index is written.
+  `partial.rs`: the partial export a query reads (#396): the contract rows whole, and the code
+  rows the query asks for, read through `index`'s filtered readers and kept in `index::export`'s
+  order.
+  `drift_view.rs`: places the links `context`, `search` and `status` show with their drift
+  (`entries`); it reads no kind (the stored links, the exports' consumer shapes, the calls and the
+  seam's `parts`), and `meada-core`'s `drift.rs` turns them into lines.
+  `render.rs`: the source files an answer reads (`Files`, `source`), re-exporting
+  `meada-core`'s budget and line helpers. `mcp.rs`: three read-only tools, one definition over
+  two transports: stdio, about the client's first `file://` root or the server's cwd without
+  roots (also for an answer with no local root). On protocol 2026-07-28 and later the call
+  answers `InputRequiredResult` asking for `roots` and the retry carries them (SEP-2322,
+  `Root::Ask`); earlier protocols get `roots/list`, waited for `ROOTS_TIMEOUT`, 5 s. A failed
+  answer (a retry with `roots` missing or malformed included) gets the last root the client
+  sent, else a tool error,
+  and in server mode streamable HTTP (`meada mcp --listen`,
+  stateless, JSON responses on a hyper listener), one endpoint per repository of the manifest at `/<identity>`, a 404
+  listing the identities served elsewhere (with `--generations`, `listen_generations` makes
+  the endpoint per request from the current generation's identities, so a pull that adds a
+  repository needs no restart, and a node with no readable generation answers 503 with the fixed body `no servable generation`, the problem on stderr; no `Host` check). A request carrying `Origin` gets 403
+  before anything else, on every path and in every build (`mcp::browser`, called first in
+  `route`): no listing, pin 404 or 503 reaches a browser. With `[generations]` on the node
+  (`Routes::Generation { pins: true }`) the routing rule is: the decoded path, a trailing slash
+  stripped, is `/<identity>@<generation>` when what follows its last `@` is an id
+  (`snapshot::is_id`); that generation is served from `<local_dir>/<generation>/`
+  (`Current::pinned`) when the node holds it, and is a 404 (`text/plain`: the requested
+  generation, `current: <id>` and `held: <ids>`) when it does not; any other path routes as
+  without pins, against the current generation. Every answer then carries `Meada-Generation:
+  <id>` (the generation it was routed by; a 404 the current one or the held pin, a 503 none),
+  and every `CallToolResult` `_meta` `{"meada/generation": "<id>"}` (`Meada::result`, tool
+  errors included); tool names, schemas and text do not change. `listen` runs every start check (`engine::served`, the predicate `status --workspace` exits on) before it binds, so an open port means indexes present (the probe counts an index locked by a commit in progress as ready, after a 50 ms wait), then installs the SIGINT and SIGTERM
+  handlers before it prints the address, then on a signal drops the listener and lets each
+  connection finish its answer in flight (`graceful_shutdown`), for at most `DRAIN` (25 s; the
+  hidden `with_drain_bound` shortens it, `main.rs` reads `MEADA_DRAIN_MS` for it in debug builds only, a second signal ends the wait), then cancels
+  rmcp's `cancellation_token` (earlier it would end calls in flight with an error), drops what
+  is left and exits 0 without waiting for the runtime's threads. Every request goes through
+  `Gate` before routing, after the `Origin` check: in the default build, or with neither
+  `[oidc]` nor `[accounts]`, it lets everything through; with `[oidc]` (feature `oidc`) it is
+  `oidc::Oidc::admit`, which answers itself (the protected resource metadata, a 401) or hands
+  routing a `Pass`; with `[accounts]` and no `[oidc]` (feature `accounts`, #560) it is
+  `accounts::Agents::admit` for `accounts::NODES`, read at start by `mcp::local_admission` (the
+  public half,
+  `accounts::Config::public`, and the issuer, the manifest's `[ui] public_url`, either missing
+  refusing the start, `Msg::AccountsNodeIssuer`), which admits an agent token for the nodes
+  (`accounts::NODES`) or answers 401 `Bearer` (`error="invalid_token"` for a token sent), and
+  whose grant is `Providers::local` of the token's groups and verified login (#561: the GitHub
+  grant of its `login` claim from the node's permissions cache under `[accounts.github]`), or `*`
+  when no table bounds it, the
+  403 `Bearer error="insufficient_scope"` (`mcp::challenged`, no `resource_metadata`). A `Pass`
+  carries only a `grant::Grant`, whichever verifier produced it: routing checks it at an
+  endpoint (`Gate::refused`, the 403 in the admitting verifier's words) and filters every 404
+  listing through it (`Pass::reads`). The gate builds the node's grant providers once
+  (`grant::Providers::of` the manifest) and hands them to the verifier, and `mcp::run` starts
+  their permissions poll (`Providers::listening`) once the address is printed. Routing then
+  puts the `Pass` in the request's extensions, which rmcp's
+  stateless transport hands the tool inside the request's `http::request::Parts`:
+  `Meada::answer` opens the engine (`open_listed`, `open_held`) over `Manifest::workspace` with
+  `Pass::reads`, which drops every entry outside the grant before the missing peers are
+  computed, so no answer names one, even as missing (#290); a call with no `Pass` is a tool
+  error. The pin is split from the path before the gate, so a pinned path is admitted
+  as its identity is. The serving loop (bind, the address line, `Stop`, the drain) is
+  `mcp::serve_http`, generic over what answers a request: the node's `run` hands it `route`
+  over `Routes` and `Gate`, the console (`ui.rs`) its own answer. `main.rs`: clap.
+  `msg.rs`: the CLI message catalog.
 
 - `engine.rs`: `Engine` is the one query seam. The CLI, the MCP server and almost every test call
   it: `open`, `refresh`, `export`, `search`, `context`, `trace`, `open_items`, `local_items`,
@@ -75,7 +147,7 @@ modules updates it.
   `search` and `status` show it, with no drift computed of its own: `entries` (binary) takes
   every link with a `Link::drift` or, but for an ambiguous one, whose consumer has a shape in the
   exports (`drift::shown_link`), and finds its consumer call by scanning every repository's calls
-  (Known ceilings), which a query reads first (`sites`, #396); `consumers`, `matches` and
+  ([Known ceilings](../ceilings.md)), which a query reads first (`sites`, #396); `consumers`, `matches` and
   `counts` (core) render. `Drift` and
   `shape::drift` live in `meada-core`'s `shape.rs`. `search` kind `drift` ranks against the route path the seam's `parts` gives (its
   second part). `context` on a contract its kind lists by its providers alone (`View::consumer`

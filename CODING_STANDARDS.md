@@ -76,7 +76,7 @@ indexing carries on.
 - A path read from a file or a config stays inside the repository root: relative, without `..`,
   and through no symlink.
 - Each limit is a named constant with a `ponytail:` marker, listed under "Known ceilings" in
-  `docs/agents/architecture.md` (`tests/it/docs.rs` checks the name is there), and a unit test
+  `docs/agents/ceilings.md` (`tests/it/docs.rs` checks the name is there), and a unit test
   feeds it an input past the limit.
 - A manifest or configuration reader reads a file of `lang::MAX_BYTES` built to explode (many
   keys, deep nesting, wide fan-out) in bounded time, and returns a bounded size. A new reader
@@ -95,10 +95,21 @@ with its `en` and `es` equivalents as `AGENTS.md` requires), the relevant guide 
 and `CHANGELOG.md` under its unreleased version.
 
 A change to what the code relies on updates the repository map (`docs/agents/architecture.md`)
-in the same change:
+in the same change. Each kind of update goes to one place, and the map stays an index within its
+budget of 64 KB (`tests/it/docs.rs` fails above it):
 
+- The map holds a line for a module, a seam or an invariant: what it owns or extends, in a
+  sentence, and the area file that has the rest. A new module gets its line, naming its area
+  file (`tests/it/docs.rs` checks every top-level file and directory of `src/` and
+  `meada-core/src/` has one).
+- The detail behind a line (behavior, routes, store functions, per-language and per-library
+  entries, the steps of a seam too long for the map) goes to the area file in `docs/agents/map/`,
+  a new one when none fits. A paragraph that only repeats an ADR or a site page links to it.
+- A limit goes to `docs/agents/ceilings.md`, under "Known ceilings", with its value and its
+  reason; it is not repeated in the map.
 - A value the index now stores (a table, a column, a field of a stored summary) joins the list
-  of the invariant "The index holds no source text and no values, apart from ...".
+  "Stored values" in `docs/agents/map/indexing.md`, the detail of the invariant "The index holds
+  no source text and no values, apart from ..." in the map.
 - A kind's rule lives in its own files behind `ContractKind`. The engine, the items, the
   decisions, the trace, the entry points and the extraction loop of the index writer ask the seam
   (`contract::kind_of`, `shown`, `serves`, `place` and the other free functions) and import no

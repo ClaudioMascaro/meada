@@ -1,8 +1,8 @@
 # Decisions
 
 Detail behind the [architecture map](../architecture.md), which keeps the flow, identities,
-seams, invariants and Known ceilings. The code wins over this file, and a change to these
-modules updates it.
+seams and invariants (the limits are in [Known ceilings](../ceilings.md)). The code wins over
+this file, and a change to these modules updates it.
 
 - `decide.rs`: `meada decide`. `items(engine, only)` (`Engine::local_items`: the open items
   whose call lives in the repository where Meada runs, id order; with `--item`,

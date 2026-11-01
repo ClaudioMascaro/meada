@@ -1,7 +1,9 @@
 //! The repository map keeps up with the code: every limit marked `ponytail:` is named under
-//! "Known ceilings" in `docs/agents/architecture.md` (CODING_STANDARDS.md, hostile input), and
-//! every entry point kind and process step mark is in the list the map gives of them.
+//! "Known ceilings" in `docs/agents/ceilings.md` (CODING_STANDARDS.md, hostile input), every
+//! entry point kind and process step mark is in the list the map gives of them, every module has
+//! its line in `docs/agents/architecture.md`, and that map stays within its size budget.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
@@ -47,7 +49,7 @@ fn sources(dir: &Path, out: &mut Vec<(String, String)>) {
 
 #[test]
 fn every_marked_limit_is_a_known_ceiling() {
-    let map = fs::read_to_string("docs/agents/architecture.md").unwrap();
+    let map = fs::read_to_string("docs/agents/ceilings.md").unwrap();
     let start = map
         .find("\n## Known ceilings")
         .expect("a Known ceilings section");
@@ -140,4 +142,75 @@ fn every_process_mark_is_listed_in_the_queries_map() {
         missing.is_empty(),
         "process marks missing from the `Mark` list of docs/agents/map/queries.md: {missing:?}"
     );
+}
+
+/// The most the architecture map may hold, in bytes: an index an agent reads whole. Detail goes
+/// to the area file in `docs/agents/map/`, a limit to `docs/agents/ceilings.md` (#572).
+const MAP_BUDGET: u64 = 64 * 1024;
+
+#[test]
+fn the_architecture_map_stays_within_its_budget() {
+    let size = fs::metadata("docs/agents/architecture.md").unwrap().len();
+    assert!(
+        size <= MAP_BUDGET,
+        "docs/agents/architecture.md is {size} bytes, over its budget of {MAP_BUDGET} bytes: \
+         move detail to the area file in docs/agents/map/, a limit to docs/agents/ceilings.md"
+    );
+}
+
+/// The leads of the map's bullets that link a file in `map/`: what they name before the first `:`.
+fn module_leads(map: &str) -> Vec<String> {
+    let mut bullets: Vec<String> = Vec::new();
+    for line in map.lines() {
+        if line.starts_with("- ") {
+            bullets.push(line.to_string());
+        } else if line.starts_with("  ") && !bullets.is_empty() {
+            let last = bullets.last_mut().unwrap();
+            last.push(' ');
+            last.push_str(line.trim());
+        }
+    }
+    (bullets.iter())
+        // A bullet that names an area file points to it with a link into `map/`.
+        .filter(|b| b.contains("](map/"))
+        .map(|b| b.split(": ").next().unwrap().to_string())
+        .collect()
+}
+
+#[test]
+fn every_module_has_a_line_in_the_map_naming_its_area_file() {
+    let map = fs::read_to_string("docs/agents/architecture.md").unwrap();
+    let leads = module_leads(&map);
+    let mut missing = Vec::new();
+    for dir in ["src", "meada-core/src"] {
+        let mut stems = BTreeSet::new();
+        for entry in fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() || path.extension().is_some_and(|e| e == "rs") {
+                stems.insert(path.file_stem().unwrap().to_string_lossy().to_string());
+            }
+        }
+        for stem in stems {
+            let named = leads.iter().any(|lead| {
+                // `meada-core` shares file names with the binary's crate: its lines say so.
+                (lead.contains("meada-core") == (dir != "src"))
+                    && (lead.contains(&format!("`{stem}.rs`"))
+                        || lead.contains(&format!("`{stem}/`"))
+                        || lead.contains(&format!("/{stem}.rs`")))
+            });
+            if !named {
+                missing.push(format!("{dir}/{stem}"));
+            }
+        }
+    }
+    assert!(
+        missing.is_empty(),
+        "modules with no line in the architecture map naming their area file: {missing:?}"
+    );
+}
+
+#[test]
+fn a_module_lead_is_what_a_bullet_with_an_area_link_names_before_its_colon() {
+    let map = "- `a.rs`: one. [x](map/x.md)\n- `b.rs`: no link\n- `c.rs`, `d/`: two,\n  wrapped. [y](map/y.md)\n";
+    assert_eq!(module_leads(map), vec!["- `a.rs`", "- `c.rs`, `d/`"]);
 }

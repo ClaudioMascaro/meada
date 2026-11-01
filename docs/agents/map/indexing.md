@@ -1,8 +1,161 @@
 # Discovery, index and resolution
 
 Detail behind the [architecture map](../architecture.md), which keeps the flow, identities,
-seams, invariants and Known ceilings. The code wins over this file, and a change to these
-modules updates it.
+seams and invariants (the limits are in [Known ceilings](../ceilings.md)). The code wins over
+this file, and a change to these modules updates it.
+
+## Modules in brief
+
+- `workspace.rs`, `config.rs`, `repo.rs`: repositories, peers, `meada.toml` and identities.
+  `workspace.rs` also reads the workspace manifest (`Manifest`) and refuses the entries server
+  mode cannot serve; an entry's `[repository.serve]`, `[[repository.resource]]` and
+  `[[repository.peer]]` reuse `config.rs`'s shapes (the peer without `path`) and are the
+  configuration of a mirror with no `meada.toml`. The entry's schema, those shapes and every
+  check the text decides (identities included, `entry_problems`) are `meada_core::manifest`'s;
+  `mirror` keeps the checks that need the mirror, after them. A mirror's own `meada.toml` wins whole: the
+  entry's blocks are ignored, not merged, and `Listed::ignored` names them for `status`.
+  The file `--workspace` names is the bootstrap manifest: its `[workspace]` section, read in
+  every build, has `source`, `"file"` (the default, and what a file without the section means:
+  its own `[[repository]]` entries) or `"store"` (the current workspace version,
+  `snapshot/versions.rs`). `source = "store"` without `generation-pointer` is an error naming
+  the feature (`Msg::WorkspaceStoreNeedsFeature`), without `[snapshot]` or `[generations]` one
+  naming them (`modules::needs`), and beside a `[[repository]]` one naming both
+  (`Msg::WorkspaceStoreBeside`); `Manifest::store` records it, with no entries from `read`. An
+  `owner` in the bootstrap manifest's own `[[repository]]` entries (`source = "file"`) is an
+  error naming the file, the line, `repository.owner` and `source = "store"`
+  (`Msg::WorkspaceOwnerStatic`), and an `added_by` likewise (`Msg::WorkspaceAddedByStatic`);
+  `meada workspace import` reads the same entries with them allowed.
+  `Manifest::read_listed`, which `index`, `status`, `export` without `--generations` and
+  `snapshot publish` call, reads the entries of the version `meada workspace pull` left under
+  `<index_dir>/workspace/` (`versions::pulled`, from disk, once per read, `Manifest::version`
+  its id), its paths relative to the bootstrap manifest's directory, and goes on as for a
+  file's entries (the checks that need a mirror run in `mirror`); without one it refuses naming
+  `meada workspace pull` (`Msg::WorkspaceNotPulled`). Under `[oidc.github]` (#331) it reads
+  `versions::eligible` instead: the pulled version without the identities the exclusions file
+  `<index_dir>/workspace/excluded` names (`versions::excluded`: hostile input, at most
+  `VERSION_MAX`, its first line a version id equal to the pulled one, then one identity per
+  line, no space or control character and no `identity_problem`), refused naming `meada
+  github-app roles` when the file is missing (`Msg::ExcludedMissing`), names another version
+  (`Msg::ExcludedOther`) or holds a malformed line (`Msg::ExcludedBad`, the file and the line);
+  an excluded identity is absent as an entry the workspace does not list (a peer naming it misses
+  it). `Manifest::excludes` says whether a manifest's readers do so (`[oidc.github]` with
+  `source = "store"`). `meada workspace show --pulled` (`versions::show_pulled`) prints what
+  they read, in the `[[repository]]` shape, for the fetch script; without `[oidc.github]` the
+  pulled version whole, and with a version argument it is a usage error (clap's
+  `conflicts_with`). `[oidc.github]` without `[postgres]` is refused here, at the table's line,
+  naming both. `mcp --listen` without `--generations`
+  refuses such a manifest naming `--generations` (`Msg::WorkspaceStoreRefused`): a managed
+  workspace's nodes serve generations, which take their repositories from the generation.
+  `Manifest::index_dir` is the directory every index lives under.
+  `index.rs`: the SQLite schema, the freshness pipeline in `refresh` (with `fresh`, its
+  read-only twin for `meada snapshot publish`: the same walk, `packs_of` and stamps, and a file
+  whose stat moved but whose hash did not is no difference), and
+  `export`; `open` and `state` take the index's path, `<root>/.meada/index.db` locally (`path`,
+  with a `.gitignore` of `*`) or `<index_dir>/<identity>/index.db` in server mode (no
+  `.gitignore`). A rebuild (a missing index, or one of another schema) is a rename under the
+  rebuild lock: `open` builds the whole new index in `index.db.new.<pid>` while it holds
+  `index.db.lock` and renames it over `index.db`, so a reader sees the old index or the new
+  one, never a missing or empty file; `refresh` stays one transaction in place. An operator
+  renames an index in (built elsewhere) only while no `meada index` writes that index, one
+  writer per index: a refresh's live `index.db-journal` would be taken for the new file's. `lang/`: the
+  language adapter and the TS/JS, Python, Rust, Go, Java, Kotlin, C# and Swift packs. `resolve.rs`: calls to definitions (`Resolver`), values
+  and receivers (`Code`: `Code::origins`, the one origin question, with three evidence policies
+  (`Values`, `Constants` for the TypeScript forms, `Declarations` for Go's typed clients and
+  forms), `Code::outside` for what an import from outside binds a name to, `Code::extensions`
+  for the extension functions a Kotlin call has in scope, and `Code::expand`
+  for wrappers, `Expand::Chain` reading a call whole). `community.rs`: the deterministic Leiden behind communities (spec
+  #31).
+
+## Stored values
+
+The invariant of the architecture map, "The index holds no source text and no values, apart
+from ...", with the whole list. A value the index now stores joins it.
+
+- The index holds no source text and no values, apart from the BLAKE3 of each symbol's span
+  (`symbols.hash`, `Def::hash`), the argument count, the argument
+  labels and constructor form of an overloaded call (`Call::arity`, `Call::labels`,
+  `Call::constructs`), the argument label of a parameter and whether its written type takes a
+  trailing closure, or the name it is written as (`Param::label`, `Param::closure`), the names
+  of a Swift file's aliases of a function type (`Facts::function_aliases`), the place of the call a
+  chained call is made on (`Call::on`), whether a Swift call is written under `await` and
+  whether a function needs one (`Call::awaited`, `Def::suspends`), the modules a Swift file imports
+  `@testable` and the names only their file sees (`Facts::testable`, `Facts::confined`), whether an `inferred` call was narrowed from several
+  definitions of its name (`calls.narrowed`), the definition a decorating call decorates (`calls.decorates`, the
+  call site's `decorates`), callable-to-signature and
+  static-member names (`Facts::overloads`, `Facts::constructors` and
+  `Facts::statics`), the namespaces and types a C# file's `global using` directives name
+  (`Facts::project`, names as `Facts::imports` holds them), the qualified names of the types a C#
+  file declares in `partial` parts (`Facts::partial`), the qualified names of the classes a
+  Kotlin file declares `expect` or `actual` (`Facts::expect`, `Facts::actual`), the size of the budget a file exhausted
+  (`Facts::budget`, which `meada status` names), the count of usings the project of a file
+  passed (`Facts::usings`, set by a join and stamped into the stored facts after it, which
+  `meada status` names), whether the grammar misread a Kotlin file (`Facts::misparsed`, which
+  `meada status` names), the literal URL path fragments and the
+  method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
+  of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
+  consumer reads from the parsed response, and those of the zod schema or object literals a
+  route handler returns, spec #23, with the parts a package import gives as the specifier, the
+  name imported, the importing file and the view, issue #175), the shapes a repository with a
+  named manifest keeps for the constants and types its files export (`contracts` rows of role
+  `shape`: the exported name in `method`, the view (`shape::Want`) in `via`, and field paths, open
+  parts, scalar leaves, declared and optional paths and the imports they leave to fill, issue
+  #175; what crosses repositories is this shape of an exported name,
+  never its source text), the names of the Cargo features a Rust crate enables by default
+  (`files.setting`, a comma-separated list per file, from `[features] default`), the Rust item
+  macros a file invokes (#398: the lines after it in `files.setting`, each a macro's name and the
+  `cfg` predicates its arm writes, as tokens; `Facts::macro_rules`, the outer attributes each
+  `macro_rules!` of a file writes on the items it passes through, as tokens; `Facts::invokes`,
+  the names of the macros a file invokes with braces), and what a
+  provider document states (`documents.summary`: format, version, title, normalized route paths
+  and methods, channel sides (broker kind, name, role), the field paths of their response and
+  payload shapes (fields, open parts, scalar leaves) and the external references met, the
+  hosts and server paths of the root `servers` URLs, and the parser's reason and line for a
+  document it could not read), and what spec #22 stores of the build and package files: the
+  `manifests` summaries of each `package.json` (name, version, the dependency ranges as
+  written, `exports` as written, `types`, `module` and `main`) and, spec #24, of each
+  `pyproject.toml` (normalized name, version, the dependency specifiers as written, the source
+  roots and the console scripts it declares) and `requirements*.txt` (the dependency specifiers as written), of
+  each `Cargo.toml` (spec #30: name, version or the flag that it inherits one, the library root
+  as a path of the repository and the `[lib] name` when it differs from the package's, the
+  entries with the version requirement as written, the `alias` when the key renames the crate
+  and the `via`: a `path` folded from the manifest's directory, which keeps its leading `../`
+  when it leaves the repository, or the normalized `git` URL; `workspace = true` as a flag; the
+  `[workspace.dependencies]` entries; the `[workspace.package]` version), and of JVM build files
+  (spec #26: literal Maven coordinates and versions, dependency coordinate fragments with `*`
+  for computed parts, declared ranges and a `computed` source flag, source roots with the test ones marked, a pom's
+  `<properties>` and `<parent>` coordinate, with the group and artifact of a computed entry as
+  written (`Entry::template`, for `Maven::inherit` to fill from the parent poms), and Gradle's
+  literal group, root project name and included project names/directories in `Summary::build`),
+  of each SDK-style `.csproj` (spec #28: the package id, else assembly name, else file name, the
+  literal version, each `PackageReference` with its range as written, each `ProjectReference`
+  as a `path` folded from the project's directory, each with `Entry::private` when it does not
+  pass on (#369), the package properties as written (`Summary::properties`, #381), and
+  `Summary::project`, the mark that it is an SDK-style project that owns its files), of each
+  `Directory.Build.props` (#381: its `PackageReference`s, its `ProjectReference`s by the path as
+  written, its package properties and the props file it imports, `Summary::import`) and of each
+  `Package.swift` (spec #29, #124: the literal name, the library products with the targets each
+  holds, `Summary::products`, each target's module and directory, `Summary::targets`, and each
+  `.package` dependency with its requirement as written as the range and its source as `via`:
+  `git <identity>` of a `url:`, `path <manifest>` of a `path:`, or `computed git <pattern>` and
+  `computed path <pattern>`, with `*` for a computed part), the
+  `tsconfig.json` rows
+  (`outDir` and `rootDir`, as written) and the `exports` table (each file's exported names and
+  the definition, constant, type or file they name), the `families` table (spec #26: each public
+  Java class's ancestors past it, `Resolver::ancestries`, a repository class by file and name and
+  an opaque one as `null`), the `flexible` table (spec #27, #106: each function that takes more
+  than one count of arguments, a default parameter or a vararg, by file and qualified name with
+  its parameter types, with the least and the most count, `resolve::Flexible`), the `entry_points` table (spec #31:
+  each entry point's identity, kind, label and start symbol, rewritten with the contracts),
+  each community's name and member identities (`communities`, spec #31), and the paths of the
+  files whose values the last contract extraction read (`valued`, #391). `Call::args`,
+  `Call::kwargs`, `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::return_values`, `Def::type_params`, `Param::default`,
+  `Field::default`, `Const::value` and `Const::ty` are `serde(skip)`, so unchanged files come
+  back from SQLite without them. An `interface` or `type` declaration is a `Const` too, so its
+  name is stored (its members are not). `Code` records every file it needs but lacks as a miss, and
+  every file of `full` it looks into (`Code::read`); `refresh` re-parses the files the last
+  extraction read (`valued`) before its first pass, then the missed ones, and extracts again the
+  packs that missed until none does. A contract kind that reads a
+  value from a new place relies on this loop.
 
 - `workspace.rs`, `config.rs`: `Workspace::discover` finds `Repository { root, identity, config }`
   from the `meada.toml` files (peers by `path` hint, then sibling clones; siblings that name a
