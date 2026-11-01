@@ -3,9 +3,12 @@
 //! opens its own connection through `postgres::connected`, so a schema version this binary does
 //! not know counts as unreachable, and is bounded as the audit's calls are. Every row is hostile when read: one that fails its
 //! checks admits nothing (`Attempt::Bad`), and its reader writes one line naming the table, never
-//! a value. A password attempt (`attempt`) holds the row while it checks and counts.
+//! a value. A password attempt (`attempt`) holds the row while it checks and counts. Account
+//! administration (`list`, `create`, `change`, #557) is the global operator's; a change that
+//! could leave no active operator runs under the schema's advisory lock, so two at once never do.
+//! A console write first reads its account's `standing`.
 
-use crate::accounts::{Role, groups_ok, is_hash, username_ok};
+use crate::accounts::{Role, groups_ok, is_hash, username_of, username_ok};
 use crate::modules::Problem;
 use crate::msg::Msg;
 use crate::postgres::Config;
@@ -287,4 +290,273 @@ pub fn bootstrap(
         Ok(Err(problem)) => Err(Refused::Password(problem)),
         Err(reason) => Err(Refused::Postgres(reason)),
     }
+}
+
+/// How a timestamp column reads: RFC 3339 in UTC to the microsecond, as the audit's times.
+const TIME: &str = "'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'";
+
+/// The columns of an account as the list shows it, in `Listed`'s order, then its hash and groups,
+/// read only to check the row as a sign-in would (`Listed` holds neither). A lock that has ended
+/// reads as none.
+fn listed_columns() -> String {
+    format!(
+        "username, role, suspended, CASE WHEN locked_until > now() THEN \
+         to_char(locked_until AT TIME ZONE 'UTC', {TIME}) END, change_required, \
+         to_char(password_changed AT TIME ZONE 'UTC', {TIME}), \
+         to_char(created AT TIME ZONE 'UTC', {TIME}), created_by, password_hash, groups"
+    )
+}
+
+/// An account as the global operator's list shows it (#557): never its hash.
+#[derive(Debug, PartialEq)]
+pub struct Listed {
+    pub username: String,
+    pub role: Role,
+    pub suspended: bool,
+    /// When its lock ends, while one holds.
+    pub locked_until: Option<String>,
+    pub change_required: bool,
+    pub password_changed: String,
+    pub created: String,
+    /// The subject of the global operator that created it; none for the default account and
+    /// one `meada ui reset-admin` created.
+    pub created_by: Option<String>,
+}
+
+impl Listed {
+    /// Its state: `suspended`, else `locked` while a lock holds, else `active`.
+    pub fn state(&self) -> &'static str {
+        match (self.suspended, &self.locked_until) {
+            (true, _) => "suspended",
+            (false, Some(_)) => "locked",
+            (false, None) => "active",
+        }
+    }
+}
+
+/// `row`, read with `listed_columns`, when every column passes its check.
+fn listed(row: &tokio_postgres::Row) -> Option<Listed> {
+    let time = |i: usize| -> Option<Option<String>> {
+        let text: Option<String> = row.try_get(i).ok()?;
+        match text {
+            Some(t) if !crate::postgres::is_time(&t) => None,
+            text => Some(text),
+        }
+    };
+    let username: String = row.try_get(0).ok()?;
+    let role = Role::of(&row.try_get::<_, String>(1).ok()?)?;
+    let created_by: Option<String> = row.try_get(7).ok()?;
+    let hash: String = row.try_get(8).ok()?;
+    let groups: Vec<String> = row.try_get(9).ok()?;
+    let creator_ok = created_by
+        .as_deref()
+        .is_none_or(|s| username_of(s).is_some());
+    if !username_ok(&username) || !creator_ok || !is_hash(&hash) || !groups_ok(&groups) {
+        return None;
+    }
+    Some(Listed {
+        username,
+        role,
+        suspended: row.try_get(2).ok()?,
+        locked_until: time(3)?,
+        change_required: row.try_get(4).ok()?,
+        password_changed: time(5)??,
+        created: time(6)??,
+        created_by,
+    })
+}
+
+/// Every account, by username, and how many rows failed their checks and were left out.
+pub fn list(config: &Config) -> Result<(Vec<Listed>, usize), String> {
+    let run = async {
+        let opened = crate::postgres::connected(config).await?;
+        let sql = format!(
+            "SELECT {} FROM {}.accounts ORDER BY username",
+            listed_columns(),
+            config.quoted()
+        );
+        let rows = (opened.client).query(&sql, &[]).await;
+        rows.map_err(|e| opened.scrub(e))
+    };
+    let rows = crate::modules::within(config.bound(2), run, Msg::PostgresTimeout)?;
+    let accounts: Vec<Listed> = rows.iter().filter_map(listed).collect();
+    let skipped = rows.len() - accounts.len();
+    Ok((accounts, skipped))
+}
+
+/// A new account `username` of `role`, its password `hash`, a change required when
+/// `change_required`, created by `created_by` (a subject): `Taken` when the username is.
+pub fn create(
+    config: &Config,
+    username: &str,
+    role: Role,
+    hash: &str,
+    change_required: bool,
+    created_by: &str,
+) -> Result<Changed, String> {
+    let run = async {
+        let opened = crate::postgres::connected(config).await?;
+        let sql = format!(
+            "INSERT INTO {}.accounts (username, password_hash, role, change_required, \
+             created_by) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (username) DO NOTHING \
+             RETURNING {}",
+            config.quoted(),
+            listed_columns()
+        );
+        let values: [&(dyn tokio_postgres::types::ToSql + Sync); 5] = [
+            &username,
+            &hash,
+            &role.name(),
+            &change_required,
+            &created_by,
+        ];
+        let rows = (opened.client).query(&sql, &values).await;
+        let rows = rows.map_err(|e| opened.scrub(e))?;
+        Ok(match rows.first() {
+            Some(row) => Changed::Done(listed(row)),
+            None => Changed::Taken,
+        })
+    };
+    crate::modules::within(config.bound(2), run, Msg::PostgresTimeout)
+}
+
+/// One change of account administration (#557).
+pub enum Change {
+    /// The role set.
+    Role(Role),
+    Suspend,
+    Reactivate,
+    /// The password `hash` set, a change required when `change_required`, the lock and its
+    /// count cleared.
+    ResetPassword {
+        hash: String,
+        change_required: bool,
+    },
+}
+
+/// What a creation or a change found and did.
+#[derive(Debug, PartialEq)]
+pub enum Changed {
+    /// A creation's username is another account's: nothing created.
+    Taken,
+    /// No row of that username.
+    Unknown,
+    /// A row that fails its checks: left as it was.
+    Bad,
+    /// The change would leave no active operator: nothing changed.
+    LastOperator,
+    /// Done: the account as listed after it, `None` when that row fails its checks.
+    Done(Option<Listed>),
+}
+
+/// `change` of the account `username`, in one transaction under the schema's advisory lock, so
+/// two changes at once are decided one after the other: a suspension or a demotion of the last
+/// active operator is `LastOperator`, and nothing changes.
+pub fn change(config: &Config, username: &str, change: &Change) -> Result<Changed, String> {
+    let quoted = config.quoted();
+    let key = lock_key(config.schema());
+    let run = async {
+        let mut opened = crate::postgres::connected(config).await?;
+        let scrub = opened.scrubber();
+        let tx = opened.client.transaction().await.map_err(&scrub)?;
+        let lock = tx
+            .execute("SELECT pg_advisory_xact_lock($1)", &[&key])
+            .await;
+        lock.map_err(&scrub)?;
+        let sql =
+            format!("SELECT role, suspended FROM {quoted}.accounts WHERE username = $1 FOR UPDATE");
+        let rows = tx.query(&sql, &[&username]).await.map_err(&scrub)?;
+        let Some(row) = rows.first() else {
+            return Ok(Changed::Unknown);
+        };
+        let role = row.try_get::<_, String>(0).ok().and_then(|r| Role::of(&r));
+        let suspended = row.try_get::<_, bool>(1).ok();
+        let (Some(role), Some(suspended)) = (role, suspended) else {
+            return Ok(Changed::Bad);
+        };
+        let removes = matches!(change, Change::Role(Role::Viewer) | Change::Suspend);
+        if removes && role == Role::Operator && !suspended {
+            // The other active operators that can sign in: a row failing its checks admits
+            // nothing, so it never counts as one.
+            let others = format!(
+                "SELECT username, password_hash, role, groups, change_required, suspended \
+                 FROM {quoted}.accounts WHERE role = $2 AND NOT suspended AND username <> $1"
+            );
+            let operator = Role::Operator.name();
+            let others = tx.query(&others, &[&username, &operator]).await;
+            let others = others.map_err(&scrub)?;
+            if !(others.iter()).any(|row| {
+                row.try_get(0)
+                    .is_ok_and(|name: String| checked(row, &name).is_some())
+            }) {
+                return Ok(Changed::LastOperator);
+            }
+        }
+        let columns = listed_columns();
+        let set = |set: &str| {
+            format!("UPDATE {quoted}.accounts SET {set} WHERE username = $1 RETURNING {columns}")
+        };
+        let row = match change {
+            Change::Role(role) => {
+                let sql = set("role = $2");
+                tx.query_one(&sql, &[&username, &role.name()]).await
+            }
+            Change::Suspend => tx.query_one(&set("suspended = true"), &[&username]).await,
+            Change::Reactivate => tx.query_one(&set("suspended = false"), &[&username]).await,
+            Change::ResetPassword {
+                hash,
+                change_required,
+            } => {
+                let sql = set("password_hash = $2, change_required = $3, failures = 0, \
+                     locked_until = NULL, password_changed = now()");
+                let values: [&(dyn tokio_postgres::types::ToSql + Sync); 3] =
+                    [&username, hash, change_required];
+                tx.query_one(&sql, &values).await
+            }
+        };
+        let done = listed(&row.map_err(&scrub)?);
+        tx.commit().await.map_err(&scrub)?;
+        Ok(Changed::Done(done))
+    };
+    // Waiting for the lock is one statement's bound, the change under it a few more.
+    crate::modules::within(config.bound(5), run, Msg::PostgresTimeout)
+}
+
+/// An account's standing, read before each of its console writes (ADR 0024).
+#[derive(Debug, PartialEq)]
+pub enum Standing {
+    /// No row of that username.
+    Unknown,
+    /// A row that fails its checks: it admits nothing.
+    Bad,
+    Suspended,
+    /// Active, with its role and groups now.
+    Active(Role, Vec<String>),
+}
+
+/// The standing of the account `username` now.
+pub fn standing(config: &Config, username: &str) -> Result<Standing, String> {
+    let run = async {
+        let opened = crate::postgres::connected(config).await?;
+        let sql = format!(
+            "SELECT role, groups, suspended FROM {}.accounts WHERE username = $1",
+            config.quoted()
+        );
+        let rows = (opened.client).query(&sql, &[&username]).await;
+        rows.map_err(|e| opened.scrub(e))
+    };
+    let rows = crate::modules::within(config.bound(1), run, Msg::PostgresTimeout)?;
+    let Some(row) = rows.first() else {
+        return Ok(Standing::Unknown);
+    };
+    let role = row.try_get::<_, String>(0).ok().and_then(|r| Role::of(&r));
+    let groups = row.try_get::<_, Vec<String>>(1).ok();
+    let suspended = row.try_get::<_, bool>(2).ok();
+    Ok(match (role, groups, suspended) {
+        (Some(role), Some(groups), Some(false)) if groups_ok(&groups) => {
+            Standing::Active(role, groups)
+        }
+        (Some(_), Some(groups), Some(true)) if groups_ok(&groups) => Standing::Suspended,
+        _ => Standing::Bad,
+    })
 }

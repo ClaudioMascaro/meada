@@ -1,10 +1,10 @@
 //! The console with `[accounts]` (#554, #555, ADR 0024): its own sign-in, the default account,
 //! session tokens it signs with Ed25519, the forced password change, the lockout, the rehash of a
-//! weaker hash, `meada ui reset-admin` and the audit of each. The section and key refusals, and
-//! `reset-admin`'s refusals before Postgres, need no service; the rest run against the local
-//! Postgres of `MEADA_TEST_POSTGRES_URL`, each test in a schema of its own, and skip without it;
-//! the save as the global operator also needs the fleet's Valkey and store. Break glass beside
-//! `[oidc]` (#563) is `break_glass`.
+//! weaker hash, `meada ui reset-admin` and the audit of each; account administration (#557) in
+//! `administration`. The section and key refusals, and `reset-admin`'s refusals before Postgres,
+//! need no service; the rest run against the local Postgres of `MEADA_TEST_POSTGRES_URL`, each
+//! test in a schema of its own, and skip without it; the save as the global operator also needs
+//! the fleet's Valkey and store. Break glass beside `[oidc]` (#563) is `break_glass`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -17,6 +17,7 @@ use crate::manifest::{MANIFEST, chain_manifest, run, run_args};
 use crate::postgres::{Audited, audited, meada};
 use crate::server::Server;
 
+mod administration;
 mod break_glass;
 
 const EN: &str = "en_US.UTF-8";
@@ -231,7 +232,12 @@ struct Local {
 
 /// The console of `case` with `operations` and `[accounts]`, started with `env`.
 fn local(case: &'static str, env: &[(&str, &str)]) -> Option<Local> {
-    let ui = ui_section() + "operations = true\n";
+    local_with(case, true, env)
+}
+
+/// The console of `case` with `[accounts]` and `operations` as given, started with `env`.
+fn local_with(case: &'static str, operations: bool, env: &[(&str, &str)]) -> Option<Local> {
+    let ui = ui_section() + &format!("operations = {operations}\n");
     let dir = console_dir(case, Some(VERSION), "", &ui);
     let audit = audited(&dir, case)?;
     let keys = keys(&dir);

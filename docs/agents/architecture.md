@@ -889,7 +889,16 @@ one for the area a change touches.
   the weaker one is still stored), `reset_admin` (an upsert of `admin`: an operator, active, its
   count and lock cleared, the given hash with a change required, `password_changed` now; whether
   it created the row), `set_password` (the new hash, no
-  change required, `password_changed` now, only on an account not suspended) and `bootstrap`
+  change required, `password_changed` now, only on an account not suspended), account
+  administration's `list` (every row by username with `Listed`'s columns, never the hash; a
+  timestamp as the audit's, a lock that has ended as none, `created_by` none or a local subject,
+  the row checked as `attempt` checks one, its hash and groups read for that alone),
+  `create` (`ON CONFLICT DO NOTHING`, `Changed::Taken`), `change` (`Change::Role`, `Suspend`,
+  `Reactivate`, `ResetPassword`, which also clears `failures` and `locked_until`, in one
+  transaction under the same advisory lock as `bootstrap`, the row held `FOR UPDATE`: a
+  suspension or demotion of an active operator with no other active operator whose row passes
+  its checks is `Changed::LastOperator`, nothing written, so two at once are decided one after the other),
+  `standing` (the role, groups and suspension a console write acts with) and `bootstrap`
   (in one transaction under `pg_advisory_xact_lock` of the first eight bytes of BLAKE3 of
   `meada accounts <schema>`: when the table is empty, `admin`, an operator, with the hash and
   change required its caller gives; a table holding a row is never touched and the initial
@@ -1015,7 +1024,10 @@ one for the area a change touches.
   null), `action` (`audit::ACTIONS`: `workspace.save`, `workspace.import`, `workspace.apply`,
   `pointer.set`, `pointer.retain`, `pointer.drop`, `fence.recover`, and `pointer` for a pointer
   request refused before its body; the named workspaces' `workspaces.*`; `account.login` and
-  `account.password`, #554, and `account.reset_admin`, #555, below), `arguments` (`{"version", "message"}` for a save or an import,
+  `account.password`, #554, `account.reset_admin`, #555, and account administration's
+  `account.create`, `account.role`, `account.suspend`, `account.reactivate`,
+  `account.reset_password` and the route-level `account`, #557, below), `arguments`
+  (`{"version", "message"}` for a save or an import,
   the id of the entries as submitted; `{"version"}` for an apply; `{"generation"}` for the
   pointer actions; `{"at_least"}` for a recovery with a floor, its decimal digits; `{}` for a
   refusal before the body), `outcome` (`pending`, `accepted`, `refused`, `failed`) and `message`
@@ -1120,6 +1132,40 @@ one for the area a change touches.
   exiting 1 with `Msg::AuditCli` and nothing written. Its one stdout line is the generated
   password; stderr names what it did (`Msg::AccountsResetDone`) and, for the setting's value,
   only its key. It never reads the signing keys.
+  Every console write of a local account acts as its row stands (#557, `Console::standing`, in
+  `Console::checked` after `operations` and before any role check): `store::standing` reads the
+  role, groups and suspension of the session's username; an active account's session is rebuilt
+  from them (`Console::local_session`, as `admit_local` builds one from a token; under break
+  glass an active row keeps the global operator's session `admit_break_glass` made), a suspended,
+  unknown or hostile one (one `Msg::AccountsBadRow` line) writes as a viewer with no group and so
+  gets its write's role refusal; Postgres unreachable is a 503 `unavailable`. Reads, `login` and
+  `account/password` (which reads the row itself) keep the token's session, so a suspended or
+  demoted account's reads last until its token expires. Account administration
+  (`ui/accounts/administration.rs`, #557), the global operator's whatever `operations` says,
+  and absent under break glass (`Console::has_administration` false, so each route is the 404 of
+  an unknown one, #563): `Console::administration_refused` refuses anyone but a local account of the role `operator`
+  with a 403 `Msg::AccountsOperatorRequired` before the body is read (`Console::administer`
+  checks it again), a write's refusal printed and recorded `refused` as `account.create`, or
+  `account` for a change (its `{"account"}` when the route names a valid username).
+  `GET accounts` lists `store::list` (`{"accounts": [{username, role, state (active, suspended,
+  locked), locked_until, change_required, password_changed, created, created_by}]}`, never a
+  hash; a row failing its checks left out with one line). `POST accounts` (`ADMIN_BODY_MAX`,
+  `{username, role, password, change_required}`, a fixed 400 `Msg::AccountsCreateBody` for any
+  other shape, a 422 `invalid_username` for a username failing `username_ok`, the policy's 422 on
+  the password against that username) hashes under a permit of `HASHES_MAX`, records
+  `account.create` `pending` (`{"account", "role", "change_required"}`, the last as `"true"` or
+  `"false"`), then `store::create` (a taken username a 409 `username_taken`, the record
+  `refused`; `created_by` the session's subject). `POST accounts/<username>` (a username failing
+  `username_ok` a 404 before the body is read; `{"action": "role", "role"}`, `suspend`,
+  `reactivate` or `{"action": "reset_password", "password", "change_required"}`, each refused a
+  fixed 400 `Msg::AccountsChangeBody` with any other field, so no body deletes or renames) records
+  `account.<action>` `pending` (`{"account"}`, with `"role"` or `"change_required"`) before
+  `store::change`; an unknown or hostile account is a 404 `not_found`, the last active operator's
+  suspension or demotion a 409 `last_operator`, each finishing the record `refused` with the line
+  `refused (<code>)`; a success
+  answers `{"account": ...}` as listed. A record that cannot be inserted is a 503
+  `audit_unavailable` and nothing changes. No method but `GET` and `POST` and no other route
+  reaches the table: a `DELETE` or a rename's path is the 404 of an unknown route.
   Operational reads live in `ui/read.rs`: `GET fleet` reads the checked pointer/retained/kept
   state (`generations::inspect`), live heartbeats (`heartbeat::read`), holder and remaining
   lock TTL, and fence counter from Valkey; workspace ids come from generation documents and
@@ -3047,7 +3093,8 @@ one for the area a change touches.
   `ui/accounts.rs`: `HASHES_MAX` (4) bounds the argon2id hashes the console computes at once,
   19 MiB each (a further sign-in or password change is a 503 `busy`, nothing hashed), and
   `LOGIN_MAX` and `PASSWORD_BODY_MAX` (4 KiB each) the bodies of `login` and `account/password`
-  (413 past them). The lockout (#555, `accounts.rs`): `LOCKOUT_FAILURES` (10) consecutive failed
+  (413 past them); `ui/accounts/administration.rs` (#557): `ADMIN_BODY_MAX` (4 KiB) the body of
+  an account's creation or change (413 past it). The lockout (#555, `accounts.rs`): `LOCKOUT_FAILURES` (10) consecutive failed
   password checks, counted under the account row's lock, lock an account for `LOCKOUT_MINUTES`
   (15), never extended by an attempt while it holds; the hash bound is `HASHES_MAX` above, and
   `HASH_MEMORY_MAX_KIB`, `HASH_ITERATIONS_MAX` and `HASH_LANES_MAX` bound what a stored hash may

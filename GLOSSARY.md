@@ -257,7 +257,9 @@ _Avoid_: tombstone, soft delete
 A username and password kept in the data layer, with the role operator or viewer and the groups
 the global operator assigns, for people who sign in to the console of a deployment without an
 identity provider. Its subject is `local:<username>`, never an identity provider's; it is never
-deleted or renamed, and it is not an account with Meada (ADR 0024).
+deleted or renamed, and it is not an account with Meada (ADR 0024). The global operator may
+suspend one: it can no longer sign in and its console writes are refused at once, while its audit
+history stays and its reads last until its token expires; reactivated, it is active again.
 _Avoid_: user, local user, Meada account, login (a GitHub login is the verified login)
 
 **Default account**:

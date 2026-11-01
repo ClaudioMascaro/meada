@@ -706,6 +706,30 @@ password printed, no URL) and a short setting, and `meada ui --help` naming it.
 `tests/it/postgres.rs` holds
 migration 9's columns, and the tests that name the schema version moved to 9.
 
+### Local accounts: account administration (#557)
+
+`src/ui/accounts/administration.rs` holds the unit tests of the bodies: each action parses with
+its own fields and none other (an unknown action, a deletion or rename among them, an unknown
+field beside `suspend`, a role that is neither `operator` nor `viewer`, a missing field are
+refused), a creation's fields, and which routes are administration's.
+`tests/it/ui/accounts/administration.rs` runs the console against Postgres (skipping without it):
+the list's fields and its default account (no hash, no creator); a creation's 400s, 413, 422s
+(`invalid_username`, the policy against the new username), a change required by default, a
+taken username's 409; an unknown or malformed account's 404, no action, method (`DELETE`,
+`PUT`, `PATCH`) or rename route that removes or renames; the role both ways; a lock listed with
+its end and cleared by a reset that requires a change by default (and not when told not to);
+suspension and reactivation; a viewer's 403s on the list, a creation and a change, the last two
+recorded; every record's action, arguments and outcome; no password, token, hash or key in any
+answer, record or stderr line. The demo: a suspended viewer's next write is the role refusal
+and its sign-in the one 401, recorded `suspended`, its token still reading; a suspended, then
+demoted operator's writes are a viewer's refusal at once (recorded as `viewer`), its token still
+saying operator, writing again once reactivated. The last active operator: alone beside a hostile
+operator row (no hash), its own suspension and demotion are 409 `last_operator`; two operators removing themselves at once, five
+rounds, one passes and the other is the 409, leaving one active operator each time. With
+`operations = false` the routes answer and the four operations are the 403 naming
+`ui.operations`. A change whose record cannot be inserted changes nothing (503
+`audit_unavailable`), and with Postgres gone a write and the list are a 503 `unavailable`.
+
 ### Local accounts: the console's pages (#556)
 
 `ui/tests/local.test.ts` holds the client: the sign-in posting to `login` and keeping the token in

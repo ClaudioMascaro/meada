@@ -1155,6 +1155,42 @@ pub enum Msg<'a> {
     /// A session token the console could not sign.
     #[cfg(feature = "accounts")]
     AccountsUnsigned,
+    /// Account administration by anyone but the global operator (#557).
+    #[cfg(feature = "accounts")]
+    AccountsOperatorRequired,
+    /// An account creation whose body is no `{"username", "role", "password"}`.
+    #[cfg(feature = "accounts")]
+    AccountsCreateBody,
+    /// An account change whose body is no one action with its fields.
+    #[cfg(feature = "accounts")]
+    AccountsChangeBody,
+    /// A username that is not 1 to 64 of the allowed characters.
+    #[cfg(feature = "accounts")]
+    AccountsUsernameInvalid,
+    /// A creation's username another account holds.
+    #[cfg(feature = "accounts")]
+    AccountsTaken,
+    /// No account of that username.
+    #[cfg(feature = "accounts")]
+    AccountsUnknown,
+    /// A suspension or a demotion of the last active operator.
+    #[cfg(feature = "accounts")]
+    AccountsLastOperator,
+    /// The audit message of an account created.
+    #[cfg(feature = "accounts")]
+    AccountsCreated,
+    /// The audit message of an account's role changed.
+    #[cfg(feature = "accounts")]
+    AccountsRoleChanged,
+    /// The audit message of an account suspended.
+    #[cfg(feature = "accounts")]
+    AccountsSuspended,
+    /// The audit message of an account reactivated.
+    #[cfg(feature = "accounts")]
+    AccountsReactivated,
+    /// The audit message of an account's password reset.
+    #[cfg(feature = "accounts")]
+    AccountsPasswordReset,
     /// The directory could not be read: the stderr line, naming the directory and never a claim.
     #[cfg(all(feature = "ui", feature = "directory"))]
     DirectoryUnreadable(&'a str),
@@ -3750,6 +3786,62 @@ impl Msg<'_> {
                 "the session token could not be signed".into(),
                 "o token de sessão não pôde ser assinado".into(),
             ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsOperatorRequired => pick(
+                "account administration needs the global operator".into(),
+                "a administração de contas exige o operador global".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsCreateBody => pick(
+                "the body must be {\"username\", \"role\", \"password\"}, with an optional \
+                 \"change_required\""
+                    .into(),
+                "o corpo deve ser {\"username\", \"role\", \"password\"}, com um \
+                 \"change_required\" opcional"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsChangeBody => pick(
+                "the body must be one {\"action\"} (`role`, `suspend`, `reactivate` or \
+                 `reset_password`) with that action's fields"
+                    .into(),
+                "o corpo deve ser uma {\"action\"} (`role`, `suspend`, `reactivate` ou \
+                 `reset_password`) com os campos dessa ação"
+                    .into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsUsernameInvalid => {
+                let max = crate::accounts::USERNAME_MAX;
+                pick(
+                    format!("a username is 1 to {max} lowercase ASCII letters, digits, `.`, `-` and `_`"),
+                    format!("um nome de usuário tem de 1 a {max} letras ASCII minúsculas, dígitos, `.`, `-` e `_`"),
+                )
+            }
+            #[cfg(feature = "accounts")]
+            Msg::AccountsTaken => pick(
+                "another account has that username".into(),
+                "outra conta tem esse nome de usuário".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsUnknown => pick(
+                "no account has that username".into(),
+                "nenhuma conta tem esse nome de usuário".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsLastOperator => pick(
+                "this would leave no active operator account".into(),
+                "isto deixaria a console sem nenhuma conta de operador ativa".into(),
+            ),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsCreated => pick("account created".into(), "conta criada".into()),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsRoleChanged => pick("role changed".into(), "papel trocado".into()),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsSuspended => pick("account suspended".into(), "conta suspensa".into()),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsReactivated => pick("account reactivated".into(), "conta reativada".into()),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsPasswordReset => pick("password reset".into(), "senha redefinida".into()),
             #[cfg(all(feature = "ui", feature = "directory"))]
             Msg::DirectoryUnreadable(reason) => pick(
                 format!("directory: unreadable ({reason})"),

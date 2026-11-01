@@ -540,6 +540,10 @@ async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
         "/api/v1/login" => accounts::LOGIN_MAX,
         #[cfg(feature = "accounts")]
         "/api/v1/account/password" => accounts::PASSWORD_BODY_MAX,
+        #[cfg(feature = "accounts")]
+        path if (path.strip_prefix("/api/v1/")).is_some_and(accounts::is_administration) => {
+            accounts::ADMIN_BODY_MAX
+        }
         "/api/v1/pointer" => write::POINTER_MAX,
         "/api/v1/fence/recover" => write::FENCE_MAX,
         "/api/v1/workspace/versions" => write::SAVE_MAX,
@@ -907,6 +911,25 @@ impl Console {
         if writes_off {
             return disabled(session.subject.as_deref());
         }
+        // A local account's write (an operation, a named workspace's, account administration)
+        // acts as its row stands now, not as its token says (ADR 0024); a read, the playground's
+        // `query` included, keeps the token's session.
+        #[cfg(feature = "accounts")]
+        let subject = session.subject.clone();
+        #[cfg(feature = "accounts")]
+        let administering = write && route.is_some_and(|r| self.has_administration(r));
+        #[cfg(feature = "accounts")]
+        let session = match self.standing(session, route, writes || administering) {
+            Ok(session) => session,
+            Err((refused, message)) => {
+                audit(subject.as_deref(), &message);
+                return Err(refused);
+            }
+        };
+        #[cfg(feature = "accounts")]
+        if let Some(refused) = self.administration_refused(&session, route, &request.method) {
+            return Err(refused);
+        }
         if let Some(operation) = operation {
             // A team operator saves and applies workspace versions; the generation operations
             // stay the global operator's (ADR 0015).
@@ -1077,15 +1100,17 @@ impl Console {
         // administration, agent tokens and login verification do not exist there (ADR 0024). The
         // password change is a local account's own: an identity provider's session gets the 404.
         #[cfg(feature = "accounts")]
-        if let Some(local) = &self.accounts
-            && *method == Method::POST
-        {
-            match route {
-                accounts::LOGIN => return self.login(local, request.body()),
-                accounts::PASSWORD if session.account => {
+        if let Some(local) = &self.accounts {
+            match (route, *method == Method::POST) {
+                (accounts::LOGIN, true) => return self.login(local, request.body()),
+                (accounts::PASSWORD, true) if session.account => {
                     return self.password(local, request.body(), session);
                 }
                 _ => {}
+            }
+            let body = request.body();
+            if let Some(answer) = self.administer(local, method, route, body, session) {
+                return answer;
             }
         }
         #[cfg(feature = "workspaces")]

@@ -8,6 +8,26 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Account administration for local accounts (#557, ADR 0024, from #551): the global operator
+  lists every account (`GET /api/v1/accounts`: username, role, state, the end of a lock, change
+  required, last password change, created and created by, never a hash), creates one
+  (`POST /api/v1/accounts`, `{username, role, password, change_required}`, the policy applied to
+  the temporary password, a change required unless the body turns it off; a malformed username a
+  422 `invalid_username`, a taken one a 409 `username_taken`) and changes one
+  (`POST /api/v1/accounts/<username>`, one `action`: `role`, `suspend`, `reactivate` or
+  `reset_password`, which clears a lock and requires a change unless told not to; an unknown
+  account a 404). Suspending or demoting the last active operator is a 409 `last_operator`,
+  decided under the schema's advisory lock so two requests at once never leave none. Anyone else
+  gets a 403. The routes answer whatever `[ui] operations` says; workspace and generation writes
+  keep requiring it. Every console write of a local account now reads the account's row first,
+  so a suspended or demoted account loses its writes at once, while its reads last until its
+  token expires. Audit actions `account.create`, `account.role`, `account.suspend`,
+  `account.reactivate` and `account.reset_password` name the account and the fields changed,
+  never a password, written before the change (503 `audit_unavailable` otherwise); `account` is
+  the route-level action of a change refused before its body is read. No route deletes or
+  renames an account; under `[accounts] break_glass` (#563) none of these routes exists, each a
+  404. No golden changed.
+
 - Break-glass account beside the identity provider (#563, ADR 0024, from #551): `[accounts]
   break_glass = true` lets the section sit beside `[oidc]`; without `[oidc]` it is an error, and
   `[accounts.groups]` or `[accounts.github]` under it is an error naming the table. The console

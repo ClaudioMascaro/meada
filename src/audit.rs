@@ -25,9 +25,10 @@ use serde_json::json;
 use crate::msg::Msg;
 
 /// The actions a record names: the operations, `pointer`, the route-level action of a pointer
-/// request refused before its body is read, and the local accounts' sign-in, password change
-/// and `meada ui reset-admin` (ADR 0024).
-pub const ACTIONS: [&str; 18] = [
+/// request refused before its body is read, and the local accounts' sign-in, password change,
+/// `meada ui reset-admin` and administration (ADR 0024, #557), with `account`, the route-level
+/// action of an account change refused before its body is read.
+pub const ACTIONS: [&str; 24] = [
     "workspace.save",
     "workspace.import",
     "workspace.apply",
@@ -46,6 +47,12 @@ pub const ACTIONS: [&str; 18] = [
     "account.login",
     "account.password",
     "account.reset_admin",
+    "account.create",
+    "account.role",
+    "account.suspend",
+    "account.reactivate",
+    "account.reset_password",
+    "account",
 ];
 
 /// The outcome a finished write records.
@@ -337,6 +344,8 @@ fn record(row: &tokio_postgres::Row) -> Option<Value> {
         "base",
         "account",
         "reason",
+        "role",
+        "change_required",
     ];
     if !(arguments.iter()).all(|(k, v)| known.contains(&k.as_str()) && v.is_string()) {
         return None;

@@ -48,6 +48,9 @@ use crate::accounts::{self, Keys, Role, Rule};
 use crate::audit::{Actor, Outcome};
 use crate::msg::Msg;
 
+mod administration;
+pub(super) use administration::{ADMIN_BODY_MAX, is_administration};
+
 // ponytail: the most bytes of a sign-in's body: a username and a password of at most 128
 // characters, each escaped, with room to spare; past it a 413.
 pub(super) const LOGIN_MAX: usize = 4 << 10;
@@ -184,6 +187,36 @@ fn postgres_line(reason: &str) {
     );
 }
 
+/// The 503 `unavailable` of the accounts table out of reach, after Postgres's line.
+fn unreachable(reason: &str) -> Answer {
+    postgres_line(reason);
+    let message = Msg::AccountsUnavailable.text();
+    error(StatusCode::SERVICE_UNAVAILABLE, "unavailable", &message)
+}
+
+/// The line of a row of the accounts table that fails its checks, naming the table alone.
+fn bad_row(local: &Local) {
+    let table = store::table(&local.postgres);
+    eprintln!("ui: {}", Msg::AccountsBadRow(&table).text());
+}
+
+/// `password` hashed under a permit of `HASHES_MAX`: the 503 `busy` with none left, the 503
+/// `unavailable` when it cannot be hashed.
+fn hashed(local: &Local, password: &str) -> std::result::Result<String, Box<Answer>> {
+    let hashed = match local.hashes.try_acquire() {
+        Ok(_permit) => accounts::hash(password),
+        Err(_) => return Err(Box::new(busy())),
+    };
+    hashed.map_err(|_| {
+        let message = Msg::AccountsUnavailable.text();
+        Box::new(error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "unavailable",
+            &message,
+        ))
+    })
+}
+
 /// The stderr line of an `action` on the account `shown` refused for `reason`.
 fn refused_line(subject: Option<&str>, action: &str, shown: &str, reason: &str) {
     let line = format!("refused ({reason})");
@@ -274,17 +307,69 @@ impl Console {
             return Err(change_required());
         }
         let operator = claims.role == Role::Operator;
-        let mut groups = claims.groups;
+        Ok(self.local_session(claims.sub, operator, claims.groups, route))
+    }
+
+    /// The session of the local account `subject` on `route`: global operator when `operator`,
+    /// its `groups` sorted, the grant the grant providers compute from them (every repository
+    /// with no table, ADR 0024) and a team operator's teams.
+    fn local_session(
+        self: &std::sync::Arc<Self>,
+        subject: String,
+        operator: bool,
+        mut groups: Vec<String>,
+        route: Option<&str>,
+    ) -> Session {
         groups.sort();
         groups.dedup();
-        // With no groups table, every account reads every repository (ADR 0024).
         let granted = self.providers.grant(&groups, None);
         let grant = match self.providers.bounds() {
             true => granted.union(),
             false => crate::grant::Grant::All,
         };
         let teams = self.teams_on(route, operator, &groups, &grant);
-        Ok(Session::local(claims.sub, operator, groups, teams, grant))
+        Session::local(subject, operator, groups, teams, grant)
+    }
+
+    /// Before a console write of a local account (`write`: an operation, a named workspace's
+    /// write, account administration; ADR 0024, #557): the session as the account's row stands
+    /// now, so a suspension or a role change takes effect on writes at once, while reads keep the
+    /// token's until it expires. An active account's role and groups come from its row (under
+    /// break glass the session stands as admitted, the global operator's); a suspended, unknown
+    /// or hostile one (one line naming the table) writes as a viewer with no group, and so gets
+    /// the role refusal its write already has. `login` and the password change are no such
+    /// write: they read the row themselves. Postgres unreachable is a 503 `unavailable`, with its
+    /// line, and the write's message.
+    pub(super) fn standing(
+        self: &std::sync::Arc<Self>,
+        session: Session,
+        route: Option<&str>,
+        write: bool,
+    ) -> std::result::Result<Session, (Box<Answer>, String)> {
+        let Some(local) = &self.accounts else {
+            return Ok(session);
+        };
+        if !write || !session.account {
+            return Ok(session);
+        }
+        let subject = session.subject.clone().unwrap_or_default();
+        let username = accounts::username_of(&subject).unwrap_or_default();
+        let (operator, groups) = match store::standing(&local.postgres, username) {
+            // Under break glass the default account is the global operator whatever its row's
+            // role (`Local::signed_as`), with every repository: only its suspension takes a write.
+            Ok(store::Standing::Active(..)) if local.break_glass => return Ok(session),
+            Ok(store::Standing::Active(role, groups)) => (role == Role::Operator, groups),
+            Ok(store::Standing::Suspended | store::Standing::Unknown) => (false, Vec::new()),
+            Ok(store::Standing::Bad) => {
+                bad_row(local);
+                (false, Vec::new())
+            }
+            Err(reason) => {
+                let answer = unreachable(&reason);
+                return Err((Box::new(answer), Msg::AccountsUnavailable.text()));
+            }
+        };
+        Ok(self.local_session(subject, operator, groups, route))
     }
 
     /// Admission under break glass (`[oidc]` beside, #563) of a request to the API route `route`
@@ -369,8 +454,7 @@ impl Console {
             }
             Ok(Attempt::Unchecked(account, refusal)) => (Some(account), refusal),
             Ok(Attempt::Bad) => {
-                let table = store::table(&local.postgres);
-                eprintln!("ui: {}", Msg::AccountsBadRow(&table).text());
+                bad_row(local);
                 (None, Refusal::Unknown)
             }
             Ok(Attempt::Unknown) => (None, Refusal::Unknown),
@@ -531,13 +615,9 @@ impl Console {
         if change.new == change.current {
             return refused_by(Rule::Current);
         }
-        let hashed = match local.hashes.try_acquire() {
-            Ok(_permit) => accounts::hash(&change.new),
-            Err(_) => return busy(),
-        };
-        let Ok(hashed) = hashed else {
-            let message = Msg::AccountsUnavailable.text();
-            return error(StatusCode::SERVICE_UNAVAILABLE, "unavailable", &message);
+        let hashed = match hashed(local, &change.new) {
+            Ok(hashed) => hashed,
+            Err(refused) => return *refused,
         };
         let pending = match self.audit.pending(&actor, action, &arguments) {
             Ok(pending) => pending,
