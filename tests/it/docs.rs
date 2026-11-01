@@ -158,7 +158,8 @@ fn the_architecture_map_stays_within_its_budget() {
     );
 }
 
-/// The leads of the map's bullets that link a file in `map/`: what they name before the first `:`.
+/// The leads of the map's bullets that link a file in `map/`: what they name before the first `: `.
+/// A bullet with no `: ` has no lead.
 fn module_leads(map: &str) -> Vec<String> {
     let mut bullets: Vec<String> = Vec::new();
     for line in map.lines() {
@@ -173,14 +174,18 @@ fn module_leads(map: &str) -> Vec<String> {
     (bullets.iter())
         // A bullet that names an area file points to it with a link into `map/`.
         .filter(|b| b.contains("](map/"))
-        .map(|b| b.split(": ").next().unwrap().to_string())
+        .filter_map(|b| b.split_once(": ").map(|(lead, _)| lead.to_string()))
         .collect()
 }
 
 #[test]
 fn every_module_has_a_line_in_the_map_naming_its_area_file() {
     let map = fs::read_to_string("docs/agents/architecture.md").unwrap();
-    let leads = module_leads(&map);
+    // Module lines sit under Crates and Modules, before the Console frontend pointer.
+    let modules = &map[..map
+        .find("\n## Console frontend")
+        .expect("a Console frontend section")];
+    let leads = module_leads(modules);
     let mut missing = Vec::new();
     for dir in ["src", "meada-core/src"] {
         let mut stems = BTreeSet::new();
@@ -196,7 +201,7 @@ fn every_module_has_a_line_in_the_map_naming_its_area_file() {
                 (lead.contains("meada-core") == (dir != "src"))
                     && (lead.contains(&format!("`{stem}.rs`"))
                         || lead.contains(&format!("`{stem}/`"))
-                        || lead.contains(&format!("/{stem}.rs`")))
+                        || lead.contains(&format!("`meada-core/src/{stem}.rs`")))
             });
             if !named {
                 missing.push(format!("{dir}/{stem}"));
@@ -211,6 +216,6 @@ fn every_module_has_a_line_in_the_map_naming_its_area_file() {
 
 #[test]
 fn a_module_lead_is_what_a_bullet_with_an_area_link_names_before_its_colon() {
-    let map = "- `a.rs`: one. [x](map/x.md)\n- `b.rs`: no link\n- `c.rs`, `d/`: two,\n  wrapped. [y](map/y.md)\n";
+    let map = "- `a.rs`: one. [x](map/x.md)\n- `b.rs`: no link\n- `e.rs` no colon [z](map/z.md)\n- `c.rs`, `d/`: two,\n  wrapped. [y](map/y.md)\n";
     assert_eq!(module_leads(map), vec!["- `a.rs`", "- `c.rs`, `d/`"]);
 }
