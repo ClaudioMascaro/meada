@@ -2,10 +2,12 @@
 //! table, whatever `[ui] operations` says, so a read-only console can still have viewers.
 //!
 //! - `GET accounts`: every account (`store::list`), by username, never a hash.
-//! - `POST accounts`: `{username, role, password, change_required}` creates one, its temporary
-//!   password through the policy, a change required unless the body turns it off; a malformed
-//!   username is a 422 `invalid_username`, a taken one a 409 `username_taken`.
-//! - `POST accounts/<username>`: one action, `{"action": "role", "role"}`, `suspend`,
+//! - `POST accounts`: `{username, role, groups, password, change_required}` creates one, its
+//!   temporary password through the policy, a change required unless the body turns it off,
+//!   `groups` none when absent; a malformed username is a 422 `invalid_username`, a group that is
+//!   no owner name a 422 `invalid_group`, a taken username a 409 `username_taken`.
+//! - `POST accounts/<username>`: one action, `{"action": "role", "role"}`, `{"action": "groups",
+//!   "groups"}` (#558: each an owner name, ADR 0015, sorted without repeats), `suspend`,
 //!   `reactivate`, or `{"action": "reset_password", "password", "change_required"}`, which also
 //!   clears a lock and requires a change unless the body turns it off. An unknown account is a
 //!   404; a suspension or a demotion of the last active operator a 409 `last_operator`, decided
@@ -16,8 +18,9 @@
 //! `account.create`, or the route's own `account` for a change whose action is still unread. A
 //! change passes its body's checks
 //! (400, 413, 422, not recorded), then is recorded `pending` (`account.create`, `account.role`,
-//! `account.suspend`, `account.reactivate`, `account.reset_password`, naming the account and the
-//! fields changed, never a password) before the table is touched, and finished with its outcome;
+//! `account.groups`, `account.suspend`, `account.reactivate`, `account.reset_password`, naming the
+//! account and the fields changed, the groups as a JSON array in a string, never a password)
+//! before the table is touched, and finished with its outcome;
 //! a record that cannot be inserted is a 503 `audit_unavailable` and nothing changes.
 
 use hyper::{Method, StatusCode};
@@ -55,6 +58,7 @@ fn named(route: &str) -> Option<&str> {
 struct Create {
     username: String,
     role: Role,
+    groups: Option<Vec<String>>,
     password: String,
     change_required: Option<bool>,
 }
@@ -66,6 +70,9 @@ struct Create {
 enum Action {
     Role {
         role: Role,
+    },
+    Groups {
+        groups: Vec<String>,
     },
     // Empty structs rather than units, so a field beside them is refused as for the others.
     Suspend {},
@@ -81,6 +88,7 @@ impl Action {
     fn recorded(&self) -> &'static str {
         match self {
             Action::Role { .. } => "account.role",
+            Action::Groups { .. } => "account.groups",
             Action::Suspend {} => "account.suspend",
             Action::Reactivate {} => "account.reactivate",
             Action::ResetPassword { .. } => "account.reset_password",
@@ -91,6 +99,7 @@ impl Action {
     fn accepted(&self) -> String {
         match self {
             Action::Role { .. } => Msg::AccountsRoleChanged.text(),
+            Action::Groups { .. } => Msg::AccountsGroupsChanged.text(),
             Action::Suspend {} => Msg::AccountsSuspended.text(),
             Action::Reactivate {} => Msg::AccountsReactivated.text(),
             Action::ResetPassword { .. } => Msg::AccountsPasswordReset.text(),
@@ -103,6 +112,7 @@ fn document(account: &Listed) -> Value {
     json!({
         "username": account.username,
         "role": account.role.name(),
+        "groups": account.groups,
         "state": account.state(),
         "locked_until": account.locked_until,
         "change_required": account.change_required,
@@ -110,6 +120,24 @@ fn document(account: &Listed) -> Value {
         "created": account.created,
         "created_by": account.created_by,
     })
+}
+
+/// `groups` sorted without repeats, or the 422 `invalid_group` when one is no name an entry's
+/// owner may be (ADR 0015), so a group always means what an owner of the same name does.
+fn checked_groups(mut groups: Vec<String>) -> std::result::Result<Vec<String>, Box<Answer>> {
+    if !accounts::groups_ok(&groups) {
+        let message = Msg::AccountsGroupInvalid.text();
+        let answer = error(StatusCode::UNPROCESSABLE_ENTITY, "invalid_group", &message);
+        return Err(Box::new(answer));
+    }
+    groups.sort();
+    groups.dedup();
+    Ok(groups)
+}
+
+/// `groups` as an audit argument: a JSON array in a string, since every argument is a string.
+fn recorded_groups(groups: &[String]) -> String {
+    json!(groups).to_string()
 }
 
 /// A change's pending record, and what its stderr line names.
@@ -301,6 +329,10 @@ impl Console {
                 &message,
             );
         }
+        let groups = match checked_groups(create.groups.unwrap_or_default()) {
+            Ok(groups) => groups,
+            Err(refused) => return *refused,
+        };
         if let Err(rule) = accounts::policy(&create.password, &create.username) {
             return refused_by(rule);
         }
@@ -314,6 +346,7 @@ impl Console {
         let arguments = json!({
             "account": username,
             "role": create.role.name(),
+            "groups": recorded_groups(&groups),
             "change_required": change_required.to_string(),
         });
         let recorded = match self.account_pending(session, action, username, &arguments) {
@@ -325,6 +358,7 @@ impl Console {
             &local.postgres,
             username,
             create.role,
+            &groups,
             &hash,
             change_required,
             creator,
@@ -356,6 +390,14 @@ impl Console {
             Action::Role { role } => {
                 arguments["role"] = json!(role.name());
                 Change::Role(*role)
+            }
+            Action::Groups { groups } => {
+                let groups = match checked_groups(groups.clone()) {
+                    Ok(groups) => groups,
+                    Err(refused) => return *refused,
+                };
+                arguments["groups"] = json!(recorded_groups(&groups));
+                Change::Groups(groups)
             }
             Action::Suspend {} => Change::Suspend,
             Action::Reactivate {} => Change::Reactivate,
@@ -405,6 +447,10 @@ mod tests {
             Ok(Action::Role { role: Role::Viewer })
         ));
         assert!(matches!(
+            parse(r#"{"action": "groups", "groups": ["team-billing"]}"#),
+            Ok(Action::Groups { groups }) if groups == ["team-billing"]
+        ));
+        assert!(matches!(
             parse(r#"{"action": "suspend"}"#),
             Ok(Action::Suspend {})
         ));
@@ -433,6 +479,9 @@ mod tests {
             r#"{"action": "role"}"#,
             r#"{"action": "suspend", "username": "eve"}"#,
             r#"{"action": "role", "role": "viewer", "groups": []}"#,
+            r#"{"action": "groups"}"#,
+            r#"{"action": "groups", "groups": "team-billing"}"#,
+            r#"{"action": "groups", "groups": [], "role": "viewer"}"#,
             r#"{"action": "reset_password"}"#,
             r#"{"role": "viewer"}"#,
         ] {
@@ -440,8 +489,8 @@ mod tests {
         }
     }
 
-    /// A creation takes a username, a role and a password, `change_required` optional, and no
-    /// other field.
+    /// A creation takes a username, a role and a password, `groups` and `change_required`
+    /// optional, and no other field.
     #[test]
     fn a_creation_takes_its_fields_and_no_other() {
         let parse = |body: &str| serde_json::from_str::<Create>(body);
@@ -454,10 +503,13 @@ mod tests {
             ),
             ("bo", Role::Operator, None)
         );
+        let grouped = r#"{"username": "bo", "role": "viewer", "groups": ["g"], "password": "p"}"#;
+        assert_eq!(parse(grouped).unwrap().groups, Some(vec!["g".to_string()]));
         for refused in [
             r#"{"username": "bo", "role": "viewer"}"#,
             r#"{"username": "bo", "role": "root", "password": "p"}"#,
             r#"{"username": "bo", "role": "viewer", "password": "p", "hash": "h"}"#,
+            r#"{"username": "bo", "role": "viewer", "password": "p", "groups": "g"}"#,
         ] {
             assert!(parse(refused).is_err(), "{refused}");
         }
@@ -471,5 +523,20 @@ mod tests {
         for route in ["account/password", "accountsx", "login", "session"] {
             assert!(!is_administration(route), "{route}");
         }
+    }
+
+    /// Groups are owner names, kept sorted without repeats; one that is not refuses them all.
+    #[test]
+    fn groups_are_owner_names_sorted_without_repeats() {
+        let names = |list: &[&str]| list.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let checked = checked_groups(names(&["team-web", "team-billing", "team-web"]));
+        assert_eq!(checked.ok(), Some(names(&["team-billing", "team-web"])));
+        assert_eq!(checked_groups(Vec::new()).ok(), Some(Vec::new()));
+        let long = "g".repeat(meada_core::manifest::OWNER_MAX + 1);
+        for refused in ["", " padded", "line\nbreak", long.as_str()] {
+            let refused = checked_groups(names(&["team-web", refused])).err().unwrap();
+            assert_eq!(refused.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        }
+        assert_eq!(recorded_groups(&names(&["a", "b\"c"])), r#"["a","b\"c"]"#);
     }
 }

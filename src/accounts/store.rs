@@ -4,8 +4,9 @@
 //! not know counts as unreachable, and is bounded as the audit's calls are. Every row is hostile when read: one that fails its
 //! checks admits nothing (`Attempt::Bad`), and its reader writes one line naming the table, never
 //! a value. A password attempt (`attempt`) holds the row while it checks and counts. Account
-//! administration (`list`, `create`, `change`, #557) is the global operator's; a change that
-//! could leave no active operator runs under the schema's advisory lock, so two at once never do.
+//! administration (`list`, `create`, `change`, #557, groups #558) is the global operator's; a
+//! change that could leave no active operator runs under the schema's advisory lock, so two at
+//! once never do.
 //! A console write first reads its account's `standing`.
 
 use crate::accounts::{Role, groups_ok, is_hash, username_of, username_ok};
@@ -295,9 +296,9 @@ pub fn bootstrap(
 /// How a timestamp column reads: RFC 3339 in UTC to the microsecond, as the audit's times.
 const TIME: &str = "'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'";
 
-/// The columns of an account as the list shows it, in `Listed`'s order, then its hash and groups,
-/// read only to check the row as a sign-in would (`Listed` holds neither). A lock that has ended
-/// reads as none.
+/// The columns of an account as the list shows it, in `Listed`'s order, then its hash, read only
+/// to check the row as a sign-in would (`Listed` never holds it), and its groups. A lock that has
+/// ended reads as none.
 fn listed_columns() -> String {
     format!(
         "username, role, suspended, CASE WHEN locked_until > now() THEN \
@@ -321,6 +322,8 @@ pub struct Listed {
     /// The subject of the global operator that created it; none for the default account and
     /// one `meada ui reset-admin` created.
     pub created_by: Option<String>,
+    /// Its groups, as stored (#558).
+    pub groups: Vec<String>,
 }
 
 impl Listed {
@@ -363,6 +366,7 @@ fn listed(row: &tokio_postgres::Row) -> Option<Listed> {
         password_changed: time(5)??,
         created: time(6)??,
         created_by,
+        groups,
     })
 }
 
@@ -384,12 +388,13 @@ pub fn list(config: &Config) -> Result<(Vec<Listed>, usize), String> {
     Ok((accounts, skipped))
 }
 
-/// A new account `username` of `role`, its password `hash`, a change required when
+/// A new account `username` of `role` in `groups`, its password `hash`, a change required when
 /// `change_required`, created by `created_by` (a subject): `Taken` when the username is.
 pub fn create(
     config: &Config,
     username: &str,
     role: Role,
+    groups: &[String],
     hash: &str,
     change_required: bool,
     created_by: &str,
@@ -398,17 +403,18 @@ pub fn create(
         let opened = crate::postgres::connected(config).await?;
         let sql = format!(
             "INSERT INTO {}.accounts (username, password_hash, role, change_required, \
-             created_by) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (username) DO NOTHING \
-             RETURNING {}",
+             created_by, groups) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (username) DO \
+             NOTHING RETURNING {}",
             config.quoted(),
             listed_columns()
         );
-        let values: [&(dyn tokio_postgres::types::ToSql + Sync); 5] = [
+        let values: [&(dyn tokio_postgres::types::ToSql + Sync); 6] = [
             &username,
             &hash,
             &role.name(),
             &change_required,
             &created_by,
+            &groups,
         ];
         let rows = (opened.client).query(&sql, &values).await;
         let rows = rows.map_err(|e| opened.scrub(e))?;
@@ -424,6 +430,8 @@ pub fn create(
 pub enum Change {
     /// The role set.
     Role(Role),
+    /// The groups set, each an owner name (#558).
+    Groups(Vec<String>),
     Suspend,
     Reactivate,
     /// The password `hash` set, a change required when `change_required`, the lock and its
@@ -500,6 +508,10 @@ pub fn change(config: &Config, username: &str, change: &Change) -> Result<Change
             Change::Role(role) => {
                 let sql = set("role = $2");
                 tx.query_one(&sql, &[&username, &role.name()]).await
+            }
+            Change::Groups(groups) => {
+                let sql = set("groups = $2");
+                tx.query_one(&sql, &[&username, groups]).await
             }
             Change::Suspend => tx.query_one(&set("suspended = true"), &[&username]).await,
             Change::Reactivate => tx.query_one(&set("suspended = false"), &[&username]).await,

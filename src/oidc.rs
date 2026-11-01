@@ -972,14 +972,8 @@ impl Oidc {
         let failed = (fetched.failed.as_ref()).map(
             |(at, why)| serde_json::json!({"time": crate::modules::rfc3339(*at), "reason": why}),
         );
-        let groups: Option<Map<String, Value>> = (self.config.groups.as_ref()).map(|(_, table)| {
-            (table.iter())
-                .map(|(group, identities)| {
-                    let shown = identities.iter().filter(|i| *i == "*" || reads(i));
-                    (group.clone(), shown.cloned().collect::<Vec<_>>().into())
-                })
-                .collect()
-        });
+        let groups =
+            (self.config.groups.as_ref()).map(|(_, table)| crate::grant::bounded(table, reads));
         let mut document = serde_json::json!({
             "type": self.config.kind,
             "issuer": self.config.issuer,

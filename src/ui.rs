@@ -1136,13 +1136,22 @@ impl Console {
             "session" if read => Some(session.document()),
             "manifest" if read => Some(self.manifest(session)),
             #[cfg(feature = "oidc")]
-            "admission" if read => (self.oidc.as_ref()).map(|o| {
-                #[allow(unused_mut)]
-                let mut document = o.admission(&|i| session.reads(i));
-                #[cfg(feature = "directory")]
-                self.with_directory_counts(&mut document);
+            "admission" if read => {
+                let document = (self.oidc.as_ref()).map(|o| {
+                    #[allow(unused_mut)]
+                    let mut document = o.admission(&|i| session.reads(i));
+                    #[cfg(feature = "directory")]
+                    self.with_directory_counts(&mut document);
+                    document
+                });
+                // With `[accounts]`, its mode and key beside, or alone without `[oidc]` (#558).
+                #[cfg(feature = "accounts")]
+                let document = match &self.accounts {
+                    Some(local) => Some(self.accounts_admission(local, document, session)),
+                    None => document,
+                };
                 document
-            }),
+            }
             #[cfg(feature = "oidc")]
             "admission/check" if *method == Method::POST => match &self.oidc {
                 Some(oidc) => return self.check(oidc, request.body(), session),
@@ -1229,10 +1238,10 @@ impl Console {
             if let Some(Value::Array(entries)) = loaded.get_mut("repository") {
                 read::filter_entries(entries, "repo", session);
             }
-            if let Some(groups) = loaded
-                .pointer_mut("/oidc/groups")
-                .and_then(Value::as_object_mut)
-            {
+            for table in GROUP_TABLES {
+                let Some(groups) = loaded.pointer_mut(table).and_then(Value::as_object_mut) else {
+                    continue;
+                };
                 for identities in groups.values_mut().filter_map(Value::as_array_mut) {
                     identities.retain(|identity| {
                         identity
@@ -1614,6 +1623,10 @@ fn origin(url: &str) -> &str {
     &url[..end]
 }
 
+/// The groups tables of a manifest as JSON: the identity provider's and the local accounts'
+/// (#558), each bounded alike.
+const GROUP_TABLES: [&str; 2] = ["/oidc/groups", "/accounts/groups"];
+
 /// Repository, peer and group identities, including identities not listed as entries.
 fn identities(manifest: &Value) -> impl Iterator<Item = &str> {
     let entries = manifest.get("repository").and_then(Value::as_array);
@@ -1627,10 +1640,8 @@ fn identities(manifest: &Value) -> impl Iterator<Item = &str> {
             .filter_map(|peer| peer.get("repo").and_then(Value::as_str));
         own.into_iter().chain(peers)
     });
-    let groups = manifest
-        .pointer("/oidc/groups")
-        .and_then(Value::as_object)
-        .into_iter()
+    let groups = (GROUP_TABLES.iter())
+        .filter_map(|table| manifest.pointer(table).and_then(Value::as_object))
         .flat_map(|groups| groups.values())
         .flat_map(|value| {
             value.as_str().into_iter().chain(

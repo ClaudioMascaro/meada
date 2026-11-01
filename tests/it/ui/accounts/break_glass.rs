@@ -240,6 +240,12 @@ fn the_break_glass_account_signs_in_beside_the_identity_provider() {
                "account": true})
     );
     assert_eq!(ask(console, "/api/v1/manifest", &operator).status, 200);
+    // The admission view is the identity provider's, with break glass's mode and key (#558).
+    let admission = ask(console, "/api/v1/admission", &operator).json();
+    assert_eq!(admission["issuer"], json!(glass.issuer.base), "{admission}");
+    assert_eq!(admission["accounts"]["mode"], "break_glass", "{admission}");
+    let fingerprint = admission["accounts"]["public_key"].as_str().unwrap();
+    assert!(fingerprint.starts_with("blake3:"), "{fingerprint}");
     let again = login(console, "admin", CHANGED);
     assert_eq!(again.json()["change_required"], false);
 

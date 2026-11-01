@@ -23,6 +23,7 @@
 // The console (feature `ui`) is the one reader of the keys, the policy and the store so far.
 #![cfg_attr(not(feature = "ui"), allow(dead_code))]
 
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::OnceLock;
 
@@ -148,6 +149,8 @@ pub struct File {
     admin_password_file: Option<String>,
     #[serde(default)]
     break_glass: bool,
+    /// `[accounts.groups]`: a group to the identities it grants, as `[oidc.groups]` (#558).
+    groups: Option<HashMap<String, Vec<String>>>,
 }
 
 /// The validated section: where each secret comes from, never a value.
@@ -159,6 +162,10 @@ pub struct Config {
     /// `break_glass = true`: beside `[oidc]`, only the default account signs in to the console,
     /// as the global operator, and nothing else of local accounts exists (ADR 0024).
     pub break_glass: bool,
+    /// `[accounts.groups]` (#558): a group of local accounts to the identities it grants, `*` for
+    /// all, with `[oidc.groups]`'s rules and comparison; without it (and `[accounts.github]`)
+    /// every local account reads every repository.
+    pub groups: Option<HashMap<String, Vec<String>>>,
     /// The manifest's `[postgres]`, where the accounts live: `Manifest::read` sets it, and
     /// refuses the section without it.
     pub postgres: Option<crate::postgres::Config>,
@@ -191,6 +198,7 @@ impl File {
             private_key,
             admin_password: admin_password.unwrap_or(Secret::Env(ADMIN_PASSWORD_ENV.into())),
             break_glass: self.break_glass,
+            groups: self.groups,
             postgres: None,
         })
     }
@@ -357,6 +365,15 @@ pub struct Keys {
 }
 
 impl Keys {
+    /// The public key's fingerprint (#558), which the admission view shows so an operator can tell
+    /// which key pair the console holds: `blake3:` and the hex BLAKE3 hash of the raw 32-byte
+    /// Ed25519 public key (the last 32 bytes of its DER). Never a secret.
+    pub fn fingerprint(&self) -> String {
+        let raw = (self.decoding.try_get_as_bytes())
+            .expect("an Ed25519 key read from PEM holds its raw bytes");
+        format!("blake3:{}", blake3::hash(raw).to_hex())
+    }
+
     /// A session token for `username` from `issuer`, now: the token and its expiry in seconds
     /// since the epoch.
     pub fn session(
@@ -767,6 +784,40 @@ mod tests {
             }
         }
         format!("-----BEGIN {label}-----\n{text}\n-----END {label}-----\n")
+    }
+
+    /// The fingerprint is the BLAKE3 hash of the raw public key, the last 32 bytes of its DER,
+    /// as `openssl pkey -pubin -outform DER | tail -c 32 | b3sum` computes it.
+    #[test]
+    fn the_fingerprint_hashes_the_raw_public_key() {
+        let (private, public) = pair();
+        let keys = keyed("fingerprint", &public, &private).keys().unwrap();
+        let body: String = (public.lines())
+            .filter(|l| !l.starts_with("-----"))
+            .collect();
+        let der = decoded(&body);
+        let raw = &der[der.len() - 32..];
+        assert_eq!(
+            keys.fingerprint(),
+            format!("blake3:{}", blake3::hash(raw).to_hex())
+        );
+        let (other_private, other_public) = pair();
+        let other = keyed("fingerprint2", &other_public, &other_private);
+        assert_ne!(other.keys().unwrap().fingerprint(), keys.fingerprint());
+    }
+
+    /// `text`, standard base64 with padding, decoded.
+    fn decoded(text: &str) -> Vec<u8> {
+        const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let sextets: Vec<u32> = (text.bytes().filter(|b| *b != b'='))
+            .map(|b| ALPHABET.iter().position(|a| *a == b).unwrap() as u32)
+            .collect();
+        let mut bytes = Vec::new();
+        for chunk in sextets.chunks(4) {
+            let n = (chunk.iter().enumerate()).fold(0u32, |n, (i, s)| n | s << (18 - 6 * i));
+            bytes.extend_from_slice(&n.to_be_bytes()[1..chunk.len()]);
+        }
+        bytes
     }
 
     /// `[accounts]` over the key files `public` and `private` written under a directory of `case`.

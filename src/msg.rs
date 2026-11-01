@@ -1167,6 +1167,9 @@ pub enum Msg<'a> {
     /// A username that is not 1 to 64 of the allowed characters.
     #[cfg(feature = "accounts")]
     AccountsUsernameInvalid,
+    /// An account's group that is no name an entry's owner may be (#558).
+    #[cfg(feature = "accounts")]
+    AccountsGroupInvalid,
     /// A creation's username another account holds.
     #[cfg(feature = "accounts")]
     AccountsTaken,
@@ -1182,6 +1185,9 @@ pub enum Msg<'a> {
     /// The audit message of an account's role changed.
     #[cfg(feature = "accounts")]
     AccountsRoleChanged,
+    /// The audit message of an account's groups changed (#558).
+    #[cfg(feature = "accounts")]
+    AccountsGroupsChanged,
     /// The audit message of an account suspended.
     #[cfg(feature = "accounts")]
     AccountsSuspended,
@@ -3793,20 +3799,20 @@ impl Msg<'_> {
             ),
             #[cfg(feature = "accounts")]
             Msg::AccountsCreateBody => pick(
-                "the body must be {\"username\", \"role\", \"password\"}, with an optional \
-                 \"change_required\""
+                "the body must be {\"username\", \"role\", \"password\"}, with optional \
+                 \"groups\" and \"change_required\""
                     .into(),
-                "o corpo deve ser {\"username\", \"role\", \"password\"}, com um \
-                 \"change_required\" opcional"
+                "o corpo deve ser {\"username\", \"role\", \"password\"}, com \"groups\" e \
+                 \"change_required\" opcionais"
                     .into(),
             ),
             #[cfg(feature = "accounts")]
             Msg::AccountsChangeBody => pick(
-                "the body must be one {\"action\"} (`role`, `suspend`, `reactivate` or \
-                 `reset_password`) with that action's fields"
+                "the body must be one {\"action\"} (`role`, `groups`, `suspend`, `reactivate` \
+                 or `reset_password`) with that action's fields"
                     .into(),
-                "o corpo deve ser uma {\"action\"} (`role`, `suspend`, `reactivate` ou \
-                 `reset_password`) com os campos dessa ação"
+                "o corpo deve ser uma {\"action\"} (`role`, `groups`, `suspend`, `reactivate` \
+                 ou `reset_password`) com os campos dessa ação"
                     .into(),
             ),
             #[cfg(feature = "accounts")]
@@ -3836,6 +3842,22 @@ impl Msg<'_> {
             Msg::AccountsCreated => pick("account created".into(), "conta criada".into()),
             #[cfg(feature = "accounts")]
             Msg::AccountsRoleChanged => pick("role changed".into(), "papel trocado".into()),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGroupsChanged => pick("groups changed".into(), "grupos trocados".into()),
+            #[cfg(feature = "accounts")]
+            Msg::AccountsGroupInvalid => {
+                let max = meada_core::manifest::OWNER_MAX;
+                pick(
+                    format!(
+                        "a group is a name an entry's owner may be: 1 to {max} characters, no \
+                         control character, no leading or trailing space"
+                    ),
+                    format!(
+                        "um grupo é um nome que o dono de uma entrada pode ter: de 1 a {max} \
+                         caracteres, sem caractere de controle nem espaço no início ou no fim"
+                    ),
+                )
+            }
             #[cfg(feature = "accounts")]
             Msg::AccountsSuspended => pick("account suspended".into(), "conta suspensa".into()),
             #[cfg(feature = "accounts")]

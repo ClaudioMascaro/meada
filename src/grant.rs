@@ -177,11 +177,18 @@ impl Providers {
         }
     }
 
-    /// The grant providers `manifest` configures: `[oidc.groups]` and `Manifest::github`.
+    /// The grant providers `manifest` configures: `[oidc.groups]` or `[accounts.groups]` (never
+    /// both: `[accounts]` sits beside `[oidc]` only under break glass, which refuses its groups)
+    /// and `Manifest::github`.
     pub fn of(manifest: &crate::workspace::Manifest) -> Self {
         let groups = (manifest.oidc.as_ref())
             .and_then(|oidc| oidc.groups.as_ref())
             .map(|(_, table)| table.clone());
+        #[cfg(feature = "accounts")]
+        let groups = groups.or_else(|| {
+            let accounts = manifest.accounts.as_ref()?;
+            accounts.groups.clone()
+        });
         Self::new(groups, manifest.github())
     }
 
@@ -285,6 +292,21 @@ impl Providers {
         }
         None
     }
+}
+
+/// The groups table `table` as an admission view shows it (#558): each group's identities that
+/// `reads` admits, `*` kept since it names none.
+#[cfg(feature = "ui")]
+pub fn bounded(
+    table: &HashMap<String, Vec<String>>,
+    reads: &dyn Fn(&str) -> bool,
+) -> serde_json::Map<String, serde_json::Value> {
+    (table.iter())
+        .map(|(group, identities)| {
+            let shown = identities.iter().filter(|i| *i == "*" || reads(i));
+            (group.clone(), shown.cloned().collect::<Vec<_>>().into())
+        })
+        .collect()
 }
 
 /// A subject a verifier admitted, whichever verifier it was: what the console's session and the

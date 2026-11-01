@@ -96,3 +96,16 @@ test('the token check splits the admitted identities into the claims side and th
   expect(checkModel({ checks, identities: ['a/b'] }, t).sources).toBeUndefined();
   expect(checkModel({ checks, identities: null, sources: null }, t).sources).toBeNull();
 });
+
+test('admission with local accounts shows the sign-in mode and the public key, beside the identity provider under break glass', () => {
+  for (const locale of ['en', 'pt-BR'] as const) {
+    const t = operationsCopy[locale];
+    const key = `blake3:${'a'.repeat(64)}`;
+    const alone = admissionModel({ accounts: { mode: 'accounts', public_key: key }, groups: { 'team-billing': ['example.com/team/api'] } }, t);
+    expect(alone).toEqual([[t.signIn, t.signIn_accounts], [t.publicKey, key]]);
+    const beside = admissionModel({ ...operational.admission, accounts: { mode: 'break_glass', public_key: key } }, t);
+    expect(beside.slice(0, 2)).toEqual([[t.issuer, 'https://issuer.example'], [t.providerType, 'entra']]);
+    expect(beside).toContainEqual([t.signIn, t.signIn_break_glass]);
+    expect(beside).toContainEqual([t.publicKey, key]);
+  }
+});

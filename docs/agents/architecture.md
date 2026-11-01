@@ -262,6 +262,10 @@ menu, no link, no session read, reached only while the stage is `forced`; the ch
 workspace) and `ProfilePage` (the session's fields, the voluntary change, sign-out), `account.ts`
 their view model and `account-i18n.ts` their pt-BR/en copy. The shell offers `/profile` with
 local accounts only. Agent tokens, the GitHub login and the accounts page are later tickets.
+The admission page (#558, `operations.ts`): `Admission` is the identity provider's document
+(`OidcAdmission`, with `accounts` under break glass) or local accounts' alone (`AccountsAdmission`,
+told apart by `isOidcAdmission`); `admissionModel` adds the sign-in mode and the public key's
+fingerprint, and the issuer's metadata and the token check show only for the identity provider.
 Break glass (#563): when `config` says `"sign_in": "oidc"` with `"break_glass": true`, `main.tsx`
 builds a `LocalAuth` instead for a tab on `/break-glass` (`BREAK_GLASS_PATH`) or holding a
 session token (`breakGlassTab`); any other tab without a token gets `SignInChoicePage` before the
@@ -791,7 +795,9 @@ one for the area a change touches.
   through `Manifest::excludes`) reaches through `Manifest::github`, the one accessor a later
   section can also fill; `role_ok` and `ROLE_MAX` the role names it takes. `Providers` is a
   process's providers, built once from its manifest (`Providers::of`: the groups table of
-  `[oidc.groups]` and `Manifest::github`) by `mcp::Gate::new`, `ui::Console::start` and
+  `[oidc.groups]`, or of `[accounts.groups]` (#558; never both, since `[accounts]` sits beside
+  `[oidc]` only under break glass, which refuses its groups), and `Manifest::github`) by
+  `mcp::Gate::new`, `ui::Console::start` and
   `Console::for_proposals`, shared through an `Arc` with the verifier, and its permissions
   cache's poll starts at `Providers::listening` (called by `mcp::run`, `ui::listen` and the
   proposal server's listener once the address is printed). `Providers::grant(groups, login)` is
@@ -835,7 +841,10 @@ one for the area a change touches.
   used; #554): local accounts. `File` is the `[accounts]` section and `File::validate` its
   `Config`: `public_key_env` or `public_key_file`, `private_key_env` or `private_key_file`,
   `admin_password_env` (`MEADA_ADMIN_PASSWORD` by default) or `admin_password_file`, at most one
-  of each pair (`Msg::AccountsBoth`), names only, and `break_glass` (false by default, #563).
+  of each pair (`Msg::AccountsBoth`), names only, `break_glass` (false by default, #563) and
+  `groups` (`[accounts.groups]`, #558: a group to the identities it grants, `*` for all, read as
+  `[oidc.groups]` is and handed to `grant::Providers::of`; without it, nor the GitHub grant
+  provider, every local account reads every repository).
   `Manifest::read` refuses, before the sections are parsed, `[accounts.groups]` or
   `[accounts.github]` under `break_glass = true` (`under_break_glass`,
   `Msg::AccountsUnderBreakGlass`, naming the table); then the section without `[postgres]`
@@ -844,7 +853,8 @@ one for the area a change touches.
   and gives it its `[postgres]`. `issued_by` reads a token's `iss` without any check
   (`jsonwebtoken::dangerous::insecure_decode_claims`), only to route a bearer to its one
   verifier under break glass. `Config::keys` reads the key pair, only in the console and only at
-  start: a key
+  start (`Keys::fingerprint`, #558: `blake3:` and the hex BLAKE3 hash of the raw 32-byte public
+  key, what the admission view shows): a key
   not named (`Msg::AccountsKeyMissing`), an unset variable, an unreadable file (`KEY_MAX`), a key
   that is no Ed25519 key in PEM (`jsonwebtoken`'s `from_ed_pem`) or a private key that does not
   sign what the public key verifies (a probe token) refuses the start naming the key, never its
@@ -953,9 +963,15 @@ one for the area a change touches.
   node's answers: a repository outside the grant is absent, state that belongs to no repository
   is shown whole, a `*` grant reads everything; the read routes (#304) and the playground
   (#305) bound theirs through it. `/api/v1/` is the JSON API (`config`, `session`, `manifest`,
-  and with `[oidc]` `admission` and `POST admission/check`; errors `{"error": {"code",
-  "message"}}`, an unknown path a 404 in that shape, as the admission routes are without
-  `[oidc]`); `config` adds `sign_in` (`accounts` with `[accounts]`, `oidc` with `[oidc]`, and
+  and with `[oidc]` `admission` and `POST admission/check`; with `[accounts]` `admission` too
+  (#558, `Console::accounts_admission`: `accounts`, `{mode (accounts or break_glass),
+  public_key (Keys::fingerprint)}`, added to the identity provider's document under break glass,
+  and without `[oidc]` the whole document with `groups`, `[accounts.groups]` each group's
+  identities the session reads, `*` kept (`grant::bounded`, shared with the identity provider's
+  view), and the GitHub grant provider's `github`); errors
+  `{"error": {"code", "message"}}`, an unknown path a 404 in that shape, as the admission routes
+  are without either section); `config` adds `sign_in` (`accounts` with `[accounts]`, `oidc`
+  with `[oidc]`, and
   then `break_glass: true` under break glass) and, with `[oidc]`, the issuer, `client_id`, the
   scopes and the audience
   the browser's authorization code flow with PKCE needs; `session` is the subject and role (`viewer`, `team_operator`, `operator`) and, with `[oidc]`, `groups`
@@ -968,7 +984,8 @@ one for the area a change touches.
   `manifest` answers the file as loaded at start (a TOML table as JSON: secrets' variable and
   file names only), the module table with what this build has, and the errors of the file as it
   now stands on disk, read again per request, for a session that does not read everything
-  without the `[[repository]]` entries, nested peers or OIDC group identities outside its grant
+  without the `[[repository]]` entries, nested peers or group identities (`[oidc.groups]` and
+  `[accounts.groups]`, `GROUP_TABLES`) outside its grant
   (group wildcards remain visible), and with only the file and line of an error whose text
   could name one, including an identity known only through groups; `admission/check` reads `{"token": ...}` (`CHECK_MAX`) and answers each check's outcome and the identities, of the
   file's entries or the checked current workspace version's entries for `source = "store"`,
@@ -1026,7 +1043,8 @@ one for the area a change touches.
   request refused before its body; the named workspaces' `workspaces.*`; `account.login` and
   `account.password`, #554, `account.reset_admin`, #555, and account administration's
   `account.create`, `account.role`, `account.suspend`, `account.reactivate`,
-  `account.reset_password` and the route-level `account`, #557, below), `arguments`
+  `account.reset_password` and the route-level `account`, #557, and `account.groups`, #558,
+  below), `arguments`
   (`{"version", "message"}` for a save or an import,
   the id of the entries as submitted; `{"version"}` for an apply; `{"generation"}` for the
   pointer actions; `{"at_least"}` for a recovery with a floor, its decimal digits; `{}` for a
@@ -1148,18 +1166,24 @@ one for the area a change touches.
   checks it again), a write's refusal printed and recorded `refused` as `account.create`, or
   `account` for a change (its `{"account"}` when the route names a valid username).
   `GET accounts` lists `store::list` (`{"accounts": [{username, role, state (active, suspended,
-  locked), locked_until, change_required, password_changed, created, created_by}]}`, never a
-  hash; a row failing its checks left out with one line). `POST accounts` (`ADMIN_BODY_MAX`,
-  `{username, role, password, change_required}`, a fixed 400 `Msg::AccountsCreateBody` for any
-  other shape, a 422 `invalid_username` for a username failing `username_ok`, the policy's 422 on
-  the password against that username) hashes under a permit of `HASHES_MAX`, records
-  `account.create` `pending` (`{"account", "role", "change_required"}`, the last as `"true"` or
-  `"false"`), then `store::create` (a taken username a 409 `username_taken`, the record
+  locked), locked_until, change_required, password_changed, created, created_by, groups}]}`,
+  never a hash; a row failing its checks left out with one line). `POST accounts`
+  (`ADMIN_BODY_MAX`, `{username, role, groups, password, change_required}`, `groups` optional, a
+  fixed 400 `Msg::AccountsCreateBody` for any other shape, a 422 `invalid_username` for a
+  username failing `username_ok`, a 422 `invalid_group` (`Msg::AccountsGroupInvalid`,
+  `checked_groups`, #558) for a group that is no owner name, which also sorts them without
+  repeats, the policy's 422 on the password against that username) hashes under a permit of
+  `HASHES_MAX`, records `account.create` `pending` (`{"account", "role", "groups",
+  "change_required"}`, the groups a JSON array in a string, `change_required` as `"true"` or
+  `"false"`, since every argument is a string), then `store::create` (a taken username a 409
+  `username_taken`, the record
   `refused`; `created_by` the session's subject). `POST accounts/<username>` (a username failing
-  `username_ok` a 404 before the body is read; `{"action": "role", "role"}`, `suspend`,
+  `username_ok` a 404 before the body is read; `{"action": "role", "role"}`, `{"action":
+  "groups", "groups"}` (#558, replacing the list, checked as a creation's), `suspend`,
   `reactivate` or `{"action": "reset_password", "password", "change_required"}`, each refused a
   fixed 400 `Msg::AccountsChangeBody` with any other field, so no body deletes or renames) records
-  `account.<action>` `pending` (`{"account"}`, with `"role"` or `"change_required"`) before
+  `account.<action>` `pending` (`{"account"}`, with `"role"`, `"groups"` or
+  `"change_required"`) before
   `store::change`; an unknown or hostile account is a 404 `not_found`, the last active operator's
   suspension or demotion a 409 `last_operator`, each finishing the record `refused` with the line
   `refused (<code>)`; a success

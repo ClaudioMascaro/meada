@@ -49,7 +49,7 @@ fn create(
 }
 
 /// `POST accounts/<username>` with `body`.
-fn act(console: &Server, token: &str, username: &str, body: Value) -> Reply {
+pub(super) fn act(console: &Server, token: &str, username: &str, body: Value) -> Reply {
     post(
         console,
         &format!("accounts/{username}"),
@@ -59,7 +59,7 @@ fn act(console: &Server, token: &str, username: &str, body: Value) -> Reply {
 }
 
 /// The accounts `GET accounts` lists.
-fn listed(console: &Server, token: &str) -> Vec<Value> {
+pub(super) fn listed(console: &Server, token: &str) -> Vec<Value> {
     let reply = ask(console, "/api/v1/accounts", token);
     assert_eq!(reply.status, 200, "{}", reply.body);
     assert!(!reply.body.contains("$argon2"), "{}", reply.body);
@@ -91,7 +91,7 @@ fn changed(console: &Server, username: &str, password: &str) -> String {
 /// The audit's records of account administration (`account.*` but the sign-in and the password
 /// change, and the route-level `account`), oldest first: action, subject, role, arguments,
 /// outcome and message.
-fn administered(console: &Server, token: &str) -> Vec<Value> {
+pub(super) fn administered(console: &Server, token: &str) -> Vec<Value> {
     let page = ask(console, "/api/v1/audit?limit=100", token);
     assert_eq!(page.status, 200, "{}", page.body);
     let mut found: Vec<Value> = (page.json()["records"].as_array().unwrap().iter())
@@ -145,6 +145,7 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
             "change_required",
             "created",
             "created_by",
+            "groups",
             "locked_until",
             "password_changed",
             "role",
@@ -181,7 +182,7 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
         "{",
         r#"{"username": "carol", "role": "viewer"}"#,
         r#"{"username": "carol", "role": "root", "password": "temporary passphrase one"}"#,
-        r#"{"username": "carol", "role": "viewer", "password": "temporary passphrase one", "groups": []}"#,
+        r#"{"username": "carol", "role": "viewer", "password": "temporary passphrase one", "groups": "g"}"#,
     ] {
         let reply = post(console, "accounts", Some(&admin), bad);
         assert_eq!(refusal(&reply), (400, "bad_request".into()), "{bad}");
@@ -257,7 +258,7 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
         json!({"action": "delete"}),
         json!({"action": "rename", "username": "caroline"}),
         json!({"action": "suspend", "username": "caroline"}),
-        json!({"action": "groups", "groups": ["team-billing"]}),
+        json!({"action": "groups"}),
         json!({"role": "operator"}),
     ] {
         let reply = act(console, &admin, "carol", body.clone());
@@ -401,7 +402,7 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
                 "account.create",
                 &admin_subject,
                 "operator",
-                json!({"account": "carol", "role": "viewer", "change_required": "true"}),
+                json!({"account": "carol", "role": "viewer", "groups": "[]", "change_required": "true"}),
                 "accepted",
                 "account created"
             ),
@@ -409,7 +410,7 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
                 "account.create",
                 &admin_subject,
                 "operator",
-                json!({"account": "carol", "role": "operator", "change_required": "true"}),
+                json!({"account": "carol", "role": "operator", "groups": "[]", "change_required": "true"}),
                 "refused",
                 "another account has that username"
             ),
@@ -417,7 +418,7 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
                 "account.create",
                 &admin_subject,
                 "operator",
-                json!({"account": "dave", "role": "operator", "change_required": "false"}),
+                json!({"account": "dave", "role": "operator", "groups": "[]", "change_required": "false"}),
                 "accepted",
                 "account created"
             ),

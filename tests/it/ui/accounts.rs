@@ -1,10 +1,11 @@
 //! The console with `[accounts]` (#554, #555, ADR 0024): its own sign-in, the default account,
 //! session tokens it signs with Ed25519, the forced password change, the lockout, the rehash of a
 //! weaker hash, `meada ui reset-admin` and the audit of each; account administration (#557) in
-//! `administration`. The section and key refusals, and `reset-admin`'s refusals before Postgres,
-//! need no service; the rest run against the local Postgres of `MEADA_TEST_POSTGRES_URL`, each
-//! test in a schema of its own, and skip without it; the save as the global operator also needs
-//! the fleet's Valkey and store. Break glass beside `[oidc]` (#563) is `break_glass`.
+//! `administration`, groups of accounts and their grant (#558) in `groups`. The section and key
+//! refusals, and `reset-admin`'s refusals before Postgres, need no service; the rest run against
+//! the local Postgres of `MEADA_TEST_POSTGRES_URL`, each test in a schema of its own, and skip
+//! without it; the save as the global operator also needs the fleet's Valkey and store. Break
+//! glass beside `[oidc]` (#563) is `break_glass`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -19,6 +20,7 @@ use crate::server::Server;
 
 mod administration;
 mod break_glass;
+mod groups;
 
 const EN: &str = "en_US.UTF-8";
 /// The variable every test here names for the initial password, so the runner's own

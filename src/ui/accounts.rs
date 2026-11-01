@@ -282,6 +282,39 @@ fn issued(token: String, expires: u64, change_required: bool) -> Answer {
 }
 
 impl Console {
+    /// `GET admission` with `[accounts]` (#558): `accounts`, the mode (`accounts`, or
+    /// `break_glass` beside `[oidc]`) and the public key's fingerprint, set into `document`, the
+    /// identity provider's under break glass. With local accounts alone, the document is the
+    /// groups table (`[accounts.groups]`, each group's identities `session` reads, `*` kept, null
+    /// without it) and the GitHub grant provider's state as an identity provider's shows it.
+    pub(super) fn accounts_admission(
+        &self,
+        local: &Local,
+        document: Option<Value>,
+        session: &Session,
+    ) -> Value {
+        let mode = match local.break_glass {
+            true => "break_glass",
+            false => "accounts",
+        };
+        let accounts = json!({"mode": mode, "public_key": local.keys.fingerprint()});
+        if let Some(mut document) = document {
+            document["accounts"] = accounts;
+            return document;
+        }
+        let table = self
+            .bootstrap
+            .accounts
+            .as_ref()
+            .and_then(|a| a.groups.as_ref());
+        let groups = table.map(|table| crate::grant::bounded(table, &|i| session.reads(i)));
+        let mut document = json!({"accounts": accounts, "groups": groups});
+        if let Some(github) = self.providers.admission() {
+            document["github"] = github;
+        }
+        document
+    }
+
     /// Admission with local accounts (`local`) of a request to the API route `route` (`None`:
     /// a static file): the static files, `config` and `login` need no token; every other route a
     /// session token of this console, a token with the change-required mark only

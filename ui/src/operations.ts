@@ -110,7 +110,10 @@ export function credentialsModel(data: Credentials | Missing, t: OperationsCopy)
   };
 }
 
-export interface Admission {
+/** With `[accounts]` (#558): how the console signs in and its public key's fingerprint. */
+export interface LocalAdmission { mode: 'accounts' | 'break_glass'; public_key: string }
+/** The identity provider's admission, with `[accounts]` under break glass beside it. */
+export interface OidcAdmission {
   type: string; issuer: string; metadata: unknown; jwks_uri: string; keys: (string | null)[]; refreshed: string;
   failed: { time: string; reason: string } | null; identities_claim: string; groups_claim: string | null;
   groups: Record<string, string[]> | null; scopes: string[];
@@ -121,13 +124,27 @@ export interface Admission {
     host: string; login_claim: string; roles: string[]; max_age_seconds: number; grant: GithubGrant;
     set: { id: string; finished: string; age_seconds: number; repositories: number; rows: number; exclusions: number } | null;
   };
+  accounts?: LocalAdmission;
 }
-function directoryRows(directory: Admission['directory'], t: OperationsCopy): [string, string][] {
+/** Local accounts alone (#558): the mode, the key, the groups table bounded by the session's grant. */
+export interface AccountsAdmission {
+  accounts: LocalAdmission; groups: Record<string, string[]> | null; github?: OidcAdmission['github'];
+}
+export type Admission = OidcAdmission | AccountsAdmission;
+/** Whether `data` is the identity provider's admission, rather than local accounts' alone. */
+export function isOidcAdmission(data: Admission): data is OidcAdmission {
+  return 'issuer' in data;
+}
+function directoryRows(directory: OidcAdmission['directory'], t: OperationsCopy): [string, string][] {
   if (directory === undefined) return [];
   if (directory === null) return [[t.directory, t.directoryUnavailable]];
   return [[t.directoryUsers, String(directory.users)], [t.directoryGroups, String(directory.groups)], [t.directoryLastWrite, directory.last_write ?? t.none]];
 }
-function githubRows(github: Admission['github'], t: OperationsCopy): [string, string][] {
+function localRows(accounts: LocalAdmission | undefined, t: OperationsCopy): [string, string][] {
+  if (accounts === undefined) return [];
+  return [[t.signIn, accounts.mode === 'accounts' ? t.signIn_accounts : t.signIn_break_glass], [t.publicKey, accounts.public_key]];
+}
+function githubRows(github: OidcAdmission['github'], t: OperationsCopy): [string, string][] {
   if (github === undefined) return [];
   const set = github.set;
   return [
@@ -139,12 +156,14 @@ function githubRows(github: Admission['github'], t: OperationsCopy): [string, st
     ] as [string, string][],
   ];
 }
-/** The admission page's fields: the identity provider's type beside the issuer, then the JWKS cache and the claims, the directory and the GitHub grant provider. */
+/** The admission page's fields: the identity provider's type beside the issuer, then the JWKS cache and the claims, local accounts, the directory and the GitHub grant provider; with local accounts alone, their mode and key, and the GitHub grant provider. */
 export function admissionModel(data: Admission, t: OperationsCopy): [string, string][] {
+  if (!isOidcAdmission(data)) return [...localRows(data.accounts, t), ...githubRows(data.github, t)];
   return [
     [t.issuer, data.issuer], [t.providerType, data.type], [t.jwks, data.jwks_uri],
     [t.keyIds, data.keys.map(key => key ?? t.unknown).join(', ') || t.none], [t.refreshed, data.refreshed],
     [t.identitiesClaim, data.identities_claim], [t.groupsClaim, data.groups_claim ?? t.none], [t.scopes, data.scopes.join(', ') || t.none],
+    ...localRows(data.accounts, t),
     ...directoryRows(data.directory, t),
     ...githubRows(data.github, t),
   ];

@@ -8,6 +8,22 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Groups of local accounts (#558, ADR 0024, from #551): the global operator gives accounts groups
+  (`groups` on `POST /api/v1/accounts`, and the `groups` action of
+  `POST /api/v1/accounts/<username>`, each an owner name, else a 422 `invalid_group`);
+  `GET /api/v1/accounts` lists them, and each change is recorded `account.groups`.
+  `[accounts.groups]` maps groups to identities as `[oidc.groups]` does: once it exists, a local
+  session's grant is what its groups map to, and it bounds every view (the manifest, the
+  workspace and its versions, the store, the repositories, the credentials, the playground, the
+  exports and the graph views) as an identity provider's grant does; without it every local
+  account still reads every repository. A local viewer whose group owns an entry of the current
+  workspace version its grant reads is a team operator (ADR 0015). Session tokens carry the
+  groups, so a change reaches reads at the next sign-in and writes at once (the account row is
+  read before each). `GET /api/v1/admission` with `[accounts]` now answers: `accounts` (the mode,
+  `accounts` or `break_glass`, and the signing public key's fingerprint, `blake3:` and the hex
+  BLAKE3 hash of the raw Ed25519 key) and, without `[oidc]`, the groups table bounded by the
+  caller's grant. No golden changed.
+
 - Account administration for local accounts (#557, ADR 0024, from #551): the global operator
   lists every account (`GET /api/v1/accounts`: username, role, state, the end of a lock, change
   required, last password change, created and created by, never a hash), creates one
