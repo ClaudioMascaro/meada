@@ -203,7 +203,7 @@ this file, and a change to these modules updates it.
   `Msg::WorkspaceNoCurrent`, naming `meada workspace apply`) and the document (at most
   `VERSION_MAX`, `checked`) before anything on disk changes, then, under `<index_dir>/workspace/`
   (`DIR`) and its `pull.lock` (an advisory lock, one pull at a time), writes `<id>.json` (the
-  document as stored, through `<id>.json.new` and a rename) and swaps `current` (one line `<id>
+  document as stored, through `pull::replace`: `<id>.json.new` synced, then renamed; the helper `swap`, `write_contexts` and the exclusions file share) and swaps `current` (one line `<id>
   <fence>`, `pull::swap`); a pointer whose fence is below the current file's, or equal with
   another id, is `Msg::WorkspaceFenceBelow` naming both fences and the file, and the same id and
   fence is `Pulled::Current` (the id on stdout, `Msg::WorkspaceAlreadyCurrent` on stderr). Only

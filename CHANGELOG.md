@@ -213,6 +213,11 @@ All notable changes to Meada are recorded here. The format follows
   itself and every call site counts only its own (the audit and directory reads and the overage
   lookup moved accordingly; the accounts' calls, which undercounted, and the permissions poll
   gained the two). No golden changed.
+- A crash after the pointer swap can no longer leave `current` naming a version document that
+  never reached the disk (#518): the pointer, the version document `meada workspace pull` writes,
+  the pulled contexts file and the exclusions file are replaced through one helper
+  (`pull::replace`) that syncs the new file before the rename and removes `<name>.new` when a
+  step fails. A failed pointer rename now names `current`, not `current.new`.
 - A server-mode mirror's `meada.toml` and `meada.decisions.toml` are read through no symbolic
   link (#547, after #506), as a pulled generation's are: `mirror()`, behind `Manifest::read`
   (`mcp --listen`, snapshot pull, the lock and pointer operations, workspace versions, the
