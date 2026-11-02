@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { PREFIX_MAX } from './catalog';
-import { lines, removeAt, replaceAt, ROLES } from './guided';
+import { resourceRoles } from './core';
+import { lines, removeAt, replaceAt } from './guided';
 import type { Entry, PeerDecl, ResourceDecl, ServeDecl } from './guided';
 import type { GuidedCopy } from './guided-i18n';
 import type { CatalogView } from './useCatalog';
@@ -36,7 +37,7 @@ function ResourceFields({ resources, disabled, t, onChange }: { resources: Resou
       <label>{t.kind}<input value={resource.kind} onChange={event => onChange(replaceAt(resources, at, { ...resource, kind: event.target.value }))} /></label>
       <label>{t.id}<input value={resource.id} onChange={event => onChange(replaceAt(resources, at, { ...resource, id: event.target.value }))} /></label>
       <label>{t.role}<select value={resource.role} onChange={event => onChange(replaceAt(resources, at, { ...resource, role: event.target.value as ResourceDecl['role'] }))}>
-        {ROLES.map(role => <option key={role} value={role}>{t[role]}</option>)}
+        {(JSON.parse(resourceRoles()) as ResourceDecl['role'][]).map(role => <option key={role} value={role}>{t[role]}</option>)}
       </select></label>
       <LinesField label={t.via} value={resource.via ?? []} disabled={disabled} onChange={via => onChange(replaceAt(resources, at, { ...resource, via }))} />
       <button type="button" className="secondary" aria-label={`${t.remove} ${t.resource(at + 1)}`} onClick={() => onChange(removeAt(resources, at))}>{t.remove}</button>

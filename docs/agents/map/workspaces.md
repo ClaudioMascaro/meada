@@ -50,7 +50,7 @@ metadata path is then a 404, as it is without `[oidc]`.
 
 Delivered by #345 (the guided controls; ADR 0021 "As built (#345)"), front end only plus two
 WebAssembly exports (`namedDiff` and `namedChanged` in `meada-core/src/wasm.rs`, over `named::diff`
-and `named::changed`): `EditWorkspace.tsx` is the operator's editor (it replaces #344's text-only
+and `named::changed`; #501 adds `namedNameProblem`, `namedDescriptionProblem` and `namedMessageProblem`, over `named::*_problem`, and `resourceRoles`, over `manifest::Role::ALL`, so the browser keeps no copy of the text rule, its bounds or the role list; `message_problem` also refuses an empty message, so the four server call sites carry no check of their own): `EditWorkspace.tsx` is the operator's editor (it replaces #344's text-only
 `EditWorkspace` in `NamedWorkspacesPage.tsx`), holding the manifest text and a model of its entries
 that rewrite each other through `namedEntriesText` and `namedEntriesJson`, so the form and the text
 are one canonical document; `GuidedForm.tsx` is the form (repositories from the catalog, per entry

@@ -38,7 +38,8 @@ runtime; it builds for `wasm32-unknown-unknown`, its `wasm-bindgen` feature (nev
 exporting `init`, `validate`, `workspaceVersionId`, `workspaceDiff`, `entriesText`,
 `entriesJson`, `authorizeEntries`, `composeEntries`, `touchedOwners`, `parseExport` and the named-workspace set
 (`namedEntriesJson`, `namedEntriesText`, `namedVersionId`, `namedAuthorize`, `namedVisible`,
-`namedEffective`, `namedDiff`, `namedChanged`). CI's `core` job builds it
+`namedEffective`, `namedDiff`, `namedChanged`, `namedNameProblem`, `namedDescriptionProblem`,
+`namedMessageProblem`, `resourceRoles`). CI's `core` job builds it
 with wasm-pack and checks both trees.
 
 Every tree-sitter grammar is a crate except Kotlin's: `vendor/tree-sitter-kotlin-ng/` holds

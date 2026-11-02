@@ -167,7 +167,6 @@ impl Console {
             |code, message: &str| bad(StatusCode::UNPROCESSABLE_ENTITY, code, message);
         if let Some(problem) = named::name_problem(&create.name)
             .or_else(|| named::description_problem(&create.description))
-            .or_else(|| (create.message.is_empty()).then(|| Msg::WorkspacesBody.text()))
             .or_else(|| named::message_problem(&create.message))
         {
             return unprocessable("invalid_workspace", &problem);

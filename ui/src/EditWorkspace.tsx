@@ -4,7 +4,7 @@ import type { Api, Session } from './api';
 import { CHECK_IDENTITIES } from './catalog';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EffectiveList } from './EffectiveList';
-import { loadCore, namedAuthorize, namedChanged, namedDiff, namedEntriesJson, namedEntriesText } from './core';
+import { loadCore, namedAuthorize, namedChanged, namedDiff, namedEntriesJson, namedEntriesText, namedMessageProblem } from './core';
 import { GuidedForm } from './GuidedForm';
 import type { EntryStatus } from './GuidedForm';
 import { diffLines, entriesJson } from './guided';
@@ -12,7 +12,7 @@ import type { Entry, NamedDiff } from './guided';
 import { guidedCopy } from './guided-i18n';
 import { copy } from './i18n';
 import type { Language } from './i18n';
-import { MESSAGE_MAX, applyBody, coverageText, diagnosticText, findingText, ingestionText, pendingText, plain, previewBody, saveBody, sourceText } from './named';
+import { applyBody, coverageText, diagnosticText, findingText, ingestionText, pendingText, previewBody, saveBody, sourceText } from './named';
 import type { EffectiveView, Refusal, WorkspaceDetail, Written } from './named';
 import { namedCopy } from './named-i18n';
 import type { CatalogView } from './useCatalog';
@@ -128,7 +128,7 @@ export function EditWorkspace({ api, locale, session, detail, savedView, catalog
   }
 
   const changed = original !== undefined && current !== original;
-  const ok = ready && invalid === undefined && changed && authorization.allowed && plain(message, 1, MESSAGE_MAX);
+  const ok = ready && invalid === undefined && changed && authorization.allowed && namedMessageProblem(message) === undefined;
   const shown = view ?? savedView;
   const changes = diff ? diffLines(diff, g) : [];
   const status: Record<string, EntryStatus> = {};

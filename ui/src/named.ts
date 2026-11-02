@@ -24,9 +24,6 @@ export interface Refusal { refused: { identity: string }[]; hidden: number }
 
 /** The most workspaces a page asks for. */
 export const PAGE = 25;
-export const NAME_MAX = 80;
-export const DESCRIPTION_MAX = 500;
-export const MESSAGE_MAX = 500;
 
 export function listRoute(after?: string): string {
   const query = new URLSearchParams({ limit: String(PAGE) });
@@ -37,14 +34,6 @@ export function listRoute(after?: string): string {
 /** The body of a creation: the manifest text is the canonical one `meada-core` produced. */
 export function createBody(name: string, description: string, entries: string, message: string): string {
   return JSON.stringify({ name, description, entries, message });
-}
-
-/**
- * Whether a text is a valid name, description or message: bounded, no control character, no space at either end.
- * `White_Space` is Rust's `char::is_whitespace`, so the browser and `meada-core` agree (`trim()` also strips U+FEFF).
- */
-export function plain(text: string, min: number, max: number): boolean {
-  return [...text].length >= min && [...text].length <= max && !/^\p{White_Space}|\p{White_Space}$/u.test(text) && !/\p{Cc}/u.test(text);
 }
 
 export function stateText(state: WorkspaceState, t: NamedCopy): string { return t[state]; }

@@ -11,9 +11,6 @@ export interface ResourceDecl { kind: string; id: string; role: ResourceRole; vi
 export interface ServeDecl { hosts?: string[]; prefix?: string; strip?: string }
 export interface Entry { repo: string; serve?: ServeDecl; resource?: ResourceDecl[]; peer?: PeerDecl[] }
 
-/** The roles a resource declares, as `meada.toml` spells them. */
-export const ROLES: readonly ResourceRole[] = ['read', 'write', 'read-write'];
-
 /** The lines of a textarea: trimmed, empty ones dropped. */
 export function lines(text: string): string[] {
   return text.split('\n').map(line => line.trim()).filter(line => line !== '');
