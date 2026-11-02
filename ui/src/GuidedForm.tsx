@@ -28,6 +28,10 @@ function ServeFields({ serve, disabled, t, onChange }: { serve: ServeDecl | unde
   </fieldset>;
 }
 
+/** A role's label, or the role itself when the core lists one the copy does not name yet. */
+const roleLabel = (t: GuidedCopy, role: string): string =>
+  ({ read: t.read, write: t.write, 'read-write': t['read-write'] } as Record<string, string>)[role] ?? role;
+
 function ResourceFields({ resources, roles, disabled, t, onChange }: { resources: ResourceDecl[]; roles: string[]; disabled: boolean; t: GuidedCopy; onChange: (resources: ResourceDecl[]) => void }) {
   return <fieldset disabled={disabled}>
     <legend>{t.resources}</legend>
@@ -36,7 +40,7 @@ function ResourceFields({ resources, roles, disabled, t, onChange }: { resources
       <label>{t.kind}<input value={resource.kind} onChange={event => onChange(replaceAt(resources, at, { ...resource, kind: event.target.value }))} /></label>
       <label>{t.id}<input value={resource.id} onChange={event => onChange(replaceAt(resources, at, { ...resource, id: event.target.value }))} /></label>
       <label>{t.role}<select value={resource.role} onChange={event => onChange(replaceAt(resources, at, { ...resource, role: event.target.value }))}>
-        {roles.map(role => <option key={role} value={role}>{(t as unknown as Record<string, string>)[role] ?? role}</option>)}
+        {roles.map(role => <option key={role} value={role}>{roleLabel(t, role)}</option>)}
       </select></label>
       <LinesField label={t.via} value={resource.via ?? []} disabled={disabled} onChange={via => onChange(replaceAt(resources, at, { ...resource, via }))} />
       <button type="button" className="secondary" aria-label={`${t.remove} ${t.resource(at + 1)}`} onClick={() => onChange(removeAt(resources, at))}>{t.remove}</button>

@@ -49,7 +49,8 @@ All notable changes to Meada are recorded here. The format follows
   message are valid and which resource roles exist, instead of keeping its own copy of the rule,
   its bounds and the role list (#501). A version message is refused when empty by the same
   function on the browser, the console API and `meada workspaces`: the empty-message refusal now
-  reads "a message is 1 to 500 characters, ..." instead of the request-body shape.
+  reads "a message is 1 to 500 characters, ..." instead of the request-body shape, and the
+  refusal of a too-long or control-bearing message reads "1 to 500" where it read "at most 500".
 
 ## [1.1.0] - 2026-11-02
 
