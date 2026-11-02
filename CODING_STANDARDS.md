@@ -115,8 +115,9 @@ browser reaches it through the WebAssembly export (`meada-core/src/wasm.rs`), ne
 the browser decides too.
 
 - A second copy of such a decision, in TypeScript or in another Rust module, is a review finding.
-- The instances today: `meada_core::effective` (the console calls it and the browser reaches it
-  through the export) and `meada_core::named` (the name and description checks, and `visible`).
+- The instances today: `meada_core::effective::effective` (the console calls it and the browser
+  reaches it through the export) and the functions in `meada_core::named` (the name, description
+  and message checks, and the access helpers such as `visible`).
 
 ## Known ceilings
 
