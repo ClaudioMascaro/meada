@@ -266,19 +266,19 @@ impl LanguagePack for TsJs {
         // not JSON or not an object declares no paths, and indexing carries on.
         // The nearest config above an importer serves it; in one directory `tsconfig.json`
         // comes first in `configs`, so it wins. A config under `node_modules` declares nothing.
-        // Each config is read once; an `extends` is followed among these (`Aliases::parse`).
-        let mut read: HashMap<String, Options> = HashMap::new();
+        // Each config is read once; an `extends` is followed among these (`Aliases::of_chain`).
+        let mut options: HashMap<String, Options> = HashMap::new();
         let mut nearest: HashMap<&str, &str> = HashMap::new();
         for (path, src) in configs {
             let dir = path.rsplit_once('/').map_or("", |(dir, _)| dir);
             if !path.split('/').any(|s| s == "node_modules") {
                 nearest.entry(dir).or_insert(path);
-                read.insert(path.to_string(), Options::read(dir, src));
+                options.insert(path.to_string(), Options::read(dir, src));
             }
         }
         let by_dir: HashMap<String, Aliases> = nearest
             .into_iter()
-            .map(|(dir, path)| (dir.to_string(), Aliases::parse(path, &read)))
+            .map(|(dir, path)| (dir.to_string(), Aliases::of_chain(path, &options)))
             .collect();
         Ok(Box::new(move |importer, specifier| {
             let dir = importer.rsplit_once('/').map_or("", |(dir, _)| dir);
@@ -371,13 +371,13 @@ struct Aliases {
 }
 
 impl Aliases {
-    /// The aliases of the config at `path`, among every `read` config of the repository.
-    fn parse(path: &str, read: &HashMap<String, Options>) -> Self {
+    /// The aliases of the config at `path`, among every config of the repository, read once.
+    fn of_chain(path: &str, configs: &HashMap<String, Options>) -> Self {
         let mut chain: Vec<&Options> = Vec::new();
         let mut seen: Vec<&str> = Vec::new();
         let mut next = Some(path);
         while let Some(at) = next {
-            let Some((at, options)) = read.get_key_value(at) else {
+            let Some((at, options)) = configs.get_key_value(at) else {
                 break;
             };
             if chain.len() > EXTENDS_DEPTH || seen.contains(&at.as_str()) {
@@ -1479,8 +1479,8 @@ mod tests {
         let found = aliased(&cycle, "c0/x.ts");
         assert!(found.contains(&"c0/own/b.ts".to_string()), "{found:?}");
         assert!(!found.iter().any(|f| f.starts_with("c1/")), "{found:?}");
-        let selfie = [("c0/tsconfig.json", r#"{"extends": "./tsconfig.json"}"#)];
-        assert!(aliased(&selfie, "c0/x.ts").is_empty());
+        let self_extends = [("c0/tsconfig.json", r#"{"extends": "./tsconfig.json"}"#)];
+        assert!(aliased(&self_extends, "c0/x.ts").is_empty());
     }
 
     #[test]

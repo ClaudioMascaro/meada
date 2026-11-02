@@ -1060,15 +1060,15 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   leaves the call a name match. A `Result` or `Option` is told by its last path segment, so a
   user type of that name with another first argument is read the same way.
 - `lang/ts.rs`: tsconfig `references` are not followed, and `extends` only for `paths` and
-  `baseUrl` (`Aliases::parse`; `package::read_tsconfig`'s `outDir` and `rootDir` still ignore it).
+  `baseUrl` (`Aliases::of_chain`; `package::read_tsconfig`'s `outDir` and `rootDir` still ignore it).
   An `extends` that is a relative path inside the repository (a package such as `@tsconfig/node18`,
   an absolute path, one that leaves the repository, and an array are not read, and the chain stops
   there) is followed to a config named `tsconfig.json` or `jsconfig.json`, since only those are
   read (`tsconfig.base.json` has no bytes here: a follow-up). Each option is the nearest
   declaration's, as a whole (a nested `paths` replaces the base's), `paths` relative to the config
   that declares them. `EXTENDS_DEPTH` (8, `ponytail:`): a chain with more than that many configs
-  after the nearest, and a cycle, read as the nearest config alone, so the walk costs at most
-  nine lookups per config. Every `tsconfig.json` and
+  after the nearest, and a cycle, read as the nearest config alone, so the walk, the budget of each
+  config, costs at most ten lookups. Every `tsconfig.json` and
   `jsconfig.json` but those under `node_modules` is read; an importer uses the nearest one in its
   directory or above (`tsconfig.json` over `jsconfig.json`), `paths` and `baseUrl` relative to it.
   Each is read as `package::read_tsconfig` reads one
