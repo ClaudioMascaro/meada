@@ -93,6 +93,17 @@ indexing carries on.
   keys, deep nesting, wide fan-out) in bounded time, and returns a bounded size. A new reader
   adds its row to `probes` in `src/package/hostile.rs`.
 
+## One decision, one function
+
+A decision that more than one surface makes (console, node, CLI, browser), such as access,
+visibility or text validation, is one function in `meada-core`. Every surface calls it; the
+browser reaches it through the WebAssembly export (`meada-core/src/wasm.rs`), needed only when
+the browser decides too.
+
+- A second copy of such a decision, in TypeScript or in another Rust module, is a review finding.
+- The instances today: `meada_core::effective` (the console calls it and the browser reaches it
+  through the export) and `meada_core::named` (the name and description checks, and `visible`).
+
 ## Known ceilings
 
 A Known ceiling bounds only what the spec and the ticket leave out: every item they ask for is
