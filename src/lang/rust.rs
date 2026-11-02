@@ -1392,14 +1392,17 @@ impl<'t> Built<'_, 't, '_> {
     }
 }
 
+/// The `(..)` condition of an attribute item that is a `cfg`.
+fn cfg_condition<'a>(item: Node, src: &'a [u8]) -> Option<&'a str> {
+    let attribute = named(item).find(|n| n.kind() == "attribute")?;
+    let rest = text(attribute, src).strip_prefix("cfg")?.trim_start();
+    rest.starts_with('(').then_some(rest)
+}
+
 /// Whether an attribute item is no `#[cfg(..)]`, or one that holds, with `test` false and with
 /// it true.
 fn attribute_holds(item: Node, features: &BTreeSet<String>, src: &[u8]) -> (bool, bool) {
-    let attribute = named(item).find(|n| n.kind() == "attribute");
-    let condition = attribute.and_then(|a| text(a, src).strip_prefix("cfg"));
-    let condition = condition.filter(|c| c.trim_start().starts_with('('));
-    let condition = condition.map(str::trim_start);
-    let holds = |test| condition.is_none_or(|c| cfg::holds(c, features, test));
+    let holds = |test| cfg_condition(item, src).is_none_or(|c| cfg::holds(c, features, test));
     (holds(false), holds(true))
 }
 
@@ -1417,10 +1420,7 @@ fn inner_off(node: Node, features: &BTreeSet<String>, src: &[u8], test: bool) ->
     for inner in body.named_children(&mut cursor) {
         match inner.kind() {
             "inner_attribute_item" => {
-                let attribute = named(inner).find(|n| n.kind() == "attribute");
-                let condition = attribute.and_then(|a| text(a, src).strip_prefix("cfg"));
-                let condition = condition.filter(|c| c.trim_start().starts_with('('));
-                if condition.is_some_and(|c| !cfg::holds(c.trim_start(), features, test)) {
+                if cfg_condition(inner, src).is_some_and(|c| !cfg::holds(c, features, test)) {
                     return true;
                 }
             }
