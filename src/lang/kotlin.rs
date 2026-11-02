@@ -368,7 +368,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     )
                 };
                 facts.defs.push(def);
-                match platform(node, src) {
+                match platform(node, src).or_else(|| enclosing_expect(node, src)) {
                     Some("expect") => facts.expect.push(inner.as_ref().clone()),
                     Some("actual") => facts.actual.push(inner.as_ref().clone()),
                     _ => {}
@@ -1009,6 +1009,20 @@ fn platform<'s>(node: Node, src: &'s [u8]) -> Option<&'s str> {
         .flat_map(named)
         .find(|n| n.kind() == "platform_modifier")
         .map(|n| text(n, src))
+}
+
+/// `expect` when a declaration the node is nested in is `expect`: Kotlin makes its members so.
+fn enclosing_expect<'s>(node: Node, src: &'s [u8]) -> Option<&'s str> {
+    let mut up = node.parent();
+    while let Some(p) = up {
+        if matches!(p.kind(), "class_declaration" | "object_declaration")
+            && let Some(m @ "expect") = platform(p, src)
+        {
+            return Some(m);
+        }
+        up = p.parent();
+    }
+    None
 }
 
 /// The primary constructor's parameters of a class; `None` for an interface, an object, a

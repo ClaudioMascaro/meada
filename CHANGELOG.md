@@ -222,6 +222,9 @@ All notable changes to Meada are recorded here. The format follows
   were absent (#463): `x.hash(seed: 1)` on a type that conforms to `Hashable` and declares
   `hash(seed:)` is `exact`, while `x.hash(into: &h)` stays opaque. A call with no labels, or in
   another language, is still compared by its bare name.
+- Kotlin: a class, object or interface nested in an `expect` declaration, at any depth, is `expect`
+  too (#437), so a use of it resolves to the `expect` one instead of staying `ambiguous` among
+  its `actual` declarations.
 - C# `using static T` imports only the static members and nested types `T` declares (#433): a bare
   `Go()` with `Go` on a base of `T` was an `exact` link to the base's method, which C# rejects
   ("inherited members aren't imported"), and is now a name match at best; `using static` of the
