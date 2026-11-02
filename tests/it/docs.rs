@@ -156,14 +156,24 @@ fn limit_problems(files: &[(String, String)], allowed: &[(&str, &str)]) -> Vec<S
 
 #[test]
 fn every_limit_is_marked_once() {
-    let problems = limit_problems(&limit_sources(), NOT_CEILINGS);
+    let files = limit_sources();
+    let problems = limit_problems(&files, NOT_CEILINGS);
     assert!(
         problems.is_empty(),
         "mark a limit `ponytail:` and list it under Known ceilings, rename it, share it, or \
          add it to NOT_CEILINGS with its reason: {problems:#?}"
     );
+    let unmarked: BTreeSet<String> = (files.iter())
+        .flat_map(|(_, text)| consts(text))
+        .filter_map(|(name, marked)| (!marked).then_some(name))
+        .collect();
     for (name, reason) in NOT_CEILINGS {
         assert!(looks_like_a_limit(name) && !reason.is_empty(), "{name}");
+        // An excuse outlives its const unnoticed otherwise.
+        assert!(
+            unmarked.contains(*name),
+            "{name} is excused but no unmarked const has it"
+        );
     }
 }
 

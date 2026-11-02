@@ -329,8 +329,11 @@ to the client, so it keeps no channel back to it.
 - A change under a feature passes the gate with that feature too (`AGENTS.md`, Workflow).
 - CI has a `clippy-features` matrix that runs `cargo clippy --locked --all-targets --features
   <f> -- -D warnings` for every cloud feature of `Cargo.toml` alone (the table above and its
-  amendments), and for the sets the code gates on: `postgres,oidc`, `ui,directory`, `ui,oidc` and
-  `github-app,postgres,oidc,refresh-lock`. A feature that does not build alone fails there, not in
+  amendments), and for the pairs the code gates on (`postgres,oidc`, `ui,directory`, `ui,oidc`,
+  `directory,oidc`, `directory,refresh-lock`, `postgres,refresh-lock`,
+  `generation-pointer,postgres`, `oidc,generation-pointer`, `ui,refresh-lock`,
+  `github-app,refresh-lock`, `workspaces,accounts`; a pair one feature already implies, as
+  `workspaces` implies `ui`, is not repeated) and `github-app,postgres,oidc,refresh-lock`. A feature that does not build alone fails there, not in
   the next ticket's gate. The tests are not run per feature. (Amended 2026-11-02; #484: the role
   check of `meada github-app roles` needs `oidc` beside `postgres`, which the last set covers;
   `github-app` keeps its own entry.)

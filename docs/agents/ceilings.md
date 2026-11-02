@@ -18,6 +18,14 @@ a ticket accepted, each with its value and its reason. Detail behind the
   hide an import from); the test in `http/csharp.rs` pins `annotation` over C# facts, not that
   reader.
 
+- `lang/kotlin.rs`, `lang/swift.rs` (review of #507): two `*_in_linear_time` tests do not catch
+  a scan per item. `many_properties_and_locals_are_read_in_linear_time` (5,000 of each) and
+  `many_names_and_many_members_are_assigned_in_linear_time` (12,000 names, 24,000 members) both
+  passed with their lookup turned into a scan (1.5 s together, bounds 15 s and 2 s): their parse
+  or setup outweighs the quadratic part at these sizes. Counting the lookups, as
+  `dotnet/references.rs` counts its reads, would catch it; a bigger input would not stay under a
+  twentieth of a usable bound.
+
 - `tests/it/docs.rs` (#491): the check that a limit is marked reads only a `const` named `MAX_*`,
   `*_MAX`, `*_LIMIT` or `*_CAP` (a minimum or a test's allowance goes in `NOT_CEILINGS` with its
   reason), one line each; a limit under another name (`*_DEPTH`, `*_BUDGET`, `*_TTL`) is marked
