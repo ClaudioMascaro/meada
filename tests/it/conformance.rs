@@ -14217,6 +14217,9 @@ fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
         app("main"),
         app("use(_:_:_:_:)"),
         app("cycle(_:_:)"),
+        app("reach(_:_:)"),
+        aliases("Animation.spin()"),
+        aliases("Animation.build()"),
         app("Sender"),
         app("Sender.send(_:animation:)"),
         app("Sender.send(_:assert:)"),
@@ -14256,14 +14259,31 @@ fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
         ),
         (lib("inside()::Reduce#0"), EXACT, vec![internal]),
         (aliases("Feature.tap()::store.send#0"), EXACT, vec![send]),
-        // A cycle of aliases and an alias of an outside type type their receivers: neither
-        // reaches the repository's `spin` by name, as a receiver of no known type does.
+        // A cycle of aliases types its receiver: it reaches no `spin` by name, as a receiver of
+        // no known type does. An alias of an outside type, or a chain of them, reaches the
+        // repository's extensions of that type, `inferred` as a receiver written as the type
+        // itself; one of a type with none reaches nothing.
         (app("cycle(_:_:)::a.spin#0"), None, vec![]),
-        (app("cycle(_:_:)::anim.spin#0"), None, vec![]),
+        (
+            app("cycle(_:_:)::anim.spin#0"),
+            INFERRED,
+            vec![aliases("Animation.spin()")],
+        ),
+        (
+            app("reach(_:_:)::chained.spin#0"),
+            INFERRED,
+            vec![aliases("Animation.spin()")],
+        ),
+        (app("reach(_:_:)::mover.spin#0"), None, vec![]),
+        (
+            app("reach(_:_:)::Anim.build#0"),
+            INFERRED,
+            vec![aliases("Animation.build()")],
+        ),
         (
             app("untyped()::w.spin#0"),
-            INFERRED,
-            vec![app("Wheel.spin()")],
+            AMBIGUOUS,
+            vec![aliases("Animation.spin()"), app("Wheel.spin()")],
         ),
         (app("local()::x.send#0"), EXACT, vec![lib("Store.send(_:)")]),
         // A type parameter named like an alias hides it, and an alias in a type hides a type

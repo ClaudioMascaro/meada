@@ -165,6 +165,10 @@ struct Seen<'a> {
     depth: usize,
     cut: bool,
     looped: bool,
+    /// The outside name the innermost alias met ended in (`Resolver::alias`), and whether a
+    /// cycle of aliases or a cut link made that unreliable.
+    outside: Option<&'a str>,
+    unsure: bool,
     /// The file whose code being run while it loads (at its top level, in a class body there or
     /// in its main guard) the name is resolved from (`Resolver::seen`).
     load: Option<&'a str>,
@@ -1346,30 +1350,36 @@ impl<'a> Resolver<'a> {
         receiver: &Binding<'a>,
         work: &mut Work<'a>,
     ) -> Option<Option<&'a str>> {
-        let outside = |name: &'a str, work: &mut Work<'a>| {
+        // The spelling of `name` when it is outside the repository: the target of an alias of
+        // an outside type, else the name itself.
+        let outside = |name: &'a str, work: &mut Work<'a>| -> Option<&'a str> {
             let seen = &mut self.seen(path, scope);
             let found = self.resolve_as(path, scope, name, seen, work, Reading::Path);
+            let spelled = seen.outside.filter(|_| !seen.unsure && !seen.cut);
             matches!(found, Binding::Unknown | Binding::External(..))
+                .then_some(spelled.unwrap_or(name))
         };
         if let Some((p, s, n)) = self.holder(receiver) {
             return match self.receivers[p].get(&(s, n)) {
-                Some(Class::Type(ty) | Class::Named(ty)) if outside(ty, work) => Some(Some(ty)),
+                Some(Class::Type(ty) | Class::Named(ty)) => outside(ty, work).map(Some),
                 // A member read on a name from outside (`let s = URLSession.shared`): opaque.
                 Some(Class::Member(read)) => {
                     // As a direct chain, only a capitalized head is a type: `h.cache` is a member
                     // of a local or a parameter.
                     let first = read.split('.').next().unwrap_or(read);
-                    (first.starts_with(|c: char| c.is_ascii_uppercase()) && outside(first, work))
-                        .then_some(None)
+                    (first.starts_with(|c: char| c.is_ascii_uppercase())
+                        && outside(first, work).is_some())
+                    .then_some(None)
                 }
                 _ => None,
             };
         }
         let first = head.split('.').next().unwrap_or(head);
-        if !first.starts_with(|c: char| c.is_ascii_uppercase()) || !outside(first, work) {
+        if !first.starts_with(|c: char| c.is_ascii_uppercase()) {
             return None;
         }
-        Some((first == head).then_some(first))
+        let spelled = outside(first, work)?;
+        Some((first == head).then_some(spelled))
     }
 
     /// The name match of a call that no binding answers (`infer`). A call narrowed by its
@@ -3706,6 +3716,7 @@ impl<'a> Resolver<'a> {
             return Binding::Unknown;
         }
         if !seen.aliases.insert((path, target)) {
+            seen.unsure = true;
             return Binding::Unknown;
         }
         seen.depth += 1;
@@ -3714,6 +3725,10 @@ impl<'a> Resolver<'a> {
             self.resolve_as(path, scope, target, seen, work, Reading::Alias)
         });
         seen.depth -= 1;
+        // The innermost alias returns first: its target is the outside type's spelling.
+        if seen.outside.is_none() && matches!(found, Binding::Unknown | Binding::External(..)) {
+            seen.outside = Some(target);
+        }
         found
     }
 

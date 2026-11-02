@@ -164,12 +164,10 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   function, enum cases, `Self` as a type's name, a local typed by a call result or a closure
   parameter's type (#118), a typed local of a nested block, closure or accessor (a name match
   where Java and C# keep it function-wide), a `typealias` as a symbol, one written in a type
-  seen from another file (its extensions included), the repository's extension of an outside
-  type reached through an alias of it (the receiver stays outside under the alias's name, so
-  it reaches no block), an outside alias of a function type (`Ext.Handler`, which takes no
-  trailing closure, as the brief of #411 decides for every outside name), and the
-  protocols a conformed protocol inherits when the conformance is written on an extension. As in Java, an outside base
-  the pack does not list among its known outside members (`NSObject`, `View`) keeps a type's own
+  seen from another file (its extensions included), an outside alias of a function type
+  (`Ext.Handler`, which takes no trailing closure, as the brief of #411 decides for every
+  outside name), and the protocols a conformed protocol inherits when the conformance is
+  written on an extension. As in Java, an outside base the pack does not list among its known outside members (`NSObject`, `View`) keeps a type's own
   overloads from `exact`, and a listed one (`Codable`, a raw value type) the names it declares.
 - `http/swift/client.rs`: `CLIENT_DEPTH` (8) bounds the locals, properties and constants followed
   from a call's receiver to a client; past it the receiver is no client and the call is no

@@ -218,6 +218,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Swift: an alias of an outside type reaches the repository's extensions of that type (#440). A
+  receiver typed by `typealias Anim = Animation`, or by an alias of an alias, and `Anim.build()`
+  match `extension Animation { }` as `Animation` does; an alias of an outside type with no
+  extension stays unresolved.
 - Rust: a call after `?` or `.await` is typed by the value they unwrap (#435, after #401): the
   pack keeps beside a function's written result the first type argument of a `Result` or
   `Option` (`Def::unwrapped`) and the `Output = T` of `impl Future<Output = T>` and
