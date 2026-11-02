@@ -3,7 +3,7 @@ import type { FormEvent } from 'react';
 import { accountsCopy } from './accounts-i18n';
 import { accountsModel, changeRoute, createCheck, parseGroups, passwordCheck, refusalText } from './accounts';
 import type { AccountRole, Change, ManagedAccount } from './accounts';
-import { ApiError } from './api';
+import { messageOf } from './api';
 import type { Api } from './api';
 import { ConfirmDialog } from './ConfirmDialog';
 import { copy } from './i18n';
@@ -52,7 +52,7 @@ export function AccountsPage({ api, locale }: { api: Api; locale: Language }) {
     </div>
     <p className="intro">{t.intro}</p>
     {done && <p className="notice" role="status">{done}</p>}
-    {problem ? <p className="error" role="alert">{problem instanceof ApiError ? problem.message : common.loadError}</p>
+    {problem ? <p className="error" role="alert">{messageOf(problem, common.loadError)}</p>
       : !accounts ? <p role="status">{common.loading}</p>
       : <section>
         <h2>{t.list}</h2>

@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ApiError } from './api';
+import { ApiError, messageOf } from './api';
 import type { Api, Session } from './api';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EditWorkspace } from './EditWorkspace';
 import type { Outcome } from './EditWorkspace';
 import { EffectiveList } from './EffectiveList';
 import { WorkspaceVersions } from './WorkspaceVersions';
-import { loadCore, namedAuthorize, namedDescriptionProblem, namedEntriesJson, namedEntriesText, namedMessageProblem, namedNameProblem } from './core';
+import { loadCore, namedDescriptionProblem, namedEntriesJson, namedEntriesText, namedMessageProblem, namedNameProblem } from './core';
 import { guidedCopy } from './guided-i18n';
 import { copy } from './i18n';
 import type { Language } from './i18n';
 import { createBody, effectiveRoute, ingestionText, listRoute, pendingText, stateText } from './named';
 import type { Created, EffectiveView, Refusal, WorkspaceDetail, WorkspaceList } from './named';
 import { namedCopy } from './named-i18n';
+import { authorizationOf } from './named-core';
 import { useCatalog } from './useCatalog';
 import type { CatalogView } from './useCatalog';
 import './operations.css';
@@ -68,7 +69,7 @@ export function NamedWorkspacesPage({ api, locale, session, maxEntries }: { api:
       <button type="button" className="secondary" onClick={reload}>{problem ? common.retry : t.refresh}</button>
     </div>
     <p className="intro">{t.intro}</p>
-    {problem ? <p className="error" role="alert">{problem instanceof ApiError ? problem.message : common.loadError}</p> : null}
+    {problem ? <p className="error" role="alert">{messageOf(problem, common.loadError)}</p> : null}
     {!list && !problem ? <p role="status">{common.loading}</p> : null}
     {list && <section aria-label={t.list}>
       <h2>{t.list}</h2>
@@ -140,7 +141,7 @@ function CreateWorkspace({ api, locale, session, catalog, maxEntries, onCreated 
     try { namedEntriesJson(text, maxEntries); } catch (error) { invalid = String(error); }
   }
   const grant = session.grant ?? '*';
-  const decision = core === locale && chosen.length > 0 ? JSON.parse(namedAuthorize(JSON.stringify(chosen), JSON.stringify([...catalog.eligible]), JSON.stringify(grant))) as { allowed: boolean } : { allowed: true };
+  const decision = core === locale && chosen.length > 0 ? authorizationOf(chosen, catalog.eligible, grant) : { allowed: true };
   const errors: string[] = [];
   if (core === locale) {
     for (const problem of [namedNameProblem(name), namedDescriptionProblem(description), namedMessageProblem(message)]) if (problem) errors.push(problem);
@@ -163,13 +164,13 @@ function CreateWorkspace({ api, locale, session, catalog, maxEntries, onCreated 
         setConfirming(undefined); catalog.reload();
       } else if (error instanceof ApiError && error.code === 'pending') {
         setFailure(pendingText(error.body.reason as string | undefined, t));
-      } else setFailure(error instanceof ApiError ? error.message : copy[locale].loadError);
+      } else setFailure(messageOf(error, copy[locale].loadError));
     } finally { setBusy(false); }
   }
   const pending = catalog.answer?.state === 'pending';
   return <section aria-label={t.new}>
     <h2>{t.new}</h2>
-    {problem || catalog.problem ? <p className="error" role="alert">{(problem ?? catalog.problem) instanceof ApiError ? ((problem ?? catalog.problem) as ApiError).message : copy[locale].loadError}</p> : null}
+    {problem || catalog.problem ? <p className="error" role="alert">{messageOf(problem ?? catalog.problem, copy[locale].loadError)}</p> : null}
     {pending && <p role="status">{pendingText(catalog.answer?.reason ?? undefined, t)}</p>}
     <form onSubmit={review}>
       <label>{t.name}<input value={name} onChange={event => setName(event.target.value)} /></label>

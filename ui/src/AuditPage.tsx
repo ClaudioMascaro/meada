@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ApiError } from './api';
+import { messageOf } from './api';
 import type { Api } from './api';
 import { auditModel, auditRoute } from './audit';
 import type { AuditPage as Page } from './audit';
@@ -32,7 +32,7 @@ export function AuditPage({ api, locale }: { api: Api; locale: Language }) {
       <button type="button" className="secondary" onClick={() => setAttempt(value => value + 1)}>{problem ? common.retry : t.refresh}</button>
     </div>
     <p className="intro">{t.auditIntro}</p>
-    {problem ? <p className="error" role="alert">{problem instanceof ApiError ? problem.message : common.loadError}</p>
+    {problem ? <p className="error" role="alert">{messageOf(problem, common.loadError)}</p>
       : !page ? <p role="status">{common.loading}</p>
       : <section>
         <h2>{t.records}</h2>

@@ -1,20 +1,21 @@
 import { useEffect, useState } from 'react';
-import { ApiError } from './api';
+import { ApiError, messageOf } from './api';
 import type { Api, Session } from './api';
 import { CHECK_IDENTITIES } from './catalog';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EffectiveList } from './EffectiveList';
-import { loadCore, namedAuthorize, namedChanged, namedDiff, namedEntriesJson, namedEntriesText, namedMessageProblem, resourceRoles } from './core';
+import { loadCore, namedEntriesText, namedMessageProblem } from './core';
 import { GuidedForm } from './GuidedForm';
 import type { EntryStatus } from './GuidedForm';
 import { diffLines, entriesJson } from './guided';
-import type { Entry, NamedDiff } from './guided';
+import type { Entry } from './guided';
 import { guidedCopy } from './guided-i18n';
 import { copy } from './i18n';
 import type { Language } from './i18n';
 import { applyBody, coverageText, diagnosticText, findingText, ingestionText, pendingText, previewBody, saveBody, sourceText } from './named';
 import type { EffectiveView, Refusal, WorkspaceDetail, Written } from './named';
 import { namedCopy } from './named-i18n';
+import { authorizationOf, changedOf, diffOf, parseEntries, rolesOf } from './named-core';
 import type { CatalogView } from './useCatalog';
 
 /** What the person reviewed: nothing else is sent when they confirm. */
@@ -68,20 +69,20 @@ export function EditWorkspace({ api, locale, session, detail, savedView, catalog
   let next: Entry[] | undefined;
   let invalid: string | undefined;
   if (ready) {
-    try { next = JSON.parse(namedEntriesJson(current, maxEntries)) as Entry[]; } catch (error) { invalid = String(error); }
+    try { next = parseEntries(current, maxEntries); } catch (error) { invalid = String(error); }
   }
   // The diff, the entries to recheck and the eligibility are the core's: the same functions the server runs.
-  const diff = next ? JSON.parse(namedDiff(JSON.stringify(before), JSON.stringify(next))) as NamedDiff : undefined;
-  const touched = next ? JSON.parse(namedChanged(JSON.stringify(before), JSON.stringify(next))) as string[] : [];
+  const diff = next ? diffOf(before, next) : undefined;
+  const touched = next ? changedOf(before, next) : [];
   const authorization = ready && touched.length > 0
-    ? JSON.parse(namedAuthorize(JSON.stringify(touched), JSON.stringify([...catalog.eligible]), JSON.stringify(session.grant ?? '*'))) as { allowed: boolean; named: string[]; hidden: number }
+    ? authorizationOf(touched, catalog.eligible, session.grant ?? '*')
     : { allowed: true, named: [], hidden: 0 };
   // A check that could not decide (`pending`) can be asked again.
   const unverified = touched.filter(identity => !catalog.eligible.has(identity) && (catalog.checked.get(identity) ?? 'pending') === 'pending');
 
   function edit(value: string) {
     setText(value); setView(undefined); setRefusal(undefined); setStale(false); setStoredOnly(false); setFailure(undefined);
-    try { setModel(JSON.parse(namedEntriesJson(value, maxEntries)) as Entry[]); setFormOk(true); } catch { setFormOk(false); }
+    try { setModel(parseEntries(value, maxEntries)); setFormOk(true); } catch { setFormOk(false); }
   }
   function editForm(entries: Entry[]) {
     setModel(entries); setFormOk(true);
@@ -92,11 +93,11 @@ export function EditWorkspace({ api, locale, session, detail, savedView, catalog
     setFailure(undefined);
     try {
       setView(await api.request<EffectiveView>('workspaces/effective', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: previewBody(current) }));
-    } catch (error) { setFailure(error instanceof ApiError ? error.message : copy[locale].loadError); }
+    } catch (error) { setFailure(messageOf(error, copy[locale].loadError)); }
   }
   async function verify() {
     setChecking(true); setFailure(undefined);
-    try { await catalog.verify(unverified.slice(0, CHECK_IDENTITIES)); } catch (error) { setFailure(error instanceof ApiError ? error.message : copy[locale].loadError); } finally { setChecking(false); }
+    try { await catalog.verify(unverified.slice(0, CHECK_IDENTITIES)); } catch (error) { setFailure(messageOf(error, copy[locale].loadError)); } finally { setChecking(false); }
   }
   function review() {
     if (!diff) return;
@@ -123,13 +124,13 @@ export function EditWorkspace({ api, locale, session, detail, savedView, catalog
         setFailure(t.staleBase); setStale(true);
       } else if (error instanceof ApiError && error.code === 'not_operator') {
         setFrozen(undefined); onLost(t.notOperator);
-      } else setFailure(error instanceof ApiError ? error.message : copy[locale].loadError);
+      } else setFailure(messageOf(error, copy[locale].loadError));
     } finally { setBusy(false); }
   }
 
   const changed = original !== undefined && current !== original;
   const messageProblem = ready ? namedMessageProblem(message) : undefined;
-  const roles: string[] = ready ? JSON.parse(resourceRoles()) : [];
+  const roles = ready ? rolesOf() : [];
   const ok = ready && invalid === undefined && changed && authorization.allowed && messageProblem === undefined;
   const shown = view ?? savedView;
   const changes = diff ? diffLines(diff, g) : [];
@@ -155,7 +156,7 @@ export function EditWorkspace({ api, locale, session, detail, savedView, catalog
       {detail.hidden ? <p className="notice">{g.scopeHidden(detail.hidden)}</p> : null}
       {detail.operators && <p>{g.scopeOperators}: {detail.operators.map(operator => operator.login ?? operator.subject).join(', ')}</p>}
     </section>
-    {problem || catalog.problem ? <p className="error" role="alert">{(problem ?? catalog.problem) instanceof ApiError ? ((problem ?? catalog.problem) as ApiError).message : copy[locale].loadError}</p> : null}
+    {problem || catalog.problem ? <p className="error" role="alert">{messageOf(problem ?? catalog.problem, copy[locale].loadError)}</p> : null}
     {catalog.answer?.state === 'pending' && <p role="status">{pendingText(catalog.answer.reason ?? undefined, t)}</p>}
     <p className="notice">{g.guidedNote}</p>
     {!formOk && <p className="error" role="status">{g.textInvalid}</p>}
