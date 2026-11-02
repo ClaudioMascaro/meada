@@ -108,7 +108,7 @@ impl Console {
     fn read_grant(session: &Session) -> Grant {
         #[cfg(feature = "oidc")]
         if let Some(grant) = &session.grant {
-            return grant.core();
+            return grant.into();
         }
         Grant::All
     }

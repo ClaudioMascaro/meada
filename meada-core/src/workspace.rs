@@ -1,12 +1,13 @@
 //! Workspace changes in manifest order, computed from the same entry validation as import.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as Json};
 use toml::de::{DeTable, DeValue, ValueDeserializer};
 
-use crate::ids::entry_blocks;
+use crate::authorize;
+use crate::ids::{entry_blocks, workspace_version_id};
 use crate::manifest::{EntryFile, validate_import};
 use crate::qualify;
 
@@ -199,9 +200,43 @@ pub fn entry(e: &EntryFile, blocks: Json) -> Json {
 /// validation errors when it is not valid.
 pub fn version_entries(file: &str, src: &str) -> Result<Vec<Json>, Vec<String>> {
     let entries = validate_import(file, src)?;
-    Ok((entries.iter().zip(entry_blocks(src)))
+    Ok(with_blocks(&entries, entry_blocks(src)))
+}
+
+/// `entries` as a version document holds them, their blocks being `blocks` (`entry_blocks`).
+pub fn with_blocks(entries: &[EntryFile], blocks: Vec<Json>) -> Vec<Json> {
+    (entries.iter().zip(blocks))
         .map(|(e, blocks)| entry(e, blocks))
-        .collect())
+        .collect()
+}
+
+/// The version id of `entries`, their blocks being `blocks` (`entry_blocks`).
+pub fn entries_id(entries: &[EntryFile], blocks: &[Json]) -> String {
+    let ids: Vec<_> = (entries.iter().zip(blocks))
+        .map(|(e, blocks)| e.version_entry(blocks))
+        .collect();
+    workspace_version_id(&ids)
+}
+
+/// The owners, sorted and without repeats, of the entries that differ between `current` and
+/// `new` (by identity, whatever their order): the groups a change touches. A reorder alone
+/// touches none.
+pub fn touched_owners(current: &[Json], new: &[Json]) -> Vec<String> {
+    let keyed = |entries: &[Json]| -> BTreeMap<String, Json> {
+        (entries.iter())
+            .map(|e| (authorize::repo(e).to_string(), e.clone()))
+            .collect()
+    };
+    let (old, new) = (keyed(current), keyed(new));
+    let touched = old.keys().chain(new.keys()).collect::<BTreeSet<_>>();
+    (touched.into_iter())
+        .filter(|repo| old.get(*repo) != new.get(*repo))
+        .filter_map(|repo| new.get(repo).or_else(|| old.get(repo)))
+        .filter_map(|entry| entry["owner"].as_str())
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
 }
 
 /// A document's entries as `[[repository]]` tables, `None` when they are not TOML tables. An

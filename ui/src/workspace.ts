@@ -1,4 +1,4 @@
-import { authorizeEntries, composeEntries, entriesJson, entriesText, init, validate, workspaceDiff, workspaceVersionId } from './core';
+import { authorizeEntries, composeEntries, entriesJson, entriesText, init, touchedOwners, validate, workspaceDiff, workspaceVersionId } from './core';
 import type { Session } from './api';
 import type { Language } from './i18n';
 import { shellQuote } from './commands';
@@ -62,12 +62,8 @@ export function entryRows(held: Entry[], who: Authority): EntryRow[] {
   return held.map(entry => ({ ...entry, may_change: !refused.has(entry.repo), ...refused.has(entry.repo) && { refusal: refused.get(entry.repo) } }));
 }
 
-/** The owners of the entries a diff touches (a reorder touches none), as the server's audit line names them. */
-function touchedOwners(diff: WorkspaceDiff, before: Entry[], after: Entry[]): string[] {
-  const owner = new Map([...before, ...after].map(entry => [entry.repo, entry.owner]));
-  const touched = [...diff.added, ...diff.removed, ...diff.changed.filter(change => change.keys.some(key => key !== 'repository')).map(change => change.repo)];
-  return [...new Set(touched.flatMap(repo => owner.get(repo) ?? []))].sort();
-}
+/** The owners of the entries that differ between two lists, as the server's audit line names them (the core's own function; a reorder touches none). */
+const owners = (before: Entry[], after: Entry[]): string[] => JSON.parse(touchedOwners(JSON.stringify(before), JSON.stringify(after))) as string[];
 
 /**
  * A team operator's editor: the text holds the entries it reads. Each change is composed with the
@@ -82,7 +78,7 @@ export function teamEditorModel(text: string, held: Entry[], who: Authority, loc
   if (base.errors.length) return { errors: base.errors, diff: undefined, refusals: [] as Refusal[], owners: [] as string[] };
   const composed = JSON.parse(composeEntries(JSON.stringify(who.grant), who.login, who.host, current, entriesJson(text))) as Entry[];
   const diff = JSON.parse(workspaceDiff(entriesText(current), entriesText(JSON.stringify(composed)))) as WorkspaceDiff;
-  return { errors: [], diff, refusals: refusals(who, held, composed), owners: touchedOwners(diff, held, composed) };
+  return { errors: [], diff, refusals: refusals(who, held, composed), owners: owners(held, composed) };
 }
 
 export interface VersionSummary { id: string; author: string; time: string; message: string }
@@ -91,15 +87,10 @@ export interface WorkspacePointer { id: string; fence: number | string }
 export interface CurrentWorkspace { current: WorkspacePointer | null; version: WorkspaceVersion | null }
 export interface WorkspaceVersions { current: WorkspacePointer | null; versions: VersionSummary[]; malformed: string[] }
 
-/** A confirmed write names its CLI command (the global operator) or the teams that authorize it. */
-export interface SaveAction {
-  kind: 'save'; route: 'workspace/versions'; id?: string; command?: string; teams?: string[];
-  body: { entries: string; message: string };
-}
-export interface ApplyAction {
-  kind: 'apply'; route: 'workspace/apply'; rollback: boolean; command?: string; teams?: string[];
-  body: { version: string };
-}
+/** A confirmed write names its CLI command (the global operator) or the teams that authorize it, never both. */
+type Who = { command: string; teams?: never } | { teams: string[]; command?: never };
+export type SaveAction = { kind: 'save'; route: 'workspace/versions'; id?: string; body: { entries: string; message: string } } & Who;
+export type ApplyAction = { kind: 'apply'; route: 'workspace/apply'; rollback: boolean; body: { version: string } } & Who;
 
 export function saveAction(entries: string, message: string, file: string): SaveAction {
   const id = workspaceVersionId(entries);
@@ -128,11 +119,10 @@ export function teamSaveAction(entries: string, message: string, teams: string[]
  * reads, the current ones against the stored version's, refuses any; the API still decides.
  */
 export function teamApplyAction(version: VersionSummary, current: string | undefined, versions: VersionSummary[],
-  held: Entry[], stored: Entry[], who: Authority, locale: Language): ApplyAction | undefined {
+  held: Entry[], stored: Entry[], who: Authority): ApplyAction | undefined {
   if (refusals(who, held, stored).length) return undefined;
-  const diff = editorModel(versionText(stored), versionText(held), locale).diff;
   return { kind: 'apply', route: 'workspace/apply', body: { version: version.id },
-    rollback: isRollback(version, current, versions), teams: diff ? touchedOwners(diff, held, stored) : [] };
+    rollback: isRollback(version, current, versions), teams: owners(held, stored) };
 }
 
 /** The `owner = "<partial>` the caret is inside, as the picker's prefix (decoded) and where its text starts; `undefined` elsewhere. */

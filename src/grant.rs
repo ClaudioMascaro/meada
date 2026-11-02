@@ -54,22 +54,22 @@ pub enum Grant {
     Only(HashSet<String>),
 }
 
+/// The grant as `meada-core` takes it, for the rules the console and a node share.
+#[cfg(feature = "snapshot")]
+impl From<&Grant> for meada_core::authorize::Grant {
+    fn from(grant: &Grant) -> Self {
+        match grant {
+            Grant::All => Self::All,
+            Grant::Only(identities) => Self::Only(identities.iter().cloned().collect()),
+        }
+    }
+}
+
 impl Grant {
     pub fn reads(&self, identity: &str) -> bool {
         match self {
             Grant::All => true,
             Grant::Only(identities) => identities.contains(identity),
-        }
-    }
-
-    /// The grant as `meada-core` takes it, for the rules the console and a node share.
-    #[cfg(feature = "snapshot")]
-    pub fn core(&self) -> meada_core::authorize::Grant {
-        match self {
-            Grant::All => meada_core::authorize::Grant::All,
-            Grant::Only(identities) => {
-                meada_core::authorize::Grant::Only(identities.iter().cloned().collect())
-            }
         }
     }
 
