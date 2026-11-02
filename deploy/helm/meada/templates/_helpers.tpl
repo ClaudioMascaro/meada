@@ -133,8 +133,9 @@ app.kubernetes.io/component: server
 {{- if not .Values.modules.workspaces.enabled -}}
 {{- fail "proposals.enabled requires modules.workspaces: the proposal server reads [workspaces] and [catalog]" -}}
 {{- end -}}
-{{- if not (hasPrefix "https://" .Values.proposals.publicUrl) -}}
-{{- fail "proposals.publicUrl must use https" -}}
+{{- /* The binary's bare URL: https, a host, no user, path, query or fragment. */ -}}
+{{- if not (regexMatch "^https://[^/?#@]+/?$" .Values.proposals.publicUrl) -}}
+{{- fail "proposals.publicUrl must be a bare https URL (no path, query, fragment or user)" -}}
 {{- end -}}
 {{- end -}}
 {{- if .Values.console.enabled -}}

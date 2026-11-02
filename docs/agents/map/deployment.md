@@ -27,11 +27,10 @@ the store has none, and `Caddyfile.accounts` forwards `Authorization` without th
 (off by default) run the proposal server (`meada workspaces mcp`, ADR 0022, #504) as a process of
 its own beside the console: its own pull and volume (`node_name = "proposals"`), the read role
 (`MEADA_POSTGRES_READ_URL` in Compose, the Secret's `read-url` in the chart), a Caddy on
-`127.0.0.1:8445` in Compose and a Service without Ingress in the chart. `proposals.workspace.toml`
-keeps the console's identity sections commented until the operator copies them; the chart repeats
-the console's `[oidc]`, `[catalog]`, `[workspaces]` and `[ui]` and adds `[proposals]` (also to the
-console's, which issues the agent tokens under local accounts). `compose-check` and `helm-check`
-assert both, and that the block is absent when off.
+`127.0.0.1:8445` in Compose and a Service in the chart (its limits are in Known ceilings). The chart
+repeats the console's `[oidc]`, `[catalog]`, `[workspaces]` and `[ui]` and adds `[proposals]` (also
+to the console's, which issues the agent tokens under local accounts). `compose-check` and
+`helm-check` assert both, and that the block is absent when off.
 
 Managed writers pull the workspace before the external fetch, index and publish, inside one
 refresh lock. A failed stage ends the job before publish, so the pointer stays (#316, ADR
