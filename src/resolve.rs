@@ -275,9 +275,6 @@ const RECEIVER_DEPTH: usize = 64;
 struct Work<'a> {
     busy: Vec<Busy<'a>>,
     families: HashMap<Target<'a>, Family<'a>>,
-    /// The labels of the call being resolved, which its last member step compares with a known
-    /// outside member's (`Resolver::may_declare`).
-    labels: Option<&'a [String]>,
 }
 
 /// One entry of a class family: a class of the repository, or a base that is not one
@@ -1208,28 +1205,29 @@ impl<'a> Resolver<'a> {
         // The result of the call this one is made on, read once: the name match below reads it
         // too, and reading it twice per call would double the work at every call of a chain.
         let mut on = None;
-        let outer = std::mem::replace(&mut work.labels, call.labels.as_deref());
+        let labels = call.labels.as_deref();
         let binding = match (call.on, constructs, call.by_path) {
             (Some(inner), false, _) => {
                 let members = callee.split_once('.').map_or("", |(_, m)| m);
                 let result = self.result_of(path, inner, work);
                 on = Some(result.clone());
-                self.walk(result, members, seen, work, Reading::Value)
+                self.walk(result, members, seen, work, Reading::Value, labels)
             }
             (_, true, _) => self.resolve_as(path, scope, callee, seen, work, Reading::Type),
             (_, false, true) if self.members_in_scope && !callee.contains('.') => {
-                self.resolve_as(path, scope, callee, seen, work, Reading::Method)
+                self.resolve_labelled(path, scope, callee, seen, work, Reading::Method, labels)
             }
-            (_, false, true) => self.resolve_as(path, scope, callee, seen, work, Reading::Path),
+            (_, false, true) => {
+                self.resolve_labelled(path, scope, callee, seen, work, Reading::Path, labels)
+            }
             (_, false, false) => {
                 let reading = match call.decorates {
                     Some(_) => Reading::Decorator,
                     None => Reading::Value,
                 };
-                self.resolve_as(path, scope, callee, seen, work, reading)
+                self.resolve_labelled(path, scope, callee, seen, work, reading, labels)
             }
         };
-        work.labels = outer;
         let binding = match binding {
             Binding::Several(all) if constructs => {
                 let classes: Vec<_> = all.into_iter().filter(|t| self.is_class(*t)).collect();
@@ -1948,12 +1946,29 @@ impl<'a> Resolver<'a> {
         work: &mut Work<'a>,
         reading: Reading,
     ) -> Binding<'a> {
+        self.resolve_labelled(path, scope, callee, seen, work, reading, None)
+    }
+
+    /// `resolve_as` for the callee of a call that writes `labels` (Swift): its last member is
+    /// looked up with them (`may_declare`).
+    #[allow(clippy::too_many_arguments)]
+    fn resolve_labelled(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        callee: &'a str,
+        seen: &mut Seen<'a>,
+        work: &mut Work<'a>,
+        reading: Reading,
+        labels: Option<&'a [String]>,
+    ) -> Binding<'a> {
         if let Some((head, members)) = callee.split_once('.')
             && Some(head) == self.base_receiver
         {
             let (first, rest) = members.split_once('.').unwrap_or((members, ""));
-            let found = self.base_member(path, scope, first, work);
-            return self.walk(found, rest, seen, work, reading);
+            let found =
+                self.base_member(path, scope, first, work, labels.filter(|_| rest.is_empty()));
+            return self.walk(found, rest, seen, work, reading, labels);
         }
         if self.assigned_members
             && let Some(found) = self.assigned(path, scope, callee)
@@ -2001,7 +2016,7 @@ impl<'a> Resolver<'a> {
         {
             (binding, members) = found;
         }
-        let found = self.walk(binding, members, seen, work, reading);
+        let found = self.walk(binding, members, seen, work, reading, labels);
         self.in_unit(path, self.accessible(path, found))
     }
 
@@ -2040,6 +2055,7 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
         work: &mut Work<'a>,
         reading: Reading,
+        labels: Option<&'a [String]>,
     ) -> Binding<'a> {
         let members: Vec<&str> = members.split('.').filter(|m| !m.is_empty()).collect();
         for (n, member) in members.iter().enumerate() {
@@ -2048,10 +2064,8 @@ impl<'a> Resolver<'a> {
             // A member read on the way, or read last, is no method where fields and methods
             // are separate namespaces (`Reading::Read`).
             let read = self.members_in_scope && (!last || reading.read());
-            let labels = work.labels;
-            work.labels = labels.filter(|_| last);
-            let stepped = self.instance(binding, work);
-            binding = match stepped {
+            let labels = labels.filter(|_| last);
+            binding = match self.instance(binding, work) {
                 // A class's name (`Type.m()`, `Type.X`) reaches a Kotlin companion's members
                 // before the class's, which only an instance reaches; past the companion, a
                 // nested class or a constant of the class (an enum entry).
@@ -2059,8 +2073,8 @@ impl<'a> Resolver<'a> {
                     if self.is_class(t)
                         && let Some(&c) = self.companions.get(&t) =>
                 {
-                    match self.member(c, member, read, work) {
-                        Binding::Unknown => match self.member(t, member, read, work) {
+                    match self.member(c, member, read, labels, work) {
+                        Binding::Unknown => match self.member(t, member, read, labels, work) {
                             found @ Binding::Def(d) if self.is_class(d) => found,
                             found @ Binding::Const(..) => found,
                             _ => Binding::Unknown,
@@ -2069,7 +2083,7 @@ impl<'a> Resolver<'a> {
                     }
                 }
                 Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => {
-                    self.member(t, member, read, work)
+                    self.member(t, member, read, labels, work)
                 }
                 Binding::Def(t) => match self.def(t.path, &format!("{}.{member}", t.name)) {
                     Binding::Unknown if self.defs[t.path][t.name].kind == Kind::Module => {
@@ -2083,7 +2097,7 @@ impl<'a> Resolver<'a> {
                 {
                     alternatives(
                         all.into_iter()
-                            .map(|t| self.member(t, member, read, work))
+                            .map(|t| self.member(t, member, read, labels, work))
                             .collect(),
                     )
                     .unwrap_or(Binding::Unknown)
@@ -2091,7 +2105,6 @@ impl<'a> Resolver<'a> {
                 Binding::Several(_) => Binding::Unknown,
                 other => other,
             };
-            work.labels = labels;
         }
         binding
     }
@@ -2273,6 +2286,7 @@ impl<'a> Resolver<'a> {
         class: Target<'a>,
         member: &'a str,
         read: bool,
+        labels: Option<&[String]>,
         work: &mut Work<'a>,
     ) -> Binding<'a> {
         let Some(family) = self.family(class, work) else {
@@ -2287,13 +2301,13 @@ impl<'a> Resolver<'a> {
                 _ => Binding::Unknown,
             };
         };
-        if !read && let Some(found) = self.overloaded(&family, member, work.labels) {
+        if !read && let Some(found) = self.overloaded(&family, member, labels) {
             return found;
         }
         for ancestor in self.with_parts(&family).iter() {
             let c = match ancestor {
                 Ancestor::Class(c) => *c,
-                Ancestor::Opaque(o) if !self.may_declare(o, member, work.labels) => continue,
+                Ancestor::Opaque(o) if !self.may_declare(o, member, labels) => continue,
                 Ancestor::Opaque(_) => return Binding::Unknown,
             };
             if let Some(found) = self.block_member(c, member) {
@@ -2325,7 +2339,7 @@ impl<'a> Resolver<'a> {
             }
         }
         match self.companion(class, work) {
-            Some(companion) => self.member(companion, member, read, work),
+            Some(companion) => self.member(companion, member, read, labels, work),
             None => Binding::Unknown,
         }
     }
@@ -2434,13 +2448,14 @@ impl<'a> Resolver<'a> {
         scope: &str,
         member: &str,
         work: &mut Work<'a>,
+        labels: Option<&[String]>,
     ) -> Binding<'a> {
         let Binding::Def(class) = self.class(path, scope) else {
             return Binding::Unknown;
         };
         let family = self.family(class, work).unwrap_or_default();
         (family.get(1..))
-            .and_then(|bases| self.overloaded(bases, member, None))
+            .and_then(|bases| self.overloaded(bases, member, labels))
             .unwrap_or(Binding::Unknown)
     }
 
@@ -3557,7 +3572,7 @@ impl<'a> Resolver<'a> {
                     self.statics.contains(m)
                         && (self.static_imports_inherit || declared_in(t.name, m.name))
                 };
-                match self.member(t, name, false, work) {
+                match self.member(t, name, false, None, work) {
                     Binding::Def(m) if offered(&m) => Binding::Def(m),
                     Binding::Several(all) => {
                         one(all.into_iter().filter(offered).map(Binding::Def).collect())
@@ -6147,7 +6162,7 @@ impl<'a> Code<'a> {
         let found = r.resolve_as(path, scope, name, seen, work, Reading::Value);
         match r.instance(found, work) {
             Binding::Def(t) | Binding::Instance(t) if r.is_class(t) => {
-                match r.member(t, method, false, work) {
+                match r.member(t, method, false, None, work) {
                     Binding::Def(t) => Some(t),
                     _ => None,
                 }
@@ -10119,11 +10134,15 @@ mod tests {
             "struct P: Hashable { func hash(seed: Int) {} }
              func own(p: P) { p.hash(seed: 1) }
              func declared(p: P, h: inout Hasher) { p.hash(into: &h) }
+             func closure(p: P) { p.hash { 1 } }
 ",
         );
         assert_eq!(calls["own(p:) p.hash"], "exact P.hash(seed:)");
         // `hash(into:)` is `Hashable`'s, not an overload of `P`: the call stays opaque.
         assert_eq!(calls["declared(p:h:) p.hash"], "none");
+        // A trailing closure compares by the bare name: `Hashable` may declare `hash`, so the
+        // strict level stands.
+        assert_eq!(calls["closure(p:) p.hash"], "inferred P.hash(seed:)");
     }
 
     /// A Swift local bound to a member read on a name nothing in the repository binds is opaque

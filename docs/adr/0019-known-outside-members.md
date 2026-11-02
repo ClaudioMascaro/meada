@@ -91,8 +91,9 @@ Option 2, generalized to the four packs that merge overloads.
   name.
 - Another accepted risk: an extension the tables do not list, in scope of a call (a library's
   extension of `Comparable` or `IDisposable`), that a call no own overload fits by type takes.
-- A Swift entry is compared without its labels, since the resolver looks members up by base
-  name: `hash(into:)` keeps every call named `hash` at today's level, a stricter reading than
-  the table spells.
+- A Swift entry is compared with the labels of a call that writes them (#463): `hash(into:)`
+  hides `x.hash(into: &h)` but not `x.hash(seed: 1)`, so an own `hash(seed:)` beside `Hashable`
+  is `exact`. A call without labels, with a trailing closure, or a bare call inside the type
+  still compares by base name and keeps the strict reading.
 - Storing arities for listed names, so that an own overload of a listed name could be `exact`, a
   `meada.toml` allowance and "own class wins" stay out.
