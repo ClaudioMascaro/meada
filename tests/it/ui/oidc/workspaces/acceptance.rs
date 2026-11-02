@@ -110,12 +110,80 @@ fn every_failed_stage_keeps_the_generation_and_a_revoked_grant_never_revives() {
     fs::rename(&broken, &indexes).unwrap();
     assert_eq!(pointer(&case), g1);
     assert_eq!(node_call(&node, &route(&yb, &b), &bob, "handle").0, 200);
+    // Alice's revocation of A holds through the failed publication, at the node and in the
+    // eligibility the console reads.
+    assert_eq!(node_call(&node, &route(&ya, &a), &alice, "handle").0, 404);
+    case.await_check("alice", "A", "unavailable");
 
     // 6. Only a later complete set brings the grant back, by the roles GitHub then shows.
     case.grant_all_but(&[]);
     case.roles();
     case.await_check("alice", "A", "selectable");
     until_status(&node, &route(&ya, &a), &alice, 200);
+    case.github.clean(&node.stderr(), &[]);
+    case.github.clean(&case.console.stderr(), &[]);
+}
+
+/// A permissions set that ages past `max_age_seconds` while the runs that should replace it
+/// fail: eligibility is `pending` / `stale_set` for the caller and for the administrator, the
+/// revocation the last complete set recorded does not revive at the node, and only a later
+/// complete set restores the grant.
+#[test]
+fn a_stale_set_fails_closed_through_the_failure_run_and_a_complete_set_restores_the_grant() {
+    let Some(case) = Case::aged("ws_failed_stale", false, 12) else {
+        return;
+    };
+    case.refresh();
+    case.ready();
+    let ya = id_of(&case.create("alice", "Y and A", &["Y", "A"]));
+    let (y, a) = (case.identity("Y"), case.identity("A"));
+    let route = |identity: &str| format!("/-/workspaces/{ya}/{identity}");
+    case.refresh();
+    case.job_ok(&["index", "--workspace", MANIFEST]);
+    case.job_ok(&["snapshot", "publish", "--workspace", MANIFEST]);
+    let (node, _) = case.node();
+    let alice = case.node_token("alice");
+    until_status(&node, &route(&a), &alice, 200);
+
+    // Alice loses A; then every later role check fails, so the set that records it is the last.
+    case.revoke(&[("alice", "A")]);
+    until_status(&node, &route(&a), &alice, 404);
+    case.github.api.with(|s| s.listing_status = Some(500));
+    case.job_ok(&["workspace", "pull", "--workspace", MANIFEST]);
+    stops(&case, &["github-app", "roles", "--workspace", MANIFEST]);
+    // GitHub already shows A restored: nothing reads it, the failed run wrote no set.
+    case.grant_all_but(&[]);
+
+    // The set ages out: for alice and for the administrator every check is `pending`, none of
+    // the older grants (A's included) comes back.
+    for caller in ["alice", "root"] {
+        let token = case.token(caller);
+        let start = Instant::now();
+        let stale = loop {
+            let body = json!({"identities": [y, a]});
+            let reply = case.post("/api/v1/catalog/check", &token, &body);
+            if reply.json()["reason"] == json!("stale_set") {
+                break reply.json();
+            }
+            assert!(start.elapsed() < Duration::from_secs(30), "{}", reply.body);
+            std::thread::sleep(Duration::from_millis(200));
+        };
+        assert_eq!(
+            stale,
+            json!({"state": "pending", "reason": "stale_set", "results": [
+                {"identity": y, "state": "pending"}, {"identity": a, "state": "pending"}
+            ]}),
+            "{caller}"
+        );
+    }
+    assert_eq!(node_call(&node, &route(&a), &alice, "handle").0, 404);
+
+    // Only a later complete set restores A.
+    case.github.api.with(|s| s.listing_status = None);
+    case.roles();
+    case.await_check("alice", "A", "selectable");
+    case.await_check("root", "A", "selectable");
+    until_status(&node, &route(&a), &alice, 200);
     case.github.clean(&node.stderr(), &[]);
     case.github.clean(&case.console.stderr(), &[]);
 }

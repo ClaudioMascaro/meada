@@ -23,14 +23,14 @@ fn code(reply: &Reply) -> String {
 impl Case {
     /// Removes the `meada.toml` of the mirror of `short` and commits, before any refresh: the
     /// repository then declares nothing of its own and a context's blocks apply to it.
-    fn bare(&self, short: &str) {
+    pub(super) fn bare(&self, short: &str) {
         let mirror = self.dir.join("mirrors").join(self.identity(short));
         crate::common::git(&mirror, &["rm", "-q", "meada.toml"]);
         crate::common::git(&mirror, &["commit", "-q", "-m", "no meada.toml"]);
     }
 
     /// The job's refresh to a published generation, pulled by the console: its id and document.
-    fn publish(&self) -> (String, Value) {
+    pub(super) fn publish(&self) -> (String, Value) {
         self.refresh();
         self.job_ok(&["index", "--workspace", MANIFEST]);
         let generation = self.job_ok(&["snapshot", "publish", "--workspace", MANIFEST]);
