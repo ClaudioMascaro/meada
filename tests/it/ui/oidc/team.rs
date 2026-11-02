@@ -13,6 +13,8 @@ use crate::ui::{Reply, front_end, send_body};
 use jsonwebtoken::{Algorithm, EncodingKey};
 use serde_json::{Value, json};
 use std::fs;
+#[cfg(debug_assertions)]
+use std::time::{Duration, Instant};
 
 pub(super) const BILLING: &str = "e.test/team/billing";
 pub(super) const LEDGER: &str = "e.test/team/ledger";
@@ -68,6 +70,11 @@ pub(super) struct Team {
 /// A fleet whose current workspace version is `ENTRIES` (imported and applied through the CLI)
 /// and a console over its store with `operations`.
 pub(super) fn team(case: &'static str, operations: bool) -> Option<Team> {
+    team_with(case, operations, &[])
+}
+
+/// `team` with more environment variables for the console.
+fn team_with(case: &'static str, operations: bool, env: &[(&str, &str)]) -> Option<Team> {
     let fleet = Fleet::new(case, 2)?;
     let (encoding, jwk) = key("team");
     let issuer = Issuer::new(set(&[&jwk]));
@@ -87,7 +94,7 @@ pub(super) fn team(case: &'static str, operations: bool) -> Option<Team> {
     );
     fs::write(fleet.dir.join("ops/console.toml"), bootstrap).unwrap();
     front_end(&fleet.dir, Some(VERSION));
-    let console = start(&fleet);
+    let console = start_with(&fleet, env);
     Some(Team {
         fleet,
         encoding,
@@ -98,11 +105,16 @@ pub(super) fn team(case: &'static str, operations: bool) -> Option<Team> {
 }
 
 pub(super) fn start(fleet: &Fleet) -> Server {
+    start_with(fleet, &[])
+}
+
+fn start_with(fleet: &Fleet, env: &[(&str, &str)]) -> Server {
+    let env = [&[("MEADA_TEST_S3_KEY", KEY_ID)], env].concat();
     Server::start_command(
         &fleet.dir,
         "ui",
         &["--listen", "127.0.0.1:0", "--workspace", "ops/console.toml"],
-        &[("MEADA_TEST_S3_KEY", KEY_ID)],
+        &env,
     )
 }
 
@@ -639,4 +651,129 @@ fn a_team_operator_cannot_move_generations() {
         assert!(line.contains("global operator"), "{line}");
         assert!(!line.contains("Bearer") && !line.contains("eyJ"), "{line}");
     }
+}
+
+/// The knob's file, relative to the console's directory: `.reached` and `.go` are written beside
+/// it, and the console removes it when a request pauses.
+#[cfg(debug_assertions)]
+const PAUSE_FILE: &str = "pause";
+
+/// Runs `request` (a write of a team operator the console admits), holds it at the debug knob
+/// between admission and the refresh lock, and meanwhile has the global operator save and apply
+/// `list`. Answers the request's reply and the version then current with the versions stored.
+#[cfg(debug_assertions)]
+fn lose_the_role_in_flight(
+    team: &Team,
+    operator: &str,
+    list: &[(&str, Option<&str>)],
+    request: impl FnOnce() -> Reply + Send,
+) -> (Reply, (String, usize)) {
+    let pause = team.fleet.dir.join(PAUSE_FILE);
+    // The directory outlives a run: a `.reached` or `.go` left by an earlier one would skip a wait.
+    for end in ["reached", "go"] {
+        let _ = fs::remove_file(team.fleet.dir.join(format!("{PAUSE_FILE}.{end}")));
+    }
+    fs::write(&pause, "").unwrap();
+    std::thread::scope(|scope| {
+        let answered = scope.spawn(request);
+        let reached = team.fleet.dir.join(format!("{PAUSE_FILE}.reached"));
+        let start = Instant::now();
+        while !reached.exists() {
+            assert!(start.elapsed() < Duration::from_secs(20), "never admitted");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let moved = team.save(operator, &entries(list));
+        assert_eq!(moved.status, 200, "{}", moved.body);
+        let id = moved.json()["result"].as_str().unwrap().to_string();
+        assert_eq!(team.apply(operator, &id).status, 200);
+        let state = (team.current(operator), team.versions(operator));
+        assert_eq!(state.0, id);
+        fs::write(team.fleet.dir.join(format!("{PAUSE_FILE}.go")), "").unwrap();
+        (answered.join().unwrap(), state)
+    })
+}
+
+/// What a team operator whose last entry went between admission and the lock is answered: the
+/// viewer's 403 `forbidden` with the text of an admission refusal, nothing stored, the pointer
+/// where the global operator put it. Its stderr line tells the two apart: it names the teams
+/// admission found (`as ["team-billing"]`), which an admitted viewer's line never has. `lines`
+/// is the count of lines the console wrote.
+#[cfg(debug_assertions)]
+fn assert_role_lost(
+    team: Team,
+    operator: &str,
+    (reply, state): (Reply, (String, usize)),
+    arguments: &str,
+    lines: usize,
+) {
+    let message = "console writes require an authenticated operator with a subject";
+    assert_eq!(reply.status, 403, "{}", reply.body);
+    assert_eq!(
+        reply.json()["error"],
+        json!({"code": "forbidden", "message": message}),
+    );
+    assert_eq!((team.current(operator), team.versions(operator)), state);
+    let written = audit(team.console);
+    assert_eq!(written.len(), lines, "{written:?}");
+    assert_eq!(
+        written[lines - 1],
+        format!("ui: ana as [\"team-billing\"] {arguments}: {message}"),
+    );
+}
+
+/// What ana reads, with the billing entry's path changed: a save her team may make.
+#[cfg(debug_assertions)]
+fn billing_edit() -> String {
+    let seen: Vec<_> = (ENTRIES.iter())
+        .filter(|(repo, _)| [BILLING, LEDGER, SHARED, JOINT].contains(repo))
+        .copied()
+        .collect();
+    entries(&seen).replace(&format!("path = \"../{BILLING}\""), "path = \"../mine\"")
+}
+
+/// Entries that no team-billing entry survives in: the search team's alone.
+#[cfg(debug_assertions)]
+const WITHOUT_BILLING: [(&str, Option<&str>); 1] = [(SEARCH, Some("team-search"))];
+
+/// A save admitted as a team operator whose team loses its last entry before the lock is taken
+/// is answered as a viewer's, because the role is recomputed under the lock: nothing is stored
+/// and the pointer stays where the global operator put it.
+#[cfg(debug_assertions)]
+#[test]
+fn a_save_whose_role_is_lost_before_the_lock_is_refused_as_a_viewer() {
+    let env = [("MEADA_PAUSE_BEFORE_LOCK", PAUSE_FILE)];
+    let Some(team) = team_with("ui_team_lost_save", true, &env) else {
+        return;
+    };
+    let operator = team.token("root", &[], true);
+    let ana = team.token("ana", &["team-billing"], false);
+    let text = billing_edit();
+    let answered = lose_the_role_in_flight(&team, &operator, &WITHOUT_BILLING, || {
+        team.save(&ana, &text)
+    });
+    // The operator's save and apply, then ana's refused save.
+    assert_role_lost(team, &operator, answered, "workspace save -", 3);
+}
+
+/// The same for an apply: ana's own version, stored while she was a team operator, is not applied
+/// once the current one has none of her team's entries.
+#[cfg(debug_assertions)]
+#[test]
+fn an_apply_whose_role_is_lost_before_the_lock_is_refused_as_a_viewer() {
+    let env = [("MEADA_PAUSE_BEFORE_LOCK", PAUSE_FILE)];
+    let Some(team) = team_with("ui_team_lost_apply", true, &env) else {
+        return;
+    };
+    let operator = team.token("root", &[], true);
+    let ana = team.token("ana", &["team-billing"], false);
+    let text = billing_edit();
+    let saved = team.save(&ana, &text);
+    assert_eq!(saved.status, 200, "{}", saved.body);
+    let mine = saved.json()["result"].as_str().unwrap().to_string();
+    let answered = lose_the_role_in_flight(&team, &operator, &WITHOUT_BILLING, || {
+        team.apply(&ana, &mine)
+    });
+    // Ana's save, the operator's save and apply, then ana's refused apply.
+    let arguments = format!("workspace apply {mine}");
+    assert_role_lost(team, &operator, answered, &arguments, 4);
 }

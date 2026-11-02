@@ -386,7 +386,11 @@ all repository fixtures; it contains no private corpus data. Existing tests own 
   outside the grant kept in place, its subject as author) and its apply and rollback, two teams
   in one save, each refusal reason as a 403 `entries_refused` with nothing written and the lock
   free, an apply naming what the grant reads and counting the rest in `hidden`, an apply checked
-  against the version current then, a team that removes its last entry turning viewer, the
+  against the version current then, a team that removes its last entry turning viewer, a save
+  and an apply that lose the role between admission and the refresh lock (#477: the debug-only
+  `MEADA_PAUSE_BEFORE_LOCK` knob of `ui/write.rs` holds the request while the global operator
+  moves the pointer; the 403 has the admission refusal's text and its stderr line names the
+  teams, `as ["team-billing"]`, which an admitted viewer's never does), the
   generation operations refused by role before the body is read, and the `as <owners>` stderr
   line;
   serialized workspace versions refused before storage even when their uploads fit the cap;

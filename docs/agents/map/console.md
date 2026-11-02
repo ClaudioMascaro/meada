@@ -114,7 +114,9 @@ this file, and a change to these modules updates it.
   <Msg::WorkspaceRefused>, "refused": [{"identity", "change", "reason"}], "hidden": <n>}}` with
   nothing written and the lock released: a save names every refused entry (it refuses only what
   the subject submitted or reads), an apply names those whose identity the grant reads and counts
-  the rest in `hidden`. A role lost at admission, or under the lock, gets the viewer's refusal.
+  the rest in `hidden`. A role lost at admission, or under the lock, gets the viewer's refusal: the same 403 `forbidden` text, but under the lock the stderr line keeps
+  the teams admission found (`as [...]`), which tells the two apart (a test knob,
+  `MEADA_PAUSE_BEFORE_LOCK`, debug builds only, holds a save or apply before the lock).
   Every accepted or refused write logs one stderr line `ui: <subject> <action> <arguments>:
   <outcome>` (a write refused at admission because the directory cannot be read logs only the
   directory's `ui: directory: unreadable (<reason>)` line, #451), with controls escaped throughout; a team operator's is `ui: <subject> as <owners>
