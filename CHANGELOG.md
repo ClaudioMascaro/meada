@@ -15,6 +15,12 @@ All notable changes to Meada are recorded here. The format follows
   function on the browser, the console API and `meada workspaces`: the empty-message refusal now
   reads "a message is 1 to 500 characters, ..." instead of the request-body shape.
 
+### Fixed
+
+- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
+  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
+  node unready (#448).
+
 ### Added
 
 - The console's named workspace view gains a versions page (#503): the versions newest first,

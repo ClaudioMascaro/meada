@@ -74,6 +74,7 @@ spec:
                 {{- end }}
             {{- end }}
             periodSeconds: {{ .Values.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.readiness.timeoutSeconds }}
           lifecycle:
             preStop:
               exec:

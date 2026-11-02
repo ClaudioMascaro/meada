@@ -43,6 +43,7 @@ server = spec["containers"][0]
 assert "--generations" not in server["args"]
 assert "-cloud" not in server["image"]
 assert server["readinessProbe"]["exec"]["command"][1] == "status"
+assert server["readinessProbe"]["timeoutSeconds"] >= 7
 assert server["lifecycle"]["preStop"]["exec"]["command"][:1] == ["sleep"]
 assert resource(default, "Service")["spec"].get("sessionAffinity", "None") == "None"
 assert not any(item["kind"] == "CronJob" for item in default)

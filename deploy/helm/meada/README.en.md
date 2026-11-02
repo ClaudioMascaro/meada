@@ -53,6 +53,8 @@ Each pod performs an initial pull and runs a `pull --every 30` companion sharing
 pod's `local_dir`. The CronJob uses `concurrencyPolicy: Forbid`, its own mirrors and index_dir,
 and runs fetch, index and publish inside `meada snapshot lock`. Do not share index directories
 between pods. Readiness checks local state with `meada status`, or TCP with `readiness.type=tcp`.
+The probe's exit code depends on local state only; the `valkey:` and `postgres:` lines are
+informative. `readiness.timeoutSeconds` (8) must exceed the sum of their bounds (800 ms and `connect_timeout_seconds`, 5 s by default) plus a margin.
 
 `modules.snapshot.credentials` accepts `static`, `web-identity` and `pod-identity`. For IRSA,
 set the role annotation in `serviceAccount.annotations`; the platform webhook injects

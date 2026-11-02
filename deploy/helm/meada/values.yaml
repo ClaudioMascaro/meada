@@ -15,6 +15,10 @@ preStop:
 readiness:
   type: exec
   periodSeconds: 10
+  # The exec probe's exit code depends on local state only; the `valkey:` (800 ms) and
+  # `postgres:` (connect_timeout_seconds, default 5 s) lines of `meada status` are informative.
+  # Keep this above their sum plus a margin, or a dropped-packet service makes every node unready.
+  timeoutSeconds: 8
 resources: {}
 nodeSelector: {}
 tolerations: []
