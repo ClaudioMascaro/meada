@@ -1341,8 +1341,7 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   name anywhere that disagrees leaves every invocation unread (no marker); only `m!` or
   `crate::m!` invoked with braces among the items of a module, an `impl` or a trait qualifies
   (`other::m! {}`, `self::m! {}`, `m!(..)` and invocations in a function body are skipped, no
-  marker); an `impl`'s `#n` block suffix is told from the methods it writes itself, not those an
-  item macro gives it.
+  marker).
 - `lang/rust.rs` (spec #30): `DEFINITION_DEPTH` (128) as in the other packs; `BINDING_DEPTH`
   (64): a pattern or a `use` tree deeper binds nothing; `PATH_DEPTH` (256): a longer path or
   member chain in a callee is its node kind, and an `impl` type behind more references names

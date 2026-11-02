@@ -714,8 +714,10 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 }
                 // Two blocks giving one name a method (`impl From<A> for E`, `impl From<B>
                 // for E`) are two scopes: the later one is `E.From#2`.
-                let methods: Vec<&str> = (field(node, "body").into_iter())
-                    .flat_map(named)
+                // The methods an item macro gives the block count too.
+                let written = field(node, "body")
+                    .map(|body| built(body, &features, src, &mut renamed, &mut routes, &expand));
+                let methods: Vec<&str> = (written.into_iter().flatten())
                     .filter(|n| n.kind() == "function_item")
                     .filter_map(|f| field(f, "name").map(|n| text(n, src)))
                     .collect();

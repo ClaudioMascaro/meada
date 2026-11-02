@@ -526,6 +526,14 @@ mod tests {
     }
 
     #[test]
+    fn two_impls_that_an_item_macro_gives_one_method_are_two_blocks() {
+        let src = format!(
+            "{CFG_RT}impl From<A> for E {{ cfg_rt! {{ fn from(a: A) -> E {{ E }} }} }}\nimpl From<B> for E {{ cfg_rt! {{ fn from(b: B) -> E {{ E }} }} }}\n"
+        );
+        assert_eq!(names(&one(&src, "")), ["E.From.from", "E.From#2.from"]);
+    }
+
+    #[test]
     fn an_item_macro_in_an_impl_in_a_body_is_read_in_its_place() {
         let src = format!(
             "{CFG_RT}cfg_rt! {{ impl Rt {{ cfg_rt! {{ fn deep(&self) {{}} }} }} }}\nmod inner {{ impl Rt {{ cfg_rt! {{ fn other(&self) {{}} }} }} }}\n"
