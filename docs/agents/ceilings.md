@@ -18,6 +18,12 @@ a ticket accepted, each with its value and its reason. Detail behind the
   hide an import from); the test in `http/csharp.rs` pins `annotation` over C# facts, not that
   reader.
 
+- `tests/it/docs.rs` (#491): the check that a limit is marked reads only a `const` named `MAX_*`,
+  `*_MAX`, `*_LIMIT` or `*_CAP` (a minimum or a test's allowance goes in `NOT_CEILINGS` with its
+  reason), one line each; a limit under another name (`*_DEPTH`, `*_BUDGET`, `*_TTL`) is marked
+  by hand, and only a limit-named marked `const` must be unique (each language pack keeps its own
+  `VALUE_DEPTH`).
+
 - `deploy/` (#504): the proposal server's Helm block renders no Ingress (the operator exposes its
   Service behind their own TLS at `proposals.publicUrl`), and Compose's `proposals.workspace.toml`
   keeps `[oidc]`, `[catalog]` and `[workspaces]` commented, so the service does not start until the
@@ -26,7 +32,9 @@ a ticket accepted, each with its value and its reason. Detail behind the
   server as its `[oidc] issuer` (untested); the chart renders one `[oidc]` for every pod and cannot
   give it one.
 
-- `accounts.rs` (#554, ADR 0024): `KEY_MAX` (16 KiB) bounds a key file of `[accounts]` and
+- `accounts.rs` (#554, ADR 0024): a password holds `PASSWORD_MIN` (12) to `PASSWORD_MAX` (128)
+  characters and a username at most `USERNAME_MAX` (64); an agent token lives `AGENT_HOURS` (8) by
+  default and `AGENT_HOURS_MAX` (168) at most. `KEY_MAX` (16 KiB) bounds a key file of `[accounts]` and
   `PASSWORD_FILE_MAX` (1 KiB) `admin_password_file`, each refused past it naming the file;
   `HASH_MEMORY_MAX_KIB` (64 MiB), `HASH_ITERATIONS_MAX` (8) and `HASH_LANES_MAX` (4) bound the
   argon2id parameters a stored hash may carry (a row past one is hostile and admits nothing);
@@ -51,7 +59,8 @@ a ticket accepted, each with its value and its reason. Detail behind the
 - `ui/workspaces.rs`, `workspaces.rs`, `snapshot/versions.rs`, `meada-core/src/named.rs` (#342):
   `CREATE_MAX` (80 KiB) bounds a creation's body (413), `TEXT_MAX` (64 KiB) a named manifest's
   text, `NAME_MAX` (80) and `DESCRIPTION_MAX` (500) their characters, `LIST_LIMIT_MAX` (100) and
-  `AFTER_MAX` (256) a list page and its cursor, `WORKSPACES_MAX` (2000) and `ENTRIES_MAX` (500)
+  `AFTER_MAX` (256) a list page and its cursor (`LIST_LIMIT`, 25, a page without `limit`), `WORKSPACES_MAX` (2000) and `ENTRIES_MAX` (500)
+  (`WORKSPACES_DEFAULT`, 200, and `ENTRIES_DEFAULT`, 100, are their defaults)
   what `max_workspaces` and `max_entries` may allow and what a reader of the contexts file or a
   version document accepts whatever they say now (a version document is also bounded by the
   deployment version's `VERSION_MAX`), `OPERATORS_MAX` (20) a workspace's operators (the
@@ -68,8 +77,10 @@ a ticket accepted, each with its value and its reason. Detail behind the
   (ADR 0015); a longer name is an error naming its line and key, wherever the entry is read
   (import, a stored version, a pull, the browser). A named entry's peer names environment
   variables of at most `ENV_NAME_MAX` (128) bytes in `base_url_env` (#342).
+- `decider/mod.rs`: an item with more than `MAX_CANDIDATES` (50) candidates is skipped in decider
+  mode and reported as such; human mode still offers it.
 - `ui/catalog.rs` and `catalog.rs` (#341): `GET catalog` answers at most `LIMIT_MAX` (100)
-  records a page, takes a `q` of at most `PREFIX_MAX` (128) characters and an `after` of at most
+  records a page (`LIMIT`, 50, without `limit`), takes a `q` of at most `PREFIX_MAX` (128) characters and an `after` of at most
   `CURSOR_MAX` (256); `POST catalog/check` takes at most `CHECK_IDENTITIES` (50) identities in a body of at most
   `CHECK_BODY_MAX` (16 KiB);
   `[catalog] max_repositories` may allow at most `MAX_REPOSITORIES` (5000).
@@ -256,7 +267,7 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   which reads them into memory whole, sees the archive. Past any of them the pull fails and
   changes nothing. A symbolic link whose target goes through another symbolic link is refused
   even when both stay inside the mirror. A sparse file is refused. The node pointer file holds at
-  most `POINTER_MAX` (64 bytes); past it the pointer file is malformed.
+  most `NODE_POINTER_MAX` (64 bytes); past it the pointer file is malformed.
 - `snapshot/generations.rs`: `{<key_prefix>}:kept` holds at most `KEPT_MAX` (8) generations,
   since every node holds every retained generation on disk: `pointer retain` refuses past it,
   and a pull refuses a retained list longer than `keep` plus `KEPT_MAX`, naming the key and
@@ -267,10 +278,13 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
 - `snapshot/store.rs`: a credential file (key id, secret, token) holds at most `SECRET_MAX`
   (16 KiB), and `ca_file` at most `CA_MAX` (1 MiB); past either the file is refused, naming it.
   An empty CA file or invalid certificate is also refused before connecting.
-- `valkey.rs`: `password_file` holds at most `PASSWORD_MAX` (4096 bytes) and `ca_file` at most
-  `CA_MAX` (1 MiB); past either the connection fails, naming the file.
-- `postgres.rs`: `url_file` holds at most `URL_MAX` (4096 bytes) and `ca_file` at most `CA_MAX`
-  (1 MiB); past either the connection fails, naming the file.
+- `valkey.rs`: `password_file` holds at most `VALKEY_PASSWORD_MAX` (4096 bytes) and `ca_file` at most
+  `VALKEY_CA_MAX` (1 MiB); past either the connection fails, naming the file.
+- `postgres.rs`: `url_file` holds at most `URL_MAX` (4096 bytes) and `ca_file` at most
+  `POSTGRES_CA_MAX` (1 MiB); past either the connection fails, naming the file. `schema` holds at
+  most `SCHEMA_MAX` (63 bytes, Postgres's own identifier length) and `statement_timeout` at most
+  `STATEMENT_MAX` (about 2.1 million seconds, `INT_MAX` milliseconds), which Postgres would refuse
+  anyway.
 - `postgres.rs`: SCRAM's channel binding (`end_point`) knows the RSA PKCS#1, ECDSA and RSASSA-PSS
   signatures with MD5, SHA-1 or SHA-2 (SHA-224 apart, which ring does not hash); a server certificate signed otherwise
   (Ed25519, for which RFC 5929 names no hash and Postgres binds nothing either) gets no binding,
@@ -330,7 +344,7 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   answers at most 100.
 - `github_app.rs`: each REST request takes at most `REQUEST_TIMEOUT` (10 seconds) and reads at
   most `ANSWER_MAX` (4 MiB); an App's installations are listed over at most `PAGES_MAX` pages of
-  100 (10,000 installations), the rest unseen; the role check lists one repository's
+  `PER_PAGE` (100 each; 10,000 installations), the rest unseen; the role check lists one repository's
   collaborators over at most `COLLABORATOR_PAGES_MAX` pages of 100 (100,000 collaborators), past
   which the run fails, writing nothing; with `[catalog]` (#341) it lists one installation's
   repositories over at most `PAGES_MAX` pages of 100 (10,000 repositories), past which it fails
@@ -341,7 +355,7 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   so that the pagination cursor (at most 256 characters of base64url) can name it, and counts
   a longer row as hostile. It costs one listing per repository on the host,
   `ceil(collaborators / 100)` requests each, against the installation's REST budget (#319's
-  Known ceilings), and it holds every row of the set in memory once, as Postgres receives it; a `private_key_file` holds at most `KEY_MAX` (16
+  Known ceilings), and it holds every row of the set in memory once, as Postgres receives it; a `private_key_file` holds at most `APP_KEY_MAX` (16
   KiB) and git's request at most `INPUT_MAX` (64 KiB). The time margins are fixed, not
   configured: `TOKEN_MARGIN` and `REFRESH_EVERY` (10 minutes each), the JWT's `JWT_LIFE` (9
   minutes) and `JWT_BACKDATE` (60 s), `INSTALLATIONS_TTL` (the listed installations stay usable
@@ -354,10 +368,11 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
 - `mcp.rs`: the stop signal drains for at most `DRAIN` (25 seconds, no flag, under Kubernetes'
   30-second default grace period); past it the connections left are dropped, an answer still
   waiting on an index lock included, and the exit is 0.
-- `ui.rs`: `meada-ui.json` is read up to `VERSION_MAX` (4 KiB); a larger file counts as front
+- `ui.rs`: `meada-ui.json` is read up to `UI_VERSION_MAX` (4 KiB); a larger file counts as front
   end files built for another version, and the console refuses to start. A token check's body
   is read up to `CHECK_MAX` (16 KiB), and a playground query's up to `QUERY_MAX` (16 KiB); past
-  either the answer is a 413. Without `[snapshot]` the playground and the exports serve the
+  either the answer is a 413. `GET audit` answers at most `AUDIT_LIMIT_MAX` (100) records, `AUDIT_LIMIT`
+  (50) without `limit`. Without `[snapshot]` the playground and the exports serve the
   `[[repository]]` entries as read at start (a mirror missing then stays unservable until a
   restart, as on a node). Operational service reads and managed-workspace token checks share
   a two-second request bound, including the wait for one of `READERS_MAX` (4) workers;
@@ -367,7 +382,7 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
 - `directory/scim.rs`: a request's body is read up to `SCIM_BODY_MAX` (1 MiB), and a stored
   resource (the JSON the provider sent, a group without its members) holds at most
   `SCIM_RESOURCE_MAX` (64 KiB) after every change; past either the answer is a 413. A list
-  answers at most `PAGE_MAX` (100) resources, `count` above it is lowered to it. Each request opens
+  answers at most `SCIM_PAGE_MAX` (100) resources, `count` above it is lowered to it. Each request opens
   its own Postgres connection (`pool_size` is still unread), and every write holds one advisory
   lock of the schema, so the directory's writes run one at a time: per-resource locks when a
   provider's throughput needs them. A group's answer lists every member.
@@ -401,7 +416,7 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   no fragments, since only `refresh` writes it. A manifest or pack config file (`package.json`,
   `pyproject.toml`, `requirements*.txt`, `Cargo.toml`, `go.mod`, `tsconfig.json`, `jsconfig.json`) is read up to one
   byte past `lang::MAX_BYTES`, and a provider document up to one byte past
-  `document::MAX_BYTES` (`read_up_to`), which their readers take as invalid whatever the rest
+  `document::DOCUMENT_BYTES_MAX` (`read_up_to`), which their readers take as invalid whatever the rest
   holds, so the `manifests` and `documents` hashes and the config digest are of what was read. A
   pack config, at the root or at any depth (`**/`), is read through no symbolic link
   (`read_config`), as the walk follows none.
@@ -1314,7 +1329,7 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   (it vanished after the walk, or is unreadable) has no row instead of failing the refresh; a
   `[serve] documents` entry in that state is then reported as missing.
 - `document/`: a document never fails indexing, so its readers have fixed limits; deeper or
-  larger parts are unreadable or open. `mod.rs`: `MAX_BYTES` (16 MiB, above the largest public
+  larger parts are unreadable or open. `mod.rs`: `DOCUMENT_BYTES_MAX` (16 MiB, above the largest public
   single-file descriptions, GitHub's REST API and Stripe's SDK spec at 10 to 15 MB): a larger
   document is unreadable at its first line. `yaml.rs`: `MAX_NESTING` (128 nested collections, as
   `serde_json` has for JSON) and the alias budget (`EXPANSION` times the source plus `SLACK`, no

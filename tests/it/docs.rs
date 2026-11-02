@@ -7,30 +7,58 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
-/// The `const` names whose comment block (the `//` lines right above them) holds `ponytail:`.
-fn marked(text: &str) -> Vec<String> {
+/// The name a `const` item on this line declares: `pub const NAME: u8` gives `NAME`, while a
+/// `const fn` and a line of comment give none.
+fn const_name(line: &str) -> Option<String> {
+    let (_, rest) = line
+        .split_once("const ")
+        .filter(|_| !line.trim_start().starts_with("//"))?;
+    rest.starts_with(|c: char| c.is_ascii_uppercase()).then(|| {
+        (rest.chars())
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+            .collect()
+    })
+}
+
+/// Every `const` of the text with whether its comment block holds `ponytail:`. The block is the
+/// `//` lines right above the const, or above the first of a run of consecutive `const` lines
+/// (a const with a comment of its own starts a run of its own): a run shares its marker.
+fn consts(text: &str) -> Vec<(String, bool)> {
     let lines: Vec<&str> = text.lines().collect();
-    let mut names = Vec::new();
+    let mut out = Vec::new();
     for (i, line) in lines.iter().enumerate() {
-        let code = !line.trim_start().starts_with("//");
-        let Some((_, rest)) = line.split_once("const ").filter(|_| code) else {
+        let Some(name) = const_name(line) else {
             continue;
         };
-        if !rest.starts_with(|c: char| c.is_ascii_uppercase()) {
-            continue;
-        }
-        let comments = lines[..i]
+        let first = (0..i)
+            .rev()
+            .take_while(|j| {
+                const_name(lines[*j]).is_some() || lines[*j].trim_start().starts_with("#[")
+            })
+            .last()
+            .unwrap_or(i);
+        let comments = lines[..first]
             .iter()
             .rev()
             .take_while(|l| l.trim_start().starts_with("//"));
-        if comments.into_iter().any(|l| l.contains("ponytail:")) {
-            let name: String = (rest.chars())
-                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
-                .collect();
-            names.push(name);
-        }
+        out.push((name, comments.into_iter().any(|l| l.contains("ponytail:"))));
     }
-    names
+    out
+}
+
+/// The `const` names whose comment block holds `ponytail:` (see `consts`).
+fn marked(text: &str) -> Vec<String> {
+    (consts(text).into_iter())
+        .filter_map(|(name, marked)| marked.then_some(name))
+        .collect()
+}
+
+/// The sources whose limits the checks guard: the binary's and the core's.
+fn limit_sources() -> Vec<(String, String)> {
+    let mut files = Vec::new();
+    sources(Path::new("src"), &mut files);
+    sources(Path::new("meada-core/src"), &mut files);
+    files
 }
 
 fn sources(dir: &Path, out: &mut Vec<(String, String)>) {
@@ -58,8 +86,7 @@ fn every_marked_limit_is_a_known_ceiling() {
         Some(end) => &section[..end + 1],
         None => section,
     };
-    let mut files = Vec::new();
-    sources(Path::new("src"), &mut files);
+    let files = limit_sources();
     let found: Vec<(&String, String)> = (files.iter())
         .flat_map(|(path, text)| marked(text).into_iter().map(move |n| (path, n)))
         .collect();
@@ -80,6 +107,80 @@ fn a_marker_counts_only_in_the_comment_block_right_above() {
     let text = "// ponytail: a ceiling\n/// Doc.\nconst A: u8 = 1;\n\nconst B: u8 = 2;\n\
                 // ponytail: not this one\nfn f() {}\nconst C: u8 = 3;\n";
     assert_eq!(marked(text), vec!["A".to_string()]);
+}
+
+/// Names that look like a limit (`MAX_*`, `*_MAX`, `*_LIMIT`, `*_CAP`) and are not a ceiling,
+/// each with its reason.
+const NOT_CEILINGS: &[(&str, &str)] = &[
+    (
+        "MAX_AGE_MIN",
+        "a minimum, the shortest `[oidc.github] max_age_seconds`",
+    ),
+    (
+        "MAX_OUT",
+        "a hostile-input test's allowance for what a reader returns, not a bound of the code",
+    ),
+];
+
+fn looks_like_a_limit(name: &str) -> bool {
+    name.starts_with("MAX_")
+        || name.ends_with("_MAX")
+        || name.ends_with("_LIMIT")
+        || name.ends_with("_CAP")
+}
+
+/// What is wrong with the limits of `files`: a const named like a limit without a `ponytail:`
+/// marker, and a marked limit name declared twice (Known ceilings lists limits by name, so one name
+/// stands for one limit).
+fn limit_problems(files: &[(String, String)], allowed: &[(&str, &str)]) -> Vec<String> {
+    let mut problems = Vec::new();
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    for (path, text) in files {
+        for (name, marked) in consts(text) {
+            // Only limit names must be unique: each language pack keeps its own `VALUE_DEPTH`.
+            if marked && looks_like_a_limit(&name) && !seen.insert(name.clone()) {
+                problems.push(format!(
+                    "{path}: {name} is a second marked const of that name"
+                ));
+            }
+            let excused = allowed.iter().any(|(n, _)| *n == name);
+            if !marked && looks_like_a_limit(&name) && !excused {
+                problems.push(format!(
+                    "{path}: {name} is named like a limit but not marked"
+                ));
+            }
+        }
+    }
+    problems
+}
+
+#[test]
+fn every_limit_is_marked_once() {
+    let problems = limit_problems(&limit_sources(), NOT_CEILINGS);
+    assert!(
+        problems.is_empty(),
+        "mark a limit `ponytail:` and list it under Known ceilings, rename it, share it, or \
+         add it to NOT_CEILINGS with its reason: {problems:#?}"
+    );
+    for (name, reason) in NOT_CEILINGS {
+        assert!(looks_like_a_limit(name) && !reason.is_empty(), "{name}");
+    }
+}
+
+#[test]
+fn an_unmarked_or_repeated_limit_is_a_problem() {
+    let file = |text: &str| vec![("a.rs".to_string(), text.to_string())];
+    // A run shares the comment block above its first const.
+    let run = "// ponytail: both\nconst A_MAX: u8 = 1;\nconst B_LIMIT: u8 = 2;\n";
+    assert!(limit_problems(&file(run), &[]).is_empty());
+    let bare = "const FOO_MAX: u8 = 1;\n";
+    assert_eq!(limit_problems(&file(bare), &[]).len(), 1);
+    assert!(limit_problems(&file(bare), &[("FOO_MAX", "a minimum")]).is_empty());
+    let twice =
+        "// ponytail: one\nconst A_MAX: u8 = 1;\n\n// ponytail: two\nconst A_MAX: u8 = 2;\n";
+    assert_eq!(limit_problems(&file(twice), &[]).len(), 1);
+    let two_files = [file(run), file(run)].concat();
+    assert_eq!(limit_problems(&two_files, &[]).len(), 2);
 }
 
 /// The names in `names` that `doc` does not hold in backticks between `anchor` and the first

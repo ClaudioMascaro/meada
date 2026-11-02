@@ -4,7 +4,7 @@
 //! and `Origin` checks) and bounds its body at `SCIM_BODY_MAX`; `Scim::answer` routes it:
 //!
 //! - `/Users` and `/Groups`: `POST` (201), `GET` with `filter` (`userName eq`, `externalId eq`;
-//!   `displayName eq`, `externalId eq`), `startIndex` and `count` (at most `PAGE_MAX`), and `GET`,
+//!   `displayName eq`, `externalId eq`), `startIndex` and `count` (at most `SCIM_PAGE_MAX`), and `GET`,
 //!   `PUT`, `PATCH` and `DELETE` (204) of `/<kind>/<id>`. A user `PATCH` answers 200 with the
 //!   user, a group `PATCH` 204; `excludedAttributes=members` leaves a group's members out.
 //! - `/ServiceProviderConfig`, `/ResourceTypes`, `/Schemas`: fixed documents.
@@ -33,7 +33,7 @@ pub const SCIM_BODY_MAX: usize = 1 << 20;
 // ponytail: the most bytes of a stored resource, as JSON, after every change; past it a 413.
 pub const SCIM_RESOURCE_MAX: usize = 64 << 10;
 // ponytail: the most resources a page holds, and how many without `count`.
-const PAGE_MAX: i64 = 100;
+const SCIM_PAGE_MAX: i64 = 100;
 
 /// The statements of the longest request besides the version check's: a group `PATCH`, which
 /// begins, takes the lock, loads the group and its members, checks the name, the members, writes
@@ -895,9 +895,9 @@ impl Scim {
     }
 
     /// `GET /<kind>`: the resources `filter` selects (all without it), from `startIndex` (1 by
-    /// default) at most `count` (`PAGE_MAX` by default and at most).
+    /// default) at most `count` (`SCIM_PAGE_MAX` by default and at most).
     async fn list(&self, kind: Kind, query: Option<&str>) -> Done<Reply> {
-        let (mut selected, mut start, mut count, mut members) = (None, 1, PAGE_MAX, true);
+        let (mut selected, mut start, mut count, mut members) = (None, 1, SCIM_PAGE_MAX, true);
         for (name, value) in parameters(query) {
             let number = || {
                 let n = value.trim().parse::<i64>();
@@ -906,7 +906,7 @@ impl Scim {
             match name.as_str() {
                 "filter" => selected = Some(filter(kind, &value)?),
                 "startIndex" => start = number()?.max(1),
-                "count" => count = number()?.clamp(0, PAGE_MAX),
+                "count" => count = number()?.clamp(0, SCIM_PAGE_MAX),
                 "excludedAttributes" => members = !excludes_members(&value),
                 _ => {}
             }
@@ -1213,7 +1213,7 @@ impl Scim {
         Ok((stored, members))
     }
 
-    /// `/ServiceProviderConfig`: `patch` and `filter` (up to `PAGE_MAX` results) supported;
+    /// `/ServiceProviderConfig`: `patch` and `filter` (up to `SCIM_PAGE_MAX` results) supported;
     /// `bulk`, `sort`, `etag` and `changePassword` not; the bearer token scheme.
     fn provider_config(&self) -> Reply {
         Reply::ok(
@@ -1222,7 +1222,7 @@ impl Scim {
                 "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
                 "patch": {"supported": true},
                 "bulk": {"supported": false, "maxOperations": 0, "maxPayloadSize": 0},
-                "filter": {"supported": true, "maxResults": PAGE_MAX},
+                "filter": {"supported": true, "maxResults": SCIM_PAGE_MAX},
                 "changePassword": {"supported": false},
                 "sort": {"supported": false},
                 "etag": {"supported": false},

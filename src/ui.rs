@@ -70,22 +70,22 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 const VERSION_FILE: &str = "meada-ui.json";
 
 // ponytail: the most bytes of `meada-ui.json`; past it the file counts as another version.
-const VERSION_MAX: u64 = 4096;
+const UI_VERSION_MAX: u64 = 4096;
 
 /// The path of the token check, a route whose body the console reads.
 const CHECK: &str = "/api/v1/admission/check";
 
-/// The most bytes of a token check's body: a JWT in `{"token": ...}` with room to spare.
+// ponytail: the most bytes of a token check's body: a JWT in `{"token": ...}` with room to spare.
 const CHECK_MAX: usize = 16 << 10;
 
 /// The path of the playground, the other route whose body the console reads.
 const QUERY: &str = "/api/v1/query";
 
-/// The most bytes of a playground query's body: an identity, a generation id and a tool's few
-/// short arguments, with room to spare.
+// ponytail: the most bytes of a playground query's body: an identity, a generation id and a
+// tool's few short arguments, with room to spare.
 const QUERY_MAX: usize = 16 << 10;
 
-/// The most records `GET audit` answers at once, and how many without `limit` (#328).
+// ponytail: the most records `GET audit` answers at once, and how many without `limit` (#328).
 const AUDIT_LIMIT_MAX: i64 = 100;
 const AUDIT_LIMIT: i64 = 50;
 
@@ -1723,7 +1723,7 @@ fn built_for(root: &Path) -> Option<String> {
     struct Built {
         version: String,
     }
-    let bytes = crate::config::read_bounded(&root.join(VERSION_FILE), VERSION_MAX).ok()?;
+    let bytes = crate::config::read_bounded(&root.join(VERSION_FILE), UI_VERSION_MAX).ok()?;
     Some(serde_json::from_slice::<Built>(&bytes).ok()?.version)
 }
 

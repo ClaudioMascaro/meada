@@ -161,7 +161,7 @@ section of `meada.workspace.toml`:
   `application/json` (else a 415). Operations (`Scim::answer`): `/Users` and `/Groups` take
   `POST` (201, `Location`), `GET` with `filter` (`userName eq "<v>"`, compared ignoring case, or
   `externalId eq`; `displayName eq` or `externalId eq` for groups; attribute names and `eq`
-  ignoring case), `startIndex` (1 by default) and `count` (`PAGE_MAX`, 100, by default and at
+  ignoring case), `startIndex` (1 by default) and `count` (`SCIM_PAGE_MAX`, 100, by default and at
   most), ordered by creation, and `GET`, `PUT`, `PATCH` and `DELETE` (204) of `/<kind>/<id>`. A
   user `PATCH` answers 200 with the user, a group `PATCH` 204; `excludedAttributes=members`
   leaves a group's members out. `PATCH` (`operations`, `apply`) takes `add`, `replace` and

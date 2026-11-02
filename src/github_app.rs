@@ -66,7 +66,7 @@ const ANSWER_MAX: u64 = 4 << 20;
 const PAGES_MAX: u32 = 100;
 const PER_PAGE: usize = 100;
 // ponytail: the most bytes of a `private_key_file`; past it the key is refused, naming the file.
-const KEY_MAX: u64 = 16 << 10;
+const APP_KEY_MAX: u64 = 16 << 10;
 // ponytail: the most bytes of git's request on stdin; past it the request is refused.
 const INPUT_MAX: u64 = 64 << 10;
 /// The username git sends with an installation token.
@@ -347,7 +347,7 @@ fn jwt(app: &Config) -> Result<String, String> {
         Secret::Env(var) => format!("${var}"),
         Secret::File(file) => file.display().to_string(),
     };
-    let pem = match (app.key.read(KEY_MAX)?, &app.key) {
+    let pem = match (app.key.read(APP_KEY_MAX)?, &app.key) {
         (Some(pem), _) => pem,
         (None, Secret::Env(var)) => return Err(Msg::ValkeyEnvUnset(var).text()),
         (None, Secret::File(_)) => return Err(Msg::GithubAppKey(&source).text()),

@@ -48,10 +48,10 @@ const URL_ENV: &str = "MEADA_POSTGRES_URL";
 // ponytail: the most `url_file` may hold; past it the connection fails, naming the file.
 const URL_MAX: u64 = 4096;
 // ponytail: the most `ca_file` may hold; past it the connection fails, naming the file.
-const CA_MAX: u64 = 1 << 20;
-/// Postgres's longest identifier (`NAMEDATALEN - 1`).
+const POSTGRES_CA_MAX: u64 = 1 << 20;
+// ponytail: Postgres's longest identifier (`NAMEDATALEN - 1`), which a `schema` may not pass.
 const SCHEMA_MAX: usize = 63;
-/// The longest `statement_timeout` Postgres takes, in seconds (`INT_MAX` milliseconds).
+// ponytail: the longest `statement_timeout` Postgres takes, in seconds (`INT_MAX` milliseconds).
 const STATEMENT_MAX: u64 = i32::MAX as u64 / 1000;
 
 /// The migrations in order: migration `n` is `MIGRATIONS[n - 1]`, `{schema}` standing for the
@@ -465,7 +465,7 @@ fn tls(ca_file: Option<&Path>) -> Result<rustls::ClientConfig, String> {
                     rustls::Error::InvalidCertificate(bad)
                 )
             };
-            let pem = crate::modules::read_utf8(file, CA_MAX)?;
+            let pem = crate::modules::read_utf8(file, POSTGRES_CA_MAX)?;
             let mut roots = rustls::RootCertStore::empty();
             for cert in CertificateDer::pem_slice_iter(pem.as_bytes()) {
                 roots
@@ -1210,9 +1210,9 @@ mod tests {
         let config = section(&format!("url_file = \"{}\"", big.display())).unwrap();
         let err = runtime.block_on(config.url()).unwrap_err();
         assert!(err.ends_with("larger than 4096 bytes"), "{err}");
-        // Past `CA_MAX`, so is the CA.
+        // Past `POSTGRES_CA_MAX`, so is the CA.
         let ca = std::env::temp_dir().join(format!("meada-postgres-ca-{pid}"));
-        std::fs::write(&ca, vec![b'x'; CA_MAX as usize + 1]).unwrap();
+        std::fs::write(&ca, vec![b'x'; POSTGRES_CA_MAX as usize + 1]).unwrap();
         let err = tls(Some(&ca)).err().unwrap();
         assert!(err.ends_with("larger than 1048576 bytes"), "{err}");
     }

@@ -208,6 +208,7 @@ fn owner<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
 }
 
 /// The most characters a GitHub login holds.
+// ponytail: GitHub's own bound on a login.
 pub const ADDED_BY_MAX: usize = 39;
 
 /// What an `added_by` may not be (#330): empty, over `ADDED_BY_MAX` characters or holding

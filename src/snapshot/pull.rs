@@ -42,7 +42,7 @@ pub const DOCUMENT: &str = "generation.json";
 const LOCK: &str = "pull.lock";
 // ponytail: the most the node pointer file may hold (an id, a space, a `u64` fence and a
 // newline); past it the pointer file is malformed.
-const POINTER_MAX: u64 = 64;
+const NODE_POINTER_MAX: u64 = 64;
 // ponytail: the most bytes a generation's bundles may hold together, as its document records
 // them (checked before any download), and the most its regular files may hold once extracted.
 const GENERATION_BYTES_MAX: u64 = 256 << 30;
@@ -83,7 +83,7 @@ pub(super) fn pointer_file(
     }
     let shown = path.display().to_string();
     let bad = || bad(&shown);
-    let bytes = crate::config::read_bounded(path, POINTER_MAX).map_err(|_| bad())?;
+    let bytes = crate::config::read_bounded(path, NODE_POINTER_MAX).map_err(|_| bad())?;
     let text = String::from_utf8(bytes).map_err(|_| bad())?;
     let (id, fence) = (text.strip_suffix('\n'))
         .and_then(|line| line.split_once(' '))
@@ -912,7 +912,7 @@ mod tests {
             fs::write(&file, bad).unwrap();
             assert!(current(&dir).unwrap_err().contains("delete it"), "{bad}");
         }
-        fs::write(&file, "0".repeat(POINTER_MAX as usize + 1)).unwrap();
+        fs::write(&file, "0".repeat(NODE_POINTER_MAX as usize + 1)).unwrap();
         assert!(current(&dir).is_err());
         let _ = fs::remove_dir_all(&dir);
     }
