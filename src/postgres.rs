@@ -520,7 +520,7 @@ impl tokio_postgres::tls::TlsStream for Stream {
 /// The `tls-server-end-point` channel binding of a DER certificate (RFC 5929, 4.1): its hash with
 /// the digest its signature algorithm names, SHA-256 for MD5 and SHA-1. `None` for a signature
 /// with no digest of its own (Ed25519) or one not listed here, which Postgres cannot bind either.
-// shortcut: no SHA-224 (ring has none), DSA or Ed448 signature gets a binding; add one when a
+// ponytail: no SHA-224 (ring has none), DSA or Ed448 signature gets a binding; add one when a
 // deployment's certificate needs it.
 fn end_point(cert: &[u8]) -> Option<Vec<u8>> {
     use ring::digest::{SHA256, SHA384, SHA512, digest};
@@ -539,6 +539,7 @@ fn end_point(cert: &[u8]) -> Option<Vec<u8>> {
     }
     const SEQUENCE: u8 = 0x30;
     const OID: u8 = 0x06;
+    const EXPLICIT_0: u8 = 0xa0;
     const PKCS1: &[u8] = &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01];
     const ECDSA: &[u8] = &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04];
     const SHA2: &[u8] = &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02];
@@ -557,16 +558,18 @@ fn end_point(cert: &[u8]) -> Option<Vec<u8>> {
         // RSASSA-PSS: the hash is its parameters' `[0] hashAlgorithm`, SHA-1 when absent.
         [p @ .., 0x0a] if p == PKCS1 => {
             let (pss, _) = element(SEQUENCE, parameters)?;
-            let Some((explicit, _)) = element(0xa0, pss) else {
-                return Some(digest(&SHA256, cert).as_ref().to_vec());
-            };
-            let (algorithm, _) = element(SEQUENCE, explicit)?;
-            match element(OID, algorithm)?.0 {
-                [0x2b, 0x0e, 0x03, 0x02, 0x1a] => &SHA256,
-                [p @ .., 0x01] if p == SHA2 => &SHA256,
-                [p @ .., 0x02] if p == SHA2 => &SHA384,
-                [p @ .., 0x03] if p == SHA2 => &SHA512,
-                _ => return None,
+            match element(EXPLICIT_0, pss) {
+                None => &SHA256,
+                Some((explicit, _)) => {
+                    let (algorithm, _) = element(SEQUENCE, explicit)?;
+                    match element(OID, algorithm)?.0 {
+                        [0x2b, 0x0e, 0x03, 0x02, 0x1a] => &SHA256,
+                        [p @ .., 0x01] if p == SHA2 => &SHA256,
+                        [p @ .., 0x02] if p == SHA2 => &SHA384,
+                        [p @ .., 0x03] if p == SHA2 => &SHA512,
+                        _ => return None,
+                    }
+                }
             }
         }
         _ => return None,

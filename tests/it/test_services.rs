@@ -35,12 +35,16 @@ fn the_script_mirrors_the_cloud_job() {
     }
     let (access, secret) = (var(&script, "S3_ACCESS_KEY"), var(&script, "S3_SECRET_KEY"));
     let password = var(&script, "POSTGRES_PASSWORD");
-    for line in [
-        format!("RUSTFS_ACCESS_KEY: {access}\n"),
-        format!("RUSTFS_SECRET_KEY: {secret}\n"),
-        format!("POSTGRES_PASSWORD: {password}\n"),
+    for (key, value) in [
+        ("RUSTFS_ACCESS_KEY", &access),
+        ("RUSTFS_SECRET_KEY", &secret),
+        ("POSTGRES_PASSWORD", &password),
     ] {
-        assert!(cloud.contains(&line), "ci.yml lacks {line:?}");
+        let line = format!("{key}: {value}\n");
+        assert!(
+            cloud.contains(&line),
+            "ci.yml lacks {key} with the value scripts/test-services sets"
+        );
     }
 
     // Each export the script prints, with its variables expanded, is a line of the job's env.
@@ -61,7 +65,11 @@ fn the_script_mirrors_the_cloud_job() {
         .filter_map(|l| l.trim().strip_prefix("echo \"export "))
         .map(|l| expand(l.trim_end_matches('"')))
         .collect();
-    assert_eq!(exports.len(), 6, "{exports:?}");
+    let keys: Vec<&str> = exports
+        .iter()
+        .map(|e| e.split('=').next().unwrap())
+        .collect();
+    assert_eq!(exports.len(), 6, "{keys:?}");
     for export in exports {
         let (key, value) = export.split_once('=').unwrap();
         // The CA path is made by CI's step at run time, not set in the job's env.
@@ -74,6 +82,6 @@ fn the_script_mirrors_the_cloud_job() {
         } else {
             format!("{key}: {value}\n")
         };
-        assert!(cloud.contains(&line), "ci.yml env lacks {line:?}");
+        assert!(cloud.contains(&line), "ci.yml env lacks {key}");
     }
 }

@@ -61,9 +61,16 @@ the session may select and the `catalog/check` results, and is shared by the cre
 editor; `EffectiveList.tsx` is #344's view, extracted. The editor marks each changed entry
 (`namedChanged`) with `namedAuthorize`, shows the diff (`namedDiff`) and freezes the reviewed
 payload until the confirmation. Tests: `ui/tests/guided.test.ts` (actual WebAssembly) and
-`ui/tests/GuidedWorkspace.test.tsx` (DOM). Proposals are #346 (above); the page over versions with rollback is #503 (below).
+`ui/tests/GuidedWorkspace.test.tsx` (DOM). Proposals are #346 (above); the page over versions
+with rollback is #503 (below).
 
-#501 moved the text rule and the role list to the same seam: `namedNameProblem`, `namedDescriptionProblem` and `namedMessageProblem` (over `named::*_problem`) and `resourceRoles` (over `manifest::Role::ALL`), so `ui/` keeps no copy of the rule, its bounds or the roles. `message_problem` also refuses an empty message (1 to `DESCRIPTION_MAX`), so the console routes and `meada workspaces` carry no empty check of their own.
+#501 moved the text rule and the role list to the same seam: `namedNameProblem`,
+`namedDescriptionProblem` and `namedMessageProblem` (over `named::*_problem`) and `resourceRoles`
+(over `manifest::Role::ALL`), so `ui/` keeps no copy of the rule, its bounds or the roles.
+`message_problem` also refuses an empty message (1 to `DESCRIPTION_MAX`), so the console routes and
+`meada workspaces` carry no empty check of their own. `ui/src/named-core.ts` (#522) is the one place
+that parses the JSON of the `named*` and `resourceRoles` results, into typed values; `messageOf` in
+`ui/src/api.ts` is the console's `ApiError` message with a fallback.
 
 Delivered by #344 (contract 6, the effective configuration; ADR 0021 "As built (#344)"), same feature:
 `meada-core/src/effective.rs` is the pure decision (`effective(entries, facts)`: per entry the

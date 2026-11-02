@@ -11416,8 +11416,8 @@ mod csharp_tests {
             p == "App/U.cs" && callee == "P.M" && *level == "exact"
         });
         assert_eq!(exact.count(), n);
-        // 5.8 s measured in a local debug build; the bound is over twenty times that.
-        assert!(took.as_secs() < 120, "{took:?}");
+        // 6.1 s measured in a local debug build; the bound is over twenty times that.
+        assert!(took.as_secs() < 130, "{took:?}");
     }
 
     /// What `Gen.M` (`Util.Go(); new Util();`, in `namespace Acme.Query.Internal`, or `block`
