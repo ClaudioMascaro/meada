@@ -117,6 +117,7 @@ pub struct Github {
 /// The state of a GitHub grant: whether the permissions set it was read from is usable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
+#[cfg_attr(not(feature = "postgres"), allow(dead_code))]
 pub enum GrantState {
     Unread,
     Current,
