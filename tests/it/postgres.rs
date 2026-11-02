@@ -467,19 +467,20 @@ fn a_version_this_binary_does_not_know_is_refused() {
     let admin = Admin::new(&url);
     admin.run(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"));
     let dir = manifest("postgres_version", &format!("schema = \"{schema}\"\n"));
+    let current = crate::common::SCHEMA_VERSION;
     // Capped at 0, migrate leaves the schema absent: version 0, lower than the binary's.
     let (stdout, _, code) = migrate(&dir, &url, Some("0"));
     assert_eq!((stdout.as_str(), code), ("0\n", 0));
     assert_eq!(
         status_line(&dir, &url, None),
         format!(
-            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 9: \
-             run meada postgres migrate)"
+            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's \
+             {current}: run meada postgres migrate)"
         )
     );
-    assert_eq!(migrate(&dir, &url, None).0, "9\n");
+    assert_eq!(migrate(&dir, &url, None).0, format!("{current}\n"));
     let higher =
-        format!("the schema {schema} is at version 9, above this Meada's 0: upgrade Meada");
+        format!("the schema {schema} is at version {current}, above this Meada's 0: upgrade Meada");
     assert_eq!(
         status_line(&dir, &url, Some("0")),
         format!("postgres: unreachable ({higher})")
@@ -526,11 +527,17 @@ fn status_names_whether_postgres_is_reachable_and_its_exit_code_ignores_it() {
     let admin = Admin::new(&url);
     admin.run(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"));
     with(&format!("schema = \"{schema}\"\n"));
-    assert_eq!(migrate(&dir, &url, None).0, "9\n");
+    assert_eq!(
+        migrate(&dir, &url, None).0,
+        format!("{}\n", crate::common::SCHEMA_VERSION)
+    );
     let env = [("MEADA_POSTGRES_URL", url.as_str())];
     let (status, stderr, code) = meada(&dir, EN, &env, &STATUS);
     assert!(code == 0 && stderr.is_empty(), "{stderr}");
-    let line = format!("\npostgres: reachable, schema {schema} version 9\n");
+    let line = format!(
+        "\npostgres: reachable, schema {schema} version {}\n",
+        crate::common::SCHEMA_VERSION
+    );
     assert!(status.ends_with(&line), "{status}");
     // A `ca_file` on loopback is never ignored: the plain test server refuses the TLS it asks.
     let roots = "/etc/ssl/certs/ca-certificates.crt";

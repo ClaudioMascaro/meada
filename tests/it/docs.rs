@@ -255,3 +255,20 @@ fn changelog_union_merge_keeps_both_bullets() {
     );
     assert!(!merged.contains("<<<<<<<"), "{merged}");
 }
+
+#[test]
+fn schema_version_matches_the_migrations() {
+    let source = fs::read_to_string("src/postgres.rs").unwrap();
+    let list = source
+        .split("const MIGRATIONS: &[&str] = &[")
+        .nth(1)
+        .and_then(|rest| rest.split("\n];").next())
+        .unwrap();
+    // Each entry is a string literal opening at the list's own indentation.
+    let count = list.lines().filter(|l| l.starts_with("    \"")).count();
+    assert_eq!(
+        count as u32,
+        crate::common::SCHEMA_VERSION,
+        "SCHEMA_VERSION in tests/it/common/mod.rs must equal the entries of MIGRATIONS"
+    );
+}

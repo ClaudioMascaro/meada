@@ -421,8 +421,11 @@ fn a_node_serves_without_postgres_and_names_an_unknown_version_once() {
     assert_eq!(listed(&server, &ana), lines(&[WORKER]));
     assert_eq!(listed(&server, &machine), SERVED);
     let stderr = server.stderr();
-    let named = "is at version 9, above this Meada's 4";
-    assert_eq!(stderr.matches(named).count(), 1, "{stderr}");
+    let named = format!(
+        "is at version {}, above this Meada's 4",
+        crate::common::SCHEMA_VERSION
+    );
+    assert_eq!(stderr.matches(&named).count(), 1, "{stderr}");
     assert_eq!(stderr.lines().count(), 1, "{stderr}");
     github.clean(&stderr, &[ana, machine]);
 }
