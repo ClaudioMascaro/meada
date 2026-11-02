@@ -1082,6 +1082,27 @@ fn targets_of<'a>(
     targets
 }
 
+/// Each operator's eligible identities for the sponsor rule: those on the `prefix` host whose
+/// row for that login holds one of `roles`.
+#[cfg(feature = "workspaces")]
+fn eligible_sets(
+    prefix: &str,
+    roles: &[String],
+    operators: &[String],
+    rows: &std::collections::BTreeMap<(String, String), String>,
+) -> Vec<std::collections::BTreeSet<String>> {
+    (operators.iter())
+        .map(|login| {
+            (rows.iter())
+                .filter(|((identity, row_login), role)| {
+                    row_login == login && identity.starts_with(prefix) && roles.contains(role)
+                })
+                .map(|((identity, _), _)| identity.clone())
+                .collect()
+        })
+        .collect()
+}
+
 /// What `roles` reads of the workspace: the pulled version's id with `source = "store"` and each
 /// entry's identity and `added_by`, whole: the exclusions are this command's to write. With
 /// `[workspaces]` also the named workspaces the pull read (#342) and the digest of their file.
@@ -1415,16 +1436,12 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     let mut named_out: std::collections::BTreeSet<(String, String)> = Default::default();
     #[cfg(feature = "workspaces")]
     for context in &contexts {
-        for identity in context.identities() {
-            let sponsored = (context.operators.iter()).any(|login| {
-                let role = role_of(&identity, login);
-                identity.starts_with(&prefix) && role.is_some_and(|r| github.roles.contains(r))
-            });
-            if !sponsored {
-                let (context, identity) = (&context.id, &identity);
-                notes.push(Msg::RolesNoSponsor { context, identity }.text());
-                named_out.insert((context.clone(), identity.clone()));
-            }
+        let identities = context.identities();
+        let eligible = eligible_sets(&prefix, &github.roles, &context.operators, &rows);
+        for identity in meada_core::named::unsponsored(&identities, &eligible) {
+            let (context, identity) = (&context.id, &identity);
+            notes.push(Msg::RolesNoSponsor { context, identity }.text());
+            named_out.insert((context.clone(), identity.clone()));
         }
     }
 
@@ -1702,6 +1719,26 @@ pub(crate) async fn inspect(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[cfg(feature = "workspaces")]
+    fn only_a_row_on_the_host_with_an_accepted_role_makes_an_operator_eligible() {
+        let rows = [
+            (("github.com/a/x", "ann"), "admin"),
+            (("github.com/a/y", "ann"), "read"),
+            (("ghe.example/a/z", "ann"), "admin"),
+            (("github.com/a/w", "bob"), "admin"),
+        ]
+        .map(|((i, l), r)| ((i.to_string(), l.to_string()), r.to_string()))
+        .into();
+        let roles = ["admin".to_string()];
+        let operators = ["ann".to_string(), "cid".to_string()];
+        let sets = eligible_sets("github.com/", &roles, &operators, &rows);
+        assert_eq!(
+            sets,
+            [["github.com/a/x".to_string()].into(), Default::default()]
+        );
+    }
 
     #[test]
     #[cfg(all(feature = "postgres", feature = "oidc"))]
