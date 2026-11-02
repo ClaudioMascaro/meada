@@ -51,7 +51,7 @@ python3 $S/console.py api --run "$RUN"
 ```
 
 That adds `[postgres]` (schema `zz_prove_<run>`) and `[accounts]` with an Ed25519 pair from
-`openssl` and a generated `admin` password, then checks: a wrong password refused (401 or 403),
+`openssl` and an `admin` password derived from that key (never written), then checks: a wrong password refused (401 or 403),
 a login without `Origin` refused (403), `admin` signed in with a token, `/api/v1/session` with it,
 `/api/v1/manifest` without it refused (401), and the query and export parity under the token.
 Without `MEADA_TEST_POSTGRES_URL` the start is BLOCKED: never stub Postgres.
@@ -86,6 +86,6 @@ in the receipt; its own behaviour answers to the issue.
 python3 $S/console.py stop --run "$RUN"
 ```
 
-It stops the console by its process group, removes the console's indexes, the private key and
-the admin password, and leaves the Postgres schema `zz_prove_*`: drop it by name
+It stops the console by its process group, removes the console's indexes and the private key (the
+admin password goes with it), and leaves the Postgres schema `zz_prove_*`: drop it by name
 (`DROP SCHEMA "zz_prove_..." CASCADE`) and list it under Left behind until you do.

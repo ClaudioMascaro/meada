@@ -7,6 +7,7 @@
 // Needs playwright-core and axe-core under PROVE_NODE (references/console.md installs them) and a
 // Chromium: PROVE_CHROMIUM, or the newest under PLAYWRIGHT_BROWSERS_PATH / ~/.cache/ms-playwright.
 import { createRequire } from 'node:module';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -47,12 +48,14 @@ page.on('pageerror', e => errors.push(`${page.url()}: uncaught ${e.message}`));
 
 const lines = [];
 let failures = 0;
-const password = path.join(dir, 'admin-password');
-if (fs.existsSync(password)) {
+// The admin password is derived from the run's signing key, as console.py's admin_password does.
+const key = path.join(dir, 'private.pem');
+if (fs.existsSync(key)) {
+  const password = crypto.createHmac('sha256', fs.readFileSync(key)).update('prove-meada admin').digest().subarray(0, 18).toString('base64url');
   // The sign-in page: the first text input is the user name, the password input the password.
   await page.goto(url + '/', { waitUntil: 'networkidle' });
   await page.locator('input:not([type=password])').first().fill('admin');
-  await page.locator('input[type=password]').first().fill(fs.readFileSync(password, 'utf8'));
+  await page.locator('input[type=password]').first().fill(password);
   await page.locator('button[type=submit]').first().click();
   await page.waitForLoadState('networkidle');
   await page.screenshot({ path: path.join(shots, 'signed-in.png') });

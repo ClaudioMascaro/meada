@@ -9,14 +9,15 @@
 `meada ui` detached on a free loopback port and waits until `/api/v1/config` answers. Without
 `--accounts` the console admits every request as a viewer (the operator's proxy case). With it,
 `[postgres]` reads `MEADA_TEST_POSTGRES_URL` and a schema of this run, and `[accounts]` signs in
-`admin` with a password generated here. `api` checks the console's API against the head's MCP
+`admin` with a password derived from the run's signing key, never written. `api` checks the console's API against the head's MCP
 stdio answers and `meada export` bytes. Exit 0: checks passed, 1: differences, 2: BLOCKED.
 """
 
 import argparse
+import base64
+import hmac
 import json
 import os
-import secrets
 import shutil
 import socket
 import subprocess
@@ -45,12 +46,20 @@ def repos(run):
     return out
 
 
+def admin_password(d):
+    """The console's admin password, derived from the run's signing key and never written: whoever
+    can read private.pem can already mint a session. console-pages.mjs derives the same value."""
+    key = (d / "private.pem").read_bytes()
+    return base64.urlsafe_b64encode(hmac.new(key, b"prove-meada admin", "sha256").digest()[:18]).decode()
+
+
 def cmd_start(a):
     run = Path(a.run).resolve()
     d = run / "console"
     if (d / "ui.pid").exists():
         sys.exit(f"a console of this run may still be up: console.py stop --run {run}")
     d.mkdir(parents=True, exist_ok=True)
+    os.chmod(d, 0o700)  # it holds the signing key
     ui_dir = Path(a.ui_dir).resolve()
     if not (ui_dir / "meada-ui.json").exists():
         sys.exit(f"BLOCKED: {ui_dir}/meada-ui.json missing: build the front end (references/console.md)")
@@ -68,10 +77,8 @@ def cmd_start(a):
             sys.exit("BLOCKED: --accounts needs MEADA_TEST_POSTGRES_URL (a Postgres 15+ the run may write a schema in)")
         subprocess.run(["openssl", "genpkey", "-algorithm", "ed25519", "-out", d / "private.pem"], check=True, capture_output=True)
         subprocess.run(["openssl", "pkey", "-in", d / "private.pem", "-pubout", "-out", d / "public.pem"], check=True, capture_output=True)
-        password = secrets.token_urlsafe(18)
-        (d / "admin-password").write_text(password)
-        os.chmod(d / "admin-password", 0o600)
-        env["PROVE_ADMIN_PASSWORD"] = password
+        os.chmod(d / "private.pem", 0o600)
+        env["PROVE_ADMIN_PASSWORD"] = admin_password(d)
         text += (f'\n[postgres]\nurl_env = "MEADA_TEST_POSTGRES_URL"\nschema = "zz_prove_{run.name.replace("-", "_")[:40]}"\n'
                  '\n[accounts]\npublic_key_file = "public.pem"\nprivate_key_file = "private.pem"\n'
                  'admin_password_env = "PROVE_ADMIN_PASSWORD"\n')
@@ -106,8 +113,8 @@ def cmd_api(a):
     origin = {"Origin": url, "Content-Type": "application/json"}
     lines, differences = [], 0
     token = None
-    if (d / "admin-password").exists():
-        password = (d / "admin-password").read_text()
+    if (d / "private.pem").exists():
+        password = admin_password(d)
         status, body = http(url + "/api/v1/login", "POST", {"username": "admin", "password": password + "x"}, origin)
         lines.append(f"login with a wrong password: {status}" + ("" if status in (401, 403) else "  UNEXPECTED, expected 401 or 403"))
         differences += status not in (401, 403)
@@ -164,8 +171,7 @@ def cmd_stop(a):
             pass
         pid.unlink()
     shutil.rmtree(d / "indexes", ignore_errors=True)
-    for secret in ("private.pem", "admin-password"):
-        (d / secret).unlink(missing_ok=True)
+    (d / "private.pem").unlink(missing_ok=True)
     print(f"console of {run} stopped; the Postgres schema zz_prove_* of an --accounts run stays: drop it by name")
 
 

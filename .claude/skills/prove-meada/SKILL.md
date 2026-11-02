@@ -252,7 +252,7 @@ Send the findings back to the agent that made the change: the failing steps, the
 - Target: only binaries this run built (or the release binaries the receipt names) and only the copies under `$RUN/work/`. Never index a checkout of the user's: indexing writes `.meada/` into it.
 - Everything a run creates outside `$RUN` is named `zz-prove-` or `zz_prove_` (the Postgres schema of an `--accounts` console). Before starting, look for leftovers with that prefix and report them; don't silently reuse or delete them.
 - Never: push, publish (crates.io, npm, ghcr), `meada snapshot publish` to a real store, or `meada decide` against a real model (the only network path, and it costs).
-- Secrets: `MEADA_TEST_POSTGRES_URL` comes from the environment; the console's admin password is generated into `$RUN/console/` and removed by `console.py stop`. Never write a secret value into this skill or a receipt.
+- Secrets: `MEADA_TEST_POSTGRES_URL` comes from the environment; the console's admin password is derived from the run's signing key (`$RUN/console/private.pem`, mode 600, removed by `console.py stop`) and never written. Never write a secret value into this skill or a receipt.
 
 ## Clean up
 
