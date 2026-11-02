@@ -1,0 +1,27 @@
+{{- if .Values.proposals.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "meada.proposalsName" . }}
+  labels:
+    {{- include "meada.proposalsLabels" . | nindent 4 }}
+data:
+  meada.workspace.toml: |
+    index_dir = "/data/proposals/indexes"
+
+    [workspace]
+    source = "store"
+    {{- include "meada.modules" (dict "Values" .Values "localDir" "/data/proposals/generations") | nindent 4 }}
+    {{- include "meada.namedWorkspaces" . | nindent 4 }}
+    {{- include "meada.jobUi" . | nindent 4 }}
+    {{- include "meada.accounts" (dict "Values" .Values "role" "node") | nindent 4 }}
+    {{- include "meada.proposalsSection" . | nindent 4 }}
+  {{- if .Values.modules.postgres.enabled }}
+  postgres.workspace.toml: |
+    index_dir = "/data/proposals/indexes"
+    {{- with .Values.modules.postgres }}
+
+    {{ include "meada.postgresBlock" (dict "urlEnv" "MEADA_POSTGRES_URL" "schema" .schema "ca" (or $.Values.tls.caSecret $.Values.tls.caConfigMap)) | indent 4 | trim }}
+    {{- end }}
+  {{- end }}
+{{- end }}

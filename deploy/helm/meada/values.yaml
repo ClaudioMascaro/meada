@@ -205,7 +205,7 @@ modules:
   #   adminPasswordSecret key password     (optional): the default account's initial password
   # The two key Secrets must be different Secrets: the nodes mount the public one. Rotate the pair
   # by replacing both Secrets and restarting the pods: every outstanding token ends. The proposal
-  # server is not part of this chart; give it the public key yourself.
+  # server (the proposals block below) mounts the public one, like a node.
   accounts:
     enabled: false
     publicKeySecret: meada-accounts-public
@@ -264,3 +264,21 @@ console:
     annotations: {}
     host: console.example.internal
     tls: []
+
+# The proposal server (`meada workspaces mcp`, ADR 0022): a Deployment, Service and bootstrap of its
+# own beside the console, off by default. It needs modules.workspaces (which needs the console, its
+# operations and the GitHub grant provider) and reads Postgres with the read-url of the Secret, every
+# session read-only. It pulls the generation as the console does. No Ingress is rendered: expose
+# the Service behind your own TLS, at publicUrl (https), forwarding Authorization unchanged and never
+# adding Origin. Its tokens carry `audience` (publicUrl by default) as `aud`; register it in the
+# identity provider (docs: identity provider recipes). Under modules.accounts it admits the agent
+# tokens the console issues for the proposals surface instead.
+proposals:
+  enabled: false
+  replicaCount: 1
+  listen: 8090
+  publicUrl: https://proposals.example.internal
+  audience: ""
+  resources: {}
+  service:
+    port: 8090

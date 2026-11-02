@@ -129,6 +129,14 @@ app.kubernetes.io/component: server
 {{- fail "modules.workspaces.maxRepositories must be set (1 to 5000): it has no default" -}}
 {{- end -}}
 {{- end -}}
+{{- if .Values.proposals.enabled -}}
+{{- if not .Values.modules.workspaces.enabled -}}
+{{- fail "proposals.enabled requires modules.workspaces: the proposal server reads [workspaces] and [catalog]" -}}
+{{- end -}}
+{{- if not (hasPrefix "https://" .Values.proposals.publicUrl) -}}
+{{- fail "proposals.publicUrl must use https" -}}
+{{- end -}}
+{{- end -}}
 {{- if .Values.console.enabled -}}
 {{- if not (and .Values.image.cloud .Values.modules.snapshot.enabled .Values.modules.generations.enabled .Values.modules.valkey.enabled) -}}
 {{- fail "console requires image.cloud and snapshot, valkey and generations" -}}
@@ -234,6 +242,44 @@ app.kubernetes.io/component: console
 - name: ca
   configMap:
     name: {{ .Values.tls.caConfigMap }}
+{{- end }}
+{{- end -}}
+{{- define "meada.proposalsName" -}}
+{{- printf "%s-proposals" (include "meada.name" . | trunc 53 | trimSuffix "-") -}}
+{{- end -}}
+{{- define "meada.proposalsLabels" -}}
+{{ include "meada.labels" . }}
+app.kubernetes.io/component: proposals
+{{- end -}}
+{{- /* The proposal server holds the public half of the accounts key, never the private one (ADR 0022, ADR 0024). */ -}}
+{{- define "meada.proposalsVolumes" -}}
+- name: config
+  configMap:
+    name: {{ include "meada.proposalsName" . }}
+- name: data
+  emptyDir: {}
+{{- include "meada.accountsPublicVolume" . }}
+{{- if .Values.tls.caSecret }}
+- name: ca
+  secret:
+    secretName: {{ .Values.tls.caSecret }}
+{{- else if .Values.tls.caConfigMap }}
+- name: ca
+  configMap:
+    name: {{ .Values.tls.caConfigMap }}
+{{- end }}
+{{- end -}}
+{{- /* [proposals] (ADR 0022): the proposal server's bootstrap reads it, and the console's reads it to issue agent tokens for the surface under local accounts. */ -}}
+{{- define "meada.proposalsSection" -}}
+{{- with .Values.proposals }}
+{{- if .enabled }}
+
+[proposals]
+public_url = {{ .publicUrl | toJson }}
+{{- with .audience }}
+audience = {{ . | toJson }}
+{{- end }}
+{{- end }}
 {{- end }}
 {{- end -}}
 {{- define "meada.postgresName" -}}

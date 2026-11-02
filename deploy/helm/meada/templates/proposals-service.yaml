@@ -1,0 +1,16 @@
+{{- if .Values.proposals.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "meada.proposalsName" . }}
+  labels:
+    {{- include "meada.proposalsLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "meada.proposalsLabels" . | nindent 4 }}
+  ports:
+    - name: proposals
+      port: {{ .Values.proposals.service.port }}
+      targetPort: proposals
+{{- end }}

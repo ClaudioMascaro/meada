@@ -7,7 +7,8 @@
 # to a cap you measured (docs: "Discovery evidence"). The refresh job's workspace.fetch receives
 # `meada workspace show --pulled` as $1 and must clone each member at the path listed there, under
 # modules.workspaces.mirrors, on a volume the job keeps. The proposal server (`meada workspaces mcp`)
-# is not part of this chart: run it beside the console, behind your own TLS and its own audience.
+# is opt-in: set proposals.enabled, proposals.publicUrl and, if it differs, proposals.audience
+# (below), and expose its Service behind your own TLS.
 console:
   operations: true
 modules:
@@ -15,3 +16,8 @@ modules:
     enabled: true
     allow: [github.com/acme/*]
     maxRepositories: 200
+# The proposal server, opt in (uncomment and set the URL it is served at):
+# proposals:
+#   enabled: true
+#   publicUrl: https://proposals.example.internal
+#   audience: ""          # the aud of its tokens; publicUrl when empty

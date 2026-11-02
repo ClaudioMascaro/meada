@@ -27,6 +27,7 @@ data:
     operator_claim = {{ . | toJson }}
     {{- end }}
     {{- include "meada.accounts" (dict "Values" .Values "role" "console") | nindent 4 }}
+    {{- include "meada.proposalsSection" . | nindent 4 }}
   {{- if .Values.modules.postgres.enabled }}
   postgres.workspace.toml: |
     index_dir = "/data/console/indexes"

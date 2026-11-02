@@ -29,6 +29,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The workspaces profiles run the proposal server: `compose.proposals.yaml` and
+  `proposals.workspace.toml` in Compose (its own pull and volume, the read role, TLS on
+  `127.0.0.1:8445`) and an opt-in `proposals` block in the Helm chart (Deployment, Service,
+  bootstrap and probes with `timeoutSeconds`, absent by default); `scripts/compose-check` and
+  `scripts/helm-check` assert both. The identity provider recipes say how a person or an agent
+  gets a token whose `aud` is `[proposals] audience` (Entra ID, Okta, Keycloak, local accounts; Okta
+  needs a second authorization server the chart cannot render), in pt-BR, English and Spanish (#504).
+
 - Over TLS, the Postgres client of the data layer authenticates with SCRAM channel binding
   (`tls-server-end-point`, RFC 5929): it runs `SCRAM-SHA-256-PLUS` whenever the server offers
   it, so a client that requires channel binding connects (#483). Loopback without TLS keeps plain

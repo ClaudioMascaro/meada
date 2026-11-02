@@ -135,6 +135,7 @@ Un usuario de Entra ID en más grupos de los que un token puede llevar recibe `_
 - **`OVERAGE_TTL`** (5 minutos): un cambio de miembros llega a un sujeto en overage con ese retraso.
 - **Token vivo:** el token de un usuario desaprovisionado sigue leyendo en los nodos hasta expirar.
 - **`outside_grant`** le dice a un operador de equipo que la identidad ya está en el workspace, y el editor no lo prevé.
+- **Okta y el servidor de propuestas:** un servidor de autorización de Okta estampa un solo `aud`, así que el servidor de propuestas necesita un segundo servidor de autorización como `[oidc] issuer` (sin prueba); el chart Helm renderiza un solo `[oidc]` para todos los pods y no le da uno ([receta](identity-providers.md#un-token-para-el-servidor-de-propuestas)).
 - **Un host de GitHub** por despliegue; un login tiene como máximo 39 caracteres y un nombre de rol, 100.
 - **SCIM:** el token se lee al arrancar (rotarlo exige reiniciar la consola); cuerpos de hasta `SCIM_BODY_MAX` (1 MiB), un recurso almacenado de hasta `SCIM_RESOURCE_MAX` (64 KiB) y páginas de hasta 100.
 - **La auditoría crece sin límite** hasta que el operador la pode.

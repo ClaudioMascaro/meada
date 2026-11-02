@@ -185,7 +185,15 @@ de um nó. O chart a recusa sem `console.operations`, `modules.oidc.github` (ou 
 `maxRepositories` definido por você (não tem padrão). Atualize todas as imagens, nós incluídos, antes
 do primeiro refresh que registre um workspace. Seu `workspace.fetch` deve clonar os repositórios que
 só workspaces nomeados selecionam sob `modules.workspaces.mirrors`, nos caminhos que `meada workspace
-show --pulled` lista. O servidor de propostas não faz parte do chart.
+show --pulled` lista. O servidor de propostas é opt-in:
+
+```sh
+helm upgrade --install meada deploy/helm/meada -f deploy/helm/meada/values-console.yaml \
+  -f deploy/helm/meada/values-identity.yaml -f deploy/helm/meada/values-workspaces.yaml \
+  --set proposals.enabled=true --set proposals.publicUrl=https://propostas.exemplo.internal -f meus-valores.yaml
+```
+
+`proposals.enabled=true` (desligado por padrão; o chart o recusa sem `modules.workspaces` ou com um `publicUrl` que não seja https) renderiza um Deployment, um Service e um ConfigMap de bootstrap próprios, ao lado da console, nunca no pod de um nó: `meada workspaces mcp` na porta `proposals.listen` (8090), um `snapshot pull` inicial e outro periódico no volume do pod, um init container que espera o schema e uma readiness TCP com `readiness.timeoutSeconds`. Ele lê o Postgres com `read-url` do Secret, com toda sessão somente leitura. O bootstrap repete `[oidc]`, `[catalog]`, `[workspaces]` e `[ui]` da console e acrescenta `[proposals]`, e a console recebe o mesmo `[proposals]` para emitir tokens de agente dessa superfície sob contas locais, onde o pod monta só a chave pública. O chart não renderiza Ingress para ele: exponha o Service com seu TLS em `proposals.publicUrl`, preservando `Authorization` e sem criar `Origin`. Registre `proposals.audience` (o `publicUrl` quando vazio) como recurso no provedor de identidade ([receitas de token](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/pt/identity-providers.md#um-token-para-o-servidor-de-propostas)).
 
 ## Contas locais, opcional
 
@@ -219,4 +227,4 @@ GitHub, toda conta local lê todos os repositórios. O refresh roda `meada githu
 `modules.accounts.breakGlass`: só a console mantém `[accounts]`, com a conta `admin` como porta de
 emergência, e os nós ignoram contas locais e não recebem chave alguma (`groups` e `github` são
 recusados nesse modo). Para girar o par, troque os dois Secrets e reinicie os pods: todo token emitido
-deixa de valer. O servidor de propostas não faz parte do chart; entregue a ele a chave pública.
+deixa de valer. O servidor de propostas (`proposals.enabled`) monta a chave pública, como um nó.

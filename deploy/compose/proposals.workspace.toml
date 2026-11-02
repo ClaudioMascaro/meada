@@ -1,0 +1,82 @@
+# The proposal server (ADR 0022, compose.proposals.yaml). Its bootstrap is the console's
+# (console.workspace.toml) for [oidc], [oidc.github], [catalog], [workspaces], [ui] and
+# [directory], plus [proposals]: copy those sections from the console's file. Only [oidc] issuer
+# may differ (Okta: a second authorization server whose Audience is the [proposals] audience).
+index_dir = "/var/lib/meada/proposals/indexes"
+
+[workspace]
+source = "store"
+
+[snapshot]
+endpoint = "https://store:9000"
+region = "us-east-1"
+bucket = "meada-compose"
+prefix = "prod"
+path_style = true
+credentials = "static"
+access_key_id_env = "AWS_ACCESS_KEY_ID"
+secret_access_key_env = "AWS_SECRET_ACCESS_KEY"
+ca_file = "/etc/meada/ca/ca.pem"
+local_dir = "/var/lib/meada/proposals/generations"
+node_name = "proposals"
+
+[valkey]
+url = "rediss://meada@valkey:6379"
+password_env = "VALKEY_PASSWORD"
+key_prefix = "meada:compose"
+ca_file = "/etc/meada/ca/ca.pem"
+
+[generations]
+keep = 3
+
+[refresh_lock]
+ttl_seconds = 300
+
+# The read role: every Postgres session of this server is read-only.
+[postgres]
+url_env = "MEADA_POSTGRES_READ_URL"
+ca_file = "/etc/meada/ca/ca.pem"
+
+[ui]
+dir = "/usr/share/meada/ui"
+public_url = "https://localhost:8444"
+client_id = "meada-console"
+audience = "https://localhost:8444"
+operations = false
+# [workspaces] needs, as in the console's file: operations = true and one selector.
+# operator_groups = ["meada-operators"]
+
+# Uncomment these, equal to the console's: the proposal server does not start without them.
+# [oidc]
+# issuer = "https://id.example.internal/realms/agents"
+# public_url = "https://localhost:8443"
+# audience = "meada-nodes"
+# identities_claim = "meada_repositories"
+# groups_claim = "groups"
+# [oidc.groups]
+# "meada-operators" = ["*"]
+#
+# [oidc.github]
+# login_claim = "github_login"
+# max_age_seconds = 5400
+#
+# [catalog]
+# allow = ["github.com/acme/*"]
+# max_repositories = 200
+#
+# [workspaces]
+# mirrors = "/srv/mirrors"
+#
+# With [directory] in the console's file: copy it too, so a deprovisioned subject is refused here.
+# [directory]
+# token_env = "MEADA_SCIM_TOKEN"
+# user_claim = "oid"
+# user_attribute = "externalId"
+# group_attribute = "externalId"
+
+# The server's own URL and the audience of its tokens (the aud). A token for a node or for the
+# console is refused here, and this server's token by them; register the audience as a resource in
+# the identity provider (docs site, "Identity provider recipes").
+# [proposals]
+# public_url = "https://localhost:8445"
+# audience = "https://localhost:8445"

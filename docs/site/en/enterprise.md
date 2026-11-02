@@ -135,6 +135,7 @@ An Entra ID user in more groups than a token can carry gets `_claim_names` inste
 - **`OVERAGE_TTL`** (5 minutes): a membership change reaches an overage subject that late.
 - **Live token:** a deprovisioned user's token keeps reading on nodes until it expires.
 - **`outside_grant`** tells a team operator that the identity is already in the workspace, and the editor cannot predict it.
+- **Okta and the proposal server:** an Okta authorization server stamps one `aud`, so the proposal server needs a second authorization server as its `[oidc] issuer` (untested); the Helm chart renders one `[oidc]` for every pod and cannot give it one ([recipe](identity-providers.md#a-token-for-the-proposal-server)).
 - **One GitHub host** per deployment; a login is at most 39 characters and a role name at most 100.
 - **SCIM:** the token is read at start (rotating means restarting the console); bodies at most `SCIM_BODY_MAX` (1 MiB), one stored resource at most `SCIM_RESOURCE_MAX` (64 KiB), pages at most 100.
 - **The audit grows without bound** until the operator prunes it.
