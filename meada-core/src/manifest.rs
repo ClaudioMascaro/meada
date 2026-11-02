@@ -132,7 +132,7 @@ pub struct Resource {
     pub via: Vec<String>,
 }
 
-#[derive(Deserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(Deserialize, serde::Serialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum Role {
     Read,
@@ -141,6 +141,9 @@ pub enum Role {
 }
 
 impl Role {
+    /// Every role, in the order a form lists them.
+    pub const ALL: [Role; 3] = [Role::Read, Role::Write, Role::ReadWrite];
+
     pub fn writes(self) -> bool {
         self != Role::Read
     }

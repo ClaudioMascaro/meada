@@ -330,10 +330,7 @@ impl Console {
         };
         match &request {
             Decoded::Save(save) => {
-                if let Some(problem) = named::message_problem(&save.message).or_else(|| {
-                    (save.message.is_empty())
-                        .then(|| Msg::WorkspacesOpBody(Self::shape("versions")).text())
-                }) {
+                if let Some(problem) = named::message_problem(&save.message) {
                     return unprocessable("invalid_workspace", problem);
                 }
                 let submitted =

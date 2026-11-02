@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, expect, test } from 'vitest';
 import table from '../../tests/fixtures/named-workspaces.json';
 import effectiveTable from '../../tests/fixtures/effective-configuration.json';
-import { initSync, init, namedAuthorize, namedEntriesJson, namedEffective, namedEntriesText, namedVersionId, namedVisible } from '../wasm/meada_core';
+import { initSync, init, namedAuthorize, namedEntriesJson, namedEffective, namedDescriptionProblem, namedEntriesText, namedMessageProblem, namedNameProblem, namedVersionId, namedVisible, resourceRoles } from '../wasm/meada_core';
 
 // The Y/A/B table (ADR 0020) the Rust tests read, through the actual WebAssembly bundle: the browser
 // marks what a selection may not include exactly as the server's `meada_core::named` decides it.
@@ -84,4 +84,25 @@ test('two contexts sharing a repository read only their own blocks, and the view
   const text = namedEntriesText(json(spelled(row.first)));
   expect(text).not.toMatch(/source|coverage|diagnostic|ignored/);
   expect(namedVersionId(text, 5)).toBe(namedVersionId(namedEntriesText(json(JSON.parse(namedEntriesJson(text, 5)))), 5));
+});
+
+// The text rule is the core's (`meada_core::named`), so the browser and the server give one verdict.
+test('names, descriptions and messages are bounded and plain, as the core says', () => {
+  expect(namedNameProblem('Payments')).toBeUndefined();
+  for (const bad of ['', ' x', 'x ', 'a\nb', 'x'.repeat(81), '\u3000x']) expect(namedNameProblem(bad), JSON.stringify(bad)).toContain('1 to 80');
+  expect(namedNameProblem('x'.repeat(80))).toBeUndefined();
+  // U+FEFF is no whitespace to Rust.
+  expect(namedNameProblem('\uFEFFx')).toBeUndefined();
+  expect(namedDescriptionProblem('')).toBeUndefined();
+  expect(namedDescriptionProblem('\tx')).toContain('500');
+  expect(namedDescriptionProblem('x'.repeat(501))).toContain('500');
+  expect(namedDescriptionProblem('x'.repeat(500))).toBeUndefined();
+  expect(namedMessageProblem('x'.repeat(500))).toBeUndefined();
+  expect(namedMessageProblem('\uFEFFx')).toBeUndefined();
+  expect(namedMessageProblem('why')).toBeUndefined();
+  for (const bad of ['', ' x', 'a\u0085b', '\u3000x', 'x'.repeat(501)]) expect(namedMessageProblem(bad), JSON.stringify(bad)).toContain('1 to 500');
+});
+
+test('the resource roles are the manifest\'s spelling', () => {
+  expect(JSON.parse(resourceRoles())).toEqual(['read', 'write', 'read-write']);
 });

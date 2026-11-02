@@ -128,6 +128,30 @@ fn from_json<T: serde::de::DeserializeOwned>(text: &str) -> Result<T, String> {
     serde_json::from_str(text).map_err(|e| e.to_string())
 }
 
+/// The problem with a named workspace's name, in the active language; `undefined` when it is valid.
+#[wasm_bindgen(js_name = namedNameProblem)]
+pub fn named_name_problem(name: &str) -> Option<String> {
+    crate::named::name_problem(name)
+}
+
+/// The problem with a named workspace's description; `undefined` when it is valid.
+#[wasm_bindgen(js_name = namedDescriptionProblem)]
+pub fn named_description_problem(description: &str) -> Option<String> {
+    crate::named::description_problem(description)
+}
+
+/// The problem with a version's message (required); `undefined` when it is valid.
+#[wasm_bindgen(js_name = namedMessageProblem)]
+pub fn named_message_problem(message: &str) -> Option<String> {
+    crate::named::message_problem(message)
+}
+
+/// The roles a resource may declare, as `meada.toml` spells them: a JSON array of strings.
+#[wasm_bindgen(js_name = resourceRoles)]
+pub fn resource_roles() -> Result<String, String> {
+    serde_json::to_string(&crate::manifest::Role::ALL).map_err(|e| e.to_string())
+}
+
 /// The entries of the named workspace text `src` (ADR 0021) as the JSON a version document
 /// holds them, with no `path`, `owner` or `added_by`; throws the problems when it is not valid.
 /// `max` is `[workspaces] max_entries`.
