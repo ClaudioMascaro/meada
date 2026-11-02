@@ -1273,6 +1273,21 @@ impl<'a> Resolver<'a> {
         {
             return found;
         }
+        // A top-level function answers a bare call, but an extension of the implicit receiver
+        // in scope comes before it, as Kotlin resolves it.
+        if let Some(tops) = self.top_level_functions(path, call, constructs, &binding)
+            && let Some(found) = self.extended(path, call, constructs, on.clone(), work)
+        {
+            return match found {
+                Resolution::Exact(_) => found,
+                _ if !matching => Resolution::Unresolved,
+                Resolution::Inferred(t) | Resolution::Narrowed(t) => {
+                    one_of_all([&[t][..], &tops].concat())
+                }
+                Resolution::Ambiguous(all) => one_of_all([&all[..], &tops].concat()),
+                Resolution::Unresolved => Resolution::Ambiguous(tops),
+            };
+        }
         if known && matches!(binding, Binding::Unknown) {
             return Resolution::Unresolved;
         }
@@ -1626,6 +1641,48 @@ impl<'a> Resolver<'a> {
         }
     }
 
+    /// The top-level functions (of a file's package, no member, extension or local function)
+    /// a bare call of a pack with extension functions is bound to: the ones an extension of the
+    /// implicit receiver in scope comes before.
+    fn top_level_functions(
+        &self,
+        path: &str,
+        call: &Call,
+        constructs: bool,
+        binding: &Binding<'a>,
+    ) -> Option<Vec<Target<'a>>> {
+        if constructs || call.on.is_some() || call.callee.contains('.') {
+            return None;
+        }
+        if !self.extending.contains(path) {
+            return None;
+        }
+        let all = match binding {
+            Binding::Def(t) => vec![*t],
+            Binding::Several(all) => all.clone(),
+            _ => return None,
+        };
+        let top = |t: &Target| {
+            self.defs[t.path][t.name].kind == Kind::Function
+                && crate::parent(t.name) == self.files[t.path].package
+        };
+        all.iter().all(top).then_some(all)
+    }
+
+    /// Whether `t` is a Kotlin `object`: a class of a file whose pack has extension functions
+    /// that holds the `INSTANCE` of its own type (`Facts::receivers`) and has no `Def::result`,
+    /// which only a `class` declaration sets (a class's own `INSTANCE` property is no object).
+    /// Its name is its instance.
+    fn is_object(&self, t: Target<'a>) -> bool {
+        self.extending.contains(t.path)
+            && self.is_class(t)
+            && self.defs[t.path][t.name].result.is_none()
+            && matches!(
+                self.receivers[t.path].get(&(t.name, "INSTANCE")),
+                Some(Class::Type(_))
+            )
+    }
+
     /// A call of a pack with extension functions (`LanguagePack::extension_functions`) that no
     /// member answers: the extensions in scope (`visible`) that may apply to its receiver, as
     /// Kotlin picks one. On a class of the repository whose family is all known, the first scope
@@ -1633,7 +1690,7 @@ impl<'a> Resolver<'a> {
     /// a type from outside the repository or of a type parameter may apply to any receiver
     /// (`Any`, `T`), and an outside receiver's members are unknown (Opaque outside): those are
     /// name matches. `None` when no extension in scope may apply, or the receiver is unknown or
-    /// no instance (a type's name, `Outside.create()`): the name match reads it as any other.
+    /// no instance (a class's name, `Outside.create()`; an `object`'s name is its instance): the name match reads it as any other.
     fn extended(
         &self,
         path: &'a str,
@@ -1672,9 +1729,15 @@ impl<'a> Resolver<'a> {
                 (true, ..) | (false, None, None) => {
                     let seen = &mut self.seen(path, scope);
                     let found = self.resolve_as(path, scope, head, seen, work, Reading::Value);
-                    // A type's name calls its companion or its statics.
-                    self.holder(&found)?;
-                    self.instance(found, work)
+                    match found {
+                        // An object's name is its instance, as a typed local is.
+                        Binding::Def(t) if self.is_object(t) => found,
+                        // A class's name calls its companion or its statics.
+                        _ => {
+                            self.holder(&found)?;
+                            self.instance(found, work)
+                        }
+                    }
                 }
             },
         };
@@ -4092,6 +4155,13 @@ fn latest<'a>(
         Some(_) if before => Some(Binding::Unknown),
         found => found,
     }
+}
+
+/// `found`, sorted and without repeats, as several candidates.
+fn one_of_all(mut found: Vec<Target>) -> Resolution {
+    found.sort();
+    found.dedup();
+    Resolution::Ambiguous(found)
 }
 
 /// The one binding several files that share a scope give a name, when they give the same one:
@@ -11272,5 +11342,64 @@ mod kotlin_tests {
             let two = [("a/C.kt", &*expect), ("b/C.kt", &**other), ("u/U.kt", user)];
             assert_eq!(level(&two, "C"), "ambiguous a/C.kt::e.C b/C.kt::e.C");
         }
+    }
+
+    /// A call on an `object`'s name (`P.setMain(1)`), with `fun P.setMain` in another package.
+    #[test]
+    fn an_extension_on_an_objects_name_is_reached_as_on_a_typed_local() {
+        let object = "package p\nobject P\n";
+        let extension = "package q\nimport p.P\nfun P.setMain(x: Int) {}\n";
+        let user = "package u\nimport p.P\nimport q.setMain\nfun go() { P.setMain(1) }\n";
+        let found = resolved(&[("p/P.kt", object), ("q/E.kt", extension), ("u/U.kt", user)]);
+        // Before #436 the object's family held no extension of another package, and the call
+        // resolved to nothing; the object's name is its instance now.
+        assert_eq!(
+            found["u/U.kt u.go() P.setMain"],
+            "exact q/E.kt::q.P.setMain(Int)"
+        );
+        // A class's name keeps today's reading (companion and statics): no extension, also
+        // for a class with a self-typed `INSTANCE` property of its own.
+        for class in [
+            "package p\nclass P\n",
+            "package p\nclass P { val INSTANCE: P? = null }\n",
+        ] {
+            let found = resolved(&[("p/P.kt", class), ("q/E.kt", extension), ("u/U.kt", user)]);
+            assert_eq!(found["u/U.kt u.go() P.setMain"], "none");
+        }
+    }
+
+    /// Inside `fun CoroutineScope.x()`, an extension `CoroutineScope.launch` in scope comes
+    /// before a top-level `launch`; alone, the top-level one is still `exact`.
+    #[test]
+    fn a_bare_call_takes_the_extension_of_the_implicit_receiver_before_a_top_level_function() {
+        let scope = "package k\ninterface CoroutineScope\n";
+        let top = "package k\nfun launch(block: () -> Unit) {}\n";
+        let ext = "package k\nfun CoroutineScope.launch(block: () -> Unit) {}\n";
+        let user = "package u\nimport k.*\nfun CoroutineScope.x() { launch { } }\n";
+        let level = |files: &[(&str, &str)]| {
+            let found = resolved(files);
+            (found.iter())
+                .find(|(k, _)| k.starts_with("u/U.kt") && k.ends_with(" launch"))
+                .map(|(_, v)| v.clone())
+                .unwrap()
+        };
+        let (s, t, e, u) = (
+            ("k/S.kt", scope),
+            ("k/T.kt", top),
+            ("k/E.kt", ext),
+            ("u/U.kt", user),
+        );
+        assert_eq!(
+            level(&[s, t, e, u]),
+            "exact k/E.kt::k.CoroutineScope.launch(()->Unit)"
+        );
+        assert_eq!(level(&[s, t, u]), "exact k/T.kt::k.launch(()->Unit)");
+        // An extension of an outside type may apply to the receiver, a name match: `ambiguous`
+        // with the top-level function.
+        let outside = "package k\nfun String.launch(block: () -> Unit) {}\n";
+        assert_eq!(
+            level(&[s, t, ("k/O.kt", outside), u]),
+            "ambiguous k/O.kt::k.String.launch(()->Unit) k/T.kt::k.launch(()->Unit)"
+        );
     }
 }

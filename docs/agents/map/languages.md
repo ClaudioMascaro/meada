@@ -177,7 +177,7 @@ environment reads; the architecture map keeps the lead of the first:
   family gives the one of the nearest class, `exact`. An extension of a type from outside the
   repository or of a type parameter may apply to any receiver (`Any`, `T`, `CharSequence`), and
   an outside receiver's own members are unknown, so those are name matches over the extensions in
-  scope that may apply; a call on a type's name (`Outside.create()`) reaches no extension. A
+  scope that may apply; a call on a class's name (`Outside.create()`) reaches no extension, while an `object`'s name is its instance (`Resolver::is_object`: a class of a Kotlin file holding an `INSTANCE` of its own type), so `Dispatchers.setMain(..)` reaches an imported `fun Dispatchers.setMain`. A bare call a top-level function answers (`Resolver::top_level_functions`: a function of its file's package, no member, extension or local one) asks `extended` first, as Kotlin puts the implicit receiver's extensions before top-level callables: `exact` to the extension, or `ambiguous` with the top-level function when the extension is a name match (an outside or type-parameter receiver). A
   lambda passed to `apply`, `run` or `with` is a `Kind::Inline` definition of its own
   (`@<offset>`, folded into the one around it) and an `Impl` block of the receiver's type that
   declares no member (`impls` leaves it out, so a class's lookups never read one per lambda):

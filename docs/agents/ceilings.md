@@ -106,8 +106,7 @@ a ticket accepted, each with its value and its reason. Detail behind the
   scope with different types, or named like a property of its class or of an enclosing class (or
   of the file), holds an unknown type. A call `X.f(..)`
   is read as a constructor only when `f` is capitalized, as Kotlin names classes. An import alias
-  of an extension (`import a.slug as s`) brings nothing in scope for it. A bare call a top-level function of its name answers is
-  exact to that function, though Kotlin prefers an extension of the implicit receiver. A star import of a class (`import a.C.*`) reads every export of
+  of an extension (`import a.slug as s`) brings nothing in scope for it. A star import of a class (`import a.C.*`) reads every export of
   the class's file. An imported extension of the provider's class `p.C` is `exact` on a
   receiver typed `p.C`, though the extension's file may import another `C` over its package's. In the block of a receiver whose type is outside the repository (a Ktor
   `Application` or `Route` extension function), a constant's value and a call's receiver are

@@ -218,6 +218,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Kotlin: a bare call resolves in Kotlin's order, an extension of the implicit receiver in scope
+  before a top-level function of its name (#436, from #402): inside `fun CoroutineScope.x() {
+  launch { } }` the call is `exact` to `CoroutineScope.launch`, not to the top-level `launch`
+  (`ambiguous` with it when the extension may apply to any receiver), and an `object`'s name is
+  its instance, so `Dispatchers.setMain(..)` reaches an imported `fun Dispatchers.setMain` (it
+  was no link) while a class's name keeps companion and statics. "Known ceilings" drops the
+  bare-call line. No golden changed.
 - C#: an `internal`, `private` or `private protected` constructor or method of a public type is a candidate
   from its own project's files alone (#441); `InternalsVisibleTo` stays unread.
 - The console writes one `ui: directory: unreadable` stderr line per request when the directory
