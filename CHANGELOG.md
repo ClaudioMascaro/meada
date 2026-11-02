@@ -232,7 +232,8 @@ All notable changes to Meada are recorded here. The format follows
   `Pin<Box<dyn Future<Output = T>>>` (`Def::output`, read only through `.await`), so
   `load()?.port()` and `fut().await.port()` resolve within `T`'s family, `exact` when it
   declares one `port`, where `?` left a name match and a plain `fn` returning a future resolved
-  to nothing. A type outside the repository leaves the call as it was. The stored facts gain
+  to nothing. A type outside the repository, or a `?` before an `.await`, leaves the call as
+  it was. The stored facts gain
   `Def::unwrapped`, `Def::output`, `Call::unwraps` and `Call::awaits`, so the schema version
   changes and Rust indexes are rebuilt once.
 - Kotlin: a class, object or interface nested in an `expect` declaration, at any depth, is
