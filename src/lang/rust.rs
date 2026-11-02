@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, Impl, Import, Imported, Kind, LanguagePack,
-    Layout, Modules, Param, Receiver, Star, children, named, text,
+    Layout, Modules, Param, Receiver, Star, Through, children, named, text,
 };
 use crate::{Result, qualify};
 
@@ -269,6 +269,10 @@ enum Slot {
     Named(usize),
     /// The class this function returns, a type the source writes.
     Result(usize),
+    /// The class `?` unwraps the written result to.
+    Unwrapped(usize),
+    /// The class `.await` yields from a future signature.
+    Output(usize),
 }
 
 /// What the file binds, for the paths: the qualified names of its non-method definitions
@@ -354,7 +358,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     // The values to read once the file is, and how many bindings each local name has.
     let mut held: Vec<Held> = Vec::new();
     // The calls made on another call (`Router::new().route(..)`) and the range of the inner one.
-    let mut chains: Vec<(usize, Range<usize>)> = Vec::new();
+    let mut chains: Vec<(usize, Range<usize>, Through)> = Vec::new();
     let mut bindings: HashMap<String, usize> = HashMap::new();
     // The names a `let mut` of a plain name declares.
     let mut mut_lets: HashSet<String> = HashSet::new();
@@ -500,10 +504,18 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                         binds: None,
                     };
                     // A type parameter as the result names no class: it is the caller's type.
-                    let result = field(node, "return_type")
-                        .and_then(|t| written(t, place.down(1), src, false));
-                    if let Some(result) = result {
-                        paths.push((Slot::Result(facts.defs.len()), path(result)));
+                    if let Some(ty) = field(node, "return_type") {
+                        let types = result_types(ty, place.down(1), src);
+                        let at = facts.defs.len();
+                        for (slot, found) in [
+                            (Slot::Result(at), types.result),
+                            (Slot::Unwrapped(at), types.unwrapped),
+                            (Slot::Output(at), types.output),
+                        ] {
+                            if let Some(found) = found {
+                                paths.push((slot, path(found)));
+                            }
+                        }
                     }
                     if kind == Kind::Method && has_self(node) {
                         facts.receivers.push(Receiver {
@@ -568,6 +580,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                                 by_path,
                                 root: None,
                                 on: None,
+                                unwraps: false,
+                                awaits: false,
                                 receiver: None,
                                 arg_types: Vec::new(),
                                 uses: Vec::new(),
@@ -775,9 +789,9 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 let root = chain_root(function, src);
                 if root.is_none()
                     && callee.starts_with('(')
-                    && let Some(inner) = inner_call(function)
+                    && let Some((inner, through)) = inner_call(function)
                 {
-                    chains.push((facts.calls.len(), inner.byte_range()));
+                    chains.push((facts.calls.len(), inner.byte_range(), through));
                 }
                 facts.calls.push(Call {
                     arity: None,
@@ -793,6 +807,8 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     by_path,
                     root,
                     on: None,
+                    unwraps: false,
+                    awaits: false,
                     receiver: None,
                     arg_types: Vec::new(),
                     uses: Vec::new(),
@@ -1007,13 +1023,17 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 facts.receivers[*at].class = callee.map_or(Class::Unknown, Class::Type);
             }
             Slot::Result(at) => facts.defs[*at].result = callee.map(Class::Type),
+            Slot::Unwrapped(at) => facts.defs[*at].unwrapped = callee.map(Class::Type),
+            Slot::Output(at) => facts.defs[*at].output = callee.map(Class::Type),
         }
     }
     let called: HashMap<(usize, usize), usize> = (facts.calls.iter().enumerate())
         .map(|(n, c)| ((c.range.start, c.range.end), n))
         .collect();
-    for (outer, inner) in chains {
+    for (outer, inner, through) in chains {
         facts.calls[outer].on = called.get(&(inner.start, inner.end)).copied();
+        facts.calls[outer].unwraps = through.tried;
+        facts.calls[outer].awaits = through.awaited;
     }
     // The values, now that the file's `use` declarations are known.
     let mut reader = Reader::new(src, &scan, &mut heads, &candidates);
@@ -1133,6 +1153,8 @@ fn def(name: &str, kind: Kind, node: Node) -> Def {
         type_params: Vec::new(),
         result: None,
         suspends: false,
+        unwrapped: None,
+        output: None,
         hash: String::new(),
     }
 }
@@ -1534,6 +1556,65 @@ fn typed_let(node: Node, place: Around, src: &[u8]) -> Option<(String, How)> {
         .then(|| (name, How::Call(value.byte_range())))
 }
 
+/// What a function's written result gives a call, by how the call goes on.
+struct ResultTypes {
+    /// The item a call gives (`written`).
+    result: Option<Vec<String>>,
+    /// The item `?` unwraps it to: the first argument of a `Result` or `Option`.
+    unwrapped: Option<Vec<String>>,
+    /// The item `.await` yields from a future signature (`impl Future<Output = T>`,
+    /// `Pin<Box<dyn Future<Output = T>>>`), which a call made without `.await` does not get.
+    output: Option<Vec<String>>,
+}
+
+fn result_types(ty: Node, place: Around, src: &[u8]) -> ResultTypes {
+    let unwrapped = (ty.kind() == "generic_type")
+        .then(|| segments(ty, src))
+        .flatten()
+        .filter(|path| matches!(path.last().map(String::as_str), Some("Result" | "Option")))
+        .and_then(|_| field(ty, "type_arguments")?.named_child(0))
+        .and_then(|arg| written(arg, place.down(2), src, false));
+    let output = future_output(ty, src)
+        .and_then(|(output, levels)| written(output, place.down(levels), src, false));
+    ResultTypes {
+        result: written(ty, place, src, false),
+        unwrapped,
+        output,
+    }
+}
+
+/// The `T` of a written `Future<Output = T>` (`impl`, `dyn`, or behind `Pin` and `Box`), with
+/// how many levels below `ty` it is.
+fn future_output<'t>(ty: Node<'t>, src: &[u8]) -> Option<(Node<'t>, usize)> {
+    let mut at = ty;
+    for depth in 0..PATH_DEPTH {
+        match at.kind() {
+            "reference_type" => at = field(at, "type")?,
+            "abstract_type" | "dynamic_type" | "bounded_type" => {
+                let bound = bound_node(&[at], src)?;
+                let future = segments(bound, src)?;
+                if future.last().map(String::as_str) != Some("Future") {
+                    return None;
+                }
+                let output = named(field(bound, "type_arguments")?).find(|a| {
+                    a.kind() == "type_binding"
+                        && field(*a, "name").is_some_and(|n| text(n, src) == "Output")
+                })?;
+                return Some((field(output, "type")?, 2 * depth + 3));
+            }
+            "generic_type" => {
+                let path = segments(at, src)?;
+                if !matches!(path.last().map(String::as_str), Some("Pin" | "Box")) {
+                    return None;
+                }
+                at = field(at, "type_arguments")?.named_child(0)?;
+            }
+            _ => return None,
+        }
+    }
+    None
+}
+
 /// The path of the item a written type names: `&T` and `&mut T` name `T`; `dyn Trait`, `impl
 /// Trait` and a type parameter bounded by one trait name that trait, so a call on it stops at
 /// the trait's method. `None` for a type that names no single item: a tuple, a slice, a
@@ -1579,9 +1660,14 @@ fn written(ty: Node, mut place: Around, src: &[u8], generic: bool) -> Option<Vec
 /// lifetimes, `?Sized` and the marker traits `Send`, `Sync`, `Unpin` and `Sized`, which add no
 /// method; `None` for none or several.
 fn only_bound(bounds: &[Node], src: &[u8]) -> Option<Vec<String>> {
+    segments(bound_node(bounds, src)?, src)
+}
+
+/// The node of the one trait among `bounds`, as `only_bound` reads it.
+fn bound_node<'t>(bounds: &[Node<'t>], src: &[u8]) -> Option<Node<'t>> {
     // `A + B + 'c` nests: `(A + B) + 'c`.
     let mut found = Vec::new();
-    let mut pending: Vec<Node> = bounds.to_vec();
+    let mut pending: Vec<Node<'t>> = bounds.to_vec();
     while let Some(bound) = pending.pop() {
         if found.len() + pending.len() >= PATH_DEPTH {
             return None;
@@ -1609,7 +1695,7 @@ fn only_bound(bounds: &[Node], src: &[u8]) -> Option<Vec<String>> {
                 "type_identifier" | "scoped_type_identifier" | "generic_type"
             ) =>
         {
-            segments(one, src)
+            Some(one)
         }
         _ => None,
     }
@@ -1845,19 +1931,27 @@ fn member(node: Node, src: &[u8]) -> String {
 }
 
 /// The call a method call is made on (`Router::new()` in `Router::new().route(..)`), through
-/// `.await` and parentheses. Not through `?`: it unwraps the written result (`Result<T>`,
-/// `Option<T>`), so the receiver is not of that type and the call stays a name match.
-// ponytail: `.await` takes the written result as the awaited value, which holds for an `async
-// fn`; a plain `fn` that returns `impl Future<Output = T>` leaves the call unresolved.
-fn inner_call(function: Node) -> Option<Node> {
+/// `.await`, parentheses and one `?`, and what it crossed. Two `?` name no type, nor a `?`
+/// before an `.await` (`f()?.await`): what `?` unwraps is awaited, and its output is unknown.
+fn inner_call(function: Node) -> Option<(Node, Through)> {
     if function.kind() != "field_expression" {
         return None;
     }
     let mut at = field(function, "value")?;
+    let mut through = Through::default();
     for _ in 0..PATH_DEPTH {
         match at.kind() {
-            "call_expression" => return Some(at),
-            "await_expression" | "parenthesized_expression" => at = at.named_child(0)?,
+            "call_expression" => return Some((at, through)),
+            "try_expression" if through.tried || through.awaited => return None,
+            "try_expression" => {
+                through.tried = true;
+                at = at.named_child(0)?;
+            }
+            "await_expression" => {
+                through.awaited = true;
+                at = at.named_child(0)?;
+            }
+            "parenthesized_expression" => at = at.named_child(0)?,
             _ => return None,
         }
     }

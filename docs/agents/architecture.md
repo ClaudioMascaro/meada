@@ -482,7 +482,7 @@ the rendered configuration.
   `assert_golden(name, actual)`. `MEADA_BLESS=1 cargo test` rewrites them; the diff is the
   review, read per section with `cargo run --example golden_diff` (`--range` picks the
   revisions; the default is `origin/main...HEAD`). `.gitattributes` marks fixtures and goldens `-text`, since BLAKE3 hashes and byte
-  ranges are in them. An export golden of a test about something else goes through
+  ranges are in them, and `CHANGELOG.md merge=union` (`docs::changelog_union_merge_keeps_both_bullets`), so same-heading entries from two branches merge without a conflict. An export golden of a test about something else goes through
   `without_processes(export)`, which drops `processes`: only the chain's own exports
   (`chain-{web,gateway,catalog,worker}.export.json`), the conformance export and the
   `*.processes.json` goldens carry them (spec #31), so a change to the process walk re-blesses

@@ -368,7 +368,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     )
                 };
                 facts.defs.push(def);
-                match platform(node, src) {
+                match platform(node, src).or_else(|| enclosing_expect(node, src)) {
                     Some("expect") => facts.expect.push(inner.as_ref().clone()),
                     Some("actual") => facts.actual.push(inner.as_ref().clone()),
                     _ => {}
@@ -615,6 +615,8 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 facts.defs.push(Def {
                     result: Some(Class::Type(class.to_string())),
                     suspends: false,
+                    unwrapped: None,
+                    output: None,
                     hash: String::new(),
                     ..definition(&ctor, Kind::Method, node.byte_range(), params)
                 });
@@ -934,6 +936,8 @@ fn definition(name: &str, kind: Kind, range: Range<usize>, params: Vec<Param>) -
         type_params: Vec::new(),
         result: None,
         suspends: false,
+        unwrapped: None,
+        output: None,
         hash: String::new(),
     }
 }
@@ -1009,6 +1013,20 @@ fn platform<'s>(node: Node, src: &'s [u8]) -> Option<&'s str> {
         .flat_map(named)
         .find(|n| n.kind() == "platform_modifier")
         .map(|n| text(n, src))
+}
+
+/// `expect` when a declaration the node is nested in is `expect`: Kotlin makes its members so.
+fn enclosing_expect<'s>(node: Node, src: &'s [u8]) -> Option<&'s str> {
+    let mut up = node.parent();
+    while let Some(p) = up {
+        if matches!(p.kind(), "class_declaration" | "object_declaration")
+            && let Some(m @ "expect") = platform(p, src)
+        {
+            return Some(m);
+        }
+        up = p.parent();
+    }
+    None
 }
 
 /// The primary constructor's parameters of a class; `None` for an interface, an object, a
@@ -1620,6 +1638,8 @@ fn call(node: Node, src: &[u8], scope: &str, implicit: Implicit, lambdas: bool) 
         by_path: false,
         root: None,
         on: None,
+        unwraps: false,
+        awaits: false,
         receiver: None,
         arg_types: Vec::new(),
         uses: Vec::new(),
@@ -2057,6 +2077,8 @@ fn annotations_of<'s>(modifiers: Node, src: &'s [u8], scope: &str) -> Vec<(Call,
             by_path: false,
             root: None,
             on: None,
+            unwraps: false,
+            awaits: false,
             receiver: None,
             arg_types: Vec::new(),
             uses: Vec::new(),

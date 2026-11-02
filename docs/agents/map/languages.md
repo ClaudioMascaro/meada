@@ -119,6 +119,7 @@ environment reads; the architecture map keeps the lead of the first:
   `guesses_constructs` (`Call::constructs` is a guess from the callee's case: a guess that is no
   `exact` type is read again as a plain call, and a function it binds wins),
   `unordered_globs` (combine wildcard candidates, with an inside glob taking priority),
+  `static_imports_inherit` (whether a static import of a class takes its bases' statics too: Java and Kotlin yes, C#'s `using static T` no, only the members and nested types `T` declares),
   `qualified_types` (an unbound path head may name a repository type through its layout),
   `Facts::overloads` and `Facts::constructors` (separate method and constructor families with
   written signatures), `Call::arity` and `Call::constructs`
@@ -177,7 +178,7 @@ environment reads; the architecture map keeps the lead of the first:
   family gives the one of the nearest class, `exact`. An extension of a type from outside the
   repository or of a type parameter may apply to any receiver (`Any`, `T`, `CharSequence`), and
   an outside receiver's own members are unknown, so those are name matches over the extensions in
-  scope that may apply; a call on a type's name (`Outside.create()`) reaches no extension. A
+  scope that may apply; a call on a class's name (`Outside.create()`) reaches no extension, while an `object`'s name is its instance (`Resolver::is_object`: a class of a Kotlin file holding an `INSTANCE` of its own type), so `Dispatchers.setMain(..)` reaches an imported `fun Dispatchers.setMain`. A bare call a top-level function answers (`Resolver::top_level_functions`: a function of its file's package, no member, extension or local one) asks `extended` first, as Kotlin puts the implicit receiver's extensions before top-level callables: `exact` to the extension, or `ambiguous` with the top-level function when the extension is a name match (an outside or type-parameter receiver). A
   lambda passed to `apply`, `run` or `with` is a `Kind::Inline` definition of its own
   (`@<offset>`, folded into the one around it) and an `Impl` block of the receiver's type that
   declares no member (`impls` leaves it out, so a class's lookups never read one per lambda):
@@ -353,7 +354,8 @@ environment reads; the architecture map keeps the lead of the first:
   import names. The layout shares a module's scope among its files (`Layout::shared`), whose
   top-level overload families are one family across its files (`Group::families`,
   `Resolver::family_at`), and names it by its first file; `join` sets each file's
-  `Facts::unit` to its module, so `internal` declarations (`Facts::private`) stay in it
+  `Facts::unit` to its module, so `internal` declarations (`Facts::private`: C#'s non-public types, and constructors and
+  methods hidden outside their project) stay in it
   (`Resolver::hidden`), and appends the module's own inside glob after the imports, so its
   names come before an import's. `import M` is a namespace import of `M` and an outside glob
   of it, which takes `M`'s public names (`Facts::star`); `M` is the target of that name in the

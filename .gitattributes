@@ -5,3 +5,5 @@ tests/golden/** -text
 vendor/tree-sitter-kotlin-ng/** -text
 # Generated grammar sources: GitHub collapses them in diffs and leaves them out of language stats.
 vendor/tree-sitter-kotlin-ng/src/** linguist-generated=true
+# Two branches adding entries under one heading merge without a conflict; the tier review reads the result (#576).
+CHANGELOG.md merge=union

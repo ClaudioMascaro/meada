@@ -59,8 +59,8 @@ a ticket accepted, each with its value and its reason. Detail behind the
   document size cap) bounds; it is not truncated.
 - `resolve.rs` (`Resolver::may_declare`, ADR 0019): a base among a pack's known outside members is
   matched by its spelling, so a same-named type of a wildcard-imported outside package that
-  declares an overload of the called name may give a wrong `exact`; a Swift entry is compared
-  without its labels, so `hash(into:)` keeps every `hash` call at the strict level; an extension
+  declares an overload of the called name may give a wrong `exact`; a bare call inside the type,
+  a call with a trailing closure or one without labels compares a Swift entry by its base name; an extension
   the tables do not list, in scope of a call no own overload fits by type, is missed. A base the
   tables do not list keeps every name opaque.
 - `jvm/spring.rs` (`read_yaml`): the dotted keys a YAML file flattens to are charged to
@@ -106,8 +106,7 @@ a ticket accepted, each with its value and its reason. Detail behind the
   scope with different types, or named like a property of its class or of an enclosing class (or
   of the file), holds an unknown type. A call `X.f(..)`
   is read as a constructor only when `f` is capitalized, as Kotlin names classes. An import alias
-  of an extension (`import a.slug as s`) brings nothing in scope for it. A bare call a top-level function of its name answers is
-  exact to that function, though Kotlin prefers an extension of the implicit receiver. A star import of a class (`import a.C.*`) reads every export of
+  of an extension (`import a.slug as s`) brings nothing in scope for it. A star import of a class (`import a.C.*`) reads every export of
   the class's file. An imported extension of the provider's class `p.C` is `exact` on a
   receiver typed `p.C`, though the extension's file may import another `C` over its package's. In the block of a receiver whose type is outside the repository (a Ktor
   `Application` or `Route` extension function), a constant's value and a call's receiver are
@@ -165,12 +164,10 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   function, enum cases, `Self` as a type's name, a local typed by a call result or a closure
   parameter's type (#118), a typed local of a nested block, closure or accessor (a name match
   where Java and C# keep it function-wide), a `typealias` as a symbol, one written in a type
-  seen from another file (its extensions included), the repository's extension of an outside
-  type reached through an alias of it (the receiver stays outside under the alias's name, so
-  it reaches no block), an outside alias of a function type (`Ext.Handler`, which takes no
-  trailing closure, as the brief of #411 decides for every outside name), and the
-  protocols a conformed protocol inherits when the conformance is written on an extension. As in Java, an outside base
-  the pack does not list among its known outside members (`NSObject`, `View`) keeps a type's own
+  seen from another file (its extensions included), an outside alias of a function type
+  (`Ext.Handler`, which takes no trailing closure, as the brief of #411 decides for every
+  outside name), and the protocols a conformed protocol inherits when the conformance is
+  written on an extension. As in Java, an outside base the pack does not list among its known outside members (`NSObject`, `View`) keeps a type's own
   overloads from `exact`, and a listed one (`Codable`, a raw value type) the names it declares.
 - `http/swift/client.rs`: `CLIENT_DEPTH` (8) bounds the locals, properties and constants followed
   from a call's receiver to a client; past it the receiver is no client and the call is no
@@ -220,7 +217,9 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   library project reads the library's `appsettings.json`, never the consuming app's.
   An `internal` type (one with no access modifier too) links from its own project's files
   alone (`Resolver::hidden`); `InternalsVisibleTo` is not read, so a friend project's calls to
-  it get no link. From a file of another project it is not there at all, so a type of its
+  it get no link. A constructor or method of a public type (`internal`, `private`,
+  `private protected`; a plain `protected` one stays visible) is in `Facts::private` the same way, so another project's call narrows among the
+  accessible members. From a file of another project an `internal` type is not there at all, so a type of its
   name a using brings binds even from a file of its namespace. A repository extension method wins over an outside
   type's instance member of the same name (`sb.Append("x")` beside a
   `static StringBuilder Append(this StringBuilder b, string s)`), where C# picks the member
@@ -1051,10 +1050,15 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   around it, so `parameter` asks for no parent (each lookup walks down from the root of the
   tree).
 - `lang/rust.rs` (`inner_call`): a method called on another call (`Router::new().route(..)`)
-  names it (`Call::on`) through `.await` and parentheses, so its receiver is the inner target's
-  written result. Not through `?`, which unwraps that result (`Result<T>`, `Option<T>`): the call
-  stays a name match. `.await` takes the written result as the awaited value, as an `async fn`
-  writes it; on a plain `fn` that returns `impl Future<Output = T>` the call resolves to nothing.
+  names it (`Call::on`) through `.await`, parentheses and one `?`, so its receiver is the inner
+  target's written result, or, through `?`, the first type argument of a `Result` or `Option`
+  (`Def::unwrapped`). A plain `fn` that returns a future (`impl Future<Output = T>`,
+  `Pin<Box<dyn Future<Output = T>>>`) keeps `T` as `Def::output`, which only `.await` reads: a
+  call on the future itself keeps the written future as its receiver. The `Result` or `Option`
+  inside a future's output is not kept, so `.await?` after it is a name match. Two `?` in a row
+  name no type, nor does a `?` before an `.await` (`f()?.await`), and a `?` whose unwrapped type is outside the repository, a type parameter or not written
+  leaves the call a name match. A `Result` or `Option` is told by its last path segment, so a
+  user type of that name with another first argument is read the same way.
 - `lang/ts.rs`: tsconfig `extends` and `references` are not followed. Every `tsconfig.json` and
   `jsconfig.json` but those under `node_modules` is read; an importer uses the nearest one in its
   directory or above (`tsconfig.json` over `jsconfig.json`), `paths` and `baseUrl` relative to it.

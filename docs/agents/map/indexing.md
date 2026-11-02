@@ -77,7 +77,7 @@ from ...", with the whole list. A value the index now stores joins it.
   `Call::constructs`), the argument label of a parameter and whether its written type takes a
   trailing closure, or the name it is written as (`Param::label`, `Param::closure`), the names
   of a Swift file's aliases of a function type (`Facts::function_aliases`), the place of the call a
-  chained call is made on (`Call::on`), whether a Swift call is written under `await` and
+  chained call is made on and whether it is reached through `?` (`Call::on`, `Call::unwraps`), the class `?` unwraps a Rust function's written result to and the one `.await` yields from a future signature (`Def::unwrapped`, `Def::output`, `Call::awaits`), whether a Swift call is written under `await` and
   whether a function needs one (`Call::awaited`, `Def::suspends`), the modules a Swift file imports
   `@testable` and the names only their file sees (`Facts::testable`, `Facts::confined`), whether an `inferred` call was narrowed from several
   definitions of its name (`calls.narrowed`), the definition a decorating call decorates (`calls.decorates`, the
@@ -705,7 +705,7 @@ even when that class declares no constructor, keeping its identity distinct and 
 a constructor is added. Constructors keep their class-named signatures.
 Package groups come from `Facts::package`, independently of directory layout. The package's
 inside glob sees its non-public types; public star sets and hidden members define the exported
-surface. Static class globs take `Facts::statics` alone. `unordered_globs` combines candidates from
+surface. Static class globs take `Facts::statics` alone, and a pack whose `static_imports_inherit()` is false (C#: "inherited members aren't imported") offers only the statics the named class declares itself, not its bases'. `unordered_globs` combines candidates from
 on-demand imports, explicit imports take priority, and the current package takes priority over
 public package globs including `java.lang`. A shared package checks each declaring file's star
 set, so its first file does not hide another file's public types. Qualified imports go through

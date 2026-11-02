@@ -1,16 +1,16 @@
 {
   "format": 1,
   "repository": "example.com/acme/conformance",
-  "commit": "007371e3a08908ce0090a5c07faa9d21081040d2",
+  "commit": "351bdfc23330d78510e9dbf67ac767db0d6df402",
   "dirty": false,
   "files": [
     {
       "path": "Sources/App/Aliases.swift",
-      "hash": "705baade888cf58f6d00fe6ecb6aa950a9dfc5c506e37d7c1c5293f1198a9ed0"
+      "hash": "268b1b7a12f7d4679a0073157ee2cd694f8f84137d3998d41b8afd1a881021e9"
     },
     {
       "path": "Sources/App/main.swift",
-      "hash": "ff7a42ba9678c733d5ba7be5f2ec4a4d4f99ae56f6180cf291ce08f32fa191ef"
+      "hash": "19f2ef51458fc37dcc4bfbbf3a5a353888a4a6bb6a8a18124aa307821570af13"
     },
     {
       "path": "Sources/Lib/Lib.swift",
@@ -18,6 +18,24 @@
     }
   ],
   "symbols": [
+    {
+      "id": "example.com/acme/conformance::Sources/App/Aliases.swift::Animation.build()",
+      "span": {
+        "path": "Sources/App/Aliases.swift",
+        "start": 299,
+        "end": 331
+      },
+      "hash": "5cfb6ca921cd35b16b2b93c2fa95b2b3a5ae0547193907e9f02309d60d4cf404"
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/Aliases.swift::Animation.spin()",
+      "span": {
+        "path": "Sources/App/Aliases.swift",
+        "start": 280,
+        "end": 294
+      },
+      "hash": "43a3195a96414ff4ee498b795b08329c4f0d73eaeaebfd21c4d51fc92feac71b"
+    },
     {
       "id": "example.com/acme/conformance::Sources/App/Aliases.swift::Feature",
       "span": {
@@ -176,9 +194,18 @@
       "span": {
         "path": "Sources/App/main.swift",
         "start": 0,
-        "end": 1040
+        "end": 1147
       },
-      "hash": "ff7a42ba9678c733d5ba7be5f2ec4a4d4f99ae56f6180cf291ce08f32fa191ef"
+      "hash": "19f2ef51458fc37dcc4bfbbf3a5a353888a4a6bb6a8a18124aa307821570af13"
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::reach(_:_:)",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 1041,
+        "end": 1146
+      },
+      "hash": "3ff49b46a5042585a17985fd8d06d4957a614e974e615bbb7665604a89bedc45"
     },
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::run(_:)",
@@ -326,8 +353,8 @@
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::cycle(_:_:)::anim.spin#0",
       "caller": "example.com/acme/conformance::Sources/App/main.swift::cycle(_:_:)",
-      "target": null,
-      "level": null,
+      "target": "example.com/acme/conformance::Sources/App/Aliases.swift::Animation.spin()",
+      "level": "inferred",
       "span": {
         "path": "Sources/App/main.swift",
         "start": 293,
@@ -381,6 +408,39 @@
         "path": "Sources/App/main.swift",
         "start": 789,
         "end": 798
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::reach(_:_:)::Anim.build#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::reach(_:_:)",
+      "target": "example.com/acme/conformance::Sources/App/Aliases.swift::Animation.build()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 1132,
+        "end": 1144
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::reach(_:_:)::chained.spin#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::reach(_:_:)",
+      "target": "example.com/acme/conformance::Sources/App/Aliases.swift::Animation.spin()",
+      "level": "inferred",
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 1092,
+        "end": 1106
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::Sources/App/main.swift::reach(_:_:)::mover.spin#0",
+      "caller": "example.com/acme/conformance::Sources/App/main.swift::reach(_:_:)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sources/App/main.swift",
+        "start": 1111,
+        "end": 1123
       }
     },
     {
@@ -445,8 +505,12 @@
     {
       "id": "example.com/acme/conformance::Sources/App/main.swift::untyped()::w.spin#0",
       "caller": "example.com/acme/conformance::Sources/App/main.swift::untyped()",
-      "target": "example.com/acme/conformance::Sources/App/main.swift::Wheel.spin()",
-      "level": "inferred",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "example.com/acme/conformance::Sources/App/Aliases.swift::Animation.spin()",
+        "example.com/acme/conformance::Sources/App/main.swift::Wheel.spin()"
+      ],
       "span": {
         "path": "Sources/App/main.swift",
         "start": 1029,
@@ -550,6 +614,15 @@
     {
       "name": "Sources/App",
       "members": [
+        "example.com/acme/conformance::Sources/App/Aliases.swift::Animation.build()",
+        "example.com/acme/conformance::Sources/App/Aliases.swift::Animation.spin()",
+        "example.com/acme/conformance::Sources/App/main.swift::cycle(_:_:)",
+        "example.com/acme/conformance::Sources/App/main.swift::reach(_:_:)"
+      ]
+    },
+    {
+      "name": "Sources/App#2",
+      "members": [
         "example.com/acme/conformance::Sources/App/Aliases.swift::Feature.tap()",
         "example.com/acme/conformance::Sources/App/main.swift::local()",
         "example.com/acme/conformance::Sources/App/main.swift::use(_:_:_:_:)",
@@ -557,26 +630,19 @@
       ]
     },
     {
-      "name": "Sources/App#2",
+      "name": "Sources/App#3",
       "members": [
         "example.com/acme/conformance::Sources/App/main.swift::Box.g(_:)",
         "example.com/acme/conformance::Sources/App/main.swift::Other.ping()"
       ]
     },
     {
-      "name": "Sources/App#3",
+      "name": "Sources/App#4",
       "members": [
         "example.com/acme/conformance::Sources/App/main.swift::Sender.on(_:h:)",
         "example.com/acme/conformance::Sources/App/main.swift::Sender.send(_:assert:)",
         "example.com/acme/conformance::Sources/App/main.swift::run(_:)",
         "example.com/acme/conformance::Sources/App/main.swift::trailing(_:)"
-      ]
-    },
-    {
-      "name": "Sources/App#4",
-      "members": [
-        "example.com/acme/conformance::Sources/App/main.swift::Wheel.spin()",
-        "example.com/acme/conformance::Sources/App/main.swift::untyped()"
       ]
     },
     {

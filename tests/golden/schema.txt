@@ -831,6 +831,27 @@ sample.rs
         }
       ],
       "hash": "e6884722a1b1cd96f2baf3d9483c0ad26bec74fc34ecd3c6f126b6c6ad693829"
+    },
+    {
+      "name": "load",
+      "kind": "Function",
+      "range": {
+        "start": 1101,
+        "end": 1154
+      },
+      "params": [
+        {
+          "name": "path",
+          "binds": "Any"
+        }
+      ],
+      "result": {
+        "Type": "Option"
+      },
+      "unwrapped": {
+        "Type": "Store"
+      },
+      "hash": "b484bf6de60f94e6d1f6cc1f92bf7f5c46c2f86a0b65c4321bbfd246f811b22b"
     }
   ],
   "imports": [
@@ -948,6 +969,12 @@ sample.rs
         "exported": "save",
         "local": "save"
       }
+    },
+    {
+      "Local": {
+        "exported": "load",
+        "local": "load"
+      }
     }
   ],
   "star": {
@@ -955,7 +982,8 @@ sample.rs
       "util",
       "Store",
       "Persist",
-      "save"
+      "save",
+      "load"
     ]
   },
   "calls": [
@@ -1078,6 +1106,13 @@ sample.rs
       "class": {
         "Returned": "Store.new"
       }
+    },
+    {
+      "scope": "load",
+      "name": "path",
+      "class": {
+        "Type": "str"
+      }
     }
   ],
   "impls": [
@@ -1094,6 +1129,7 @@ sample.rs
     }
   ],
   "externs": [
+    "Option",
     "std",
     "str",
     "u32"

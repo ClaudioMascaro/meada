@@ -954,6 +954,8 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
         by_path: false,
         root: None,
         on: None,
+        unwraps: false,
+        awaits: false,
         receiver: None,
         arg_types: Vec::new(),
         uses: Vec::new(),
@@ -973,6 +975,8 @@ fn def(name: String, kind: Kind, range: Range<usize>, params: Vec<Param>) -> Def
         type_params: Vec::new(),
         result: None,
         suspends: false,
+        unwrapped: None,
+        output: None,
         hash: String::new(),
     }
 }
