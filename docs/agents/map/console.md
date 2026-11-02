@@ -121,7 +121,7 @@ this file, and a change to these modules updates it.
   <outcome>` (a write refused at admission because the directory cannot be read logs only the
   directory's `ui: directory: unreadable (<reason>)` line, #451), with controls escaped throughout; a team operator's is `ui: <subject> as <owners>
   <action> <arguments>: <outcome>`, `<owners>` a JSON array: the owner groups of the entries an
-  accepted change touched (`versions::touched_owners`, sorted, without repeats), the subject's
+  accepted change touched (`meada_core::workspace::touched_owners`, sorted, without repeats, also the browser's `touchedOwners`: an entry counts when its JSON differs by identity, so a reorder alone touches none), the subject's
   teams for a refusal, whose outcome is the message with the named identities and the hidden
   count. Pre-authentication refusals use absent subject `-` and safe
   fixed arguments, never body or token text. Save validation keeps its full CLI diagnostics in

@@ -65,7 +65,7 @@ The crates are described in the [architecture map](../architecture.md#crates). T
   held, absent without a valid login; absent off it). The attribution step comes before
   authorization: the server and the browser both authorize the change from the entries the
   grant reads to `compose_entries` over them, so a forged `added_by` decides no reason. The
-  binary's save and apply and the browser (`authorizeEntries`, `composeEntries` in `wasm.rs`,
+  binary's save and apply and the browser (`authorizeEntries`, `composeEntries` and `touchedOwners` in `wasm.rs`,
   `login` and `github_host` as `string | undefined`) call the same functions.
 - `meada-core/src/msg.rs`: the messages of those checks and the language flag the binary's
   `msg.rs` reads too; `meada-core/src/http.rs`: `normalize_path` and `PARAM`, which the HTTP

@@ -219,7 +219,8 @@ fn touched_owners_names_the_groups_of_entries_that_differ_whatever_their_order()
         touched_owners(&[x.clone(), y.clone()], &[x.clone(), moved]),
         ["team-b"]
     );
-    assert_eq!(touched_owners(&[x.clone()], &[x, y]), ["team-b"]);
+    let (only_x, both) = ([x.clone()], [x, y]);
+    assert_eq!(touched_owners(&only_x, &both), ["team-b"]);
     assert_eq!(
         touched_owners(&[json!({"repo": "a/z", "path": "z"})], &[]),
         [] as [&str; 0]

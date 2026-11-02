@@ -123,7 +123,7 @@ pub fn workspace_version_id(entries: &[VersionEntry]) -> String {
 pub const NON_BLOCK_KEYS: [&str; 4] = ["repo", "path", "owner", "added_by"];
 
 /// Each `[[repository]]` of the manifest text `src`, in order, as its blocks were written
-/// (every key but `repo`, `path`, `owner`, `added_by`), as JSON with every table's keys sorted: TOML's spellings
+/// (every key but `NON_BLOCK_KEYS`), as JSON with every table's keys sorted: TOML's spellings
 /// of one value give one text.
 pub fn entry_blocks(src: &str) -> Vec<Json> {
     let Ok(table) = toml::from_str::<toml::Table>(src) else {
@@ -136,9 +136,9 @@ pub fn entry_blocks(src: &str) -> Vec<Json> {
         .map(|entry| {
             let mut entry = entry.clone();
             if let toml::Value::Table(table) = &mut entry {
-                NON_BLOCK_KEYS.iter().for_each(|key| {
-                    table.remove(*key);
-                });
+                for key in NON_BLOCK_KEYS {
+                    table.remove(key);
+                }
             }
             canonical(&entry)
         })
