@@ -7,6 +7,14 @@ a ticket accepted, each with its value and its reason. Detail behind the
 
 ## Known ceilings
 
+- `deploy/` (#504): the proposal server's Helm block renders no Ingress (the operator exposes its
+  Service behind their own TLS at `proposals.publicUrl`), and Compose's `proposals.workspace.toml`
+  keeps `[oidc]`, `[catalog]` and `[workspaces]` commented, so the service does not start until the
+  operator copies the console's sections (the local accounts profile has no proposal server). An
+  Okta authorization server stamps one `aud`, so the proposal server needs a second authorization
+  server as its `[oidc] issuer` (untested); the chart renders one `[oidc]` for every pod and cannot
+  give it one.
+
 - `accounts.rs` (#554, ADR 0024): `KEY_MAX` (16 KiB) bounds a key file of `[accounts]` and
   `PASSWORD_FILE_MAX` (1 KiB) `admin_password_file`, each refused past it naming the file;
   `HASH_MEMORY_MAX_KIB` (64 MiB), `HASH_ITERATIONS_MAX` (8) and `HASH_LANES_MAX` (4) bound the
@@ -252,6 +260,12 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   `CA_MAX` (1 MiB); past either the connection fails, naming the file.
 - `postgres.rs`: `url_file` holds at most `URL_MAX` (4096 bytes) and `ca_file` at most `CA_MAX`
   (1 MiB); past either the connection fails, naming the file.
+- `postgres.rs`: SCRAM's channel binding (`end_point`) knows the RSA PKCS#1, ECDSA and RSASSA-PSS
+  signatures with MD5, SHA-1 or SHA-2 (SHA-224 apart, which ring does not hash); a server certificate signed otherwise
+  (Ed25519, for which RFC 5929 names no hash and Postgres binds nothing either) gets no binding,
+  and SCRAM runs as `SCRAM-SHA-256` without `-PLUS`. An RSASSA-PSS certificate on a Postgres that
+  cannot hash one (an old build or OpenSSL) fails `-PLUS` authentication, as libpq does.
+  `tls-unique` and client certificates are not supported.
 - `grant/permissions.rs`: a process holds every accepted-role row of the newest permissions set in
   memory (logins times repositories under an organization base role), loaded whole when the set
   changes; a revocation on GitHub reaches it at the next successful refresh plus at most

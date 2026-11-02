@@ -318,5 +318,26 @@ lee `[workspaces]` lee `[ui]` con `operations = true`). Actualiza todas las imá
 incluidos, antes del primer refresh que registre un workspace: un nodo antiguo rechaza esa
 generación y conserva la última. `mirrors = "/srv/mirrors"` es el volumen de espejos del job, donde
 `fetch-pulled.sh` clona cada repositorio que solo seleccionan workspaces nombrados. El servidor de
-propuestas (`meada workspaces mcp`) no forma parte de este ejemplo. El procedimiento y sus modos de
+propuestas (`meada workspaces mcp`) es el overlay opcional siguiente. El procedimiento y sus modos de
 fallo están en la página de workspaces nombrados del sitio.
+
+### Servidor de propuestas
+
+`compose.proposals.yaml` suma el servidor de propuestas (`meada workspaces mcp`, ADR 0022) al overlay de Postgres, en un proceso propio junto a la consola y los nodos: `proposals-first-pull` y `proposals-pull` traen la generación como los nodos, en un volumen solo suyo (`proposals-data`, `node_name = "proposals"`); `proposals` escucha en `0.0.0.0:8090` en la red interna, sin puerto publicado; `proposals-proxy` publica `https://localhost:8445` con el TLS de Caddy, que no crea `Origin` y preserva `Authorization`. Lee Postgres con el rol de lectura (`MEADA_POSTGRES_READ_URL`), y toda sesión es de solo lectura. El servidor no arranca hasta que descomente, en `proposals.workspace.toml`, las secciones iguales a las de la consola (`[oidc]`, `[oidc.github]`, `[catalog]`, `[workspaces]`, `operations` y el selector de `[ui]`, `[directory]` si existe) y `[proposals]`, cuya `audience` registra como recurso en el proveedor de identidad ([recetas de token](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/es/identity-providers.md#un-token-para-el-servidor-de-propuestas)). Actualice antes `job.workspace.toml` y `console.workspace.toml` con `[catalog]` y `[workspaces]`.
+
+```sh
+compose_proposals() {
+  docker compose -f compose.yaml -f compose.console.yaml -f compose.postgres.yaml -f compose.proposals.yaml \
+    --profile generations --profile console "$@"
+}
+compose_proposals config -q
+compose_proposals up -d
+compose_proposals logs -f proposals-first-pull proposals
+compose_proposals cp proposals-proxy:/data/caddy/pki/authorities/local/root.crt ./proposals-ca.crt
+curl --cacert proposals-ca.crt https://localhost:8445/.well-known/oauth-protected-resource
+curl --cacert proposals-ca.crt -i https://localhost:8445/ -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' --data '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+Sin token, la segunda llamada responde 401 con un `WWW-Authenticate` que apunta a la metadata (la primera, también sin token, responde un `resource` igual a `public_url`). Con un token cuyo `aud` es `[proposals] audience`, la misma llamada lista `catalog`, `workspaces`, `show` y `propose`; un token de nodo o de la consola se rechaza con 401. Para terminar, `compose_proposals down`.
+

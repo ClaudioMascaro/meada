@@ -36,12 +36,7 @@ ca_file = "/etc/meada-ca/ca.crt"
 {{- with .Values.modules.postgres }}
 {{- if .enabled }}
 
-[postgres]
-url_env = "MEADA_POSTGRES_URL"
-schema = {{ .schema | toJson }}
-{{- if or $.Values.tls.caSecret $.Values.tls.caConfigMap }}
-ca_file = "/etc/meada-ca/ca.crt"
-{{- end }}
+{{ include "meada.postgresBlock" (dict "urlEnv" "MEADA_POSTGRES_URL" "schema" .schema "ca" (or $.Values.tls.caSecret $.Values.tls.caConfigMap)) }}
 {{- end }}
 {{- end }}
 {{- if .Values.modules.generations.enabled }}

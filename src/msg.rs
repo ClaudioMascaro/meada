@@ -1840,8 +1840,8 @@ impl Msg<'_> {
             ),
             #[cfg(feature = "postgres")]
             Msg::PostgresSchema => pick(
-                "must be 1 to 63 lowercase letters, digits or `_`, starting with a letter".into(),
-                "deve ter de 1 a 63 letras minúsculas, dígitos ou `_`, começando por uma letra"
+                "must be 1 to 63 lowercase letters, digits or `_`, starting with a letter, not with `pg_` (reserved by Postgres)".into(),
+                "deve ter de 1 a 63 letras minúsculas, dígitos ou `_`, começando por uma letra, sem começar por `pg_` (reservado pelo Postgres)"
                     .into(),
             ),
             #[cfg(feature = "postgres")]

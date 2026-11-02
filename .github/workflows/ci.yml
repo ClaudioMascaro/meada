@@ -93,10 +93,35 @@ jobs:
       MEADA_TEST_VALKEY_URL: redis://127.0.0.1:6379
       MEADA_TEST_S3_ENDPOINT: http://127.0.0.1:9000
       MEADA_TEST_POSTGRES_URL: postgres://postgres:meada-test@127.0.0.1:5432/postgres
+      # The second Postgres, over TLS (#483), that the step "Postgres over TLS" starts.
+      MEADA_TEST_POSTGRES_TLS_URL: postgres://postgres:meada-test@127.0.0.1:5433/postgres
       MEADA_TEST_SERVICES_REQUIRED: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Postgres over TLS
+        # SCRAM's channel binding (#483) needs a Postgres with TLS, which a service container
+        # cannot be given a certificate for: a second one on 5433, started early so its initdb
+        # overlaps the steps before the wait. The CA signs with SHA-384, so the binding's hash is
+        # not SHA-256.
+        # The key belongs to the image's `postgres` user (uid 70), as Postgres requires.
+        shell: bash
+        run: |
+          dir="$RUNNER_TEMP/postgres-tls"
+          mkdir -p "$dir" && cd "$dir"
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-384 -sha384 -nodes -days 2 \
+            -subj /CN=meada-test-ca -keyout ca.key -out ca.pem
+          openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -subj /CN=127.0.0.1 \
+            -keyout server.key -out server.csr
+          printf 'subjectAltName=IP:127.0.0.1\nbasicConstraints=CA:FALSE\n' > server.ext
+          openssl x509 -req -in server.csr -CA ca.pem -CAkey ca.key -CAcreateserial -sha384 \
+            -days 2 -extfile server.ext -out server.pem
+          sudo chown 70:70 server.key server.pem
+          sudo chmod 600 server.key
+          docker run -d --name postgres-tls -p 5433:5432 -e POSTGRES_PASSWORD=meada-test \
+            -v "$dir:/tls:ro" postgres:15-alpine \
+            -c ssl=on -c ssl_cert_file=/tls/server.pem -c ssl_key_file=/tls/server.key
+          echo "MEADA_TEST_POSTGRES_TLS_CA=$dir/ca.pem" >> "$GITHUB_ENV"
       - name: Default build carries no module crate
         # bash with pipefail, so a failing `cargo tree` fails the step.
         shell: bash
@@ -120,6 +145,8 @@ jobs:
           for port in 6379 9000 5432; do
             timeout 60 bash -c "until (echo > /dev/tcp/127.0.0.1/$port) 2>/dev/null; do sleep 1; done"
           done
+          timeout 60 bash -c "until docker exec postgres-tls pg_isready -h 127.0.0.1 >/dev/null; do sleep 1; done" \
+            || { docker logs postgres-tls; exit 1; }
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo test --locked --all-features
 

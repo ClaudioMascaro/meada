@@ -23,6 +23,15 @@ console's `[ui] public_url` as issuer), `seed.sh` applies the first workspace ve
 the store has none, and `Caddyfile.accounts` forwards `Authorization` without the static bearer.
 `scripts/compose-check` renders it and checks the order, the mounts and the manifests.
 
+`compose.proposals.yaml` (over the console and Postgres overlays) and the chart's `proposals` block
+(off by default) run the proposal server (`meada workspaces mcp`, ADR 0022, #504) as a process of
+its own beside the console: its own pull and volume (`node_name = "proposals"`), the read role
+(`MEADA_POSTGRES_READ_URL` in Compose, the Secret's `read-url` in the chart), a Caddy on
+`127.0.0.1:8445` in Compose and a Service in the chart (its limits are in Known ceilings). The chart
+repeats the console's `[oidc]`, `[catalog]`, `[workspaces]` and `[ui]` and adds `[proposals]` (also
+to the console's, which issues the agent tokens under local accounts). `compose-check` and
+`helm-check` assert both, and that the block is absent when off.
+
 Managed writers pull the workspace before the external fetch, index and publish, inside one
 refresh lock. A failed stage ends the job before publish, so the pointer stays (#316, ADR
 0012): the compose `fetch.sh` and `fetch-pulled.sh` and the chart's default `workspace.fetch`

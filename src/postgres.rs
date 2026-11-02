@@ -7,7 +7,9 @@
 //! another name) or the user (a refused login). A host outside loopback always connects over TLS with its name verified, against
 //! `ca_file` alone when set, else the system roots; a loopback host connects in plain TCP unless
 //! `ca_file` is set (`over_tls`). The client is tokio-postgres on the binary's tokio runtime,
-//! with rustls and ring: no ORM and no second TLS stack.
+//! with rustls and ring: no ORM and no second TLS stack. Over TLS, SCRAM binds the channel to the
+//! server's certificate (`tls-server-end-point`), so it runs as `SCRAM-SHA-256-PLUS` whenever the
+//! server offers it.
 //!
 //! Every table lives in `[postgres] schema`, and every statement names it: Meada writes nothing
 //! outside it (ADR 0002, invariant 3). `meada postgres migrate` (`migrate`) is the only command
@@ -320,10 +322,12 @@ impl File {
 }
 
 /// Whether `schema` is a name Meada accepts: lowercase letters, digits and `_`, starting with a
-/// letter, at most `SCHEMA_MAX` characters. Such a name needs no escaping inside double quotes.
+/// letter, not `pg_` (reserved by Postgres), at most `SCHEMA_MAX` characters. Such a name needs no
+/// escaping inside double quotes.
 fn schema_ok(schema: &str) -> bool {
     schema.len() <= SCHEMA_MAX
         && schema.starts_with(|c: char| c.is_ascii_lowercase())
+        && !schema.starts_with("pg_")
         && (schema.bytes()).all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
 }
 
@@ -498,11 +502,80 @@ impl TlsConnect<TcpStream> for Tls {
 struct Stream(tokio_rustls::client::TlsStream<TcpStream>);
 
 impl tokio_postgres::tls::TlsStream for Stream {
-    // ponytail: no channel binding, so SCRAM runs without `-PLUS`; the certificate check already
-    // binds the server. Add `tls-server-end-point` when an operator requires it.
+    /// `tls-server-end-point` of the server's certificate, so SCRAM runs as `-PLUS` whenever the
+    /// server offers it; none when the certificate's hash is unknown (`end_point`).
     fn channel_binding(&self) -> ChannelBinding {
-        ChannelBinding::none()
+        let leaf = self
+            .0
+            .get_ref()
+            .1
+            .peer_certificates()
+            .and_then(|c| c.first());
+        match leaf.and_then(|cert| end_point(cert)) {
+            Some(hash) => ChannelBinding::tls_server_end_point(hash),
+            None => ChannelBinding::none(),
+        }
     }
+}
+
+/// The `tls-server-end-point` channel binding of a DER certificate (RFC 5929, 4.1): its hash with
+/// the digest its signature algorithm names, SHA-256 for MD5 and SHA-1. `None` for a signature
+/// with no digest of its own (Ed25519) or one not listed here, which Postgres cannot bind either.
+// ponytail: no SHA-224 (ring has none), DSA or Ed448 signature gets a binding; add one when a
+// deployment's certificate needs it.
+fn end_point(cert: &[u8]) -> Option<Vec<u8>> {
+    use ring::digest::{SHA256, SHA384, SHA512, digest};
+    // The contents and the rest of the DER element at the start of `der`, if its tag is `tag`.
+    fn element(tag: u8, der: &[u8]) -> Option<(&[u8], &[u8])> {
+        let (&first, der) = der.strip_prefix(&[tag])?.split_first()?;
+        let (len, der) = match first {
+            0..=0x7f => (usize::from(first), der),
+            0x81..=0x84 => {
+                let (bytes, der) = der.split_at_checked(usize::from(first & 0x7f))?;
+                (bytes.iter().fold(0, |n, &b| n << 8 | usize::from(b)), der)
+            }
+            _ => return None,
+        };
+        der.split_at_checked(len)
+    }
+    const SEQUENCE: u8 = 0x30;
+    const OID: u8 = 0x06;
+    const EXPLICIT_0: u8 = 0xa0;
+    const PKCS1: &[u8] = &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01];
+    const ECDSA: &[u8] = &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04];
+    const SHA2: &[u8] = &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02];
+    let (certificate, _) = element(SEQUENCE, cert)?;
+    let (_, after_tbs) = element(SEQUENCE, certificate)?;
+    let (signature, _) = element(SEQUENCE, after_tbs)?;
+    let (oid, parameters) = element(OID, signature)?;
+    let hash = match oid {
+        [p @ .., 0x04 | 0x05 | 0x0b] if p == PKCS1 => &SHA256,
+        [p @ .., 0x0c] if p == PKCS1 => &SHA384,
+        [p @ .., 0x0d] if p == PKCS1 => &SHA512,
+        [p @ .., 0x01] if p == ECDSA => &SHA256,
+        [p @ .., 0x03, 0x02] if p == ECDSA => &SHA256,
+        [p @ .., 0x03, 0x03] if p == ECDSA => &SHA384,
+        [p @ .., 0x03, 0x04] if p == ECDSA => &SHA512,
+        // RSASSA-PSS: the hash is its parameters' `[0] hashAlgorithm`, SHA-1 when absent.
+        [p @ .., 0x0a] if p == PKCS1 => {
+            let (pss, _) = element(SEQUENCE, parameters)?;
+            match element(EXPLICIT_0, pss) {
+                None => &SHA256,
+                Some((explicit, _)) => {
+                    let (algorithm, _) = element(SEQUENCE, explicit)?;
+                    match element(OID, algorithm)?.0 {
+                        [0x2b, 0x0e, 0x03, 0x02, 0x1a] => &SHA256,
+                        [p @ .., 0x01] if p == SHA2 => &SHA256,
+                        [p @ .., 0x02] if p == SHA2 => &SHA384,
+                        [p @ .., 0x03] if p == SHA2 => &SHA512,
+                        _ => return None,
+                    }
+                }
+            }
+        }
+        _ => return None,
+    };
+    Some(digest(hash, cert).as_ref().to_vec())
 }
 
 impl AsyncRead for Stream {
@@ -899,6 +972,7 @@ mod tests {
             ("schema = \"_meada\"", "postgres.schema"),
             ("schema = \"\"", "postgres.schema"),
             ("schema = \"me-ada\"", "postgres.schema"),
+            ("schema = \"pg_meada\"", "postgres.schema"),
             (&long, "postgres.schema"),
             ("pool_size = 0", "postgres.pool_size"),
             (
@@ -923,6 +997,9 @@ mod tests {
         assert!(section("statement_timeout_seconds = 2147483").is_ok());
         assert!(section(&format!("schema = \"{}\"", "a".repeat(63))).is_ok());
         assert!(section("schema = \"m_9\"").is_ok());
+        assert!(section("schema = \"meada_x\"").is_ok());
+        let refused = section("schema = \"pg_meada\"").unwrap_err().1;
+        assert!(refused.contains("pg_"), "{refused}");
     }
 
     #[test]
@@ -1019,6 +1096,100 @@ mod tests {
         }
         assert_eq!(lock_key("meada"), lock_key("meada"));
         assert_ne!(lock_key("meada"), lock_key("meada_prod"));
+    }
+
+    #[test]
+    fn the_channel_binding_hashes_the_certificate_with_its_signatures_digest() {
+        use ring::digest::{SHA256, SHA384, SHA512, digest};
+        fn der(tag: u8, contents: &[u8]) -> Vec<u8> {
+            let len = contents.len();
+            let mut out = vec![tag];
+            match len {
+                0..=0x7f => out.push(len as u8),
+                0x80..=0xff => out.extend([0x81, len as u8]),
+                _ => out.extend([0x82, (len >> 8) as u8, len as u8]),
+            }
+            out.extend(contents);
+            out
+        }
+        // A certificate whose signature algorithm is `oid` with `parameters`, its body large
+        // enough for long-form lengths.
+        let cert = |oid: &[u8], parameters: &[u8]| {
+            let algorithm = der(0x30, &[der(0x06, oid), parameters.to_vec()].concat());
+            let tbs = der(0x30, &[0u8; 300]);
+            der(0x30, &[tbs, algorithm, der(0x03, &[0])].concat())
+        };
+        let pkcs1 = |last: u8| [0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, last];
+        let ecdsa = |last: u8| [0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, last];
+        let sha2 = |last: u8| [0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, last];
+        let pss = |hash: Option<&[u8]>| {
+            let hash = hash.map(|oid| der(0xa0, &der(0x30, &der(0x06, oid))));
+            cert(&pkcs1(0x0a), &der(0x30, &hash.unwrap_or_default()))
+        };
+        let null = der(0x05, &[]);
+        let sha1 = [0x2b, 0x0e, 0x03, 0x02, 0x1a];
+        for (signed, hash) in [
+            (cert(&pkcs1(0x04), &null), &SHA256), // MD5
+            (cert(&pkcs1(0x05), &null), &SHA256), // SHA-1
+            (cert(&pkcs1(0x0b), &null), &SHA256),
+            (cert(&pkcs1(0x0c), &null), &SHA384),
+            (cert(&pkcs1(0x0d), &null), &SHA512),
+            (
+                cert(&[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x01], &[]),
+                &SHA256,
+            ), // SHA-1
+            (cert(&ecdsa(0x02), &[]), &SHA256),
+            (cert(&ecdsa(0x03), &[]), &SHA384),
+            (cert(&ecdsa(0x04), &[]), &SHA512),
+            (pss(None), &SHA256),
+            (pss(Some(&sha1)), &SHA256),
+            (pss(Some(&sha2(0x01))), &SHA256),
+            (pss(Some(&sha2(0x02))), &SHA384),
+            (pss(Some(&sha2(0x03))), &SHA512),
+        ] {
+            let bound = end_point(&signed);
+            assert_eq!(bound.as_deref(), Some(digest(hash, &signed).as_ref()));
+        }
+        // Ed25519, SHA-224 and a truncated certificate bind nothing.
+        assert_eq!(end_point(&cert(&[0x2b, 0x65, 0x70], &[])), None);
+        assert_eq!(end_point(&cert(&pkcs1(0x0e), &null)), None);
+        let whole = cert(&pkcs1(0x0b), &null);
+        assert_eq!(end_point(&whole[..whole.len() - 1]), None);
+    }
+
+    /// Over TLS, SCRAM negotiates `SCRAM-SHA-256-PLUS` with the server's certificate: a client
+    /// that requires channel binding connects to the Postgres of `MEADA_TEST_POSTGRES_TLS_URL`,
+    /// verified against `MEADA_TEST_POSTGRES_TLS_CA`. Without them it prints why and skips
+    /// (fails with `MEADA_TEST_SERVICES_REQUIRED=1`).
+    #[test]
+    fn over_tls_a_client_requiring_channel_binding_connects() {
+        use tokio_postgres::config::{ChannelBinding, Host};
+        let vars = ["MEADA_TEST_POSTGRES_TLS_URL", "MEADA_TEST_POSTGRES_TLS_CA"];
+        let [Ok(url), Ok(ca)] = vars.map(std::env::var) else {
+            let required = std::env::var("MEADA_TEST_SERVICES_REQUIRED").is_ok_and(|v| v == "1");
+            assert!(!required, "{vars:?} are not set");
+            eprintln!("skipped: {vars:?} are not set");
+            return;
+        };
+        let mut pg: tokio_postgres::Config = url.parse().unwrap();
+        pg.ssl_mode(SslMode::Require)
+            .channel_binding(ChannelBinding::Require);
+        let Host::Tcp(host) = &pg.get_hosts()[0] else {
+            panic!("MEADA_TEST_POSTGRES_TLS_URL names no TCP host");
+        };
+        let port = pg.get_ports().first().copied().unwrap_or(5432);
+        let name = ServerName::try_from(host.clone()).unwrap();
+        let tls = Tls(Arc::new(tls(Some(Path::new(&ca))).unwrap()).into(), name);
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let tcp = TcpStream::connect((host.as_str(), port)).await.unwrap();
+            let (client, connection) = pg.connect_raw(tcp, tls).await.unwrap();
+            tokio::spawn(connection);
+            client.simple_query("SELECT 1").await.unwrap();
+        });
     }
 
     #[test]

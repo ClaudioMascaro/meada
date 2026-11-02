@@ -53,7 +53,9 @@ Cada pod hace un pull inicial y mantiene un companion `pull --every 30` que comp
 el `local_dir` de ese pod. El CronJob usa `concurrencyPolicy: Forbid`, sus propios mirrors e
 index_dir, y ejecuta fetch, index y publish dentro de `meada snapshot lock`. No comparta índices
 entre pods. La readiness consulta el estado local con `meada status`, o TCP con
-`readiness.type=tcp`.
+`readiness.type=tcp`. El código de salida de la sonda depende solo del estado local; las líneas
+`valkey:` y `postgres:` son informativas. `readiness.timeoutSeconds` (8) debe superar la suma de
+sus límites (800 ms y `connect_timeout_seconds`, 5 s por defecto) más un margen.
 
 `modules.snapshot.credentials` acepta `static`, `web-identity` y `pod-identity`. Para IRSA,
 configure la annotation de la role en `serviceAccount.annotations`; el webhook de la plataforma
@@ -184,8 +186,15 @@ de un nodo. El chart lo rechaza sin `console.operations`, `modules.oidc.github` 
 y un `maxRepositories` definido por ti (no tiene valor por defecto). Actualiza todas las imágenes,
 nodos incluidos, antes del primer refresh que registre un workspace. Tu `workspace.fetch` debe
 clonar los repositorios que solo seleccionan workspaces nombrados bajo `modules.workspaces.mirrors`,
-en las rutas que lista `meada workspace show --pulled`. El servidor de propuestas no forma parte del
-chart.
+en las rutas que lista `meada workspace show --pulled`. El servidor de propuestas es opt-in:
+
+```sh
+helm upgrade --install meada deploy/helm/meada -f deploy/helm/meada/values-console.yaml \
+  -f deploy/helm/meada/values-identity.yaml -f deploy/helm/meada/values-workspaces.yaml \
+  --set proposals.enabled=true --set proposals.publicUrl=https://propuestas.ejemplo.internal -f mis-valores.yaml
+```
+
+`proposals.enabled=true` (apagado por defecto; el chart lo rechaza sin `modules.workspaces` o con un `publicUrl` que no sea una URL https sin ruta) renderiza un Deployment, un Service y un ConfigMap de bootstrap propios junto a la consola, nunca en el pod de un nodo: `meada workspaces mcp` en `proposals.listen` (8090), un `snapshot pull` inicial y otro periódico en el volumen del pod, un init container que espera el esquema y una readiness TCP con `readiness.timeoutSeconds`. Lee Postgres con el `read-url` del Secret, con toda sesión de solo lectura. El bootstrap repite `[oidc]`, `[catalog]`, `[workspaces]` y `[ui]` de la consola y agrega `[proposals]`, y la consola recibe el mismo `[proposals]` para emitir tokens de agente de esa superficie con cuentas locales, donde el pod monta solo la clave pública. El chart no renderiza Ingress para él: exponga el Service con su propio TLS en `proposals.publicUrl`, preservando `Authorization` y sin crear `Origin`. Registre `proposals.audience` (el `publicUrl` si está vacío) como recurso en el proveedor de identidad ([recetas de token](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/es/identity-providers.md#un-token-para-el-servidor-de-propuestas)).
 
 ## Cuentas locales, opcional
 
@@ -220,5 +229,5 @@ GitHub por login verificado y exige `modules.githubApp` (y `api` para un host di
 `modules.oidc` y active `modules.accounts.breakGlass`: solo la consola conserva `[accounts]`, con la
 cuenta `admin` como puerta de emergencia, y los nodos ignoran las cuentas locales y no reciben ninguna
 clave (`groups` y `github` se rechazan en ese modo). Para rotar el par, reemplace los dos Secrets y
-reinicie los pods: todo token emitido deja de valer. El servidor de propuestas no forma parte del
-chart; entréguele la clave pública.
+reinicie los pods: todo token emitido deja de valer. El servidor de propuestas (`proposals.enabled`) monta la
+clave pública, como un nodo.

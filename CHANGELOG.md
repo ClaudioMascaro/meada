@@ -18,6 +18,17 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The workspaces profiles run the proposal server: `compose.proposals.yaml` and
+  `proposals.workspace.toml` in Compose (its own pull and volume, the read role, TLS on
+  `127.0.0.1:8445`) and an opt-in `proposals` block in the Helm chart (Deployment, Service,
+  bootstrap and probes with `timeoutSeconds`, absent by default); `scripts/compose-check` and
+  `scripts/helm-check` assert both. The identity provider recipes say how a person or an agent
+  gets a token whose `aud` is `[proposals] audience` (Entra ID, Okta, Keycloak, local accounts; Okta
+  needs a second authorization server the chart cannot render), in pt-BR, English and Spanish (#504).
+- Over TLS, the Postgres client of the data layer authenticates with SCRAM channel binding
+  (`tls-server-end-point`, RFC 5929): it runs `SCRAM-SHA-256-PLUS` whenever the server offers
+  it, so a client that requires channel binding connects (#483). Loopback without TLS keeps plain
+  `SCRAM-SHA-256`.
 - The console's named workspace view gains a versions page (#503): the versions newest first,
   paged with the server's cursor; one version's entries, manifest text and diff against the
   current one as the route answers; the history for operators and the administrator (a viewer
@@ -25,6 +36,19 @@ All notable changes to Meada are recorded here. The format follows
   current before, through the editor's confirmation at the base the page read. A stale base and
   a refused entry show the server's message and the page reads the versions again. In pt-BR and
   English.
+
+### Fixed
+
+- `[postgres] schema` starting with `pg_` (reserved by Postgres) is refused at manifest read with
+  Meada's own message, in pt-BR and English, instead of Postgres's raw error at `meada postgres
+  migrate` (#482).
+
+- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
+  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
+  node unready (#448).
+
+- The container build copies every top-level `tests/fixtures/*.json` in the UI stage with one
+  `COPY`, so a UI test importing a new fixture no longer breaks the image (#495).
 
 ## [1.1.0] - 2026-11-02
 

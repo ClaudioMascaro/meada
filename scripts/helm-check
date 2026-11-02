@@ -18,9 +18,13 @@ def render(*args):
     return [item for item in yaml.safe_load_all(text) if item]
 
 
+def component(item):
+    return item["metadata"].get("labels", {}).get("app.kubernetes.io/component")
+
+
 def resource(items, kind, console=False):
     return next(item for item in items if item["kind"] == kind
-                and (item["metadata"].get("labels", {}).get("app.kubernetes.io/component") == "console") == console)
+                and component(item) != "proposals" and (component(item) == "console") == console)
 
 
 def pod(items):
@@ -43,6 +47,7 @@ server = spec["containers"][0]
 assert "--generations" not in server["args"]
 assert "-cloud" not in server["image"]
 assert server["readinessProbe"]["exec"]["command"][1] == "status"
+assert server["readinessProbe"]["timeoutSeconds"] >= 7
 assert server["lifecycle"]["preStop"]["exec"]["command"][:1] == ["sleep"]
 assert resource(default, "Service")["spec"].get("sessionAffinity", "None") == "None"
 assert not any(item["kind"] == "CronJob" for item in default)
@@ -268,6 +273,17 @@ assert "write-url" in console_env and "MEADA_SCIM_TOKEN" in console_env
 bundled = render("-f", str(CHART / "values-console.yaml"), "-f", str(CHART / "values-identity.yaml"), "--set", "postgres.enabled=true")
 assert next(item for item in bundled if item["kind"] == "StatefulSet")["spec"]["template"]["spec"]["containers"][0]["image"].startswith("postgres:15")
 assert next(item for item in bundled if item["kind"] == "Job")["metadata"]["annotations"]["helm.sh/hook"] == "post-install,post-upgrade"
+
+
+def role_sql(script):
+    """The SQL between the `<<'SQL'` line and the closing `SQL`, indentation removed."""
+    body = script.split("<<'SQL'\n", 1)[1].split("\nSQL", 1)[0]
+    return [line.strip() for line in body.splitlines()]
+
+
+chart_sql = role_sql(next(item for item in bundled if item["kind"] == "ConfigMap" and "10-roles.sh" in item.get("data", {}))["data"]["10-roles.sh"])
+compose_sql = role_sql((ROOT / "deploy/compose/postgres-init.sh").read_text())
+assert chart_sql and chart_sql == compose_sql, "the role SQL in the chart and in deploy/compose/postgres-init.sh must stay identical"
 for profile in [default, generations, console_profile]:
     assert not any(item["kind"] in ("StatefulSet", "Job") for item in profile), "Postgres and its migrate step are opt-in"
     assert "postgres" not in yaml.dump(profile).lower(), "disabled by default, nothing of Postgres renders"
@@ -304,6 +320,51 @@ for arguments, problem in [
                             capture_output=True, text=True)
     assert failed.returncode and problem in failed.stderr
 print("helm-check: named workspaces sections for the console and the job, never the nodes, passed")
+
+# The proposal server (ADR 0022): opt in, a pod of its own, read-only Postgres role, absent when off.
+assert not any(component(item) == "proposals" for item in workspaces), "the proposal server is off by default"
+assert "proposals" not in named_console
+proposals_args = ["-f", str(CHART / "values-console.yaml"), "-f", str(CHART / "values-identity.yaml"),
+                  "-f", str(CHART / "values-workspaces.yaml"), "--set", "proposals.enabled=true"]
+proposals = render(*proposals_args)
+
+
+def of_proposals(kind):
+    return next(item for item in proposals if item["kind"] == kind
+                and component(item) == "proposals")
+
+
+proposals_pod = of_proposals("Deployment")["spec"]["template"]["spec"]
+assert proposals_pod["containers"][0]["args"][:3] == ["workspaces", "mcp", "--listen"]
+assert proposals_pod["initContainers"][0]["name"] == "wait-postgres", "it holds back until the schema is migrated"
+assert proposals_pod["initContainers"][1]["args"][:2] == ["snapshot", "pull"]
+assert proposals_pod["containers"][1]["args"][:3] == ["snapshot", "pull", "--every"]
+probe = proposals_pod["containers"][0]["readinessProbe"]
+assert probe["tcpSocket"]["port"] == "proposals" and probe["timeoutSeconds"] >= 1
+assert "read-url" in str(proposals_pod["containers"][0]["env"]) and "write-url" not in str(proposals_pod), \
+    "the proposal server reads Postgres with the read role"
+assert proposals_pod["volumes"][0]["configMap"]["name"] == of_proposals("ConfigMap")["metadata"]["name"]
+assert of_proposals("Service")["spec"]["selector"]["app.kubernetes.io/component"] == "proposals"
+proposals_config = tomllib.loads(of_proposals("ConfigMap")["data"]["meada.workspace.toml"])
+assert proposals_config["proposals"] == {"public_url": "https://proposals.example.internal"}
+proposals_console = tomllib.loads(resource(proposals, "ConfigMap", console=True)["data"]["meada.workspace.toml"])
+for section in ["catalog", "workspaces", "oidc", "postgres", "ui"]:
+    assert proposals_config[section] == proposals_console[section], section
+assert proposals_config["snapshot"]["local_dir"] != proposals_console["snapshot"]["local_dir"]
+assert proposals_console["proposals"] == proposals_config["proposals"], "the console issues agent tokens for the surface"
+assert "proposals" not in tomllib.loads(manifest(proposals)), "a node's bootstrap never carries [proposals]"
+audience = render(*proposals_args, "--set", "proposals.audience=meada-proposals")
+assert tomllib.loads(next(item for item in audience if item["kind"] == "ConfigMap" and item["metadata"]["name"].endswith("-proposals"))
+                     ["data"]["meada.workspace.toml"])["proposals"]["audience"] == "meada-proposals"
+for arguments, problem in [
+    (["--set", "modules.workspaces.enabled=false"], "modules.workspaces"),
+    (["--set", "proposals.publicUrl=http://proposals.example.internal"], "https"),
+    (["--set", "proposals.publicUrl=https://proposals.example.internal/mcp"], "no path"),
+]:
+    failed = subprocess.run(["helm", "template", "check", str(CHART), *proposals_args, *arguments],
+                            capture_output=True, text=True)
+    assert failed.returncode and problem in failed.stderr, arguments
+print("helm-check: proposal server opt-in, read role, pull and bootstrap passed")
 
 # Local accounts (ADR 0024): [accounts] from values, the private key in the console only.
 accounts = render("-f", str(CHART / "values-accounts.yaml"), "--set", "modules.accounts.adminPasswordSecret=meada-admin")

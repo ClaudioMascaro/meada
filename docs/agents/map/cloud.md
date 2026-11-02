@@ -45,7 +45,7 @@ section of `meada.workspace.toml`:
   `tokio-rustls` are used): the data layer, the durable mutable state of server mode in Postgres
   15 and later. `File` is the `[postgres]` section and `File::validate` its `Config`: `url_env`
   (default `MEADA_POSTGRES_URL`) or `url_file`, at most one; `ca_file`; `schema` (default
-  `meada`, lowercase letters, digits and `_`, starting with a letter, 1 to 63 characters);
+  `meada`, lowercase letters, digits and `_`, starting with a letter, not `pg_` (reserved by Postgres), 1 to 63 characters);
   `pool_size` (4), `connect_timeout_seconds` (5) and `statement_timeout_seconds` (10), each at
   least 1, the last at most `STATEMENT_MAX` (Postgres's `INT_MAX` milliseconds); every problem names its key. The URL is read only when a process connects
   (`Config::url`), kept in memory, and `parse` accepts only `postgres://` or `postgresql://` with
@@ -58,7 +58,9 @@ section of `meada.workspace.toml`:
   over TLS with its name verified, against `ca_file` alone when set, else the platform verifier;
   a loopback host connects in plain TCP unless `ca_file` is set, then over TLS against that file.
   `open` makes the TCP connection itself and hands it to tokio-postgres (`connect_raw`, no
-  `runtime` feature) with its own `TlsConnect` over tokio-rustls and ring (no channel binding),
+  `runtime` feature) with its own `TlsConnect` over tokio-rustls and ring, whose `Stream` gives SCRAM the `tls-server-end-point` channel
+  binding (`end_point`, RFC 5929: the certificate hashed with its signature's digest; so
+  `SCRAM-SHA-256-PLUS` runs whenever the server offers it),
   the URL read, the TCP connection and the handshake bounded together by
   `connect_timeout_seconds`, every statement bounded by `statement_timeout_seconds`
   (`-c statement_timeout`), the password scrubbed from every error. A peer that accepts the

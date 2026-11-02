@@ -104,3 +104,36 @@ En Keycloak:
 Keycloak **no tiene push SCIM propio**. `[directory]` solo funciona con un aprovisionamiento que envíe usuarios y grupos al endpoint SCIM (un puente de aprovisionamiento que mantienes tú). Sin él, deja `[directory]` desactivado: el grant de las claims y el de GitHub funcionan igual, pero el selector de owners, `owner_missing`, el desaprovisionamiento en la consola y el overage de Entra (que no aplica a Keycloak) quedan fuera.
 
 Documentación: [protocol mappers](https://www.keycloak.org/docs/latest/server_admin/#_protocol-mappers).
+
+## Un token para el servidor de propuestas
+
+El [servidor de propuestas](named-workspaces.md#ejecutar-el-servidor-de-propuestas) admite un JWT bearer cuyo `aud` es `[proposals] audience` (su `public_url` si no se define), firmado por el `[oidc] issuer` de su bootstrap (el de los nodos y de la consola, salvo que le dé uno propio, como exige Okta). Un token de nodo o de la consola se rechaza allí (401), y el token de este servidor lo rechazan ellos. El token debe ser **de una persona**: el login, los grupos y el rol salen de él; un token sin persona (el grant de credenciales del cliente) queda `pending` con `missing_login` y no selecciona nada. Un agente actúa por un operador al portar el token de ese operador, con vida corta, pues la vida del token del proveedor es el límite contra el abuso ([ADR 0022](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0022-authenticated-workspace-proposals.md)).
+
+En cada proveedor siguiente, registre el servidor de propuestas como un recurso propio y obtenga el token con un **cliente público sin secreto**: Authorization Code con PKCE S256 para una persona en el navegador, o el device authorization grant para un agente en la terminal (la persona aprueba el código y el agente recibe el token). Antes de configurar el agente, decodifique el payload del token y compare `aud` con `[proposals] audience`, `iss` con `[oidc] issuer`, `exp`, y la claim de login (`github_login`) y los grupos que exigen las otras recetas: `printf '%s' "$TOKEN" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null`. Los nombres de claim y de pantalla vienen de lo que cada producto documenta; contrástelos con su documentación vigente.
+
+### Entra ID
+
+1. Registre una segunda aplicación para el servidor de propuestas. En **Exponer una API**, defina un URI de ID de aplicación y un ámbito (por ejemplo `propose`). En su manifiesto, defina `requestedAccessTokenVersion` en `2`, para que `aud` sea el ID de cliente (de la aplicación): `[proposals] audience = "<id de la aplicación>"`.
+2. Emita las mismas claims que emite la aplicación de los nodos: `groups` y `github_login` (la política de asignación de claims y la claim de grupos valen para cada aplicación por separado).
+3. En el registro del cliente del agente (un cliente público, con el URI de redirección o el flujo de dispositivo habilitado), conceda el permiso delegado `propose` de la aplicación de propuestas.
+4. Una persona obtiene el token con el ámbito `<URI de ID de aplicación>/propose` (por defecto `api://<id de la aplicación>/propose`) en `https://login.microsoftonline.com/<tenant>/oauth2/v2.0/` (`authorize` y `token`, o `devicecode` y `token` para un agente). No use `.default` con un secreto de cliente: ese es el grant de credenciales del cliente, que no lleva persona.
+
+Documentación: [exponer una API](https://learn.microsoft.com/entra/identity-platform/quickstart-configure-app-expose-web-apis), [flujo de código de dispositivo](https://learn.microsoft.com/entra/identity-platform/v2-oauth2-device-code) y [claims del token de acceso](https://learn.microsoft.com/entra/identity-platform/access-token-claims-reference).
+
+### Okta
+
+El `aud` de un token de acceso de Okta es el **Audience** del servidor de autorización personalizado que lo emitió, un valor único, y los nodos, la consola y el servidor de propuestas necesitan tres audiences distintas. El servidor de propuestas es un proceso propio, con bootstrap propio, así que puede leer un segundo servidor de autorización personalizado: cree uno cuyo Audience sea `[proposals] audience`, con las mismas claims `groups` y `github_login` y los mismos usuarios, y apunte a él el `[oidc] issuer` del bootstrap del servidor de propuestas (las demás claves de `[oidc]` como antes). Una persona o un agente obtiene entonces el token de ese servidor con los flujos anteriores. Las pruebas de Meada no cubren este camino, y el chart Helm renderiza un solo `[oidc]` para todos los pods, así que por el chart el servidor de propuestas lee el emisor de los nodos y, con Okta, solo es alcanzable con los tokens de agente de las cuentas locales ([límites conocidos](enterprise.md#limites-conocidos)). No defina `[proposals] audience` como la audience de un nodo para sortearlo: eso vuelve válido en el servidor de propuestas el token de un nodo y no cierra nada del confused deputy.
+
+Documentación: [servidores de autorización](https://developer.okta.com/docs/concepts/auth-servers/).
+
+### Keycloak
+
+1. En **Client scopes**, cree un ámbito `meada-proposals` y agregue un mapper **Audience** con **Included Custom Audience** igual a `[proposals] audience` y **Add to access token** activado.
+2. Cree el cliente del agente como cliente **público** con el flujo estándar (método PKCE `S256`) o el OAuth 2.0 device authorization grant, y agréguele `meada-proposals` como ámbito **opcional**. Los mappers `github_login` y `groups` de la otra receta también deben alcanzar a ese cliente (póngalos en un ámbito que el cliente tenga, o en su ámbito dedicado).
+3. Pida `scope=meada-proposals` en `protocol/openid-connect/auth` y `token` del realm (o `auth/device` y `token`). Un token sin ese ámbito no lleva esa audience y se rechaza.
+
+Documentación: [mapper de audience y client scopes](https://www.keycloak.org/docs/latest/server_admin/#_audience) y [device authorization grant](https://www.keycloak.org/docs/latest/securing_apps/#_oauth2_device_authorization_grant).
+
+### Cuentas locales
+
+Con las [cuentas locales](console.md#cuentas-locales) no hay proveedor: la página de perfil de la consola (o `POST /api/v1/account/tokens` con `{"surface": "proposals"}`, cuando el bootstrap de la consola tiene `[proposals]`) emite un token de agente para el servidor de propuestas, con audience `meada:proposals`.

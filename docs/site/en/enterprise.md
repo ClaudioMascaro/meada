@@ -16,14 +16,14 @@ Postgres 15 or later holds the durable mutable state: audit, directory and permi
 [postgres]
 url_env = "MEADA_POSTGRES_URL"      # the default; or url_file = "/run/secrets/postgres-url"
 ca_file = "/etc/meada/ca/ca.pem"    # optional: verifies against this file alone
-schema = "meada"                    # the default; lowercase letters, digits and _, 1 to 63 characters
+schema = "meada"                    # the default; lowercase letters, digits and _, 1 to 63 characters, not starting with pg_
 pool_size = 4                       # the default
 connect_timeout_seconds = 5         # the default
 statement_timeout_seconds = 10      # the default
 ```
 
 - **The URL** comes from `url_env` or `url_file` (at most one), never the manifest, which stays free of secrets. It is `postgres://` or `postgresql://` with a TCP host, and may carry a user, a password, a port and a database, but no query parameter: `sslmode` and the rest are errors, because TLS is Meada's decision. An error names the key, never the URL.
-- **TLS.** A host outside loopback (`localhost`, `127.0.0.0/8`, `::1`) always uses TLS with the host name verified; only loopback uses plain TCP (unless `ca_file` is set). Without `ca_file` the system roots apply; with it, only that file's.
+- **TLS.** A host outside loopback (`localhost`, `127.0.0.0/8`, `::1`) always uses TLS with the host name verified; only loopback uses plain TCP (unless `ca_file` is set). Without `ca_file` the system roots apply; with it, only that file's. Over TLS, SCRAM authentication uses channel binding (`SCRAM-SHA-256-PLUS` with `tls-server-end-point`), so the password exchange is tied to the verified certificate; a certificate whose signature names no supported hash (Ed25519, SHA-224) has no binding, and SCRAM then runs without it.
 - **The schema** `[postgres] schema` holds every table, and Meada writes nothing outside it; several deployments can share a database with different schemas.
 - **Migrations.** Only `meada postgres migrate --workspace <bootstrap manifest>` creates or alters a table. It creates the schema when absent, applies each migration in its own transaction under an advisory lock of the schema (two runs serialize) and prints the version reached. Run it **before every upgrade of the binary**. Every other command that connects reads the version: one lower than the binary's is the error naming `meada postgres migrate`, one higher names both versions. The console and the CLI commands refuse to start or exit 1; a node writes the error once on stderr and treats Postgres as unreachable, leaving its readiness unchanged.
 - **Deadlines.** The server's `statement_timeout` does not fire on a Postgres that accepts the connection and then stops answering, so the calls of the console and the job (the named workspaces' store apart) also run within a client-side deadline: `connect_timeout_seconds` plus `statement_timeout_seconds` for each statement of the call, the version check's two included (the defaults give 25 s for a call of no statement of its own, 35 s for one). A SCIM request has twelve statements at most: 5 + 14 × 10 = 145 s by default, then a 503 `the directory in Postgres is unavailable`, its connection dropped: it closes once Postgres answers the statement it stalled on, and Postgres then rolls the transaction back and releases the directory's lock. `meada github-app roles` bounds its connection with the fence read (35 s) and its write transaction (9 statements, 115 s), then exits 1; it has removed the exclusions file before it lists anything, so none stays (the figures are upper bounds, since the write transaction reuses an open connection); the listing of the repositories is not under these deadlines. The console's start check, the audit, the directory reads, the accounts, the overage lookup and the permissions poll each have theirs by the same rule.
@@ -135,6 +135,7 @@ An Entra ID user in more groups than a token can carry gets `_claim_names` inste
 - **`OVERAGE_TTL`** (5 minutes): a membership change reaches an overage subject that late.
 - **Live token:** a deprovisioned user's token keeps reading on nodes until it expires.
 - **`outside_grant`** tells a team operator that the identity is already in the workspace, and the editor cannot predict it.
+- **Okta and the proposal server:** an Okta authorization server stamps one `aud`, so the proposal server needs a second authorization server as its `[oidc] issuer` (untested); the Helm chart renders one `[oidc]` for every pod and cannot give it one ([recipe](identity-providers.md#a-token-for-the-proposal-server)).
 - **One GitHub host** per deployment; a login is at most 39 characters and a role name at most 100.
 - **SCIM:** the token is read at start (rotating means restarting the console); bodies at most `SCIM_BODY_MAX` (1 MiB), one stored resource at most `SCIM_RESOURCE_MAX` (64 KiB), pages at most 100.
 - **The audit grows without bound** until the operator prunes it.

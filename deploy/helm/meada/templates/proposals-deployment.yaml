@@ -1,0 +1,87 @@
+{{- if .Values.proposals.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "meada.proposalsName" . }}
+  labels:
+    {{- include "meada.proposalsLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.proposals.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "meada.proposalsLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "meada.proposalsLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/proposals-config.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "meada.account" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        {{- include "meada.waitPostgres" (dict "root" . "key" "read-url") | nindent 8 }}
+        - name: pull-initial
+          image: {{ include "meada.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["snapshot", "pull", "--workspace", "/etc/meada/meada.workspace.toml"]
+          env: {{ include "meada.env" . | nindent 12 }}
+          volumeMounts: {{ include "meada.mounts" . | nindent 12 }}
+          resources: {{ toYaml .Values.proposals.resources | nindent 12 }}
+      containers:
+        - name: proposals
+          image: {{ include "meada.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["workspaces", "mcp", "--listen", {{ printf "0.0.0.0:%v" .Values.proposals.listen | quote }}, "--workspace", "/etc/meada/meada.workspace.toml"]
+          ports:
+            - name: proposals
+              containerPort: {{ .Values.proposals.listen }}
+          readinessProbe:
+            tcpSocket:
+              port: proposals
+            periodSeconds: {{ .Values.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.readiness.timeoutSeconds }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", {{ .Values.preStop.sleepSeconds | quote }}]
+          env: {{ include "meada.env" . | nindent 12 }}
+            {{- include "meada.postgresEnv" (dict "root" . "key" "read-url") | nindent 12 }}
+            {{- if .Values.modules.directory.enabled }}
+            - name: MEADA_SCIM_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.modules.directory.tokenSecret }}
+                  key: token
+            {{- end }}
+          volumeMounts: {{ include "meada.mounts" . | nindent 12 }}
+            {{- if and .Values.modules.accounts.enabled (not .Values.modules.accounts.breakGlass) }}
+            {{- include "meada.accountsPublicMount" . | nindent 12 }}
+            {{- end }}
+          resources: {{ toYaml .Values.proposals.resources | nindent 12 }}
+        - name: pull
+          image: {{ include "meada.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["snapshot", "pull", "--every", {{ .Values.modules.generations.pullEverySeconds | quote }}, "--workspace", "/etc/meada/meada.workspace.toml"]
+          env: {{ include "meada.env" . | nindent 12 }}
+          volumeMounts: {{ include "meada.mounts" . | nindent 12 }}
+          resources: {{ toYaml .Values.proposals.resources | nindent 12 }}
+      volumes: {{ include "meada.proposalsVolumes" . | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{ toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
