@@ -95,6 +95,9 @@ rustls = { version = "0.23.46", optional = true, default-features = false, featu
     "tls12",
 ] }
 rustls-platform-verifier = { version = "0.7.1", optional = true }
+# The hash of Postgres's SCRAM channel binding (`tls-server-end-point`), only behind `postgres`:
+# ring is already rustls's provider in every build.
+ring = { version = "0.17.14", optional = true }
 # Maven POMs and .NET project files: read-only XML, DTD disabled and bounded by the JVM reader's
 # limits. Not quick-xml: it is in the lockfile only through the optional `snapshot` feature
 # (`object_store`), and the default dependency tree forbids it.
@@ -163,6 +166,7 @@ github-app = ["valkey", "dep:jsonwebtoken", "jsonwebtoken/use_pem", "ureq/platfo
 postgres = [
     "dep:tokio-postgres",
     "dep:tokio-rustls",
+    "dep:ring",
     "dep:rustls",
     "dep:rustls-platform-verifier",
 ]

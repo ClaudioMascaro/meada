@@ -252,6 +252,12 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   `CA_MAX` (1 MiB); past either the connection fails, naming the file.
 - `postgres.rs`: `url_file` holds at most `URL_MAX` (4096 bytes) and `ca_file` at most `CA_MAX`
   (1 MiB); past either the connection fails, naming the file.
+- `postgres.rs`: SCRAM's channel binding (`end_point`) knows the RSA PKCS#1, ECDSA and RSASSA-PSS
+  signatures with MD5, SHA-1 or SHA-2 (SHA-224 apart, which ring does not hash); a server certificate signed otherwise
+  (Ed25519, for which RFC 5929 names no hash and Postgres binds nothing either) gets no binding,
+  and SCRAM runs as `SCRAM-SHA-256` without `-PLUS`. An RSASSA-PSS certificate on a Postgres that
+  cannot hash one (an old build or OpenSSL) fails `-PLUS` authentication, as libpq does.
+  `tls-unique` and client certificates are not supported.
 - `grant/permissions.rs`: a process holds every accepted-role row of the newest permissions set in
   memory (logins times repositories under an organization base role), loaded whole when the set
   changes; a revocation on GitHub reaches it at the next successful refresh plus at most

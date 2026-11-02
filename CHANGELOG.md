@@ -23,6 +23,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Over TLS, the Postgres client of the data layer authenticates with SCRAM channel binding
+  (`tls-server-end-point`, RFC 5929): it runs `SCRAM-SHA-256-PLUS` whenever the server offers
+  it, so a client that requires channel binding connects (#483). Loopback without TLS keeps plain
+  `SCRAM-SHA-256`.
 - The console's named workspace view gains a versions page (#503): the versions newest first,
   paged with the server's cursor; one version's entries, manifest text and diff against the
   current one as the route answers; the history for operators and the administrator (a viewer

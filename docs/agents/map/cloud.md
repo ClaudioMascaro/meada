@@ -58,7 +58,9 @@ section of `meada.workspace.toml`:
   over TLS with its name verified, against `ca_file` alone when set, else the platform verifier;
   a loopback host connects in plain TCP unless `ca_file` is set, then over TLS against that file.
   `open` makes the TCP connection itself and hands it to tokio-postgres (`connect_raw`, no
-  `runtime` feature) with its own `TlsConnect` over tokio-rustls and ring (no channel binding),
+  `runtime` feature) with its own `TlsConnect` over tokio-rustls and ring, whose `Stream` gives SCRAM the `tls-server-end-point` channel
+  binding (`end_point`, RFC 5929: the certificate hashed with its signature's digest; so
+  `SCRAM-SHA-256-PLUS` runs whenever the server offers it),
   the URL read, the TCP connection and the handshake bounded together by
   `connect_timeout_seconds`, every statement bounded by `statement_timeout_seconds`
   (`-c statement_timeout`), the password scrubbed from every error. A peer that accepts the
