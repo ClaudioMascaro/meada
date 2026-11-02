@@ -269,6 +269,17 @@ assert "write-url" in console_env and "MEADA_SCIM_TOKEN" in console_env
 bundled = render("-f", str(CHART / "values-console.yaml"), "-f", str(CHART / "values-identity.yaml"), "--set", "postgres.enabled=true")
 assert next(item for item in bundled if item["kind"] == "StatefulSet")["spec"]["template"]["spec"]["containers"][0]["image"].startswith("postgres:15")
 assert next(item for item in bundled if item["kind"] == "Job")["metadata"]["annotations"]["helm.sh/hook"] == "post-install,post-upgrade"
+
+
+def role_sql(script):
+    """The SQL between the `<<'SQL'` line and the closing `SQL`, indentation removed."""
+    body = script.split("<<'SQL'\n", 1)[1].split("\nSQL", 1)[0]
+    return [line.strip() for line in body.splitlines()]
+
+
+chart_sql = role_sql(next(item for item in bundled if item["kind"] == "ConfigMap" and "10-roles.sh" in item.get("data", {}))["data"]["10-roles.sh"])
+compose_sql = role_sql((ROOT / "deploy/compose/postgres-init.sh").read_text())
+assert chart_sql and chart_sql == compose_sql, "the role SQL in the chart and in deploy/compose/postgres-init.sh must stay identical"
 for profile in [default, generations, console_profile]:
     assert not any(item["kind"] in ("StatefulSet", "Job") for item in profile), "Postgres and its migrate step are opt-in"
     assert "postgres" not in yaml.dump(profile).lower(), "disabled by default, nothing of Postgres renders"

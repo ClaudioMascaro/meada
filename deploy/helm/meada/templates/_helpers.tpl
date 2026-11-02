@@ -339,3 +339,13 @@ public_url = {{ .Values.console.publicUrl | toJson }}
   mountPath: /etc/meada-accounts/public
   readOnly: true
 {{- end -}}
+
+{{/* The [postgres] block of a workspace manifest: dict "urlEnv" "schema" "ca" (true when ca_file is set). */}}
+{{- define "meada.postgresBlock" -}}
+[postgres]
+url_env = {{ .urlEnv | toJson }}
+schema = {{ .schema | toJson }}
+{{- if .ca }}
+ca_file = "/etc/meada-ca/ca.crt"
+{{- end }}
+{{- end }}

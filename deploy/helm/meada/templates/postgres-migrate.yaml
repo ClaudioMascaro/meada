@@ -14,12 +14,7 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 data:
   postgres.workspace.toml: |
-    [postgres]
-    url_env = "MEADA_POSTGRES_MIGRATE_URL"
-    schema = {{ .Values.modules.postgres.schema | toJson }}
-    {{- if or .Values.tls.caSecret .Values.tls.caConfigMap }}
-    ca_file = "/etc/meada-ca/ca.crt"
-    {{- end }}
+    {{ include "meada.postgresBlock" (dict "urlEnv" "MEADA_POSTGRES_MIGRATE_URL" "schema" .Values.modules.postgres.schema "ca" (or .Values.tls.caSecret .Values.tls.caConfigMap)) | indent 4 | trim }}
 ---
 apiVersion: batch/v1
 kind: Job
