@@ -197,8 +197,8 @@ section of `meada.workspace.toml`:
   (SQLSTATE class 22, as a NUL) is a 400 `invalidValue`. Postgres unreachable, a schema
   version this binary does not know (`postgres::connected`) or a request still running past
   `Scim::bound` (the connection, the version check and twelve statements, the longest request,
-  a group `PATCH`; the future is dropped, so Postgres rolls the transaction back and releases the
-  advisory lock) is a 503 in the same schema after
+  a group `PATCH`; the future is dropped, and the connection closes once Postgres answers the
+  statement it stalled on, which rolls the transaction back and releases the advisory lock) is a 503 in the same schema after
   one `ui: postgres: unreachable (<reason>)` line; the console's other routes are unaffected.
   Each `POST`, `PUT`, `PATCH` or `DELETE` under the prefix leaves one stderr line `scim:
   <method> <resource> <id>: <status>`, `<resource>` `Users`, `Groups` or `-`, `<id>` the stored
