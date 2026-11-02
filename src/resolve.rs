@@ -9984,7 +9984,8 @@ mod tests {
              pub async fn g() -> Result<()> { asynced().await?.port(); Ok(()) }
              pub fn h() -> Result<()> { outside()?.send(); Ok(()) }
              pub async fn i() { later().await.send(); }
-             pub fn j() -> Result<()> { load()??.port(); Ok(()) }",
+             pub fn j() -> Result<()> { load()??.port(); Ok(()) }
+             pub async fn l() -> Result<()> { load()?.await.port(); Ok(()) }",
         );
         let exact = "exact Cfg.port";
         assert_eq!(calls["a (try_expression).port"], exact);
@@ -10007,6 +10008,11 @@ mod tests {
         // Two `?` name no type.
         assert_eq!(
             calls["j (try_expression).port"],
+            "ambiguous Cfg.port Other.port"
+        );
+        // `?` then `.await`: the unwrapped `Cfg` is awaited, its output unknown, so no `exact`.
+        assert_eq!(
+            calls["l (await_expression).port"],
             "ambiguous Cfg.port Other.port"
         );
     }

@@ -1931,7 +1931,8 @@ fn member(node: Node, src: &[u8]) -> String {
 }
 
 /// The call a method call is made on (`Router::new()` in `Router::new().route(..)`), through
-/// `.await`, parentheses and one `?`, and what it crossed. Two `?` name no type.
+/// `.await`, parentheses and one `?`, and what it crossed. Two `?` name no type, nor a `?`
+/// before an `.await` (`f()?.await`): what `?` unwraps is awaited, and its output is unknown.
 fn inner_call(function: Node) -> Option<(Node, Through)> {
     if function.kind() != "field_expression" {
         return None;
@@ -1941,7 +1942,7 @@ fn inner_call(function: Node) -> Option<(Node, Through)> {
     for _ in 0..PATH_DEPTH {
         match at.kind() {
             "call_expression" => return Some((at, through)),
-            "try_expression" if through.tried => return None,
+            "try_expression" if through.tried || through.awaited => return None,
             "try_expression" => {
                 through.tried = true;
                 at = at.named_child(0)?;
