@@ -13,8 +13,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
     Annotated, Binds, Bound, Call, Class, Closure, Const, Def, Export, Facts, Import, Imported,
-    Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker, Ty,
-    Value,
+    Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker,
+    Through, Ty, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -1209,9 +1209,21 @@ impl<'a> Resolver<'a> {
         let binding = match (call.on, constructs, call.by_path) {
             (Some(inner), false, _) => {
                 let members = callee.split_once('.').map_or("", |(_, m)| m);
-                let result = self.result_of(path, inner, work);
-                on = Some(result.clone());
-                self.walk(result, members, seen, work, Reading::Value, labels)
+                match self.on_result(path, call, inner, work) {
+                    Some(result) => {
+                        on = Some(result.clone());
+                        self.walk(result, members, seen, work, Reading::Value, labels)
+                    }
+                    None => self.resolve_labelled(
+                        path,
+                        scope,
+                        callee,
+                        seen,
+                        work,
+                        Reading::Value,
+                        labels,
+                    ),
+                }
             }
             (_, true, _) => self.resolve_as(path, scope, callee, seen, work, Reading::Type),
             (_, false, true) if self.members_in_scope && !callee.contains('.') => {
@@ -1424,10 +1436,13 @@ impl<'a> Resolver<'a> {
                     false => (on, call.on),
                 };
                 let receiver = match (on, inner) {
-                    (Some(known), _) => known,
-                    (None, Some(inner)) => self.result_of(path, inner, work),
-                    (None, None) => self.resolve_as(path, scope, head, seen, work, Reading::Value),
+                    (Some(known), _) => Some(known),
+                    (None, Some(inner)) => self.on_result(path, call, inner, work),
+                    (None, None) => None,
                 };
+                let receiver = receiver.unwrap_or_else(|| {
+                    self.resolve_as(path, scope, head, seen, work, Reading::Value)
+                });
                 // The source writes a type for the receiver.
                 written = (self.holder(&receiver)).is_some_and(|(p, s, n)| {
                     matches!(self.receivers[p].get(&(s, n)), Some(Class::Type(_)))
@@ -1551,7 +1566,13 @@ impl<'a> Resolver<'a> {
     /// What the call at `index` of `path`'s calls gives (`Call::on`, `Class::Result`): the class
     /// its exact target's declared result names (`Def::result`), or something outside the
     /// repository; unknown otherwise, and past `RECEIVER_DEPTH` calls and receivers.
-    fn result_of(&self, path: &'a str, index: usize, work: &mut Work<'a>) -> Binding<'a> {
+    fn result_of(
+        &self,
+        path: &'a str,
+        index: usize,
+        through: Through,
+        work: &mut Work<'a>,
+    ) -> Binding<'a> {
         let Some(call) = self.files[path].calls.get(index) else {
             return Binding::Unknown;
         };
@@ -1559,7 +1580,7 @@ impl<'a> Resolver<'a> {
             return Binding::Unknown;
         }
         let found = match self.resolved(path, call, false, work) {
-            Resolution::Exact(t) => match &self.defs[t.path][t.name].result {
+            Resolution::Exact(t) => match self.written_result(t, through) {
                 Some(Class::Type(class)) => {
                     let seen = &mut self.seen(t.path, t.name);
                     match self.resolve_as(t.path, t.name, class, seen, work, Reading::Path) {
@@ -1574,6 +1595,39 @@ impl<'a> Resolver<'a> {
         };
         self.leave(work);
         found
+    }
+
+    /// The class `target`'s declared result names, or, going on `through`, the one `.await` or
+    /// `?` takes it to: a future signature's output (after `?` too, its `Result` is not kept, so
+    /// nothing), else what `?` unwraps.
+    fn written_result(&self, target: Target<'a>, through: Through) -> Option<&'a Class> {
+        let def = &self.defs[target.path][target.name];
+        let class = match (&def.output, through.awaited, through.tried) {
+            (Some(_), true, true) => &None,
+            (Some(_), true, false) => &def.output,
+            (_, _, true) => &def.unwrapped,
+            _ => &def.result,
+        };
+        class.as_ref()
+    }
+
+    /// The receiver of `call`, made on the call at `inner`: its result, or, through `?`
+    /// (`Call::unwraps`), the type that result wraps. Through `?` a type outside the repository
+    /// or unknown is no receiver (`None`): the call is read as one on the expression, a name
+    /// match.
+    fn on_result(
+        &self,
+        path: &'a str,
+        call: &'a Call,
+        inner: usize,
+        work: &mut Work<'a>,
+    ) -> Option<Binding<'a>> {
+        let through = Through {
+            tried: call.unwraps,
+            awaited: call.awaits,
+        };
+        let result = self.result_of(path, inner, through, work);
+        (!call.unwraps || matches!(result, Binding::Def(_))).then_some(result)
     }
 
     /// Whether the call at `index` of `path` gives something from outside the repository, as
@@ -1729,23 +1783,31 @@ impl<'a> Resolver<'a> {
             Some(head) if Some(head) == self.base_receiver => return None,
             // A member read between the call and the call made (`make().x.tag()`) is the
             // receiver, not the call's result.
-            Some(head) => match (head.contains('.'), on, call.on) {
-                (false, Some(known), _) => known,
-                (false, None, Some(inner)) => self.result_of(path, inner, work),
-                (true, ..) | (false, None, None) => {
-                    let seen = &mut self.seen(path, scope);
-                    let found = self.resolve_as(path, scope, head, seen, work, Reading::Value);
-                    match found {
-                        // An object's name is its instance, as a typed local is.
-                        Binding::Def(t) if self.is_object(t) => found,
-                        // A class's name calls its companion or its statics.
-                        _ => {
-                            self.holder(&found)?;
-                            self.instance(found, work)
+            Some(head) => {
+                let made = match (head.contains('.'), on) {
+                    (true, _) => None,
+                    (false, Some(known)) => Some(known),
+                    (false, None) => call
+                        .on
+                        .and_then(|inner| self.on_result(path, call, inner, work)),
+                };
+                match made {
+                    Some(known) => known,
+                    None => {
+                        let seen = &mut self.seen(path, scope);
+                        let found = self.resolve_as(path, scope, head, seen, work, Reading::Value);
+                        match found {
+                            // An object's name is its instance, as a typed local is.
+                            Binding::Def(t) if self.is_object(t) => found,
+                            // A class's name calls its companion or its statics.
+                            _ => {
+                                self.holder(&found)?;
+                                self.instance(found, work)
+                            }
                         }
                     }
                 }
-            },
+            }
         };
         let family = match receiver {
             Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => self.family(t, work),
@@ -2217,7 +2279,7 @@ impl<'a> Resolver<'a> {
             }
             Class::Returned(callee) => self.returned(path, scope, callee, false, work),
             Class::Called(callee) => self.returned(path, scope, callee, true, work),
-            Class::Result(index) => self.result_of(path, *index, work),
+            Class::Result(index) => self.result_of(path, *index, Through::default(), work),
             Class::Imported | Class::Member(_) | Class::Unknown => Binding::Unknown,
         };
         self.leave(work);
@@ -7159,6 +7221,8 @@ mod tests {
             type_params: Vec::new(),
             result: None,
             suspends: false,
+            unwrapped: None,
+            output: None,
             hash: String::new(),
         }
     }
@@ -7507,6 +7571,8 @@ mod tests {
                 by_path: false,
                 root: None,
                 on: None,
+                unwraps: false,
+                awaits: false,
                 receiver: None,
                 arg_types: Vec::new(),
                 uses: Vec::new(),
@@ -9867,29 +9933,67 @@ mod tests {
     }
 
     /// A call on another call's result is typed by the inner target's written result, through
-    /// `.await` and parentheses; after `?` that result is the `Result` or `Option` around the
-    /// value, so the call stays the name match it was.
+    /// `.await` and parentheses; after `?` it is typed by the type a `Result` or `Option` wraps,
+    /// and a plain `fn` that returns a future yields its `Output` under `.await`. Where that
+    /// type is outside the repository, a call after `?` stays the name match it was and one
+    /// after `.await` resolves to nothing.
     #[test]
-    fn a_rust_call_after_try_on_a_call_stays_a_name_match() {
+    fn a_rust_call_after_try_or_await_is_typed_by_the_type_they_unwrap() {
         let calls = pack_calls(
             &crate::lang::rust::Rust,
             "src/lib.rs",
             "use anyhow::Result;
+             use std::future::Future;
+             use std::pin::Pin;
              pub struct Cfg;
              impl Cfg { pub fn port(&self) {} }
              pub struct Other;
-             impl Other { pub fn port(&self) {} }
+             impl Other { pub fn port(&self) {} pub fn send(&self) {} }
              pub fn load() -> Result<Cfg> { todo!() }
              pub fn opt() -> Option<Cfg> { todo!() }
              pub fn cfg() -> Cfg { Cfg }
-             pub fn a() -> Result<()> { load()?.port(); Ok(()) }
+             pub fn fut() -> impl Future<Output = Cfg> { async { Cfg } }
+             pub fn boxed() -> Pin<Box<dyn Future<Output = Cfg>>> { todo!() }
+             pub fn tried() -> impl Future<Output = Result<Cfg>> { todo!() }
+             impl Cfg { pub fn map(&self) {} }
+             pub async fn asynced() -> Result<Cfg> { todo!() }
+             pub fn outside() -> Result<reqwest::Client> { todo!() }
+             pub fn later() -> impl Future<Output = reqwest::Client> { todo!() }
+             pub async fn a() -> Result<()> { load()?.port(); Ok(()) }
              pub fn b() -> Option<()> { opt()?.port(); None }
-             pub async fn c() { (cfg()).port(); }",
+             pub async fn c() { (cfg()).port(); }
+             pub async fn d() { fut().await.port(); }
+             pub async fn e() { boxed().await.port(); }
+             pub async fn f() -> Result<()> { tried().await?.port(); Ok(()) }
+             pub async fn k() { fut().map(); }
+             pub async fn g() -> Result<()> { asynced().await?.port(); Ok(()) }
+             pub fn h() -> Result<()> { outside()?.send(); Ok(()) }
+             pub async fn i() { later().await.send(); }
+             pub fn j() -> Result<()> { load()??.port(); Ok(()) }",
         );
-        let both = "ambiguous Cfg.port Other.port";
-        assert_eq!(calls["a (try_expression).port"], both);
-        assert_eq!(calls["b (try_expression).port"], both);
-        assert_eq!(calls["c (parenthesized_expression).port"], "exact Cfg.port");
+        let exact = "exact Cfg.port";
+        assert_eq!(calls["a (try_expression).port"], exact);
+        assert_eq!(calls["b (try_expression).port"], exact);
+        assert_eq!(calls["c (parenthesized_expression).port"], exact);
+        assert_eq!(calls["d (await_expression).port"], exact);
+        assert_eq!(calls["e (await_expression).port"], exact);
+        // The `Result` inside a future is not kept: after `await` and `?` the type is unknown.
+        assert_eq!(
+            calls["f (try_expression).port"],
+            "ambiguous Cfg.port Other.port"
+        );
+        // A method of the future itself is not a method of its output.
+        assert_eq!(calls["k (call_expression).map"], "none");
+        assert_eq!(calls["g (try_expression).port"], exact);
+        // Outside the repository: after `?` the call is the name match it was, after `.await`
+        // it resolves to nothing.
+        assert_eq!(calls["h (try_expression).send"], "inferred Other.send");
+        assert_eq!(calls["i (await_expression).send"], "none");
+        // Two `?` name no type.
+        assert_eq!(
+            calls["j (try_expression).port"],
+            "ambiguous Cfg.port Other.port"
+        );
     }
 
     /// `T::new().m().m()..`: each Rust call is made on the one before and typed by its exact
@@ -9907,6 +10011,24 @@ mod tests {
         let calls = pack_calls(&crate::lang::rust::Rust, "src/lib.rs", &src);
         let took = start.elapsed();
         assert_eq!(calls["f T.new"], "exact T.new");
+        assert!(took.as_secs() < 10, "{took:?}");
+    }
+
+    /// The same chain with a `?` after every link: a call is typed by the type the result of the
+    /// one before it wraps, and the chain costs its length.
+    #[test]
+    fn a_rust_chain_of_calls_through_try_is_read_in_linear_time() {
+        let n = 4 * RECEIVER_DEPTH;
+        let src = format!(
+            "pub struct T;\nimpl T {{ pub fn new() -> Option<T> {{ None }} pub fn m(self) -> Option<T> {{ None }} }}\n\
+             pub fn f() -> Option<()> {{ T::new(){}; None }}\n",
+            "?.m()".repeat(n)
+        );
+        let start = std::time::Instant::now();
+        let calls = pack_calls(&crate::lang::rust::Rust, "src/lib.rs", &src);
+        let took = start.elapsed();
+        assert_eq!(calls["f T.new"], "exact T.new");
+        assert_eq!(calls["f (try_expression).m"], "exact T.m");
         assert!(took.as_secs() < 10, "{took:?}");
     }
 

@@ -279,6 +279,8 @@ mod tests {
                 type_params: Vec::new(),
                 result: None,
                 suspends: false,
+                unwrapped: None,
+                output: None,
                 hash: String::new(),
             });
         }
@@ -322,6 +324,8 @@ mod tests {
                 type_params: Vec::new(),
                 result: None,
                 suspends: false,
+                unwrapped: None,
+                output: None,
                 hash: String::new(),
             });
             exported.push(Exported {
@@ -390,6 +394,8 @@ mod tests {
             type_params: Vec::new(),
             result: None,
             suspends: false,
+            unwrapped: None,
+            output: None,
             hash: String::new(),
         };
         // `T` holds `n` lower-case methods, no door each, and `Run`.

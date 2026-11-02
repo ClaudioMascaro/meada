@@ -77,7 +77,7 @@ from ...", with the whole list. A value the index now stores joins it.
   `Call::constructs`), the argument label of a parameter and whether its written type takes a
   trailing closure, or the name it is written as (`Param::label`, `Param::closure`), the names
   of a Swift file's aliases of a function type (`Facts::function_aliases`), the place of the call a
-  chained call is made on (`Call::on`), whether a Swift call is written under `await` and
+  chained call is made on and whether it is reached through `?` (`Call::on`, `Call::unwraps`), the class `?` unwraps a Rust function's written result to and the one `.await` yields from a future signature (`Def::unwrapped`, `Def::output`, `Call::awaits`), whether a Swift call is written under `await` and
   whether a function needs one (`Call::awaited`, `Def::suspends`), the modules a Swift file imports
   `@testable` and the names only their file sees (`Facts::testable`, `Facts::confined`), whether an `inferred` call was narrowed from several
   definitions of its name (`calls.narrowed`), the definition a decorating call decorates (`calls.decorates`, the

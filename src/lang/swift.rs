@@ -617,6 +617,8 @@ fn walk(
                 facts.defs.push(Def {
                     params: signature.params,
                     suspends: children(node).any(|c| c.kind() == "async"),
+                    unwrapped: None,
+                    output: None,
                     hash: String::new(),
                     ..definition(&inner, kind, node.byte_range(), Vec::new())
                 });
@@ -1690,6 +1692,8 @@ fn call(function: Node, suffixes: &[Node], node: Node, src: &[u8], scope: &str) 
         by_path: false,
         root: None,
         on: None,
+        unwraps: false,
+        awaits: false,
         receiver: None,
         arg_types: Vec::new(),
         uses: Vec::new(),
@@ -1779,6 +1783,8 @@ fn definition(name: &str, kind: Kind, range: Range<usize>, bases: Vec<String>) -
         type_params: Vec::new(),
         result: None,
         suspends: false,
+        unwrapped: None,
+        output: None,
         hash: String::new(),
     }
 }

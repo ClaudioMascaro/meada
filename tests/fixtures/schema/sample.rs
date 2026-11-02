@@ -57,3 +57,8 @@ macro_rules! cfg_disk {
 cfg_disk! {
     pub fn sync() {}
 }
+
+// A result `?` and `.await` unwrap.
+pub fn load(path: &str) -> Option<Store> {
+    None
+}

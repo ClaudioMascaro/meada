@@ -1052,10 +1052,15 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   around it, so `parameter` asks for no parent (each lookup walks down from the root of the
   tree).
 - `lang/rust.rs` (`inner_call`): a method called on another call (`Router::new().route(..)`)
-  names it (`Call::on`) through `.await` and parentheses, so its receiver is the inner target's
-  written result. Not through `?`, which unwraps that result (`Result<T>`, `Option<T>`): the call
-  stays a name match. `.await` takes the written result as the awaited value, as an `async fn`
-  writes it; on a plain `fn` that returns `impl Future<Output = T>` the call resolves to nothing.
+  names it (`Call::on`) through `.await`, parentheses and one `?`, so its receiver is the inner
+  target's written result, or, through `?`, the first type argument of a `Result` or `Option`
+  (`Def::unwrapped`). A plain `fn` that returns a future (`impl Future<Output = T>`,
+  `Pin<Box<dyn Future<Output = T>>>`) keeps `T` as `Def::output`, which only `.await` reads: a
+  call on the future itself keeps the written future as its receiver. The `Result` or `Option`
+  inside a future's output is not kept, so `.await?` after it is a name match. Two `?` in a row
+  name no type, and a `?` whose unwrapped type is outside the repository, a type parameter or not written
+  leaves the call a name match. A `Result` or `Option` is told by its last path segment, so a
+  user type of that name with another first argument is read the same way.
 - `lang/ts.rs`: tsconfig `extends` and `references` are not followed. Every `tsconfig.json` and
   `jsconfig.json` but those under `node_modules` is read; an importer uses the nearest one in its
   directory or above (`tsconfig.json` over `jsconfig.json`), `paths` and `baseUrl` relative to it.

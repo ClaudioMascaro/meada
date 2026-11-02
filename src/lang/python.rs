@@ -113,6 +113,8 @@ impl LanguagePack for Python {
                             type_params: Vec::new(),
                             result: None,
                             suspends: false,
+                            unwrapped: None,
+                            output: None,
                             hash: String::new(),
                         });
                         facts.programs.push(MAIN.to_string());
@@ -162,6 +164,8 @@ impl LanguagePack for Python {
                                 type_params: Vec::new(),
                                 result: None,
                                 suspends: false,
+                                unwrapped: None,
+                                output: None,
                                 hash: String::new(),
                             });
                         }
@@ -214,6 +218,8 @@ impl LanguagePack for Python {
                             by_path: false,
                             root: None,
                             on: None,
+                            unwraps: false,
+                            awaits: false,
                             receiver: None,
                             arg_types: Vec::new(),
                             uses: Vec::new(),

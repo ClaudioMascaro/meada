@@ -222,6 +222,15 @@ All notable changes to Meada are recorded here. The format follows
   were absent (#463): `x.hash(seed: 1)` on a type that conforms to `Hashable` and declares
   `hash(seed:)` is `exact`, while `x.hash(into: &h)` stays opaque. A call with no labels, or in
   another language, is still compared by its bare name.
+- Rust: a call after `?` or `.await` is typed by the value they unwrap (#435, after #401): the
+  pack keeps beside a function's written result the first type argument of a `Result` or
+  `Option` (`Def::unwrapped`) and the `Output = T` of `impl Future<Output = T>` and
+  `Pin<Box<dyn Future<Output = T>>>` (`Def::output`, read only through `.await`), so
+  `load()?.port()` and `fut().await.port()` resolve within `T`'s family, `exact` when it
+  declares one `port`, where `?` left a name match and a plain `fn` returning a future resolved
+  to nothing. A type outside the repository leaves the call as it was. The stored facts gain
+  `Def::unwrapped`, `Def::output`, `Call::unwraps` and `Call::awaits`, so the schema version
+  changes and Rust indexes are rebuilt once.
 - Kotlin: a class, object or interface nested in an `expect` declaration, at any depth, is `expect`
   too (#437), so a use of it resolves to the `expect` one instead of staying `ambiguous` among
   its `actual` declarations.
