@@ -124,7 +124,8 @@ pub fn run(
     let (picks, failed) = match &config {
         Some((config, min_p)) => {
             let (items, show) = (&items, options.show_request);
-            let outcome = decider::run(config, engine.root(), items, show, *min_p, out)?;
+            let stored = |path: &str| engine.stored_setting(path);
+            let outcome = decider::run(config, engine.root(), &stored, items, show, *min_p, out)?;
             if show {
                 return Ok(());
             }

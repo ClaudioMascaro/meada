@@ -960,8 +960,10 @@ Detalhes por ecossistema:
   funções, tipos e métodos exportados do diretório.
 - **Maven e Gradle.** Uma dependência, também na notação de mapa do Gradle (`group: 'g', name:
   'a'`), liga ao artefato do workspace em `exact`, com `range unchecked`. Um grupo ou artefato
-  escrito com propriedade ou variável liga quando o build declara o valor como literal; senão o
-  elo é `ambiguous`. Um `import` de uma classe do artefato chega ao código do provedor pela
+  escrito com propriedade ou variável liga quando o build declara o valor como literal, ou quando
+  um `gradle.properties` (da raiz, do diretório do settings ou do módulo) o define; um acessor de
+  version catalog (`libs.x`) é lido do `gradle/libs.versions.toml` ou do catálogo que o settings
+  nomeia. Senão o elo é `ambiguous`. Um `import` de uma classe do artefato chega ao código do provedor pela
   declaração `package` dos arquivos, e não por um caminho (em Kotlin, também o de uma função de
   topo ou de extensão): `exact` quando um único provedor declara o pacote e o tipo, `ambiguous`
   quando vários declaram ou restam sobrecargas com o mesmo número de argumentos, `inferred`
@@ -1013,7 +1015,10 @@ correção, não uma quebra.
 
 **Arquivos.** `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs` e `.cjs`. Um `import` usa os `paths` e o
 `baseUrl` do `tsconfig.json` (ou `jsconfig.json`) mais próximo, no diretório do arquivo ou acima,
-relativos ao diretório daquele arquivo de configuração. O `node_modules` é ignorado.
+relativos ao diretório daquele arquivo de configuração. Se ele tem `extends` para outro `tsconfig.json`
+ou `jsconfig.json` do repositório (caminho relativo), `paths` e `baseUrl` vêm da cadeia, e o config mais
+próximo que declara cada opção vence; um `extends` para pacote ou para fora do repositório não é lido,
+e uma cadeia longa demais ou circular vale só pelo config mais próximo. O `node_modules` é ignorado.
 
 **O que vira definição.** Funções, classes e métodos, os `const`, `let` e `var` de uma função ou
 classe e o `export default`. No topo de um arquivo, funções atribuídas também contam:
@@ -1235,8 +1240,9 @@ mut` String só lido e acrescido por `push_str`, `push` e `+=` também dobra.
   Um chamador que só chama de dentro de uma macro não aparece, e o `context` o trata como "não
   provado". A única exceção é o corpo entre chaves de uma macro de itens do próprio repositório
   (um `macro_rules!` cuja primeira regra recebe `$($x:item)*` e reescreve cada item só com
-  atributos externos, como o `cfg_rt!` do tokio): ele é lido como itens do módulo. Macros de outros
-  crates continuam sem leitura.
+  atributos externos, como o `cfg_rt!` do tokio), invocada como `m!` ou `crate::m!`: ele é lido
+  como itens do módulo, ou do bloco `impl` ou trait onde a invocação está. Macros de outros crates
+  continuam sem leitura.
 - Métodos que não estão nos blocos `impl` do tipo, incluindo os gerados por `derive` ou fornecidos
   por traits externos, não geram ligação.
 - A análise usa a configuração padrão de cada crate para x86_64 Linux: itens sob um `#[cfg(..)]`
@@ -1292,7 +1298,8 @@ em `src/main/resources` do módulo. Um placeholder `${VAR}` que nenhuma chave pr
 `VAR`, que o `base_url_env` do par mapeia. Perfis (`application-<perfil>`) e SpEL não são lidos.
 
 **Manifestos.** `pom.xml` e os arquivos de build do Gradle (`build.gradle`, `build.gradle.kts`,
-`settings.gradle` e `settings.gradle.kts`). Veja Maven e Gradle na seção 8.5.
+`settings.gradle`, `settings.gradle.kts`, `gradle.properties` e os version catalogs
+`*.versions.toml`). Veja Maven e Gradle na seção 8.5.
 
 **Canais.**
 

@@ -25,6 +25,33 @@ Release notes are available in
 
 ### Added
 
+- Gradle coordinate holes from `gradle.properties` and version catalogs (#467): a dependency
+  written `implementation(libs.models)` or with a `${name}` or `$name` the script leaves open
+  now links to the package providing its coordinate. `gradle.properties` of the repository root,
+  the settings file's directory and the module (the module's wins, and a name the script assigns
+  is never filled) feeds the same hole filler as the script's own declarations, and
+  `gradle/libs.versions.toml`, or a `*.versions.toml` a settings `from(files("..."))` names by a
+  relative path, maps `libs.<alias>` (dashes and underscores as dots) to `group:artifact` and
+  its version through `[libraries]` and `[versions]`; an alias the catalog lacks declares
+  nothing. Both files are bounded (`lang::MAX_BYTES`, 8192 entries) and have rows in the
+  manifest probes. `buildSrc`, convention plugins, included builds and build-time BOMs stay
+  unread. The stored manifest summary gains Gradle's `template` and catalog placeholders, so
+  existing indexes rebuild once (ADR 0004); the `conformance-java` export gained two links.
+- Rust item macros in associated-item position and by `crate::` (#505, after #398): an
+  invocation of a qualifying item macro among the items of an `impl` or a trait gives its
+  body's methods, associated consts and types to that block, under the same rules (first arm
+  only, the attributes on the invocation, the same `cfg` handling), and `crate::m! { .. }`
+  qualifies as `m!` does; `other::m!`, `self::m!` and `super::m!` stay unread. `meada decide
+  --decider` now parses a file under the setting the index stored for it, so a function from an
+  item macro body is function-like and its span is sent.
+- TypeScript and JavaScript: a `tsconfig.json` (or `jsconfig.json`) with `extends` naming a
+  relative path inside the repository takes the `paths` and `baseUrl` of the chain, the nearest
+  config that declares each option winning (#465), so the alias imports under a monorepo's
+  `packages/*` whose configs only extend the root's resolve. A package, a path outside the
+  repository, a chain of more than 8 configs after the nearest and a cycle are not followed (the
+  nearest config alone serves). Project `references` and a base not named `tsconfig.json` or
+  `jsconfig.json` are still not read.
+
 - The export format and the indexed commit (#512, ADR 0004 "Canonical export"): every export
   starts with `format` (`meada_core::export::FORMAT`, 1), which rises only when a reader of the
   previous shape would misread the new one, never for an added optional field; then
@@ -234,6 +261,10 @@ Release notes are available in
   drops from about 1.4 s to about 0.1 s. No golden changed.
 
 ### Fixed
+
+- Rust: a `crate::a::*` glob written inside `a` or below it sees what `use super::*` sees,
+  the ancestor's private `use` included, so `Def::new()` through it is `exact` instead of
+  unresolved (#438). A glob of a sibling module still takes public names only.
 
 - Swift: a call whose labels differ from a known outside member's resolves as if that base
   were absent (#463): `x.hash(seed: 1)` on a type that conforms to `Hashable` and declares

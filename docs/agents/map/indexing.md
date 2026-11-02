@@ -125,7 +125,11 @@ from ...", with the whole list. A value the index now stores joins it.
   for computed parts, declared ranges and a `computed` source flag, source roots with the test ones marked, a pom's
   `<properties>` and `<parent>` coordinate, with the group and artifact of a computed entry as
   written (`Entry::template`, for `Maven::inherit` to fill from the parent poms), and Gradle's
-  literal group, root project name and included project names/directories in `Summary::build`),
+  literal group, root project name and included project names/directories in `Summary::build`,
+  with the version catalogs a settings file names as `(accessor, path)`; a Gradle dependency's
+  `template` for a hole `gradle.properties` may fill, or a catalog accessor as a placeholder
+  entry; and, as `Summary::properties`, the `name=value` lines of a `gradle.properties` and the
+  `[libraries]` of a `*.versions.toml` as `alias -> group:artifact[:version]`),
   of each SDK-style `.csproj` (spec #28: the package id, else assembly name, else file name, the
   literal version, each `PackageReference` with its range as written, each `ProjectReference`
   as a `path` folded from the project's directory, each with `Entry::private` when it does not
@@ -481,10 +485,13 @@ from ...", with the whole list. A value the index now stores joins it.
   (`Facts::invokes`, inside macro tokens too). `Rust::extend` gives each file the item macros it
   invokes whose every definition in the repository agrees, a line each after the features (the
   name, then the `cfg` predicates of its attributes, tab-separated); `table` reads them back.
-  `bodies` parses, before the walk, the braced body of each such invocation written by a plain
-  name among the items of the file or of a module written in place, over the file's bytes
-  (`set_included_ranges`, so spans are the file's), `ITEM_MACRO_DEPTH` deep; a body with an
-  error is left out. `built` gives a built invocation's body items in its place, each judged by
+  `bodies` parses, before the walk, the braced body of each such invocation written as `m!` or
+  `crate::m!` (`invoked_name`; any other path is skipped) among the items of the file, of a
+  module written in place, or among the associated items of an `impl` or a trait in either,
+  over the file's bytes (`set_included_ranges`, so spans are the file's), `ITEM_MACRO_DEPTH`
+  deep; a body with an error is left out. The decider reads the setting the index stored for a
+  file (`files.setting`, `Engine::stored_setting`), so a function from such a body is
+  function-like there. `built` gives a built invocation's body items in its place, each judged by
   its own attributes after the arm's predicates (`Built::keep`), so a `mod x;` in one is a `mod`
   declaration of the module and reaches its file. Conditional compilation (`lang/rust/cfg.rs`): `parse` skips a node whose
   preceding `#[cfg(..)]` attributes are not all true (`compiled`), for the fixed target
@@ -505,8 +512,9 @@ from ...", with the whole list. A value the index now stores joins it.
   module tree). The features reach `parse` as `Facts::setting` (`LanguagePack::settings` gives
   it per path, `parse_with` takes it; the index keeps it in `files.setting`): `refresh` parses a
   file again when the setting it was parsed under differs, so a toggled default feature gives
-  the cold export. The decider's `function_like` reads the nearest `Cargo.toml` files from disk
-  for the same setting. `lang/rust/crates.rs` (`Tree`) is the module tree behind the
+  the cold export. The decider's `function_like` parses under the setting the index stored for
+  the file (`Engine::stored_setting`), and reads the nearest `Cargo.toml` files from disk for it
+  only when the index has none. `lang/rust/crates.rs` (`Tree`) is the module tree behind the
   Rust `layout`, built once per refresh (each `Cargo.toml` parsed once for it; `settings` parses
   them once more, before any file is): the crate roots of every `Cargo.toml` with a `[package]`, at any
   depth (`[lib] path`, else `src/lib.rs`, `src/main.rs`, `[[bin]] path`, `src/bin/*.rs`,

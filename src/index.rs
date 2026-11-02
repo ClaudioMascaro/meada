@@ -1403,6 +1403,18 @@ fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
     file.then_some(abs)
 }
 
+/// The setting the index stored for the file at `path` (`files.setting`: what the configs and
+/// `LanguagePack::extend` made of it); `None` when the index has no such file or cannot be read,
+/// and the caller works out the setting itself.
+pub(crate) fn stored_setting(db: &Connection, path: &str) -> Option<String> {
+    (db.query_row(
+        "SELECT setting FROM files WHERE path = ?1",
+        params![path],
+        |r| r.get(0),
+    ))
+    .ok()
+}
+
 /// The pack config file at `path` under `root` (`tsconfig.json`, `pyproject.toml`, each
 /// `Cargo.toml`), read as a manifest is (`read_up_to`): the pack's reader takes one past
 /// `lang::MAX_BYTES` as invalid. Like the walk, the read goes through no symbolic link.
@@ -3123,6 +3135,8 @@ mod tests {
             ("sample.pom.xml", "pom.xml"),
             ("sample.build.gradle.kts", "build.gradle.kts"),
             ("sample.settings.gradle.kts", "settings.gradle.kts"),
+            ("sample.gradle.properties", "gradle.properties"),
+            ("sample.libs.versions.toml", "gradle/libs.versions.toml"),
             ("sample.csproj", "src/Kit/Kit.csproj"),
             ("sample.Directory.Build.props", "src/Directory.Build.props"),
             ("sample.Package.swift", "pkg/Package.swift"),

@@ -8294,19 +8294,27 @@ fn rust() {
 
 /// Item macros in the Rust pack (#398): the body of a repository `macro_rules!` that passes
 /// items through is read as items of the module invoking it, under the `cfg` attributes its arm
-/// writes on each, and a `mod` in it reaches its file. A macro that wraps its items, and an
-/// item gated off, stay out.
+/// writes on each, and a `mod` in it reaches its file. So is one in an `impl` or a trait body
+/// (#505), and one written `crate::m!`. A macro that wraps its items, an item gated off, and
+/// `other::m!` or `self::m!` stay out.
 #[test]
 fn rust_item_macros() {
     conform(
         "rust-item-macros",
         &[
+            "src/lib.rs::Driver",
+            "src/lib.rs::Driver.drive",
+            "src/lib.rs::Driver.pending",
+            "src/lib.rs::Runtime",
+            "src/lib.rs::Runtime.plain",
+            "src/lib.rs::Runtime.start",
             "src/lib.rs::caller",
             "src/lib.rs::enter",
             "src/lib.rs::macros",
             "src/lib.rs::rt",
             "src/lib.rs::runtime",
             "src/lib.rs::spawn",
+            "src/lib.rs::via_crate",
             "src/rt.rs::block_on",
             "src/rt.rs::park",
             "src/runtime.rs::start",
@@ -8314,6 +8322,21 @@ fn rust_item_macros() {
         &[],
         &[
             ("src/lib.rs::caller::spawn#0", EXACT, &["src/lib.rs::spawn"]),
+            (
+                "src/lib.rs::Runtime.start::spawn#0",
+                EXACT,
+                &["src/lib.rs::spawn"],
+            ),
+            (
+                "src/lib.rs::Driver.drive::spawn#0",
+                EXACT,
+                &["src/lib.rs::spawn"],
+            ),
+            (
+                "src/lib.rs::via_crate::spawn#0",
+                EXACT,
+                &["src/lib.rs::spawn"],
+            ),
             (
                 "src/lib.rs::enter::rt.block_on#0",
                 EXACT,

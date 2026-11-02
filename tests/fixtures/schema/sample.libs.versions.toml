@@ -1,0 +1,6 @@
+[versions]
+models = "1.0"
+
+[libraries]
+models = { module = "example:models", version.ref = "models" }
+my-tools = "example:tools:2.0"

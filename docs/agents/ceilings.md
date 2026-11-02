@@ -1059,7 +1059,16 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   name no type, nor does a `?` before an `.await` (`f()?.await`), and a `?` whose unwrapped type is outside the repository, a type parameter or not written
   leaves the call a name match. A `Result` or `Option` is told by its last path segment, so a
   user type of that name with another first argument is read the same way.
-- `lang/ts.rs`: tsconfig `extends` and `references` are not followed. Every `tsconfig.json` and
+- `lang/ts.rs`: tsconfig `references` are not followed, and `extends` only for `paths` and
+  `baseUrl` (`Aliases::of_chain`; `package::read_tsconfig`'s `outDir` and `rootDir` still ignore it).
+  An `extends` that is a relative path inside the repository (a package such as `@tsconfig/node18`,
+  an absolute path, one that leaves the repository, and an array are not read, and the chain stops
+  there) is followed to a config named `tsconfig.json` or `jsconfig.json`, since only those are
+  read (`tsconfig.base.json` has no bytes here: a follow-up). Each option is the nearest
+  declaration's, as a whole (a nested `paths` replaces the base's), `paths` relative to the config
+  that declares them. `EXTENDS_DEPTH` (8, `ponytail:`): a chain with more than that many configs
+  after the nearest, and a cycle, read as the nearest config alone, so the walk, the budget of each
+  config, costs at most ten lookups. Every `tsconfig.json` and
   `jsconfig.json` but those under `node_modules` is read; an importer uses the nearest one in its
   directory or above (`tsconfig.json` over `jsconfig.json`), `paths` and `baseUrl` relative to it.
   Each is read as `package::read_tsconfig` reads one
@@ -1112,6 +1121,10 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   `CHAIN` (64): a builder chain (`FutureRecord::to(t).payload(p)`, an SQS `send_message()...`,
   redis `StreamReadOptions`) is read to that many calls below the form (`Code::chain`, itself
   bounded by `FLUENT_CHAIN`); a longer one is not a producer or a consumer.
+- `resolve.rs` (`Resolver::is_self_or_ancestor`, #438): a Rust glob reads the private names of
+  the importing file or of an ancestor file on its `super` chain; an ancestor written as an
+  in-file `mod` (`use crate::a::outer::*` from `a::outer::inner`) is read as a foreign module, so
+  only its public names come through the glob.
 - `resolve.rs` (`Resolver::owned_outside`): a Rust method called on a call chain
   (`client.get(u).send()`, `Call::root` = `client`) resolves to nothing when `client.send` would
   be external, and so does one on a chain that starts at a call (`rocket::build().mount(..)`,
@@ -1338,9 +1351,10 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   each file that invokes it stores them in its setting. An item
   macro is found by name alone (no `#[macro_use]`, `#[macro_export]` or textual scope is
   followed), across every Rust file of the repository whatever its `cfg`, so a definition of the
-  name anywhere that disagrees leaves every invocation unread (no marker); only a plain name
-  invoked with braces in a module qualifies (`crate::m! {}`, `m!(..)` and invocations in an
-  `impl`, a trait or a function body are skipped, no marker).
+  name anywhere that disagrees leaves every invocation unread (no marker); only `m!` or
+  `crate::m!` invoked with braces among the items of a module, an `impl` or a trait qualifies
+  (`other::m! {}`, `self::m! {}`, `m!(..)` and invocations in a function body are skipped, no
+  marker).
 - `lang/rust.rs` (spec #30): `DEFINITION_DEPTH` (128) as in the other packs; `BINDING_DEPTH`
   (64): a pattern or a `use` tree deeper binds nothing; `PATH_DEPTH` (256): a longer path or
   member chain in a callee is its node kind, and an `impl` type behind more references names
@@ -1588,8 +1602,22 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   source directories. The Groovy and the Kotlin DSL files (`*.gradle`, `*.gradle.kts`) go
   through this one scanner (spec #27: `tests/it/kotlinpkg.rs`); a `project(":x")` dependency
   declares no coordinate. A block comment nests, as Kotlin's does (Groovy's does not, so a
-  nested opener there turns a coordinate into a miss, never a wrong `exact`). Ceilings, all
-  misses: a version catalog (`libs.x`), a `dependencies` block nested deeper than one block
+  nested opener there turns a coordinate into a miss, never a wrong `exact`). `gradle.properties` and a version
+  catalog (`*.versions.toml`) are manifests of the Maven ecosystem that bound no package
+  (`Maven::owns`), read by `jvm::gradle::properties` and `catalog`: each reads as empty past
+  `lang::MAX_BYTES`, keeps at most `MAX_ENTRIES` (8192) properties or `[libraries]` aliases and
+  skips a value longer than a package name; a settings file keeps at most `MAX_CATALOGS` (16)
+  `from(files(..))` catalogs, each a relative path that stays inside its directory and ends in
+  `.versions.toml` to be read as a manifest. `Maven::inherit` fills a build's holes from them
+  in one pass per build, sharing `FILL_BUDGET`. Ceilings, all
+  misses: `buildSrc`, convention plugins, included builds and plugin-provided BOMs (code or
+  build-time resolution, not declarations), a catalog accessor that is not a `[libraries]` alias
+  (`libs.bundles.x`, `libs.versions.x`, a call on it such as `.get()`), a catalog whose file name
+  does not end in `.versions.toml`, an alias written as a dotted TOML key (it parses as a nested
+  table), a `gradle.properties` value with a backslash escape or a
+  continued line, a `gradle.properties` of the user's home, and one in a directory between the
+  repository root, the settings file and the module (the repository root's is read even when the
+  settings file sits deeper), a `dependencies` block nested deeper than one block
   (`subprojects`, `constraints`, `sourceSets { commonMain { dependencies } }`), a configuration
   called as a string (`"implementation"("g:a:1")`), a positional `implementation("g", "a",
   "1")`, a `group` set only in `subprojects`/`allprojects`, and a top-level `val group`. A

@@ -3031,14 +3031,23 @@ sample.build.gradle.kts
   "dependencies": [
     {
       "field": "implementation",
+      "name": "*:*",
+      "via": "catalog libs.models"
+    },
+    {
+      "field": "implementation",
       "name": "example:models",
       "range": "1.0"
     },
     {
       "field": "runtimeOnly",
       "name": "example:*",
-      "range": "$version",
-      "via": "computed"
+      "range": "1.0",
+      "via": "computed",
+      "template": [
+        "example",
+        "${artifact}"
+      ]
     }
   ],
   "roots": [
@@ -3066,7 +3075,29 @@ sample.settings.gradle.kts
         "tools",
         "tools"
       ]
+    ],
+    "catalogs": [
+      [
+        "tools",
+        "gradle/tools.versions.toml"
+      ]
     ]
+  }
+}
+
+sample.gradle.properties
+{
+  "properties": {
+    "artifact": "api",
+    "version": "2.0"
+  }
+}
+
+sample.libs.versions.toml
+{
+  "properties": {
+    "models": "example:models:1.0",
+    "my.tools": "example:tools:2.0"
   }
 }
 

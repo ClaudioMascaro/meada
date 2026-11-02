@@ -391,6 +391,11 @@ impl Engine {
         &self.root
     }
 
+    /// The setting the index stored for the file at `path` of the repository where Meada runs.
+    pub(crate) fn stored_setting(&self, path: &str) -> Option<String> {
+        index::stored_setting(&self.dbs[0], path)
+    }
+
     /// The open items whose call lives in the repository where Meada runs, in id order: the
     /// ones `meada decide` works on.
     pub fn local_items(&self) -> Result<Vec<OpenItem>> {

@@ -942,3 +942,191 @@ fn a_module_sees_the_dependencies_a_module_it_depends_on_passes_on() {
         "{export}"
     );
 }
+
+/// The `(contract, level, reason)` of each declared link of the Gradle client after `write`
+/// puts `files` (path, text) in it, with a `build.gradle` of `dependencies` under group `example`.
+fn gradle_links(
+    case: &str,
+    files: &[(&str, &str)],
+    dependencies: &str,
+) -> Vec<(String, String, String)> {
+    let [_, _, _, client] = workspace(case);
+    fs::write(
+        client.join("build.gradle"),
+        format!("group = 'example'\ndependencies {{\n{dependencies}\n}}\n"),
+    )
+    .unwrap();
+    for (path, text) in files {
+        let path = client.join(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+    declared_links(&client)
+}
+
+const CATALOG: &str = "[versions]\nmodels = \"1.2.0\"\n\n[libraries]\n\
+    models = { module = \"example:models\", version.ref = \"models\" }\n\
+    my-tools = { group = \"example\", name = \"tools\", version = \"2.0\" }\n\
+    kit = \"example:kit:2.0\"\n";
+
+#[test]
+fn a_version_catalog_and_gradle_properties_fill_the_coordinates_of_a_build() {
+    let catalog = [("gradle/libs.versions.toml", CATALOG)];
+    let found = |links: Vec<(String, String, String)>| -> Vec<(String, String)> {
+        links.into_iter().map(|(c, l, _)| (c, l)).collect()
+    };
+    let link = |c: &str, l: &str| (c.to_string(), l.to_string());
+    // An accessor is the library its alias names, dots and dashes as Gradle spells them; the
+    // version of the catalog is the range, and an alias the catalog lacks declares nothing.
+    let links = gradle_links(
+        "jvm_catalog",
+        &catalog,
+        "implementation(libs.models)\nimplementation libs.my.tools\nimplementation(libs.kit)\n\
+         implementation(libs.absent)\nimplementation(libs.bundles.web)",
+    );
+    assert_eq!(
+        found(links.clone()),
+        [
+            link("package::maven::example:kit", "exact"),
+            link("package::maven::example:models", "exact"),
+            link("package::maven::example:tools", "exact"),
+        ]
+    );
+    assert!(links[1].2.contains("1.2.0 (local 1.2.0)"), "{links:?}");
+    // One module takes the accessor from the catalog and the coordinate from `gradle.properties`,
+    // an all-hole coordinate included.
+    let links = gradle_links(
+        "jvm_both",
+        &[
+            ("gradle/libs.versions.toml", CATALOG),
+            (
+                "gradle.properties",
+                "vendor=example\nartifact=tools\nappVersion=2.0\n",
+            ),
+        ],
+        "implementation(libs.models)\nimplementation \"${vendor}:${artifact}:${appVersion}\"",
+    );
+    assert_eq!(
+        found(links.clone()),
+        [
+            link("package::maven::example:models", "exact"),
+            link("package::maven::example:tools", "exact"),
+        ]
+    );
+    assert!(links[1].2.contains("2.0 (local 2.0)"), "{links:?}");
+    // No catalog file, or a catalog that is no TOML or past the size limit, fills nothing.
+    for files in [
+        vec![],
+        vec![("gradle/libs.versions.toml", "[libraries\nmodels = ")],
+        vec![(
+            "gradle/libs.versions.toml",
+            &*format!("{CATALOG}#{}", " ".repeat(1_100_000)),
+        )],
+    ] {
+        let links = gradle_links("jvm_catalog_none", &files, "implementation(libs.models)");
+        assert!(links.is_empty(), "{links:?}");
+    }
+    // `gradle.properties` fills a hole of the coordinate and the version, the module's value
+    // beating the repository's; a name the script assigns twice stays a hole.
+    let build = "implementation \"${vendor}:models:${appVersion}\"\n\
+                 implementation \"example:$artifact\"";
+    let links = gradle_links(
+        "jvm_properties",
+        &[(
+            "gradle.properties",
+            "# build\nvendor=other\nappVersion=9.9\nartifact=tools\n",
+        )],
+        build,
+    );
+    assert_eq!(
+        found(links),
+        [link("package::maven::example:tools", "exact")]
+    );
+    let links = gradle_links(
+        "jvm_properties_module",
+        &[
+            (
+                "gradle.properties",
+                "vendor=other\nappVersion=9.9\nartifact=tools\n",
+            ),
+            ("settings.gradle", "rootProject.name = 'worker'\n"),
+        ],
+        build,
+    );
+    assert_eq!(
+        found(links),
+        [link("package::maven::example:tools", "exact")]
+    );
+    let [_, _, _, client] = workspace("jvm_properties_module_wins");
+    fs::write(
+        client.join("gradle.properties"),
+        "vendor=other\nappVersion=9.9\nartifact=tools\n",
+    )
+    .unwrap();
+    fs::write(
+        client.join("build.gradle"),
+        format!("group = 'example'\ndependencies {{\n{build}\n}}\n"),
+    )
+    .unwrap();
+    let before = declared_links(&client);
+    fs::write(
+        client.join("gradle.properties"),
+        "vendor=example\nappVersion=2.0\nartifact=tools\n",
+    )
+    .unwrap();
+    let after = declared_links(&client);
+    assert_eq!(before.len(), 1, "{before:?}");
+    assert_eq!(
+        after.iter().map(|(c, ..)| c.as_str()).collect::<Vec<_>>(),
+        [
+            "package::maven::example:models",
+            "package::maven::example:tools"
+        ]
+    );
+    assert!(after[0].2.contains("2.0"), "{after:?}");
+    // A script that assigns the name wins over `gradle.properties`, and is no literal here.
+    let links = gradle_links(
+        "jvm_properties_script",
+        &[("gradle.properties", "artifact=tools\n")],
+        "def artifact = 'models'\nartifact = 'kit'\nimplementation \"example:$artifact\"",
+    );
+    assert!(
+        !links.is_empty() && links.iter().all(|(_, l, _)| l == "ambiguous"),
+        "{links:?}"
+    );
+}
+
+#[test]
+fn a_catalog_a_settings_file_names_is_read_by_its_accessor_name() {
+    let settings = "rootProject.name = 'worker'\ndependencyResolutionManagement {\n\
+        versionCatalogs {\n create(\"tools\") {\n  from(files(\"deps/tools.versions.toml\"))\n }\n}\n}\n";
+    let files = [
+        ("settings.gradle", settings),
+        ("deps/tools.versions.toml", CATALOG),
+        (
+            "gradle/libs.versions.toml",
+            "[libraries]\nmodels = \"example:kit:1\"\n",
+        ),
+    ];
+    let links = gradle_links(
+        "jvm_catalog_named",
+        &files,
+        "implementation(tools.models)\nimplementation(libs.models)",
+    );
+    let names: Vec<_> = links.iter().map(|(c, ..)| c.as_str()).collect();
+    // `tools.models` is the named file's, `libs.models` the default file's.
+    assert_eq!(
+        names,
+        [
+            "package::maven::example:kit",
+            "package::maven::example:models"
+        ]
+    );
+    // A path that leaves the directory names no catalog.
+    let escaping = settings.replace("deps/tools", "../tools");
+    let files = [
+        ("settings.gradle", escaping.as_str()),
+        ("deps/tools.versions.toml", CATALOG),
+    ];
+    assert!(gradle_links("jvm_catalog_escape", &files, "implementation(tools.models)").is_empty());
+}
