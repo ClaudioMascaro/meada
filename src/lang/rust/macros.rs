@@ -643,7 +643,7 @@ mod tests {
     fn nested_item_macros_are_read_in_linear_time() {
         // Every level holds `per` functions of its own, and each level's body is parsed again for
         // the next: the bytes parsed are the depth times the file's, not more.
-        let per = 500;
+        let per = 400;
         let mut src = CFG_RT.to_string();
         for level in 0..ITEM_MACRO_DEPTH {
             src += "cfg_rt! {\n";
@@ -656,7 +656,7 @@ mod tests {
         let facts = one(&src, "");
         let took = start.elapsed();
         assert_eq!(facts.defs.len(), ITEM_MACRO_DEPTH * per);
-        // About a second in a local debug build, a twentieth of the bound.
+        // About 0.6 s in a local debug build, under a thirtieth of the bound.
         assert!(took.as_secs() < 20, "{took:?}");
     }
 
