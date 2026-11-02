@@ -68,11 +68,14 @@ export function WorkspaceVersions({ api, locale, detail, onApplied, onStale }: {
   }
   async function readHistory(from?: number) {
     setProblem(undefined);
+    // A read that the base moved past (or a reload) is dropped, like a late `show`.
+    const mine = latest.current;
     try {
       const value = await api.request<HistoryList>(historyRoute(id, from));
+      if (mine !== latest.current) return;
       setHistory(previous => from === undefined ? value.history : [...(previous ?? []), ...value.history]);
       setHistoryNext(value.next);
-    } catch (error) { fail(error); }
+    } catch (error) { if (mine === latest.current) fail(error); }
   }
   async function apply(version: VersionDocument) {
     setBusy(true); setFailure(undefined);
