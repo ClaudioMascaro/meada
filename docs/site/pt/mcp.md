@@ -35,7 +35,7 @@ configuração do seu agente (por exemplo o `.mcp.json` do Claude Code), na form
       "mcpServers": {
         "meada": {
           "command": "sh",
-          "args": ["-c", "exec docker run -i --rm --network none --user \"$(id -u):$(id -g)\" -v \"${PWD%/*}:${PWD%/*}\" -w \"$PWD\" ghcr.io/claudiomascaro/meada:1.0.0 mcp"]
+          "args": ["-c", "exec docker run -i --rm --network none --user \"$(id -u):$(id -g)\" -v \"${PWD%/*}:${PWD%/*}\" -w \"$PWD\" ghcr.io/claudiomascaro/meada:1.1.0 mcp"]
         }
       }
     }
@@ -85,7 +85,7 @@ para a versão em que foi publicada; baixe a da sua versão.
 
     ```sh
     mkdir -p ~/.claude/skills/meada
-    curl -fsSL https://raw.githubusercontent.com/ClaudioMascaro/meada/v1.0.0/skills/meada/SKILL.md -o ~/.claude/skills/meada/SKILL.md
+    curl -fsSL https://raw.githubusercontent.com/ClaudioMascaro/meada/v1.1.0/skills/meada/SKILL.md -o ~/.claude/skills/meada/SKILL.md
     ```
 
 - **Outro agente que lê pastas de skills** (`SKILL.md` com frontmatter): copie a pasta
