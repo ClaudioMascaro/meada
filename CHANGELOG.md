@@ -6,6 +6,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The console asks `meada-core` through WebAssembly (`namedNameProblem`, `namedDescriptionProblem`,
+  `namedMessageProblem`, `resourceRoles`) whether a workspace name, description and version
+  message are valid and which resource roles exist, instead of keeping its own copy of the rule,
+  its bounds and the role list (#501). A version message is refused when empty by the same
+  function on the browser, the console API and `meada workspaces`: the empty-message refusal now
+  reads "a message is 1 to 500 characters, ..." instead of the request-body shape, and the
+  refusal of a too-long or control-bearing message reads "1 to 500" where it read "at most 500".
+
 ### Added
 
 - The CLI messages (`--help`, `status`, `meada.toml` and index errors, and every other message of
@@ -18,7 +28,6 @@ All notable changes to Meada are recorded here. The format follows
   `scripts/helm-check` assert both. The identity provider recipes say how a person or an agent
   gets a token whose `aud` is `[proposals] audience` (Entra ID, Okta, Keycloak, local accounts; Okta
   needs a second authorization server the chart cannot render), in pt-BR, English and Spanish (#504).
-
 - Over TLS, the Postgres client of the data layer authenticates with SCRAM channel binding
   (`tls-server-end-point`, RFC 5929): it runs `SCRAM-SHA-256-PLUS` whenever the server offers
   it, so a client that requires channel binding connects (#483). Loopback without TLS keeps plain
@@ -39,8 +48,13 @@ All notable changes to Meada are recorded here. The format follows
 - The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
   Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
   node unready (#448).
+
+- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
+  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
+  node unready (#448).
+
 - The container build copies every top-level `tests/fixtures/*.json` in the UI stage with one
-  `COPY`, so a UI test importing a new fixture no longer breaks the image.
+  `COPY`, so a UI test importing a new fixture no longer breaks the image (#495).
 
 ### Changed
 

@@ -18,8 +18,11 @@ def render(*args):
     return [item for item in yaml.safe_load_all(text) if item]
 
 
+def component(item):
+    return item["metadata"].get("labels", {}).get("app.kubernetes.io/component")
+
+
 def resource(items, kind, console=False):
-    component = lambda item: item["metadata"].get("labels", {}).get("app.kubernetes.io/component")
     return next(item for item in items if item["kind"] == kind
                 and component(item) != "proposals" and (component(item) == "console") == console)
 
@@ -319,8 +322,7 @@ for arguments, problem in [
 print("helm-check: named workspaces sections for the console and the job, never the nodes, passed")
 
 # The proposal server (ADR 0022): opt in, a pod of its own, read-only Postgres role, absent when off.
-assert not any(item["metadata"].get("labels", {}).get("app.kubernetes.io/component") == "proposals"
-               for item in workspaces), "the proposal server is off by default"
+assert not any(component(item) == "proposals" for item in workspaces), "the proposal server is off by default"
 assert "proposals" not in named_console
 proposals_args = ["-f", str(CHART / "values-console.yaml"), "-f", str(CHART / "values-identity.yaml"),
                   "-f", str(CHART / "values-workspaces.yaml"), "--set", "proposals.enabled=true"]
@@ -329,7 +331,7 @@ proposals = render(*proposals_args)
 
 def of_proposals(kind):
     return next(item for item in proposals if item["kind"] == kind
-                and item["metadata"].get("labels", {}).get("app.kubernetes.io/component") == "proposals")
+                and component(item) == "proposals")
 
 
 proposals_pod = of_proposals("Deployment")["spec"]["template"]["spec"]
@@ -357,6 +359,7 @@ assert tomllib.loads(next(item for item in audience if item["kind"] == "ConfigMa
 for arguments, problem in [
     (["--set", "modules.workspaces.enabled=false"], "modules.workspaces"),
     (["--set", "proposals.publicUrl=http://proposals.example.internal"], "https"),
+    (["--set", "proposals.publicUrl=https://proposals.example.internal/mcp"], "no path"),
 ]:
     failed = subprocess.run(["helm", "template", "check", str(CHART), *proposals_args, *arguments],
                             capture_output=True, text=True)
