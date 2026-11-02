@@ -10400,6 +10400,26 @@ mod tests {
         assert_eq!(calls["p.Mine.Plain.run() own"], "exact p.Mine.own()");
     }
 
+    /// A class nested in another reads the field of the class around it, and a field of its own
+    /// of that name comes first (#359): the nested class's own `repo` is `B`, the outer's `A`.
+    #[test]
+    fn a_nested_class_reads_the_outer_field_unless_it_declares_one_of_its_name() {
+        let calls = java_calls(
+            "package p;
+             class A { void go() {} }
+             class B { void go() {} }
+             class Outer {
+                 A repo;
+                 void mine() { repo.go(); }
+                 class Inner { void run() { repo.go(); } }
+                 static class Nested { B repo; void run() { repo.go(); } }
+             }",
+        );
+        assert_eq!(calls["p.Outer.mine() repo.go"], "exact p.A.go()");
+        assert_eq!(calls["p.Outer.Inner.run() repo.go"], "exact p.A.go()");
+        assert_eq!(calls["p.Outer.Nested.run() repo.go"], "exact p.B.go()");
+    }
+
     #[test]
     fn a_redundant_interface_keeps_the_family_and_its_subclasses() {
         let calls = java_calls(
@@ -11587,6 +11607,38 @@ mod kotlin_tests {
         for (i, known) in exact.iter().enumerate() {
             assert_eq!(*known, i + RECEIVER_DEPTH + 1 >= n, "call {i} of {n}");
         }
+    }
+
+    /// An inner class reads the field of the class around it, and a companion's (or a nested
+    /// class's) own field of that name comes first (#359): the companion's `repo` is `B`, the
+    /// class's `A`.
+    #[test]
+    fn an_inner_class_reads_the_outer_field_and_a_companion_one_of_its_name_hides_it() {
+        let found = resolved(&[(
+            "p/A.kt",
+            "package p
+class A { fun go() {} }
+class B { fun go() {} }
+class Outer {
+    val repo: A = A()
+    fun mine() { repo.go() }
+    inner class Inner { fun run() { repo.go() } }
+    class Nested {
+        val repo: B = B()
+        fun run() { repo.go() }
+    }
+    companion object {
+        val repo: B = B()
+        fun run() { repo.go() }
+    }
+}
+",
+        )]);
+        let go = |scope: &str| found[&format!("p/A.kt p.Outer{scope} repo.go")].as_str();
+        assert_eq!(go(".mine()"), "exact p/A.kt::p.A.go()");
+        assert_eq!(go(".Inner.run()"), "exact p/A.kt::p.A.go()");
+        assert_eq!(go(".Nested.run()"), "exact p/A.kt::p.B.go()");
+        assert_eq!(go(".Companion.run()"), "exact p/A.kt::p.B.go()");
     }
 
     /// A class of the file's own package hides one a star import gives, and two star imports

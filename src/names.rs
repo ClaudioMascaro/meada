@@ -143,3 +143,64 @@ pub fn is_type<'a>(
     in_full(code, path, scope, ty, |n| n == full)
         || one(&spellings(code, path, scope, ty), |s| s == full).is_some()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::LanguagePack;
+    use crate::lang::java::Java;
+    use crate::resolve::Resolver;
+    use std::collections::BTreeMap;
+
+    const GET: &str = "org.springframework.web.bind.annotation.GetMapping";
+
+    /// What `annotation` makes of the annotation `callee`, written in `a/C.java` under
+    /// `imports`, with the other files of the repository (`(path, source)`): the framework's
+    /// `GetMapping` is the one name the table knows.
+    fn written(imports: &str, callee: &str, others: &[(&str, &str)]) -> Option<String> {
+        let src = format!("package a;\n{imports}\nclass C {{ @{callee}(\"/x\") void f() {{}} }}\n");
+        let mut parsed = vec![("a/C.java", Java.parse("a/C.java", src.as_bytes()).unwrap())];
+        for (path, source) in others {
+            parsed.push((path, Java.parse(path, source.as_bytes()).unwrap()));
+        }
+        let files: BTreeMap<&str, &_> = parsed.iter().map(|(p, f)| (*p, f)).collect();
+        let layout = Java.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &Java);
+        let code = Code::new(&resolver, &files, &Java);
+        let facts = files["a/C.java"];
+        let call = (facts.calls.iter())
+            .find(|c| c.decorates.is_some())
+            .unwrap();
+        annotation(&code, "a/C.java", call, |s| s == GET)
+    }
+
+    /// The three guards of `written_in_full` (#360): a dotted name is its own spelling only when
+    /// no import binds its head, no definition of the repository is its head, and none names it
+    /// in full. The repository wins each time.
+    #[test]
+    fn a_name_written_in_full_is_the_library_s_only_when_the_repository_binds_none_of_it() {
+        assert_eq!(written("", GET, &[]).as_deref(), Some(GET));
+        // An import binds the head: `org` is the imported class, not the root package.
+        assert_eq!(written("import com.acme.org;", GET, &[]), None);
+        // A class of the repository is the head.
+        let head = [("a/org.java", "package a; class org {}")];
+        assert_eq!(written("", GET, &head), None);
+        // A class of the repository is spelled exactly like the library's.
+        let own = format!(
+            "package {}; @interface GetMapping {{}}",
+            GET.rsplit_once('.').unwrap().0
+        );
+        let same = [(
+            "org/springframework/web/bind/annotation/GetMapping.java",
+            &*own,
+        )];
+        assert_eq!(written("", GET, &same), None);
+        // Another class of that package hides nothing.
+        let other = own.replace("GetMapping", "PostMapping");
+        let beside = [(
+            "org/springframework/web/bind/annotation/PostMapping.java",
+            &*other,
+        )];
+        assert_eq!(written("", GET, &beside).as_deref(), Some(GET));
+    }
+}

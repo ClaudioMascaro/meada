@@ -7,6 +7,17 @@ a ticket accepted, each with its value and its reason. Detail behind the
 
 ## Known ceilings
 
+- `names.rs`, `http/csharp.rs`, `channel/java.rs` (#466): two cases are not pinned.
+  (1) #358: a Rabbit `convertAndSend("orders", o)` whose `o` is a parameter of a type the
+  repository does not declare (`void f(Order o)`) reads as the named producer `amqp orders
+  producer`, because Java's implicit `java.lang` on-demand candidates make the type an outside
+  one; #358 asks for a producer with no name. `an_argument_of_unknown_type_does_not_tell_the_overload`
+  fixes the observed answer, and which is right waits on the maintainer.
+  (2) #354: the C# HTTP reader reads its attributes through `names::known` (the value reading),
+  not `names::annotation` (the decorator reading, which a class with an outside base does not
+  hide an import from); the test in `http/csharp.rs` pins `annotation` over C# facts, not that
+  reader.
+
 - `deploy/` (#504): the proposal server's Helm block renders no Ingress (the operator exposes its
   Service behind their own TLS at `proposals.publicUrl`), and Compose's `proposals.workspace.toml`
   keeps `[oidc]`, `[catalog]` and `[workspaces]` commented, so the service does not start until the

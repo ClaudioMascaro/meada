@@ -513,6 +513,50 @@ mod tests {
         assert!(plain("", ": Other", USINGS).is_empty());
     }
 
+    /// `(annotation, known)` for the attribute `attr` of the first method of `class C : base`,
+    /// under `using <attr> = Acme.<attr>;` (the alias is C#'s single-name import, which a
+    /// `using Acme;` is not), where `Acme.<attr>` is the one name the table knows: the decorator
+    /// reading and the value reading of the same name.
+    fn attribute_of(base: &str, attr: &str) -> (Option<String>, Option<String>) {
+        let src = format!(
+            "using {attr} = Acme.{attr};\nnamespace A;\npublic class C : {base} {{ [{attr}] public void M() {{}} }}\n"
+        );
+        let facts = CSharp.parse("A/C.cs", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("A/C.cs", &facts)]);
+        let layout = CSharp.layout(&[], &files).unwrap();
+        let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &CSharp);
+        let code = Code::new(&resolver, &files, &CSharp);
+        let call = facts.calls.iter().find(|c| c.decorates.is_some()).unwrap();
+        let is_known = |s: &str| s == format!("Acme.{attr}");
+        let value = crate::names::known(&code, "A/C.cs", &call.scope, &call.callee, is_known);
+        (
+            crate::names::annotation(&code, "A/C.cs", call, is_known),
+            value,
+        )
+    }
+
+    /// A class with a base from outside the repository hides no `using` from its members'
+    /// attributes (#354): `[Foo]` reads as a decorator, which no member of the base binds. A
+    /// value reading of the same name stays unknown where the base may declare it. This pins
+    /// `names::annotation` over C# facts; the reader of this module reads its attributes through
+    /// `known`, the value reading (`spelled`), so it does not yet take that way (#466).
+    #[test]
+    fn an_attribute_of_a_member_under_an_outside_base_is_read_through_the_usings() {
+        let acme = |attr: &str| Some(format!("Acme.{attr}"));
+        // A listed base (`IDisposable` declares `Dispose` alone): both readings agree.
+        assert_eq!(
+            attribute_of("IDisposable", "Foo"),
+            (acme("Foo"), acme("Foo"))
+        );
+        // A listed base's own name: only the decorator reading gets past it.
+        assert_eq!(
+            attribute_of("IDisposable", "Dispose"),
+            (acme("Dispose"), None)
+        );
+        // An unlisted base may declare anything.
+        assert_eq!(attribute_of("Unlisted", "Foo"), (acme("Foo"), None));
+    }
+
     #[test]
     fn names_count_only_through_the_mvc_namespace() {
         let m = "[HttpGet(\"a\")] public void A() {}";
