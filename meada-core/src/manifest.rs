@@ -8,8 +8,10 @@ use std::ops::Range;
 
 use serde::de::{DeserializeOwned, Error as _};
 use serde::{Deserialize, Deserializer};
+use serde_json::Value as Json;
 use toml::de::{DeTable, DeValue};
 
+use crate::ids::VersionEntry;
 use crate::msg::{Kind, Msg};
 use crate::{parent, qualify};
 
@@ -266,6 +268,18 @@ pub struct EntryPeer {
 }
 
 impl EntryFile {
+    /// Its fields as `workspace_version_id` hashes them, `blocks` being its blocks
+    /// (`entry_blocks`): the one place the tuple's order is written.
+    pub fn version_entry<'a>(&'a self, blocks: &'a Json) -> VersionEntry<'a> {
+        (
+            &self.repo,
+            &self.path,
+            blocks,
+            self.owner.as_deref(),
+            self.added_by.as_deref(),
+        )
+    }
+
     /// Its blocks, as `status` names those a mirror's own `meada.toml` overrides:
     /// `[repository.serve]`, `[[repository.resource]] <kind> <id>`, `[[repository.peer]] <repo>`.
     pub fn blocks(&self) -> Vec<String> {

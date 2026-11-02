@@ -413,7 +413,7 @@ impl Session {
     fn core_grant(&self) -> meada_core::authorize::Grant {
         #[cfg(feature = "oidc")]
         if let Some(grant) = &self.grant {
-            return grant.core();
+            return grant.into();
         }
         meada_core::authorize::Grant::All
     }

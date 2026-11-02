@@ -128,7 +128,7 @@ each context with the identities the sponsor rule excluded from its version (`ex
 `snapshot/pull.rs` checks them; `snapshot/serve.rs` `Held::context` builds a context once, and
 `Held::admits` and `Held::viewable` decide a workspace route and its 404 list with
 `named::visible` over every entry of the recorded version, excluded ones included, with no
-operator exemption (the token's grant through `grant::Grant::core`, as the console maps it);
+operator exemption (the token's grant through `From<&grant::Grant>` for `meada_core::authorize::Grant`, as the console maps it);
 `mcp.rs` routes `/-/workspaces/<id>/<identity>` and `Engine::open_context` opens it;
 `meada-core/src/named.rs` holds the pure rules (`creation`, `visible`, `answers`, `shown`,
 `unsponsored`, names, named entries and their version id) that the Rust table test, the console

@@ -156,12 +156,7 @@ impl Console {
             let read = self.bounded("console", |console, service| {
                 read_runtime(console.current_entries(&service), &service)
             });
-            let grant = match grant {
-                crate::grant::Grant::All => meada_core::authorize::Grant::All,
-                crate::grant::Grant::Only(identities) => {
-                    meada_core::authorize::Grant::Only(identities.iter().cloned().collect())
-                }
-            };
+            let grant = meada_core::authorize::Grant::from(grant);
             if let Ok(Some(entries)) = read {
                 let teams = meada_core::authorize::teams(groups, &grant, &entries);
                 return teams.into_iter().map(str::to_string).collect();

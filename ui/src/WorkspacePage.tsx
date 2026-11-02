@@ -194,7 +194,7 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
     if (!allowed || !listing) return undefined;
     if (!team) return applyAction(version, workspace?.current?.id, listing.versions, file ?? '');
     const stored = cache[version.id];
-    return stored ? teamApplyAction(version, workspace?.current?.id, listing.versions, held, plainEntries(stored.repositories), team, locale) : undefined;
+    return stored ? teamApplyAction(version, workspace?.current?.id, listing.versions, held, plainEntries(stored.repositories), team) : undefined;
   }
   return <>
     <div className="workspace-heading"><div><h1>{t.title}</h1><p className="intro">{t.intro}</p></div>

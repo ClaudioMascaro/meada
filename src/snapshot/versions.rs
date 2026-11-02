@@ -20,7 +20,7 @@
 //! Under `[oidc.github]` they read it without the additions `meada github-app roles` excluded
 //! (`eligible`), which it writes to `excluded` (`EXCLUDED`) beside `current` (#331).
 
-#[cfg(feature = "refresh-lock")]
+#[cfg(all(feature = "ui", feature = "refresh-lock"))]
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fs::{self, File};
@@ -30,9 +30,10 @@ use std::path::{Path, PathBuf};
 use meada_core::authorize::{self, Grant, Refusal, Role, authorize_entries};
 #[cfg(all(feature = "ui", feature = "refresh-lock"))]
 use meada_core::authorize::{Change, Reason, compose_entries};
-use meada_core::ids::{VersionEntry, workspace_version_id};
 use meada_core::manifest::{EntryFile, validate, validate_import};
-use meada_core::workspace::{entries_text, entry};
+#[cfg(feature = "refresh-lock")]
+use meada_core::workspace::touched_owners;
+use meada_core::workspace::{entries_id, entries_text, with_blocks};
 use redis::cmd;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as Json;
@@ -405,41 +406,10 @@ async fn current_entries(
     ))
 }
 
-/// The owners, sorted and without repeats, of the entries that differ between `current` and
-/// `new`: the groups a team operator's change touched.
-#[cfg(feature = "refresh-lock")]
-fn touched_owners(current: &[Json], new: &[Json]) -> Vec<String> {
-    let keyed = |entries: &[Json]| -> BTreeMap<String, Json> {
-        (entries.iter())
-            .map(|e| (authorize::repo(e).to_string(), e.clone()))
-            .collect()
-    };
-    let (old, new) = (keyed(current), keyed(new));
-    let touched = old.keys().chain(new.keys()).collect::<BTreeSet<_>>();
-    (touched.into_iter())
-        .filter(|repo| old.get(*repo) != new.get(*repo))
-        .filter_map(|repo| new.get(repo).or_else(|| old.get(repo)))
-        .filter_map(|entry| entry["owner"].as_str())
-        .map(str::to_string)
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect()
-}
-
 /// The version id of `entries`, their blocks being `blocks` (`entry_blocks`), and the entries as
 /// a version document holds them.
 fn versioned(entries: &[EntryFile], blocks: Vec<Json>) -> (String, Vec<Json>) {
-    let ids: Vec<VersionEntry> = (entries.iter().zip(&blocks))
-        .map(|(e, blocks)| {
-            let (owner, added_by) = (e.owner.as_deref(), e.added_by.as_deref());
-            (e.repo.as_str(), e.path.as_str(), blocks, owner, added_by)
-        })
-        .collect();
-    let id = workspace_version_id(&ids);
-    let repositories = (entries.iter().zip(blocks))
-        .map(|(e, blocks)| entry(e, blocks))
-        .collect();
-    (id, repositories)
+    (entries_id(entries, &blocks), with_blocks(entries, blocks))
 }
 
 /// The version stored at `key`, checked as the version `id` (`checked`), with its entries in the
