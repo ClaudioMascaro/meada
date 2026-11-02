@@ -218,6 +218,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Rust: a `crate::a::*` glob written inside `a` or below it sees what `use super::*` sees,
+  the ancestor's private `use` included, so `Def::new()` through it is `exact` instead of
+  unresolved (#438). A glob of a sibling module still takes public names only.
+
 - Swift: a call whose labels differ from a known outside member's resolves as if that base
   were absent (#463): `x.hash(seed: 1)` on a type that conforms to `Hashable` and declares
   `hash(seed:)` is `exact`, while `x.hash(into: &h)` stays opaque. A call with no labels, or in

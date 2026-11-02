@@ -3611,6 +3611,22 @@ impl<'a> Resolver<'a> {
             .map(|i| i.source.as_str())
     }
 
+    /// Whether the module `m` is the file `path` or one of its ancestors (Rust's `super`
+    /// chain), whose private names a glob of it sees whatever the path's spelling (#438).
+    fn is_self_or_ancestor(&self, path: &str, m: &str) -> bool {
+        let mut at = path;
+        for _ in 0..LINK_DEPTH {
+            if at == m {
+                return true;
+            }
+            match self.module(at, "super") {
+                Some(up) => at = up,
+                None => return false,
+            }
+        }
+        false
+    }
+
     /// What a glob import whose target is `bound` gives `name` (`globs`).
     fn through_glob(
         &self,
@@ -3623,7 +3639,9 @@ impl<'a> Resolver<'a> {
     ) -> Binding<'a> {
         match bound {
             // A module `path` imports `testable` gives its `internal` names as its own do.
-            Binding::Module(m) if inside || self.sees_internals(path, m) => {
+            Binding::Module(m)
+                if inside || self.sees_internals(path, m) || self.is_self_or_ancestor(path, m) =>
+            {
                 self.export(m, name, seen)
             }
             Binding::Module(m) => self.star(m, name, seen).unwrap_or(Binding::Unknown),
@@ -8631,6 +8649,52 @@ mod tests {
         assert_eq!(found["a.rs tests.deep.g Def.new"], "exact x.rs::Def.new");
         // A private type is not the glob's outside its module.
         assert_eq!(found["a.rs sibling.p Priv.new"], "none");
+    }
+
+    #[test]
+    fn a_crate_glob_of_an_ancestor_file_sees_its_private_use() {
+        let found = calls(&[
+            ("main.rs", "mod a;\nmod x;\nfn main() {}\n"),
+            (
+                "x.rs",
+                "pub struct Def;\nimpl Def { pub fn new() -> Self { Def } }\n",
+            ),
+            ("a.rs", "use crate::x::Def;\nmod b;\n"),
+            ("b.rs", "mod c;\n"),
+            ("c.rs", "use crate::a::*;\nfn h() { Def::new(); }\n"),
+        ]);
+        assert_eq!(found["c.rs h Def.new"], "exact x.rs::Def.new");
+    }
+
+    #[test]
+    fn a_crate_glob_of_an_ancestor_sees_what_super_glob_sees() {
+        // #438: a private `use` of the module is visible to its descendants, however the glob
+        // spells the module; a sibling's is not.
+        let found = calls(&[
+            ("main.rs", "mod a;\nmod b;\nmod x;\nfn main() {}\n"),
+            (
+                "x.rs",
+                "pub struct Def;\nimpl Def { pub fn new() -> Self { Def } }\npub fn xf() {}\n",
+            ),
+            (
+                "a.rs",
+                "use crate::x::Def;\nuse crate::x::xf;\n\
+                 mod named { use crate::a::*; fn h() { Def::new(); xf(); } }\n\
+                 mod sup { use super::*; fn h() { Def::new(); xf(); } }\n\
+                 mod sib { use crate::b::*; fn h() { Def::new(); xf(); bf(); } }\n",
+            ),
+            (
+                "b.rs",
+                "use crate::x::Def;\nuse crate::x::xf;\npub fn bf() {}\n",
+            ),
+        ]);
+        assert_eq!(found["a.rs named.h Def.new"], "exact x.rs::Def.new");
+        assert_eq!(found["a.rs named.h xf"], "exact x.rs::xf");
+        assert_eq!(found["a.rs sup.h Def.new"], "exact x.rs::Def.new");
+        assert_eq!(found["a.rs sup.h xf"], "exact x.rs::xf");
+        assert_eq!(found["a.rs sib.h bf"], "exact b.rs::bf");
+        assert_eq!(found["a.rs sib.h Def.new"], "none");
+        assert_eq!(found["a.rs sib.h xf"], "inferred x.rs::xf");
     }
 
     #[test]
