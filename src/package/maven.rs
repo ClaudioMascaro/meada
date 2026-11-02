@@ -990,6 +990,26 @@ mod tests {
     }
 
     #[test]
+    fn the_gradle_properties_of_the_module_beat_the_repository_roots() {
+        let build = "dependencies {\n  implementation \"${g}:${a}\"\n}\n";
+        let mut manifests: Vec<_> = [
+            ("gradle.properties", "g=root\na=models\n"),
+            ("app/gradle.properties", "g=example\n"),
+            ("app/build.gradle", build),
+        ]
+        .map(|(path, src)| Manifest {
+            path: path.to_string(),
+            summary: Maven.read(path, src.as_bytes()),
+        })
+        .into();
+        Maven.inherit(&mut manifests);
+        let names: Vec<_> = (manifests[2].summary.dependencies.iter())
+            .map(|e| e.name.as_str())
+            .collect();
+        assert_eq!(names, ["example:models"]);
+    }
+
+    #[test]
     fn a_parent_pom_of_the_repository_gives_its_properties_to_the_dependencies_below() {
         let pom = |parent: &str, id: &str, properties: &str, dependency: &str| {
             format!(
@@ -1116,6 +1136,17 @@ mod tests {
     /// The names of the entries `Maven::entries` gives a file of module `app`, in a repository
     /// whose modules are `poms`, as `(module, pom.xml dependencies)`.
     fn entries(poms: &[(&str, &str)]) -> Vec<String> {
+        let exports = exports(poms);
+        let providers = Providers::new(&exports);
+        (Maven
+            .entries(&exports, &providers, (0, "app/src/main/java/A.java"), "c")
+            .iter())
+        .map(|(e, _)| format!("{}{}", e.name, e.range.as_deref().unwrap_or("")))
+        .collect()
+    }
+
+    /// The export of a repository whose modules are `poms`, as `(module, pom.xml dependencies)`.
+    fn exports(poms: &[(&str, &str)]) -> [Export; 1] {
         let manifests = (poms.iter())
             .map(|(module, deps)| {
                 let src = format!("<project><groupId>g</groupId><artifactId>{module}</artifactId><dependencies>{deps}</dependencies></project>");
@@ -1125,16 +1156,10 @@ mod tests {
                 }
             })
             .collect();
-        let exports = [Export {
+        [Export {
             manifests,
             ..Export::default()
-        }];
-        let providers = Providers::new(&exports);
-        (Maven
-            .entries(&exports, &providers, (0, "app/src/main/java/A.java"), "c")
-            .iter())
-        .map(|(e, _)| format!("{}{}", e.name, e.range.as_deref().unwrap_or("")))
-        .collect()
+        }]
     }
 
     fn dep(artifact: &str, more: &str) -> String {
@@ -1162,8 +1187,8 @@ mod tests {
 
     #[test]
     fn a_module_cycle_and_a_chain_past_the_depth_bound_are_walked_in_linear_time() {
-        let names: Vec<String> = (0..500).map(|i| format!("m{i}")).collect();
-        // A chain from app that closes into a cycle back to app.
+        // A chain from app that closes into a cycle back to app stops at the depth bound.
+        let names: Vec<String> = (0..100).map(|i| format!("m{i}")).collect();
         let deps: Vec<String> = (0..names.len())
             .map(|i| dep(names.get(i + 1).map_or("app", |n| n.as_str()), ""))
             .collect();
@@ -1172,14 +1197,38 @@ mod tests {
         poms.extend(
             names
                 .iter()
-                .zip(&deps)
-                .map(|(n, d)| (n.as_str(), d.as_str())),
+                .map(String::as_str)
+                .zip(deps.iter().map(String::as_str)),
         );
-        let start = std::time::Instant::now();
-        let found = entries(&poms);
-        assert!(start.elapsed().as_millis() < 500, "{:?}", start.elapsed());
-        assert_eq!(found.len(), MODULE_DEPTH + 1);
+        assert_eq!(entries(&poms).len(), MODULE_DEPTH + 1);
         let found = entries(&[("app", &dep("a", "")), ("a", &dep("app", ""))]);
         assert_eq!(found, ["g:a", "g:app"]);
+        // App reaches every module of a ring through four hubs (a pom past `lang::MAX_BYTES` reads
+        // as nothing), so one level of the walk holds them all and the next finds each already
+        // walked. Only the walk is timed: each module walked once takes about 0.26 s here (under a
+        // thirtieth of the bound); a walk that rescans what it walked (`walked` as a `Vec`), 12 s.
+        const HUBS: usize = 4;
+        const RING: usize = HUBS * 10_000;
+        let names: Vec<String> = (0..RING).map(|i| format!("w{i}")).collect();
+        let deps: Vec<String> = (0..RING).map(|i| dep(&names[(i + 1) % RING], "")).collect();
+        let hubs: Vec<(String, String)> = (names.chunks(RING / HUBS).enumerate())
+            .map(|(h, chunk)| (format!("h{h}"), chunk.iter().map(|n| dep(n, "")).collect()))
+            .collect();
+        let app: String = hubs.iter().map(|(h, _)| dep(h, "")).collect();
+        let mut poms = vec![("app", app.as_str())];
+        poms.extend(hubs.iter().map(|(h, d)| (h.as_str(), d.as_str())));
+        poms.extend(
+            names
+                .iter()
+                .map(String::as_str)
+                .zip(deps.iter().map(String::as_str)),
+        );
+        let exports = exports(&poms);
+        let providers = Providers::new(&exports);
+        let start = std::time::Instant::now();
+        let found = Maven.entries(&exports, &providers, (0, "app/src/main/java/A.java"), "c");
+        let took = start.elapsed();
+        assert_eq!(found.len(), HUBS + RING);
+        assert!(took.as_secs() < 8, "{took:?}");
     }
 }
