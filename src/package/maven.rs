@@ -383,6 +383,132 @@ fn parent_properties(manifests: &mut [Manifest]) {
     }
 }
 
+/// Whether `name` is a file of declarations a Gradle build reads values from, no build of its
+/// own: `gradle.properties` or a version catalog.
+fn declarations(name: &str) -> bool {
+    name == "gradle.properties" || name.ends_with(".versions.toml")
+}
+
+/// A Gradle build's dependencies take the literal `gradle.properties` (the repository's, the
+/// settings file's and the module's, the later winning) give a `${..}` of their coordinate or
+/// version, and a catalog accessor (`libs.models`) the coordinate its version catalog gives it:
+/// `gradle/libs.versions.toml` under the settings file's directory, or the file the settings
+/// file's `from(files(..))` names. An accessor the catalog lacks declares nothing.
+fn gradle_holes(manifests: &mut [Manifest]) {
+    let name = |m: &Manifest| m.path.rsplit('/').next().unwrap_or("").to_string();
+    let at = |dir: &str, rel: &str| match dir {
+        "" => rel.to_string(),
+        dir => format!("{dir}/{rel}"),
+    };
+    let declared: HashMap<&str, &Manifest> = (manifests.iter())
+        .filter(|m| declarations(&name(m)))
+        .map(|m| (m.path.as_str(), m))
+        .collect();
+    let settings: Vec<(&str, &jvm::Build)> = (manifests.iter())
+        .filter(|m| name(m).starts_with("settings.gradle"))
+        .filter_map(|m| Some((bare_directory(&m.path), m.summary.build.as_ref()?)))
+        .collect();
+    let mut filled = Vec::new();
+    for (i, m) in manifests.iter().enumerate() {
+        if !matches!(name(m).as_str(), "build.gradle" | "build.gradle.kts") {
+            continue;
+        }
+        let holes = |e: &Entry| {
+            e.template.is_some()
+                || e.via
+                    .as_deref()
+                    .is_some_and(|v| v.starts_with(jvm::gradle::CATALOG))
+        };
+        if !m.summary.dependencies.iter().any(holes) {
+            continue;
+        }
+        let dir = bare_directory(&m.path);
+        // The settings file of the project: the deepest one in a directory holding the build.
+        let root = (settings.iter())
+            .filter(|(root, _)| {
+                root.is_empty() || dir == *root || dir.starts_with(&format!("{root}/"))
+            })
+            .max_by_key(|(root, _)| root.len());
+        let root_dir = root.map_or(dir, |(root, _)| root);
+        let mut chain = vec!["", root_dir, dir];
+        chain.dedup();
+        let properties: Vec<_> = (chain.iter())
+            .filter_map(|d| declared.get(at(d, "gradle.properties").as_str()))
+            .collect();
+        let mut budget = jvm::maven::FILL_BUDGET;
+        let lookup = |name: &str| {
+            (properties.iter().rev())
+                .find_map(|m| m.summary.properties.get(name))
+                .map(String::as_str)
+        };
+        let catalogs = root.map_or(&[][..], |(_, b)| &b.catalogs[..]);
+        let catalog = |accessor: &str| {
+            let (library, alias) = accessor.split_once('.')?;
+            let file = match catalogs.iter().find(|(n, _)| n == library) {
+                Some((_, file)) => file.as_str(),
+                None if library == "libs" => "gradle/libs.versions.toml",
+                None => return None,
+            };
+            declared
+                .get(at(root_dir, file).as_str())?
+                .summary
+                .properties
+                .get(alias)
+        };
+        let mut entries: Vec<Entry> = Vec::new();
+        for e in &m.summary.dependencies {
+            if let Some(accessor) = e
+                .via
+                .as_deref()
+                .and_then(|v| v.strip_prefix(jvm::gradle::CATALOG))
+            {
+                // `group:artifact`, then the version when the catalog gives one.
+                let Some(found) = catalog(accessor) else {
+                    continue;
+                };
+                let (name, range) = match found.match_indices(':').nth(1) {
+                    Some((end, _)) => (&found[..end], Some(&found[end + 1..])),
+                    None => (found.as_str(), None),
+                };
+                entries.push(Entry {
+                    name: name.to_string(),
+                    range: range.map(str::to_string),
+                    via: None,
+                    ..e.clone()
+                });
+                continue;
+            }
+            let mut entry = e.clone();
+            if let Some((g, a)) = &e.template {
+                let (g, a) = (
+                    jvm::maven::fill(g, &lookup, &mut budget),
+                    jvm::maven::fill(a, &lookup, &mut budget),
+                );
+                if let Some((name, computed)) = jvm::maven::named(&g, &a) {
+                    // No literal fragment left: the coordinate fits every provider, so it names none.
+                    if name == "*:*" {
+                        continue;
+                    }
+                    entry.name = name;
+                    entry.via = computed.then(|| "computed".into());
+                    entry.template = computed.then_some((g, a));
+                }
+            }
+            // The version, when `gradle.properties` gives all it holds.
+            let range = e.range.as_deref().map(jvm::gradle::braced);
+            let range = range.map(|r| jvm::maven::fill(&r, &lookup, &mut budget));
+            entry.range = range.filter(|r| !r.contains('$')).or(entry.range);
+            entries.push(entry);
+        }
+        entries.sort_by(|a, b| (&a.field, &a.name, &a.range).cmp(&(&b.field, &b.name, &b.range)));
+        entries.dedup();
+        filled.push((i, entries));
+    }
+    for (i, entries) in filled {
+        manifests[i].summary.dependencies = entries;
+    }
+}
+
 pub struct Maven;
 
 impl Ecosystem for Maven {
@@ -397,13 +523,19 @@ impl Ecosystem for Maven {
                 | "settings.gradle.kts"
                 | "build.gradle"
                 | "build.gradle.kts"
-        )
+        ) || declarations(name)
     }
     fn read(&self, path: &str, src: &[u8]) -> Summary {
         match path.rsplit('/').next() {
             Some("pom.xml") => jvm::maven::read(src),
+            Some("gradle.properties") => jvm::gradle::properties(src),
+            Some(name) if declarations(name) => jvm::gradle::catalog(src),
             _ => jvm::gradle::read(path, src),
         }
+    }
+    /// Values a build reads bound no package.
+    fn owns(&self, manifest: &Manifest) -> bool {
+        !manifest.path.rsplit('/').next().is_some_and(declarations)
     }
     fn fits(&self, wanted: &str, provided: &str) -> bool {
         pattern_fits(wanted, provided)
@@ -528,6 +660,7 @@ impl Ecosystem for Maven {
     }
     fn inherit(&self, manifests: &mut [Manifest]) {
         parent_properties(manifests);
+        gradle_holes(manifests);
         let settings: Vec<_> = manifests
             .iter()
             .filter(|m| {

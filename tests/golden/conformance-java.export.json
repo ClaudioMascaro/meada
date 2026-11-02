@@ -1,7 +1,7 @@
 {
   "format": 1,
   "repository": "example.com/acme/conformance",
-  "commit": "5ab0f659c65e0c294c945296733510e9efed19c3",
+  "commit": "87b9b92cfcd4d0111ef6ae5a587fad65c41beac1",
   "dirty": false,
   "files": [
     {
@@ -5593,7 +5593,17 @@
   "consumers": [
     {
       "contract": "package::maven::example:api",
+      "site": "example.com/acme/conformance::gradle/build.gradle::compileOnly::example:api",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:api",
       "site": "example.com/acme/conformance::gradle/build.gradle::implementation::example:api",
+      "via": null
+    },
+    {
+      "contract": "package::maven::example:api",
+      "site": "example.com/acme/conformance::gradle/build.gradle::runtimeOnly::example:api",
       "via": null
     },
     {
@@ -5856,8 +5866,19 @@
   "dependencies": [
     {
       "manifest": "gradle/build.gradle",
+      "field": "compileOnly",
+      "name": "example:api"
+    },
+    {
+      "manifest": "gradle/build.gradle",
       "field": "implementation",
       "name": "example:api"
+    },
+    {
+      "manifest": "gradle/build.gradle",
+      "field": "runtimeOnly",
+      "name": "example:api",
+      "range": "1.0"
     }
   ],
   "communities": [
@@ -5987,11 +6008,25 @@
   ],
   "links": [
     {
+      "consumer": "example.com/acme/conformance::gradle/build.gradle::compileOnly::example:api",
+      "provider": "example.com/acme/conformance::maven/api/pom.xml",
+      "contract": "package::maven::example:api",
+      "level": "exact",
+      "reason": "package::maven::example:api none (local none), range unchecked"
+    },
+    {
       "consumer": "example.com/acme/conformance::gradle/build.gradle::implementation::example:api",
       "provider": "example.com/acme/conformance::maven/api/pom.xml",
       "contract": "package::maven::example:api",
       "level": "exact",
       "reason": "package::maven::example:api none (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/acme/conformance::gradle/build.gradle::runtimeOnly::example:api",
+      "provider": "example.com/acme/conformance::maven/api/pom.xml",
+      "contract": "package::maven::example:api",
+      "level": "exact",
+      "reason": "package::maven::example:api 1.0 (local none), range unchecked"
     },
     {
       "consumer": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onInvoice(String)",

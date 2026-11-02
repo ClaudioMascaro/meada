@@ -442,8 +442,15 @@ this file, and a change to these modules updates it.
   its range as written. Literal coordinate fragments filter those candidates, a coordinate
   with none (`*:*`) is no consumer, and a manifest is never a candidate of its own
   dependency (`consume` and `link` drop it). Gradle map notation (`group:`/`name:`/`version:`)
-  is read as a coordinate; a call (`project(...)`, `platform(...)`), a catalog accessor and
-  a configuration block's contents are not. A settings assignment to a project's `name` or
+  is read as a coordinate; a call (`project(...)`, `platform(...)`) and a configuration
+  block's contents are not. A `${name}` or `$name` the script leaves open is kept as the entry's
+  `template` and a catalog accessor (`libs.models`) as a placeholder entry (`via` `catalog
+  libs.models`, name `*:*`); `Maven::inherit` (`gradle_holes`) fills them from the
+  `gradle.properties` of the repository root, the settings file's directory and the module's (the
+  module's wins; a name the script assigns is never filled) and from the catalog (`gradle/
+  libs.versions.toml`, or the file a settings `from(files(..))` names for that accessor name),
+  and drops a placeholder the catalog does not resolve. Both files are manifests that own
+  nothing (`Maven::owns`). A settings assignment to a project's `name` or
   `projectDir`, and a `group` set in `allprojects`, drop the affected provider.
   Dependencies outside the workspace add nothing.
   Imports (ticket #94): `Maven::imports` turns a Java call into `(class, name(arity))`: the

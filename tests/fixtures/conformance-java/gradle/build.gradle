@@ -6,3 +6,9 @@ def suffix = 'pi'
 dependencies {
     implementation "example:a${suffix}"
 }
+
+// A catalog accessor and a `gradle.properties` value fill what the script leaves open.
+dependencies {
+    runtimeOnly libs.api
+    compileOnly "${vendor}:api"
+}

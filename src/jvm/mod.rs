@@ -24,6 +24,10 @@ pub struct Build {
     /// Project name and relative directory, as a settings file lists them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub includes: Vec<(String, String)>,
+    /// Settings only: each version catalog `from(files(..))` names, as its accessor name and the
+    /// path relative to the settings file's directory.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub catalogs: Vec<(String, String)>,
 }
 
 /// The source roots every JVM module has, and the test ones among them: Java's and Kotlin's.

@@ -119,7 +119,8 @@ all repository fixtures; it contains no private corpus data. Existing tests own 
   and the chart's refusals.
 - `src/package/hostile.rs` (unit, `cfg(test)`): the table `probes` of the readers of manifests and
   configurations, a row each for `package.json`, `tsconfig.json`, `pyproject.toml`,
-  `requirements.txt`, `Cargo.toml`, `go.mod`, `pom.xml`, Gradle builds, `.csproj` and
+  `requirements.txt`, `Cargo.toml`, `go.mod`, `pom.xml`, Gradle builds, `gradle.properties` and
+  version catalogs (also `Maven::inherit` over many builds), `.csproj` and
   `Directory.Build.props` (also `Nuget::inherit`), `msbuild::read` and `props`, Spring's
   `application.properties` and `.yml` (also placeholders) and `appsettings.json`, and the walks
   `Maven::entries` and `Nuget::entries` over modules and projects that pass on to each other.
@@ -566,7 +567,10 @@ all repository fixtures; it contains no private corpus data. Existing tests own 
   on-demand imports that both bring a class, a same-package class and a parameter or local
   that hide the import, test roots and outside types left out); an edited source set
   relinks like a cold workspace; `context` on the class `Order` lists the calls that reach its
-  members. Goldens `jvm-*.export.json`, `jvm-maven.context-total.txt`,
+  members. A catalog and `gradle.properties` fill a build's holes (#467): accessors with dots
+  and dashes, a missing alias, a catalog past the size limit or no TOML, a settings-named
+  catalog and one that leaves its directory, the module's property beating the repository's and
+  a script assignment beating both. Goldens `jvm-*.export.json`, `jvm-maven.context-total.txt`,
   `jvm-maven.context-order.txt` and `jvm-client.trace-down.txt`. Unit tests in
   `package/maven.rs` and `jvm/gradle.rs`.
 
@@ -1133,7 +1137,8 @@ checks the excerpt is the method.
 
 `conformance-java` holds Maven modules and a Gradle source tree, with `example.clients.Injected`
 (Spring `@Value` with a literal, a placeholder the module's configuration holds and a placeholder
-with a default) and a computed Gradle coordinate. `conformance::java` checks
+with a default), a computed Gradle coordinate and, in the Gradle build, a catalog accessor and a
+`gradle.properties` hole (#467). `conformance::java` checks
 all Java definitions and its golden export; the companion engine tests check package and
 static imports and their priority/ambiguity (including duplicate fully qualified types),
 overloads and constructors in separate namespaces, fully qualified calls with shadowing,

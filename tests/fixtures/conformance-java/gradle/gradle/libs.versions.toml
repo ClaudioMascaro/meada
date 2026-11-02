@@ -1,0 +1,5 @@
+[versions]
+api = "1.0"
+
+[libraries]
+api = { module = "example:api", version.ref = "api" }

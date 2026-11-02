@@ -3,13 +3,21 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::package::{Entry, Summary};
+use crate::lang::MAX_BYTES;
+use crate::package::{Entry, MAX_NAME, Summary};
 
 // ponytail: build scripts nest a few blocks; a deeper file reads as nothing.
 const GRADLE_DEPTH: usize = 64;
 
 // ponytail: a project names a few source directories; the rest of a hostile file is dropped.
 const MAX_ROOTS: usize = 64;
+
+// ponytail: a repository names a few thousand properties or catalog aliases; the rest of a
+// hostile `gradle.properties` or version catalog is dropped.
+const MAX_ENTRIES: usize = 8192;
+
+// ponytail: a settings file names a few catalogs; the rest of a hostile one is dropped.
+const MAX_CATALOGS: usize = 16;
 
 #[derive(Clone, Debug, PartialEq)]
 enum Token {
@@ -270,9 +278,67 @@ fn filled(value: &str, literals: &BTreeMap<String, String>) -> String {
     out
 }
 
-fn dependency(field: &str, args: &[Token], literals: &BTreeMap<String, String>) -> Option<Entry> {
-    // A call (`project(...)`, `files(...)`, `platform(...)`) or no string at all
-    // (`libs.models`) declares no `group:artifact` coordinate.
+/// `value` with each bare `$name` written `${name}`, the form `jvm::maven::fill` reads; a
+/// `$name.rest` stays, as `filled` leaves it.
+pub fn braced(value: &str) -> String {
+    let mut out = String::new();
+    let mut rest = value;
+    while let Some(at) = rest.find('$') {
+        out.push_str(&rest[..at]);
+        let after = &rest[at + 1..];
+        let len = after
+            .find(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+            .unwrap_or(after.len());
+        if len > 0 && !after[len..].starts_with('.') {
+            out.push_str(&format!("${{{}}}", &after[..len]));
+            rest = &after[len..];
+        } else {
+            out.push('$');
+            rest = after;
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// The names of the `${..}` holes of `value`.
+fn holes(value: &str) -> impl Iterator<Item = &str> {
+    value
+        .split("${")
+        .skip(1)
+        .filter_map(|rest| rest.split_once('}').map(|(name, _)| name))
+}
+
+/// The `via` of a dependency written as a catalog accessor, `libs.models`, until
+/// `Maven::inherit` reads the catalog.
+pub const CATALOG: &str = "catalog ";
+
+fn dependency(
+    field: &str,
+    args: &[Token],
+    literals: &BTreeMap<String, String>,
+    declared: &BTreeSet<String>,
+) -> Option<Entry> {
+    // `libs.models` (or `libs.models` in parentheses): a name in a catalog, if one says so.
+    let lone = match args {
+        [Token::Mark('('), inner @ .., Token::Mark(')')] => inner,
+        _ => args,
+    };
+    if let [Token::Word(accessor)] = lone
+        && !accessor.contains('$')
+        && accessor.len() <= MAX_NAME
+        && accessor.split('.').count() >= 2
+        && accessor.split('.').all(|s| !s.is_empty())
+    {
+        return Some(Entry {
+            field: field.into(),
+            name: "*:*".into(),
+            via: Some(format!("{CATALOG}{accessor}")),
+            ..Entry::default()
+        });
+    }
+    // A call (`project(...)`, `files(...)`, `platform(...)`) or no string at all declares no
+    // `group:artifact` coordinate.
     let call = args
         .windows(2)
         .any(|w| matches!(w, [Token::Word(_), Token::Mark('(')]));
@@ -290,24 +356,43 @@ fn dependency(field: &str, args: &[Token], literals: &BTreeMap<String, String>) 
             (g.to_string(), a.to_string(), v.map(str::to_string))
         }
     };
-    let (group, group_computed) = piece(&filled(&group, literals))?;
-    let (artifact, artifact_computed) = piece(&filled(&artifact, literals))?;
-    // A coordinate without one literal fragment fits every provider: it names none.
-    if group == "*" && artifact == "*" {
+    let (group, artifact) = (filled(&group, literals), filled(&artifact, literals));
+    // What the pom's seam can fill later: holes in the `${..}` form, none of them a name the
+    // script assigns (the script's value wins over `gradle.properties`, and is not a literal).
+    let template = (braced(&group), braced(&artifact));
+    let template = [&template.0, &template.1]
+        .iter()
+        .all(|v| {
+            v.match_indices('$')
+                .all(|(i, _)| v[i + 1..].starts_with('{'))
+        })
+        .then_some(template)
+        .filter(|(g, a)| holes(g).chain(holes(a)).all(|n| !declared.contains(n)));
+    let (group, group_computed) = piece(&group)?;
+    let (artifact, artifact_computed) = piece(&artifact)?;
+    // A coordinate without one literal fragment fits every provider: it names none, unless
+    // `gradle.properties` may still fill it (`Maven::inherit` drops it when it does not).
+    if group == "*" && artifact == "*" && template.is_none() {
         return None;
     }
     let name = format!("{group}:{artifact}");
-    if name.len() > crate::package::MAX_NAME {
+    if name.len() > MAX_NAME {
         return None;
     }
+    let computed = group_computed || artifact_computed;
     // A computed version keeps the coordinate literal: the range is kept as written, a part
     // that is no string leaves none.
     let range = range.filter(|v| !v.contains('*'));
+    // The script's own literals fill the version too; one naming a name the script assigns
+    // otherwise is unknown, and `gradle.properties` never overrides the script.
+    let range = (range.map(|v| filled(&v, literals)))
+        .filter(|v| holes(&braced(v)).all(|n| !declared.contains(n)));
     Some(Entry {
         field: field.into(),
         name,
         range,
-        via: (group_computed || artifact_computed).then(|| "computed".into()),
+        via: computed.then(|| "computed".into()),
+        template: template.filter(|_| computed),
         ..Entry::default()
     })
 }
@@ -436,6 +521,40 @@ fn dotted(tokens: &[Token]) -> Option<(String, &[Token])> {
     }
 }
 
+/// Whether `path` stays inside the directory it is relative to.
+fn relative(path: &str) -> bool {
+    !path.is_empty()
+        && !path.contains('\\')
+        && path.split('/').all(|s| !matches!(s, "" | "." | ".."))
+}
+
+/// The accessor name and the file of `from(files("gradle/other.versions.toml"))` inside
+/// `versionCatalogs { create("name") { .. } }` (Groovy: `name { .. }`).
+fn catalog_file(tokens: &[Token], blocks: &[String]) -> Option<(String, String)> {
+    let [.., parent, name] = blocks else {
+        return None;
+    };
+    let files = tokens.iter().filter_map(Token::word).any(|w| w == "files");
+    let [Token::Word(from), rest @ ..] = tokens else {
+        return None;
+    };
+    let strings: Vec<&str> = (rest.iter())
+        .filter_map(|t| match t {
+            Token::String(s, false) => Some(s.as_str()),
+            _ => None,
+        })
+        .collect();
+    let [path] = strings[..] else {
+        return None;
+    };
+    (parent == "versionCatalogs"
+        && from == "from"
+        && files
+        && relative(path)
+        && super::literal(name))
+    .then(|| (name.clone(), path.to_string()))
+}
+
 /// The literal directories a statement adds to a source set of `sourceSets`, with whether the
 /// set is `main`: `srcDirs = ['a']`, `srcDirs += 'a'`, `srcDir 'a'`, `srcDirs("a", "b")`, inside
 /// `sourceSets { main { java { ... } } }` or written with the dotted path, for the `java` or the
@@ -474,15 +593,9 @@ fn source_dirs(tokens: &[Token], blocks: &[String]) -> Option<(bool, Vec<String>
     if let [Token::Mark('['), inner @ .., Token::Mark(']')] = rest {
         rest = inner;
     }
-    let relative = |dir: &str| {
-        let dir = dir.strip_suffix('/').unwrap_or(dir);
-        !dir.is_empty()
-            && !dir.contains('\\')
-            && dir.split('/').all(|s| !matches!(s, "" | "." | ".."))
-    };
     let dirs = (arguments(rest).into_iter())
         .filter_map(|arg| match arg {
-            [Token::String(s, false)] if relative(s) => {
+            [Token::String(s, false)] if relative(s.strip_suffix('/').unwrap_or(s)) => {
                 Some(s.strip_suffix('/').unwrap_or(s).to_string())
             }
             _ => None,
@@ -491,8 +604,9 @@ fn source_dirs(tokens: &[Token], blocks: &[String]) -> Option<(bool, Vec<String>
     Some((main, dirs))
 }
 
-/// The name a block's head line gives it: its first word, with a `named(..)` or `getByName(..)`
-/// of a literal set read as that set (`sourceSets.named("main")` is `sourceSets.main`).
+/// The name a block's head line gives it: its first word, with a `named(..)`, `getByName(..)`,
+/// `create(..)` or `register(..)` of a literal name read as that name (`sourceSets.named("main")`
+/// is `sourceSets.main`, `create("libs")` in `versionCatalogs` is `libs`).
 fn block_head(line: &[Token]) -> String {
     if let Some((head, [])) = dotted(line) {
         return head;
@@ -506,7 +620,7 @@ fn block_head(line: &[Token]) -> String {
     ] = line
     {
         let (before, last) = head.rsplit_once('.').unwrap_or(("", head));
-        if matches!(last, "named" | "getByName") && super::literal(set) {
+        if matches!(last, "named" | "getByName" | "create" | "register") && super::literal(set) {
             return match before {
                 "" => set.clone(),
                 before => format!("{before}.{set}"),
@@ -530,6 +644,8 @@ struct Scan {
     /// Each name the script assigns, with its string when that is its one assignment, at the
     /// top level or in `ext { }`, outside any condition.
     names: BTreeMap<String, Option<String>>,
+    /// The version catalogs a settings file names, `(accessor, path)`.
+    catalogs: Vec<(String, String)>,
     /// The `dependencies` statements, read once `names` is complete.
     pending: Vec<(String, Vec<Token>)>,
 }
@@ -548,6 +664,12 @@ fn statement(tokens: &[Token], blocks: &[String], controlled: bool, scan: &mut S
         (scan.names.entry(name.to_string()))
             .and_modify(|v| *v = None)
             .or_insert(literal);
+    }
+    if !conditional
+        && scan.catalogs.len() < MAX_CATALOGS
+        && let Some(catalog) = catalog_file(tokens, blocks)
+    {
+        scan.catalogs.push(catalog);
     }
     let Scan { build, summary, .. } = scan;
     if blocks.is_empty() {
@@ -637,7 +759,7 @@ fn statement(tokens: &[Token], blocks: &[String], controlled: bool, scan: &mut S
 // string reads as quoted pairs; text inside them may be scanned as code when its quotes do not
 // pair up.
 pub fn read(path: &str, src: &[u8]) -> Summary {
-    if src.len() > crate::lang::MAX_BYTES {
+    if src.len() > MAX_BYTES {
         return Summary::default();
     }
     let Ok(text) = std::str::from_utf8(src) else {
@@ -692,13 +814,16 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
         unplaced,
         sources,
         names,
+        catalogs,
         pending,
     } = scan;
+    build.catalogs = catalogs;
+    let declared: BTreeSet<String> = names.keys().cloned().collect();
     let literals: BTreeMap<String, String> = (names.into_iter())
         .filter_map(|(name, value)| Some((name, value.filter(|v| super::literal(v))?)))
         .collect();
     summary.dependencies = (pending.iter())
-        .filter_map(|(field, args)| dependency(field, args, &literals))
+        .filter_map(|(field, args)| dependency(field, args, &literals, &declared))
         .collect();
     let settings = path
         .rsplit('/')
@@ -731,6 +856,8 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
         .retain(|(_, path)| !unplaced && !moved.contains(path));
     build.includes.sort();
     build.includes.dedup();
+    build.catalogs.sort();
+    build.catalogs.dedup();
     summary.build = Some(build);
     summary
         .dependencies
@@ -739,12 +866,247 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
     summary
 }
 
+/// The properties a `gradle.properties` gives, as `Summary::properties`: each `name=value` (or
+/// `name:value`) line whose name is a plain key and whose value is no longer than a package
+/// name and holds no escape, the last line of a name winning. Comments (`#`, `!`) and the other
+/// lines are skipped; a file past `MAX_BYTES` reads as nothing.
+pub fn properties(src: &[u8]) -> Summary {
+    let text = (src.len() <= MAX_BYTES)
+        .then(|| std::str::from_utf8(src).ok())
+        .flatten()
+        .unwrap_or("");
+    let mut found = BTreeMap::new();
+    for line in text.lines().map(str::trim_start) {
+        let Some((key, value)) = line.split_once(['=', ':']) else {
+            continue;
+        };
+        let (key, value) = (key.trim_end(), value.trim());
+        if !line.starts_with(['#', '!'])
+            && super::literal(key)
+            && value.len() <= MAX_NAME
+            && !value.contains('\\')
+            && (found.len() < MAX_ENTRIES || found.contains_key(key))
+        {
+            found.insert(key.to_string(), value.to_string());
+        }
+    }
+    Summary {
+        properties: found,
+        ..Summary::default()
+    }
+}
+
+/// The libraries of a version catalog (`gradle/libs.versions.toml`), as `Summary::properties`:
+/// each alias as Gradle's accessor spells it (`my-lib` and `my_lib` are `my.lib`) with its
+/// `group:artifact` and, when `[versions]` or the library gives one, `:version`. A file past
+/// `MAX_BYTES`, one that is no TOML, and a library with no literal coordinate read as nothing.
+pub fn catalog(src: &[u8]) -> Summary {
+    use toml::Value;
+    let table = (src.len() <= MAX_BYTES)
+        .then(|| std::str::from_utf8(src).ok())
+        .flatten()
+        .and_then(|text| text.parse::<toml::Table>().ok())
+        .unwrap_or_default();
+    let versions = table.get("versions").and_then(Value::as_table);
+    // A version as a string, or a rich version's strictest bound.
+    fn version(v: &Value) -> Option<&str> {
+        match v {
+            Value::String(s) => Some(s),
+            Value::Table(t) => ["strictly", "require", "prefer"]
+                .iter()
+                .find_map(|k| t.get(*k)?.as_str()),
+            _ => None,
+        }
+    }
+    let coordinate = |library: &Value| {
+        let (group, artifact, wanted) = match library {
+            Value::String(s) => {
+                let mut parts = s.splitn(3, ':');
+                (parts.next()?, parts.next()?, parts.next())
+            }
+            Value::Table(t) => {
+                let text = |k: &str| t.get(k).and_then(Value::as_str);
+                let (group, artifact) = match text("module") {
+                    Some(module) => module.split_once(':')?,
+                    None => (text("group")?, text("name")?),
+                };
+                let wanted = match t.get("version") {
+                    Some(Value::Table(v)) if v.contains_key("ref") => {
+                        let named = v.get("ref").and_then(Value::as_str);
+                        named.and_then(|r| versions?.get(r)).and_then(version)
+                    }
+                    Some(v) => version(v),
+                    None => None,
+                };
+                (group, artifact, wanted)
+            }
+            _ => return None,
+        };
+        let name = super::coordinate(group, artifact)?;
+        let wanted = wanted.filter(|v| !v.is_empty() && v.len() <= MAX_NAME && !v.contains(':'));
+        Some(wanted.map_or(name.clone(), |v| format!("{name}:{v}")))
+    };
+    let libraries = (table.get("libraries").and_then(Value::as_table).into_iter())
+        .flatten()
+        .take(MAX_ENTRIES);
+    let properties = libraries
+        .filter_map(|(alias, library)| Some((alias.replace(['-', '_'], "."), coordinate(library)?)))
+        .filter(|(alias, _)| super::literal(alias))
+        .collect();
+    Summary {
+        properties,
+        ..Summary::default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn build(path: &str, src: &str) -> super::super::Build {
         read(path, src.as_bytes()).build.unwrap_or_default()
+    }
+
+    #[test]
+    fn gradle_properties_read_plain_keys_and_short_values_the_last_winning() {
+        let found = |src: &str| properties(src.as_bytes()).properties;
+        let src = "# c\n! c\na=1\n b : 2 \na=3\nspace key=x\nlong=\\u0041\nnone\nempty=\n";
+        let read = found(src);
+        let read: Vec<_> = read.iter().map(|(k, v)| (&k[..], &v[..])).collect();
+        assert_eq!(read, [("a", "3"), ("b", "2"), ("empty", "")]);
+        let long = format!("a={}\nb=1\n", "x".repeat(MAX_NAME + 1));
+        assert_eq!(found(&long).keys().collect::<Vec<_>>(), ["b"]);
+        let wide: String = (0..MAX_ENTRIES + 10).map(|i| format!("p{i}=1\n")).collect();
+        assert_eq!(found(&wide).len(), MAX_ENTRIES);
+        assert!(properties(&vec![b'a'; MAX_BYTES + 1]).properties.is_empty());
+        assert!(properties(b"a=\xff").properties.is_empty());
+    }
+
+    #[test]
+    fn a_catalog_maps_each_alias_to_its_coordinate_and_version() {
+        let src = r#"
+[versions]
+guava = "33.0"
+rich = { strictly = "2.0", prefer = "2.1" }
+
+[libraries]
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+my-lib_x = { group = "com.acme", name = "lib", version = "1.0" }
+rich = { module = "com.acme:rich", version.ref = "rich" }
+short = "com.acme:short:3"
+bare = "com.acme:bare"
+absent = { module = "com.acme:absent", version.ref = "nowhere" }
+wild = { module = "com.*:wild" }
+no-colon = "bare"
+list = ["com.acme:list"]
+"#;
+        let found = catalog(src.as_bytes()).properties;
+        let found: Vec<_> = found.iter().map(|(k, v)| (&k[..], &v[..])).collect();
+        assert_eq!(
+            found,
+            [
+                ("absent", "com.acme:absent"),
+                ("bare", "com.acme:bare"),
+                ("guava", "com.google.guava:guava:33.0"),
+                ("my.lib.x", "com.acme:lib:1.0"),
+                ("rich", "com.acme:rich:2.0"),
+                ("short", "com.acme:short:3"),
+            ]
+        );
+        assert!(catalog(&vec![b' '; MAX_BYTES + 1]).properties.is_empty());
+        assert!(catalog(b"[libraries\n").properties.is_empty());
+    }
+
+    #[test]
+    fn a_catalog_and_a_settings_file_stop_at_their_limits() {
+        let wide: String = (0..MAX_ENTRIES + 10)
+            .map(|i| format!("a{i} = \"g:a{i}\"\n"))
+            .collect();
+        let found = catalog(format!("[libraries]\n{wide}").as_bytes());
+        assert_eq!(found.properties.len(), MAX_ENTRIES);
+        let many: String = (0..MAX_CATALOGS + 5)
+            .map(|i| format!("create(\"c{i}\") {{ from(files(\"c{i}.versions.toml\")) }}\n"))
+            .collect();
+        let settings = format!("versionCatalogs {{\n{many}}}\n");
+        let catalogs = build("settings.gradle.kts", &settings).catalogs;
+        assert_eq!(catalogs.len(), MAX_CATALOGS);
+    }
+
+    #[test]
+    fn the_script_decides_a_version_before_gradle_properties_can() {
+        let range = |src: &str| {
+            let summary = read("build.gradle", src.as_bytes());
+            summary
+                .dependencies
+                .into_iter()
+                .map(|e| e.range)
+                .collect::<Vec<_>>()
+        };
+        let dep = "dependencies { implementation \"g:a:$version\" }";
+        let some = |v: &str| vec![Some(v.to_string())];
+        assert_eq!(range(&format!("version = '1.0'\n{dep}")), some("1.0"));
+        assert_eq!(
+            range(&format!("version = '1.0'\nversion = '2'\n{dep}")),
+            [None]
+        );
+        assert_eq!(range(dep), some("$version"));
+    }
+
+    #[test]
+    fn a_settings_file_names_its_catalogs_by_a_relative_file() {
+        let catalogs = |src: &str| build("settings.gradle.kts", src).catalogs;
+        let kts = "versionCatalogs {\n create(\"deps\") {\n  from(files(\"gradle/deps.versions.toml\"))\n }\n}\n";
+        assert_eq!(
+            catalogs(kts),
+            [("deps".to_string(), "gradle/deps.versions.toml".to_string())]
+        );
+        let groovy = "versionCatalogs {\n libs {\n  from files('x.versions.toml')\n }\n}\n";
+        assert_eq!(
+            catalogs(groovy),
+            [("libs".to_string(), "x.versions.toml".to_string())]
+        );
+        for bad in [
+            "from(files(\"x.versions.toml\"))",
+            "versionCatalogs { create(\"a\") { from(files(\"../x.versions.toml\")) } }",
+            "versionCatalogs { create(\"a\") { from(files(\"/x.versions.toml\")) } }",
+            "versionCatalogs { create(\"a\") { from(files(\"${d}.versions.toml\")) } }",
+            "versionCatalogs { create(\"a\") { from(\"g:a:1\") } }",
+        ] {
+            assert!(catalogs(bad).is_empty(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_bare_hole_is_braced_unless_a_property_follows_it() {
+        assert_eq!(braced("a$b:${c}:$d_e"), "a${b}:${c}:${d_e}");
+        assert_eq!(braced("$x.y $ $"), "$x.y $ $");
+    }
+
+    #[test]
+    fn an_entry_keeps_its_holes_for_the_seam_unless_the_script_assigns_the_name() {
+        let template = |src: &str| {
+            let summary = read("build.gradle", src.as_bytes());
+            summary
+                .dependencies
+                .into_iter()
+                .map(|e| e.template)
+                .collect::<Vec<_>>()
+        };
+        let dep = "dependencies { implementation \"example:$a:${b}\" }";
+        assert_eq!(
+            template(dep),
+            [Some(("example".to_string(), "${a}".to_string()))]
+        );
+        assert_eq!(template(&format!("def a = 'x'\na = 'y'\n{dep}")), [None]);
+        assert_eq!(
+            template("dependencies { implementation 'example:a:1' }"),
+            [None]
+        );
+        let accessor = read("build.gradle", b"dependencies { implementation(libs.a.b) }");
+        assert_eq!(
+            accessor.dependencies[0].via.as_deref(),
+            Some("catalog libs.a.b")
+        );
     }
 
     #[test]

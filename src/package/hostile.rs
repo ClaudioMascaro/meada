@@ -319,6 +319,46 @@ fn probes() -> Vec<Probe> {
                 format!("foo(\n{}", fill(1, |i| format!("'a{i}' + \n"))),
             )
         }),
+        ("gradle: many properties", || {
+            let lines = fill(1, |i| format!("p{i}=v{i}\n"));
+            manifest("gradle.properties", lines)
+        }),
+        ("gradle: one property of a long value", || {
+            manifest(
+                "gradle.properties",
+                format!("a={}\n", "v".repeat(MAX_BYTES - 16)),
+            )
+        }),
+        ("gradle: catalog many libraries", || {
+            let libs = fill(1, |i| {
+                format!("a{i} = {{ module = \"g:a{i}\", version.ref = \"v{i}\" }}\n")
+            });
+            manifest("gradle/libs.versions.toml", format!("[libraries]\n{libs}"))
+        }),
+        ("gradle: catalog many versions", || {
+            let versions = fill(1, |i| format!("v{i} = \"1.{i}\"\n"));
+            let library = "a = { module = \"g:a\", version.ref = \"v0\" }\n";
+            manifest(
+                "libs.versions.toml",
+                format!("[versions]\n{versions}[libraries]\n{library}"),
+            )
+        }),
+        ("gradle: catalog deep arrays", || {
+            let nest = format!("{}{}", "[".repeat(NESTING), "]".repeat(NESTING));
+            manifest(
+                "gradle/libs.versions.toml",
+                format!("[libraries]\nx={nest}\n"),
+            )
+        }),
+        (
+            "gradle: many catalog accessors and one property web",
+            || {
+                let deps = fill(1, |i| {
+                    format!("  implementation libs.a{i}\n  api \"g:${{p{i}}}\"\n")
+                });
+                manifest("build.gradle", format!("dependencies {{\n{deps}}}\n"))
+            },
+        ),
         // NuGet: `*.csproj`, `Directory.Build.props`
         ("csproj: many references", || {
             let refs = fill(1, |i| {
@@ -350,6 +390,40 @@ fn probes() -> Vec<Probe> {
             let text = format!("<Project><ItemGroup>{refs}</ItemGroup></Project>");
             manifest("Directory.Build.props", text)
         }),
+        (
+            "gradle: properties and a catalog filling many builds",
+            || {
+                // Each build asks the one catalog and `gradle.properties` for every dependency.
+                let properties = fill(2, |i| format!("p{i}=v{i}\n"));
+                let libraries = fill(2, |i| format!("a{i} = \"g:a{i}:1\"\n"));
+                let build = count(100, |i| {
+                    format!("  implementation libs.a{i}\n  api \"g:${{p{i}}}\"\n")
+                });
+                let mut manifests = vec![
+                    ("gradle.properties".to_string(), properties),
+                    (
+                        "gradle/libs.versions.toml".to_string(),
+                        format!("[libraries]\n{libraries}"),
+                    ),
+                ];
+                for i in 0..PROJECTS {
+                    manifests.push((
+                        format!("m{i}/build.gradle"),
+                        format!("dependencies {{\n{build}}}\n"),
+                    ));
+                }
+                let mut manifests: Vec<_> = (manifests.into_iter())
+                    .map(|(path, text)| Manifest {
+                        summary: read_manifest(&path, &file(text)),
+                        path,
+                    })
+                    .collect();
+                super::inherit(&mut manifests);
+                (manifests.iter().skip(2))
+                    .map(|m| serde_json::to_string(&m.summary).unwrap().len())
+                    .sum()
+            },
+        ),
         ("nuget: a props file inherited by many projects", || {
             // Each project takes the props file's references: the size is all of theirs.
             let refs = fill(1, |i| format!("<PackageReference Include=\"P{i}\"/>"));

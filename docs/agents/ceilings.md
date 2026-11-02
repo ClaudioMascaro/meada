@@ -1598,8 +1598,22 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   source directories. The Groovy and the Kotlin DSL files (`*.gradle`, `*.gradle.kts`) go
   through this one scanner (spec #27: `tests/it/kotlinpkg.rs`); a `project(":x")` dependency
   declares no coordinate. A block comment nests, as Kotlin's does (Groovy's does not, so a
-  nested opener there turns a coordinate into a miss, never a wrong `exact`). Ceilings, all
-  misses: a version catalog (`libs.x`), a `dependencies` block nested deeper than one block
+  nested opener there turns a coordinate into a miss, never a wrong `exact`). `gradle.properties` and a version
+  catalog (`*.versions.toml`) are manifests of the Maven ecosystem that bound no package
+  (`Maven::owns`), read by `jvm::gradle::properties` and `catalog`: each reads as empty past
+  `lang::MAX_BYTES`, keeps at most `MAX_ENTRIES` (8192) properties or `[libraries]` aliases and
+  skips a value longer than a package name; a settings file keeps at most `MAX_CATALOGS` (16)
+  `from(files(..))` catalogs, each a relative path that stays inside its directory and ends in
+  `.versions.toml` to be read as a manifest. `Maven::inherit` fills a build's holes from them
+  in one pass per build, sharing `FILL_BUDGET`. Ceilings, all
+  misses: `buildSrc`, convention plugins, included builds and plugin-provided BOMs (code or
+  build-time resolution, not declarations), a catalog accessor that is not a `[libraries]` alias
+  (`libs.bundles.x`, `libs.versions.x`, a call on it such as `.get()`), a catalog whose file name
+  does not end in `.versions.toml`, an alias written as a dotted TOML key (it parses as a nested
+  table), a `gradle.properties` value with a backslash escape or a
+  continued line, a `gradle.properties` of the user's home, and one in a directory between the
+  repository root, the settings file and the module (the repository root's is read even when the
+  settings file sits deeper), a `dependencies` block nested deeper than one block
   (`subprojects`, `constraints`, `sourceSets { commonMain { dependencies } }`), a configuration
   called as a string (`"implementation"("g:a:1")`), a positional `implementation("g", "a",
   "1")`, a `group` set only in `subprojects`/`allprojects`, and a top-level `val group`. A

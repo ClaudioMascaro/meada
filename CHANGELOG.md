@@ -8,6 +8,18 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Gradle coordinate holes from `gradle.properties` and version catalogs (#467): a dependency
+  written `implementation(libs.models)` or with a `${name}` or `$name` the script leaves open
+  now links to the package providing its coordinate. `gradle.properties` of the repository root,
+  the settings file's directory and the module (the module's wins, and a name the script assigns
+  is never filled) feeds the same hole filler as the script's own declarations, and
+  `gradle/libs.versions.toml`, or a `*.versions.toml` a settings `from(files("..."))` names by a
+  relative path, maps `libs.<alias>` (dashes and underscores as dots) to `group:artifact` and
+  its version through `[libraries]` and `[versions]`; an alias the catalog lacks declares
+  nothing. Both files are bounded (`lang::MAX_BYTES`, 8192 entries) and have rows in the
+  manifest probes. `buildSrc`, convention plugins, included builds and build-time BOMs stay
+  unread. The stored manifest summary gains Gradle's `template` and catalog placeholders, so
+  existing indexes rebuild once (ADR 0004); the `conformance-java` export gained two links.
 - Rust item macros in associated-item position and by `crate::` (#505, after #398): an
   invocation of a qualifying item macro among the items of an `impl` or a trait gives its
   body's methods, associated consts and types to that block, under the same rules (first arm

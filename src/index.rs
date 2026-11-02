@@ -3134,6 +3134,8 @@ mod tests {
             ("sample.pom.xml", "pom.xml"),
             ("sample.build.gradle.kts", "build.gradle.kts"),
             ("sample.settings.gradle.kts", "settings.gradle.kts"),
+            ("sample.gradle.properties", "gradle.properties"),
+            ("sample.libs.versions.toml", "gradle/libs.versions.toml"),
             ("sample.csproj", "src/Kit/Kit.csproj"),
             ("sample.Directory.Build.props", "src/Directory.Build.props"),
             ("sample.Package.swift", "pkg/Package.swift"),

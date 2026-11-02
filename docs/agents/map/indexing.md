@@ -125,7 +125,11 @@ from ...", with the whole list. A value the index now stores joins it.
   for computed parts, declared ranges and a `computed` source flag, source roots with the test ones marked, a pom's
   `<properties>` and `<parent>` coordinate, with the group and artifact of a computed entry as
   written (`Entry::template`, for `Maven::inherit` to fill from the parent poms), and Gradle's
-  literal group, root project name and included project names/directories in `Summary::build`),
+  literal group, root project name and included project names/directories in `Summary::build`,
+  with the version catalogs a settings file names as `(accessor, path)`; a Gradle dependency's
+  `template` for a hole `gradle.properties` may fill, or a catalog accessor as a placeholder
+  entry; and, as `Summary::properties`, the `name=value` lines of a `gradle.properties` and the
+  `[libraries]` of a `*.versions.toml` as `alias -> group:artifact[:version]`),
   of each SDK-style `.csproj` (spec #28: the package id, else assembly name, else file name, the
   literal version, each `PackageReference` with its range as written, each `ProjectReference`
   as a `path` folded from the project's directory, each with `Entry::private` when it does not
