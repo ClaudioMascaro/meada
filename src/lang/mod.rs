@@ -582,6 +582,15 @@ pub struct Bound {
     pub value: Value,
 }
 
+/// What a method call's receiver is reached through from the call it is made on (Rust).
+#[derive(Clone, Copy, Default)]
+pub struct Through {
+    /// One `?`: the receiver is `Def::unwrapped`.
+    pub tried: bool,
+    /// An `.await`: the receiver is `Def::output` of a future signature.
+    pub awaited: bool,
+}
+
 /// An annotation written on a field or a parameter: the binding it marks and the annotation as
 /// a call (`callee` its name, `args` and `kwargs` its arguments, `scope` the class around it).
 pub struct Annotated {
@@ -828,6 +837,14 @@ pub struct Def {
     /// it gives (`Class::Returned`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result: Option<Class>,
+    /// The class `?` unwraps the written result to: the first argument of a `Result` or `Option`
+    /// (Rust), as a callee-like name resolved from the function's own scope.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unwrapped: Option<Class>,
+    /// The class `.await` yields from a future signature (`impl Future<Output = T>`), when the
+    /// function is not an `async fn` (whose written result is already the awaited value).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<Class>,
     /// A call fits the function only when written under `await` (Swift's `async`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub suspends: bool,
@@ -997,6 +1014,14 @@ pub struct Call {
     /// declared result of that call's exact target names.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on: Option<usize>,
+    /// Whether `on` is crossed through `?` (Rust): the receiver is then the class `on`'s exact
+    /// target's `Def::unwrapped` names, not its `Def::result`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub unwraps: bool,
+    /// Whether `on` is crossed through `.await` (Rust): the receiver is then the class of a
+    /// future signature's `Def::output`, when the target has one.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub awaits: bool,
     /// The name a method call on a call chain starts at (`client` in `client.get(u).send()`,
     /// whose callee is `(call_expression).send`), when it is a plain name or a member chain of
     /// them. An outside type owns the whole chain, so the resolver reads the call as one on

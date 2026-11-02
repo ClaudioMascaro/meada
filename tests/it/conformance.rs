@@ -7128,6 +7128,10 @@ fn rust() {
             "api/src/chains.rs::awaited",
             "api/src/chains.rs::outside",
             "api/src/chains.rs::parenthesized",
+            "api/src/chains.rs::load",
+            "api/src/chains.rs::pending",
+            "api/src/chains.rs::tried",
+            "api/src/chains.rs::pended",
             "api/src/main.rs::below",
             "api/src/main.rs::below.go",
             "api/src/main.rs::elsewhere",
@@ -8242,6 +8246,18 @@ fn rust() {
             ),
             (
                 "api/src/chains.rs::parenthesized::(parenthesized_expression).route#0",
+                EXACT,
+                &["api/src/chains.rs::Router.route"],
+            ),
+            // `?` and `.await` hand the call the type they unwrap: the `Option`'s argument, a
+            // plain `fn`'s future output.
+            (
+                "api/src/chains.rs::tried::(try_expression).route#0",
+                EXACT,
+                &["api/src/chains.rs::Router.route"],
+            ),
+            (
+                "api/src/chains.rs::pended::(await_expression).route#0",
                 EXACT,
                 &["api/src/chains.rs::Router.route"],
             ),

@@ -367,6 +367,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 return_values: Vec::new(),
                 returns: None,
                 suspends: false,
+                unwrapped: None,
+                output: None,
                 hash: String::new(),
                 type_params: Vec::new(),
                 result: match node
@@ -1170,6 +1172,8 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
         by_path: false,
         root: None,
         on: None,
+        unwraps: false,
+        awaits: false,
         receiver: None,
         arg_types: Vec::new(),
         uses: Vec::new(),

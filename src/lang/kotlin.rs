@@ -615,6 +615,8 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 facts.defs.push(Def {
                     result: Some(Class::Type(class.to_string())),
                     suspends: false,
+                    unwrapped: None,
+                    output: None,
                     hash: String::new(),
                     ..definition(&ctor, Kind::Method, node.byte_range(), params)
                 });
@@ -934,6 +936,8 @@ fn definition(name: &str, kind: Kind, range: Range<usize>, params: Vec<Param>) -
         type_params: Vec::new(),
         result: None,
         suspends: false,
+        unwrapped: None,
+        output: None,
         hash: String::new(),
     }
 }
@@ -1634,6 +1638,8 @@ fn call(node: Node, src: &[u8], scope: &str, implicit: Implicit, lambdas: bool) 
         by_path: false,
         root: None,
         on: None,
+        unwraps: false,
+        awaits: false,
         receiver: None,
         arg_types: Vec::new(),
         uses: Vec::new(),
@@ -2071,6 +2077,8 @@ fn annotations_of<'s>(modifiers: Node, src: &'s [u8], scope: &str) -> Vec<(Call,
             by_path: false,
             root: None,
             on: None,
+            unwraps: false,
+            awaits: false,
             receiver: None,
             arg_types: Vec::new(),
             uses: Vec::new(),
