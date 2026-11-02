@@ -47,7 +47,8 @@ this file, and a change to these modules updates it.
   variable, `decisions` defaults to OpenRouter and `typesafe/jev-1.14` and needs the key, `chat`
   needs URL and model; HTTPS except to a loopback host), `Question` (the excerpt: call
   expression, the enclosing span read from disk only when the pack's parse of the file says
-  that symbol is a function, method or inline function (`function_like`), so a call in a class
+  that symbol is a function, method or inline function (`function_like`, parsed under the
+  setting the index stored for the file, so a function an item macro gives it counts), so a call in a class
   field initializer goes alone and the top level says so; `offers: Vec<Offer {key, description,
   target}>`, keyed `"1".."n"`, described by `Candidate::describe`), `MAX_CANDIDATES` (50: more
   is skipped in decider mode only), `Config::requests` (the protocol dispatch), `show`

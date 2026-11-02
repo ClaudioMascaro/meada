@@ -1,12 +1,12 @@
 {
   "format": 1,
   "repository": "example.com/acme/conformance",
-  "commit": "87092475e18e0dd85866cc16d2a83c5f86d45c6e",
+  "commit": "e090d9a0fbd22942f4c225c638cf712d41dc68e4",
   "dirty": false,
   "files": [
     {
       "path": "src/lib.rs",
-      "hash": "12314ec5f0bf7a05a2a28c1d62a539ddac1237346b2d09074bbe856579de335c"
+      "hash": "42acb3e6bacf036ca9ec7169e26fc8a832d758a7dd1818b152e3edfa0d1e8901"
     },
     {
       "path": "src/macros.rs",
@@ -23,6 +23,60 @@
   ],
   "symbols": [
     {
+      "id": "example.com/acme/conformance::src/lib.rs::Driver",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 1140,
+        "end": 1244
+      },
+      "hash": "fefa0f8dea8907a41d5c0b4c339b1ff5ba63c6823c463f8165da0cbba7df86f6"
+    },
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::Driver.drive",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 1181,
+        "end": 1209
+      },
+      "hash": "eb3796af0cd10e5c9571079479f705186e67cf8e837984f849dc618023ddaeee"
+    },
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::Driver.pending",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 1218,
+        "end": 1236
+      },
+      "hash": "7bcdba94548595a274ac23fe46d307a97debf52f606907acbfa4d927566f90ae"
+    },
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::Runtime",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 741,
+        "end": 760
+      },
+      "hash": "1c8c377ffe6d97b24a3d4cd94179edbe2be3a486321944262301ed8dfc1fe7d7"
+    },
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::Runtime.plain",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 1115,
+        "end": 1137
+      },
+      "hash": "94b45f7e4c03d1a4ac6a1616bb84e9e3ec489db8ca3175779ba7ec6f18335799"
+    },
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::Runtime.start",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 798,
+        "end": 830
+      },
+      "hash": "fd321e18a6027125ac81507649700c3731f4a7d66f842e22e93030f0c998da31"
+    },
+    {
       "id": "example.com/acme/conformance::src/lib.rs::caller",
       "span": {
         "path": "src/lib.rs",
@@ -35,8 +89,8 @@
       "id": "example.com/acme/conformance::src/lib.rs::enter",
       "span": {
         "path": "src/lib.rs",
-        "start": 649,
-        "end": 709
+        "start": 1468,
+        "end": 1528
       },
       "hash": "484d3af6af4130d31604e807cbf0c7db415dec51bea09307b9709c555a95e3fe"
     },
@@ -77,6 +131,15 @@
       "hash": "ba70b401caa8c4e5bacb895aaea3237ba4ec62d7a2692123f37068c1f825f843"
     },
     {
+      "id": "example.com/acme/conformance::src/lib.rs::via_crate",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 1353,
+        "end": 1384
+      },
+      "hash": "f9f2140f2f125dff29ea522ed2c145c4d935fd217d44bfa0b480650c14bde448"
+    },
+    {
       "id": "example.com/acme/conformance::src/rt.rs::block_on",
       "span": {
         "path": "src/rt.rs",
@@ -106,6 +169,28 @@
   ],
   "calls": [
     {
+      "id": "example.com/acme/conformance::src/lib.rs::Driver.drive::spawn#0",
+      "caller": "example.com/acme/conformance::src/lib.rs::Driver.drive",
+      "target": "example.com/acme/conformance::src/lib.rs::spawn",
+      "level": "exact",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 1199,
+        "end": 1206
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::Runtime.start::spawn#0",
+      "caller": "example.com/acme/conformance::src/lib.rs::Runtime.start",
+      "target": "example.com/acme/conformance::src/lib.rs::spawn",
+      "level": "exact",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 820,
+        "end": 827
+      }
+    },
+    {
       "id": "example.com/acme/conformance::src/lib.rs::caller::spawn#0",
       "caller": "example.com/acme/conformance::src/lib.rs::caller",
       "target": "example.com/acme/conformance::src/lib.rs::spawn",
@@ -123,8 +208,8 @@
       "level": "exact",
       "span": {
         "path": "src/lib.rs",
-        "start": 670,
-        "end": 684
+        "start": 1489,
+        "end": 1503
       }
     },
     {
@@ -134,8 +219,19 @@
       "level": "exact",
       "span": {
         "path": "src/lib.rs",
-        "start": 690,
-        "end": 706
+        "start": 1509,
+        "end": 1525
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::src/lib.rs::via_crate::spawn#0",
+      "caller": "example.com/acme/conformance::src/lib.rs::via_crate",
+      "target": "example.com/acme/conformance::src/lib.rs::spawn",
+      "level": "exact",
+      "span": {
+        "path": "src/lib.rs",
+        "start": 1374,
+        "end": 1381
       }
     },
     {
@@ -170,27 +266,95 @@
     {
       "name": "src",
       "members": [
+        "example.com/acme/conformance::src/lib.rs::Driver.drive",
+        "example.com/acme/conformance::src/lib.rs::Runtime.start",
         "example.com/acme/conformance::src/lib.rs::caller",
-        "example.com/acme/conformance::src/lib.rs::spawn"
+        "example.com/acme/conformance::src/lib.rs::spawn",
+        "example.com/acme/conformance::src/lib.rs::via_crate"
       ]
     },
     {
       "name": "src#2",
       "members": [
         "example.com/acme/conformance::src/lib.rs::enter",
-        "example.com/acme/conformance::src/runtime.rs::start"
-      ]
-    },
-    {
-      "name": "src#3",
-      "members": [
         "example.com/acme/conformance::src/rt.rs::block_on",
-        "example.com/acme/conformance::src/rt.rs::park"
+        "example.com/acme/conformance::src/rt.rs::park",
+        "example.com/acme/conformance::src/runtime.rs::start"
       ]
     }
   ],
   "links": [],
   "processes": [
+    {
+      "entry_point": "example.com/acme/conformance::src/lib.rs::Driver.drive",
+      "kind": "export",
+      "label": "Driver.drive",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/lib.rs::Driver.drive"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/lib.rs::spawn"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/lib.rs::Driver.pending",
+      "kind": "export",
+      "label": "Driver.pending",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/lib.rs::Driver.pending"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/lib.rs::Runtime.plain",
+      "kind": "export",
+      "label": "Runtime.plain",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/lib.rs::Runtime.plain"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/lib.rs::Runtime.start",
+      "kind": "export",
+      "label": "Runtime.start",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/lib.rs::Runtime.start"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/lib.rs::spawn"
+        }
+      ]
+    },
     {
       "entry_point": "example.com/acme/conformance::src/lib.rs::caller",
       "kind": "export",
@@ -244,6 +408,27 @@
           "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::src/runtime.rs::start"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/conformance::src/lib.rs::via_crate",
+      "kind": "export",
+      "label": "via_crate",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/conformance::src/lib.rs::via_crate"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": "exact",
+          "via": "call",
+          "node": "example.com/acme/conformance::src/lib.rs::spawn"
         }
       ]
     }

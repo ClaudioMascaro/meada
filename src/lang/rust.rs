@@ -714,8 +714,10 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 }
                 // Two blocks giving one name a method (`impl From<A> for E`, `impl From<B>
                 // for E`) are two scopes: the later one is `E.From#2`.
-                let methods: Vec<&str> = (field(node, "body").into_iter())
-                    .flat_map(named)
+                // The methods an item macro gives the block count too.
+                let written = field(node, "body")
+                    .map(|body| built(body, &features, src, &mut renamed, &mut routes, &expand));
+                let methods: Vec<&str> = (written.into_iter().flatten())
                     .filter(|n| n.kind() == "function_item")
                     .filter_map(|f| field(f, "name").map(|n| text(n, src)))
                     .collect();
@@ -1311,7 +1313,7 @@ fn built<'t>(
     out
 }
 
-/// The bodies of the item macros a file invokes in a module (`macros::bodies`), by the start of
+/// The bodies of the item macros a file invokes (`macros::bodies`), by the start of
 /// the invocation, and what the file's setting says of each macro.
 struct Expand<'t, 's> {
     roots: HashMap<usize, Node<'t>>,
@@ -1358,7 +1360,8 @@ impl<'t> Built<'_, 't, '_> {
                         // then by those the arm writes on each: a module in it may be one a
                         // test build compiles.
                         Some(&body) if on || on_test => {
-                            let name = field(child, "macro").map(|m| text(m, src));
+                            let name =
+                                field(child, "macro").and_then(|m| macros::invoked_name(m, src));
                             let predicates = name.and_then(|n| self.expand.table.get(n));
                             let holds = |test| {
                                 (predicates.into_iter().flatten())

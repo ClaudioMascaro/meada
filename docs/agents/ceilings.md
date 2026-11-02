@@ -1347,9 +1347,10 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   each file that invokes it stores them in its setting. An item
   macro is found by name alone (no `#[macro_use]`, `#[macro_export]` or textual scope is
   followed), across every Rust file of the repository whatever its `cfg`, so a definition of the
-  name anywhere that disagrees leaves every invocation unread (no marker); only a plain name
-  invoked with braces in a module qualifies (`crate::m! {}`, `m!(..)` and invocations in an
-  `impl`, a trait or a function body are skipped, no marker).
+  name anywhere that disagrees leaves every invocation unread (no marker); only `m!` or
+  `crate::m!` invoked with braces among the items of a module, an `impl` or a trait qualifies
+  (`other::m! {}`, `self::m! {}`, `m!(..)` and invocations in a function body are skipped, no
+  marker).
 - `lang/rust.rs` (spec #30): `DEFINITION_DEPTH` (128) as in the other packs; `BINDING_DEPTH`
   (64): a pattern or a `use` tree deeper binds nothing; `PATH_DEPTH` (256): a longer path or
   member chain in a callee is its node kind, and an `impl` type behind more references names

@@ -1,8 +1,9 @@
 //! Item macros (#398): a `macro_rules!` of the repository whose first arm takes items
 //! (`$($x:item)*`) and writes each one back behind outer attributes only
 //! (`$( #[cfg(feature = "rt")] $x )*`). A braced invocation of one in a module is read as the
-//! module's items, under the `cfg` attributes the arm writes on each. Any other macro, and the
-//! bodies of the definitions themselves, stay unread.
+//! module's items (or the associated items of an `impl` or a trait), under the `cfg` attributes
+//! the arm writes on each. Any other macro, and the bodies of the definitions themselves, stay
+//! unread.
 //!
 //! A definition is found by name from the call site, among every file of the repository
 //! (`LanguagePack::extend`): a name qualifies only when all its definitions do, with the same
@@ -31,9 +32,9 @@ pub(super) const ATTRIBUTE_BYTES: usize = 1024;
 /// `cfg` attribute the arm writes on every item, as tokens.
 pub(super) type Table<'s> = HashMap<&'s str, Vec<&'s str>>;
 
-/// The braced bodies of the item macros a file invokes in a module, each parsed on its own over
-/// the file's bytes (so spans are the file's), by the start of the invocation. A body that does
-/// not parse as items is none.
+/// The braced bodies of the item macros a file invokes in a module, an `impl` or a trait, each
+/// parsed on its own over the file's bytes (so spans are the file's), by the start of the
+/// invocation. A body that does not parse as items is none.
 pub(super) type Bodies = Vec<(usize, Tree)>;
 
 /// Reads what `LanguagePack::extend` needs of a file, whatever its setting: the `macro_rules!`
@@ -105,6 +106,21 @@ fn agree<K: Ord, V: PartialEq>(defined: &mut BTreeMap<K, Option<V>>, name: K, fo
         None => {
             defined.insert(name, found);
         }
+    }
+}
+
+/// The name an invocation's macro qualifies under: `m` of `m!` and of `crate::m!`. Any other
+/// path (`other::m!`, `self::m!`, `super::m!`, `crate::a::m!`) is none: it may name a macro of
+/// another crate or module.
+pub(super) fn invoked_name<'s>(path: Node, src: &'s [u8]) -> Option<&'s str> {
+    match path.kind() {
+        "identifier" => Some(text(path, src)),
+        "scoped_identifier" if field(path, "path").is_some_and(|p| p.kind() == "crate") => {
+            field(path, "name")
+                .filter(|n| n.kind() == "identifier")
+                .map(|n| text(n, src))
+        }
+        _ => None,
     }
 }
 
@@ -269,9 +285,9 @@ pub(super) fn table(extra: &str) -> Table<'_> {
         .collect()
 }
 
-/// The bodies of the item macros of `table` that the file at `root` invokes in a module, those
-/// written in such bodies too, `ITEM_MACRO_DEPTH` deep. Each body is parsed again; one that does
-/// not parse as items is left out, as is an empty one.
+/// The bodies of the item macros of `table` that the file at `root` invokes in a module, an
+/// `impl` or a trait, those written in such bodies too, `ITEM_MACRO_DEPTH` deep. Each body is
+/// parsed again; one that does not parse as items is left out, as is an empty one.
 pub(super) fn bodies(root: Node, src: &[u8], table: &Table) -> Result<Bodies> {
     let mut out = Vec::new();
     if table.is_empty() {
@@ -302,18 +318,18 @@ pub(super) fn bodies(root: Node, src: &[u8], table: &Table) -> Result<Bodies> {
 }
 
 /// The invocations of `table`'s macros written with braces among the items of the file or the
-/// body at `root`, and of the modules written in place in it: each one's start and the range
-/// between its braces.
+/// body at `root`, and of the modules written in place in it, and among the associated items of
+/// an `impl` or a trait: each one's start and the range between its braces.
 fn invoked(root: Node, src: &[u8], table: &Table) -> Vec<(usize, Range)> {
     let mut out = Vec::new();
     let mut containers = vec![root];
     while let Some(container) = containers.pop() {
         for item in named(container) {
             match item.kind() {
-                "mod_item" => containers.extend(field(item, "body")),
+                "mod_item" | "impl_item" | "trait_item" => containers.extend(field(item, "body")),
                 "macro_invocation" => {
-                    let name = field(item, "macro").filter(|m| m.kind() == "identifier");
-                    if !name.is_some_and(|n| table.contains_key(text(n, src))) {
+                    let name = field(item, "macro").and_then(|m| invoked_name(m, src));
+                    if !name.is_some_and(|n| table.contains_key(n)) {
                         continue;
                     }
                     let Some(tree) = braced(item) else {
@@ -445,16 +461,87 @@ mod tests {
             assert!(facts.defs.is_empty(), "{shape}: {:?}", names(&facts));
             assert!(mods(&facts).is_empty(), "{shape}");
         }
-        // Parentheses, a path, and a body that is no list of items.
+        // Parentheses, a path that may be another crate's or module's, and a body that is no
+        // list of items.
         for call in [
             "m!(pub fn hidden() {});",
-            "crate::m! { pub fn hidden() {} }",
+            "other::m! { pub fn hidden() {} }",
+            "self::m! { pub fn hidden() {} }",
+            "super::m! { pub fn hidden() {} }",
+            "crate::a::m! { pub fn hidden() {} }",
+            "::m! { pub fn hidden() {} }",
             "m! { pub fn hidden() {} + }",
         ] {
             let mut src = CFG_RT.replace("cfg_rt", "m");
             src += call;
             assert!(one(&src, "").defs.is_empty(), "{call}");
         }
+    }
+
+    #[test]
+    fn an_invocation_written_crate_path_qualifies_as_the_plain_name() {
+        let src = format!(
+            "{CFG_RT}crate::cfg_rt! {{ pub fn spawn() {{}} }}\nimpl T {{ crate::cfg_rt! {{ fn go(&self) {{}} }} }}\n"
+        );
+        assert_eq!(names(&one(&src, "")), ["spawn", "T.go"]);
+    }
+
+    #[test]
+    fn the_body_of_an_item_macro_in_an_impl_or_a_trait_is_its_associated_items() {
+        let src = format!(
+            "{CFG_RT}macro_rules! cfg_off {{ ($($i:item)*) => {{ $( #[cfg(feature = \"off\")] $i )* }} }}\n\
+             pub fn spawn() {{}}\n\
+             impl Rt {{\n\
+                 cfg_rt! {{ pub fn start(&self) {{ spawn(); }} const SLOTS: usize = 4; type Out = u8; }}\n\
+                 cfg_off! {{ fn gated(&self) {{}} }}\n\
+                 other! {{ fn unread(&self) {{}} }}\n\
+                 #[cfg(windows)]\n\
+                 cfg_rt! {{ fn win(&self) {{}} }}\n\
+                 fn plain(&self) {{}}\n\
+             }}\n\
+             pub trait Drive {{\n\
+                 cfg_rt! {{ fn run(&self) {{ spawn(); }} fn pending(&self); type Out; }}\n\
+             }}\n"
+        );
+        let facts = one(&src, "");
+        assert_eq!(
+            names(&facts),
+            [
+                "spawn",
+                "Rt.start",
+                "Rt.plain",
+                "Drive",
+                "Drive.run",
+                "Drive.pending"
+            ]
+        );
+        let scopes: Vec<&str> = (facts.calls.iter())
+            .filter(|c| c.callee == "spawn")
+            .map(|c| c.scope.as_str())
+            .collect();
+        assert_eq!(scopes, ["Rt.start", "Drive.run"]);
+        // The arm's predicates and the features decide, as at a module's level.
+        let facts = one(&src, "off");
+        assert!(names(&facts).contains(&"Rt.gated"));
+    }
+
+    #[test]
+    fn two_impls_that_an_item_macro_gives_one_method_are_two_blocks() {
+        let src = format!(
+            "{CFG_RT}impl From<A> for E {{ cfg_rt! {{ fn from(a: A) -> E {{ E }} }} }}\nimpl From<B> for E {{ cfg_rt! {{ fn from(b: B) -> E {{ E }} }} }}\n"
+        );
+        assert_eq!(names(&one(&src, "")), ["E.From.from", "E.From#2.from"]);
+    }
+
+    #[test]
+    fn an_item_macro_in_an_impl_in_a_body_is_read_in_its_place() {
+        let src = format!(
+            "{CFG_RT}cfg_rt! {{ impl Rt {{ cfg_rt! {{ fn deep(&self) {{}} }} }} }}\nmod inner {{ impl Rt {{ cfg_rt! {{ fn other(&self) {{}} }} }} }}\n"
+        );
+        assert_eq!(
+            names(&one(&src, "")),
+            ["Rt.deep", "inner", "inner.Rt.other"]
+        );
     }
 
     #[test]
@@ -550,6 +637,27 @@ mod tests {
         assert_eq!(facts.defs.len(), ITEM_MACRO_DEPTH);
         let facts = one(&nest(ITEM_MACRO_DEPTH + 3), "");
         assert_eq!(facts.defs.len(), ITEM_MACRO_DEPTH);
+    }
+
+    #[test]
+    fn nested_item_macros_are_read_in_linear_time() {
+        // Every level holds `per` functions of its own, and each level's body is parsed again for
+        // the next: the bytes parsed are the depth times the file's, not more.
+        let per = 500;
+        let mut src = CFG_RT.to_string();
+        for level in 0..ITEM_MACRO_DEPTH {
+            src += "cfg_rt! {\n";
+            for n in 0..per {
+                src += &format!("pub fn f{level}_{n}() {{}}\n");
+            }
+        }
+        src += &"}".repeat(ITEM_MACRO_DEPTH);
+        let start = std::time::Instant::now();
+        let facts = one(&src, "");
+        let took = start.elapsed();
+        assert_eq!(facts.defs.len(), ITEM_MACRO_DEPTH * per);
+        // About a second in a local debug build, a twentieth of the bound.
+        assert!(took.as_secs() < 20, "{took:?}");
     }
 
     #[test]
