@@ -237,6 +237,12 @@ All notable changes to Meada are recorded here. The format follows
   the pulled contexts file and the exclusions file are replaced through one helper
   (`pull::replace`) that syncs the new file before the rename and removes `<name>.new` when a
   step fails. A failed pointer rename now names `current`, not `current.new`.
+- The docs say what 1.0.0 ships: nine languages (TypeScript, JavaScript, Python, Go, Rust, Java,
+  Kotlin, C# and Swift). The three READMEs, the three 1.0.0 release notes and the three user
+  guides no longer call Java, Kotlin, C# and Swift later 1.x work, the user guides gain a section
+  for each of the four (9.5 to 9.8) with their brokers (JMS, Azure Service Bus) and package
+  ecosystems (Maven and Gradle, NuGet, SwiftPM), and ADR 0003 records the change in an
+  amendment. No code, default dependency or golden changed.
 - A server-mode mirror's `meada.toml` and `meada.decisions.toml` are read through no symbolic
   link (#547, after #506), as a pulled generation's are: `mirror()`, behind `Manifest::read`
   (`mcp --listen`, snapshot pull, the lock and pointer operations, workspace versions, the

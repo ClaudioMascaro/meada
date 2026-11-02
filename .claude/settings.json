@@ -1,7 +1,10 @@
 {
   "extraKnownMarketplaces": {
     "ponytail": {
-      "source": { "source": "github", "repo": "DietrichGebert/ponytail" }
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
+      }
     }
   },
   "enabledPlugins": {
@@ -11,8 +14,18 @@
   "env": {
     "PONYTAIL_DEFAULT_MODE": "lite"
   },
-  "enabledMcpjsonServers": ["meada"],
+  "enabledMcpjsonServers": [
+    "meada"
+  ],
   "permissions": {
-    "allow": ["mcp__meada"]
+    "allow": [
+      "mcp__meada"
+    ]
+  },
+  "skillOverrides": {
+    "git-guardrails-claude-code": "off",
+    "migrate-to-shoehorn": "off",
+    "scaffold-exercises": "off",
+    "setup-pre-commit": "off"
   }
 }
