@@ -6,6 +6,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `[postgres] schema` starting with `pg_` (reserved by Postgres) is refused at manifest read with
+  Meada's own message, in pt-BR and English, instead of Postgres's raw error at `meada postgres
+  migrate` (#482).
+
 ### Changed
 
 - The console asks `meada-core` through WebAssembly (`namedNameProblem`, `namedDescriptionProblem`,

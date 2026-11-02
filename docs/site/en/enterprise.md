@@ -16,7 +16,7 @@ Postgres 15 or later holds the durable mutable state: audit, directory and permi
 [postgres]
 url_env = "MEADA_POSTGRES_URL"      # the default; or url_file = "/run/secrets/postgres-url"
 ca_file = "/etc/meada/ca/ca.pem"    # optional: verifies against this file alone
-schema = "meada"                    # the default; lowercase letters, digits and _, 1 to 63 characters
+schema = "meada"                    # the default; lowercase letters, digits and _, 1 to 63 characters, not starting with pg_
 pool_size = 4                       # the default
 connect_timeout_seconds = 5         # the default
 statement_timeout_seconds = 10      # the default

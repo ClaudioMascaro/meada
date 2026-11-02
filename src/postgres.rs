@@ -322,10 +322,12 @@ impl File {
 }
 
 /// Whether `schema` is a name Meada accepts: lowercase letters, digits and `_`, starting with a
-/// letter, at most `SCHEMA_MAX` characters. Such a name needs no escaping inside double quotes.
+/// letter, not `pg_` (reserved by Postgres), at most `SCHEMA_MAX` characters. Such a name needs no
+/// escaping inside double quotes.
 fn schema_ok(schema: &str) -> bool {
     schema.len() <= SCHEMA_MAX
         && schema.starts_with(|c: char| c.is_ascii_lowercase())
+        && !schema.starts_with("pg_")
         && (schema.bytes()).all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
 }
 
@@ -967,6 +969,7 @@ mod tests {
             ("schema = \"_meada\"", "postgres.schema"),
             ("schema = \"\"", "postgres.schema"),
             ("schema = \"me-ada\"", "postgres.schema"),
+            ("schema = \"pg_meada\"", "postgres.schema"),
             (&long, "postgres.schema"),
             ("pool_size = 0", "postgres.pool_size"),
             (
@@ -991,6 +994,9 @@ mod tests {
         assert!(section("statement_timeout_seconds = 2147483").is_ok());
         assert!(section(&format!("schema = \"{}\"", "a".repeat(63))).is_ok());
         assert!(section("schema = \"m_9\"").is_ok());
+        assert!(section("schema = \"meada_x\"").is_ok());
+        let refused = section("schema = \"pg_meada\"").unwrap_err().1;
+        assert!(refused.contains("pg_"), "{refused}");
     }
 
     #[test]

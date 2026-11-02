@@ -16,7 +16,7 @@ Postgres 15 ou mais novo guarda o estado mutável durável: auditoria, diretóri
 [postgres]
 url_env = "MEADA_POSTGRES_URL"      # padrão; ou url_file = "/run/secrets/postgres-url"
 ca_file = "/etc/meada/ca/ca.pem"    # opcional: valida só contra este arquivo
-schema = "meada"                    # padrão; minúsculas, dígitos e _, 1 a 63 caracteres
+schema = "meada"                    # padrão; minúsculas, dígitos e _, 1 a 63 caracteres, sem começar por pg_
 pool_size = 4                       # padrão
 connect_timeout_seconds = 5         # padrão
 statement_timeout_seconds = 10      # padrão

@@ -1215,12 +1215,13 @@ fn postgres_refusals_follow_lang() {
         (
             en,
             "meada: ops/meada.workspace.toml:4: `postgres.schema`: must be 1 to 63 lowercase \
-             letters, digits or `_`, starting with a letter\n",
+             letters, digits or `_`, starting with a letter, not with `pg_` (reserved by \
+             Postgres)\n",
         ),
         (
             pt,
             "meada: ops/meada.workspace.toml:4: `postgres.schema`: deve ter de 1 a 63 letras \
-             minúsculas, dígitos ou `_`, começando por uma letra\n",
+             minúsculas, dígitos ou `_`, começando por uma letra, sem começar por `pg_` (reservado pelo Postgres)\n",
         ),
     ] {
         assert_eq!(meada(&dir, lang, &[], &MIGRATE).1, expected, "{lang}");

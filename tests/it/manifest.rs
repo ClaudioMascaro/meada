@@ -860,7 +860,7 @@ fn postgres_section_errors_name_the_file_the_line_and_the_key() {
     let dir = mirrors("manifest_postgres_errors");
     let head = "index_dir = \"../indexes\"\n\n[postgres]\n";
     let at = "meada: ops/meada.workspace.toml";
-    let schema = "must be 1 to 63 lowercase letters, digits or `_`, starting with a letter";
+    let schema = "must be 1 to 63 lowercase letters, digits or `_`, starting with a letter, not with `pg_` (reserved by Postgres)";
     let long = "a".repeat(64);
     for (body, expected) in [
         (

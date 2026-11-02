@@ -45,7 +45,7 @@ section of `meada.workspace.toml`:
   `tokio-rustls` are used): the data layer, the durable mutable state of server mode in Postgres
   15 and later. `File` is the `[postgres]` section and `File::validate` its `Config`: `url_env`
   (default `MEADA_POSTGRES_URL`) or `url_file`, at most one; `ca_file`; `schema` (default
-  `meada`, lowercase letters, digits and `_`, starting with a letter, 1 to 63 characters);
+  `meada`, lowercase letters, digits and `_`, starting with a letter, not `pg_` (reserved by Postgres), 1 to 63 characters);
   `pool_size` (4), `connect_timeout_seconds` (5) and `statement_timeout_seconds` (10), each at
   least 1, the last at most `STATEMENT_MAX` (Postgres's `INT_MAX` milliseconds); every problem names its key. The URL is read only when a process connects
   (`Config::url`), kept in memory, and `parse` accepts only `postgres://` or `postgresql://` with
