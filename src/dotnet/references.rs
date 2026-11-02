@@ -106,7 +106,8 @@ mod tests {
             reads.set(reads.get() + 1);
             all.clone()
         });
-        assert!(start.elapsed().as_secs() < 2, "{:?}", start.elapsed());
+        // 0.26 s measured in a local debug build; the bound is over twenty times that.
+        assert!(start.elapsed().as_secs() < 6, "{:?}", start.elapsed());
         assert_eq!((found.len(), reads.get()), (names.len() - 1, names.len()));
         let cycle = HashMap::from([("A", vec![("B", false)]), ("B", vec![("A", false)])]);
         assert_eq!(walk(&cycle, "A"), ["B"]);

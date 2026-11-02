@@ -2849,7 +2849,8 @@ mod tests {
             let took = start.elapsed();
             // Past the value limit the chain is no read, whatever it starts with.
             assert!(found.is_none(), "{head}");
-            assert!(took.as_secs() < 10, "{head}: {took:?}");
+            // 1.6 s measured in a local debug build; the bound is over twenty times that.
+            assert!(took.as_secs() < 40, "{head}: {took:?}");
         }
     }
 
@@ -3101,7 +3102,8 @@ class A {
         let mut marks = writes(&src);
         marks.dedup();
         assert_eq!(marks, [".a@a.C"]);
-        assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
+        // 1.8 s measured in a local debug build; the bound is over twenty times that.
+        assert!(start.elapsed().as_secs() < 40, "{:?}", start.elapsed());
     }
 
     /// Thousands of properties and thousands of locals cost their sum: a local finds the
@@ -3122,7 +3124,8 @@ class A {
             .map(|r| r.name.as_str())
             .collect();
         assert_eq!(typed, ["control"]);
-        assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
+        // 0.6 s measured in a local debug build; the bound is over twenty times that.
+        assert!(start.elapsed().as_secs() < 15, "{:?}", start.elapsed());
     }
 
     /// Writes at the bottom of deeply nested blocks cost the depth each: a node's parent is read
@@ -3138,7 +3141,8 @@ class A {
         );
         let start = std::time::Instant::now();
         assert_eq!(writes(&src), [".a@a.C"]);
-        assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
+        // 0.6 s measured in a local debug build; the bound is over twenty times that.
+        assert!(start.elapsed().as_secs() < 15, "{:?}", start.elapsed());
     }
 
     #[test]

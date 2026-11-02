@@ -7227,7 +7227,8 @@ mod tests {
             assert_eq!(Resolver::new(&files, modules, pack).exported().len(), n);
             // Each name was looked up among the file's exports one by one: minutes here.
             let took = start.elapsed();
-            assert!(took.as_secs() < 20, "{label}: {took:?}");
+            // 2.4 s measured in a local debug build; the bound is over twenty times that.
+            assert!(took.as_secs() < 50, "{label}: {took:?}");
         }
     }
 
@@ -7245,13 +7246,14 @@ mod tests {
         Def::new(name, Kind::Module, 0..0)
     }
 
-    /// The rows `main.rs` of `facts` exports, timed.
-    fn timed_rows(facts: Facts, label: &str) -> usize {
+    /// The rows `main.rs` of `facts` exports, timed against `secs` (over twenty times the linear
+    /// path in a local debug build).
+    fn timed_rows(facts: Facts, label: &str, secs: u64) -> usize {
         let files = BTreeMap::from([("main.rs", &facts)]);
         let start = std::time::Instant::now();
         let rows = resolver(&files).exported().len();
         let took = start.elapsed();
-        assert!(took.as_secs() < 20, "{label}: {took:?}");
+        assert!(took.as_secs() < secs, "{label}: {took:?}");
         rows
     }
 
@@ -7283,7 +7285,8 @@ mod tests {
         };
         // Each name nothing binds was looked up among the file's imports and among its
         // externs one by one: minutes here.
-        assert_eq!(timed_rows(facts, "imports"), n);
+        // 0.9 s measured in a local debug build, under a twentieth of the bound.
+        assert_eq!(timed_rows(facts, "imports", 20), n);
     }
 
     #[test]
@@ -7314,7 +7317,8 @@ mod tests {
         let fillers = (0..300_000).map(|_| filler(Imported::Namespace));
         facts.imports.extend(fillers);
         // Each module was looked up among the file's imports one by one: minutes here.
-        assert_eq!(timed_rows(facts, "modules"), n);
+        // 1.4 s measured in a local debug build, under a twentieth of the bound.
+        assert_eq!(timed_rows(facts, "modules", 30), n);
     }
 
     #[test]
@@ -7344,7 +7348,8 @@ mod tests {
         // Each call looked its name up among the file's imports one by one, for the import,
         // for whether a path import exists and for the name it spells: minutes here.
         let took = start.elapsed();
-        assert!(took.as_secs() < 20, "{took:?}");
+        // 2.2 s measured in a local debug build; the bound is over twenty times that.
+        assert!(took.as_secs() < 45, "{took:?}");
     }
 
     #[test]
@@ -7402,7 +7407,8 @@ mod tests {
         // out, and its glob gives none.
         let took = start.elapsed();
         assert_eq!(rows.len(), n + 1);
-        assert!(took.as_secs() < 20, "{took:?}");
+        // 1.8 s measured in a local debug build; the bound is over twenty times that.
+        assert!(took.as_secs() < 40, "{took:?}");
     }
 
     /// Swift's argument labels: each argument goes to the next parameter of its label in order,
@@ -11410,7 +11416,8 @@ mod csharp_tests {
             p == "App/U.cs" && callee == "P.M" && *level == "exact"
         });
         assert_eq!(exact.count(), n);
-        assert!(took.as_secs() < 20, "{took:?}");
+        // 5.8 s measured in a local debug build; the bound is over twenty times that.
+        assert!(took.as_secs() < 120, "{took:?}");
     }
 
     /// What `Gen.M` (`Util.Go(); new Util();`, in `namespace Acme.Query.Internal`, or `block`

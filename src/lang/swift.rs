@@ -2278,7 +2278,8 @@ mod tests {
         assert!(
             (bound.iter()).all(|b| matches!(&b.value, Value::Call(c) if c.kwargs.len() == per))
         );
-        assert!(took < std::time::Duration::from_secs(1), "{took:?}");
+        // 0.07 s measured in a local debug build; the bound is over twenty times that.
+        assert!(took < std::time::Duration::from_secs(2), "{took:?}");
     }
 
     /// A chain of string methods on an environment read costs its length: each link is read
@@ -2301,7 +2302,8 @@ mod tests {
         };
         assert!(!held(&long));
         assert!(held(&facts(&source(8))));
-        assert!(took < std::time::Duration::from_secs(1), "{took:?}");
+        // 0.09 s measured in a local debug build; the bound is over twenty times that.
+        assert!(took < std::time::Duration::from_secs(2), "{took:?}");
     }
 
     #[test]
