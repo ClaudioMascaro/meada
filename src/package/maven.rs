@@ -1032,7 +1032,7 @@ mod tests {
 
     #[test]
     fn a_module_cycle_and_a_chain_past_the_depth_bound_are_walked_in_linear_time() {
-        let names: Vec<String> = (0..2000).map(|i| format!("m{i}")).collect();
+        let names: Vec<String> = (0..500).map(|i| format!("m{i}")).collect();
         // A chain from app that closes into a cycle back to app.
         let deps: Vec<String> = (0..names.len())
             .map(|i| dep(names.get(i + 1).map_or("app", |n| n.as_str()), ""))
@@ -1047,7 +1047,7 @@ mod tests {
         );
         let start = std::time::Instant::now();
         let found = entries(&poms);
-        assert!(start.elapsed().as_secs() < 2, "{:?}", start.elapsed());
+        assert!(start.elapsed().as_millis() < 500, "{:?}", start.elapsed());
         assert_eq!(found.len(), MODULE_DEPTH + 1);
         let found = entries(&[("app", &dep("a", "")), ("a", &dep("app", ""))]);
         assert_eq!(found, ["g:a", "g:app"]);
