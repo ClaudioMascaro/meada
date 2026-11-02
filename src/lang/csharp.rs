@@ -65,6 +65,10 @@ impl LanguagePack for CSharp {
         true
     }
 
+    fn static_imports_inherit(&self) -> bool {
+        false
+    }
+
     fn qualified_types(&self) -> bool {
         true
     }
@@ -539,6 +543,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 returns: None,
                 type_params: Vec::new(),
                 suspends: false,
+                unwrapped: None,
+                output: None,
                 hash: String::new(),
                 // The declared return type of a method or a local function.
                 result: match (kind, constructor) {
@@ -635,6 +641,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
             }
             if !public {
                 facts.hidden.push(inner.as_ref().clone());
+                // A member another project of the unit's repository may not call
+                // (`Resolver::hidden`); a type's own entries are pushed above.
+                if kind == Kind::Method {
+                    facts.private.push(inner.as_ref().clone());
+                }
             }
             for mut at in attributes(node, src, &scope) {
                 at.decorates = Some(inner.as_ref().clone());
@@ -1110,6 +1121,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         type_params: Vec::new(),
                         result: None,
                         suspends: false,
+                        unwrapped: None,
+                        output: None,
                         hash: String::new(),
                     });
                     nested += 1;
@@ -1193,6 +1206,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 type_params: Vec::new(),
                 result: None,
                 suspends: false,
+                unwrapped: None,
+                output: None,
                 hash: String::new(),
             });
             facts.programs.push(MAIN.to_string());
@@ -1690,6 +1705,8 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
         by_path: false,
         root: None,
         on: None,
+        unwraps: false,
+        awaits: false,
         receiver: None,
         arg_types: Vec::new(),
         uses: Vec::new(),

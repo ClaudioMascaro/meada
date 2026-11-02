@@ -93,6 +93,8 @@ impl LanguagePack for TsJs {
                     type_params: types::type_parameters(node, src),
                     result: None,
                     suspends: false,
+                    unwrapped: None,
+                    output: None,
                     hash: String::new(),
                     name: inner.clone(),
                     kind,
@@ -135,6 +137,8 @@ impl LanguagePack for TsJs {
                             by_path: false,
                             root: None,
                             on: None,
+                            unwraps: false,
+                            awaits: false,
                             receiver: None,
                             arg_types: arguments
                                 .map(|a| named(a).map(|arg| cast(arg, src, &parents)).collect())

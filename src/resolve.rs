@@ -13,8 +13,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
     Annotated, Binds, Bound, Call, Class, Closure, Const, Def, Export, Facts, Import, Imported,
-    Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker, Ty,
-    Value,
+    Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker,
+    Through, Ty, Value,
 };
 
 /// A definition: the repository-relative path of its file and its qualified name.
@@ -165,6 +165,10 @@ struct Seen<'a> {
     depth: usize,
     cut: bool,
     looped: bool,
+    /// The outside name the innermost alias met ended in (`Resolver::alias`), and whether a
+    /// cycle of aliases or a cut link made that unreliable.
+    outside: Option<&'a str>,
+    unsure: bool,
     /// The file whose code being run while it loads (at its top level, in a class body there or
     /// in its main guard) the name is resolved from (`Resolver::seen`).
     load: Option<&'a str>,
@@ -330,6 +334,8 @@ pub struct Resolver<'a> {
     guesses_constructs: bool,
     unordered_globs: bool,
     qualified_types: bool,
+    /// The pack's `LanguagePack::static_imports_inherit`.
+    static_imports_inherit: bool,
     /// The pack's `LanguagePack::namespaced`.
     namespaced: bool,
     consts: HashMap<&'a str, HashSet<&'a str>>,
@@ -912,6 +918,7 @@ impl<'a> Resolver<'a> {
             guesses_constructs: language.guesses_constructs(),
             unordered_globs: language.unordered_globs(),
             qualified_types: language.qualified_types(),
+            static_imports_inherit: language.static_imports_inherit(),
             namespaced: language.namespaced(),
             written,
             written_in,
@@ -1202,24 +1209,39 @@ impl<'a> Resolver<'a> {
         // The result of the call this one is made on, read once: the name match below reads it
         // too, and reading it twice per call would double the work at every call of a chain.
         let mut on = None;
+        let labels = call.labels.as_deref();
         let binding = match (call.on, constructs, call.by_path) {
             (Some(inner), false, _) => {
                 let members = callee.split_once('.').map_or("", |(_, m)| m);
-                let result = self.result_of(path, inner, work);
-                on = Some(result.clone());
-                self.walk(result, members, seen, work, Reading::Value)
+                match self.on_result(path, call, inner, work) {
+                    Some(result) => {
+                        on = Some(result.clone());
+                        self.walk(result, members, seen, work, Reading::Value, labels)
+                    }
+                    None => self.resolve_labelled(
+                        path,
+                        scope,
+                        callee,
+                        seen,
+                        work,
+                        Reading::Value,
+                        labels,
+                    ),
+                }
             }
             (_, true, _) => self.resolve_as(path, scope, callee, seen, work, Reading::Type),
             (_, false, true) if self.members_in_scope && !callee.contains('.') => {
-                self.resolve_as(path, scope, callee, seen, work, Reading::Method)
+                self.resolve_labelled(path, scope, callee, seen, work, Reading::Method, labels)
             }
-            (_, false, true) => self.resolve_as(path, scope, callee, seen, work, Reading::Path),
+            (_, false, true) => {
+                self.resolve_labelled(path, scope, callee, seen, work, Reading::Path, labels)
+            }
             (_, false, false) => {
                 let reading = match call.decorates {
                     Some(_) => Reading::Decorator,
                     None => Reading::Value,
                 };
-                self.resolve_as(path, scope, callee, seen, work, reading)
+                self.resolve_labelled(path, scope, callee, seen, work, reading, labels)
             }
         };
         let binding = match binding {
@@ -1273,6 +1295,21 @@ impl<'a> Resolver<'a> {
         {
             return found;
         }
+        // A top-level function answers a bare call, but an extension of the implicit receiver
+        // in scope comes before it, as Kotlin resolves it.
+        if let Some(tops) = self.top_level_functions(path, call, constructs, &binding)
+            && let Some(found) = self.extended(path, call, constructs, on.clone(), work)
+        {
+            return match found {
+                Resolution::Exact(_) => found,
+                _ if !matching => Resolution::Unresolved,
+                Resolution::Inferred(t) | Resolution::Narrowed(t) => {
+                    one_of_all([&[t][..], &tops].concat())
+                }
+                Resolution::Ambiguous(all) => one_of_all([&all[..], &tops].concat()),
+                Resolution::Unresolved => Resolution::Ambiguous(tops),
+            };
+        }
         if known && matches!(binding, Binding::Unknown) {
             return Resolution::Unresolved;
         }
@@ -1324,30 +1361,36 @@ impl<'a> Resolver<'a> {
         receiver: &Binding<'a>,
         work: &mut Work<'a>,
     ) -> Option<Option<&'a str>> {
-        let outside = |name: &'a str, work: &mut Work<'a>| {
+        // The spelling of `name` when it is outside the repository: the target of an alias of
+        // an outside type, else the name itself.
+        let outside = |name: &'a str, work: &mut Work<'a>| -> Option<&'a str> {
             let seen = &mut self.seen(path, scope);
             let found = self.resolve_as(path, scope, name, seen, work, Reading::Path);
+            let spelled = seen.outside.filter(|_| !seen.unsure && !seen.cut);
             matches!(found, Binding::Unknown | Binding::External(..))
+                .then_some(spelled.unwrap_or(name))
         };
         if let Some((p, s, n)) = self.holder(receiver) {
             return match self.receivers[p].get(&(s, n)) {
-                Some(Class::Type(ty) | Class::Named(ty)) if outside(ty, work) => Some(Some(ty)),
+                Some(Class::Type(ty) | Class::Named(ty)) => outside(ty, work).map(Some),
                 // A member read on a name from outside (`let s = URLSession.shared`): opaque.
                 Some(Class::Member(read)) => {
                     // As a direct chain, only a capitalized head is a type: `h.cache` is a member
                     // of a local or a parameter.
                     let first = read.split('.').next().unwrap_or(read);
-                    (first.starts_with(|c: char| c.is_ascii_uppercase()) && outside(first, work))
-                        .then_some(None)
+                    (first.starts_with(|c: char| c.is_ascii_uppercase())
+                        && outside(first, work).is_some())
+                    .then_some(None)
                 }
                 _ => None,
             };
         }
         let first = head.split('.').next().unwrap_or(head);
-        if !first.starts_with(|c: char| c.is_ascii_uppercase()) || !outside(first, work) {
+        if !first.starts_with(|c: char| c.is_ascii_uppercase()) {
             return None;
         }
-        Some((first == head).then_some(first))
+        let spelled = outside(first, work)?;
+        Some((first == head).then_some(spelled))
     }
 
     /// The name match of a call that no binding answers (`infer`). A call narrowed by its
@@ -1403,10 +1446,13 @@ impl<'a> Resolver<'a> {
                     false => (on, call.on),
                 };
                 let receiver = match (on, inner) {
-                    (Some(known), _) => known,
-                    (None, Some(inner)) => self.result_of(path, inner, work),
-                    (None, None) => self.resolve_as(path, scope, head, seen, work, Reading::Value),
+                    (Some(known), _) => Some(known),
+                    (None, Some(inner)) => self.on_result(path, call, inner, work),
+                    (None, None) => None,
                 };
+                let receiver = receiver.unwrap_or_else(|| {
+                    self.resolve_as(path, scope, head, seen, work, Reading::Value)
+                });
                 // The source writes a type for the receiver.
                 written = (self.holder(&receiver)).is_some_and(|(p, s, n)| {
                     matches!(self.receivers[p].get(&(s, n)), Some(Class::Type(_)))
@@ -1530,7 +1576,13 @@ impl<'a> Resolver<'a> {
     /// What the call at `index` of `path`'s calls gives (`Call::on`, `Class::Result`): the class
     /// its exact target's declared result names (`Def::result`), or something outside the
     /// repository; unknown otherwise, and past `RECEIVER_DEPTH` calls and receivers.
-    fn result_of(&self, path: &'a str, index: usize, work: &mut Work<'a>) -> Binding<'a> {
+    fn result_of(
+        &self,
+        path: &'a str,
+        index: usize,
+        through: Through,
+        work: &mut Work<'a>,
+    ) -> Binding<'a> {
         let Some(call) = self.files[path].calls.get(index) else {
             return Binding::Unknown;
         };
@@ -1538,7 +1590,7 @@ impl<'a> Resolver<'a> {
             return Binding::Unknown;
         }
         let found = match self.resolved(path, call, false, work) {
-            Resolution::Exact(t) => match &self.defs[t.path][t.name].result {
+            Resolution::Exact(t) => match self.written_result(t, through) {
                 Some(Class::Type(class)) => {
                     let seen = &mut self.seen(t.path, t.name);
                     match self.resolve_as(t.path, t.name, class, seen, work, Reading::Path) {
@@ -1553,6 +1605,39 @@ impl<'a> Resolver<'a> {
         };
         self.leave(work);
         found
+    }
+
+    /// The class `target`'s declared result names, or, going on `through`, the one `.await` or
+    /// `?` takes it to: a future signature's output (after `?` too, its `Result` is not kept, so
+    /// nothing), else what `?` unwraps.
+    fn written_result(&self, target: Target<'a>, through: Through) -> Option<&'a Class> {
+        let def = &self.defs[target.path][target.name];
+        let class = match (&def.output, through.awaited, through.tried) {
+            (Some(_), true, true) => &None,
+            (Some(_), true, false) => &def.output,
+            (_, _, true) => &def.unwrapped,
+            _ => &def.result,
+        };
+        class.as_ref()
+    }
+
+    /// The receiver of `call`, made on the call at `inner`: its result, or, through `?`
+    /// (`Call::unwraps`), the type that result wraps. Through `?` a type outside the repository
+    /// or unknown is no receiver (`None`): the call is read as one on the expression, a name
+    /// match.
+    fn on_result(
+        &self,
+        path: &'a str,
+        call: &'a Call,
+        inner: usize,
+        work: &mut Work<'a>,
+    ) -> Option<Binding<'a>> {
+        let through = Through {
+            tried: call.unwraps,
+            awaited: call.awaits,
+        };
+        let result = self.result_of(path, inner, through, work);
+        (!call.unwraps || matches!(result, Binding::Def(_))).then_some(result)
     }
 
     /// Whether the call at `index` of `path` gives something from outside the repository, as
@@ -1626,6 +1711,48 @@ impl<'a> Resolver<'a> {
         }
     }
 
+    /// The top-level functions (of a file's package, no member, extension or local function)
+    /// a bare call of a pack with extension functions is bound to: the ones an extension of the
+    /// implicit receiver in scope comes before.
+    fn top_level_functions(
+        &self,
+        path: &str,
+        call: &Call,
+        constructs: bool,
+        binding: &Binding<'a>,
+    ) -> Option<Vec<Target<'a>>> {
+        if constructs || call.on.is_some() || call.callee.contains('.') {
+            return None;
+        }
+        if !self.extending.contains(path) {
+            return None;
+        }
+        let all = match binding {
+            Binding::Def(t) => vec![*t],
+            Binding::Several(all) => all.clone(),
+            _ => return None,
+        };
+        let top = |t: &Target| {
+            self.defs[t.path][t.name].kind == Kind::Function
+                && crate::parent(t.name) == self.files[t.path].package
+        };
+        all.iter().all(top).then_some(all)
+    }
+
+    /// Whether `t` is a Kotlin `object`: a class of a file whose pack has extension functions
+    /// that holds the `INSTANCE` of its own type (`Facts::receivers`) and has no `Def::result`,
+    /// which only a `class` declaration sets (a class's own `INSTANCE` property is no object).
+    /// Its name is its instance.
+    fn is_object(&self, t: Target<'a>) -> bool {
+        self.extending.contains(t.path)
+            && self.is_class(t)
+            && self.defs[t.path][t.name].result.is_none()
+            && matches!(
+                self.receivers[t.path].get(&(t.name, "INSTANCE")),
+                Some(Class::Type(_))
+            )
+    }
+
     /// A call of a pack with extension functions (`LanguagePack::extension_functions`) that no
     /// member answers: the extensions in scope (`visible`) that may apply to its receiver, as
     /// Kotlin picks one. On a class of the repository whose family is all known, the first scope
@@ -1633,7 +1760,7 @@ impl<'a> Resolver<'a> {
     /// a type from outside the repository or of a type parameter may apply to any receiver
     /// (`Any`, `T`), and an outside receiver's members are unknown (Opaque outside): those are
     /// name matches. `None` when no extension in scope may apply, or the receiver is unknown or
-    /// no instance (a type's name, `Outside.create()`): the name match reads it as any other.
+    /// no instance (a class's name, `Outside.create()`; an `object`'s name is its instance): the name match reads it as any other.
     fn extended(
         &self,
         path: &'a str,
@@ -1666,17 +1793,31 @@ impl<'a> Resolver<'a> {
             Some(head) if Some(head) == self.base_receiver => return None,
             // A member read between the call and the call made (`make().x.tag()`) is the
             // receiver, not the call's result.
-            Some(head) => match (head.contains('.'), on, call.on) {
-                (false, Some(known), _) => known,
-                (false, None, Some(inner)) => self.result_of(path, inner, work),
-                (true, ..) | (false, None, None) => {
-                    let seen = &mut self.seen(path, scope);
-                    let found = self.resolve_as(path, scope, head, seen, work, Reading::Value);
-                    // A type's name calls its companion or its statics.
-                    self.holder(&found)?;
-                    self.instance(found, work)
+            Some(head) => {
+                let made = match (head.contains('.'), on) {
+                    (true, _) => None,
+                    (false, Some(known)) => Some(known),
+                    (false, None) => call
+                        .on
+                        .and_then(|inner| self.on_result(path, call, inner, work)),
+                };
+                match made {
+                    Some(known) => known,
+                    None => {
+                        let seen = &mut self.seen(path, scope);
+                        let found = self.resolve_as(path, scope, head, seen, work, Reading::Value);
+                        match found {
+                            // An object's name is its instance, as a typed local is.
+                            Binding::Def(t) if self.is_object(t) => found,
+                            // A class's name calls its companion or its statics.
+                            _ => {
+                                self.holder(&found)?;
+                                self.instance(found, work)
+                            }
+                        }
+                    }
                 }
-            },
+            }
         };
         let family = match receiver {
             Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => self.family(t, work),
@@ -1877,12 +2018,29 @@ impl<'a> Resolver<'a> {
         work: &mut Work<'a>,
         reading: Reading,
     ) -> Binding<'a> {
+        self.resolve_labelled(path, scope, callee, seen, work, reading, None)
+    }
+
+    /// `resolve_as` for the callee of a call that writes `labels` (Swift): its last member is
+    /// looked up with them (`may_declare`).
+    #[allow(clippy::too_many_arguments)]
+    fn resolve_labelled(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        callee: &'a str,
+        seen: &mut Seen<'a>,
+        work: &mut Work<'a>,
+        reading: Reading,
+        labels: Option<&'a [String]>,
+    ) -> Binding<'a> {
         if let Some((head, members)) = callee.split_once('.')
             && Some(head) == self.base_receiver
         {
             let (first, rest) = members.split_once('.').unwrap_or((members, ""));
-            let found = self.base_member(path, scope, first, work);
-            return self.walk(found, rest, seen, work, reading);
+            let found =
+                self.base_member(path, scope, first, work, labels.filter(|_| rest.is_empty()));
+            return self.walk(found, rest, seen, work, reading, labels);
         }
         if self.assigned_members
             && let Some(found) = self.assigned(path, scope, callee)
@@ -1930,7 +2088,7 @@ impl<'a> Resolver<'a> {
         {
             (binding, members) = found;
         }
-        let found = self.walk(binding, members, seen, work, reading);
+        let found = self.walk(binding, members, seen, work, reading, labels);
         self.in_unit(path, self.accessible(path, found))
     }
 
@@ -1969,6 +2127,7 @@ impl<'a> Resolver<'a> {
         seen: &mut Seen<'a>,
         work: &mut Work<'a>,
         reading: Reading,
+        labels: Option<&'a [String]>,
     ) -> Binding<'a> {
         let members: Vec<&str> = members.split('.').filter(|m| !m.is_empty()).collect();
         for (n, member) in members.iter().enumerate() {
@@ -1977,6 +2136,7 @@ impl<'a> Resolver<'a> {
             // A member read on the way, or read last, is no method where fields and methods
             // are separate namespaces (`Reading::Read`).
             let read = self.members_in_scope && (!last || reading.read());
+            let labels = labels.filter(|_| last);
             binding = match self.instance(binding, work) {
                 // A class's name (`Type.m()`, `Type.X`) reaches a Kotlin companion's members
                 // before the class's, which only an instance reaches; past the companion, a
@@ -1985,8 +2145,8 @@ impl<'a> Resolver<'a> {
                     if self.is_class(t)
                         && let Some(&c) = self.companions.get(&t) =>
                 {
-                    match self.member(c, member, read, work) {
-                        Binding::Unknown => match self.member(t, member, read, work) {
+                    match self.member(c, member, read, labels, work) {
+                        Binding::Unknown => match self.member(t, member, read, labels, work) {
                             found @ Binding::Def(d) if self.is_class(d) => found,
                             found @ Binding::Const(..) => found,
                             _ => Binding::Unknown,
@@ -1995,7 +2155,7 @@ impl<'a> Resolver<'a> {
                     }
                 }
                 Binding::Def(t) | Binding::Instance(t) if self.is_class(t) => {
-                    self.member(t, member, read, work)
+                    self.member(t, member, read, labels, work)
                 }
                 Binding::Def(t) => match self.def(t.path, &format!("{}.{member}", t.name)) {
                     Binding::Unknown if self.defs[t.path][t.name].kind == Kind::Module => {
@@ -2009,7 +2169,7 @@ impl<'a> Resolver<'a> {
                 {
                     alternatives(
                         all.into_iter()
-                            .map(|t| self.member(t, member, read, work))
+                            .map(|t| self.member(t, member, read, labels, work))
                             .collect(),
                     )
                     .unwrap_or(Binding::Unknown)
@@ -2129,7 +2289,7 @@ impl<'a> Resolver<'a> {
             }
             Class::Returned(callee) => self.returned(path, scope, callee, false, work),
             Class::Called(callee) => self.returned(path, scope, callee, true, work),
-            Class::Result(index) => self.result_of(path, *index, work),
+            Class::Result(index) => self.result_of(path, *index, Through::default(), work),
             Class::Imported | Class::Member(_) | Class::Unknown => Binding::Unknown,
         };
         self.leave(work);
@@ -2198,6 +2358,7 @@ impl<'a> Resolver<'a> {
         class: Target<'a>,
         member: &'a str,
         read: bool,
+        labels: Option<&[String]>,
         work: &mut Work<'a>,
     ) -> Binding<'a> {
         let Some(family) = self.family(class, work) else {
@@ -2212,13 +2373,13 @@ impl<'a> Resolver<'a> {
                 _ => Binding::Unknown,
             };
         };
-        if !read && let Some(found) = self.overloaded(&family, member) {
+        if !read && let Some(found) = self.overloaded(&family, member, labels) {
             return found;
         }
         for ancestor in self.with_parts(&family).iter() {
             let c = match ancestor {
                 Ancestor::Class(c) => *c,
-                Ancestor::Opaque(o) if !self.may_declare(o, member) => continue,
+                Ancestor::Opaque(o) if !self.may_declare(o, member, labels) => continue,
                 Ancestor::Opaque(_) => return Binding::Unknown,
             };
             if let Some(found) = self.block_member(c, member) {
@@ -2250,7 +2411,7 @@ impl<'a> Resolver<'a> {
             }
         }
         match self.companion(class, work) {
-            Some(companion) => self.member(companion, member, read, work),
+            Some(companion) => self.member(companion, member, read, labels, work),
             None => Binding::Unknown,
         }
     }
@@ -2269,7 +2430,12 @@ impl<'a> Resolver<'a> {
     /// after the class itself, and a block's protocol (`Impl::of`) after them, with that
     /// protocol's own inherent blocks (its default implementations); a protocol from outside the
     /// repository is an opaque base for the names it may declare.
-    fn overloaded(&self, family: &[Ancestor<'a>], member: &str) -> Option<Binding<'a>> {
+    fn overloaded(
+        &self,
+        family: &[Ancestor<'a>],
+        member: &str,
+        labels: Option<&[String]>,
+    ) -> Option<Binding<'a>> {
         let (mut found, mut signatures, mut opaque) = (Vec::new(), HashSet::new(), false);
         let blocks = |c: Target<'a>| self.impls.get(&c).into_iter().flatten();
         // Each class with its blocks is one level, in family order; then each protocol a block
@@ -2279,7 +2445,7 @@ impl<'a> Resolver<'a> {
             let c = match ancestor {
                 Ancestor::Class(c) => *c,
                 Ancestor::Opaque(o) => {
-                    opaque |= self.may_declare(o, member);
+                    opaque |= self.may_declare(o, member, labels);
                     continue;
                 }
             };
@@ -2288,7 +2454,8 @@ impl<'a> Resolver<'a> {
             for b in blocks(c) {
                 scopes.push((b.path, b.scope));
                 conformed.extend(b.of);
-                opaque |= (b.outside.as_deref()).is_some_and(|o| self.may_declare(o, member));
+                opaque |=
+                    (b.outside.as_deref()).is_some_and(|o| self.may_declare(o, member, labels));
             }
             levels.push((c, scopes));
         }
@@ -2353,13 +2520,14 @@ impl<'a> Resolver<'a> {
         scope: &str,
         member: &str,
         work: &mut Work<'a>,
+        labels: Option<&[String]>,
     ) -> Binding<'a> {
         let Binding::Def(class) = self.class(path, scope) else {
             return Binding::Unknown;
         };
         let family = self.family(class, work).unwrap_or_default();
         (family.get(1..))
-            .and_then(|bases| self.overloaded(bases, member))
+            .and_then(|bases| self.overloaded(bases, member, labels))
             .unwrap_or(Binding::Unknown)
     }
 
@@ -2375,7 +2543,7 @@ impl<'a> Resolver<'a> {
         for ancestor in self.with_parts(family).iter() {
             let c = match ancestor {
                 Ancestor::Class(c) => *c,
-                Ancestor::Opaque(o) if !self.may_declare(o, name) => continue,
+                Ancestor::Opaque(o) if !self.may_declare(o, name, None) => continue,
                 Ancestor::Opaque(_) => return Some(Binding::Unknown),
             };
             let qualified = format!("{}.{name}", c.name);
@@ -2402,9 +2570,9 @@ impl<'a> Resolver<'a> {
     fn opaque(&self, family: &[Ancestor<'a>], name: &str) -> bool {
         let name = name.rsplit('.').next().unwrap_or(name);
         family.iter().any(|a| match a {
-            Ancestor::Opaque(o) => self.may_declare(o, name),
+            Ancestor::Opaque(o) => self.may_declare(o, name, None),
             Ancestor::Class(c) => (self.impls.get(c).into_iter().flatten())
-                .any(|b| (b.outside.as_deref()).is_some_and(|o| self.may_declare(o, name))),
+                .any(|b| (b.outside.as_deref()).is_some_and(|o| self.may_declare(o, name, None))),
         })
     }
 
@@ -2434,18 +2602,29 @@ impl<'a> Resolver<'a> {
     /// Whether the outside type `outside` (an opaque base or protocol, as `imported_name`
     /// spells it) may declare the member `name`: no known outside type matches it, or one that
     /// declares `name` does (Known outside members, `docs/adr/0019-known-outside-members.md`).
-    /// A type matches by its qualified name, or a bare `outside` by its last name; a Swift
-    /// member is compared without its labels, so `hash(into:)` keeps every `hash` opaque.
-    fn may_declare(&self, outside: &str, name: &str) -> bool {
+    /// A type matches by its qualified name, or a bare `outside` by its last name. A call that
+    /// writes `labels` (Swift) is compared with a labelled entry by its full name, so `hash(seed:)`
+    /// is not `hash(into:)`; no labels, or a trailing closure (label `""`), compare the bare name.
+    fn may_declare(&self, outside: &str, name: &str, labels: Option<&[String]>) -> bool {
         let base = |n: &'static str| n.split('(').next().unwrap_or(n);
         let name = name.split('(').next().unwrap_or(name);
+        let full = (labels.filter(|l| !l.iter().any(String::is_empty))).map(|l| {
+            format!(
+                "{name}({})",
+                l.iter().map(|l| format!("{l}:")).collect::<String>()
+            )
+        });
         let known = || {
             (self.known.iter()).filter(|(ty, _)| {
                 *ty == outside || (!outside.contains('.') && ty.rsplit('.').next() == Some(outside))
             })
         };
         known().next().is_none()
-            || known().any(|(_, members)| members.iter().any(|m| base(m) == name))
+            || known().any(|(_, members)| {
+                members.iter().any(|m| {
+                    base(m) == name && full.as_ref().is_none_or(|f| !m.contains('(') || m == f)
+                })
+            })
     }
 
     /// What a bare method name written in the body of class `class` of `path` names
@@ -2459,7 +2638,7 @@ impl<'a> Resolver<'a> {
         let Some(family) = family else {
             return Some(Binding::Unknown);
         };
-        match self.overloaded(family, name) {
+        match self.overloaded(family, name, None) {
             None if self.implicit.contains(&name) || self.opaque(family, name) => {
                 Some(Binding::Unknown)
             }
@@ -3186,7 +3365,8 @@ impl<'a> Resolver<'a> {
     }
 
     /// Whether `t` is, or is declared in, a type its file keeps to its compilation
-    /// (`Facts::private` of a file with a `Facts::unit`: C#'s `internal` types) and `path` is
+    /// (`Facts::private` of a file with a `Facts::unit`: C#'s `internal` types, and their non-public
+    /// constructors and methods) and `path` is
     /// in another one. A file in no project (its own unit) neither hides nor is hidden.
     // ponytail: `InternalsVisibleTo` is not read, so a friend project gets no link.
     // A file sees the `private` names of the units it lists in `Facts::internals`, but for the
@@ -3459,16 +3639,18 @@ impl<'a> Resolver<'a> {
                 }
             }
             Binding::Def(t) if self.is_class(t) => {
-                let found = self.member(t, name, false, work);
-                match found {
-                    Binding::Def(t) if self.statics.contains(&t) => Binding::Def(t),
-                    Binding::Several(all) => one(all
-                        .into_iter()
-                        .filter(|t| self.statics.contains(t))
-                        .map(Binding::Def)
-                        .collect())
-                    .unwrap_or(Binding::Unknown),
-                    Binding::Const(path, name) if self.statics.contains(&Target { path, name }) => {
+                // The statics `t` offers; with `static_imports_inherit` off, only those `t` declares.
+                let offered = |m: &Target<'a>| {
+                    self.statics.contains(m)
+                        && (self.static_imports_inherit || declared_in(t.name, m.name))
+                };
+                match self.member(t, name, false, None, work) {
+                    Binding::Def(m) if offered(&m) => Binding::Def(m),
+                    Binding::Several(all) => {
+                        one(all.into_iter().filter(offered).map(Binding::Def).collect())
+                            .unwrap_or(Binding::Unknown)
+                    }
+                    Binding::Const(path, name) if offered(&Target { path, name }) => {
                         Binding::Const(path, name)
                     }
                     _ => Binding::Unknown,
@@ -3583,6 +3765,7 @@ impl<'a> Resolver<'a> {
             return Binding::Unknown;
         }
         if !seen.aliases.insert((path, target)) {
+            seen.unsure = true;
             return Binding::Unknown;
         }
         seen.depth += 1;
@@ -3591,6 +3774,10 @@ impl<'a> Resolver<'a> {
             self.resolve_as(path, scope, target, seen, work, Reading::Alias)
         });
         seen.depth -= 1;
+        // The innermost alias returns first: its target is the outside type's spelling.
+        if seen.outside.is_none() && matches!(found, Binding::Unknown | Binding::External(..)) {
+            seen.outside = Some(target);
+        }
         found
     }
 
@@ -4093,6 +4280,13 @@ fn latest<'a>(
     }
 }
 
+/// `found`, sorted and without repeats, as several candidates.
+fn one_of_all(mut found: Vec<Target>) -> Resolution {
+    found.sort();
+    found.dedup();
+    Resolution::Ambiguous(found)
+}
+
 /// The one binding several files that share a scope give a name, when they give the same one:
 /// `None` when none gives it, `Several` when they define it apart, unknown otherwise.
 /// A name match over these candidates: none, `inferred` to one, or `ambiguous` among several.
@@ -4135,6 +4329,13 @@ fn alternatives(found: Vec<Binding>) -> Option<Binding> {
             other => vec![other],
         })
         .collect())
+}
+
+/// Whether the definition `member` is one `owner` declares itself: what follows `owner.` is
+/// a single name, before any signature (`N.A.Go(int)`), and not a member of a nested type.
+fn declared_in(owner: &str, member: &str) -> bool {
+    let rest = member.strip_prefix(owner).and_then(|r| r.strip_prefix('.'));
+    rest.is_some_and(|r| !r.split('(').next().unwrap_or(r).contains('.'))
 }
 
 fn one(found: Vec<Binding>) -> Option<Binding> {
@@ -6038,7 +6239,7 @@ impl<'a> Code<'a> {
         let found = r.resolve_as(path, scope, name, seen, work, Reading::Value);
         match r.instance(found, work) {
             Binding::Def(t) | Binding::Instance(t) if r.is_class(t) => {
-                match r.member(t, method, false, work) {
+                match r.member(t, method, false, None, work) {
                     Binding::Def(t) => Some(t),
                     _ => None,
                 }
@@ -7035,6 +7236,8 @@ mod tests {
             type_params: Vec::new(),
             result: None,
             suspends: false,
+            unwrapped: None,
+            output: None,
             hash: String::new(),
         }
     }
@@ -7383,6 +7586,8 @@ mod tests {
                 by_path: false,
                 root: None,
                 on: None,
+                unwraps: false,
+                awaits: false,
                 receiver: None,
                 arg_types: Vec::new(),
                 uses: Vec::new(),
@@ -9743,29 +9948,73 @@ mod tests {
     }
 
     /// A call on another call's result is typed by the inner target's written result, through
-    /// `.await` and parentheses; after `?` that result is the `Result` or `Option` around the
-    /// value, so the call stays the name match it was.
+    /// `.await` and parentheses; after `?` it is typed by the type a `Result` or `Option` wraps,
+    /// and a plain `fn` that returns a future yields its `Output` under `.await`. Where that
+    /// type is outside the repository, a call after `?` stays the name match it was and one
+    /// after `.await` resolves to nothing.
     #[test]
-    fn a_rust_call_after_try_on_a_call_stays_a_name_match() {
+    fn a_rust_call_after_try_or_await_is_typed_by_the_type_they_unwrap() {
         let calls = pack_calls(
             &crate::lang::rust::Rust,
             "src/lib.rs",
             "use anyhow::Result;
+             use std::future::Future;
+             use std::pin::Pin;
              pub struct Cfg;
              impl Cfg { pub fn port(&self) {} }
              pub struct Other;
-             impl Other { pub fn port(&self) {} }
+             impl Other { pub fn port(&self) {} pub fn send(&self) {} }
              pub fn load() -> Result<Cfg> { todo!() }
              pub fn opt() -> Option<Cfg> { todo!() }
              pub fn cfg() -> Cfg { Cfg }
-             pub fn a() -> Result<()> { load()?.port(); Ok(()) }
+             pub fn fut() -> impl Future<Output = Cfg> { async { Cfg } }
+             pub fn boxed() -> Pin<Box<dyn Future<Output = Cfg>>> { todo!() }
+             pub fn tried() -> impl Future<Output = Result<Cfg>> { todo!() }
+             impl Cfg { pub fn map(&self) {} }
+             pub async fn asynced() -> Result<Cfg> { todo!() }
+             pub fn outside() -> Result<reqwest::Client> { todo!() }
+             pub fn later() -> impl Future<Output = reqwest::Client> { todo!() }
+             pub async fn a() -> Result<()> { load()?.port(); Ok(()) }
              pub fn b() -> Option<()> { opt()?.port(); None }
-             pub async fn c() { (cfg()).port(); }",
+             pub async fn c() { (cfg()).port(); }
+             pub async fn d() { fut().await.port(); }
+             pub async fn e() { boxed().await.port(); }
+             pub async fn f() -> Result<()> { tried().await?.port(); Ok(()) }
+             pub async fn k() { fut().map(); }
+             pub async fn g() -> Result<()> { asynced().await?.port(); Ok(()) }
+             pub fn h() -> Result<()> { outside()?.send(); Ok(()) }
+             pub async fn i() { later().await.send(); }
+             pub fn j() -> Result<()> { load()??.port(); Ok(()) }
+             pub async fn l() -> Result<()> { load()?.await.port(); Ok(()) }",
         );
-        let both = "ambiguous Cfg.port Other.port";
-        assert_eq!(calls["a (try_expression).port"], both);
-        assert_eq!(calls["b (try_expression).port"], both);
-        assert_eq!(calls["c (parenthesized_expression).port"], "exact Cfg.port");
+        let exact = "exact Cfg.port";
+        assert_eq!(calls["a (try_expression).port"], exact);
+        assert_eq!(calls["b (try_expression).port"], exact);
+        assert_eq!(calls["c (parenthesized_expression).port"], exact);
+        assert_eq!(calls["d (await_expression).port"], exact);
+        assert_eq!(calls["e (await_expression).port"], exact);
+        // The `Result` inside a future is not kept: after `await` and `?` the type is unknown.
+        assert_eq!(
+            calls["f (try_expression).port"],
+            "ambiguous Cfg.port Other.port"
+        );
+        // A method of the future itself is not a method of its output.
+        assert_eq!(calls["k (call_expression).map"], "none");
+        assert_eq!(calls["g (try_expression).port"], exact);
+        // Outside the repository: after `?` the call is the name match it was, after `.await`
+        // it resolves to nothing.
+        assert_eq!(calls["h (try_expression).send"], "inferred Other.send");
+        assert_eq!(calls["i (await_expression).send"], "none");
+        // Two `?` name no type.
+        assert_eq!(
+            calls["j (try_expression).port"],
+            "ambiguous Cfg.port Other.port"
+        );
+        // `?` then `.await`: the unwrapped `Cfg` is awaited, its output unknown, so no `exact`.
+        assert_eq!(
+            calls["l (await_expression).port"],
+            "ambiguous Cfg.port Other.port"
+        );
     }
 
     /// `T::new().m().m()..`: each Rust call is made on the one before and typed by its exact
@@ -9783,6 +10032,24 @@ mod tests {
         let calls = pack_calls(&crate::lang::rust::Rust, "src/lib.rs", &src);
         let took = start.elapsed();
         assert_eq!(calls["f T.new"], "exact T.new");
+        assert!(took.as_secs() < 10, "{took:?}");
+    }
+
+    /// The same chain with a `?` after every link: a call is typed by the type the result of the
+    /// one before it wraps, and the chain costs its length.
+    #[test]
+    fn a_rust_chain_of_calls_through_try_is_read_in_linear_time() {
+        let n = 4 * RECEIVER_DEPTH;
+        let src = format!(
+            "pub struct T;\nimpl T {{ pub fn new() -> Option<T> {{ None }} pub fn m(self) -> Option<T> {{ None }} }}\n\
+             pub fn f() -> Option<()> {{ T::new(){}; None }}\n",
+            "?.m()".repeat(n)
+        );
+        let start = std::time::Instant::now();
+        let calls = pack_calls(&crate::lang::rust::Rust, "src/lib.rs", &src);
+        let took = start.elapsed();
+        assert_eq!(calls["f T.new"], "exact T.new");
+        assert_eq!(calls["f (try_expression).m"], "exact T.m");
         assert!(took.as_secs() < 10, "{took:?}");
     }
 
@@ -9998,6 +10265,27 @@ mod tests {
              func run(o: Own, n: inout Int) { o.hash(into: &n) }",
         );
         assert_eq!(own["run(o:n:) o.hash"], "exact Own.hash(into:)");
+    }
+
+    /// A Swift call whose labels differ from the known outside member's (`hash(seed:)` beside
+    /// `Hashable`'s `hash(into:)`) resolves as if the base were absent (issue #463).
+    #[test]
+    fn a_swift_call_is_compared_with_a_known_outside_member_by_its_labels() {
+        let calls = pack_calls(
+            &crate::lang::swift::Swift,
+            "A.swift",
+            "struct P: Hashable { func hash(seed: Int) {} }
+             func own(p: P) { p.hash(seed: 1) }
+             func declared(p: P, h: inout Hasher) { p.hash(into: &h) }
+             func closure(p: P) { p.hash { 1 } }
+",
+        );
+        assert_eq!(calls["own(p:) p.hash"], "exact P.hash(seed:)");
+        // `hash(into:)` is `Hashable`'s, not an overload of `P`: the call stays opaque.
+        assert_eq!(calls["declared(p:h:) p.hash"], "none");
+        // A trailing closure compares by the bare name: `Hashable` may declare `hash`, so the
+        // strict level stands.
+        assert_eq!(calls["closure(p:) p.hash"], "inferred P.hash(seed:)");
     }
 
     /// A Swift local bound to a member read on a name nothing in the repository binds is opaque
@@ -10431,8 +10719,8 @@ mod csharp_tests {
     /// give is not read from that family.
     #[test]
     fn a_glob_lookup_during_linearization_sees_the_families_being_linearized() {
-        let src = "using static N.A;\nnamespace N { public class B { public static void Go() {} } \
-                   public class A : B { } }\n";
+        let src = "using static N.A;\nnamespace N { public class B { } \
+                   public class A : B { public static void Go() {} } }\n";
         with_resolver(
             &[("App/A.cs", src)],
             &[("App/App.csproj", PROJECT)],
@@ -10443,11 +10731,54 @@ mod csharp_tests {
                     *resolver.linearizing.borrow_mut() = families;
                     resolver.globs("App/A.cs", "", "Go", false, &mut Seen::new())
                 };
-                assert!(matches!(go(vec![]), Some(Binding::Def(t)) if t.name == "N.B.Go()"));
+                assert!(matches!(go(vec![]), Some(Binding::Def(t)) if t.name == "N.A.Go()"));
                 let a = ("App/A.cs".to_string(), "N.A".to_string());
                 assert!(!matches!(go(vec![a]), Some(Binding::Def(_))));
             },
         );
+    }
+
+    /// C# imports what a `using static` type declares, not what it inherits ("Inherited members
+    /// aren't imported"): a bare `Go()` under `using static N.A` with `Go` on A's base is no
+    /// `exact` link to it, while `using static N.B` gives it, and a nested type of A is reached.
+    #[test]
+    fn a_static_import_gives_the_declared_members_alone() {
+        let bases = "namespace N { public class B { public static void Go() {} \
+                     public class Inner { public static void Run() {} } } \
+                     public class A : B { public class Own { public static void Run() {} } } }\n";
+        let call = |using: &str, callee: &str| {
+            let user = format!("{using}\nclass U {{ void M() {{ {callee}(); }} }}\n");
+            let found = resolved(&[("App/Bases.cs", bases), ("App/U.cs", user.as_str())]);
+            let found = found
+                .into_iter()
+                .find(|c| c.0 == "App/U.cs" && c.1 == callee);
+            found.map(|c| c.2)
+        };
+        // No `exact` to the inherited `Go`; the call stays a name match at best.
+        assert_ne!(call("using static N.A;", "Go"), Some("exact"));
+        assert_eq!(call("using static N.B;", "Go"), Some("exact"));
+        assert_eq!(call("using static N.A;", "Own.Run"), Some("exact"));
+        assert_ne!(call("using static N.A;", "Inner.Run"), Some("exact"));
+    }
+
+    /// The declared members of a generic type are offered too, and an overload of the base
+    /// that the type's own overloads do not cover is not.
+    #[test]
+    fn a_static_import_of_a_generic_type_gives_its_declared_overloads() {
+        let types = "namespace N { public class B { public static void Go() {} } \
+                     public class A<T> : B { public static void Go(int x) {} \
+                     public static void Own() {} } }\n";
+        let call = |callee: &str, args: &str| {
+            let user =
+                format!("using static N.A;\nclass U {{ void M() {{ {callee}({args}); }} }}\n");
+            let found = resolved(&[("App/Types.cs", types), ("App/U.cs", user.as_str())]);
+            let found = found
+                .into_iter()
+                .find(|c| c.0 == "App/U.cs" && c.1 == callee);
+            found.map(|c| (c.2, c.3))
+        };
+        assert_eq!(call("Own", "").map(|c| c.0), Some("exact"));
+        assert_ne!(call("Go", "").map(|c| c.0), Some("exact"));
     }
 
     /// A `Seen` begun past an import goes on from the links the walks around it followed
@@ -10891,6 +11222,39 @@ mod csharp_tests {
         }
     }
 
+    const FOO: &str = "namespace Shop; public class Foo { internal Foo(int n) {} public Foo() {} \
+                       internal static void Make() {} private static void Own() {} \
+                       protected void Sub() {} }";
+
+    /// An `internal` or `private` constructor or method of a public type is its project's alone:
+    /// from another project `new Foo(1)` and `Foo.Make()` link to nothing, while the project's
+    /// own file links `exact`. A plain `protected` one stays visible (a derived class of another
+    /// project may call it).
+    #[test]
+    fn a_non_public_member_of_a_public_type_links_from_its_own_project_alone() {
+        let use_foo = "using Shop; class U { void M() { new Foo(1); Foo.Make(); Foo.Own(); \
+                       new Foo().Sub(); } }";
+        let found = resolved(&[("Kit/Foo.cs", FOO), ("App/Use.cs", use_foo)]);
+        let outside = calls_in(&found, "App/Use.cs");
+        for callee in ["Foo.Make", "Foo.Own"] {
+            let call = outside.iter().find(|(c, ..)| c == callee).unwrap();
+            assert_eq!(call.1, "unresolved", "{outside:?}");
+        }
+        let ctor = outside.iter().find(|(c, ..)| c == "Foo").unwrap();
+        assert!(
+            ctor.2.iter().all(|t| !t.contains("Foo.cs")) || ctor.1 != "exact",
+            "{outside:?}"
+        );
+        let sub = outside.iter().find(|(c, ..)| c.ends_with("Sub")).unwrap();
+        assert_ne!(sub.1, "unresolved", "{outside:?}");
+        let found = resolved(&[("Kit/Foo.cs", FOO), ("Kit/Use.cs", use_foo)]);
+        let own = calls_in(&found, "Kit/Use.cs");
+        for callee in ["Foo.Make", "Foo.Own", "Foo"] {
+            let call = own.iter().find(|(c, ..)| c == callee).unwrap();
+            assert_eq!(call.1, "exact", "{own:?}");
+        }
+    }
+
     /// From another project, a public type of the internal one's name is the one found; from a
     /// file of each of two projects with an internal type of one name, its project's own.
     #[test]
@@ -11238,5 +11602,86 @@ mod kotlin_tests {
             let two = [("a/C.kt", &*expect), ("b/C.kt", &**other), ("u/U.kt", user)];
             assert_eq!(level(&two, "C"), "ambiguous a/C.kt::e.C b/C.kt::e.C");
         }
+    }
+
+    /// A class nested in an `expect` class is `expect`, so the `actual`s are one family with it.
+    #[test]
+    fn a_class_nested_in_an_expect_class_is_the_expect_one() {
+        let class = |m: &str| {
+            format!("package e\n{m} class Outer {{ {m} class Inner {{ fun go() {{}} }} }}\n")
+        };
+        let (expect, actual) = (
+            class("expect").replace("expect class Inner", "class Inner"),
+            class("actual"),
+        );
+        let user = "package u\nimport e.Outer.Inner\nfun run() { Inner().go() }\n";
+        let files = [
+            ("a/O.kt", &*expect),
+            ("b/O.kt", &*actual),
+            ("c/O.kt", &*actual),
+            ("u/U.kt", user),
+        ];
+        let found = resolved(&files);
+        let hit = found.iter().find(|(k, _)| k.ends_with("Inner")).unwrap();
+        assert_eq!(hit.1, "exact a/O.kt::e.Outer.Inner", "{found:?}");
+    }
+
+    /// A call on an `object`'s name (`P.setMain(1)`), with `fun P.setMain` in another package.
+    #[test]
+    fn an_extension_on_an_objects_name_is_reached_as_on_a_typed_local() {
+        let object = "package p\nobject P\n";
+        let extension = "package q\nimport p.P\nfun P.setMain(x: Int) {}\n";
+        let user = "package u\nimport p.P\nimport q.setMain\nfun go() { P.setMain(1) }\n";
+        let found = resolved(&[("p/P.kt", object), ("q/E.kt", extension), ("u/U.kt", user)]);
+        // Before #436 the object's family held no extension of another package, and the call
+        // resolved to nothing; the object's name is its instance now.
+        assert_eq!(
+            found["u/U.kt u.go() P.setMain"],
+            "exact q/E.kt::q.P.setMain(Int)"
+        );
+        // A class's name keeps today's reading (companion and statics): no extension, also
+        // for a class with a self-typed `INSTANCE` property of its own.
+        for class in [
+            "package p\nclass P\n",
+            "package p\nclass P { val INSTANCE: P? = null }\n",
+        ] {
+            let found = resolved(&[("p/P.kt", class), ("q/E.kt", extension), ("u/U.kt", user)]);
+            assert_eq!(found["u/U.kt u.go() P.setMain"], "none");
+        }
+    }
+
+    /// Inside `fun CoroutineScope.x()`, an extension `CoroutineScope.launch` in scope comes
+    /// before a top-level `launch`; alone, the top-level one is still `exact`.
+    #[test]
+    fn a_bare_call_takes_the_extension_of_the_implicit_receiver_before_a_top_level_function() {
+        let scope = "package k\ninterface CoroutineScope\n";
+        let top = "package k\nfun launch(block: () -> Unit) {}\n";
+        let ext = "package k\nfun CoroutineScope.launch(block: () -> Unit) {}\n";
+        let user = "package u\nimport k.*\nfun CoroutineScope.x() { launch { } }\n";
+        let level = |files: &[(&str, &str)]| {
+            let found = resolved(files);
+            (found.iter())
+                .find(|(k, _)| k.starts_with("u/U.kt") && k.ends_with(" launch"))
+                .map(|(_, v)| v.clone())
+                .unwrap()
+        };
+        let (s, t, e, u) = (
+            ("k/S.kt", scope),
+            ("k/T.kt", top),
+            ("k/E.kt", ext),
+            ("u/U.kt", user),
+        );
+        assert_eq!(
+            level(&[s, t, e, u]),
+            "exact k/E.kt::k.CoroutineScope.launch(()->Unit)"
+        );
+        assert_eq!(level(&[s, t, u]), "exact k/T.kt::k.launch(()->Unit)");
+        // An extension of an outside type may apply to the receiver, a name match: `ambiguous`
+        // with the top-level function.
+        let outside = "package k\nfun String.launch(block: () -> Unit) {}\n";
+        assert_eq!(
+            level(&[s, t, ("k/O.kt", outside), u]),
+            "ambiguous k/O.kt::k.String.launch(()->Unit) k/T.kt::k.launch(()->Unit)"
+        );
     }
 }

@@ -64,3 +64,20 @@ pub fn parenthesized() {
 pub fn outside() {
     reqwest::Client::new().route("/");
 }
+
+pub fn load() -> Option<Router<()>> {
+    todo!()
+}
+
+pub fn pending() -> impl std::future::Future<Output = Router<()>> {
+    async { todo!() }
+}
+
+pub fn tried() -> Option<()> {
+    load()?.route("/");
+    None
+}
+
+pub async fn pended() {
+    pending().await.route("/");
+}

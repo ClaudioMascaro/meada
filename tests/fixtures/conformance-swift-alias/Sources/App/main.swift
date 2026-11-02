@@ -49,3 +49,9 @@ func untyped() {
     let w = make()
     w.spin()
 }
+
+func reach(_ chained: Anim2, _ mover: Mover) {
+    chained.spin()
+    mover.spin()
+    _ = Anim.build()
+}
