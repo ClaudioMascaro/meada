@@ -912,10 +912,9 @@ fn the_guided_preview_and_propose_agree_on_the_same_text() {
     // The refusal is audited; no workspace, version or history changes.
     assert_eq!(case.state(&[&ya])[1..], before[1..], "nothing is stored");
 
-    // What was applicable is what the console saves and applies, and then shows as previewed.
+    // The same text, saved and applied through the console, then shows what `propose` previewed.
     let proposal = propose(&diagnosed);
-    let manifest = proposal["manifest"].as_str().unwrap();
-    let saved = case.save("alice", &ya, manifest, 1);
+    let saved = case.save("alice", &ya, &diagnosed, 1);
     assert_eq!(saved.status, 201, "{}", saved.body);
     let version = saved.json()["version"].as_str().unwrap().to_string();
     let applied = case.apply("alice", &ya, &version, 1);

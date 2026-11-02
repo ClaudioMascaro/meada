@@ -237,6 +237,10 @@ fn pause_before_lock() {
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
+    eprintln!(
+        "ui: MEADA_PAUSE_BEFORE_LOCK: no {}.go after 30 s, going on",
+        path.to_string_lossy()
+    );
 }
 
 /// A team operator that lost its role between admission and the lock gets a viewer's refusal.
@@ -483,7 +487,7 @@ impl Console {
                 Err(answer) => return *answer,
             };
             let grant = grant(session);
-            #[cfg(debug_assertions)]
+            #[cfg(all(debug_assertions, feature = "refresh-lock"))]
             pause_before_lock();
             return match crate::snapshot::versions::save(
                 &self.file,
@@ -552,7 +556,7 @@ impl Console {
                 };
             let author = session.subject.as_deref().expect("write subject admitted");
             let grant = grant(session);
-            #[cfg(debug_assertions)]
+            #[cfg(all(debug_assertions, feature = "refresh-lock"))]
             pause_before_lock();
             let done = crate::snapshot::versions::apply(
                 &self.file,

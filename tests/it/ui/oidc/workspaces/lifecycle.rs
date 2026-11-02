@@ -1045,6 +1045,12 @@ fn a_deprovisioned_user_is_blocked_from_operators_and_the_catalog_until_provisio
             );
         }
         assert_eq!(rows(), held, "a refused route wrote");
+        let never = case.get("/api/v1/catalog", &case.token("carol"));
+        assert_eq!(
+            never.status, 200,
+            "a user never provisioned is admitted: {}",
+            never.body
+        );
     };
 
     // Deactivated, then provisioned active again.
