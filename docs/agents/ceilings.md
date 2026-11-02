@@ -1161,6 +1161,10 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   `CHAIN` (64): a builder chain (`FutureRecord::to(t).payload(p)`, an SQS `send_message()...`,
   redis `StreamReadOptions`) is read to that many calls below the form (`Code::chain`, itself
   bounded by `FLUENT_CHAIN`); a longer one is not a producer or a consumer.
+- `resolve.rs` (`Resolver::is_self_or_ancestor`, #438): a Rust glob reads the private names of
+  the importing file or of an ancestor file on its `super` chain; an ancestor written as an
+  in-file `mod` (`use crate::a::outer::*` from `a::outer::inner`) is read as a foreign module, so
+  only its public names come through the glob.
 - `resolve.rs` (`Resolver::owned_outside`): a Rust method called on a call chain
   (`client.get(u).send()`, `Call::root` = `client`) resolves to nothing when `client.send` would
   be external, and so does one on a chain that starts at a call (`rocket::build().mount(..)`,

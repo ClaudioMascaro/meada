@@ -258,7 +258,8 @@ environment reads; the architecture map keeps the lead of the first:
   `inside` it, the module's private items too; `public`, a `pub use` also re-exports them;
   Rust's glob of the importing file or of one of its ancestors, whatever its spelling
   (`crate::a::*` from inside `a`), reads the module's private names as `inside` does, by
-  `Resolver::is_self_or_ancestor` over the `super` chain; a sibling's glob stays public-only, #438),
+  `Resolver::is_self_or_ancestor` over the `super` chain of files, not in-file `mod`s; a
+  sibling's glob stays public-only, #438),
   both found by `Resolver::lexical` at each enclosing scope (`imported_at`) and, for the file
   itself, by `imported` and `export`; explicit imports beat globs, and an alias or a glob
   that reaches itself gives nothing (`Seen`: the names being resolved, the globs by file, import
