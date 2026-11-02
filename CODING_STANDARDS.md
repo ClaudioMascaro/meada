@@ -93,6 +93,32 @@ indexing carries on.
   keys, deep nesting, wide fan-out) in bounded time, and returns a bounded size. A new reader
   adds its row to `probes` in `src/package/hostile.rs`.
 
+## Service deadlines
+
+Every call to an external service (Postgres, Valkey, the store, GitHub, an identity provider) on
+a request path, in a poll or in a job runs under a client-side deadline. Background and
+retryable work is not exempt: a call that never returns holds the job, and the lock it took,
+forever.
+
+- Postgres bounds its call by `postgres::Config::bound(n)`, with `n` the statements it runs
+  (a transaction's begin and commit count).
+- Outbound HTTP goes through `modules::agent(timeout)` with the module's configured timeout.
+- Other async calls (Valkey, the store, status probes) go through `modules::within(bound, ask,
+  timeout)`, where `bound` is the duration and `timeout` builds the timeout message.
+- A new service brings its bound with it. A call outside a deadline is a review finding.
+
+## One decision, one function
+
+A decision that more than one surface makes (console, node, CLI, browser), such as access,
+visibility or text validation, is one function in `meada-core`. Every surface calls it; the
+browser reaches it through the WebAssembly export (`meada-core/src/wasm.rs`), needed only when
+the browser decides too.
+
+- A second copy of such a decision, in TypeScript or in another Rust module, is a review finding.
+- The instances today: `meada_core::effective::effective` (the console calls it and the browser
+  reaches it through the export) and the functions in `meada_core::named` (the name, description
+  and message checks, and the access helpers such as `visible`).
+
 ## Known ceilings
 
 A Known ceiling bounds only what the spec and the ticket leave out: every item they ask for is
