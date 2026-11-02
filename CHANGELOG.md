@@ -11,8 +11,9 @@ All notable changes to Meada are recorded here. The format follows
 A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md):
 local accounts (ADR 0024) in the console, the proposal server and the nodes, carried by the
 `cloud` image, the Compose recipe and the Helm chart; the export's `format` and indexed commit;
-client-side deadlines on every Postgres call; durable pulled-generation writes; and the fixes of
-tiers b1 and b2. `meada-core` 1.1.0 adds `format`, `commit` and `dirty` to `Export`, and its
+client-side deadlines on every Postgres call; durable pulled-generation writes; resolver fixes
+for C#, Kotlin, Rust and Swift (tier b3); and the fixes of tiers b1 and b2. The index schema
+version changes, so existing indexes are rebuilt once on first use. `meada-core` 1.1.0 adds `format`, `commit` and `dirty` to `Export`, and its
 `export::parse` refuses a document without `format`: re-export with 1.1.0 before parsing an export
 written by 1.0.0. The tree, the `meada-core` pin, the Dockerfile, the compose defaults and the
 Helm chart declare `1.1.0`, and the `v1.1.0` tag follows this entry's merge on main. Publication
