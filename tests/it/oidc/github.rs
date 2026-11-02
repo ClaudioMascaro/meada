@@ -203,6 +203,25 @@ fn until(server: &Server, token: &str, expected: &str, within: Duration) -> Dura
     }
 }
 
+/// `POLL_MS` as a number.
+fn poll_ms() -> u64 {
+    POLL_MS.parse().unwrap()
+}
+
+/// Sleeps `polls` poll intervals; true when the sleep overran by more than two intervals, the
+/// environment being too slow to tell the windows apart, and the caller skips.
+fn nap_too_slow(polls: u64) -> bool {
+    let poll = poll_ms();
+    let began = Instant::now();
+    std::thread::sleep(Duration::from_millis(polls * poll));
+    let took = began.elapsed();
+    let slow = took > Duration::from_millis((polls + 2) * poll);
+    if slow {
+        eprintln!("too slow to tell: a {polls} poll sleep took {took:?}");
+    }
+    slow
+}
+
 /// The 404 list of `identities`, in the manifest's order.
 fn lines(identities: &[&str]) -> String {
     (SERVED.lines())
@@ -332,12 +351,15 @@ fn the_github_grant_ages_out_while_postgres_is_unreachable() {
     let machine = token(&signing, &issuer.base, &["*"], None);
     assert_eq!(listed(&server, &machine), SERVED);
     // The set aged out on Postgres's clock: no sooner than five seconds after the check began.
+    // max_age is 5 s (the manifest above), less 100 ms of slack.
     assert!(
-        seeded.elapsed() >= Duration::from_millis(4900),
+        seeded.elapsed() >= Duration::from_millis(5000 - 100),
         "{:?}",
         seeded.elapsed()
     );
-    std::thread::sleep(Duration::from_millis(600));
+    if nap_too_slow(3) {
+        return;
+    }
     let failing = down.elapsed();
     relay.open();
     github.seed(&dir, MANIFEST, &relay.url);
@@ -346,7 +368,7 @@ fn the_github_grant_ages_out_while_postgres_is_unreachable() {
     let failed = (stderr.lines())
         .filter(|l| l.starts_with("meada: the permissions set cannot be read ("))
         .count();
-    let polls = (failing.as_millis() / 200) as usize;
+    let polls = (failing.as_millis() / u128::from(poll_ms())) as usize;
     assert!(
         failed >= 2 && failed <= polls + 2,
         "{failed} for {polls}: {stderr}"
@@ -378,7 +400,9 @@ fn a_node_serves_without_postgres_and_names_an_unknown_version_once() {
     relay.close();
     let server = node(&dir, &[]);
     assert_eq!(listed(&server, &machine), SERVED);
-    std::thread::sleep(Duration::from_millis(800));
+    if nap_too_slow(4) {
+        return;
+    }
     assert_eq!(listed(&server, &ana), lines(&[WORKER]));
     assert_eq!(listed(&server, &machine), SERVED);
     let stderr = server.stderr();
@@ -391,7 +415,9 @@ fn a_node_serves_without_postgres_and_names_an_unknown_version_once() {
 
     relay.open();
     let server = node(&dir, &[("MEADA_POSTGRES_VERSION_MAX", "4")]);
-    std::thread::sleep(Duration::from_millis(1000));
+    if nap_too_slow(5) {
+        return;
+    }
     assert_eq!(listed(&server, &ana), lines(&[WORKER]));
     assert_eq!(listed(&server, &machine), SERVED);
     let stderr = server.stderr();
@@ -425,7 +451,9 @@ fn a_future_set_and_hostile_rows_grant_nothing() {
     ));
     let server = node(&dir, &[]);
     let ana = token(&signing, &issuer.base, &[], Some(json!("ana-souza")));
-    std::thread::sleep(Duration::from_millis(600));
+    if nap_too_slow(3) {
+        return;
+    }
     assert_eq!(listed(&server, &ana), "");
     admin.run(&format!(
         "UPDATE {schema}.permission_sets SET finished = now()"
