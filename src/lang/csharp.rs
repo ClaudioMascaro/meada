@@ -530,22 +530,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 })
                 .collect();
             facts.defs.push(Def {
-                name: inner.as_ref().clone(),
-                kind,
-                range: node.byte_range(),
                 params,
                 bases: match kind {
                     Kind::Class => bases(node, src, &generics),
                     _ => Vec::new(),
                 },
-                decorators: Vec::new(),
-                return_values: Vec::new(),
-                returns: None,
-                type_params: Vec::new(),
-                suspends: false,
-                unwrapped: None,
-                output: None,
-                hash: String::new(),
                 // The declared return type of a method or a local function.
                 result: match (kind, constructor) {
                     (Kind::Method | Kind::Function, false) => (node.child_by_field_name("returns"))
@@ -554,6 +543,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     _ => None,
                 }
                 .filter(|c| matches!(c, Class::Type(_))),
+                ..Def::new(inner.as_ref().clone(), kind, node.byte_range())
             });
             if kind != Kind::Class {
                 let list = node.child_by_field_name("parameters");
@@ -1109,22 +1099,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 let own = inline(defining, &scope, &classes);
                 if own {
                     inner = Rc::new(qualify(&scope, &format!("@{}", node.start_byte())));
-                    facts.defs.push(Def {
-                        name: inner.as_ref().clone(),
-                        kind: Kind::Inline,
-                        range: node.byte_range(),
-                        params: Vec::new(),
-                        bases: Vec::new(),
-                        decorators: Vec::new(),
-                        return_values: Vec::new(),
-                        returns: None,
-                        type_params: Vec::new(),
-                        result: None,
-                        suspends: false,
-                        unwrapped: None,
-                        output: None,
-                        hash: String::new(),
-                    });
+                    facts.defs.push(Def::new(
+                        inner.as_ref().clone(),
+                        Kind::Inline,
+                        node.byte_range(),
+                    ));
                     nested += 1;
                 }
                 let unknown = |name: &str| Receiver {
@@ -1194,22 +1173,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
             false => None,
         };
         if let Some(range) = &top {
-            facts.defs.push(Def {
-                name: MAIN.to_string(),
-                kind: Kind::Function,
-                range: range.clone(),
-                params: Vec::new(),
-                bases: Vec::new(),
-                decorators: Vec::new(),
-                return_values: Vec::new(),
-                returns: None,
-                type_params: Vec::new(),
-                result: None,
-                suspends: false,
-                unwrapped: None,
-                output: None,
-                hash: String::new(),
-            });
+            facts
+                .defs
+                .push(Def::new(MAIN.to_string(), Kind::Function, range.clone()));
             facts.programs.push(MAIN.to_string());
         }
         // A definition starts its own run; a branch, a loop or a short circuit may not run all

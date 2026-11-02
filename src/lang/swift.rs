@@ -617,9 +617,6 @@ fn walk(
                 facts.defs.push(Def {
                     params: signature.params,
                     suspends: children(node).any(|c| c.kind() == "async"),
-                    unwrapped: None,
-                    output: None,
-                    hash: String::new(),
                     ..definition(&inner, kind, node.byte_range(), Vec::new())
                 });
                 if place == Place::Top {
@@ -1772,20 +1769,8 @@ fn ctx<'s>(scope: &'s str, defining: bool, types: &HashSet<String>) -> Ctx<'s> {
 
 fn definition(name: &str, kind: Kind, range: Range<usize>, bases: Vec<String>) -> Def {
     Def {
-        name: name.to_string(),
-        kind,
-        range,
-        params: Vec::new(),
         bases,
-        decorators: Vec::new(),
-        return_values: Vec::new(),
-        returns: None,
-        type_params: Vec::new(),
-        result: None,
-        suspends: false,
-        unwrapped: None,
-        output: None,
-        hash: String::new(),
+        ..Def::new(name, kind, range)
     }
 }
 

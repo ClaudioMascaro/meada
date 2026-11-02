@@ -7242,22 +7242,7 @@ mod tests {
 
     /// A module written in place, `name`.
     fn module_def(name: &str) -> Def {
-        Def {
-            name: name.into(),
-            kind: Kind::Module,
-            range: 0..0,
-            params: Vec::new(),
-            bases: Vec::new(),
-            decorators: Vec::new(),
-            return_values: Vec::new(),
-            returns: None,
-            type_params: Vec::new(),
-            result: None,
-            suspends: false,
-            unwrapped: None,
-            output: None,
-            hash: String::new(),
-        }
+        Def::new(name, Kind::Module, 0..0)
     }
 
     /// The rows `main.rs` of `facts` exports, timed.

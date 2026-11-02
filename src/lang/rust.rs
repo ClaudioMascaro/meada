@@ -1143,22 +1143,7 @@ fn field<'t>(node: Node<'t>, name: &str) -> Option<Node<'t>> {
 }
 
 fn def(name: &str, kind: Kind, node: Node) -> Def {
-    Def {
-        name: name.to_string(),
-        kind,
-        range: node.byte_range(),
-        params: Vec::new(),
-        bases: Vec::new(),
-        decorators: Vec::new(),
-        return_values: Vec::new(),
-        returns: None,
-        type_params: Vec::new(),
-        result: None,
-        suspends: false,
-        unwrapped: None,
-        output: None,
-        hash: String::new(),
-    }
+    Def::new(name.to_string(), kind, node.byte_range())
 }
 
 /// The route attributes of a function: the attribute item, the segments of its path (`get`,

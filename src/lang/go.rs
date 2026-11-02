@@ -964,20 +964,8 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
 
 fn def(name: String, kind: Kind, range: Range<usize>, params: Vec<Param>) -> Def {
     Def {
-        name,
-        kind,
-        range,
         params,
-        bases: Vec::new(),
-        decorators: Vec::new(),
-        return_values: Vec::new(),
-        returns: None,
-        type_params: Vec::new(),
-        result: None,
-        suspends: false,
-        unwrapped: None,
-        output: None,
-        hash: String::new(),
+        ..Def::new(name, kind, range)
     }
 }
 

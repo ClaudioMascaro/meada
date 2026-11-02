@@ -100,23 +100,12 @@ impl LanguagePack for Python {
                     // calls of a later guard stay at the top level of the file.
                     if let Some(body) = body.filter(|_| defined.insert(MAIN.to_string())) {
                         main_body = Some(body.id());
-                        facts.defs.push(Def {
-                            name: MAIN.to_string(),
-                            kind: Kind::Function,
+                        facts.defs.push(Def::new(
+                            MAIN,
+                            Kind::Function,
                             // The `if` and its body, not an `else` after it.
-                            range: node.start_byte()..body.end_byte(),
-                            params: Vec::new(),
-                            bases: Vec::new(),
-                            decorators: Vec::new(),
-                            return_values: Vec::new(),
-                            returns: None,
-                            type_params: Vec::new(),
-                            result: None,
-                            suspends: false,
-                            unwrapped: None,
-                            output: None,
-                            hash: String::new(),
-                        });
+                            node.start_byte()..body.end_byte(),
+                        ));
                         facts.programs.push(MAIN.to_string());
                     }
                 }
@@ -153,20 +142,10 @@ impl LanguagePack for Python {
                                 (false, false) => Kind::Function,
                             };
                             facts.defs.push(Def {
-                                name: inner.clone(),
-                                kind,
-                                range: span(node),
                                 params: params(node, !is_class && in_class, src),
                                 bases: bases(node, src),
                                 decorators: bare_names.remove(&inner).unwrap_or_default(),
-                                return_values: Vec::new(),
-                                returns: None,
-                                type_params: Vec::new(),
-                                result: None,
-                                suspends: false,
-                                unwrapped: None,
-                                output: None,
-                                hash: String::new(),
+                                ..Def::new(inner.clone(), kind, span(node))
                             });
                         }
                         if !is_class {

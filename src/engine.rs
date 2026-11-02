@@ -1234,7 +1234,7 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
                         [first, ..] => {
                             let name = render::overload_name(&first.id);
                             let at = line(identity, files, first, name);
-                            format!("{at} (one of {} overloads){}{on}", set.len(), mark(c))
+                            format!("{at} {}{}{on}", render::overloads(set.len(), true), mark(c))
                         }
                         [] => unreachable!(),
                     })

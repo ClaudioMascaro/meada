@@ -92,17 +92,7 @@ impl LanguagePack for TsJs {
                     returns: (node.child_by_field_name("return_type"))
                         .and_then(|t| types::returned(t, src, &parents)),
                     type_params: types::type_parameters(node, src),
-                    result: None,
-                    suspends: false,
-                    unwrapped: None,
-                    output: None,
-                    hash: String::new(),
-                    name: inner.clone(),
-                    kind,
-                    range,
-                    bases: Vec::new(),
-                    decorators: Vec::new(),
-                    return_values: Vec::new(),
+                    ..Def::new(inner.clone(), kind, range)
                 });
             }
             match node.kind() {
