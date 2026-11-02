@@ -1,6 +1,6 @@
 //! Workspace changes at the public deterministic core seam shared by CLI and browser.
 
-use meada_core::workspace::{diff, entries_text, version_entries};
+use meada_core::workspace::{diff, entries_text, touched_owners, version_entries};
 use serde_json::json;
 
 #[test]
@@ -204,5 +204,24 @@ fn an_added_by_change_alone_is_the_dotted_key_repository_added_by() {
     assert_eq!(
         diff("entries", &added("ana"), &added("ana")).unwrap(),
         Default::default()
+    );
+}
+
+#[test]
+fn touched_owners_names_the_groups_of_entries_that_differ_whatever_their_order() {
+    let (x, y) = (
+        json!({"repo": "a/x", "path": "x", "owner": "team-a"}),
+        json!({"repo": "a/y", "path": "y", "owner": "team-b"}),
+    );
+    let moved = json!({"repo": "a/y", "path": "y2", "owner": "team-b"});
+    assert!(touched_owners(&[x.clone(), y.clone()], &[y.clone(), x.clone()]).is_empty());
+    assert_eq!(
+        touched_owners(&[x.clone(), y.clone()], &[x.clone(), moved]),
+        ["team-b"]
+    );
+    assert_eq!(touched_owners(&[x.clone()], &[x, y]), ["team-b"]);
+    assert_eq!(
+        touched_owners(&[json!({"repo": "a/z", "path": "z"})], &[]),
+        [] as [&str; 0]
     );
 }
