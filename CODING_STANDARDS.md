@@ -93,6 +93,20 @@ indexing carries on.
   keys, deep nesting, wide fan-out) in bounded time, and returns a bounded size. A new reader
   adds its row to `probes` in `src/package/hostile.rs`.
 
+## Service deadlines
+
+Every call to an external service (Postgres, Valkey, the store, GitHub, an identity provider) on
+a request path, in a poll or in a job runs under a client-side deadline. Background and
+retryable work is not exempt: a call that never returns holds the job, and the lock it took,
+forever.
+
+- Postgres bounds its call by `postgres::Config::bound(n)`, with `n` the statements it runs
+  (a transaction's begin and commit count).
+- Outbound HTTP goes through `modules::agent(timeout)` with the module's configured timeout.
+- Other async calls (Valkey, the store, status probes) go through `modules::within(bound, ask,
+  timeout)`, where `bound` is the duration and `timeout` builds the timeout message.
+- A new service brings its bound with it. A call outside a deadline is a review finding.
+
 ## One decision, one function
 
 A decision that more than one surface makes (console, node, CLI, browser), such as access,
