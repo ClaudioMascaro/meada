@@ -59,8 +59,7 @@ a ticket accepted, each with its value and its reason. Detail behind the
   document size cap) bounds; it is not truncated.
 - `resolve.rs` (`Resolver::may_declare`, ADR 0019): a base among a pack's known outside members is
   matched by its spelling, so a same-named type of a wildcard-imported outside package that
-  declares an overload of the called name may give a wrong `exact`; a Swift entry is compared
-  without its labels, so `hash(into:)` keeps every `hash` call at the strict level; an extension
+  declares an overload of the called name may give a wrong `exact`; an extension
   the tables do not list, in scope of a call no own overload fits by type, is missed. A base the
   tables do not list keeps every name opaque.
 - `jvm/spring.rs` (`read_yaml`): the dotted keys a YAML file flattens to are charged to

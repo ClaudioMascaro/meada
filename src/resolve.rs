@@ -275,6 +275,9 @@ const RECEIVER_DEPTH: usize = 64;
 struct Work<'a> {
     busy: Vec<Busy<'a>>,
     families: HashMap<Target<'a>, Family<'a>>,
+    /// The labels of the call being resolved, which its last member step compares with a known
+    /// outside member's (`Resolver::may_declare`).
+    labels: Option<&'a [String]>,
 }
 
 /// One entry of a class family: a class of the repository, or a base that is not one
@@ -1205,6 +1208,7 @@ impl<'a> Resolver<'a> {
         // The result of the call this one is made on, read once: the name match below reads it
         // too, and reading it twice per call would double the work at every call of a chain.
         let mut on = None;
+        let outer = std::mem::replace(&mut work.labels, call.labels.as_deref());
         let binding = match (call.on, constructs, call.by_path) {
             (Some(inner), false, _) => {
                 let members = callee.split_once('.').map_or("", |(_, m)| m);
@@ -1225,6 +1229,7 @@ impl<'a> Resolver<'a> {
                 self.resolve_as(path, scope, callee, seen, work, reading)
             }
         };
+        work.labels = outer;
         let binding = match binding {
             Binding::Several(all) if constructs => {
                 let classes: Vec<_> = all.into_iter().filter(|t| self.is_class(*t)).collect();
@@ -2043,7 +2048,10 @@ impl<'a> Resolver<'a> {
             // A member read on the way, or read last, is no method where fields and methods
             // are separate namespaces (`Reading::Read`).
             let read = self.members_in_scope && (!last || reading.read());
-            binding = match self.instance(binding, work) {
+            let labels = work.labels;
+            work.labels = labels.filter(|_| last);
+            let stepped = self.instance(binding, work);
+            binding = match stepped {
                 // A class's name (`Type.m()`, `Type.X`) reaches a Kotlin companion's members
                 // before the class's, which only an instance reaches; past the companion, a
                 // nested class or a constant of the class (an enum entry).
@@ -2083,6 +2091,7 @@ impl<'a> Resolver<'a> {
                 Binding::Several(_) => Binding::Unknown,
                 other => other,
             };
+            work.labels = labels;
         }
         binding
     }
@@ -2278,13 +2287,13 @@ impl<'a> Resolver<'a> {
                 _ => Binding::Unknown,
             };
         };
-        if !read && let Some(found) = self.overloaded(&family, member) {
+        if !read && let Some(found) = self.overloaded(&family, member, work.labels) {
             return found;
         }
         for ancestor in self.with_parts(&family).iter() {
             let c = match ancestor {
                 Ancestor::Class(c) => *c,
-                Ancestor::Opaque(o) if !self.may_declare(o, member) => continue,
+                Ancestor::Opaque(o) if !self.may_declare(o, member, work.labels) => continue,
                 Ancestor::Opaque(_) => return Binding::Unknown,
             };
             if let Some(found) = self.block_member(c, member) {
@@ -2335,7 +2344,12 @@ impl<'a> Resolver<'a> {
     /// after the class itself, and a block's protocol (`Impl::of`) after them, with that
     /// protocol's own inherent blocks (its default implementations); a protocol from outside the
     /// repository is an opaque base for the names it may declare.
-    fn overloaded(&self, family: &[Ancestor<'a>], member: &str) -> Option<Binding<'a>> {
+    fn overloaded(
+        &self,
+        family: &[Ancestor<'a>],
+        member: &str,
+        labels: Option<&[String]>,
+    ) -> Option<Binding<'a>> {
         let (mut found, mut signatures, mut opaque) = (Vec::new(), HashSet::new(), false);
         let blocks = |c: Target<'a>| self.impls.get(&c).into_iter().flatten();
         // Each class with its blocks is one level, in family order; then each protocol a block
@@ -2345,7 +2359,7 @@ impl<'a> Resolver<'a> {
             let c = match ancestor {
                 Ancestor::Class(c) => *c,
                 Ancestor::Opaque(o) => {
-                    opaque |= self.may_declare(o, member);
+                    opaque |= self.may_declare(o, member, labels);
                     continue;
                 }
             };
@@ -2354,7 +2368,8 @@ impl<'a> Resolver<'a> {
             for b in blocks(c) {
                 scopes.push((b.path, b.scope));
                 conformed.extend(b.of);
-                opaque |= (b.outside.as_deref()).is_some_and(|o| self.may_declare(o, member));
+                opaque |=
+                    (b.outside.as_deref()).is_some_and(|o| self.may_declare(o, member, labels));
             }
             levels.push((c, scopes));
         }
@@ -2425,7 +2440,7 @@ impl<'a> Resolver<'a> {
         };
         let family = self.family(class, work).unwrap_or_default();
         (family.get(1..))
-            .and_then(|bases| self.overloaded(bases, member))
+            .and_then(|bases| self.overloaded(bases, member, None))
             .unwrap_or(Binding::Unknown)
     }
 
@@ -2441,7 +2456,7 @@ impl<'a> Resolver<'a> {
         for ancestor in self.with_parts(family).iter() {
             let c = match ancestor {
                 Ancestor::Class(c) => *c,
-                Ancestor::Opaque(o) if !self.may_declare(o, name) => continue,
+                Ancestor::Opaque(o) if !self.may_declare(o, name, None) => continue,
                 Ancestor::Opaque(_) => return Some(Binding::Unknown),
             };
             let qualified = format!("{}.{name}", c.name);
@@ -2468,9 +2483,9 @@ impl<'a> Resolver<'a> {
     fn opaque(&self, family: &[Ancestor<'a>], name: &str) -> bool {
         let name = name.rsplit('.').next().unwrap_or(name);
         family.iter().any(|a| match a {
-            Ancestor::Opaque(o) => self.may_declare(o, name),
+            Ancestor::Opaque(o) => self.may_declare(o, name, None),
             Ancestor::Class(c) => (self.impls.get(c).into_iter().flatten())
-                .any(|b| (b.outside.as_deref()).is_some_and(|o| self.may_declare(o, name))),
+                .any(|b| (b.outside.as_deref()).is_some_and(|o| self.may_declare(o, name, None))),
         })
     }
 
@@ -2500,18 +2515,29 @@ impl<'a> Resolver<'a> {
     /// Whether the outside type `outside` (an opaque base or protocol, as `imported_name`
     /// spells it) may declare the member `name`: no known outside type matches it, or one that
     /// declares `name` does (Known outside members, `docs/adr/0019-known-outside-members.md`).
-    /// A type matches by its qualified name, or a bare `outside` by its last name; a Swift
-    /// member is compared without its labels, so `hash(into:)` keeps every `hash` opaque.
-    fn may_declare(&self, outside: &str, name: &str) -> bool {
+    /// A type matches by its qualified name, or a bare `outside` by its last name. A call that
+    /// writes `labels` (Swift) is compared with a labelled entry by its full name, so `hash(seed:)`
+    /// is not `hash(into:)`; no labels, or a trailing closure (label `""`), compare the bare name.
+    fn may_declare(&self, outside: &str, name: &str, labels: Option<&[String]>) -> bool {
         let base = |n: &'static str| n.split('(').next().unwrap_or(n);
         let name = name.split('(').next().unwrap_or(name);
+        let full = (labels.filter(|l| !l.iter().any(String::is_empty))).map(|l| {
+            format!(
+                "{name}({})",
+                l.iter().map(|l| format!("{l}:")).collect::<String>()
+            )
+        });
         let known = || {
             (self.known.iter()).filter(|(ty, _)| {
                 *ty == outside || (!outside.contains('.') && ty.rsplit('.').next() == Some(outside))
             })
         };
         known().next().is_none()
-            || known().any(|(_, members)| members.iter().any(|m| base(m) == name))
+            || known().any(|(_, members)| {
+                members.iter().any(|m| {
+                    base(m) == name && full.as_ref().is_none_or(|f| !m.contains('(') || m == f)
+                })
+            })
     }
 
     /// What a bare method name written in the body of class `class` of `path` names
@@ -2525,7 +2551,7 @@ impl<'a> Resolver<'a> {
         let Some(family) = family else {
             return Some(Binding::Unknown);
         };
-        match self.overloaded(family, name) {
+        match self.overloaded(family, name, None) {
             None if self.implicit.contains(&name) || self.opaque(family, name) => {
                 Some(Binding::Unknown)
             }
@@ -10081,6 +10107,23 @@ mod tests {
              func run(o: Own, n: inout Int) { o.hash(into: &n) }",
         );
         assert_eq!(own["run(o:n:) o.hash"], "exact Own.hash(into:)");
+    }
+
+    /// A Swift call whose labels differ from the known outside member's (`hash(seed:)` beside
+    /// `Hashable`'s `hash(into:)`) resolves as if the base were absent (issue #463).
+    #[test]
+    fn a_swift_call_is_compared_with_a_known_outside_member_by_its_labels() {
+        let calls = pack_calls(
+            &crate::lang::swift::Swift,
+            "A.swift",
+            "struct P: Hashable { func hash(seed: Int) {} }
+             func own(p: P) { p.hash(seed: 1) }
+             func declared(p: P, h: inout Hasher) { p.hash(into: &h) }
+",
+        );
+        assert_eq!(calls["own(p:) p.hash"], "exact P.hash(seed:)");
+        // `hash(into:)` is `Hashable`'s, not an overload of `P`: the call stays opaque.
+        assert_eq!(calls["declared(p:h:) p.hash"], "none");
     }
 
     /// A Swift local bound to a member read on a name nothing in the repository binds is opaque
