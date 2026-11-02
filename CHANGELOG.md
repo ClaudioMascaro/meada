@@ -218,6 +218,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- C# `using static T` imports only the static members and nested types `T` declares (#433): a bare
+  `Go()` with `Go` on a base of `T` was an `exact` link to the base's method, which C# rejects
+  ("inherited members aren't imported"), and is now a name match at best; `using static` of the
+  base itself still gives it. Java's `import static` and Kotlin keep reading inherited members.
 - Kotlin: a bare call resolves in Kotlin's order, an extension of the implicit receiver in scope
   before a top-level function of its name (#436, from #402): inside `fun CoroutineScope.x() {
   launch { } }` the call is `exact` to `CoroutineScope.launch`, not to the top-level `launch`

@@ -119,6 +119,7 @@ environment reads; the architecture map keeps the lead of the first:
   `guesses_constructs` (`Call::constructs` is a guess from the callee's case: a guess that is no
   `exact` type is read again as a plain call, and a function it binds wins),
   `unordered_globs` (combine wildcard candidates, with an inside glob taking priority),
+  `static_imports_inherit` (whether a static import of a class takes its bases' statics too: Java and Kotlin yes, C#'s `using static T` no, only the members and nested types `T` declares),
   `qualified_types` (an unbound path head may name a repository type through its layout),
   `Facts::overloads` and `Facts::constructors` (separate method and constructor families with
   written signatures), `Call::arity` and `Call::constructs`

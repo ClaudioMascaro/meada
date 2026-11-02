@@ -132,6 +132,13 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether a static import of a type (`import static a.B.*;`) takes the members its bases
+    /// declare too. C#'s `using static T` takes only those `T` declares: inherited members
+    /// aren't imported.
+    fn static_imports_inherit(&self) -> bool {
+        true
+    }
+
     /// Whether a dotted type name may bind through the layout without an import, when no
     /// lexical value hides its head (Java's fully qualified types).
     fn qualified_types(&self) -> bool {

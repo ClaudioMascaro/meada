@@ -705,7 +705,7 @@ even when that class declares no constructor, keeping its identity distinct and 
 a constructor is added. Constructors keep their class-named signatures.
 Package groups come from `Facts::package`, independently of directory layout. The package's
 inside glob sees its non-public types; public star sets and hidden members define the exported
-surface. Static class globs take `Facts::statics` alone. `unordered_globs` combines candidates from
+surface. Static class globs take `Facts::statics` alone, and a pack whose `static_imports_inherit()` is false (C#: "inherited members aren't imported") offers only the statics the named class declares itself, not its bases'. `unordered_globs` combines candidates from
 on-demand imports, explicit imports take priority, and the current package takes priority over
 public package globs including `java.lang`. A shared package checks each declaring file's star
 set, so its first file does not hide another file's public types. Qualified imports go through

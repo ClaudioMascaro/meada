@@ -65,6 +65,10 @@ impl LanguagePack for CSharp {
         true
     }
 
+    fn static_imports_inherit(&self) -> bool {
+        false
+    }
+
     fn qualified_types(&self) -> bool {
         true
     }

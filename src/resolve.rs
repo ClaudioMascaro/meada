@@ -330,6 +330,8 @@ pub struct Resolver<'a> {
     guesses_constructs: bool,
     unordered_globs: bool,
     qualified_types: bool,
+    /// The pack's `LanguagePack::static_imports_inherit`.
+    static_imports_inherit: bool,
     /// The pack's `LanguagePack::namespaced`.
     namespaced: bool,
     consts: HashMap<&'a str, HashSet<&'a str>>,
@@ -912,6 +914,7 @@ impl<'a> Resolver<'a> {
             guesses_constructs: language.guesses_constructs(),
             unordered_globs: language.unordered_globs(),
             qualified_types: language.qualified_types(),
+            static_imports_inherit: language.static_imports_inherit(),
             namespaced: language.namespaced(),
             written,
             written_in,
@@ -3523,16 +3526,18 @@ impl<'a> Resolver<'a> {
                 }
             }
             Binding::Def(t) if self.is_class(t) => {
-                let found = self.member(t, name, false, work);
-                match found {
-                    Binding::Def(t) if self.statics.contains(&t) => Binding::Def(t),
-                    Binding::Several(all) => one(all
-                        .into_iter()
-                        .filter(|t| self.statics.contains(t))
-                        .map(Binding::Def)
-                        .collect())
-                    .unwrap_or(Binding::Unknown),
-                    Binding::Const(path, name) if self.statics.contains(&Target { path, name }) => {
+                // The statics `t` offers; with `static_imports_inherit` off, only those `t` declares.
+                let offered = |m: &Target<'a>| {
+                    self.statics.contains(m)
+                        && (self.static_imports_inherit || declared_in(t.name, m.name))
+                };
+                match self.member(t, name, false, work) {
+                    Binding::Def(m) if offered(&m) => Binding::Def(m),
+                    Binding::Several(all) => {
+                        one(all.into_iter().filter(offered).map(Binding::Def).collect())
+                            .unwrap_or(Binding::Unknown)
+                    }
+                    Binding::Const(path, name) if offered(&Target { path, name }) => {
                         Binding::Const(path, name)
                     }
                     _ => Binding::Unknown,
@@ -4206,6 +4211,13 @@ fn alternatives(found: Vec<Binding>) -> Option<Binding> {
             other => vec![other],
         })
         .collect())
+}
+
+/// Whether the definition `member` is one `owner` declares itself: what follows `owner.` is
+/// a single name, before any signature (`N.A.Go(int)`), and not a member of a nested type.
+fn declared_in(owner: &str, member: &str) -> bool {
+    let rest = member.strip_prefix(owner).and_then(|r| r.strip_prefix('.'));
+    rest.is_some_and(|r| !r.split('(').next().unwrap_or(r).contains('.'))
 }
 
 fn one(found: Vec<Binding>) -> Option<Binding> {
@@ -10502,8 +10514,8 @@ mod csharp_tests {
     /// give is not read from that family.
     #[test]
     fn a_glob_lookup_during_linearization_sees_the_families_being_linearized() {
-        let src = "using static N.A;\nnamespace N { public class B { public static void Go() {} } \
-                   public class A : B { } }\n";
+        let src = "using static N.A;\nnamespace N { public class B { } \
+                   public class A : B { public static void Go() {} } }\n";
         with_resolver(
             &[("App/A.cs", src)],
             &[("App/App.csproj", PROJECT)],
@@ -10514,11 +10526,54 @@ mod csharp_tests {
                     *resolver.linearizing.borrow_mut() = families;
                     resolver.globs("App/A.cs", "", "Go", false, &mut Seen::new())
                 };
-                assert!(matches!(go(vec![]), Some(Binding::Def(t)) if t.name == "N.B.Go()"));
+                assert!(matches!(go(vec![]), Some(Binding::Def(t)) if t.name == "N.A.Go()"));
                 let a = ("App/A.cs".to_string(), "N.A".to_string());
                 assert!(!matches!(go(vec![a]), Some(Binding::Def(_))));
             },
         );
+    }
+
+    /// C# imports what a `using static` type declares, not what it inherits ("Inherited members
+    /// aren't imported"): a bare `Go()` under `using static N.A` with `Go` on A's base is no
+    /// `exact` link to it, while `using static N.B` gives it, and a nested type of A is reached.
+    #[test]
+    fn a_static_import_gives_the_declared_members_alone() {
+        let bases = "namespace N { public class B { public static void Go() {} \
+                     public class Inner { public static void Run() {} } } \
+                     public class A : B { public class Own { public static void Run() {} } } }\n";
+        let call = |using: &str, callee: &str| {
+            let user = format!("{using}\nclass U {{ void M() {{ {callee}(); }} }}\n");
+            let found = resolved(&[("App/Bases.cs", bases), ("App/U.cs", user.as_str())]);
+            let found = found
+                .into_iter()
+                .find(|c| c.0 == "App/U.cs" && c.1 == callee);
+            found.map(|c| c.2)
+        };
+        // No `exact` to the inherited `Go`; the call stays a name match at best.
+        assert_ne!(call("using static N.A;", "Go"), Some("exact"));
+        assert_eq!(call("using static N.B;", "Go"), Some("exact"));
+        assert_eq!(call("using static N.A;", "Own.Run"), Some("exact"));
+        assert_ne!(call("using static N.A;", "Inner.Run"), Some("exact"));
+    }
+
+    /// The declared members of a generic type are offered too, and an overload of the base
+    /// that the type's own overloads do not cover is not.
+    #[test]
+    fn a_static_import_of_a_generic_type_gives_its_declared_overloads() {
+        let types = "namespace N { public class B { public static void Go() {} } \
+                     public class A<T> : B { public static void Go(int x) {} \
+                     public static void Own() {} } }\n";
+        let call = |callee: &str, args: &str| {
+            let user =
+                format!("using static N.A;\nclass U {{ void M() {{ {callee}({args}); }} }}\n");
+            let found = resolved(&[("App/Types.cs", types), ("App/U.cs", user.as_str())]);
+            let found = found
+                .into_iter()
+                .find(|c| c.0 == "App/U.cs" && c.1 == callee);
+            found.map(|c| (c.2, c.3))
+        };
+        assert_eq!(call("Own", "").map(|c| c.0), Some("exact"));
+        assert_ne!(call("Go", "").map(|c| c.0), Some("exact"));
     }
 
     /// A `Seen` begun past an import goes on from the links the walks around it followed
