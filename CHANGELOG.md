@@ -6,6 +6,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The console's named workspace view gains a versions page (#503): the versions newest first,
+  paged with the server's cursor; one version's entries, manifest text and diff against the
+  current one as the route answers; the history for operators and the administrator (a viewer
+  has no history control); and applying a listed version, which is a rollback when it was
+  current before, through the editor's confirmation at the base the page read. A stale base and
+  a refused entry show the server's message and the page reads the versions again. In pt-BR and
+  English.
+
 ## [1.1.0] - 2026-11-02
 
 A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md):

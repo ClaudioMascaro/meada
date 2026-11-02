@@ -52,7 +52,9 @@ const summary = (operate: boolean) => ({ workspaces: [{ id: ID, name: 'Payments'
 function answers(table: Record<string, () => Response>) {
   return vi.fn(async (route: string, init?: RequestInit) => {
     const key = `${init?.method ?? 'GET'} ${route}`;
-    const answer = table[key] ?? Object.entries(table).find(([k]) => key.startsWith(k))?.[1];
+    // The versions page reads its list beside the detail: an empty list unless the test says otherwise.
+    const answer = table[key] ?? Object.entries(table).find(([k]) => key.startsWith(k) && !key.includes('/versions'))?.[1]
+      ?? (key.includes('/versions') ? () => Response.json({ base: 1, versions: [], next: null }) : undefined);
     if (!answer) throw new Error(`unexpected ${key}`);
     return answer();
   });
@@ -188,7 +190,7 @@ test('the diff is concrete and the reviewed payload is frozen until the person c
   expect(dialog.textContent).not.toContain('changed behind the dialog');
   await press(within(dialog).getByRole('button', { name: t.saveApply }));
   await waitFor(() => expect(posts(fetch)).toEqual([`/api/v1/workspaces/${ID}/versions`, `/api/v1/workspaces/${ID}/apply`]));
-  const body = (route: string) => JSON.parse((fetch.mock.calls.find(([r]) => r === route)![1] as RequestInit).body as string) as Record<string, unknown>;
+  const body = (route: string) => JSON.parse((fetch.mock.calls.find(([r, i]) => r === route && i?.method === 'POST')![1] as RequestInit).body as string) as Record<string, unknown>;
   expect(body(`/api/v1/workspaces/${ID}/versions`)).toEqual({ entries: reviewed, message: 'link a', base: 1 });
   expect(body(`/api/v1/workspaces/${ID}/apply`)).toEqual({ version: 'aaaaaaaaaaaaaaaa', base: 1 });
   await waitFor(() => expect(host.textContent).toContain(t.savedNote));

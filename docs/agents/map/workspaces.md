@@ -61,8 +61,7 @@ the session may select and the `catalog/check` results, and is shared by the cre
 editor; `EffectiveList.tsx` is #344's view, extracted. The editor marks each changed entry
 (`namedChanged`) with `namedAuthorize`, shows the diff (`namedDiff`) and freezes the reviewed
 payload until the confirmation. Tests: `ui/tests/guided.test.ts` (actual WebAssembly) and
-`ui/tests/GuidedWorkspace.test.tsx` (DOM). Not built: the page over versions with rollback; proposals are
-#346 (above).
+`ui/tests/GuidedWorkspace.test.tsx` (DOM). Proposals are #346 (above); the page over versions with rollback is #503 (below).
 
 Delivered by #344 (contract 6, the effective configuration; ADR 0021 "As built (#344)"), same feature:
 `meada-core/src/effective.rs` is the pure decision (`effective(entries, facts)`: per entry the
@@ -80,6 +79,15 @@ same bundles. The front end's `NamedWorkspacesPage.tsx` shows the view in text a
 manifest text editor (`EditWorkspace`: validate with the core, preview, confirm, save and apply at
 the base read). Not built by #344: guided authoring (#345, above), proposals (#346, above),
 acceptance (#347).
+
+Delivered by #503, same feature, no route added: `ui/src/WorkspaceVersions.tsx`, rendered by
+`NamedWorkspacesPage.tsx` under a workspace's detail for every role, reads `versions[?after=]`,
+`versions/<version>?against=current` and, for `detail.operate` alone, `history[?after=<seq>]`,
+and shows the answers as the server decides them (the diff is the route's, never recomputed).
+An operator applies a listed version through `ConfirmDialog`, with the `base` of the answer it
+read; `stale_base` and `entries_refused` show the server's message and read the list again. The
+rollback audit is `workspaces.rollback` (`tests/it/ui/oidc/workspaces/lifecycle.rs`,
+`versions_are_saved_applied_and_rolled_back_along_the_base_as`).
 
 Delivered by #343 (contract 4's lifecycle; ADR 0021 "As built (#343)"), same feature:
 `workspaces/lifecycle.rs` is the atomic boundary of every other write (`transact`: one

@@ -50,7 +50,9 @@ const session = { subject: 'alice', role: 'viewer' as const, grant: [Y, A] };
 function answers(table: Record<string, () => Response>) {
   return vi.fn(async (route: string, init?: RequestInit) => {
     const key = `${init?.method ?? 'GET'} ${route}`;
-    const answer = table[key] ?? Object.entries(table).find(([k]) => key.startsWith(k))?.[1];
+    // The versions page reads its list beside the detail: an empty list unless the test says otherwise.
+    const answer = table[key] ?? Object.entries(table).find(([k]) => key.startsWith(k) && !key.includes('/versions'))?.[1]
+      ?? (key.includes('/versions') ? () => Response.json({ base: 1, versions: [], next: null }) : undefined);
     if (!answer) throw new Error(`unexpected ${key}`);
     return answer();
   });
@@ -223,7 +225,7 @@ test('an operator edits the manifest text, reads the effective configuration bef
   expect(posts()).toEqual(['/api/v1/workspaces/effective']);
   await act(() => { fireEvent.click(getAllByRole(host, 'button', { name: t.saveApply }).at(-1)!); });
   await waitFor(() => expect(posts()).toHaveLength(3));
-  const body = (route: string) => JSON.parse((fetch.mock.calls.find(([r]) => r === route)![1] as RequestInit).body as string) as Record<string, unknown>;
+  const body = (route: string) => JSON.parse((fetch.mock.calls.find(([r, i]) => r === route && i?.method === 'POST')![1] as RequestInit).body as string) as Record<string, unknown>;
   expect(body('/api/v1/workspaces/0123456789abcdef/versions')).toEqual({ entries: peerText, message: 'link the gateway', base: 1 });
   expect(body('/api/v1/workspaces/0123456789abcdef/apply')).toEqual({ version: 'aaaaaaaaaaaaaaaa', base: 1 });
   // An applied change that something overrides is not shown as plainly applied: the finding is read beside it.

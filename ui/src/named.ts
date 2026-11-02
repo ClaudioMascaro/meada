@@ -75,6 +75,30 @@ export interface ConfigurationFinding { repo: string; code: DiagnosticCode; deta
 /** `POST workspaces/<id>/versions` and `.../apply` answers. */
 export interface Written { base: number; version: string; state?: WorkspaceState; diagnostics?: ConfigurationFinding[] }
 
+/** One row of `GET workspaces/<id>/versions`; `author` only for an operator. */
+export interface VersionRow { version: string; saved: string; message: string; current: boolean; author?: string | null }
+export interface VersionList { base: number; versions: VersionRow[]; next: string | null }
+/** `GET workspaces/<id>/versions/<version>?against=current`: `diff` is the server's, over the entries the session reads; `hidden` only for an operator. */
+export interface VersionDocument {
+  id: string; saved: string; message: string; current: boolean; base: number; author?: string | null; hidden?: number;
+  entries: { repo: string; blocks: Record<string, unknown> }[]; text: string;
+  diff?: { against: string; added: string[]; removed: string[]; changed: { repo: string; keys: string[] }[] };
+}
+/** One row of `GET workspaces/<id>/history`, for operators. */
+export interface HistoryRow { seq: number; action: string; version: string | null; actor: string | null; authority: string | null; time: string; message: string | null }
+export interface HistoryList { base: number; history: HistoryRow[]; next: number | null }
+
+export function versionsRoute(id: string, after?: string): string {
+  return after ? `workspaces/${id}/versions?${new URLSearchParams({ after })}` : `workspaces/${id}/versions`;
+}
+/** `against` is dropped for a session that cannot read the current version whole: the route then refuses the diff, not the version. */
+export function versionRoute(id: string, version: string, against = true): string {
+  return against ? `workspaces/${id}/versions/${version}?against=current` : `workspaces/${id}/versions/${version}`;
+}
+export function historyRoute(id: string, after?: number): string {
+  return after === undefined ? `workspaces/${id}/history` : `workspaces/${id}/history?after=${after}`;
+}
+
 export function effectiveRoute(id: string, version?: string): string {
   return version ? `workspaces/${id}/effective?${new URLSearchParams({ version })}` : `workspaces/${id}/effective`;
 }
