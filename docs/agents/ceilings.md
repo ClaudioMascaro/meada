@@ -1056,7 +1056,7 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   `Pin<Box<dyn Future<Output = T>>>`) keeps `T` as `Def::output`, which only `.await` reads: a
   call on the future itself keeps the written future as its receiver. The `Result` or `Option`
   inside a future's output is not kept, so `.await?` after it is a name match. Two `?` in a row
-  name no type, and a `?` whose unwrapped type is outside the repository, a type parameter or not written
+  name no type, nor does a `?` before an `.await` (`f()?.await`), and a `?` whose unwrapped type is outside the repository, a type parameter or not written
   leaves the call a name match. A `Result` or `Option` is told by its last path segment, so a
   user type of that name with another first argument is read the same way.
 - `lang/ts.rs`: tsconfig `references` are not followed, and `extends` only for `paths` and
