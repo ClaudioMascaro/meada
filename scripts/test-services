@@ -48,15 +48,19 @@ start() {
   fi
   docker rm -f "$name" >/dev/null 2>&1 || true
   pull "$image"
-  docker run -d --name "$name" "${run[@]}" "$image" "${cmd[@]}" >/dev/null
+  # The `+` forms keep an empty array legal under `set -u` on bash before 4.4 (macOS).
+  docker run -d --name "$name" ${run[@]+"${run[@]}"} "$image" ${cmd[@]+"${cmd[@]}"} >/dev/null
 }
 
 # The second Postgres, over TLS (#483), as CI's step "Postgres over TLS" makes it.
 tls_postgres() {
   local dir="${TMPDIR:-/tmp}/meada-test-postgres-tls" as_root=
   [ "$(id -u)" = 0 ] || as_root=sudo
-  if [ ! -f "$dir/ca.pem" ]; then
-    rm -rf "$dir" && mkdir -p "$dir"
+  # The certificates last two days: past the next hour they are made again, and the server
+  # restarted on them.
+  if ! openssl x509 -checkend 3600 -noout -in "$dir/server.pem" >/dev/null 2>&1; then
+    docker rm -f meada-test-postgres-tls >/dev/null 2>&1 || true
+    $as_root rm -rf "$dir" && mkdir -p "$dir"
     (
       cd "$dir"
       openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-384 -sha384 -nodes -days 2 \
@@ -102,7 +106,7 @@ case "${1:-}" in
     echo "export MEADA_TEST_S3_ENDPOINT=http://127.0.0.1:$S3_PORT"
     echo "export MEADA_TEST_POSTGRES_URL=postgres://postgres:$POSTGRES_PASSWORD@127.0.0.1:$POSTGRES_PORT/postgres"
     echo "export MEADA_TEST_POSTGRES_TLS_URL=postgres://postgres:$POSTGRES_PASSWORD@127.0.0.1:$POSTGRES_TLS_PORT/postgres"
-    echo "export MEADA_TEST_POSTGRES_TLS_CA=$TLS_CA"
+    echo "export MEADA_TEST_POSTGRES_TLS_CA='$TLS_CA'"
     echo "export MEADA_TEST_SERVICES_REQUIRED=1"
     ;;
   down)

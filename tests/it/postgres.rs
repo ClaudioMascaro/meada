@@ -560,7 +560,15 @@ fn status_names_whether_postgres_is_reachable_and_its_exit_code_ignores_it() {
     all(feature = "accounts", feature = "ui"),
     feature = "github-app"
 ))]
-#[cfg_attr(not(feature = "oidc"), expect(dead_code))]
+#[cfg_attr(
+    not(any(
+        all(feature = "refresh-lock", feature = "postgres"),
+        all(feature = "oidc", feature = "ui", feature = "directory"),
+        feature = "accounts",
+        all(feature = "oidc", feature = "postgres", feature = "github-app")
+    )),
+    expect(dead_code)
+)]
 pub(crate) struct Relay {
     /// The test's URL with the relay's address.
     pub(crate) url: String,
@@ -579,7 +587,15 @@ pub(crate) struct Relay {
     all(feature = "accounts", feature = "ui"),
     feature = "github-app"
 ))]
-#[cfg_attr(not(feature = "oidc"), expect(dead_code))]
+#[cfg_attr(
+    not(any(
+        all(feature = "refresh-lock", feature = "postgres"),
+        all(feature = "oidc", feature = "ui", feature = "directory"),
+        feature = "accounts",
+        all(feature = "oidc", feature = "postgres", feature = "github-app")
+    )),
+    expect(dead_code)
+)]
 impl Relay {
     pub(crate) fn new(url: &str) -> Self {
         use std::sync::atomic::AtomicBool;
@@ -684,7 +700,18 @@ impl Relay {
         feature = "generation-pointer"
     )
 ))]
-#[cfg_attr(not(feature = "oidc"), expect(dead_code))]
+#[cfg_attr(
+    not(any(
+        all(feature = "ui", feature = "oidc", feature = "directory"),
+        all(
+            feature = "github-app",
+            feature = "postgres",
+            feature = "oidc",
+            feature = "generation-pointer"
+        )
+    )),
+    expect(dead_code)
+)]
 pub(crate) struct Stalled {
     /// A URL naming it.
     pub(crate) url: String,
@@ -698,7 +725,18 @@ pub(crate) struct Stalled {
         feature = "generation-pointer"
     )
 ))]
-#[cfg_attr(not(feature = "oidc"), expect(dead_code))]
+#[cfg_attr(
+    not(any(
+        all(feature = "ui", feature = "oidc", feature = "directory"),
+        all(
+            feature = "github-app",
+            feature = "postgres",
+            feature = "oidc",
+            feature = "generation-pointer"
+        )
+    )),
+    expect(dead_code)
+)]
 impl Stalled {
     pub(crate) fn start() -> Self {
         use std::io::{Read, Write};
@@ -737,7 +775,14 @@ impl Stalled {
     all(feature = "directory", feature = "ui"),
     all(feature = "accounts", feature = "ui")
 ))]
-#[cfg_attr(not(feature = "oidc"), expect(dead_code))]
+#[cfg_attr(
+    not(any(
+        all(feature = "refresh-lock", feature = "postgres"),
+        all(feature = "oidc", feature = "ui", feature = "directory"),
+        feature = "accounts"
+    )),
+    expect(dead_code)
+)]
 pub(crate) struct Audited {
     pub(crate) admin: Admin,
     pub(crate) schema: String,
@@ -752,7 +797,14 @@ pub(crate) struct Audited {
     all(feature = "directory", feature = "ui"),
     all(feature = "accounts", feature = "ui")
 ))]
-#[cfg_attr(not(feature = "oidc"), expect(dead_code))]
+#[cfg_attr(
+    not(any(
+        all(feature = "refresh-lock", feature = "postgres"),
+        all(feature = "oidc", feature = "ui", feature = "directory"),
+        feature = "accounts"
+    )),
+    expect(dead_code)
+)]
 pub(crate) fn audited(dir: &Path, case: &str) -> Option<Audited> {
     let url = service()?;
     let schema = schema(case);
@@ -794,7 +846,14 @@ impl Audited {
     }
 
     /// `text` carries neither the test's Postgres URL nor its password.
-    #[cfg_attr(not(feature = "oidc"), expect(dead_code))]
+    #[cfg_attr(
+        not(any(
+            all(feature = "refresh-lock", feature = "postgres"),
+            all(feature = "oidc", feature = "ui", feature = "directory"),
+            feature = "accounts"
+        )),
+        expect(dead_code)
+    )]
     pub(crate) fn assert_no_url(&self, text: &str) {
         assert!(!text.contains(&self.url), "the Postgres URL in {text}");
         let config = tokio_postgres::Config::from_str(&self.url).unwrap();
