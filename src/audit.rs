@@ -80,7 +80,7 @@ impl Outcome {
         }
     }
 
-    #[cfg_attr(not(feature = "postgres"), allow(dead_code))]
+    #[cfg_attr(not(feature = "postgres"), expect(dead_code))]
     fn name(self) -> &'static str {
         match self {
             Outcome::Accepted => "accepted",
@@ -110,10 +110,9 @@ pub struct Audit {
 }
 
 /// A record inserted as `pending`: its id, none without `[postgres]`.
-pub struct Pending(#[cfg_attr(not(feature = "postgres"), allow(dead_code))] Option<i64>);
+pub struct Pending(#[cfg_attr(not(feature = "postgres"), expect(dead_code))] Option<i64>);
 
 /// A page of records, newest first, and the `before` of the following one.
-#[cfg_attr(not(feature = "postgres"), allow(dead_code))]
 pub struct Page {
     pub records: Vec<Value>,
     pub next: Option<i64>,
@@ -226,7 +225,6 @@ impl Audit {
 
     /// The records with an id below `before` (all without it), newest first, at most `limit`.
     /// Every row is hostile: one that fails its checks is left out and counted in `skipped`.
-    #[cfg_attr(not(feature = "postgres"), allow(dead_code))]
     pub fn page(&self, before: Option<i64>, limit: i64) -> Result<Page, String> {
         #[cfg(feature = "postgres")]
         if let Some(config) = &self.config {
@@ -241,7 +239,6 @@ impl Audit {
     }
 
     /// The table the records live in, as a stderr line names it.
-    #[cfg_attr(not(feature = "postgres"), allow(dead_code))]
     pub fn table(&self) -> String {
         #[cfg(feature = "postgres")]
         if let Some(config) = &self.config {

@@ -2023,7 +2023,7 @@ impl<'a> Resolver<'a> {
 
     /// `resolve_as` for the callee of a call that writes `labels` (Swift): its last member is
     /// looked up with them (`may_declare`).
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn resolve_labelled(
         &self,
         path: &'a str,
@@ -6500,7 +6500,7 @@ impl<'a> Code<'a> {
     /// enclosing `scope` and of its callers, innermost first; a parameter no frame binds stays
     /// a `Ref`, and its function is recorded in `wants`. Past `EVAL_DEPTH` or the file's
     /// `EVAL_BUDGET` the value is unknown.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn eval(
         &self,
         path: &'a str,
@@ -6576,7 +6576,7 @@ impl<'a> Code<'a> {
         folded
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn name(
         &self,
         path: &'a str,

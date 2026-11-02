@@ -376,7 +376,7 @@ fn of<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, at: usize, class: &str
 /// the template's exchange (the default one, unless the module's configuration names one).
 /// `(message)` and `(message, postProcessor)` use the template's routing key, and an overload
 /// the arguments do not tell, an unresolved producer.
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 fn rabbit<'a>(
     code: &Code<'a>,
     path: &'a str,

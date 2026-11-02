@@ -1438,7 +1438,7 @@ fn compose_job(dir: &Path) {
 /// moved to `ops/` and the pulled list to `ops/pulled.toml`.
 #[cfg_attr(
     not(all(feature = "github-app", feature = "postgres", feature = "oidc")),
-    allow(dead_code)
+    expect(dead_code)
 )]
 pub(crate) fn compose_managed(dir: &Path) {
     let deploy = Path::new(env!("CARGO_MANIFEST_DIR")).join("deploy/compose");

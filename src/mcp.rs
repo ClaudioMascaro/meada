@@ -258,7 +258,7 @@ impl Meada {
     /// `answer` as the tool's result, an error as a tool error. A `named` generation's result
     /// carries it in `_meta` (`meada/generation`); the text stays what the tool answers.
     fn result(&self, answer: Result<String, String>) -> CallToolResult {
-        #[cfg_attr(not(feature = "snapshot"), allow(unused_mut))]
+        #[cfg_attr(not(feature = "snapshot"), expect(unused_mut))]
         let mut result = match answer {
             Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
             Err(text) => CallToolResult::error(vec![ContentBlock::text(text)]),

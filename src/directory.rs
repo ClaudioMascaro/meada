@@ -52,14 +52,11 @@ pub struct Config {
     token: Secret,
     /// The token claim naming a user: the console's deprovisioning (#335) and the overage lookup
     /// (#336) read it.
-    #[cfg_attr(not(any(feature = "ui", feature = "oidc")), allow(dead_code))]
     pub user_claim: String,
     /// `userName` or `externalId`: what `user_claim` matches, and what a revocation marker is
     /// cleared by.
-    #[cfg_attr(not(any(feature = "ui", feature = "oidc")), allow(dead_code))]
     pub user_attribute: &'static str,
     /// `displayName` or `externalId`: what names a group, unique among them.
-    #[cfg_attr(not(any(feature = "ui", feature = "oidc")), allow(dead_code))]
     pub group_attribute: &'static str,
 }
 
@@ -107,7 +104,6 @@ impl File {
 impl Config {
     /// The SCIM token, read now (the console's start): unset, unreadable or shorter than
     /// `TOKEN_MIN` characters is the problem naming the key, never the value.
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
     pub fn token(&self) -> Result<String, Problem> {
         let key = match self.token {
             Secret::Env(_) => "directory.token_env",

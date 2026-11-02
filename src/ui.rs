@@ -304,7 +304,10 @@ struct Session {
     /// The global operator (ADR 0014).
     operator: bool,
     /// The token's groups, sorted (empty behind the proxy).
-    #[cfg_attr(not(any(feature = "oidc", feature = "refresh-lock")), allow(dead_code))]
+    #[cfg_attr(
+        not(any(feature = "oidc", feature = "refresh-lock")),
+        expect(dead_code)
+    )]
     groups: Vec<String>,
     /// A team operator's teams, sorted (ADR 0015, #324); empty for everyone else.
     teams: Vec<String>,
@@ -442,7 +445,7 @@ impl Session {
     /// `[oidc.github]`, `login` when the token has a valid one, `github_host` and `github_grant`
     /// (#332); with a local account's session token, `account: true` (ADR 0024).
     fn document(&self) -> Value {
-        #[allow(unused_mut)]
+        #[cfg_attr(not(feature = "oidc"), expect(unused_mut))]
         let mut document = json!({"subject": self.subject, "role": self.role()});
         #[cfg(feature = "oidc")]
         if let Some(grant) = &self.grant {
@@ -686,7 +689,7 @@ impl Console {
             return Err(lines.join("\n").into());
         };
         let table: toml::Table = toml::from_str(&src)?;
-        #[cfg_attr(not(feature = "directory"), allow(unused_mut))]
+        #[cfg_attr(not(feature = "directory"), expect(unused_mut))]
         let mut loaded = serde_json::to_value(table)?;
         // The manifest route names where the SCIM token comes from, its default included.
         #[cfg(feature = "directory")]
@@ -1029,7 +1032,7 @@ impl Console {
                     let _ = user;
                     let teams =
                         self.teams_on(route, admitted.operator, &admitted.groups, &admitted.grant);
-                    #[allow(unused_mut)]
+                    #[cfg_attr(not(feature = "directory"), expect(unused_mut))]
                     let mut session = Session::admitted(admitted, teams);
                     #[cfg(feature = "directory")]
                     {
@@ -1166,7 +1169,7 @@ impl Console {
             #[cfg(feature = "oidc")]
             "admission" if read => {
                 let document = (self.oidc.as_ref()).map(|o| {
-                    #[allow(unused_mut)]
+                    #[cfg_attr(not(feature = "directory"), expect(unused_mut))]
                     let mut document = o.admission(&|i| session.reads(i));
                     #[cfg(feature = "directory")]
                     self.with_directory_counts(&mut document, session);
@@ -1200,7 +1203,6 @@ impl Console {
     /// The public URL fixes the browser's callback even when the listener was opened through
     /// loopback.
     fn config(&self) -> Value {
-        #[allow(unused_mut)]
         let mut config = json!({
             "version": VERSION,
             "operations": self.ui.operations,

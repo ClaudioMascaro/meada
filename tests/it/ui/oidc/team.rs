@@ -132,7 +132,7 @@ impl Team {
     /// A token for exactly `claims`, signed by the team's key.
     #[cfg_attr(
         not(any(feature = "directory", feature = "github-app")),
-        allow(dead_code)
+        expect(dead_code)
     )]
     pub(super) fn sign(&self, claims: &Value) -> String {
         sign(&self.encoding, "team", Algorithm::ES256, claims)
@@ -141,7 +141,7 @@ impl Team {
     /// The claims `token` mints for `subject`: the base of `sign`.
     #[cfg_attr(
         not(any(feature = "directory", feature = "github-app")),
-        allow(dead_code)
+        expect(dead_code)
     )]
     pub(super) fn claims(&self, subject: &str) -> Value {
         let mut claims = claims(&self.issuer.base, &[]);

@@ -401,7 +401,7 @@ pub fn rfc3339(secs: u64) -> String {
 /// host. Only the comparison folds; a row stays keyed by the identity as written.
 #[cfg_attr(
     not(all(feature = "github-app", feature = "postgres", feature = "oidc")),
-    allow(dead_code)
+    expect(dead_code)
 )]
 pub(crate) fn fold(host: &str, identity: &str) -> String {
     let on_host = (identity.strip_prefix(host)).is_some_and(|rest| rest.starts_with('/'));

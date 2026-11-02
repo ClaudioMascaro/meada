@@ -21,7 +21,7 @@ pub struct Directory {
 }
 
 /// What the admission view shows of the directory.
-#[cfg_attr(not(feature = "oidc"), allow(dead_code))] // only the admission view, an oidc route, shows them
+#[cfg_attr(not(feature = "oidc"), expect(dead_code))] // only the admission view, an oidc route, shows them
 pub struct Counts {
     pub users: i64,
     pub groups: i64,
@@ -40,7 +40,7 @@ impl Directory {
     }
 
     /// The token claim that names a user.
-    #[cfg_attr(not(feature = "oidc"), allow(dead_code))]
+    #[cfg_attr(not(feature = "oidc"), expect(dead_code))]
     pub fn user_claim(&self) -> &str {
         &self.user_claim
     }
@@ -125,7 +125,7 @@ impl Directory {
     }
 
     /// The users and groups held and the time of the last SCIM write.
-    #[cfg_attr(not(feature = "oidc"), allow(dead_code))]
+    #[cfg_attr(not(feature = "oidc"), expect(dead_code))]
     pub async fn counts(&self) -> Result<Counts, String> {
         let (opened, schema) = self.connect().await?;
         let sql = format!(

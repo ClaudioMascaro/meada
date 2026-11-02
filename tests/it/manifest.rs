@@ -991,7 +991,7 @@ fn catalog_section_errors_name_the_file_the_line_and_the_keys() {
     let needs = "[catalog] needs [oidc.github] or [accounts.github]";
     #[cfg(not(feature = "accounts"))]
     let needs = "[catalog] needs [oidc.github]";
-    #[allow(unused_mut)]
+    #[cfg_attr(not(feature = "accounts"), expect(unused_mut))]
     let mut cases = vec![
         (format!("{head}{catalog}"), format!("{at}:3: {needs}\n")),
         (

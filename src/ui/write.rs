@@ -98,7 +98,7 @@ pub(super) fn refused(
 }
 
 /// `refused` recording `outcome`.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn unsuccessful(
     record: PendingRecord,
     outcome: Outcome,

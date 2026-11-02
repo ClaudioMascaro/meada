@@ -425,7 +425,7 @@ pub struct Link {
 impl Link {
     /// Every current field, in declaration order. A field added later is optional: it starts
     /// empty and is set after `new`.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         consumer: String,
         provider: String,
@@ -537,7 +537,7 @@ pub struct Step {
 impl Step {
     /// Every current field, in declaration order. A field added later is optional: it starts
     /// empty and is set after `new`.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         depth: usize,
         repository: String,

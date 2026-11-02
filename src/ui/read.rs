@@ -233,7 +233,7 @@ impl Console {
                 .expect("github_app needs valkey");
             service.set("valkey");
             let valkey = crate::valkey::Valkey::connect(config).await.map_err(vk)?;
-            #[allow(unused_mut)]
+            #[cfg_attr(not(feature = "generation-pointer"), expect(unused_mut))]
             let mut identities: Vec<String> = self
                 .bootstrap
                 .entries

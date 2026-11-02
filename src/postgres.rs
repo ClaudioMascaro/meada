@@ -268,7 +268,6 @@ pub struct Config {
     schema: String,
     /// The most connections a process holds: the callers that pool them (S4 tickets 2, 5, 6
     /// and 8) read it; `migrate` and `status` open one.
-    #[allow(dead_code)]
     pool_size: u64,
     connect_timeout: Duration,
     statement_timeout: Duration,
@@ -817,7 +816,7 @@ pub fn probe(config: &Config) -> Result<(), String> {
 /// UTC): `YYYY-MM-DDTHH:MM:SS.ffffffZ`.
 #[cfg_attr(
     not(any(feature = "ui", feature = "oidc", feature = "generation-pointer")),
-    allow(dead_code)
+    expect(dead_code)
 )]
 pub(crate) fn is_time(text: &str) -> bool {
     let shape = "dddd-dd-ddTdd:dd:dd.ddddddZ";

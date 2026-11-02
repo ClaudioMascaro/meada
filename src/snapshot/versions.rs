@@ -978,7 +978,7 @@ pub fn excluded_contexts(
 
 /// The exclusions file parsed: the deployment workspace's identities, each context's (a line
 /// `<context id>\t<identity>`) and the digest of the contexts file it names, if any.
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 fn parse_excluded(
     dir: &Path,
     version: &str,

@@ -352,7 +352,7 @@ impl Manifest {
             let refused = Msg::AccountsUnderBreakGlass(dotted).text();
             return Err(config::error_at(file, &src, dotted, &refused));
         }
-        #[cfg_attr(not(feature = "generation-pointer"), allow(unused_mut))]
+        #[cfg_attr(not(feature = "generation-pointer"), expect(unused_mut))]
         let mut parsed: ManifestFile = config::parse(file, &src, "meada.workspace.toml")?;
         let Some(index_dir) = parsed.index_dir else {
             let missing = Msg::KeyMissing("index_dir").text();
@@ -575,7 +575,7 @@ impl Manifest {
         }
         let index_dir = base.join(index_dir);
         #[cfg(feature = "snapshot")]
-        #[cfg_attr(not(feature = "generation-pointer"), allow(unused_mut))]
+        #[cfg_attr(not(feature = "generation-pointer"), expect(unused_mut))]
         let mut entries_src = src;
         #[cfg(feature = "generation-pointer")]
         let mut version = None;

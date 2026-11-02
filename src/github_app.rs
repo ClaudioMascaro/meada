@@ -273,7 +273,7 @@ fn printable(token: &str) -> bool {
 enum Failure {
     /// 403 or 429, with the status and the seconds the answer says to wait, if it says.
     Throttled(
-        #[cfg_attr(not(all(feature = "postgres", feature = "oidc")), allow(dead_code))] u16,
+        #[cfg_attr(not(all(feature = "postgres", feature = "oidc")), expect(dead_code))] u16,
         Option<u64>,
     ),
     /// 404.
@@ -1221,7 +1221,7 @@ pub fn roles(manifest: &Path) -> crate::Result<Reply> {
         let src = std::fs::read_to_string(manifest).map_err(|e| format!("{shown}: {e}"))?;
         let why = Msg::RolesNoApp(&github.host).text();
         // The table the provider came from (#561): `[oidc.github]`, else `[accounts.github]`.
-        #[allow(unused_mut)]
+        #[cfg_attr(not(feature = "accounts"), expect(unused_mut))]
         let mut table = "oidc.github";
         #[cfg(feature = "accounts")]
         if read.oidc.as_ref().is_none_or(|o| o.github.is_none()) {
@@ -1379,7 +1379,7 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     let mut rows: BTreeMap<(String, String), String> = BTreeMap::new();
     // The catalog's candidates (#341): what the installations cover and `[catalog] allow`
     // admits, listed before any collaborator so a failure writes nothing.
-    #[cfg_attr(not(feature = "workspaces"), allow(unused_mut))]
+    #[cfg_attr(not(feature = "workspaces"), expect(unused_mut))]
     let mut candidates: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     #[cfg(feature = "workspaces")]
     if let Some(catalog) = catalog {
@@ -1456,7 +1456,7 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     // The sponsor rule (#342, ADR 0021): an entry of a named workspace that no operator of the
     // workspace holds an accepted role on, in the rows just listed, is left out of that
     // workspace before the fetch: a policy decision, not a failed fetch.
-    #[cfg_attr(not(feature = "workspaces"), allow(unused_mut))]
+    #[cfg_attr(not(feature = "workspaces"), expect(unused_mut))]
     let mut named_out: std::collections::BTreeSet<(String, String)> = Default::default();
     #[cfg(feature = "workspaces")]
     for context in &contexts {

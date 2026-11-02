@@ -74,7 +74,7 @@ struct State {
 }
 
 /// A permissions set as loaded; what only the console shows is unread on nodes.
-#[cfg_attr(not(feature = "ui"), allow(dead_code))]
+#[cfg_attr(not(feature = "ui"), expect(dead_code))]
 struct Set {
     id: String,
     /// When the job finished it, RFC 3339 on Postgres's clock.
@@ -177,7 +177,6 @@ impl Permissions {
     }
 
     /// The GitHub grant provider's `host`.
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
     pub(super) fn host(&self) -> &str {
         &self.github.host
     }
@@ -219,7 +218,7 @@ impl Permissions {
     /// The newest set's workspace version and the identities it excluded from that version
     /// (#333), whatever the set's age: what the last role check left out. `None` before a set is
     /// loaded or when it names no version.
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    #[cfg_attr(not(feature = "ui"), expect(dead_code))]
     pub(super) fn excluded(&self) -> Option<(String, BTreeSet<String>)> {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
         let set = state.set.as_ref()?;
@@ -239,12 +238,12 @@ impl Permissions {
 
     /// The admission view's `github` (#332): the grant provider's settings, the grant's state and
     /// the newest set as loaded (null before one is), its counts as the job wrote them.
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    #[cfg_attr(not(feature = "ui"), expect(dead_code))]
     pub(super) fn admission(&self) -> Value {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
         let now = Instant::now();
         let set = state.set.as_ref().map(|set| {
-            #[allow(unused_mut)]
+            #[cfg_attr(not(feature = "workspaces"), expect(unused_mut))]
             let mut shown = json!({
                 "id": set.id,
                 "finished": set.finished,
