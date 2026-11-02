@@ -589,8 +589,8 @@ pub use meada_core::export::{Dependency, Import};
 
 /// The two `compilerOptions` of a `tsconfig.json` that map build output back to source, as
 /// written. `extends` is not followed.
-// ponytail: the trunk follows no `extends` either (`lang/ts.rs`); a base config's `outDir`
-// counts as absent. Lifted together with the trunk's `paths`.
+// ponytail: the trunk follows `extends` for `paths` only (`lang/ts.rs`); a base config's `outDir`
+// counts as absent. Lifted on its own: the trunk's `paths` lift did not carry it.
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
 pub struct Tsconfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]

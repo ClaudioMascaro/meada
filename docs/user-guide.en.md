@@ -1009,7 +1009,11 @@ configuration and export), and resolving better what a language finds is a fix, 
 
 **Files.** `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs` and `.cjs`. An `import` uses the `paths` and
 `baseUrl` of the nearest `tsconfig.json` (or `jsconfig.json`), in the file's directory or above,
-relative to that configuration file's directory. `node_modules` is ignored.
+relative to that configuration file's directory. When it has an `extends` to another `tsconfig.json`
+or `jsconfig.json` of the repository (a relative path), `paths` and `baseUrl` come from the chain, the
+nearest config that declares each option winning; an `extends` to a package or outside the repository
+is not read, and a chain that is too long or circular counts as the nearest config alone.
+`node_modules` is ignored.
 
 **What becomes a definition.** Functions, classes and methods, the `const`, `let` and `var` of a
 function or class and `export default`. At the top of a file, assigned functions count too:

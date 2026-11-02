@@ -310,7 +310,7 @@ this file, and a change to these modules updates it.
   exported, as in ES modules; `seen` cuts cycles) and each further name as a member of that
   definition or a name of a whole file. A `tsconfig.json` has a row in `manifests` too, read
   by `read_tsconfig` (`out_dir`, `root_dir`; `Export::tsconfigs`, `serde(skip)`; `extends` is not
-  followed, as the trunk follows none), so an edit relinks like a `package.json` one. `import` skips a specifier no repository provides before
+  followed here, though the trunk follows it for `paths`), so an edit relinks like a `package.json` one. `import` skips a specifier no repository provides before
   reading anything else, and builds a provider's tables (`Provided`) the first time an import
   reaches it; `index::export` reads the `import` rows only for a repository with a manifest and
   the `exports` rows only for one with a named manifest. A call resolved in one provider at least

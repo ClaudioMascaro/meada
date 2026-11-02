@@ -8,6 +8,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- TypeScript and JavaScript: a `tsconfig.json` (or `jsconfig.json`) with `extends` naming a
+  relative path inside the repository takes the `paths` and `baseUrl` of the chain, the nearest
+  config that declares each option winning (#465), so the alias imports under a monorepo's
+  `packages/*` whose configs only extend the root's resolve. A package, a path outside the
+  repository, a chain of more than 8 configs after the nearest and a cycle are not followed (the
+  nearest config alone serves). Project `references` and a base not named `tsconfig.json` or
+  `jsconfig.json` are still not read.
+
 - The export format and the indexed commit (#512, ADR 0004 "Canonical export"): every export
   starts with `format` (`meada_core::export::FORMAT`, 1), which rises only when a reader of the
   previous shape would misread the new one, never for an added optional field; then

@@ -1027,7 +1027,10 @@ corrección, no una ruptura.
 
 **Archivos.** `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs` y `.cjs`. Un `import` usa los `paths` y el
 `baseUrl` del `tsconfig.json` (o `jsconfig.json`) más próximo, en el directorio del archivo o
-más arriba, relativos al directorio de ese archivo de configuración. `node_modules` se ignora.
+más arriba, relativos al directorio de ese archivo de configuración. Si tiene un `extends` a otro `tsconfig.json`
+o `jsconfig.json` del repositorio (una ruta relativa), `paths` y `baseUrl` vienen de la cadena, y gana
+el config más cercano que declara cada opción; un `extends` a un paquete o fuera del repositorio no se
+lee, y una cadena demasiado larga o circular vale solo por el config más cercano. `node_modules` se ignora.
 
 **Qué pasa a ser definición.** Funciones, clases y métodos, los `const`, `let` y `var` de una
 función o clase y el `export default`. En el nivel superior de un archivo, las funciones
