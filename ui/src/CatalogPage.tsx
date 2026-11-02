@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ApiError } from './api';
+import { messageOf } from './api';
 import type { Api } from './api';
 import { CHECK_IDENTITIES, PREFIX_MAX, catalogRoute, checkBody, checkText, reasonText, setText } from './catalog';
 import type { CatalogAnswer, CheckAnswer } from './catalog';
@@ -63,7 +63,7 @@ export function CatalogPage({ api, locale }: { api: Api; locale: Language }) {
       <button type="button" className="secondary" onClick={reload}>{problem ? common.retry : t.refresh}</button>
     </div>
     <p className="intro">{t.intro}</p>
-    {problem ? <p className="error" role="alert">{problem instanceof ApiError ? problem.message : common.loadError}</p> : null}
+    {problem ? <p className="error" role="alert">{messageOf(problem, common.loadError)}</p> : null}
     {!answer && !problem ? <p role="status">{common.loading}</p> : null}
     {answer && <section aria-label={t.catalog}>
       <p role="status"><strong>{pending ? t.pendingState : t.ready}</strong>{pending ? `: ${reasonText(answer.reason, t)}` : ''}</p>

@@ -44,6 +44,9 @@ export class ApiError extends Error {
   constructor(readonly status: number, readonly code: string, message: string, readonly body: Record<string, unknown> = {}) { super(message); }
 }
 
+/** The message of a caught error: the API's own when it is one, else `fallback`. */
+export const messageOf = (error: unknown, fallback: string): string => error instanceof ApiError ? error.message : fallback;
+
 export async function read<T>(response: Response): Promise<T> {
   if (response.ok) {
     return JSON.parse(await response.text(), (_key: string, value: unknown, context?: { source?: string }) => {

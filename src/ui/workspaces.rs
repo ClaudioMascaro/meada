@@ -19,6 +19,7 @@ use super::write::{PendingRecord, finish, refused};
 use super::*;
 use crate::audit::Outcome;
 use crate::workspaces::store::{self, Creator, New, Policy, Record};
+use crate::workspaces::{Authority, Reason};
 pub(super) use lifecycle::body_max;
 
 // ponytail: a creation carries a manifest text of at most 64 KiB, a name, a description and a
@@ -108,7 +109,7 @@ impl Console {
     fn read_grant(session: &Session) -> Grant {
         #[cfg(feature = "oidc")]
         if let Some(grant) = &session.grant {
-            return grant.core();
+            return grant.into();
         }
         Grant::All
     }
@@ -167,7 +168,6 @@ impl Console {
             |code, message: &str| bad(StatusCode::UNPROCESSABLE_ENTITY, code, message);
         if let Some(problem) = named::name_problem(&create.name)
             .or_else(|| named::description_problem(&create.description))
-            .or_else(|| (create.message.is_empty()).then(|| Msg::WorkspacesBody.text()))
             .or_else(|| named::message_problem(&create.message))
         {
             return unprocessable("invalid_workspace", &problem);
@@ -187,10 +187,7 @@ impl Console {
         let login = session.login.as_deref();
         let grant = Self::read_grant(session);
         let id = meada_core::ids::workspace_id(subject, &create.name, &version);
-        let authority = match administrator {
-            true => "platform_administrator",
-            false => "workspace_operator",
-        };
+        let authority = Authority::of(administrator);
         let arguments = json!({"workspace": id, "version": version, "authority": authority});
         // A cheap look at the admission cache before anything is stored; the transaction below
         // decides again from the newest set. A refusal is recorded all the same (ADR 0021).
@@ -293,7 +290,7 @@ impl Console {
         error(
             StatusCode::SERVICE_UNAVAILABLE,
             "unavailable",
-            &Msg::WorkspacesPending("unavailable").text(),
+            &Msg::WorkspacesPending(Reason::Unavailable).text(),
         )
     }
 
@@ -626,7 +623,7 @@ impl Console {
 }
 
 /// The 409 of a platform or caller condition that stops every selection (fail closed).
-pub(super) fn pending(reason: &str) -> Answer {
+pub(super) fn pending(reason: Reason) -> Answer {
     json_answer(
         StatusCode::CONFLICT,
         &json!({"error": {

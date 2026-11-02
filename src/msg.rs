@@ -841,7 +841,7 @@ pub enum Msg<'a> {
     WorkspacesRefused(usize),
     /// A creation or selection while the permissions set cannot decide (#342): the reason.
     #[cfg(feature = "workspaces")]
-    WorkspacesPending(&'a str),
+    WorkspacesPending(crate::workspaces::Reason),
     /// More workspaces than `[workspaces] max_workspaces` (#342).
     #[cfg(feature = "workspaces")]
     WorkspacesLimit(usize),

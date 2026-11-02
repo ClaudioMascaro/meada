@@ -853,6 +853,28 @@ pub struct Def {
     pub hash: String,
 }
 
+impl Def {
+    /// A definition with nothing but its name, kind and range.
+    pub fn new(name: impl Into<String>, kind: Kind, range: Range<usize>) -> Self {
+        Def {
+            name: name.into(),
+            kind,
+            range,
+            params: Vec::new(),
+            bases: Vec::new(),
+            decorators: Vec::new(),
+            return_values: Vec::new(),
+            returns: None,
+            type_params: Vec::new(),
+            result: None,
+            unwrapped: None,
+            output: None,
+            suspends: false,
+            hash: Default::default(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Param {
     pub name: String,

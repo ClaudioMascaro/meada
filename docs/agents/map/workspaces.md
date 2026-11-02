@@ -61,7 +61,16 @@ the session may select and the `catalog/check` results, and is shared by the cre
 editor; `EffectiveList.tsx` is #344's view, extracted. The editor marks each changed entry
 (`namedChanged`) with `namedAuthorize`, shows the diff (`namedDiff`) and freezes the reviewed
 payload until the confirmation. Tests: `ui/tests/guided.test.ts` (actual WebAssembly) and
-`ui/tests/GuidedWorkspace.test.tsx` (DOM). Proposals are #346 (above); the page over versions with rollback is #503 (below).
+`ui/tests/GuidedWorkspace.test.tsx` (DOM). Proposals are #346 (above); the page over versions
+with rollback is #503 (below).
+
+#501 moved the text rule and the role list to the same seam: `namedNameProblem`,
+`namedDescriptionProblem` and `namedMessageProblem` (over `named::*_problem`) and `resourceRoles`
+(over `manifest::Role::ALL`), so `ui/` keeps no copy of the rule, its bounds or the roles.
+`message_problem` also refuses an empty message (1 to `DESCRIPTION_MAX`), so the console routes and
+`meada workspaces` carry no empty check of their own. `ui/src/named-core.ts` (#522) is the one place
+that parses the JSON of the `named*` and `resourceRoles` results, into typed values; `messageOf` in
+`ui/src/api.ts` is the console's `ApiError` message with a fallback.
 
 Delivered by #344 (contract 6, the effective configuration; ADR 0021 "As built (#344)"), same feature:
 `meada-core/src/effective.rs` is the pure decision (`effective(entries, facts)`: per entry the
@@ -128,7 +137,7 @@ each context with the identities the sponsor rule excluded from its version (`ex
 `snapshot/pull.rs` checks them; `snapshot/serve.rs` `Held::context` builds a context once, and
 `Held::admits` and `Held::viewable` decide a workspace route and its 404 list with
 `named::visible` over every entry of the recorded version, excluded ones included, with no
-operator exemption (the token's grant through `grant::Grant::core`, as the console maps it);
+operator exemption (the token's grant through `From<&grant::Grant>` for `meada_core::authorize::Grant`, as the console maps it);
 `mcp.rs` routes `/-/workspaces/<id>/<identity>` and `Engine::open_context` opens it;
 `meada-core/src/named.rs` holds the pure rules (`creation`, `visible`, `answers`, `shown`,
 `unsponsored`, names, named entries and their version id) that the Rust table test, the console

@@ -12,6 +12,7 @@ use std::collections::BTreeSet;
 use meada_core::authorize::Grant;
 
 use super::*;
+use crate::workspaces::Authority;
 use crate::workspaces::lifecycle::{self as ops, Error, Op, Target};
 
 // ponytail: the request bodies of the lifecycle routes (ADR 0021): a save carries a manifest of
@@ -21,31 +22,72 @@ const RENAME_BODY_MAX: usize = 4 << 10;
 const DELETE_BODY_MAX: usize = 1 << 10;
 const OPERATORS_BODY_MAX: usize = 16 << 10;
 
+/// A lifecycle write route (`/api/v1/workspaces/<id>/<op>`), parsed once from its segment.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Route {
+    Versions,
+    Apply,
+    Rename,
+    Delete,
+    Operators,
+}
+
+impl Route {
+    fn parse(segment: &str) -> Option<Self> {
+        Some(match segment {
+            "versions" => Self::Versions,
+            "apply" => Self::Apply,
+            "rename" => Self::Rename,
+            "delete" => Self::Delete,
+            "operators" => Self::Operators,
+            _ => return None,
+        })
+    }
+
+    fn body_max(self) -> usize {
+        match self {
+            Self::Versions => super::CREATE_MAX,
+            Self::Apply => APPLY_BODY_MAX,
+            Self::Rename => RENAME_BODY_MAX,
+            Self::Delete => DELETE_BODY_MAX,
+            Self::Operators => OPERATORS_BODY_MAX,
+        }
+    }
+
+    /// The audit action (an apply that goes back to a version that was current before is
+    /// recorded as `workspaces.rollback`).
+    fn action(self) -> &'static str {
+        match self {
+            Self::Versions => "workspaces.save",
+            Self::Apply => "workspaces.apply",
+            Self::Rename => "workspaces.rename",
+            Self::Delete => "workspaces.delete",
+            Self::Operators => "workspaces.operators",
+        }
+    }
+
+    /// The shape of the body, for the 400 that names it.
+    fn shape(self) -> &'static str {
+        match self {
+            Self::Versions => "{\"entries\", \"message\", \"base\"}",
+            Self::Apply => "{\"version\", \"base\"}",
+            Self::Rename => "{\"name\", \"description\"?, \"base\"}",
+            Self::Delete => "{\"base\"}",
+            Self::Operators => {
+                "{\"add\"?: [{\"subject\", \"login\"}], \"remove\"?: [subject], \"base\"}"
+            }
+        }
+    }
+}
+
 /// The cap of the body of the lifecycle route at `path` (`/api/v1/workspaces/<id>/<op>`), none
 /// for any other path: the listener reads no more than this.
 pub(in crate::ui) fn body_max(path: &str) -> Option<usize> {
     let rest = path.strip_prefix("/api/v1/workspaces/")?;
     let (id, op) = rest.split_once('/')?;
     meada_core::ids::is_id(id).then_some(())?;
-    match op {
-        "versions" => Some(super::CREATE_MAX),
-        "apply" => Some(APPLY_BODY_MAX),
-        "rename" => Some(RENAME_BODY_MAX),
-        "delete" => Some(DELETE_BODY_MAX),
-        "operators" => Some(OPERATORS_BODY_MAX),
-        _ => None,
-    }
+    Route::parse(op).map(Route::body_max)
 }
-
-/// The operations by route, with their audit action (an apply that goes back to a version that
-/// was current before is recorded as `workspaces.rollback`).
-const ROUTES: [(&str, &str); 5] = [
-    ("versions", "workspaces.save"),
-    ("apply", "workspaces.apply"),
-    ("rename", "workspaces.rename"),
-    ("delete", "workspaces.delete"),
-    ("operators", "workspaces.operators"),
-];
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -167,7 +209,8 @@ impl Console {
     /// `POST workspaces/<id>/<op>`: the lifecycle writes. `None` when `rest` is no such route.
     pub(super) fn operate(&self, rest: &str, body: &Body, session: &Session) -> Option<Answer> {
         let (id, op) = rest.split_once('/')?;
-        let (_, action) = ROUTES.iter().find(|(route, _)| *route == op)?;
+        let route = Route::parse(op)?;
+        let action = route.action();
         self.bootstrap.workspaces.as_ref()?;
         let bad = |status, code: &str, message: &str| {
             refused(None, session, action, id, status, code, message)
@@ -180,30 +223,30 @@ impl Console {
                 return Some(bad(StatusCode::PAYLOAD_TOO_LARGE, "too_large", &message));
             }
             Err(_) => {
-                let shape = Self::shape(op);
+                let shape = route.shape();
                 let message = Msg::WorkspacesOpBody(shape).text();
                 return Some(bad(StatusCode::BAD_REQUEST, "bad_request", &message));
             }
         };
         let body_bad = || {
-            let message = Msg::WorkspacesOpBody(Self::shape(op)).text();
+            let message = Msg::WorkspacesOpBody(route.shape()).text();
             bad(StatusCode::BAD_REQUEST, "bad_request", &message)
         };
         // Never serde's text, which may echo the body.
-        let plan = match op {
-            "versions" => serde_json::from_slice::<Save>(bytes)
+        let plan = match route {
+            Route::Versions => serde_json::from_slice::<Save>(bytes)
                 .map_err(|_| ())
                 .map(|b| (b.base, Decoded::Save(b))),
-            "apply" => serde_json::from_slice::<Apply>(bytes)
+            Route::Apply => serde_json::from_slice::<Apply>(bytes)
                 .map_err(|_| ())
                 .map(|b| (b.base, Decoded::Apply(b))),
-            "rename" => serde_json::from_slice::<Rename>(bytes)
+            Route::Rename => serde_json::from_slice::<Rename>(bytes)
                 .map_err(|_| ())
                 .map(|b| (b.base, Decoded::Rename(b))),
-            "delete" => serde_json::from_slice::<Delete>(bytes)
+            Route::Delete => serde_json::from_slice::<Delete>(bytes)
                 .map_err(|_| ())
                 .map(|b| (b.base, Decoded::Delete)),
-            _ => serde_json::from_slice::<Operators>(bytes)
+            Route::Operators => serde_json::from_slice::<Operators>(bytes)
                 .map_err(|_| ())
                 .map(|b| (b.base, Decoded::Operators(b))),
         };
@@ -217,17 +260,6 @@ impl Console {
             });
         }
         Some(self.write_one(id, action, base, request, session))
-    }
-
-    /// The shape of the body of the route `op`, for the 400 that names it.
-    fn shape(op: &str) -> &'static str {
-        match op {
-            "versions" => "{\"entries\", \"message\", \"base\"}",
-            "apply" => "{\"version\", \"base\"}",
-            "rename" => "{\"name\", \"description\"?, \"base\"}",
-            "delete" => "{\"base\"}",
-            _ => "{\"add\"?: [{\"subject\", \"login\"}], \"remove\"?: [subject], \"base\"}",
-        }
     }
 
     fn write_one(
@@ -258,10 +290,7 @@ impl Console {
             }
         };
         let administrator = session.operator;
-        let authority = match administrator {
-            true => "platform_administrator",
-            false => "workspace_operator",
-        };
+        let authority = Authority::of(administrator);
         let grant = Self::read_grant(session);
         // What a refusal may name: the platform administrator reads every entry of a management
         // view, anyone else what its grant reads.
@@ -330,10 +359,7 @@ impl Console {
         };
         match &request {
             Decoded::Save(save) => {
-                if let Some(problem) = named::message_problem(&save.message).or_else(|| {
-                    (save.message.is_empty())
-                        .then(|| Msg::WorkspacesOpBody(Self::shape("versions")).text())
-                }) {
+                if let Some(problem) = named::message_problem(&save.message) {
                     return unprocessable("invalid_workspace", problem);
                 }
                 let submitted =
@@ -364,7 +390,7 @@ impl Console {
             }
             Decoded::Apply(apply) => {
                 if !meada_core::ids::is_id(&apply.version) {
-                    let message = Msg::WorkspacesOpBody(Self::shape("apply")).text();
+                    let message = Msg::WorkspacesOpBody(Route::Apply.shape()).text();
                     return refused(
                         None,
                         session,
@@ -899,4 +925,20 @@ enum Decoded {
     Rename(Rename),
     Delete,
     Operators(Operators),
+}
+
+#[cfg(test)]
+mod route_tests {
+    use super::Route;
+
+    #[test]
+    fn each_segment_parses_to_its_route_and_an_unknown_one_to_none() {
+        assert_eq!(Route::parse("versions"), Some(Route::Versions));
+        assert_eq!(Route::parse("apply"), Some(Route::Apply));
+        assert_eq!(Route::parse("rename"), Some(Route::Rename));
+        assert_eq!(Route::parse("delete"), Some(Route::Delete));
+        assert_eq!(Route::parse("operators"), Some(Route::Operators));
+        assert_eq!(Route::parse("other"), None);
+        assert_eq!(Route::parse(""), None);
+    }
 }

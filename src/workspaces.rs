@@ -20,6 +20,60 @@ pub(crate) mod store;
 
 use lifecycle::OPERATORS_MAX;
 
+/// Why the permissions set cannot decide eligibility, the same for every identity (fail
+/// closed): the text is what HTTP bodies, messages and audit lines carry, and the front end's
+/// `CatalogReason` (`unavailable` is the console's own, when the store did not answer).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Reason {
+    NoSet,
+    StaleSet,
+    MissingLogin,
+    Unavailable,
+}
+
+impl Reason {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::NoSet => "no_set",
+            Self::StaleSet => "stale_set",
+            Self::MissingLogin => "missing_login",
+            Self::Unavailable => "unavailable",
+        }
+    }
+}
+
+impl std::fmt::Display for Reason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// What a workspace write was done as, in the audit and the history: the text is stored.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Authority {
+    PlatformAdministrator,
+    WorkspaceOperator,
+}
+
+impl Authority {
+    /// The platform administrator acts as such, anyone else as an operator.
+    pub const fn of(administrator: bool) -> Self {
+        match administrator {
+            true => Self::PlatformAdministrator,
+            false => Self::WorkspaceOperator,
+        }
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::PlatformAdministrator => "platform_administrator",
+            Self::WorkspaceOperator => "workspace_operator",
+        }
+    }
+}
+
 // ponytail: the most workspaces `max_workspaces` may allow, and its default (ADR 0021).
 const WORKSPACES_MAX: i64 = 2000;
 const WORKSPACES_DEFAULT: i64 = 200;
@@ -268,6 +322,32 @@ pub fn member_path(mirrors: &Path, identity: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The text of a reason and of an authority is stored, sent and shown as it is.
+    #[test]
+    fn each_reason_and_authority_is_its_text() {
+        let reasons = [
+            (Reason::NoSet, "no_set"),
+            (Reason::StaleSet, "stale_set"),
+            (Reason::MissingLogin, "missing_login"),
+            (Reason::Unavailable, "unavailable"),
+        ];
+        for (reason, text) in reasons {
+            assert_eq!(reason.as_str(), text);
+            assert_eq!(reason.to_string(), text);
+            assert_eq!(json!(reason), json!(text));
+        }
+        let authorities = [
+            (Authority::PlatformAdministrator, "platform_administrator"),
+            (Authority::WorkspaceOperator, "workspace_operator"),
+        ];
+        for (authority, text) in authorities {
+            assert_eq!(authority.as_str(), text);
+            assert_eq!(json!(authority), json!(text));
+        }
+        assert_eq!(Authority::of(true), Authority::PlatformAdministrator);
+        assert_eq!(Authority::of(false), Authority::WorkspaceOperator);
+    }
 
     fn section(toml: &str) -> Result<Config, Problem> {
         toml::from_str::<File>(toml).unwrap().validate()

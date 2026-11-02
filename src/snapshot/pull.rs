@@ -26,6 +26,8 @@ use std::fs::{self, File};
 use std::io::{self, BufReader, BufWriter, Read, Seek, Write};
 use std::path::{Component, Path, PathBuf};
 
+use meada_core::ids::NON_BLOCK_KEYS;
+
 use super::store::{Store, Stored};
 use super::{CURRENT_MAX, Config, DOCUMENT_MAX, Document, Entry, bundle_of, is_id};
 use crate::msg::Msg;
@@ -406,10 +408,7 @@ fn checked(
         let mut fields = entry.blocks.as_object().cloned().ok_or_else(not)?;
         // `owner` and `added_by` are an entry's metadata in a workspace version, never a block of a
         // bundle.
-        if ["repo", "path", "owner", "added_by"]
-            .iter()
-            .any(|k| fields.contains_key(*k))
-        {
+        if NON_BLOCK_KEYS.iter().any(|k| fields.contains_key(*k)) {
             return Err(not());
         }
         fields.insert("repo".into(), identity.into());
@@ -462,9 +461,7 @@ fn checked(
         let mut seen = HashSet::new();
         for entry in &context.repositories {
             let mut fields = entry.blocks.as_object().cloned().ok_or_else(not)?;
-            if ["repo", "path", "owner", "added_by"]
-                .iter()
-                .any(|k| fields.contains_key(*k))
+            if NON_BLOCK_KEYS.iter().any(|k| fields.contains_key(*k))
                 || !held.contains(entry.repo.as_str())
                 || !seen.insert(entry.repo.as_str())
             {

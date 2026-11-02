@@ -40,9 +40,10 @@ pub fn description_problem(description: &str) -> Option<String> {
         .then(|| Msg::NamedDescriptionBad(DESCRIPTION_MAX).text())
 }
 
-/// The problem with a version's `message` (at most `DESCRIPTION_MAX` characters), if any.
+/// The problem with a version's `message` (1 to `DESCRIPTION_MAX` characters: a version always
+/// says why it was saved), if any.
 pub fn message_problem(message: &str) -> Option<String> {
-    (!text_ok(message, 0, DESCRIPTION_MAX)).then(|| Msg::NamedMessageBad(DESCRIPTION_MAX).text())
+    (!text_ok(message, 1, DESCRIPTION_MAX)).then(|| Msg::NamedMessageBad(DESCRIPTION_MAX).text())
 }
 
 /// One entry of a named version document: `repo` and then the entry's blocks (`entry_blocks`),
@@ -235,7 +236,7 @@ mod tests {
     }
 
     #[test]
-    fn names_and_descriptions_are_bounded_and_plain() {
+    fn names_descriptions_and_messages_are_bounded_and_plain() {
         assert!(name_problem("Payments").is_none());
         for bad in ["", " x", "x ", "a\nb", &"x".repeat(NAME_MAX + 1)] {
             assert!(name_problem(bad).is_some(), "{bad:?}");
@@ -243,6 +244,19 @@ mod tests {
         assert!(description_problem("").is_none());
         assert!(description_problem("\tx").is_some());
         assert!(description_problem(&"x".repeat(DESCRIPTION_MAX + 1)).is_some());
+        assert!(message_problem("why").is_none());
+        for bad in [
+            "",
+            " x",
+            "x\u{3000}",
+            "a\u{85}b",
+            &"x".repeat(DESCRIPTION_MAX + 1),
+        ] {
+            assert!(message_problem(bad).is_some(), "{bad:?}");
+        }
+        // U+FEFF is no whitespace to Rust, U+3000 is.
+        assert!(name_problem("\u{feff}x").is_none());
+        assert!(name_problem("\u{3000}x").is_some());
     }
 
     #[test]

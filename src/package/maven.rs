@@ -743,15 +743,13 @@ pub(super) fn imports<'a>(
     };
     // The type the source writes for the receiver comes first: a local named like a package
     // (`order.total()`) is no type the on-demand imports bring.
-    let (mut local, mut typed) = (false, Vec::new());
+    let mut typed = Vec::new();
     if let (false, Some((receiver, method))) = (call.constructs, callee.rsplit_once('.')) {
         let origins = code.origins(path, &call.scope, Of::Name(receiver), Follow::Declarations);
         let origin = (origins.into_iter().next())
             .filter(|o| o.form == Form::Type && o.routes.iter().all(|r| r.steps.is_empty()))
             // A type of the repository is no answer here: the lookup below runs as before.
             .filter(|o| o.outside.is_some());
-        // A type of the repository: its members and extensions are the repository's.
-        local = origin.as_ref().is_some_and(|o| o.outside.is_none());
         typed = (origin.and_then(|o| o.outside)).map_or_else(Vec::new, Outside::spellings);
         found.extend(
             typed
@@ -778,9 +776,8 @@ pub(super) fn imports<'a>(
     // An extension function is called on a receiver, and imported by its name alone. It
     // names the receiver's type when that is the one the source writes, for a member of the
     // type would hide it.
-    if let (true, false, Some((_, name))) = (
+    if let (true, Some((_, name))) = (
         jvm::names::kotlin(path) && (found.is_empty() || !typed.is_empty()),
-        local,
         callee.rsplit_once('.'),
     ) {
         let suffix = match &typed[..] {

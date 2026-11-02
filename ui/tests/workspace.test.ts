@@ -101,12 +101,12 @@ test('the diff is of the composed version: the entries outside the grant stay in
 test('an apply is offered when nothing is refused over the entries the session reads, and names the teams it touches', () => {
   const versions = [{ id: '1111111111111111', author: 'a', time: '', message: '' }, { id: '2222222222222222', author: 'a', time: '', message: '' }];
   const held = [x, y, z];
-  const older = teamApplyAction(versions[1]!, versions[0]!.id, versions, held, [{ ...x, path: 'older' }, y, z], who, 'en');
+  const older = teamApplyAction(versions[1]!, versions[0]!.id, versions, held, [{ ...x, path: 'older' }, y, z], who);
   expect(older).toEqual({ kind: 'apply', route: 'workspace/apply', body: { version: versions[1]!.id }, rollback: true, teams: ['team-a'] });
   expect(older).not.toHaveProperty('command');
-  expect(teamApplyAction(versions[0]!, versions[1]!.id, versions, held, held, who, 'en')).toMatchObject({ rollback: false, teams: [] });
-  expect(teamApplyAction(versions[1]!, versions[0]!.id, versions, held, [x, { ...y, path: 'changed' }, z], who, 'en')).toBeUndefined();
-  expect(teamApplyAction(versions[1]!, versions[0]!.id, versions, held, [x, { ...y, owner: 'team-c' }, z], who, 'en')).toBeUndefined();
+  expect(teamApplyAction(versions[0]!, versions[1]!.id, versions, held, held, who)).toMatchObject({ rollback: false, teams: [] });
+  expect(teamApplyAction(versions[1]!, versions[0]!.id, versions, held, [x, { ...y, path: 'changed' }, z], who)).toBeUndefined();
+  expect(teamApplyAction(versions[1]!, versions[0]!.id, versions, held, [x, { ...y, owner: 'team-c' }, z], who)).toBeUndefined();
 });
 
 test('the owner picker reads the string being typed and escapes what it inserts', () => {

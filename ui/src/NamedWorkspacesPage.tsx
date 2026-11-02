@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ApiError } from './api';
+import { ApiError, messageOf } from './api';
 import type { Api, Session } from './api';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EditWorkspace } from './EditWorkspace';
 import type { Outcome } from './EditWorkspace';
 import { EffectiveList } from './EffectiveList';
 import { WorkspaceVersions } from './WorkspaceVersions';
-import { loadCore, namedAuthorize, namedEntriesJson, namedEntriesText } from './core';
+import { loadCore, namedDescriptionProblem, namedEntriesJson, namedEntriesText, namedMessageProblem, namedNameProblem } from './core';
 import { guidedCopy } from './guided-i18n';
 import { copy } from './i18n';
 import type { Language } from './i18n';
-import { DESCRIPTION_MAX, MESSAGE_MAX, NAME_MAX, createBody, effectiveRoute, ingestionText, listRoute, pendingText, plain, stateText } from './named';
+import { createBody, effectiveRoute, ingestionText, listRoute, pendingText, stateText } from './named';
 import type { Created, EffectiveView, Refusal, WorkspaceDetail, WorkspaceList } from './named';
 import { namedCopy } from './named-i18n';
+import { authorizationOf } from './named-core';
 import { useCatalog } from './useCatalog';
 import type { CatalogView } from './useCatalog';
 import './operations.css';
@@ -68,7 +69,7 @@ export function NamedWorkspacesPage({ api, locale, session, maxEntries }: { api:
       <button type="button" className="secondary" onClick={reload}>{problem ? common.retry : t.refresh}</button>
     </div>
     <p className="intro">{t.intro}</p>
-    {problem ? <p className="error" role="alert">{problem instanceof ApiError ? problem.message : common.loadError}</p> : null}
+    {problem ? <p className="error" role="alert">{messageOf(problem, common.loadError)}</p> : null}
     {!list && !problem ? <p role="status">{common.loading}</p> : null}
     {list && <section aria-label={t.list}>
       <h2>{t.list}</h2>
@@ -140,13 +141,13 @@ function CreateWorkspace({ api, locale, session, catalog, maxEntries, onCreated 
     try { namedEntriesJson(text, maxEntries); } catch (error) { invalid = String(error); }
   }
   const grant = session.grant ?? '*';
-  const decision = core === locale && chosen.length > 0 ? JSON.parse(namedAuthorize(JSON.stringify(chosen), JSON.stringify([...catalog.eligible]), JSON.stringify(grant))) as { allowed: boolean } : { allowed: true };
+  const decision = core === locale && chosen.length > 0 ? authorizationOf(chosen, catalog.eligible, grant) : { allowed: true };
   const errors: string[] = [];
-  if (!plain(name, 1, NAME_MAX)) errors.push(t.invalidName);
-  if (!plain(description, 0, DESCRIPTION_MAX)) errors.push(t.invalidDescription);
-  if (!plain(message, 1, MESSAGE_MAX)) errors.push(t.invalidMessage);
+  if (core === locale) {
+    for (const problem of [namedNameProblem(name), namedDescriptionProblem(description), namedMessageProblem(message)]) if (problem) errors.push(problem);
+  }
   if (chosen.length > maxEntries) errors.push(t.tooMany(maxEntries));
-  const ready = errors.length === 0 && chosen.length > 0 && invalid === undefined && decision.allowed;
+  const ready = core === locale && errors.length === 0 && chosen.length > 0 && invalid === undefined && decision.allowed;
   function review(event: FormEvent) {
     event.preventDefault();
     if (ready) { setFailure(undefined); setConfirming(createBody(name, description, text, message)); }
@@ -163,16 +164,16 @@ function CreateWorkspace({ api, locale, session, catalog, maxEntries, onCreated 
         setConfirming(undefined); catalog.reload();
       } else if (error instanceof ApiError && error.code === 'pending') {
         setFailure(pendingText(error.body.reason as string | undefined, t));
-      } else setFailure(error instanceof ApiError ? error.message : copy[locale].loadError);
+      } else setFailure(messageOf(error, copy[locale].loadError));
     } finally { setBusy(false); }
   }
   const pending = catalog.answer?.state === 'pending';
   return <section aria-label={t.new}>
     <h2>{t.new}</h2>
-    {problem || catalog.problem ? <p className="error" role="alert">{(problem ?? catalog.problem) instanceof ApiError ? ((problem ?? catalog.problem) as ApiError).message : copy[locale].loadError}</p> : null}
+    {problem || catalog.problem ? <p className="error" role="alert">{messageOf(problem ?? catalog.problem, copy[locale].loadError)}</p> : null}
     {pending && <p role="status">{pendingText(catalog.answer?.reason ?? undefined, t)}</p>}
     <form onSubmit={review}>
-      <label>{t.name}<input value={name} maxLength={NAME_MAX * 4} onChange={event => setName(event.target.value)} /></label>
+      <label>{t.name}<input value={name} onChange={event => setName(event.target.value)} /></label>
       <label>{t.description}<input value={description} onChange={event => setDescription(event.target.value)} /></label>
       <label>{t.message}<input value={message} onChange={event => setMessage(event.target.value)} /></label>
       <h3>{t.pick}</h3>

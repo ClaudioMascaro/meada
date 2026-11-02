@@ -1030,7 +1030,7 @@ fn collaborators(
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 fn spelled<'a>(
     host: &str,
-    targets: &[(&str, &str)],
+    targets: &[(&str, Source)],
     selected: impl Iterator<Item = &'a str>,
     rows: &mut std::collections::BTreeMap<(String, String), String>,
 ) {
@@ -1051,6 +1051,30 @@ fn spelled<'a>(
     }
 }
 
+/// Where an identity of the permissions set comes from (`permission_repositories.source`): the
+/// text is what Postgres stores and its queries compare with.
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Source {
+    /// Only the workspaces select it.
+    Selected,
+    /// The workspaces select it and the catalog lists it.
+    Both,
+    /// Only the catalog lists it.
+    Catalog,
+}
+
+#[cfg(all(feature = "postgres", feature = "oidc"))]
+impl Source {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Selected => "selected",
+            Self::Both => "both",
+            Self::Catalog => "catalog",
+        }
+    }
+}
+
 /// Where each identity comes from (`source`): the workspace's own in its order, then the
 /// repositories named workspaces select, then the catalog's alone, sorted. Compared as GitHub
 /// compares them (#508): an identity on `host` folds to lowercase, the row keeps the identity as
@@ -1062,7 +1086,7 @@ fn targets_of<'a>(
     entries: &[&'a str],
     named: &'a std::collections::BTreeSet<String>,
     candidates: &'a std::collections::BTreeSet<String>,
-) -> Vec<(&'a str, &'static str)> {
+) -> Vec<(&'a str, Source)> {
     let fold = |identity: &str| crate::modules::fold(host, identity);
     let mut targets = Vec::new();
     let mut own = std::collections::HashSet::new();
@@ -1074,12 +1098,33 @@ fn targets_of<'a>(
         let folded = fold(identity);
         let both = candidates.contains(&folded);
         if own.insert(folded) {
-            targets.push((identity, if both { "both" } else { "selected" }));
+            targets.push((identity, if both { Source::Both } else { Source::Selected }));
         }
     }
     let alone = candidates.iter().filter(|c| !own.contains(&fold(c)));
-    targets.extend(alone.map(|c| (c.as_str(), "catalog")));
+    targets.extend(alone.map(|c| (c.as_str(), Source::Catalog)));
     targets
+}
+
+/// Each operator's eligible identities for the sponsor rule: those on the `prefix` host whose
+/// row for that login holds one of `roles`.
+#[cfg(feature = "workspaces")]
+fn eligible_sets(
+    prefix: &str,
+    roles: &[String],
+    operators: &[String],
+    rows: &std::collections::BTreeMap<(String, String), String>,
+) -> Vec<std::collections::BTreeSet<String>> {
+    (operators.iter())
+        .map(|login| {
+            (rows.iter())
+                .filter(|((identity, row_login), role)| {
+                    row_login == login && identity.starts_with(prefix) && roles.contains(role)
+                })
+                .map(|((identity, _), _)| identity.clone())
+                .collect()
+        })
+        .collect()
 }
 
 /// What `roles` reads of the workspace: the pulled version's id with `source = "store"` and each
@@ -1354,7 +1399,7 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     let own: Vec<&str> = entries.iter().map(|(i, _)| i.as_str()).collect();
     let targets = targets_of(&github.host, &own, &named, &candidates);
     // Per identity on the host, what GitHub showed of it: the App and repository coverage.
-    let mut coverage: Vec<(&str, &str, &str)> = Vec::new();
+    let mut coverage: Vec<(&str, &str, Source)> = Vec::new();
     let prefix = format!("{}/", github.host);
     let mut list_all = async || {
         for &(identity, source) in &targets {
@@ -1415,16 +1460,12 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     let mut named_out: std::collections::BTreeSet<(String, String)> = Default::default();
     #[cfg(feature = "workspaces")]
     for context in &contexts {
-        for identity in context.identities() {
-            let sponsored = (context.operators.iter()).any(|login| {
-                let role = role_of(&identity, login);
-                identity.starts_with(&prefix) && role.is_some_and(|r| github.roles.contains(r))
-            });
-            if !sponsored {
-                let (context, identity) = (&context.id, &identity);
-                notes.push(Msg::RolesNoSponsor { context, identity }.text());
-                named_out.insert((context.clone(), identity.clone()));
-            }
+        let identities = context.identities();
+        let eligible = eligible_sets(&prefix, &github.roles, &context.operators, &rows);
+        for identity in meada_core::named::unsponsored(&identities, &eligible) {
+            let (context, identity) = (&context.id, &identity);
+            notes.push(Msg::RolesNoSponsor { context, identity }.text());
+            named_out.insert((context.clone(), identity.clone()));
         }
     }
 
@@ -1473,7 +1514,7 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         tx.execute(&insert, &params).await.map_err(&scrub)?;
         let identities: Vec<&str> = coverage.iter().map(|(i, _, _)| *i).collect();
         let shown: Vec<&str> = coverage.iter().map(|(_, c, _)| *c).collect();
-        let sources: Vec<&str> = coverage.iter().map(|(_, _, s)| *s).collect();
+        let sources: Vec<&str> = coverage.iter().map(|(_, _, s)| s.as_str()).collect();
         let insert = format!(
             "INSERT INTO {q}.permission_repositories (set_id, identity, coverage, source) \
          SELECT $1, i, c, s FROM unnest($2::text[], $3::text[], $4::text[]) AS t (i, c, s)"
@@ -1544,7 +1585,7 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     #[cfg(feature = "workspaces")]
     if catalog.is_some() {
         let catalog = (coverage.iter())
-            .filter(|(_, c, s)| *c == "listed" && *s != "selected")
+            .filter(|(_, c, s)| *c == "listed" && *s != Source::Selected)
             .count();
         return Ok(Msg::RolesSetCatalog {
             id: &id,
@@ -1704,6 +1745,26 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "workspaces")]
+    fn only_a_row_on_the_host_with_an_accepted_role_makes_an_operator_eligible() {
+        let rows = [
+            (("github.com/a/x", "ann"), "admin"),
+            (("github.com/a/y", "ann"), "read"),
+            (("ghe.example/a/z", "ann"), "admin"),
+            (("github.com/a/w", "bob"), "admin"),
+        ]
+        .map(|((i, l), r)| ((i.to_string(), l.to_string()), r.to_string()))
+        .into();
+        let roles = ["admin".to_string()];
+        let operators = ["ann".to_string(), "cid".to_string()];
+        let sets = eligible_sets("github.com/", &roles, &operators, &rows);
+        assert_eq!(
+            sets,
+            [["github.com/a/x".to_string()].into(), Default::default()]
+        );
+    }
+
+    #[test]
     #[cfg(all(feature = "postgres", feature = "oidc"))]
     fn a_selected_identity_and_its_lowercase_candidate_are_one_both_row() {
         let candidates = [
@@ -1725,10 +1786,10 @@ mod tests {
         assert_eq!(
             targets,
             [
-                ("github.com/Acme/API", "both"),
-                ("ghe.example/Acme/X", "selected"),
-                ("ghe.example/acme/x", "catalog"),
-                ("github.com/acme/web", "catalog"),
+                ("github.com/Acme/API", Source::Both),
+                ("ghe.example/Acme/X", Source::Selected),
+                ("ghe.example/acme/x", Source::Catalog),
+                ("github.com/acme/web", Source::Catalog),
             ]
         );
     }
@@ -1776,11 +1837,25 @@ mod tests {
         assert_eq!(
             targets,
             [
-                ("github.com/Acme/API", "both"),
-                ("github.com/acme/web", "selected"),
-                ("ghe.example/A/x", "selected"),
+                ("github.com/Acme/API", Source::Both),
+                ("github.com/acme/web", Source::Selected),
+                ("ghe.example/A/x", Source::Selected),
             ]
         );
+    }
+
+    /// The `source` column's text is what the queries compare with.
+    #[test]
+    #[cfg(all(feature = "postgres", feature = "oidc"))]
+    fn each_source_is_its_stored_text() {
+        let all = [
+            (Source::Selected, "selected"),
+            (Source::Both, "both"),
+            (Source::Catalog, "catalog"),
+        ];
+        for (source, text) in all {
+            assert_eq!(source.as_str(), text);
+        }
     }
 
     fn block(toml: &str) -> Result<Config, Problem> {

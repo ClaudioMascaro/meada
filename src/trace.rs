@@ -640,7 +640,7 @@ impl<'a> Walk<'_, 'a> {
                 // Overloads of one method are one guess: a leaf, as an ambiguous step is.
                 let (name, n) = (render::overload_name(&s.id), set.len());
                 text.truncate(text.len() - label(&s.id).len());
-                text += &format!("{name} ({n} overloads)");
+                text += &format!("{name} {}", render::overloads(n, false));
                 self.push(depth, Row::call(text + &mark(c), m, c.level));
                 continue;
             }
@@ -1199,7 +1199,11 @@ impl<'a> Walk<'_, 'a> {
                     .map(|set| match set.as_slice() {
                         [one] => one.to_string(),
                         [first, ..] => {
-                            format!("{} ({} overloads)", render::overload_name(first), set.len())
+                            format!(
+                                "{} {}",
+                                render::overload_name(first),
+                                render::overloads(set.len(), false)
+                            )
                         }
                         [] => unreachable!(),
                     })

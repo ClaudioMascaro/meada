@@ -36,9 +36,10 @@ share. Both take one version from the workspace, and `meada` depends on `meada-c
 it. `meada-core` has no rusqlite, tree-sitter, filesystem, process or network code and no async
 runtime; it builds for `wasm32-unknown-unknown`, its `wasm-bindgen` feature (never the binary's)
 exporting `init`, `validate`, `workspaceVersionId`, `workspaceDiff`, `entriesText`,
-`entriesJson`, `authorizeEntries`, `composeEntries`, `parseExport` and the named-workspace set
+`entriesJson`, `authorizeEntries`, `composeEntries`, `touchedOwners`, `parseExport` and the named-workspace set
 (`namedEntriesJson`, `namedEntriesText`, `namedVersionId`, `namedAuthorize`, `namedVisible`,
-`namedEffective`, `namedDiff`, `namedChanged`). CI's `core` job builds it
+`namedEffective`, `namedDiff`, `namedChanged`, `namedNameProblem`, `namedDescriptionProblem`,
+`namedMessageProblem`, `resourceRoles`). CI's `core` job builds it
 with wasm-pack and checks both trees.
 
 Every tree-sitter grammar is a crate except Kotlin's: `vendor/tree-sitter-kotlin-ng/` holds

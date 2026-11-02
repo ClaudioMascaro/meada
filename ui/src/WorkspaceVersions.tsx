@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ApiError } from './api';
+import { ApiError, messageOf } from './api';
 import type { Api } from './api';
 import { ConfirmDialog } from './ConfirmDialog';
 import type { Outcome } from './EditWorkspace';
@@ -91,7 +91,7 @@ export function WorkspaceVersions({ api, locale, detail, onApplied, onStale }: {
         setFailure(error.message); reload();
       } else if (error instanceof ApiError && (error.code === 'stale_base' || error.code === 'not_operator')) {
         setFailure(error.message); reload(); onStale();
-      } else setFailure(error instanceof ApiError ? error.message : common.loadError);
+      } else setFailure(messageOf(error, common.loadError));
     } finally { setBusy(false); }
   }
 
@@ -99,7 +99,7 @@ export function WorkspaceVersions({ api, locale, detail, onApplied, onStale }: {
   const lines = diff ? diffLines(diff, g) : [];
   return <section aria-label={t.versionsTitle}>
     <h3>{t.versionsTitle}</h3>
-    {problem ? <p className="error" role="alert">{problem instanceof ApiError ? problem.message : common.loadError}</p> : null}
+    {problem ? <p className="error" role="alert">{messageOf(problem, common.loadError)}</p> : null}
     {!loaded && !problem ? <p role="status">{common.loading}</p> : null}
     {loaded && (rows.length === 0 ? <p className="notice">{t.versionsEmpty}</p> : <ul aria-label={t.versionsTitle}>
       {rows.map(row => <li key={row.version}>

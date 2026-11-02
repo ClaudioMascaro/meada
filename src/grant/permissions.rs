@@ -21,8 +21,10 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 use tokio_postgres::IsolationLevel;
 
-use super::{Github, role_ok};
+use super::{Github, GrantState, role_ok};
 use crate::msg::Msg;
+#[cfg(feature = "workspaces")]
+use crate::workspaces::Reason;
 
 // ponytail: how often the newest set is read, so a revocation on GitHub reaches a process at most
 // this long after the refresh that recorded it; `MEADA_PERMISSIONS_POLL_MS` shortens it in debug
@@ -126,7 +128,7 @@ pub(crate) struct SetInfo {
 /// identities it may select, sorted.
 #[cfg(feature = "workspaces")]
 pub(crate) struct Catalog {
-    pub(crate) reason: Option<&'static str>,
+    pub(crate) reason: Option<Reason>,
     pub(crate) set: Option<SetInfo>,
     pub(crate) selectable: BTreeSet<String>,
     /// The GitHub grant provider's `host`: identities on it compare case-insensitively (#508).
@@ -135,7 +137,7 @@ pub(crate) struct Catalog {
 
 #[cfg(feature = "workspaces")]
 impl Catalog {
-    fn pending(reason: &'static str, set: Option<SetInfo>, host: &str) -> Self {
+    fn pending(reason: Reason, set: Option<SetInfo>, host: &str) -> Self {
         Self {
             reason: Some(reason),
             set,
@@ -184,7 +186,7 @@ impl Permissions {
     /// of the set at one instant: `current` with the set's rows while it is at most
     /// `max_age_seconds` old, `expired` with none past it, `unread` with none while no set is
     /// loaded. Never `*` (a row's identity is on `host`).
-    pub(super) fn grant_and_state(&self, login: Option<&str>) -> (Vec<String>, &'static str) {
+    pub(super) fn grant_and_state(&self, login: Option<&str>) -> (Vec<String>, GrantState) {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
         self.read_at(state.set.as_ref(), login, Instant::now())
     }
@@ -195,10 +197,10 @@ impl Permissions {
         set: Option<&Set>,
         login: Option<&str>,
         now: Instant,
-    ) -> (Vec<String>, &'static str) {
+    ) -> (Vec<String>, GrantState) {
         let state = self.state_of(set, now);
         let grant = match (set, login) {
-            (Some(set), Some(login)) if state == "current" => {
+            (Some(set), Some(login)) if state == GrantState::Current => {
                 set.logins.get(login).cloned().unwrap_or_default()
             }
             _ => Vec::new(),
@@ -206,11 +208,11 @@ impl Permissions {
         (grant, state)
     }
 
-    fn state_of(&self, set: Option<&Set>, now: Instant) -> &'static str {
+    fn state_of(&self, set: Option<&Set>, now: Instant) -> GrantState {
         match set {
-            None => "unread",
-            Some(set) if set.age(now) <= self.github.max_age => "current",
-            Some(_) => "expired",
+            None => GrantState::Unread,
+            Some(set) if set.age(now) <= self.github.max_age => GrantState::Current,
+            Some(_) => GrantState::Expired,
         }
     }
 
@@ -276,7 +278,7 @@ impl Permissions {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
         let now = Instant::now();
         let Some(set) = &state.set else {
-            return Catalog::pending("no_set", None, &self.github.host);
+            return Catalog::pending(Reason::NoSet, None, &self.github.host);
         };
         let age = set.age(now);
         let info = Some(SetInfo {
@@ -285,11 +287,13 @@ impl Permissions {
             max_age_seconds: self.github.max_age.as_secs(),
         });
         if age > self.github.max_age {
-            return Catalog::pending("stale_set", info, &self.github.host);
+            return Catalog::pending(Reason::StaleSet, info, &self.github.host);
         }
         let selectable = match (administrator, login) {
             (true, _) => set.catalog.clone(),
-            (false, None) => return Catalog::pending("missing_login", info, &self.github.host),
+            (false, None) => {
+                return Catalog::pending(Reason::MissingLogin, info, &self.github.host);
+            }
             (false, Some(login)) => {
                 let roles = set.logins.get(login).map(Vec::as_slice).unwrap_or_default();
                 roles
@@ -586,21 +590,27 @@ mod tests {
     fn a_set_grants_up_to_its_max_age_exactly_then_expires() {
         let cache = cache(60);
         let now = Instant::now();
-        assert_eq!(cache.state_of(None, now), "unread");
+        assert_eq!(cache.state_of(None, now), GrantState::Unread);
         assert!(cache.grant_and_state(Some("ana")).0.is_empty());
         let fresh = set(60, now);
-        assert_eq!(cache.state_of(Some(&fresh), now), "current");
+        assert_eq!(cache.state_of(Some(&fresh), now), GrantState::Current);
         let later = now + Duration::from_millis(1);
-        assert_eq!(cache.state_of(Some(&fresh), later), "expired");
+        assert_eq!(cache.state_of(Some(&fresh), later), GrantState::Expired);
         cache.state.write().unwrap().set = Some(set(59, Instant::now()));
         let (rows, state) = cache.grant_and_state(Some("ana"));
         assert_eq!(
             (rows.as_slice(), state),
-            (&["github.com/acme/api".to_string()][..], "current")
+            (
+                &["github.com/acme/api".to_string()][..],
+                GrantState::Current
+            )
         );
         assert!(cache.grant_and_state(Some("bia")).0.is_empty());
         cache.state.write().unwrap().set = Some(set(61, Instant::now()));
-        assert_eq!(cache.grant_and_state(Some("ana")), (Vec::new(), "expired"));
+        assert_eq!(
+            cache.grant_and_state(Some("ana")),
+            (Vec::new(), GrantState::Expired)
+        );
     }
 
     #[test]
@@ -609,17 +619,20 @@ mod tests {
         let now = Instant::now();
         let fresh = set(60, now);
         let at = cache.read_at(Some(&fresh), Some("ana"), now);
-        assert_eq!(at, (vec!["github.com/acme/api".to_string()], "current"));
+        assert_eq!(
+            at,
+            (vec!["github.com/acme/api".to_string()], GrantState::Current)
+        );
         let past = now + Duration::from_millis(1);
         let after = cache.read_at(Some(&fresh), Some("ana"), past);
-        assert_eq!(after, (Vec::new(), "expired"));
+        assert_eq!(after, (Vec::new(), GrantState::Expired));
         assert_eq!(
             cache.read_at(None, Some("ana"), now),
-            (Vec::new(), "unread")
+            (Vec::new(), GrantState::Unread)
         );
         assert_eq!(
             cache.read_at(Some(&fresh), None, now),
-            (Vec::new(), "current")
+            (Vec::new(), GrantState::Current)
         );
     }
 
@@ -752,7 +765,11 @@ mod tests {
                 let seen = cache.catalog(caller.login.as_deref(), caller.platform_administrator);
                 let name = format!("{} selects {:?}", case.caller, case.select);
                 if let Some(pending) = &case.pending {
-                    assert_eq!(seen.reason, Some(pending.as_str()), "{name}");
+                    assert_eq!(
+                        seen.reason.map(Reason::as_str),
+                        Some(pending.as_str()),
+                        "{name}"
+                    );
                     assert!(seen.selectable.is_empty(), "{name}");
                     continue;
                 }
@@ -783,13 +800,19 @@ mod tests {
     fn the_catalog_needs_a_set_and_both_coverage_and_a_role() {
         let mut cache = cache(60);
         cache.github.catalog = true;
-        assert_eq!(cache.catalog(Some("ana"), false).reason, Some("no_set"));
+        assert_eq!(
+            cache.catalog(Some("ana"), false).reason,
+            Some(Reason::NoSet)
+        );
         let mut loaded = set(0, Instant::now());
         loaded.catalog = ["github.com/acme/other".to_string()].into();
         cache.state.write().unwrap().set = Some(loaded);
         let seen = cache.catalog(Some("ana"), false);
         assert_eq!((seen.reason, seen.selectable.len()), (None, 0));
-        assert_eq!(cache.catalog(None, false).reason, Some("missing_login"));
+        assert_eq!(
+            cache.catalog(None, false).reason,
+            Some(Reason::MissingLogin)
+        );
         assert_eq!(cache.catalog(None, true).selectable.len(), 1);
     }
 
@@ -811,7 +834,7 @@ mod tests {
         let granted = providers.grant(&groups(&["g"]), Some("Ana"));
         assert_eq!(granted.login.as_deref(), Some("ana"));
         let github = granted.github.as_ref().unwrap();
-        assert_eq!(github.state, "current");
+        assert_eq!(github.state, GrantState::Current);
         assert_eq!(sorted(&granted.claims), only(&["b"]));
         assert_eq!(
             sorted(&granted.union()),
@@ -842,7 +865,7 @@ mod tests {
         let github = named.github.as_ref().unwrap();
         assert_eq!(
             (github.host.as_str(), github.state),
-            ("github.com", "current")
+            ("github.com", GrantState::Current)
         );
     }
 
@@ -860,7 +883,10 @@ mod tests {
             let granted = providers.grant(&groups(&["g"]), login);
             assert_eq!(granted.login, None, "{login:?}");
             let github = granted.github.as_ref().unwrap();
-            assert_eq!((github.identities.len(), github.state), (0, "current"));
+            assert_eq!(
+                (github.identities.len(), github.state),
+                (0, GrantState::Current)
+            );
             assert_eq!(sorted(&granted.union()), only(&["b"]), "{login:?}");
         }
     }
@@ -868,7 +894,10 @@ mod tests {
     #[test]
     fn an_expired_or_unread_set_grants_nothing_through_github_and_says_so() {
         use super::super::tests::{groups, only, sorted};
-        for (held, state) in [(Some(set(61, Instant::now())), "expired"), (None, "unread")] {
+        for (held, state) in [
+            (Some(set(61, Instant::now())), GrantState::Expired),
+            (None, GrantState::Unread),
+        ] {
             let providers = providers(held);
             let granted = providers.grant(&groups(&["g"]), Some("ana"));
             assert_eq!(granted.login.as_deref(), Some("ana"));

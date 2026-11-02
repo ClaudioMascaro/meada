@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ApiError } from './api';
+import { ApiError, messageOf } from './api';
 import type { Api } from './api';
 import type { Config, Session } from './api';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -47,7 +47,7 @@ function Read<T extends object>({ kind, api, locale, children, revision }: Pick<
       <button type="button" className="secondary" onClick={() => setAttempt(value => value + 1)}>{problem ? common.retry : t.refresh}</button>
     </div>
     <p className="intro">{t[`${kind}Intro`]}</p>
-    {problem ? <p className="error" role="alert">{problem instanceof ApiError ? problem.message : common.loadError}</p>
+    {problem ? <p className="error" role="alert">{messageOf(problem, common.loadError)}</p>
       : !data ? <p role="status">{common.loading}</p>
       : isMissing(data) ? <p className="notice">{missingSections(data, t)}</p>
       : children(data)}
@@ -129,7 +129,7 @@ function StoreView({ data, api, t, locale, actions }: { data: Store; api: Api; t
         <button type="button" className="secondary" disabled={busy} aria-label={`${t.inspect} ${row.id}`} onClick={() => { void inspect(row.id); }}>{t.inspect}</button>,
         ...actions.access ? [<ActionControls {...actions} identity={row.id} operations={pointerActions(row, actions.access.session, actions.access.config, actions.access.file)} />] : []])} />
     {busy && <p role="status">{copy[locale].loading}</p>}
-    {problem != null && <p className="error" role="alert">{problem instanceof ApiError ? problem.message : copy[locale].loadError}</p>}
+    {problem != null && <p className="error" role="alert">{messageOf(problem, copy[locale].loadError)}</p>}
     {selected && <Bundles row={selected} t={t} />}
     {model.generations.filter(row => row.loaded && row.id !== selected?.id).map(row => <Bundles key={row.id} row={row} t={t} />)}
     {model.malformed.length > 0 && <Table label={t.malformed} t={t} headers={[t.generation, t.reason]} rows={model.malformed.map(row => [row.key ?? t.unknown, row.reason])} />}
@@ -181,7 +181,7 @@ function AdmissionView({ data, api, t, locale }: { data: Admission; api: Api; t:
       <textarea id="check-token" ref={token} required autoComplete="off" spellCheck={false} aria-describedby="token-hint" disabled={busy} />
       <button type="submit" disabled={busy}>{busy ? t.checking : t.checkToken}</button>
     </form></>}
-    {problem != null && <p className="error" role="alert">{problem instanceof ApiError ? problem.message : copy[locale].loadError}</p>}
+    {problem != null && <p className="error" role="alert">{messageOf(problem, copy[locale].loadError)}</p>}
     {checked && <>
       <Table label={t.checkToken} t={t} headers={[t.check, t.outcome]} rows={checked.checks.map(row => [row.name, row.outcome])} />
       <p>{t.identities}: {checked.identities === null ? t.noGrant : checked.identities.join(', ') || t.none}</p>
@@ -219,7 +219,7 @@ export function OperationalPage({ kind, api, locale, config, session }: Props) {
       });
       line = response.result;
     } catch (error) {
-      setProblem(error instanceof ApiError ? error.message : copy[locale].loadError); setBusy(false); return;
+      setProblem(messageOf(error, copy[locale].loadError)); setBusy(false); return;
     }
     setResult(line); setPending(undefined); setRevision(value => value + 1); setReloadProblem(false);
     if (kind !== 'fleet') {

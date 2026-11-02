@@ -614,10 +614,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 let ctor = qualify(&scope, &format!("{class}({})", types.join(",")));
                 facts.defs.push(Def {
                     result: Some(Class::Type(class.to_string())),
-                    suspends: false,
-                    unwrapped: None,
-                    output: None,
-                    hash: String::new(),
                     ..definition(&ctor, Kind::Method, node.byte_range(), params)
                 });
                 if access.max(own_access(node, src)) != Access::Public {
@@ -925,20 +921,8 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
 
 fn definition(name: &str, kind: Kind, range: Range<usize>, params: Vec<Param>) -> Def {
     Def {
-        name: name.to_string(),
-        kind,
-        range,
         params,
-        bases: Vec::new(),
-        decorators: Vec::new(),
-        return_values: Vec::new(),
-        returns: None,
-        type_params: Vec::new(),
-        result: None,
-        suspends: false,
-        unwrapped: None,
-        output: None,
-        hash: String::new(),
+        ..Def::new(name, kind, range)
     }
 }
 

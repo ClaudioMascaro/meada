@@ -147,6 +147,15 @@ pub fn overload_name(id: &str) -> &str {
     name.split('(').next().unwrap_or(name)
 }
 
+/// The label of an overload set of `n` members: `(one of n overloads)` after a relation's
+/// line, `(n overloads)` for a step of a chain.
+pub fn overloads(n: usize, relation: bool) -> String {
+    match relation {
+        true => format!("(one of {n} overloads)"),
+        false => format!("({n} overloads)"),
+    }
+}
+
 /// The callee of the call site `<caller>::<callee>#<ordinal>`.
 pub fn callee(site: &str) -> &str {
     let callee = label(site);

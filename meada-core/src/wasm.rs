@@ -25,19 +25,10 @@ pub fn validate(file: &str, src: &str) -> Vec<String> {
 #[wasm_bindgen(js_name = workspaceVersionId)]
 pub fn workspace_version_id(src: &str) -> Option<String> {
     let entries = crate::manifest::validate_import("entries", src).ok()?;
-    let blocks = crate::ids::entry_blocks(src);
-    let entries: Vec<_> = (entries.iter().zip(&blocks))
-        .map(|(e, blocks)| {
-            (
-                e.repo.as_str(),
-                e.path.as_str(),
-                blocks,
-                e.owner.as_deref(),
-                e.added_by.as_deref(),
-            )
-        })
-        .collect();
-    Some(crate::ids::workspace_version_id(&entries))
+    Some(crate::workspace::entries_id(
+        &entries,
+        &crate::ids::entry_blocks(src),
+    ))
 }
 
 /// The export `text` (what `meada export` prints) read into the export types and written again,
@@ -72,6 +63,17 @@ pub fn entries_text(repositories: &str) -> Result<String, String> {
 pub fn entries_json(src: &str) -> Result<String, String> {
     let entries = crate::workspace::version_entries("entries", src).map_err(|e| e.join("\n"))?;
     serde_json::to_string(&entries).map_err(|error| error.to_string())
+}
+
+/// The owners, sorted and without repeats, of the entries that differ between the JSON entries
+/// `current` and `entries`, as a JSON array: what the server's audit line names.
+#[wasm_bindgen(js_name = touchedOwners)]
+pub fn touched_owners(current: &str, entries: &str) -> Result<String, String> {
+    let owners = crate::workspace::touched_owners(
+        &from_json::<Vec<_>>(current)?,
+        &from_json::<Vec<_>>(entries)?,
+    );
+    serde_json::to_string(&owners).map_err(|e| e.to_string())
 }
 
 /// The entries `role` (`operator`, `team_operator` or `viewer`) may not change from `current` to
@@ -124,6 +126,30 @@ pub fn compose_entries(
 
 fn from_json<T: serde::de::DeserializeOwned>(text: &str) -> Result<T, String> {
     serde_json::from_str(text).map_err(|e| e.to_string())
+}
+
+/// The problem with a named workspace's name, in the active language; `undefined` when it is valid.
+#[wasm_bindgen(js_name = namedNameProblem)]
+pub fn named_name_problem(name: &str) -> Option<String> {
+    crate::named::name_problem(name)
+}
+
+/// The problem with a named workspace's description; `undefined` when it is valid.
+#[wasm_bindgen(js_name = namedDescriptionProblem)]
+pub fn named_description_problem(description: &str) -> Option<String> {
+    crate::named::description_problem(description)
+}
+
+/// The problem with a version's message (required); `undefined` when it is valid.
+#[wasm_bindgen(js_name = namedMessageProblem)]
+pub fn named_message_problem(message: &str) -> Option<String> {
+    crate::named::message_problem(message)
+}
+
+/// The roles a resource may declare, as `meada.toml` spells them: a JSON array of strings.
+#[wasm_bindgen(js_name = resourceRoles)]
+pub fn resource_roles() -> Result<String, String> {
+    serde_json::to_string(&crate::manifest::Role::ALL).map_err(|e| e.to_string())
 }
 
 /// The entries of the named workspace text `src` (ADR 0021) as the JSON a version document

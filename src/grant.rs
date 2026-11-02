@@ -54,22 +54,22 @@ pub enum Grant {
     Only(HashSet<String>),
 }
 
+/// The grant as `meada-core` takes it, for the rules the console and a node share.
+#[cfg(feature = "snapshot")]
+impl From<&Grant> for meada_core::authorize::Grant {
+    fn from(grant: &Grant) -> Self {
+        match grant {
+            Grant::All => Self::All,
+            Grant::Only(identities) => Self::Only(identities.iter().cloned().collect()),
+        }
+    }
+}
+
 impl Grant {
     pub fn reads(&self, identity: &str) -> bool {
         match self {
             Grant::All => true,
             Grant::Only(identities) => identities.contains(identity),
-        }
-    }
-
-    /// The grant as `meada-core` takes it, for the rules the console and a node share.
-    #[cfg(feature = "snapshot")]
-    pub fn core(&self) -> meada_core::authorize::Grant {
-        match self {
-            Grant::All => meada_core::authorize::Grant::All,
-            Grant::Only(identities) => {
-                meada_core::authorize::Grant::Only(identities.iter().cloned().collect())
-            }
         }
     }
 
@@ -114,12 +114,21 @@ pub struct Github {
     pub catalog: bool,
 }
 
+/// The state of a GitHub grant: whether the permissions set it was read from is usable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GrantState {
+    Unread,
+    Current,
+    Expired,
+}
+
 /// The GitHub side of a grant: the identities the login reads through GitHub, the grant's state
 /// read with them (`unread`, `current` or `expired`) and the GitHub grant provider's host.
 pub struct GithubGrant {
     pub identities: Vec<String>,
     #[cfg_attr(not(feature = "ui"), allow(dead_code))]
-    pub state: &'static str,
+    pub state: GrantState,
     #[cfg_attr(not(feature = "ui"), allow(dead_code))]
     pub host: String,
 }
@@ -346,7 +355,7 @@ pub struct Admitted {
     pub grant: Grant,
     /// With the GitHub grant provider, its host and the GitHub grant's state read with the grant
     /// itself, so a session never pairs a grant with another instant's state.
-    pub github: Option<(String, &'static str)>,
+    pub github: Option<(String, GrantState)>,
 }
 
 #[cfg(feature = "ui")]

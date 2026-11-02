@@ -267,22 +267,9 @@ mod tests {
         }];
         let mut facts = Facts::default();
         for name in ["main", "run", "__main__"] {
-            facts.defs.push(crate::lang::Def {
-                name: name.into(),
-                kind: Kind::Function,
-                range: 0..0,
-                params: Vec::new(),
-                bases: Vec::new(),
-                decorators: Vec::new(),
-                return_values: Vec::new(),
-                returns: None,
-                type_params: Vec::new(),
-                result: None,
-                suspends: false,
-                unwrapped: None,
-                output: None,
-                hash: String::new(),
-            });
+            facts
+                .defs
+                .push(crate::lang::Def::new(name, Kind::Function, 0..0));
         }
         let files = BTreeMap::from([("cmd.py", &facts)]);
         let local = Local {
@@ -312,22 +299,11 @@ mod tests {
         let mut exported = Vec::new();
         for name in names {
             symbols.insert(format!("r::cmd.py::{name}"));
-            facts.defs.push(crate::lang::Def {
-                name: name.to_string(),
-                kind: Kind::Function,
-                range: 0..0,
-                params: Vec::new(),
-                bases: Vec::new(),
-                decorators: Vec::new(),
-                return_values: Vec::new(),
-                returns: None,
-                type_params: Vec::new(),
-                result: None,
-                suspends: false,
-                unwrapped: None,
-                output: None,
-                hash: String::new(),
-            });
+            facts.defs.push(crate::lang::Def::new(
+                name.to_string(),
+                Kind::Function,
+                0..0,
+            ));
             exported.push(Exported {
                 path: "cmd.py".into(),
                 name: Some(name.to_string()),
@@ -382,22 +358,7 @@ mod tests {
     #[test]
     fn a_type_of_many_hidden_methods_finds_its_doors_in_linear_time() {
         let n = 100_000;
-        let def = |name: String, kind| crate::lang::Def {
-            name,
-            kind,
-            range: 0..0,
-            params: Vec::new(),
-            bases: Vec::new(),
-            decorators: Vec::new(),
-            return_values: Vec::new(),
-            returns: None,
-            type_params: Vec::new(),
-            result: None,
-            suspends: false,
-            unwrapped: None,
-            output: None,
-            hash: String::new(),
-        };
+        let def = |name: String, kind| crate::lang::Def::new(name, kind, 0..0);
         // `T` holds `n` lower-case methods, no door each, and `Run`.
         let methods = (0..n).map(|i| format!("T.a{i}"));
         let facts = Facts {

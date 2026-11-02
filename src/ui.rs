@@ -315,7 +315,7 @@ struct Session {
     login: Option<String>,
     /// Under the GitHub grant provider, its host and the GitHub grant's state at admission.
     #[cfg(feature = "oidc")]
-    github: Option<(String, &'static str)>,
+    github: Option<(String, crate::grant::GrantState)>,
     /// Admitted by a local account's session token (ADR 0024).
     #[cfg(feature = "accounts")]
     account: bool,
@@ -413,7 +413,7 @@ impl Session {
     fn core_grant(&self) -> meada_core::authorize::Grant {
         #[cfg(feature = "oidc")]
         if let Some(grant) = &self.grant {
-            return grant.core();
+            return grant.into();
         }
         meada_core::authorize::Grant::All
     }

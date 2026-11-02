@@ -354,23 +354,12 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 classes.insert(inner.as_ref().clone());
             }
             facts.defs.push(Def {
-                name: inner.as_ref().clone(),
-                kind,
-                range: node.byte_range(),
                 params,
                 bases: if kind == Kind::Class {
                     bases(node, src, &generics)
                 } else {
                     Vec::new()
                 },
-                decorators: Vec::new(),
-                return_values: Vec::new(),
-                returns: None,
-                suspends: false,
-                unwrapped: None,
-                output: None,
-                hash: String::new(),
-                type_params: Vec::new(),
                 result: match node
                     .child_by_field_name("type")
                     .map(|t| class_of(t, src, &generics))
@@ -378,6 +367,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     Some(Class::Type(ty)) if !constructor => Some(Class::Type(ty)),
                     _ => None,
                 },
+                ..Def::new(inner.as_ref().clone(), kind, node.byte_range())
             });
             // `public static void main(String[])` (or `String...`) starts a program.
             if kind == Kind::Method

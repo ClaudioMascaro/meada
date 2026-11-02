@@ -14,6 +14,7 @@ use meada_core::authorize::Grant;
 use meada_core::named::{self, Creation};
 use serde_json::{Value as Json, json};
 
+use super::{Authority, Reason};
 use crate::msg::Msg;
 use crate::postgres::{self, Opened};
 
@@ -50,9 +51,9 @@ pub(crate) struct New<'a> {
 /// Why a creation did not happen.
 #[derive(Debug)]
 pub(crate) enum CreateError {
-    /// A condition of the platform or the caller, the same for every identity: `no_set`,
-    /// `stale_set` or `missing_login`. Nothing can be selected (fail closed).
-    Pending(&'static str),
+    /// A condition of the platform or the caller, the same for every identity. Nothing can be
+    /// selected (fail closed).
+    Pending(Reason),
     /// Some selected identity is not eligible: the ones the grant reads, named, and the count of
     /// the others.
     Refused(Creation),
@@ -65,9 +66,9 @@ pub(crate) enum CreateError {
 
 /// Why the permissions set cannot decide eligibility.
 pub(super) enum Gate {
-    /// A condition of the platform or the caller, the same for every identity: `no_set`,
-    /// `stale_set` or `missing_login`. Nothing can be selected (fail closed).
-    Pending(&'static str),
+    /// A condition of the platform or the caller, the same for every identity. Nothing can be
+    /// selected (fail closed).
+    Pending(Reason),
     Db(tokio_postgres::Error),
 }
 
@@ -88,15 +89,15 @@ pub(super) async fn eligible(
          FROM {q}.permission_sets ORDER BY fence DESC, finished DESC LIMIT 1"
     );
     let Some(row) = tx.query_opt(&newest, &[]).await.map_err(Gate::Db)? else {
-        return Err(Gate::Pending("no_set"));
+        return Err(Gate::Pending(Reason::NoSet));
     };
     let (set, age): (String, f64) = (row.get(0), row.get(1));
     if !age.is_finite() || age < 0.0 || age > policy.max_age.as_secs_f64() {
-        return Err(Gate::Pending("stale_set"));
+        return Err(Gate::Pending(Reason::StaleSet));
     }
     let login = actor.login;
     if !actor.administrator && login.is_none() {
-        return Err(Gate::Pending("missing_login"));
+        return Err(Gate::Pending(Reason::MissingLogin));
     }
     // The catalog holds the identity; a login is eligible when it holds an accepted role on it.
     let catalog = format!(
@@ -164,10 +165,7 @@ pub(crate) async fn create(
     if held >= policy.max_workspaces as i64 {
         return Err(CreateError::Limit);
     }
-    let authority = match creator.administrator {
-        true => "platform_administrator",
-        false => "workspace_operator",
-    };
+    let authority = Authority::of(creator.administrator).as_str();
     let insert = format!(
         "INSERT INTO {q}.workspaces (id, name, description, creator, creator_login, seq, \
          current, entries) VALUES ($1, $2, $3, $4, $5, 1, $6, $7)"
