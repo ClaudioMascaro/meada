@@ -263,12 +263,13 @@ All notable changes to Meada are recorded here. The format follows
   `Pin<Box<dyn Future<Output = T>>>` (`Def::output`, read only through `.await`), so
   `load()?.port()` and `fut().await.port()` resolve within `T`'s family, `exact` when it
   declares one `port`, where `?` left a name match and a plain `fn` returning a future resolved
-  to nothing. A type outside the repository leaves the call as it was. The stored facts gain
+  to nothing. A type outside the repository, or a `?` before an `.await`, leaves the call as
+  it was. The stored facts gain
   `Def::unwrapped`, `Def::output`, `Call::unwraps` and `Call::awaits`, so the schema version
   changes and Rust indexes are rebuilt once.
-- Kotlin: a class, object or interface nested in an `expect` declaration, at any depth, is `expect`
-  too (#437), so a use of it resolves to the `expect` one instead of staying `ambiguous` among
-  its `actual` declarations.
+- Kotlin: a class, object or interface nested in an `expect` declaration, at any depth, is
+  `expect` too (#437), so a use of it resolves to the `expect` one instead of staying
+  `ambiguous` among its `actual` declarations.
 - C# `using static T` imports only the static members and nested types `T` declares (#433): a bare
   `Go()` with `Go` on a base of `T` was an `exact` link to the base's method, which C# rejects
   ("inherited members aren't imported"), and is now a name match at best; `using static` of the
@@ -280,8 +281,8 @@ All notable changes to Meada are recorded here. The format follows
   its instance, so `Dispatchers.setMain(..)` reaches an imported `fun Dispatchers.setMain` (it
   was no link) while a class's name keeps companion and statics. "Known ceilings" drops the
   bare-call line. No golden changed.
-- C#: an `internal`, `private` or `private protected` constructor or method of a public type is a candidate
-  from its own project's files alone (#441); `InternalsVisibleTo` stays unread.
+- C#: an `internal`, `private` or `private protected` constructor or method of a public type is
+  a candidate from its own project's files alone (#441); `InternalsVisibleTo` stays unread.
 - The console writes one `ui: directory: unreadable` stderr line per request when the directory
   cannot be read (#451, after #335): the request's session remembers the failure at admission,
   so the flags, the admission counts and the owner picker take that answer and write no second
