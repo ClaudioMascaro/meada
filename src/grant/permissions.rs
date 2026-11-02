@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 use tokio_postgres::IsolationLevel;
 
-use super::{Github, role_ok};
+use super::{Github, GrantState, role_ok};
 use crate::msg::Msg;
 
 // ponytail: how often the newest set is read, so a revocation on GitHub reaches a process at most
@@ -184,7 +184,7 @@ impl Permissions {
     /// of the set at one instant: `current` with the set's rows while it is at most
     /// `max_age_seconds` old, `expired` with none past it, `unread` with none while no set is
     /// loaded. Never `*` (a row's identity is on `host`).
-    pub(super) fn grant_and_state(&self, login: Option<&str>) -> (Vec<String>, &'static str) {
+    pub(super) fn grant_and_state(&self, login: Option<&str>) -> (Vec<String>, GrantState) {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
         self.read_at(state.set.as_ref(), login, Instant::now())
     }
@@ -195,10 +195,10 @@ impl Permissions {
         set: Option<&Set>,
         login: Option<&str>,
         now: Instant,
-    ) -> (Vec<String>, &'static str) {
+    ) -> (Vec<String>, GrantState) {
         let state = self.state_of(set, now);
         let grant = match (set, login) {
-            (Some(set), Some(login)) if state == "current" => {
+            (Some(set), Some(login)) if state == GrantState::Current => {
                 set.logins.get(login).cloned().unwrap_or_default()
             }
             _ => Vec::new(),
@@ -206,11 +206,11 @@ impl Permissions {
         (grant, state)
     }
 
-    fn state_of(&self, set: Option<&Set>, now: Instant) -> &'static str {
+    fn state_of(&self, set: Option<&Set>, now: Instant) -> GrantState {
         match set {
-            None => "unread",
-            Some(set) if set.age(now) <= self.github.max_age => "current",
-            Some(_) => "expired",
+            None => GrantState::Unread,
+            Some(set) if set.age(now) <= self.github.max_age => GrantState::Current,
+            Some(_) => GrantState::Expired,
         }
     }
 
@@ -586,21 +586,27 @@ mod tests {
     fn a_set_grants_up_to_its_max_age_exactly_then_expires() {
         let cache = cache(60);
         let now = Instant::now();
-        assert_eq!(cache.state_of(None, now), "unread");
+        assert_eq!(cache.state_of(None, now), GrantState::Unread);
         assert!(cache.grant_and_state(Some("ana")).0.is_empty());
         let fresh = set(60, now);
-        assert_eq!(cache.state_of(Some(&fresh), now), "current");
+        assert_eq!(cache.state_of(Some(&fresh), now), GrantState::Current);
         let later = now + Duration::from_millis(1);
-        assert_eq!(cache.state_of(Some(&fresh), later), "expired");
+        assert_eq!(cache.state_of(Some(&fresh), later), GrantState::Expired);
         cache.state.write().unwrap().set = Some(set(59, Instant::now()));
         let (rows, state) = cache.grant_and_state(Some("ana"));
         assert_eq!(
             (rows.as_slice(), state),
-            (&["github.com/acme/api".to_string()][..], "current")
+            (
+                &["github.com/acme/api".to_string()][..],
+                GrantState::Current
+            )
         );
         assert!(cache.grant_and_state(Some("bia")).0.is_empty());
         cache.state.write().unwrap().set = Some(set(61, Instant::now()));
-        assert_eq!(cache.grant_and_state(Some("ana")), (Vec::new(), "expired"));
+        assert_eq!(
+            cache.grant_and_state(Some("ana")),
+            (Vec::new(), GrantState::Expired)
+        );
     }
 
     #[test]
@@ -609,17 +615,20 @@ mod tests {
         let now = Instant::now();
         let fresh = set(60, now);
         let at = cache.read_at(Some(&fresh), Some("ana"), now);
-        assert_eq!(at, (vec!["github.com/acme/api".to_string()], "current"));
+        assert_eq!(
+            at,
+            (vec!["github.com/acme/api".to_string()], GrantState::Current)
+        );
         let past = now + Duration::from_millis(1);
         let after = cache.read_at(Some(&fresh), Some("ana"), past);
-        assert_eq!(after, (Vec::new(), "expired"));
+        assert_eq!(after, (Vec::new(), GrantState::Expired));
         assert_eq!(
             cache.read_at(None, Some("ana"), now),
-            (Vec::new(), "unread")
+            (Vec::new(), GrantState::Unread)
         );
         assert_eq!(
             cache.read_at(Some(&fresh), None, now),
-            (Vec::new(), "current")
+            (Vec::new(), GrantState::Current)
         );
     }
 
@@ -811,7 +820,7 @@ mod tests {
         let granted = providers.grant(&groups(&["g"]), Some("Ana"));
         assert_eq!(granted.login.as_deref(), Some("ana"));
         let github = granted.github.as_ref().unwrap();
-        assert_eq!(github.state, "current");
+        assert_eq!(github.state, GrantState::Current);
         assert_eq!(sorted(&granted.claims), only(&["b"]));
         assert_eq!(
             sorted(&granted.union()),
@@ -842,7 +851,7 @@ mod tests {
         let github = named.github.as_ref().unwrap();
         assert_eq!(
             (github.host.as_str(), github.state),
-            ("github.com", "current")
+            ("github.com", GrantState::Current)
         );
     }
 
@@ -860,7 +869,10 @@ mod tests {
             let granted = providers.grant(&groups(&["g"]), login);
             assert_eq!(granted.login, None, "{login:?}");
             let github = granted.github.as_ref().unwrap();
-            assert_eq!((github.identities.len(), github.state), (0, "current"));
+            assert_eq!(
+                (github.identities.len(), github.state),
+                (0, GrantState::Current)
+            );
             assert_eq!(sorted(&granted.union()), only(&["b"]), "{login:?}");
         }
     }
@@ -868,7 +880,10 @@ mod tests {
     #[test]
     fn an_expired_or_unread_set_grants_nothing_through_github_and_says_so() {
         use super::super::tests::{groups, only, sorted};
-        for (held, state) in [(Some(set(61, Instant::now())), "expired"), (None, "unread")] {
+        for (held, state) in [
+            (Some(set(61, Instant::now())), GrantState::Expired),
+            (None, GrantState::Unread),
+        ] {
             let providers = providers(held);
             let granted = providers.grant(&groups(&["g"]), Some("ana"));
             assert_eq!(granted.login.as_deref(), Some("ana"));

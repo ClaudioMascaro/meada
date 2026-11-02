@@ -114,12 +114,21 @@ pub struct Github {
     pub catalog: bool,
 }
 
+/// The state of a GitHub grant: whether the permissions set it was read from is usable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GrantState {
+    Unread,
+    Current,
+    Expired,
+}
+
 /// The GitHub side of a grant: the identities the login reads through GitHub, the grant's state
 /// read with them (`unread`, `current` or `expired`) and the GitHub grant provider's host.
 pub struct GithubGrant {
     pub identities: Vec<String>,
     #[cfg_attr(not(feature = "ui"), allow(dead_code))]
-    pub state: &'static str,
+    pub state: GrantState,
     #[cfg_attr(not(feature = "ui"), allow(dead_code))]
     pub host: String,
 }
@@ -346,7 +355,7 @@ pub struct Admitted {
     pub grant: Grant,
     /// With the GitHub grant provider, its host and the GitHub grant's state read with the grant
     /// itself, so a session never pairs a grant with another instant's state.
-    pub github: Option<(String, &'static str)>,
+    pub github: Option<(String, GrantState)>,
 }
 
 #[cfg(feature = "ui")]
