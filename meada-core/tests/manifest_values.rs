@@ -103,7 +103,7 @@ fn messages() -> Vec<(&'static str, String)> {
 
 #[test]
 fn no_manifest_error_quotes_a_written_value_in_either_language() {
-    for lang in [None, Some("pt_BR.UTF-8")] {
+    for lang in [None, Some("pt_BR.UTF-8"), Some("es_ES.UTF-8")] {
         meada_core::msg::init(lang);
         for (case, message) in messages() {
             assert!(
@@ -112,7 +112,11 @@ fn no_manifest_error_quotes_a_written_value_in_either_language() {
             );
             // The no-key case is Meada's own text, not serde's.
             if case == "no key found" {
-                let own = ["a value is not valid here", "um valor não é válido aqui"];
+                let own = [
+                    "a value is not valid here",
+                    "um valor não é válido aqui",
+                    "un valor no es válido aquí",
+                ];
                 assert!(own.iter().any(|t| message.ends_with(t)), "{message}");
             }
         }

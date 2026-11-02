@@ -23,7 +23,7 @@
     "code-review": {
       "path": "skills/engineering/code-review",
       "upstreamTree": "a8ef561571acbb611de8ff19ba6da75b197c63a8",
-      "tree": "a8ef561571acbb611de8ff19ba6da75b197c63a8"
+      "tree": "88475d4470c45f68e510bfa5747c1fda6d5d8b56"
     },
     "codebase-design": {
       "path": "skills/engineering/codebase-design",
@@ -158,7 +158,7 @@
     "triage": {
       "path": "skills/engineering/triage",
       "upstreamTree": "4cb951d62ecccaed601cdc5f9a1b7b3d8a799635",
-      "tree": "4cb951d62ecccaed601cdc5f9a1b7b3d8a799635"
+      "tree": "991ce8c02aacded5d9fe609ba8ef4c988b32074a"
     },
     "wait-what": {
       "path": "skills/productivity/wait-what",

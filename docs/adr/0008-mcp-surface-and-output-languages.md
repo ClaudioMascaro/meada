@@ -42,7 +42,9 @@ existing one means, still needs a major version.)
   with agents, like code.
 - CLI messages follow `LANG`. pt-BR and English come first, and any other value falls back to
   English.
-- Spanish arrives as an issue labelled `translation` and `good first issue`.
+- Spanish arrives as an issue labelled `translation` and `good first issue`. (Amended 2026-11-02:
+  Spanish is in, selected when `LANG` starts with `es`; the binary's catalog and `meada-core`'s
+  share one language selection in `meada_core::msg`, and the MCP surface stays English.)
 
 ## Considered options
 

@@ -74,7 +74,7 @@ for the area a change touches.
 - `render.rs`: the source files an answer reads, and the budget and line helpers `meada-core` holds. [queries](map/queries.md)
 - `mcp.rs`: three read-only MCP tools over stdio and streamable HTTP, the `Gate` before routing, `serve_http`. [queries](map/queries.md)
 - `main.rs`: clap, the CLI's commands. [queries](map/queries.md)
-- `msg.rs`: the CLI message catalog, pt-BR and English. [queries](map/queries.md)
+- `msg.rs`: the CLI message catalog, pt-BR, English and Spanish. [queries](map/queries.md)
 - `lib.rs`: the crate root, re-exporting the modules the CLI, the MCP server and the tests share. [queries](map/queries.md)
 - `workspace.rs`: the workspace (`Workspace::discover`: repositories, peers, sibling clones) and server mode's workspace manifest (`Manifest`). [indexing](map/indexing.md)
 - `config.rs`: `meada.toml` (`[[peer]]`, `[serve]`, `[[resource]]`) and the shared TOML reader. [indexing](map/indexing.md)

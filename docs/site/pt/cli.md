@@ -24,4 +24,4 @@ ou os arquivos mudam durante a atualização. No modo servidor eles vêm do que 
 
 Meada só escreve dentro de `.meada/`, que se ignora no git. Toda consulta primeiro atualiza o
 índice com o que mudou nos arquivos, inclusive o que ainda não foi commitado. As mensagens da
-linha de comando seguem o `LANG` (português ou inglês); as do MCP são sempre em inglês.
+linha de comando seguem o `LANG` (português, inglês ou espanhol); as do MCP são sempre em inglês.

@@ -573,7 +573,7 @@ In server mode, decisions are made in a pipeline, not by the server; see
 meada <COMMAND>
 ```
 
-Messages follow `LANG` (Portuguese or English); MCP's are always in English. Every invocation
+Messages follow `LANG` (Portuguese, English or Spanish); MCP's are always in English. Every invocation
 accepts `--help` and `--version`.
 
 ### The five commands of the default build

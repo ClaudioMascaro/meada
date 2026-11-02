@@ -1,0 +1,13 @@
+example.com/chain/gateway (.) indexado, 8 archivos
+  broken.openapi.yaml:7: documento ilegible (while parsing a flow sequence, expected ',' or ']'), ignorado
+  docs/api-contract.yaml: openapi 3.0.3, rutas: 1
+  generated/openapi.yaml: openapi 3.1.0, rutas: 1
+  legacy.openapi.yaml: no es OpenAPI 3.0 ni 3.1 (swagger 2.0), ignorado
+  openapi.yaml: openapi 3.1.0, rutas: 2
+  orders.openapi.json: openapi 3.0.3, rutas: 1
+  GET /api/shipments/{} en orders.openapi.json también está en openapi.yaml: una sola ruta
+  docs/missing.yaml: listado en `serve.documents`, no encontrado
+example.com/chain/catalog (../chain-catalog) indexado, 4 archivos
+example.com/chain/web (../chain-web) indexado, 6 archivos
+  ¿conclusión errónea? repórtala: https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml
+example.com/chain/worker (../chain-worker) indexado, 3 archivos

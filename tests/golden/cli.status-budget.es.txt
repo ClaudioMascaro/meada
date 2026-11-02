@@ -1,0 +1,8 @@
+local/ts-basic (.) indexado, 9 archivos
+  Broad.cs: demasiado amplio, sus nombres calificados superaron el presupuesto de 4194304 bytes: sin símbolos ni llamadas
+  Broad.java: demasiado amplio, sus nombres calificados superaron el presupuesto de 4194304 bytes: sin símbolos ni llamadas
+  Broad.kt: demasiado amplio, sus nombres calificados superaron el presupuesto de 4194304 bytes: sin símbolos ni llamadas
+  Broad.swift: demasiado amplio, sus nombres calificados superaron el presupuesto de 4194304 bytes: sin símbolos ni llamadas
+  Misread.kt: dejado fuera, la gramática lo lee mal: sin símbolos ni llamadas
+  many/A.cs: su proyecto da más de 256 usings: sin símbolos ni llamadas
+  many/Global.cs: su proyecto da más de 256 usings: sin símbolos ni llamadas

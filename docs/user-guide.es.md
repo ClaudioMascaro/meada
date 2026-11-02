@@ -578,7 +578,7 @@ En modo servidor, las decisiones se toman en un pipeline, no en el servidor; vea
 meada <COMANDO>
 ```
 
-Los mensajes siguen el `LANG` (portugués o inglés); los de MCP son siempre en inglés. Toda
+Los mensajes siguen el `LANG` (portugués, inglés o español); los de MCP son siempre en inglés. Toda
 invocación acepta `--help` y `--version`.
 
 ### Los cinco comandos del build predeterminado

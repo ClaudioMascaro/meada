@@ -1,0 +1,8 @@
+example.com/chain/gateway (.) indexado, 8 archivos
+example.com/chain/catalog (../chain-catalog) indexado, 4 archivos
+  resource::s3-bucket::invoices sin vínculo: ningún escritor y lector en repositorios diferentes
+  resource::postgres::orders: `via` lib/gone.ts::sync no corresponde a ningún símbolo, ignorado
+  resource::postgres::orders: ningún `via` corresponde a un símbolo, así que el repositorio completo es el lado
+example.com/chain/web (../chain-web) indexado, 5 archivos
+  ¿conclusión errónea? repórtala: https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml
+example.com/chain/worker (../chain-worker) indexado, 3 archivos

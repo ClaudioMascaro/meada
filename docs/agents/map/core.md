@@ -67,7 +67,7 @@ The crates are described in the [architecture map](../architecture.md#crates). T
   grant reads to `compose_entries` over them, so a forged `added_by` decides no reason. The
   binary's save and apply and the browser (`authorizeEntries`, `composeEntries` and `touchedOwners` in `wasm.rs`,
   `login` and `github_host` as `string | undefined`) call the same functions.
-- `meada-core/src/msg.rs`: the messages of those checks and the language flag the binary's
+- `meada-core/src/msg.rs`: the messages of those checks and the language setting the binary's
   `msg.rs` reads too; `meada-core/src/http.rs`: `normalize_path` and `PARAM`, which the HTTP
   kind re-exports. `qualify` and `parent` (dotted names) live in its `lib.rs`.
 - `meada-core/src/export.rs`: the export's types as `meada export` writes them (`Export` and

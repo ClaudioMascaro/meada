@@ -25,5 +25,5 @@ y allí `dirty` es siempre `false`.
 
 Meada solo escribe dentro de `.meada/`, que se ignora a sí mismo en git. Toda consulta primero
 actualiza el índice con lo que cambió en los archivos, incluso lo que aún no se hizo commit. Los
-mensajes de la línea de comandos siguen `LANG` (portugués o inglés); los del MCP son siempre en
+mensajes de la línea de comandos siguen `LANG` (portugués, inglés o español); los del MCP son siempre en
 inglés.

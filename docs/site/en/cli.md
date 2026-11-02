@@ -23,4 +23,4 @@ commit and when `HEAD` or the files change during the refresh. In server mode th
 
 Meada only writes inside `.meada/`, which ignores itself in git. Every query first refreshes
 the index with what changed in the files, including what is not committed yet. Command-line
-messages follow `LANG` (Portuguese or English); MCP messages are always in English.
+messages follow `LANG` (Portuguese, English or Spanish); MCP messages are always in English.

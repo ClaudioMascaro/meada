@@ -6,7 +6,7 @@
 use wasm_bindgen::prelude::*;
 
 /// Picks the language of the messages, as the CLI does from `LANG`: pt-BR when `lang` starts
-/// with `pt`, English otherwise.
+/// with `pt`, Spanish with `es`, English otherwise.
 #[wasm_bindgen]
 pub fn init(lang: &str) {
     crate::msg::init(Some(lang));

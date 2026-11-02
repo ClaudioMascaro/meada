@@ -32,6 +32,11 @@ The agent needs to know when it's done. Every agent brief must have concrete, te
 - **Good:** "Running `gh issue list --label needs-triage` returns issues that have been through initial classification"
 - **Bad:** "Triage should work correctly"
 
+A criterion that needs a service the session may lack (Valkey, S3, Postgres) names a proof that CI runs. A "still fails on X" check is a pure helper with a unit test on the bad input, not a temporary local edit.
+
+- **Good:** "A unit test on the TTL comparison fails for `holder = lock + margin + 1`", or "the `cloud` CI job runs the refresh-lock test green"
+- **Bad:** "Show the refresh-lock test still fails after a local edit of the holder TTL"
+
 ### Explicit scope boundaries
 
 State what is out of scope. This prevents the agent from gold-plating or making assumptions about adjacent features.

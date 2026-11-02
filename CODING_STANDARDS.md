@@ -55,6 +55,16 @@ a review finding.
   f-string hole, a parameter, an environment read) yields no provider, never a `{}` segment. A
   parameter written in the literal (`:id`, `{id}`, `<int:id>`) stays one.
 
+## Equivalence tests
+
+A test that holds two paths to the same answer (a partial read against reading every row, a
+fast path against a slow one) or checks an oracle is itself checked by one mutation in the path
+under test that turns it red. The PR names that mutation and the test it turned red. A switch
+that changes only part of the path leaves the rest comparing the code with itself: in #396 the
+`with_every_row` switch changed only `Engine::partial`, so the `search` kinds `symbol`,
+`community` and `duplicate`, the contract-site spans, the `context` community line and the trace
+starts could not fail. No tool checks this; a PR without the mutation is a review finding.
+
 ## Hostile input
 
 A reader of a file the repository holds (a provider document, a config, a source file) treats
