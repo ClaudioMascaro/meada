@@ -17,9 +17,9 @@ docker compose up -d
 docker compose ps
 ```
 
-Requer Docker Compose v2.24 ou mais novo (`!reset`) e imagens que já tragam `[accounts]` (ADR 0024,
-em `[Unreleased]` no CHANGELOG; a 1.0.0 publicada não as tem). Enquanto não há release com elas,
-construa as duas imagens deste checkout e aponte `MEADA_VERSION` para a tag:
+Requer Docker Compose v2.24 ou mais novo (`!reset`) e imagens 1.1.0 ou mais novas, as primeiras
+com `[accounts]` (ADR 0024); a 1.0.0 não as tem. Para rodar este checkout antes de uma release,
+construa as duas imagens dele e aponte `MEADA_VERSION` para a tag:
 
 ```sh
 docker build --target runtime -t ghcr.io/claudiomascaro/meada:local ../..
