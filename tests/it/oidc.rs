@@ -41,7 +41,7 @@ const SERVED: &str = "example.com/chain/web\nexample.com/chain/gateway\nexample.
 pub(crate) struct Issuer {
     pub(crate) base: String,
     jwks: Arc<Mutex<Option<String>>>,
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    #[cfg_attr(not(feature = "ui"), expect(dead_code))]
     pub(crate) log: Arc<Mutex<Vec<String>>>,
 }
 

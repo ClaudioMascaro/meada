@@ -220,7 +220,7 @@ fn a_root_tsconfig_that_is_invalid_or_linked_declares_no_paths() {
 
 #[test]
 fn an_oversized_document_is_read_up_to_the_limit_and_refreshes_as_cold() {
-    // One byte past `document::MAX_BYTES`, the size limit of a provider document.
+    // One byte past `document::DOCUMENT_BYTES_MAX`, the size limit of a provider document.
     let read = (16 << 20) + 1;
     let document = |repo: &Path| {
         let valid = fs::read_to_string(repo.join("openapi.json")).unwrap();

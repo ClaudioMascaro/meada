@@ -25,7 +25,7 @@ use crate::{channel, http};
 /// `lang::MAX_BYTES`.
 // ponytail: a flat 16 MiB, parsed whole in memory; a streaming reader that keeps only the
 // paths, servers and channels lifts it.
-pub(crate) const MAX_BYTES: usize = 16 << 20;
+pub(crate) const DOCUMENT_BYTES_MAX: usize = 16 << 20;
 
 /// Whether `path` (repository-relative) is a document by its file name: `openapi.yaml`,
 /// `openapi.yml`, `openapi.json`, or a name ending in `.openapi.` and one of those extensions;
@@ -212,14 +212,14 @@ pub enum Problem {
 
 /// The summary of the document at `path` (repository-relative) holding `src`. JSON by the
 /// extension, YAML otherwise. It never fails: what cannot be read is a problem, and a document
-/// larger than `MAX_BYTES` is unreadable at its first line whatever the rest holds.
+/// larger than `DOCUMENT_BYTES_MAX` is unreadable at its first line whatever the rest holds.
 ///
 /// The content decides the format, since a listed document can have any name: a top-level
 /// `openapi` field is OpenAPI, an `asyncapi` one AsyncAPI. With neither, the name only picks
 /// which format the document is reported as not being.
 pub fn read(path: &str, src: &[u8]) -> Summary {
-    if src.len() > MAX_BYTES {
-        let error = format!("larger than {} MiB", MAX_BYTES >> 20);
+    if src.len() > DOCUMENT_BYTES_MAX {
+        let error = format!("larger than {} MiB", DOCUMENT_BYTES_MAX >> 20);
         return Summary::problem(Problem::Unreadable { line: 1, error });
     }
     match parse(path, src) {
@@ -338,15 +338,15 @@ pub fn report(repo: &Repository, export: &Export) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Format, MAX_BYTES, Problem, is_document, read};
+    use super::{DOCUMENT_BYTES_MAX, Format, Problem, is_document, read};
 
     #[test]
     fn a_document_past_the_size_limit_is_unreadable() {
         let valid = "openapi: 3.1.0\npaths:\n  /a:\n    get: {}\n";
         let padded = |len: usize| format!("{valid}{}", "#".repeat(len - valid.len()));
 
-        let at_limit = read("openapi.yaml", padded(MAX_BYTES).as_bytes());
-        let past = read("openapi.yaml", padded(MAX_BYTES + 1).as_bytes());
+        let at_limit = read("openapi.yaml", padded(DOCUMENT_BYTES_MAX).as_bytes());
+        let past = read("openapi.yaml", padded(DOCUMENT_BYTES_MAX + 1).as_bytes());
 
         assert_eq!(at_limit.format, Some(Format::Openapi));
         assert_eq!(past.format, None);

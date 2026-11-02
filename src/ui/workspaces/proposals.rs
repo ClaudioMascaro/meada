@@ -367,7 +367,7 @@ impl Server {
                 };
                 #[cfg(not(feature = "directory"))]
                 let _ = user;
-                #[allow(unused_mut)]
+                #[cfg_attr(not(feature = "directory"), expect(unused_mut))]
                 let mut session = Session::admitted(admitted, Vec::new());
                 #[cfg(feature = "directory")]
                 {

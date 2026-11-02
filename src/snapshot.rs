@@ -517,7 +517,7 @@ async fn store_generation(
     workspace: Option<String>,
     bundles: Vec<Bundle>,
     contexts: Vec<Context>,
-    #[cfg_attr(not(feature = "generation-pointer"), allow(unused_variables))] pointer: Pointer,
+    #[cfg_attr(not(feature = "generation-pointer"), expect(unused_variables))] pointer: Pointer,
 ) -> std::result::Result<(), String> {
     let store = Store::connect(config)?;
     // Before any upload: a Valkey that cannot be reached costs no transfer.

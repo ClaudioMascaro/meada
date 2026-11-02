@@ -38,7 +38,7 @@ impl Console {
     /// stands for the request. The second item is the line the audit prints. `Ok(true)`
     /// is an admitted read whose lookup failed: the `Session` remembers it (`directory_down`), so
     /// the request's later directory reads take that answer and write no second line.
-    #[cfg_attr(not(feature = "oidc"), allow(dead_code))]
+    #[cfg_attr(not(feature = "oidc"), expect(dead_code))]
     pub(super) fn directory_refusal(
         &self,
         user: Option<&str>,
@@ -114,7 +114,7 @@ impl Console {
     /// once a group was ever provisioned (a directory that lost its final group flags every
     /// owned entry). An entry without an owner is never flagged. A directory that cannot be read
     /// flags nothing, with one stderr line (none when `session` saw it down at admission).
-    #[cfg_attr(not(feature = "generation-pointer"), allow(dead_code))]
+    #[cfg_attr(not(feature = "generation-pointer"), expect(dead_code))]
     pub(super) async fn flag_missing_owners(&self, entries: &mut [Value], session: &Session) {
         let Some(directory) = &self.directory else {
             return;
@@ -142,7 +142,7 @@ impl Console {
 
     /// `document`, the admission answer, with the directory's counts: `directory` is
     /// `{"users", "groups", "last_write"}`, or null when it cannot be read.
-    #[cfg_attr(not(feature = "oidc"), allow(dead_code))]
+    #[cfg_attr(not(feature = "oidc"), expect(dead_code))]
     pub(super) fn with_directory_counts(&self, document: &mut Value, session: &Session) {
         let Some(directory) = &self.directory else {
             return;

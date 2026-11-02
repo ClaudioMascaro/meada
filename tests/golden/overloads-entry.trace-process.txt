@@ -1,0 +1,4 @@
+process ex.Box.run(Object)
+local/overloads-entry src/main/java/ex/Box.java:8 ex.Box.run(Object)
+  local/overloads-entry src/main/java/ex/Box.java:9 m [ambiguous]: ex.Box.m (3 overloads)
+chain: ambiguous · 0 hops · 1 repos · 60 tokens

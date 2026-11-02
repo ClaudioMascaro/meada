@@ -458,6 +458,34 @@ mod tests {
         assert_eq!(served(IMPORTS, nested), ["http::GET::/in/x"]);
     }
 
+    /// An annotation written in full is the framework's unless the repository wins (#360): an
+    /// import that binds its head, a class of the repository that is its head, or one spelled
+    /// exactly like it gives no provider from the framework's reading.
+    #[test]
+    fn an_annotation_written_in_full_gives_way_to_the_repository() {
+        const SPRING: &str = "org.springframework.web.bind.annotation";
+        let body = format!(
+            "@{SPRING}.RestController class C {{ @{SPRING}.GetMapping(\"/x\") void f() {{}} }}"
+        );
+        assert_eq!(served("", &body), ["http::GET::/x"]);
+        // An import binds the head `org`.
+        assert!(served("import com.acme.org;", &body).is_empty());
+        // A class of the repository is the head.
+        let head = [("a/org.java", "package a; class org {}")];
+        assert!(served_with("", &body, &head).is_empty());
+        // The repository declares the framework's very names: its classes are not Spring's.
+        let own = |name: &str| {
+            format!(
+                "package {SPRING}; public @interface {name} {{ String[] value() default {{}}; }}"
+            )
+        };
+        let (get, rest) = (own("GetMapping"), own("RestController"));
+        let get = [("org/GetMapping.java", &*get)];
+        assert!(served_with("", &body, &get).is_empty());
+        let rest = [("org/RestController.java", &*rest)];
+        assert!(served_with("", &body, &rest).is_empty());
+    }
+
     /// A controller whose base comes from outside the repository serves its methods: a method
     /// annotation is read through the imports, no field of that base hiding them (#354).
     #[test]

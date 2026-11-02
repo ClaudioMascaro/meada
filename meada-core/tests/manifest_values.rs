@@ -13,7 +13,7 @@ const FILE: &str = "ops/meada.workspace.toml";
 /// A schema of a shape the manifests do not have: a `char`, which makes serde's `invalid value`.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-#[allow(dead_code)]
+#[expect(dead_code)]
 struct Probe {
     letter: Option<char>,
 }

@@ -274,6 +274,7 @@ const URLCONF_BUDGET: usize = 1 << 15;
 // ponytail: real projects nest a few levels of `include()`; the limit keeps a crafted chain of
 // thousands of modules from overflowing the stack, which the budget alone would not.
 const INCLUDE_DEPTH: usize = 64;
+
 const DJANGO_HTTP: &str = "django.views.decorators.http.";
 
 /// A `re_path()` pattern as a route: literal text and simple named groups (`(?P<name>...)`),

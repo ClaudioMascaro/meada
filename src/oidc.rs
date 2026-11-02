@@ -400,7 +400,7 @@ pub(crate) enum Refusal {
 pub struct Oidc {
     config: Config,
     /// The issuer's metadata document, as read at start.
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    #[cfg_attr(not(feature = "ui"), expect(dead_code))]
     issuer_metadata: Value,
     jwks_uri: String,
     agent: ureq::Agent,
@@ -419,7 +419,7 @@ pub struct Oidc {
 
 /// When the cached JWKS was read (seconds since the epoch), and the last refresh that failed
 /// after it, with its time and why.
-#[cfg_attr(not(feature = "ui"), allow(dead_code))]
+#[cfg_attr(not(feature = "ui"), expect(dead_code))]
 struct Fetched {
     at: u64,
     failed: Option<(u64, String)>,

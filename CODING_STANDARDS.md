@@ -76,8 +76,9 @@ indexing carries on.
 - A path read from a file or a config stays inside the repository root: relative, without `..`,
   and through no symlink.
 - Each limit is a named constant with a `ponytail:` marker, listed under "Known ceilings" in
-  `docs/agents/ceilings.md` (`tests/it/docs.rs` checks the name is there), and a unit test
-  feeds it an input past the limit.
+  `docs/agents/ceilings.md` (`tests/it/docs.rs` checks the name is there, that a `const` named
+  `MAX_*`, `*_MAX`, `*_LIMIT` or `*_CAP` carries the marker, and that no two share a name), and a
+  unit test feeds it an input past the limit.
 - A manifest or configuration reader reads a file of `lang::MAX_BYTES` built to explode (many
   keys, deep nesting, wide fan-out) in bounded time, and returns a bounded size. A new reader
   adds its row to `probes` in `src/package/hostile.rs`.

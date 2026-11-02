@@ -348,7 +348,7 @@ async fn gate(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 async fn history(
     tx: &tokio_postgres::Transaction<'_>,
     q: &str,

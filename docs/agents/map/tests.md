@@ -109,6 +109,7 @@ all repository fixtures; it contains no private corpus data. Existing tests own 
   named holder refusals, successful writes followed by fleet reload, missing bootstrap reads,
   and bilingual keyboard controls. `ConfirmDialog.test.tsx` checks focus restoration,
   cancellation and the busy state through the native dialog's DOM boundary.
+- `scripts/test-services up|down` starts the `cloud` job's Valkey, S3 and Postgres containers on loopback and starts the TLS Postgres too and prints the `MEADA_TEST_*` exports, `MEADA_TEST_SERVICES_REQUIRED=1` included; `tests/it/test_services.rs` fails when its images, ports or credentials differ from `ci.yml`'s.
 - `scripts/compose-check` checks the local, generations and explicit console profiles without
   starting them, including parsed bootstraps, independent console storage and proxy admission.
   `scripts/helm-check` covers default and enabled console resources, optional Ingress, private

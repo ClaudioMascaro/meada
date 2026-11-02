@@ -103,14 +103,14 @@ impl Case {
 
     /// The case with local accounts (#562), every caller of the table recreated through the
     /// console.
-    #[cfg_attr(not(feature = "accounts"), allow(dead_code))]
+    #[cfg_attr(not(feature = "accounts"), expect(dead_code))]
     fn local(name: &str) -> Option<Self> {
         Self::local_with(name, "")
     }
 
     /// `local`, `tail` appended to the console's manifest before it starts (a `[proposals]` the
     /// console must read to issue agent tokens for the proposal server).
-    #[cfg_attr(not(feature = "accounts"), allow(dead_code))]
+    #[cfg_attr(not(feature = "accounts"), expect(dead_code))]
     fn local_with(name: &str, tail: &str) -> Option<Self> {
         let case = Self::with(name, Mode::Local, false, 3600, tail)?;
         let callers: Vec<String> = (case.table["callers"].as_object().unwrap().keys())

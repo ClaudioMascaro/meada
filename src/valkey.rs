@@ -24,9 +24,9 @@ const PING_TIMEOUT: Duration = Duration::from_millis(800);
 /// A connection attempt, and an answer, of the shared client.
 const NETWORK_TIMEOUT: Duration = Duration::from_secs(2);
 // ponytail: the most `password_file` may hold; past it the connection fails, naming the file.
-const PASSWORD_MAX: u64 = 4096;
+const VALKEY_PASSWORD_MAX: u64 = 4096;
 // ponytail: the most `ca_file` may hold; past it the connection fails, naming the file.
-const CA_MAX: u64 = 1 << 20;
+const VALKEY_CA_MAX: u64 = 1 << 20;
 
 /// The `[valkey]` section as written.
 #[derive(Deserialize)]
@@ -113,7 +113,7 @@ impl Config {
         let Some(password) = self.password.clone() else {
             return Ok(None);
         };
-        let read = tokio::task::spawn_blocking(move || password.read(PASSWORD_MAX)).await;
+        let read = tokio::task::spawn_blocking(move || password.read(VALKEY_PASSWORD_MAX)).await;
         match (read.map_err(|e| e.to_string())??, &self.password) {
             (None, Some(Secret::Env(var))) => Err(Msg::ValkeyEnvUnset(var).text()),
             (value, _) => Ok(value),
@@ -154,7 +154,7 @@ impl Valkey {
         }
         let tls = match &config.ca_file {
             Some(file) if matches!(info.addr(), ConnectionAddr::TcpTls { .. }) => {
-                let root_cert = read_file(file, CA_MAX).await?;
+                let root_cert = read_file(file, VALKEY_CA_MAX).await?;
                 Some(TlsCertificates {
                     client_tls: None,
                     root_cert: Some(root_cert),
@@ -312,18 +312,25 @@ pub(crate) mod tests {
         let (small, big) = (dir.join("small"), dir.join("big"));
         std::fs::write(&small, "abc\n").unwrap();
         std::fs::write(&big, vec![b'x'; 4097]).unwrap();
-        assert_eq!(read_file(&small, PASSWORD_MAX).await.unwrap(), b"abc\n");
+        assert_eq!(
+            read_file(&small, VALKEY_PASSWORD_MAX).await.unwrap(),
+            b"abc\n"
+        );
         for (path, why) in [
             (&dir, "not a regular file"),
             (&big, "larger than 4096 bytes"),
         ] {
-            let err = read_file(path, PASSWORD_MAX).await.unwrap_err();
+            let err = read_file(path, VALKEY_PASSWORD_MAX).await.unwrap_err();
             assert!(err.ends_with(why), "{err}");
         }
-        assert!(read_file(&dir.join("none"), PASSWORD_MAX).await.is_err());
+        assert!(
+            read_file(&dir.join("none"), VALKEY_PASSWORD_MAX)
+                .await
+                .is_err()
+        );
         let ca = dir.join("ca");
-        std::fs::write(&ca, vec![b'x'; CA_MAX as usize + 1]).unwrap();
-        let err = read_file(&ca, CA_MAX).await.unwrap_err();
+        std::fs::write(&ca, vec![b'x'; VALKEY_CA_MAX as usize + 1]).unwrap();
+        let err = read_file(&ca, VALKEY_CA_MAX).await.unwrap_err();
         assert!(err.ends_with("larger than 1048576 bytes"), "{err}");
     }
 

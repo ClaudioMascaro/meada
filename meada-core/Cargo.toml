@@ -8,6 +8,9 @@ repository.workspace = true
 keywords = ["code-graph", "meada", "wasm"]
 categories = ["development-tools"]
 
+[lints]
+workspace = true
+
 # A library: cargo-dist builds and releases the `meada` binary alone (ADR 0010).
 [package.metadata.dist]
 dist = false

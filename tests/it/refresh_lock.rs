@@ -1438,7 +1438,7 @@ fn compose_job(dir: &Path) {
 /// moved to `ops/` and the pulled list to `ops/pulled.toml`.
 #[cfg_attr(
     not(all(feature = "github-app", feature = "postgres", feature = "oidc")),
-    allow(dead_code)
+    expect(dead_code)
 )]
 pub(crate) fn compose_managed(dir: &Path) {
     let deploy = Path::new(env!("CARGO_MANIFEST_DIR")).join("deploy/compose");
@@ -1796,7 +1796,10 @@ fn every_cli_twin_is_audited_and_none_writes_without_its_record() {
     }
     // A schema version this binary does not know: exit 1, naming both versions.
     fs::write(dir.join("ops/pg-url"), &audit.url).unwrap();
-    let higher = "is at version 9, above this Meada's 1: upgrade Meada";
+    let higher = &format!(
+        "is at version {}, above this Meada's 1: upgrade Meada",
+        crate::common::SCHEMA_VERSION
+    );
     for args in &twins {
         let (stdout, stderr, code) = run(args, Some("1"));
         assert_eq!((code, stdout.as_str()), (Some(1), ""), "{args:?}: {stderr}");

@@ -1286,6 +1286,8 @@ fn postgres_refusals_follow_lang() {
         ]
     };
     let status = ["status", "--workspace", crate::manifest::MANIFEST];
+    let current = crate::common::SCHEMA_VERSION;
+    let current_cap = current.to_string();
     let line = |lang, cap| {
         let (status, _, _) = meada(&dir, lang, &at(cap), &status);
         status
@@ -1295,28 +1297,35 @@ fn postgres_refusals_follow_lang() {
             .to_string()
     };
     assert_eq!(
-        line(en, "9"),
+        line(en, &current_cap),
         format!(
-            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 9: \
-             run meada postgres migrate)"
+            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's \
+             {current}: run meada postgres migrate)"
         )
     );
     assert_eq!(
-        line(pt, "9"),
+        line(pt, &current_cap),
         format!(
-            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da 9 deste Meada: \
-             rode meada postgres migrate)"
+            "postgres: inalcançável (o schema {schema} está na versão 0, abaixo da {current} \
+             deste Meada: rode meada postgres migrate)"
         )
     );
-    assert_eq!(meada(&dir, en, &at("9"), &MIGRATE).0, "9\n");
+    assert_eq!(
+        meada(&dir, en, &at(&current_cap), &MIGRATE).0,
+        format!("{current}\n")
+    );
     for (lang, expected) in [
         (
             en,
-            format!("the schema {schema} is at version 9, above this Meada's 0: upgrade Meada"),
+            format!(
+                "the schema {schema} is at version {current}, above this Meada's 0: upgrade Meada"
+            ),
         ),
         (
             pt,
-            format!("o schema {schema} está na versão 9, acima da 0 deste Meada: atualize o Meada"),
+            format!(
+                "o schema {schema} está na versão {current}, acima da 0 deste Meada: atualize o Meada"
+            ),
         ),
     ] {
         let (_, stderr, code) = meada(&dir, lang, &at("0"), &MIGRATE);

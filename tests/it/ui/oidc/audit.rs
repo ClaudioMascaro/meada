@@ -539,8 +539,9 @@ fn without_postgres_no_write_runs_and_reads_still_answer() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(1), "{stderr}");
     let higher = format!(
-        "the schema {} is at version 9, above this Meada's 1: upgrade Meada",
-        audit.schema
+        "the schema {} is at version {}, above this Meada's 1: upgrade Meada",
+        audit.schema,
+        crate::common::SCHEMA_VERSION
     );
     assert!(stderr.contains(&higher), "{stderr}");
     audit.assert_no_url(&stderr);

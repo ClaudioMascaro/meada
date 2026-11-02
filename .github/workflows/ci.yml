@@ -34,6 +34,43 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: cargo clippy --locked --all-targets -- -D warnings
 
+  # Each cloud feature builds alone (ADR 0012), and in the pairs the code gates on. Clippy only:
+  # the tests need services, and the `cloud` job runs them with `--all-features`.
+  clippy-features:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          - snapshot
+          - valkey
+          - generation-pointer
+          - refresh-lock
+          - oidc
+          - ui
+          - postgres
+          - directory
+          - github-app
+          - workspaces
+          - proposals
+          - accounts
+          - postgres,oidc
+          - ui,directory
+          - ui,oidc
+          - github-app,postgres,oidc,refresh-lock
+          - directory,oidc
+          - directory,refresh-lock
+          - postgres,refresh-lock
+          - generation-pointer,postgres
+          - oidc,generation-pointer
+          - ui,refresh-lock
+          - github-app,refresh-lock
+          - workspaces,accounts
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo clippy --locked --all-targets --features ${{ matrix.features }} -- -D warnings
+
   test:
     runs-on: ubuntu-24.04
     steps:
@@ -69,6 +106,7 @@ jobs:
   # Cloud modules (ADR 0012): every feature, against a local Valkey and S3-compatible server.
   cloud:
     runs-on: ubuntu-24.04
+    # scripts/test-services mirrors these services and env; tests/it/test_services.rs keeps them in step.
     services:
       valkey:
         # 7.2 is the oldest Valkey ADR 0012 supports.

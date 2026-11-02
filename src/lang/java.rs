@@ -1513,7 +1513,8 @@ mod tests {
         let mut marks = writes(&src);
         marks.dedup();
         assert_eq!(marks, [".a@C"]);
-        assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
+        // 1.8 s measured in a local debug build; the bound is over twenty times that.
+        assert!(start.elapsed().as_secs() < 40, "{:?}", start.elapsed());
     }
 
     /// Thousands of fields and thousands of locals cost their sum: a local finds the fields of

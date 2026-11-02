@@ -76,7 +76,7 @@ Uma mudança sob a feature de um módulo de nuvem `<f>` (ADR 0012) também passa
 tem ainda o job `cloud`: confere que o build padrão não traz nenhum crate de módulo e roda o
 clippy e os testes com `--all-features`, contra um Valkey e um servidor compatível com S3 (os
 testes que precisam deles leem `MEADA_TEST_VALKEY_URL` e `MEADA_TEST_S3_ENDPOINT`, e sem elas
-avisam e pulam).
+avisam e pulam). `scripts/test-services up` sobe esses serviços como a CI e imprime os `export`; `scripts/test-services down` os remove.
 
 Se a mudança mexe em comportamento, inclua o teste que a cobre.
 

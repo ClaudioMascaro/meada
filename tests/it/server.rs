@@ -80,7 +80,7 @@ impl Server {
     }
 
     /// What the server wrote on stderr after its first line, read once it is killed.
-    #[cfg_attr(not(feature = "oidc"), allow(dead_code))]
+    #[cfg_attr(not(feature = "oidc"), expect(dead_code))]
     pub(crate) fn stderr(mut self) -> String {
         use std::io::Read;
         let _ = self.child.kill();

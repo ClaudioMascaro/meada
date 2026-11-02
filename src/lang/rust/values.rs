@@ -78,6 +78,7 @@ const FORMATS: &[&str] = &["format", "concat"];
 // not copy a builder for each.
 pub(super) const FORMAT_ARGS: usize = 64;
 pub(super) const FORMAT_PLACEHOLDERS: usize = 256;
+
 const FORMAT_SIZE: usize = BUILDER_SIZE;
 
 /// Where a value is written: the scope, the module written in place and whether `self::` and

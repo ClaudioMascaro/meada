@@ -10,6 +10,9 @@ edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/ClaudioMascaro/meada"
 
+[workspace.lints.clippy]
+allow_attributes = "deny"
+
 [package]
 name = "meada"
 version.workspace = true
@@ -21,6 +24,9 @@ readme = "README.md"
 keywords = ["code-graph", "mcp", "tree-sitter", "cross-repo", "code-intelligence"]
 categories = ["development-tools", "command-line-utilities"]
 exclude = [".github/", "AGENTS.md", "CLAUDE.md", "dist-workspace.toml"]
+
+[lints]
+workspace = true
 
 [dependencies]
 # The local accounts' password hashes (ADR 0024), only behind `accounts`: argon2id, its salt from

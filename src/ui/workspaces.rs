@@ -30,7 +30,6 @@ pub(super) const CREATE_MAX: usize = 80 << 10;
 // `after` the list reads (an id, with room to spare).
 const LIST_LIMIT_MAX: usize = 100;
 const LIST_LIMIT: usize = 25;
-
 const AFTER_MAX: usize = 256;
 
 /// The action a creation's audit record names.

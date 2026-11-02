@@ -24,7 +24,7 @@ this file, and a change to these modules updates it.
   (`Msg::AccountsBreakGlassIssuer`, at `accounts.break_glass`, so an issuer always tells the two
   apart), a `[ui] dir` that is not a directory, and the version check:
   `meada-ui.json` at the root of `[ui] dir` must be `{"version": "<this Meada version>"}`, and
-  a missing, oversized (`VERSION_MAX`) or unreadable file counts as another version, both
+  a missing, oversized (`UI_VERSION_MAX`) or unreadable file counts as another version, both
   versions named. Each request goes, in order, through the `Host` check (403 unless `Host` is
   `public_url`'s host and port, or the bound address on loopback), the `Origin` check (403 for
   an `Origin` other than `public_url`, and for a write, any method but `GET` and `HEAD`, without

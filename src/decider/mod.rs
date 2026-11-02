@@ -30,6 +30,7 @@ use validate::Proposal;
 
 /// An item with more candidates than this is skipped in decider mode and reported as such; the
 /// excerpt would grow past what a judgment of one call needs. Human mode still offers it.
+// ponytail: the excerpt of one call stays small; past this an item is left to a person.
 pub const MAX_CANDIDATES: usize = 50;
 
 /// How long one request may take, connection to last byte. There are no retries.

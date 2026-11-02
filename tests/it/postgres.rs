@@ -467,19 +467,20 @@ fn a_version_this_binary_does_not_know_is_refused() {
     let admin = Admin::new(&url);
     admin.run(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"));
     let dir = manifest("postgres_version", &format!("schema = \"{schema}\"\n"));
+    let current = crate::common::SCHEMA_VERSION;
     // Capped at 0, migrate leaves the schema absent: version 0, lower than the binary's.
     let (stdout, _, code) = migrate(&dir, &url, Some("0"));
     assert_eq!((stdout.as_str(), code), ("0\n", 0));
     assert_eq!(
         status_line(&dir, &url, None),
         format!(
-            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's 9: \
-             run meada postgres migrate)"
+            "postgres: unreachable (the schema {schema} is at version 0, below this Meada's \
+             {current}: run meada postgres migrate)"
         )
     );
-    assert_eq!(migrate(&dir, &url, None).0, "9\n");
+    assert_eq!(migrate(&dir, &url, None).0, format!("{current}\n"));
     let higher =
-        format!("the schema {schema} is at version 9, above this Meada's 0: upgrade Meada");
+        format!("the schema {schema} is at version {current}, above this Meada's 0: upgrade Meada");
     assert_eq!(
         status_line(&dir, &url, Some("0")),
         format!("postgres: unreachable ({higher})")
@@ -526,11 +527,17 @@ fn status_names_whether_postgres_is_reachable_and_its_exit_code_ignores_it() {
     let admin = Admin::new(&url);
     admin.run(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"));
     with(&format!("schema = \"{schema}\"\n"));
-    assert_eq!(migrate(&dir, &url, None).0, "9\n");
+    assert_eq!(
+        migrate(&dir, &url, None).0,
+        format!("{}\n", crate::common::SCHEMA_VERSION)
+    );
     let env = [("MEADA_POSTGRES_URL", url.as_str())];
     let (status, stderr, code) = meada(&dir, EN, &env, &STATUS);
     assert!(code == 0 && stderr.is_empty(), "{stderr}");
-    let line = format!("\npostgres: reachable, schema {schema} version 9\n");
+    let line = format!(
+        "\npostgres: reachable, schema {schema} version {}\n",
+        crate::common::SCHEMA_VERSION
+    );
     assert!(status.ends_with(&line), "{status}");
     // A `ca_file` on loopback is never ignored: the plain test server refuses the TLS it asks.
     let roots = "/etc/ssl/certs/ca-certificates.crt";
@@ -553,12 +560,24 @@ fn status_names_whether_postgres_is_reachable_and_its_exit_code_ignores_it() {
     all(feature = "accounts", feature = "ui"),
     feature = "github-app"
 ))]
+#[cfg_attr(
+    not(any(
+        all(feature = "refresh-lock", feature = "postgres"),
+        all(feature = "oidc", feature = "ui", feature = "directory"),
+        feature = "accounts",
+        all(feature = "oidc", feature = "postgres", feature = "github-app")
+    )),
+    expect(dead_code)
+)]
 pub(crate) struct Relay {
     /// The test's URL with the relay's address.
     pub(crate) url: String,
     open: std::sync::Arc<std::sync::atomic::AtomicBool>,
     port: u16,
-    #[cfg_attr(not(feature = "github-app"), allow(dead_code))]
+    #[cfg_attr(
+        not(any(feature = "github-app", all(feature = "directory", feature = "ui"))),
+        expect(dead_code)
+    )]
     to: String,
 }
 
@@ -568,6 +587,15 @@ pub(crate) struct Relay {
     all(feature = "accounts", feature = "ui"),
     feature = "github-app"
 ))]
+#[cfg_attr(
+    not(any(
+        all(feature = "refresh-lock", feature = "postgres"),
+        all(feature = "oidc", feature = "ui", feature = "directory"),
+        feature = "accounts",
+        all(feature = "oidc", feature = "postgres", feature = "github-app")
+    )),
+    expect(dead_code)
+)]
 impl Relay {
     pub(crate) fn new(url: &str) -> Self {
         use std::sync::atomic::AtomicBool;
@@ -672,6 +700,18 @@ impl Relay {
         feature = "generation-pointer"
     )
 ))]
+#[cfg_attr(
+    not(any(
+        all(feature = "ui", feature = "oidc", feature = "directory"),
+        all(
+            feature = "github-app",
+            feature = "postgres",
+            feature = "oidc",
+            feature = "generation-pointer"
+        )
+    )),
+    expect(dead_code)
+)]
 pub(crate) struct Stalled {
     /// A URL naming it.
     pub(crate) url: String,
@@ -685,6 +725,18 @@ pub(crate) struct Stalled {
         feature = "generation-pointer"
     )
 ))]
+#[cfg_attr(
+    not(any(
+        all(feature = "ui", feature = "oidc", feature = "directory"),
+        all(
+            feature = "github-app",
+            feature = "postgres",
+            feature = "oidc",
+            feature = "generation-pointer"
+        )
+    )),
+    expect(dead_code)
+)]
 impl Stalled {
     pub(crate) fn start() -> Self {
         use std::io::{Read, Write};
@@ -723,6 +775,14 @@ impl Stalled {
     all(feature = "directory", feature = "ui"),
     all(feature = "accounts", feature = "ui")
 ))]
+#[cfg_attr(
+    not(any(
+        all(feature = "refresh-lock", feature = "postgres"),
+        all(feature = "oidc", feature = "ui", feature = "directory"),
+        feature = "accounts"
+    )),
+    expect(dead_code)
+)]
 pub(crate) struct Audited {
     pub(crate) admin: Admin,
     pub(crate) schema: String,
@@ -737,6 +797,14 @@ pub(crate) struct Audited {
     all(feature = "directory", feature = "ui"),
     all(feature = "accounts", feature = "ui")
 ))]
+#[cfg_attr(
+    not(any(
+        all(feature = "refresh-lock", feature = "postgres"),
+        all(feature = "oidc", feature = "ui", feature = "directory"),
+        feature = "accounts"
+    )),
+    expect(dead_code)
+)]
 pub(crate) fn audited(dir: &Path, case: &str) -> Option<Audited> {
     let url = service()?;
     let schema = schema(case);
@@ -778,6 +846,14 @@ impl Audited {
     }
 
     /// `text` carries neither the test's Postgres URL nor its password.
+    #[cfg_attr(
+        not(any(
+            all(feature = "refresh-lock", feature = "postgres"),
+            all(feature = "oidc", feature = "ui", feature = "directory"),
+            feature = "accounts"
+        )),
+        expect(dead_code)
+    )]
     pub(crate) fn assert_no_url(&self, text: &str) {
         assert!(!text.contains(&self.url), "the Postgres URL in {text}");
         let config = tokio_postgres::Config::from_str(&self.url).unwrap();

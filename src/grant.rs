@@ -117,6 +117,7 @@ pub struct Github {
 /// The state of a GitHub grant: whether the permissions set it was read from is usable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
+#[cfg_attr(not(feature = "postgres"), expect(dead_code))]
 pub enum GrantState {
     Unread,
     Current,
@@ -127,9 +128,15 @@ pub enum GrantState {
 /// read with them (`unread`, `current` or `expired`) and the GitHub grant provider's host.
 pub struct GithubGrant {
     pub identities: Vec<String>,
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    #[cfg_attr(
+        not(any(feature = "ui", all(test, feature = "postgres"))),
+        expect(dead_code)
+    )]
     pub state: GrantState,
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    #[cfg_attr(
+        not(any(feature = "ui", all(test, feature = "postgres"))),
+        expect(dead_code)
+    )]
     pub host: String,
 }
 
@@ -139,7 +146,7 @@ pub struct Granted {
     /// the subject's groups to, and the identities its verifier grants by name (`listing`).
     pub claims: Grant,
     /// With the GitHub grant provider, the subject's login when it is a valid one.
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    #[cfg_attr(not(any(feature = "ui", test)), expect(dead_code))]
     pub login: Option<String>,
     /// With the GitHub grant provider, its grant (empty without a valid login or a current set).
     pub github: Option<GithubGrant>,
@@ -275,7 +282,7 @@ impl Providers {
     }
 
     /// With the GitHub grant provider, its host, whatever a subject's login (#332).
-    #[cfg_attr(not(feature = "ui"), allow(dead_code))]
+    #[cfg_attr(not(any(feature = "ui", test)), expect(dead_code))]
     pub fn github(&self) -> Option<&str> {
         #[cfg(feature = "postgres")]
         if let Some(cache) = &self.github {
@@ -303,7 +310,7 @@ impl Providers {
     /// With the GitHub grant provider, the newest permissions set's workspace version and the
     /// identities it excluded from it (#333), for the console's `excluded` flag.
     #[cfg(feature = "ui")]
-    #[cfg_attr(not(feature = "generation-pointer"), allow(dead_code))]
+    #[cfg_attr(not(feature = "generation-pointer"), expect(dead_code))]
     pub fn excluded(&self) -> Option<(String, std::collections::BTreeSet<String>)> {
         #[cfg(feature = "postgres")]
         if let Some(cache) = &self.github {

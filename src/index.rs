@@ -620,7 +620,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         "documents",
         &documents_found(root, &all, serve),
         now,
-        |abs| read_up_to(abs, document::MAX_BYTES),
+        |abs| read_up_to(abs, document::DOCUMENT_BYTES_MAX),
         |path, src| Ok(serde_json::to_string(&document::read(path, src))?),
     )?;
     refresh_stamped(
@@ -1263,7 +1263,7 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
         (
             "documents",
             documents_found(root, &all, serve),
-            document::MAX_BYTES,
+            document::DOCUMENT_BYTES_MAX,
         ),
         ("manifests", manifests_found(&all), lang::MAX_BYTES),
     ];
@@ -1423,7 +1423,7 @@ pub(crate) fn read_config(root: &Path, path: &str) -> Option<Vec<u8>> {
 }
 
 /// A file read up to one byte past `max`, the size its reader takes as invalid past, whatever
-/// the rest holds (`lang::MAX_BYTES` for a manifest or pack config, `document::MAX_BYTES`
+/// the rest holds (`lang::MAX_BYTES` for a manifest or pack config, `document::DOCUMENT_BYTES_MAX`
 /// for a provider document): the rest is never read, and what was read stands for the whole
 /// file wherever it is hashed.
 fn read_up_to(abs: &Path, max: usize) -> std::io::Result<Vec<u8>> {

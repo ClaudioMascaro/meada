@@ -47,3 +47,19 @@ fn a_method_beside_a_free_function_stays_one_line_each() {
     assert_golden("overloads-mixed.context-run.txt", &context);
     assert_golden("overloads-mixed.trace-run.txt", &trace);
 }
+
+#[test]
+fn a_process_ends_at_an_overload_set_as_a_leaf() {
+    let repo = fixture_repo("overloads-entry", "overloads-entry", None);
+    let engine = Engine::open(&repo).unwrap();
+    let trace = engine
+        .trace(
+            Start::From(
+                "process::local/overloads-entry::src/main/java/ex/Box.java::ex.Box.run(Object)",
+            ),
+            Direction::Down,
+            None,
+        )
+        .unwrap();
+    assert_golden("overloads-entry.trace-process.txt", &trace);
+}

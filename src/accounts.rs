@@ -54,12 +54,15 @@ pub const PROPOSALS_SURFACE: &str = "proposals";
 /// How long a session token lives.
 pub const SESSION_HOURS: u64 = 8;
 /// How long an agent token lives when its request names no validity, and the most it may.
+// ponytail: a bearer token's lifetime is bounded; a week is the longest an agent token lives.
 pub const AGENT_HOURS: u64 = 8;
 pub const AGENT_HOURS_MAX: u64 = 168;
 /// What a password holds, in Unicode scalar values (OWASP ASVS).
+// ponytail: OWASP ASVS's bounds; a longer password is refused before any hashing.
 pub const PASSWORD_MIN: usize = 12;
 pub const PASSWORD_MAX: usize = 128;
 /// The most characters of a username.
+// ponytail: a username is a short login name, not free text.
 pub const USERNAME_MAX: usize = 64;
 /// What every local account's subject starts with, so it never equals an identity provider's.
 pub const SUBJECT_PREFIX: &str = "local:";

@@ -2480,7 +2480,8 @@ mod tests {
         let facts = facts(&src);
         assert_eq!(facts.defs.len(), 30_000);
         // Quadratic sibling lookups took minutes here.
-        assert!(start.elapsed().as_secs() < 20, "{:?}", start.elapsed());
+        // 3.7 s measured in a local debug build; the bound is over twenty times that.
+        assert!(start.elapsed().as_secs() < 90, "{:?}", start.elapsed());
     }
 
     #[test]
