@@ -69,6 +69,7 @@ jobs:
   # Cloud modules (ADR 0012): every feature, against a local Valkey and S3-compatible server.
   cloud:
     runs-on: ubuntu-24.04
+    # scripts/test-services mirrors these services and env; tests/it/test_services.rs keeps them in step.
     services:
       valkey:
         # 7.2 is the oldest Valkey ADR 0012 supports.

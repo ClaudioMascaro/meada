@@ -77,7 +77,7 @@ Un cambio bajo la feature de un módulo de nube `<f>` (ADR 0012) también pasa p
 tiene además el job `cloud`: comprueba que el build por defecto no trae ningún crate de módulo y
 corre clippy y los tests con `--all-features`, contra un Valkey y un servidor compatible con S3
 (los tests que los necesitan leen `MEADA_TEST_VALKEY_URL` y `MEADA_TEST_S3_ENDPOINT`, y sin
-ellas avisan y se saltan).
+ellas avisan y se saltan). `scripts/test-services up` los levanta como la CI e imprime los `export`; `scripts/test-services down` los quita.
 
 Si el cambio toca el comportamiento, incluye la prueba que lo cubre.
 

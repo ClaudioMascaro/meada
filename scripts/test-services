@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# Starts the services of CI's `cloud` job (.github/workflows/ci.yml) on loopback and prints the
+# exports that make the service tests run. tests/it/test_services.rs keeps the two in step.
+#   scripts/test-services up     start (or reuse) the containers, wait, print the exports
+#   scripts/test-services down   remove them
+set -euo pipefail
+
+VALKEY_IMAGE=valkey/valkey:7.2-alpine
+VALKEY_PORT=6379
+S3_IMAGE=rustfs/rustfs:1.0.1
+S3_PORT=9000
+S3_ACCESS_KEY=meada-test
+S3_SECRET_KEY=meada-test-secret
+POSTGRES_IMAGE=postgres:15-alpine
+POSTGRES_PORT=5432
+POSTGRES_PASSWORD=meada-test
+POSTGRES_TLS_PORT=5433
+
+NAMES="meada-test-valkey meada-test-s3 meada-test-postgres meada-test-postgres-tls"
+
+# Docker Hub rate limits pulls: retry the same tag from the ECR mirrors and tag it as asked.
+pull() {
+  docker image inspect "$1" >/dev/null 2>&1 && return 0
+  docker pull "$1" >/dev/null 2>&1 && return 0
+  case "$1" in
+    rustfs/*) echo "test-services: cannot pull $1" >&2; return 1 ;;
+  esac
+  echo "test-services: pulling $1 failed, trying public.ecr.aws" >&2
+  local mirror
+  for mirror in "public.ecr.aws/docker/library/${1##*/}" "public.ecr.aws/$1"; do
+    if docker pull "$mirror" >/dev/null 2>&1; then
+      docker tag "$mirror" "$1"
+      return 0
+    fi
+  done
+  echo "test-services: cannot pull $1" >&2
+  return 1
+}
+
+# start <name> <image> <docker run args...>: reuses a running container of the same image.
+start() {
+  local name=$1 image=$2 run=() cmd=()
+  shift 2
+  while [ $# -gt 0 ] && [ "$1" != -- ]; do run+=("$1"); shift; done
+  [ $# -eq 0 ] || { shift; cmd=("$@"); }
+  if [ "$(docker inspect -f '{{.State.Running}} {{.Config.Image}}' "$name" 2>/dev/null)" = "true $image" ]; then
+    return 0
+  fi
+  docker rm -f "$name" >/dev/null 2>&1 || true
+  pull "$image"
+  docker run -d --name "$name" "${run[@]}" "$image" "${cmd[@]}" >/dev/null
+}
+
+# The second Postgres, over TLS (#483), as CI's step "Postgres over TLS" makes it.
+tls_postgres() {
+  local dir="${TMPDIR:-/tmp}/meada-test-postgres-tls" as_root=
+  [ "$(id -u)" = 0 ] || as_root=sudo
+  if [ ! -f "$dir/ca.pem" ]; then
+    rm -rf "$dir" && mkdir -p "$dir"
+    (
+      cd "$dir"
+      openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-384 -sha384 -nodes -days 2 \
+        -subj /CN=meada-test-ca -keyout ca.key -out ca.pem 2>/dev/null
+      openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -subj /CN=127.0.0.1 \
+        -keyout server.key -out server.csr 2>/dev/null
+      printf 'subjectAltName=IP:127.0.0.1\nbasicConstraints=CA:FALSE\n' > server.ext
+      openssl x509 -req -in server.csr -CA ca.pem -CAkey ca.key -CAcreateserial -sha384 \
+        -days 2 -extfile server.ext -out server.pem 2>/dev/null
+    )
+    $as_root chown 70:70 "$dir/server.key" "$dir/server.pem"
+    $as_root chmod 600 "$dir/server.key"
+  fi
+  start meada-test-postgres-tls "$POSTGRES_IMAGE" -p "127.0.0.1:$POSTGRES_TLS_PORT:5432" \
+    -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" -v "$dir:/tls:ro" \
+    -- -c ssl=on -c ssl_cert_file=/tls/server.pem -c ssl_key_file=/tls/server.key
+  TLS_CA="$dir/ca.pem"
+}
+
+wait_for() {
+  local what=$1
+  shift
+  for _ in $(seq 60); do "$@" >/dev/null 2>&1 && return 0; sleep 1; done
+  echo "test-services: $what did not answer" >&2
+  return 1
+}
+
+case "${1:-}" in
+  up)
+    command -v docker curl openssl >/dev/null || { echo "test-services: docker, curl and openssl are required" >&2; exit 1; }
+    start meada-test-valkey "$VALKEY_IMAGE" -p "127.0.0.1:$VALKEY_PORT:6379"
+    start meada-test-s3 "$S3_IMAGE" -p "127.0.0.1:$S3_PORT:9000" \
+      -e RUSTFS_ACCESS_KEY="$S3_ACCESS_KEY" -e RUSTFS_SECRET_KEY="$S3_SECRET_KEY"
+    start meada-test-postgres "$POSTGRES_IMAGE" -p "127.0.0.1:$POSTGRES_PORT:5432" \
+      -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD"
+    tls_postgres
+    wait_for valkey docker exec meada-test-valkey valkey-cli ping
+    wait_for s3 curl -s -o /dev/null "http://127.0.0.1:$S3_PORT/"
+    # initdb restarts the server once, so ask over TCP, which only the final server answers.
+    wait_for postgres docker exec meada-test-postgres pg_isready -h 127.0.0.1 -U postgres
+    wait_for postgres-tls docker exec meada-test-postgres-tls pg_isready -h 127.0.0.1 -U postgres
+    echo "export MEADA_TEST_VALKEY_URL=redis://127.0.0.1:$VALKEY_PORT"
+    echo "export MEADA_TEST_S3_ENDPOINT=http://127.0.0.1:$S3_PORT"
+    echo "export MEADA_TEST_POSTGRES_URL=postgres://postgres:$POSTGRES_PASSWORD@127.0.0.1:$POSTGRES_PORT/postgres"
+    echo "export MEADA_TEST_POSTGRES_TLS_URL=postgres://postgres:$POSTGRES_PASSWORD@127.0.0.1:$POSTGRES_TLS_PORT/postgres"
+    echo "export MEADA_TEST_POSTGRES_TLS_CA=$TLS_CA"
+    echo "export MEADA_TEST_SERVICES_REQUIRED=1"
+    ;;
+  down)
+    # shellcheck disable=SC2086 # NAMES is a word list
+    docker rm -f $NAMES >/dev/null 2>&1 || true
+    ;;
+  *)
+    echo "usage: scripts/test-services up|down" >&2
+    exit 2
+    ;;
+esac
