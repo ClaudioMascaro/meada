@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Range;
+use std::rc::Rc;
 
 use tree_sitter::{Language, Node, Parser};
 
@@ -265,15 +266,20 @@ impl LanguagePack for TsJs {
         // not JSON or not an object declares no paths, and indexing carries on.
         // The nearest config above an importer serves it; in one directory `tsconfig.json`
         // comes first in `configs`, so it wins. A config under `node_modules` declares nothing.
-        let mut by_dir: HashMap<String, Aliases> = HashMap::new();
+        // Each config is read once; an `extends` is followed among these (`Aliases::parse`).
+        let mut read: HashMap<String, Options> = HashMap::new();
+        let mut nearest: HashMap<&str, &str> = HashMap::new();
         for (path, src) in configs {
             let dir = path.rsplit_once('/').map_or("", |(dir, _)| dir);
             if !path.split('/').any(|s| s == "node_modules") {
-                by_dir
-                    .entry(dir.to_string())
-                    .or_insert_with(|| Aliases::parse(dir, src));
+                nearest.entry(dir).or_insert(path);
+                read.insert(path.to_string(), Options::read(dir, src));
             }
         }
+        let by_dir: HashMap<String, Aliases> = nearest
+            .into_iter()
+            .map(|(dir, path)| (dir.to_string(), Aliases::parse(path, &read)))
+            .collect();
         Ok(Box::new(move |importer, specifier| {
             let dir = importer.rsplit_once('/').map_or("", |(dir, _)| dir);
             let bases: Vec<String> = if specifier.starts_with('.') {
@@ -300,39 +306,96 @@ impl LanguagePack for TsJs {
     }
 }
 
-/// `compilerOptions.baseUrl` and `paths` of a `tsconfig.json` (or `jsconfig.json`) in `dir`.
-// ponytail: `extends` and project `references` are not followed.
-#[derive(Default)]
-struct Aliases {
+type Paths = Rc<Vec<(String, Vec<String>)>>;
+
+/// What one `tsconfig.json` (or `jsconfig.json`) in `dir` says of `baseUrl`, `paths` and
+/// `extends`, each `None` when it does not say it.
+struct Options {
     dir: String,
-    base_url: Option<String>,
-    paths: Vec<(String, Vec<String>)>,
+    /// The config an `extends` names, as a repository path: a relative path inside the
+    /// repository (`.json` added when missing). A package, an absolute path or a path that leaves
+    /// the repository is no `extends` here.
+    extends: Option<String>,
+    /// `baseUrl` joined to `dir`; `Some(None)` when it leaves the repository.
+    base_url: Option<Option<String>>,
+    paths: Option<Paths>,
 }
 
-impl Aliases {
-    fn parse(dir: &str, src: &[u8]) -> Self {
-        let empty = Self {
+impl Options {
+    fn read(dir: &str, src: &[u8]) -> Self {
+        let mut out = Self {
             dir: dir.to_string(),
-            ..Self::default()
+            extends: None,
+            base_url: None,
+            paths: None,
         };
         let Some(config) = package::tsconfig_root(src) else {
-            return empty;
+            return out;
         };
         let options = &config["compilerOptions"];
-        let paths = options["paths"]
-            .as_object()
-            .into_iter()
-            .flatten()
-            .map(|(pattern, targets)| {
+        out.extends = config["extends"]
+            .as_str()
+            .filter(|e| e.starts_with("./") || e.starts_with("../"))
+            .and_then(|e| join(dir, e))
+            .map(|e| if e.ends_with(".json") { e } else { e + ".json" });
+        out.base_url = options["baseUrl"].as_str().map(|b| join(dir, b));
+        out.paths = options["paths"].as_object().map(|paths| {
+            let paths = paths.iter().map(|(pattern, targets)| {
                 let targets = targets.as_array().into_iter().flatten();
                 let targets = targets.filter_map(|t| t.as_str().map(String::from));
                 (pattern.clone(), targets.collect())
-            })
-            .collect();
+            });
+            Rc::new(paths.collect())
+        });
+        out
+    }
+}
+
+/// How many configs an `extends` chain may follow after the nearest one. A chain that goes
+/// deeper, or back to a config it already holds, reads as the nearest config alone.
+// ponytail: real monorepos extend one or two levels (package, then root); 8 is far past any.
+const EXTENDS_DEPTH: usize = 8;
+
+/// The `compilerOptions.baseUrl` and `paths` an importer's nearest config gives it: those of the
+/// config itself, then of the chain of its `extends`, the nearest to declare each option winning
+/// (the option as a whole, as TypeScript merges them).
+// ponytail: project `references`, an `extends` array and a base that is not named `tsconfig.json`
+// or `jsconfig.json` are not followed (only those files are read).
+#[derive(Default)]
+struct Aliases {
+    /// What `paths` targets are relative to without `baseUrl`: the directory of the config
+    /// that declares `paths`.
+    dir: String,
+    base_url: Option<String>,
+    paths: Paths,
+}
+
+impl Aliases {
+    /// The aliases of the config at `path`, among every `read` config of the repository.
+    fn parse(path: &str, read: &HashMap<String, Options>) -> Self {
+        let mut chain: Vec<&Options> = Vec::new();
+        let mut seen: Vec<&str> = Vec::new();
+        let mut next = Some(path);
+        while let Some(at) = next {
+            let Some((at, options)) = read.get_key_value(at) else {
+                break;
+            };
+            if chain.len() > EXTENDS_DEPTH || seen.contains(&at.as_str()) {
+                chain.truncate(1);
+                break;
+            }
+            seen.push(at);
+            chain.push(options);
+            next = options.extends.as_deref();
+        }
+        let Some(nearest) = chain.first() else {
+            return Self::default();
+        };
+        let declared = chain.iter().find(|o| o.paths.is_some());
         Self {
-            base_url: options["baseUrl"].as_str().and_then(|b| join(dir, b)),
-            paths,
-            ..empty
+            dir: declared.unwrap_or(nearest).dir.clone(),
+            base_url: chain.iter().find_map(|o| o.base_url.clone()).flatten(),
+            paths: declared.and_then(|o| o.paths.clone()).unwrap_or_default(),
         }
     }
 
@@ -341,7 +404,7 @@ impl Aliases {
     /// targets are relative to the config file's directory.
     fn expand(&self, specifier: &str) -> Vec<String> {
         let mut best: Option<(usize, &str, &[String])> = None;
-        for (pattern, targets) in &self.paths {
+        for (pattern, targets) in self.paths.iter() {
             let matched = match pattern.split_once('*') {
                 Some((prefix, suffix)) => specifier
                     .strip_prefix(prefix)
@@ -1322,6 +1385,102 @@ mod tests {
         // A hostile nested config declares nothing, and hides the root's aliases from its subtree.
         assert!(modules("bad/a.ts", "@/b").is_empty());
         assert!(!has("app/node_modules/p/a.ts", "app/node_modules/p/x/b.ts"));
+    }
+
+    /// The files `@/b` names from `from`, given `configs` as `(path, json)`.
+    fn aliased(configs: &[(&str, &str)], from: &str) -> Vec<String> {
+        let configs: Vec<(&str, &[u8])> = configs.iter().map(|(p, j)| (*p, j.as_bytes())).collect();
+        let modules = TsJs.modules(&configs, &BTreeMap::new()).unwrap();
+        modules(from, "@/b").iter().cloned().collect()
+    }
+
+    #[test]
+    fn an_extends_inside_the_repository_lends_its_paths_and_the_nearest_option_wins() {
+        let root = r#"{"compilerOptions": {"paths": {"@/*": ["lib/*"]}}}"#;
+        let base = r#"{"extends": "../../tsconfig", "compilerOptions": {"baseUrl": "."}}"#;
+        let configs = [
+            ("tsconfig.json", root),
+            (
+                "packages/a/tsconfig.json",
+                r#"{"extends": "../../tsconfig.json"}"#,
+            ),
+            ("packages/b/tsconfig.json", base),
+            (
+                "packages/c/tsconfig.json",
+                r#"{"extends": "../a/tsconfig.json", "compilerOptions": {"paths": {"@/*": ["c/*"]}}}"#,
+            ),
+            // A package, a path outside the repository and an absolute path are unread.
+            (
+                "packages/d/tsconfig.json",
+                r#"{"extends": "@tsconfig/node18"}"#,
+            ),
+            (
+                "packages/e/tsconfig.json",
+                r#"{"extends": "../../../tsconfig.json"}"#,
+            ),
+            (
+                "packages/f/tsconfig.json",
+                r#"{"extends": "/tsconfig.json"}"#,
+            ),
+        ];
+        let has = |from: &str, file: &str| aliased(&configs, from).contains(&file.to_string());
+        // `paths` are relative to the config that declares them.
+        assert!(has("packages/a/src/x.ts", "lib/b.ts"));
+        // The nearest `baseUrl` is the base of the root's `paths`, and also resolves the bare name.
+        assert!(has("packages/b/src/x.ts", "packages/b/lib/b.ts"));
+        assert!(has("packages/b/src/x.ts", "packages/b/@/b.ts"));
+        // A nested `paths` replaces the base's, through the chain.
+        assert!(has("packages/c/src/x.ts", "packages/c/c/b.ts"));
+        assert!(!has("packages/c/src/x.ts", "lib/b.ts"));
+        for dir in ["d", "e", "f"] {
+            assert!(aliased(&configs, &format!("packages/{dir}/x.ts")).is_empty());
+        }
+    }
+
+    #[test]
+    fn an_extends_chain_past_the_limit_or_in_a_cycle_reads_as_the_nearest_config_alone() {
+        let root = r#"{"compilerOptions": {"paths": {"@/*": ["lib/*"]}}}"#.to_string();
+        // `c0` extends `c1` and so on, the last extending the root: `links` configs in between.
+        let chain = |links: usize| {
+            let mut configs = vec![("tsconfig.json".to_string(), root.clone())];
+            for i in 0..links {
+                let up = if i + 1 == links {
+                    "../tsconfig.json".into()
+                } else {
+                    format!("../c{}/tsconfig.json", i + 1)
+                };
+                configs.push((
+                    format!("c{i}/tsconfig.json"),
+                    format!(r#"{{"extends": "{up}"}}"#),
+                ));
+            }
+            configs
+        };
+        let reaches = |configs: &[(String, String)]| {
+            let configs: Vec<(&str, &str)> = configs
+                .iter()
+                .map(|(p, j)| (p.as_str(), j.as_str()))
+                .collect();
+            aliased(&configs, "c0/x.ts").contains(&"lib/b.ts".to_string())
+        };
+        // The nearest config and `EXTENDS_DEPTH` more reach the root's paths; one more does not.
+        assert!(reaches(&chain(EXTENDS_DEPTH)));
+        assert!(!reaches(&chain(EXTENDS_DEPTH + 1)));
+        assert!(!reaches(&chain(EXTENDS_DEPTH * 1000)));
+        // A cycle reads as the nearest config alone, which here declares paths of its own.
+        let own = r#"{"extends": "../c1/tsconfig.json", "compilerOptions": {"paths": {"@/*": ["own/*"]}}}"#;
+        let cycle = [
+            ("c0/tsconfig.json", own),
+            (
+                "c1/tsconfig.json",
+                r#"{"extends": "../c0/tsconfig.json", "compilerOptions": {"baseUrl": "x"}}"#,
+            ),
+        ];
+        let found = aliased(&cycle, "c0/x.ts");
+        assert!(found.contains(&"c0/own/b.ts".to_string()), "{found:?}");
+        assert!(!found.iter().any(|f| f.starts_with("c1/")), "{found:?}");
+        let selfie = [("c0/tsconfig.json", r#"{"extends": "./tsconfig.json"}"#)];
+        assert!(aliased(&selfie, "c0/x.ts").is_empty());
     }
 
     #[test]

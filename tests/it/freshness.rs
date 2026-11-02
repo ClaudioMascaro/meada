@@ -2270,6 +2270,44 @@ fn a_nested_tsconfig_binds_its_own_imports_and_an_edit_rebinds_them() {
     assert_eq!(target(&json, "b").0, "exact");
 }
 
+/// A package config that only `extends` the root's takes the root's `paths` (its alias import is
+/// `exact`), one with `paths` of its own keeps them, and editing the base rebinds the first: the
+/// refreshed export equals a cold one.
+#[test]
+fn an_extending_tsconfig_binds_the_base_paths_and_an_edit_of_the_base_rebinds_them() {
+    let target = |export: &str, project: &str| {
+        let json: serde_json::Value = serde_json::from_str(export).unwrap();
+        let id = format!("packages/{project}/src/main.ts::main::cn#0");
+        let call = (json["calls"].as_array().unwrap().iter())
+            .find(|c| c["id"].as_str().unwrap().ends_with(&id))
+            .unwrap_or_else(|| panic!("no call {id}"));
+        (call["level"].clone(), call["target"].clone())
+    };
+    let edit = |repo: &Path| {
+        replace(repo, "tsconfig.json", "./lib/*", "./nowhere/*");
+    };
+    let repo = fixture_repo("fresh_ts_extends", "ts-extends-config", ORIGIN);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    for (project, file) in [("a", "lib/utils.ts"), ("b", "packages/b/src/utils.ts")] {
+        let (level, to) = target(&before, project);
+        assert_eq!(level, "exact", "{project}");
+        assert!(
+            to.as_str().unwrap().ends_with(&format!("{file}::cn")),
+            "{project}"
+        );
+    }
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_ts_extends_cold", "ts-extends-config", ORIGIN, edit)
+    );
+    assert!(target(&refreshed, "a").0.is_null());
+    assert_eq!(target(&refreshed, "b").0, "exact");
+}
+
 const POETRY_FROM_LIB: &str = "[tool.poetry]\npackages = [{ include = \"pkg\", from = \"lib\" }]\n";
 
 #[test]
