@@ -12,6 +12,8 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use super::{Api, fixture, prefix};
+#[cfg(feature = "refresh-lock")]
+use crate::generations::Fleet;
 use crate::manifest::{CHAIN, MANIFEST, chain_manifest};
 
 /// The bootstrap manifest of a managed workspace, beside the chain's own.
@@ -901,6 +903,58 @@ fn a_hostile_pagination_link_fails_the_run_and_is_never_followed() {
     case.checked(BOOTSTRAP, None, "4 repositories, 0 rows, 0 exclusions");
 }
 
+/// The fleet's chain in `fleet.dir` as a managed workspace: `BOOTSTRAP` takes the fleet's store,
+/// Valkey and lock and the role check's sections and is migrated, and the fake lists one
+/// collaborator per chain repository.
+#[cfg(feature = "refresh-lock")]
+fn managed(case: &Case, fleet: &Fleet) {
+    let dir = &fleet.dir;
+    fs::write(dir.join("ops/pg-url"), &case.url).unwrap();
+    let manifest = fs::read_to_string(dir.join(MANIFEST)).unwrap();
+    let fleet_sections = &manifest[manifest.find("\n[snapshot]").unwrap()..];
+    let bootstrap = format!(
+        "index_dir = \"../store-indexes\"\n{fleet_sections}\n[workspace]\nsource = \"store\"\n{}",
+        case.sections(None, false)
+    );
+    fs::write(dir.join(BOOTSTRAP), bootstrap).unwrap();
+    let _ = fs::remove_dir_all(dir.join("store-indexes"));
+    assert_eq!(on_bootstrap(dir, &["postgres", "migrate"]).2, Some(0));
+    // The fleet's Valkey holds the installations under its own prefix: the fake's App 1.
+    case.list("chain/web", &[("ana-souza", "write")]);
+    case.list("chain/gateway", &[("u0001", "write")]);
+    case.list("chain/catalog", &[("u0002", "write")]);
+    case.list("chain/worker", &[("u0003", "write")]);
+}
+
+/// `text`'s entries with `logins` as their `added_by`, imported as `name` and applied: its id.
+#[cfg(feature = "refresh-lock")]
+fn apply_version(dir: &Path, text: &str, name: &str, logins: [Option<&str>; 4]) -> String {
+    let file = format!("ops/{name}.toml");
+    fs::write(dir.join(&file), crate::generations::added(text, &logins)).unwrap();
+    let (id, _) = crate::generations::import(dir, &file, name, "alice");
+    let (stdout, stderr, code) = meada(
+        dir,
+        &["workspace", "apply", &id, "--workspace", MANIFEST],
+        &[],
+    );
+    assert_eq!(code, Some(0), "{stdout}{stderr}");
+    id
+}
+
+/// The identities of generation `generation` in the fleet's store, sorted.
+#[cfg(feature = "refresh-lock")]
+fn held_by(fleet: &Fleet, generation: &str) -> Vec<String> {
+    let s3 = crate::snapshot::bucket(&fleet.endpoint, &fleet.bucket);
+    let key = format!("prod/meada/generations/{generation}.json");
+    let document: serde_json::Value =
+        serde_json::from_slice(&crate::snapshot::get(&s3, &key)).unwrap();
+    let mut held: Vec<String> = (document["repositories"].as_array().unwrap().iter())
+        .map(|r| r["identity"].as_str().unwrap().to_string())
+        .collect();
+    held.sort();
+    held
+}
+
 /// The job's refresh under `meada snapshot lock` (pull, the role check, the fetch list
 /// `show --pulled` gives, index, publish) against the local store: an addition without an
 /// accepted role is absent from the published generation; one that stops at the role check
@@ -919,36 +973,9 @@ fn a_refresh_publishes_only_eligible_additions_and_an_adopted_one_after_its_chec
         return;
     };
     let dir = &fleet.dir;
-    // The fleet's chain in `dir`, with its store, Valkey and lock; the role check's sections.
-    fs::write(dir.join("ops/pg-url"), &case.url).unwrap();
-    let manifest = fs::read_to_string(dir.join(MANIFEST)).unwrap();
-    let fleet_sections = &manifest[manifest.find("\n[snapshot]").unwrap()..];
-    let bootstrap = format!(
-        "index_dir = \"../store-indexes\"\n{fleet_sections}\n[workspace]\nsource = \"store\"\n{}",
-        case.sections(None, false)
-    );
-    fs::write(dir.join(BOOTSTRAP), bootstrap).unwrap();
-    let _ = fs::remove_dir_all(dir.join("store-indexes"));
-    assert_eq!(on_bootstrap(dir, &["postgres", "migrate"]).2, Some(0));
-    // The fleet's Valkey holds the installations under its own prefix: the fake's App 1.
-    case.list("chain/web", &[("ana-souza", "write")]);
-    case.list("chain/gateway", &[("u0001", "write")]);
-    case.list("chain/catalog", &[("u0002", "write")]);
-    case.list("chain/worker", &[("u0003", "write")]);
-
+    managed(&case, &fleet);
     let text = fs::read_to_string(dir.join(MANIFEST)).unwrap();
-    let version = |name: &str, logins: [Option<&str>; 4]| {
-        let file = format!("ops/{name}.toml");
-        fs::write(dir.join(&file), crate::generations::added(&text, &logins)).unwrap();
-        let (id, _) = crate::generations::import(dir, &file, name, "alice");
-        let (stdout, stderr, code) = meada(
-            dir,
-            &["workspace", "apply", &id, "--workspace", MANIFEST],
-            &[],
-        );
-        assert_eq!(code, Some(0), "{stdout}{stderr}");
-        id
-    };
+    let version = |name: &str, logins: [Option<&str>; 4]| apply_version(dir, &text, name, logins);
     let v1 = version("v1", [Some("ana-souza"), Some("bia_acme"), None, None]);
     // `show` carries `added_by`, and its output imports to the same id.
     let (shown, stderr, code) = meada(
@@ -964,18 +991,7 @@ fn a_refresh_publishes_only_eligible_additions_and_an_adopted_one_after_its_chec
         v1
     );
 
-    let s3 = crate::snapshot::bucket(&fleet.endpoint, &fleet.bucket);
-    let held = |generation: &str| -> Vec<String> {
-        let key = format!("prod/meada/generations/{generation}.json");
-        let document: serde_json::Value =
-            serde_json::from_slice(&crate::snapshot::get(&s3, &key)).unwrap();
-        let repositories = document["repositories"].as_array().unwrap();
-        let mut held: Vec<String> = (repositories.iter())
-            .map(|r| r["identity"].as_str().unwrap().to_string())
-            .collect();
-        held.sort();
-        held
-    };
+    let held = |generation: &str| held_by(&fleet, generation);
     let refresh = || {
         let script = "set -e\n\
             \"$MEADA\" workspace pull --workspace ops/bootstrap.toml\n\
@@ -1048,6 +1064,83 @@ fn a_refresh_publishes_only_eligible_additions_and_an_adopted_one_after_its_chec
     let (g3, stderr, code) = refresh();
     assert_eq!(code, Some(0), "{stderr}");
     assert_eq!(g3, g2);
+}
+
+/// `deploy/compose/managed-refresh.sh` itself, under `meada snapshot lock`, with its paths moved
+/// into a case directory and `fetch-pulled.sh` (tested on its own) replaced by a stub that keeps
+/// the list it is given: a successful role check with one excluded entry (the gateway, whose
+/// adder GitHub lists no role for) hands the fetch the eligible entries and publishes them,
+/// exit 0. A failed role check exits 1 with the check's line before the script lists the pulled
+/// version or reaches the fetch, and the pointer keeps the last generation; the check repaired,
+/// the next run publishes the same generation.
+#[cfg(feature = "refresh-lock")]
+#[test]
+fn the_compose_managed_refresh_stops_at_a_failed_role_check_and_publishes_the_eligible_set() {
+    let Some(case) = Case::new("roles_managed", &[1]) else {
+        return;
+    };
+    let Some(fleet) = crate::refresh_lock::fleet("roles_managed_fleet") else {
+        return;
+    };
+    let dir = &fleet.dir;
+    managed(&case, &fleet);
+    let text = fs::read_to_string(dir.join(MANIFEST)).unwrap();
+    apply_version(
+        dir,
+        &text,
+        "v1",
+        [Some("ana-souza"), Some("bia_acme"), None, None],
+    );
+    // The script reads its bootstrap where the compose profile mounts it.
+    fs::copy(dir.join(BOOTSTRAP), dir.join(MANIFEST)).unwrap();
+    crate::refresh_lock::compose_managed(dir);
+    fs::write(
+        dir.join("ops/fetch-pulled.sh"),
+        "cp \"$1\" ops/fetched.toml\n",
+    )
+    .unwrap();
+    let refresh = || {
+        for left in ["pulled.toml", "fetched.toml"] {
+            let _ = fs::remove_file(dir.join("ops").join(left));
+        }
+        let (stdout, stderr, code) =
+            crate::refresh_lock::compose_run(dir, "managed-refresh.sh", "");
+        case.clean(&stderr);
+        (
+            stdout.lines().last().unwrap_or("").to_string(),
+            stderr,
+            code,
+        )
+    };
+    let current = || crate::refresh_lock::current(&fleet).0;
+
+    let (g1, stderr, code) = refresh();
+    assert_eq!(code, Some(0), "{stderr}");
+    assert!(
+        stderr.contains(&format!(
+            "meada: {GATEWAY}: excluded: GitHub lists no role for its added_by\n"
+        )),
+        "{stderr}"
+    );
+    assert_eq!(current(), g1);
+    assert_eq!(held_by(&fleet, &g1), [CATALOG, WEB, WORKER]);
+    let list = fs::read_to_string(dir.join("ops/fetched.toml")).unwrap();
+    assert!(!list.contains(GATEWAY) && list.contains(WEB), "{list}");
+
+    // The role check fails: the script exits 1 before it lists the pulled version, so the fetch
+    // never runs, and nothing is published.
+    case.api.with(|s| s.listing_status = Some(502));
+    let (_, stderr, code) = refresh();
+    assert_eq!(code, Some(1), "{stderr}");
+    assert!(stderr.contains("the role check failed"), "{stderr}");
+    assert!(!dir.join("ops/pulled.toml").exists() && !dir.join("ops/fetched.toml").exists());
+    assert_eq!(current(), g1);
+
+    // Repaired: the eligible set is the same, so is its generation.
+    case.api.with(|s| s.listing_status = None);
+    let (g2, stderr, code) = refresh();
+    assert_eq!(code, Some(0), "{stderr}");
+    assert_eq!(g2, g1);
 }
 
 /// With `[catalog]` the role check lists, per installation whose owner a pattern names, every
