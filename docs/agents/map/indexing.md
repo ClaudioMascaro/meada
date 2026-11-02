@@ -508,8 +508,9 @@ from ...", with the whole list. A value the index now stores joins it.
   module tree). The features reach `parse` as `Facts::setting` (`LanguagePack::settings` gives
   it per path, `parse_with` takes it; the index keeps it in `files.setting`): `refresh` parses a
   file again when the setting it was parsed under differs, so a toggled default feature gives
-  the cold export. The decider's `function_like` reads the nearest `Cargo.toml` files from disk
-  for the same setting. `lang/rust/crates.rs` (`Tree`) is the module tree behind the
+  the cold export. The decider's `function_like` parses under the setting the index stored for
+  the file (`Engine::stored_setting`), and reads the nearest `Cargo.toml` files from disk for it
+  only when the index has none. `lang/rust/crates.rs` (`Tree`) is the module tree behind the
   Rust `layout`, built once per refresh (each `Cargo.toml` parsed once for it; `settings` parses
   them once more, before any file is): the crate roots of every `Cargo.toml` with a `[package]`, at any
   depth (`[lib] path`, else `src/lib.rs`, `src/main.rs`, `[[bin]] path`, `src/bin/*.rs`,

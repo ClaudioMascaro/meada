@@ -32,9 +32,9 @@ pub(super) const ATTRIBUTE_BYTES: usize = 1024;
 /// `cfg` attribute the arm writes on every item, as tokens.
 pub(super) type Table<'s> = HashMap<&'s str, Vec<&'s str>>;
 
-/// The braced bodies of the item macros a file invokes in a module, an `impl` or a trait, each parsed on its own over
-/// the file's bytes (so spans are the file's), by the start of the invocation. A body that does
-/// not parse as items is none.
+/// The braced bodies of the item macros a file invokes in a module, an `impl` or a trait, each
+/// parsed on its own over the file's bytes (so spans are the file's), by the start of the
+/// invocation. A body that does not parse as items is none.
 pub(super) type Bodies = Vec<(usize, Tree)>;
 
 /// Reads what `LanguagePack::extend` needs of a file, whatever its setting: the `macro_rules!`
@@ -286,9 +286,8 @@ pub(super) fn table(extra: &str) -> Table<'_> {
 }
 
 /// The bodies of the item macros of `table` that the file at `root` invokes in a module, an
-/// `impl` or a trait, those
-/// written in such bodies too, `ITEM_MACRO_DEPTH` deep. Each body is parsed again; one that does
-/// not parse as items is left out, as is an empty one.
+/// `impl` or a trait, those written in such bodies too, `ITEM_MACRO_DEPTH` deep. Each body is
+/// parsed again; one that does not parse as items is left out, as is an empty one.
 pub(super) fn bodies(root: Node, src: &[u8], table: &Table) -> Result<Bodies> {
     let mut out = Vec::new();
     if table.is_empty() {

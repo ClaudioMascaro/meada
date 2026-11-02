@@ -1404,7 +1404,7 @@ fn plain_file(root: &Path, path: &str) -> Option<PathBuf> {
 }
 
 /// The setting the index stored for the file at `path` (`files.setting`: what the configs and
-/// `LanguagePack::extend` made of it); `None` when the index has no such file.
+/// `LanguagePack::extend` made of it); `None` when the index has no such file or cannot be read, and the caller works out the setting itself.
 pub(crate) fn stored_setting(db: &Connection, path: &str) -> Option<String> {
     (db.query_row(
         "SELECT setting FROM files WHERE path = ?1",
