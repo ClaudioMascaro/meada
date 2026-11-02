@@ -965,9 +965,9 @@
         "es": "De las bases a los contextos con nombre"
       },
       "summary": {
-        "pt": "S1, S2 e S4 estão entregues. S3 e S5 estão planejados; as setas mostram dependência, não datas.",
-        "en": "S1, S2 and S4 are delivered. S3 and S5 are planned; arrows show dependency, not dates.",
-        "es": "S1, S2 y S4 están entregados. S3 y S5 están planeados; las flechas muestran dependencia, no fechas."
+        "pt": "S1, S2, S3 e S4 estão entregues. S5 está planejado; as setas mostram dependência, não datas.",
+        "en": "S1, S2, S3 and S4 are delivered. S5 is planned; arrows show dependency, not dates.",
+        "es": "S1, S2, S3 y S4 están entregados. S5 está planeado; las flechas muestran dependencia, no fechas."
       },
       "start": "s1",
       "nodes": [
@@ -1047,13 +1047,13 @@
             "x": 0,
             "y": 460
           },
-          "kind": "planned",
+          "kind": "delivered",
           "stage": "S3",
           "issue": 294,
           "detail": {
-            "pt": "S3, #294 trata de owners e autorização das entradas. S4, #319 trata de identidade, grants, diretório e auditoria. Partes dessas bases podem avançar em paralelo; o grafo dos tickets determina os bloqueios reais.",
-            "en": "S3, #294 covers owners and entry authorization. S4, #319 covers identity, grants, directory and audit. Parts of these foundations can advance in parallel; the ticket graph determines the actual blockers.",
-            "es": "S3, #294 trata owners y autorización de entradas. S4, #319 trata identidad, grants, directorio y auditoría. Partes de estas bases pueden avanzar en paralelo; el grafo de tickets determina los bloqueos reales."
+            "pt": "S3, #294 trata de owners e autorização das entradas. S4, #319 trata de identidade, grants, diretório e auditoria. Partes dessas bases podem avançar em paralelo; o grafo dos tickets determina os bloqueios reais. Entregue no PR #426, com os comandos de owner do operador de equipe.",
+            "en": "S3, #294 covers owners and entry authorization. S4, #319 covers identity, grants, directory and audit. Parts of these foundations can advance in parallel; the ticket graph determines the actual blockers. Delivered in PR #426, with the team operator's owner commands.",
+            "es": "S3, #294 trata owners y autorización de entradas. S4, #319 trata identidad, grants, directorio y auditoría. Partes de estas bases pueden avanzar en paralelo; el grafo de tickets determina los bloqueos reales. Entregado en el PR #426, con los comandos de owner del operador de equipo."
           },
           "reference": {
             "pt": "#bases-em-construcao",
@@ -1137,12 +1137,12 @@
             "x": 0,
             "y": 710
           },
-          "kind": "planned",
+          "kind": "delivered",
           "issue": 316,
           "detail": {
-            "pt": "S5 depende das duas bases, da publicação atômica, #316, e da medição e validação, #338.",
-            "en": "S5 depends on both foundations, atomic publication, #316, and measurement and validation, #338.",
-            "es": "S5 depende de ambas bases, de la publicación atómica, #316, y de la medición y validación, #338."
+            "pt": "S5 depende das duas bases, da publicação atômica, #316, e da medição e validação, #338. Entregue no PR #426: uma falha aborta o refresh e preserva a geração atual.",
+            "en": "S5 depends on both foundations, atomic publication, #316, and measurement and validation, #338. Delivered in PR #426: a failure aborts the refresh and preserves the current generation.",
+            "es": "S5 depende de ambas bases, de la publicación atómica, #316, y de la medición y validación, #338. Entregado en el PR #426: un fallo aborta el refresh y conserva la generación actual."
           },
           "reference": {
             "pt": "#bases-em-construcao",
@@ -1195,7 +1195,7 @@
           "target": "s3",
           "sourceHandle": "left",
           "targetHandle": "top",
-          "kind": "planned"
+          "kind": "normal"
         },
         {
           "id": "s2-s4",
@@ -1211,7 +1211,7 @@
           "target": "s5",
           "sourceHandle": "right",
           "targetHandle": "top",
-          "kind": "planned"
+          "kind": "normal"
         },
         {
           "id": "s4-s5",
@@ -1227,7 +1227,7 @@
           "target": "s5",
           "sourceHandle": "right",
           "targetHandle": "left",
-          "kind": "planned"
+          "kind": "normal"
         },
         {
           "id": "measurement-s5",

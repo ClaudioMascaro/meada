@@ -1,6 +1,6 @@
 # Roadmap
 
-S1, S2, S4 e S5 estão entregues, com a medição de S5 contra uma organização real ([#338](https://github.com/ClaudioMascaro/meada/issues/338)) ainda aberta. S3 continua planejado. Este mapa mostra dependências e limites de escopo, sem prometer datas.
+S1, S2, S3, S4 e S5 estão entregues, com a medição de S5 contra uma organização real ([#338](https://github.com/ClaudioMascaro/meada/issues/338)) ainda aberta. Este mapa mostra dependências e limites de escopo, sem prometer datas.
 
 <!-- meada-graph:roadmap -->
 
@@ -10,7 +10,7 @@ S1, S2, S4 e S5 estão entregues, com a medição de S5 contra uma organização
 
 ## Bases em construção
 
-[S3, #294](https://github.com/ClaudioMascaro/meada/issues/294) trata de owners e autorização das entradas. [S4, #319](https://github.com/ClaudioMascaro/meada/issues/319), já entregue com a [identidade empresarial](enterprise.md), trata de identidade, grants, diretório e auditoria. Partes dessas bases podem avançar em paralelo; o grafo dos tickets determina os bloqueios reais. O mapa não representa S3 inteiro como pré-requisito de S4 inteiro.
+[S3, #294](https://github.com/ClaudioMascaro/meada/issues/294) trata de owners e autorização das entradas, entregues com os comandos de owner do operador de equipe e a regra de aborto do refresh ([#426](https://github.com/ClaudioMascaro/meada/pull/426)). [S4, #319](https://github.com/ClaudioMascaro/meada/issues/319), já entregue com a [identidade empresarial](enterprise.md), trata de identidade, grants, diretório e auditoria. Partes dessas bases podem avançar em paralelo; o grafo dos tickets determina os bloqueios reais. O mapa não representa S3 inteiro como pré-requisito de S4 inteiro.
 
 S5 depende das duas bases, da [publicação atômica, #316](https://github.com/ClaudioMascaro/meada/issues/316), e da [medição e validação, #338](https://github.com/ClaudioMascaro/meada/issues/338).
 
