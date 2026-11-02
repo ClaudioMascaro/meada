@@ -353,7 +353,8 @@ environment reads; the architecture map keeps the lead of the first:
   import names. The layout shares a module's scope among its files (`Layout::shared`), whose
   top-level overload families are one family across its files (`Group::families`,
   `Resolver::family_at`), and names it by its first file; `join` sets each file's
-  `Facts::unit` to its module, so `internal` declarations (`Facts::private`) stay in it
+  `Facts::unit` to its module, so `internal` declarations (`Facts::private`: C#'s non-public types, and constructors and
+  methods hidden outside their project) stay in it
   (`Resolver::hidden`), and appends the module's own inside glob after the imports, so its
   names come before an import's. `import M` is a namespace import of `M` and an outside glob
   of it, which takes `M`'s public names (`Facts::star`); `M` is the target of that name in the

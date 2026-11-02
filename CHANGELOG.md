@@ -218,6 +218,8 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- C#: an `internal`, `private` or `private protected` constructor or method of a public type is a candidate
+  from its own project's files alone (#441); `InternalsVisibleTo` stays unread.
 - The console writes one `ui: directory: unreadable` stderr line per request when the directory
   cannot be read (#451, after #335): the request's session remembers the failure at admission,
   so the flags, the admission counts and the owner picker take that answer and write no second

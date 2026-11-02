@@ -3186,7 +3186,8 @@ impl<'a> Resolver<'a> {
     }
 
     /// Whether `t` is, or is declared in, a type its file keeps to its compilation
-    /// (`Facts::private` of a file with a `Facts::unit`: C#'s `internal` types) and `path` is
+    /// (`Facts::private` of a file with a `Facts::unit`: C#'s `internal` types, and their non-public
+    /// constructors and methods) and `path` is
     /// in another one. A file in no project (its own unit) neither hides nor is hidden.
     // ponytail: `InternalsVisibleTo` is not read, so a friend project gets no link.
     // A file sees the `private` names of the units it lists in `Facts::internals`, but for the
@@ -10888,6 +10889,39 @@ mod csharp_tests {
                 ],
                 "{access:?}"
             );
+        }
+    }
+
+    const FOO: &str = "namespace Shop; public class Foo { internal Foo(int n) {} public Foo() {} \
+                       internal static void Make() {} private static void Own() {} \
+                       protected void Sub() {} }";
+
+    /// An `internal` or `private` constructor or method of a public type is its project's alone:
+    /// from another project `new Foo(1)` and `Foo.Make()` link to nothing, while the project's
+    /// own file links `exact`. A plain `protected` one stays visible (a derived class of another
+    /// project may call it).
+    #[test]
+    fn a_non_public_member_of_a_public_type_links_from_its_own_project_alone() {
+        let use_foo = "using Shop; class U { void M() { new Foo(1); Foo.Make(); Foo.Own(); \
+                       new Foo().Sub(); } }";
+        let found = resolved(&[("Kit/Foo.cs", FOO), ("App/Use.cs", use_foo)]);
+        let outside = calls_in(&found, "App/Use.cs");
+        for callee in ["Foo.Make", "Foo.Own"] {
+            let call = outside.iter().find(|(c, ..)| c == callee).unwrap();
+            assert_eq!(call.1, "unresolved", "{outside:?}");
+        }
+        let ctor = outside.iter().find(|(c, ..)| c == "Foo").unwrap();
+        assert!(
+            ctor.2.iter().all(|t| !t.contains("Foo.cs")) || ctor.1 != "exact",
+            "{outside:?}"
+        );
+        let sub = outside.iter().find(|(c, ..)| c.ends_with("Sub")).unwrap();
+        assert_ne!(sub.1, "unresolved", "{outside:?}");
+        let found = resolved(&[("Kit/Foo.cs", FOO), ("Kit/Use.cs", use_foo)]);
+        let own = calls_in(&found, "Kit/Use.cs");
+        for callee in ["Foo.Make", "Foo.Own", "Foo"] {
+            let call = own.iter().find(|(c, ..)| c == callee).unwrap();
+            assert_eq!(call.1, "exact", "{own:?}");
         }
     }
 

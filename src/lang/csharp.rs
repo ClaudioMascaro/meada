@@ -635,6 +635,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
             }
             if !public {
                 facts.hidden.push(inner.as_ref().clone());
+                // A member another project of the unit's repository may not call
+                // (`Resolver::hidden`); a type's own entries are pushed above.
+                if kind == Kind::Method {
+                    facts.private.push(inner.as_ref().clone());
+                }
             }
             for mut at in attributes(node, src, &scope) {
                 at.decorates = Some(inner.as_ref().clone());
