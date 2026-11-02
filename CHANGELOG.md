@@ -218,6 +218,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Swift: a call whose labels differ from a known outside member's resolves as if that base
+  were absent (#463): `x.hash(seed: 1)` on a type that conforms to `Hashable` and declares
+  `hash(seed:)` is `exact`, while `x.hash(into: &h)` stays opaque. A call with no labels, or in
+  another language, is still compared by its bare name.
 - Swift: an alias of an outside type reaches the repository's extensions of that type (#440). A
   receiver typed by `typealias Anim = Animation`, or by an alias of an alias, and `Anim.build()`
   match `extension Animation { }` as `Animation` does; an alias of an outside type with no
