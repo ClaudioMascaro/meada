@@ -218,6 +218,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Kotlin: a class, object or interface nested in an `expect` declaration, at any depth, is `expect`
+  too (#437), so a use of it resolves to the `expect` one instead of staying `ambiguous` among
+  its `actual` declarations.
 - C# `using static T` imports only the static members and nested types `T` declares (#433): a bare
   `Go()` with `Go` on a base of `T` was an `exact` link to the base's method, which C# rejects
   ("inherited members aren't imported"), and is now a name match at best; `using static` of the

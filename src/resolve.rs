@@ -11399,6 +11399,28 @@ mod kotlin_tests {
         }
     }
 
+    /// A class nested in an `expect` class is `expect`, so the `actual`s are one family with it.
+    #[test]
+    fn a_class_nested_in_an_expect_class_is_the_expect_one() {
+        let class = |m: &str| {
+            format!("package e\n{m} class Outer {{ {m} class Inner {{ fun go() {{}} }} }}\n")
+        };
+        let (expect, actual) = (
+            class("expect").replace("expect class Inner", "class Inner"),
+            class("actual"),
+        );
+        let user = "package u\nimport e.Outer.Inner\nfun run() { Inner().go() }\n";
+        let files = [
+            ("a/O.kt", &*expect),
+            ("b/O.kt", &*actual),
+            ("c/O.kt", &*actual),
+            ("u/U.kt", user),
+        ];
+        let found = resolved(&files);
+        let hit = found.iter().find(|(k, _)| k.ends_with("Inner")).unwrap();
+        assert_eq!(hit.1, "exact a/O.kt::e.Outer.Inner", "{found:?}");
+    }
+
     /// A call on an `object`'s name (`P.setMain(1)`), with `fun P.setMain` in another package.
     #[test]
     fn an_extension_on_an_objects_name_is_reached_as_on_a_typed_local() {
