@@ -175,8 +175,9 @@ from ...", with the whole list. A value the index now stores joins it.
   document's server path as the prefix. `config::read<T>(root, name)` is the shared TOML reader (file, line and key in
   every error), also used for the decisions file; `Repository` carries both `config` and
   `decisions`, loaded together at discovery.
-- `repo.rs`: root, identity (normalized `origin`, else `local/<dir>`) and `uncommitted()`, all by
-  shelling out to `git`.
+- `repo.rs`: root, identity (normalized `origin`, else `local/<dir>`), `uncommitted()`, `head`,
+  `unclean` (status with ignored files, for snapshots and server-mode recording) and `changed`
+  (status without them, for a local export's `dirty`), all by shelling out to `git`.
 - `entry.rs`: entry points (spec #31): `find(&Local)` reads what `refresh` has at its end (the
   symbols, the targets of every call, the `exports` rows, the providers and consumers the code gives, the
   `Facts::programs` the packs set, and the console scripts of the `manifests` rows through

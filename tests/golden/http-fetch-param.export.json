@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/portal",
+  "commit": "6a9ef8557a79c5e2e21c35a6c9e2a5fee53928af",
+  "dirty": false,
   "files": [
     {
       "path": "src/client.ts",

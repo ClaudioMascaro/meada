@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/conformance",
+  "commit": "1295ad5aa4db49900ef8adb5db5b1a24d29e6b46",
+  "dirty": false,
   "files": [
     {
       "path": "api/extra/legacy_util.rs",

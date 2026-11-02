@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/admin",
+  "commit": "8b74e6fc74123618fe2f05d85f6a272c431d6f80",
+  "dirty": false,
   "files": [
     {
       "path": "src/http.ts",

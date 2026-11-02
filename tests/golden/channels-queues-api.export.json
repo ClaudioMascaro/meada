@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/queues/api",
+  "commit": "f1c1fd1d21733a5ed47682d59b59b2a85c3379a7",
+  "dirty": false,
   "files": [
     {
       "path": "src/nats.ts",

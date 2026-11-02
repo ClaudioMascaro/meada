@@ -116,7 +116,8 @@ this file, and a change to these modules updates it.
   the subject submitted or reads), an apply names those whose identity the grant reads and counts
   the rest in `hidden`. A role lost at admission, or under the lock, gets the viewer's refusal.
   Every accepted or refused write logs one stderr line `ui: <subject> <action> <arguments>:
-  <outcome>`, with controls escaped throughout; a team operator's is `ui: <subject> as <owners>
+  <outcome>` (a write refused at admission because the directory cannot be read logs only the
+  directory's `ui: directory: unreadable (<reason>)` line, #451), with controls escaped throughout; a team operator's is `ui: <subject> as <owners>
   <action> <arguments>: <outcome>`, `<owners>` a JSON array: the owner groups of the entries an
   accepted change touched (`versions::touched_owners`, sorted, without repeats), the subject's
   teams for a refusal, whose outcome is the message with the named identities and the hidden
@@ -352,6 +353,8 @@ this file, and a change to these modules updates it.
   after a clean indexing pass; its commit is accepted only while its fingerprint of the
   index's existing metadata and file/document/manifest hashes matches. Older indexes,
   interrupted writes and stale sidecars give an unknown commit; the SQLite schema is unchanged.
+  `index::indexed_commit` reads and checks it in every build: a server-mode export names it as
+  its `commit` (#512).
   `GET credentials` uses `github_app::inspect` to read installations, token expiry and
   throttle expiry times from Valkey only, filtering owners by the granted workspace identities;
   expiry is extracted beside the token in Valkey, so no token or private key is read by the

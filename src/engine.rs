@@ -32,6 +32,19 @@ pub struct Engine {
     identity: String,
     /// Opened from a manifest (server mode): every index read-only, never refreshed.
     read_only: bool,
+    /// Where the export's `commit` and `dirty` come from (ADR 0004, #512).
+    commit_source: CommitSource,
+}
+
+/// Where an engine learns the indexed commit of the repository where Meada runs.
+enum CommitSource {
+    /// Locally: from the checkout, around the refresh `export` makes.
+    Checkout,
+    /// Server mode: the commit `meada index --workspace` recorded beside the index.
+    Recorded,
+    /// At a generation: the `head` its document records for the repository.
+    #[cfg(feature = "snapshot")]
+    Generation(Option<String>),
 }
 
 impl Engine {
@@ -88,7 +101,8 @@ impl Engine {
             id: &held.id,
             dir: &dir,
         };
-        Self::read(held.listed.clone().workspace(repo, reads)?, fix)
+        let engine = Self::read(held.listed.clone().workspace(repo, reads)?, fix)?;
+        Ok(engine.at_generation(held))
     }
 
     /// `open_held` over one named workspace of the generation (#342): `listed` is the workspace
@@ -105,7 +119,15 @@ impl Engine {
             id: &held.id,
             dir: &dir,
         };
-        Self::read(listed.clone().workspace(repo, reads)?, fix)
+        let engine = Self::read(listed.clone().workspace(repo, reads)?, fix)?;
+        Ok(engine.at_generation(held))
+    }
+
+    /// The engine with its indexed commit the one the generation `held` records.
+    #[cfg(feature = "snapshot")]
+    fn at_generation(mut self, held: &crate::snapshot::serve::Held) -> Self {
+        self.commit_source = CommitSource::Generation(held.head(&self.identity));
+        self
     }
 
     /// `open_held` over the generation current in the `local_dir` of the node manifest at
@@ -130,6 +152,7 @@ impl Engine {
             identity: here.identity.clone(),
             workspace,
             read_only: true,
+            commit_source: CommitSource::Recorded,
         })
     }
 
@@ -147,6 +170,7 @@ impl Engine {
             identity: here.identity.clone(),
             workspace,
             read_only: false,
+            commit_source: CommitSource::Checkout,
         })
     }
 
@@ -170,7 +194,20 @@ impl Engine {
     /// The canonical export of the repository where Meada runs: its whole index, plus the
     /// links from its consumers and to its providers, as sorted, pretty-printed JSON.
     pub fn export(&self) -> Result<String> {
+        let before = match self.commit_source {
+            CommitSource::Checkout => repo::head(&self.root).ok(),
+            _ => None,
+        };
         self.refresh()?;
+        let commit = match &self.commit_source {
+            CommitSource::Checkout => self.checkout_commit(before),
+            CommitSource::Recorded => {
+                index::indexed_commit(&self.dbs[0], &self.workspace.repos[0].index)
+                    .map(|commit| (commit, false))
+            }
+            #[cfg(feature = "snapshot")]
+            CommitSource::Generation(head) => head.clone().map(|commit| (commit, false)),
+        };
         let mut exports = self.exports()?;
         let here = format!("{}::", self.identity);
         let (all, mut evaluations) = self.links_and_decisions(&exports);
@@ -186,7 +223,25 @@ impl Engine {
         export.processes = processes;
         export.links = links.collect();
         export.stale_decisions = evaluations.swap_remove(0).stale;
-        Ok(export.written().write()?)
+        let mut written = export.written();
+        if let Some((commit, dirty)) = commit {
+            (written.commit, written.dirty) = (Some(commit), Some(dirty));
+        }
+        Ok(written.write()?)
+    }
+
+    /// The indexed commit of a local checkout and whether it was dirty, read after the refresh:
+    /// `before` is what `HEAD` named before it. Both are known only when `HEAD` did not move
+    /// and the index is fresh, as `meada index --workspace` decides before recording.
+    fn checkout_commit(&self, before: Option<String>) -> Option<(String, bool)> {
+        let before = before?;
+        let serve = &self.workspace.repos[0].config.serve;
+        // A freshness check that fails leaves the commit unknown rather than failing the export.
+        let fresh = index::fresh(&self.dbs[0], &self.root, &self.identity, serve).unwrap_or(false);
+        if !fresh || repo::head(&self.root).ok().as_ref() != Some(&before) {
+            return None;
+        }
+        repo::changed(&self.root).ok().map(|dirty| (before, dirty))
     }
 
     /// The index content of every repository of the workspace, with the contracts its

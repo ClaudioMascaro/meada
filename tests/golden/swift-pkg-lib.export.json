@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/swift/lib",
+  "commit": "1cdd244503b941af31aa4b920c4057bd55b0e3fd",
+  "dirty": false,
   "files": [
     {
       "path": "Sources/KitMoney/Money.swift",

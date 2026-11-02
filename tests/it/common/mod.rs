@@ -385,6 +385,30 @@ pub fn assert_golden(name: &str, actual: &str) {
     );
 }
 
+/// Compares the export `actual` with the export golden `name` but for `commit` and `dirty`
+/// (#512), for a test that shares another test's export golden over a tree it changed (a
+/// `meada.toml` moved into the manifest, a decisions file or a stray `.meada/` written): a local
+/// export calls that checkout dirty, and server-mode indexing records no commit for that mirror.
+/// The test of the unchanged tree blesses the golden; this one never writes it.
+pub fn assert_golden_but_indexed_commit(name: &str, actual: &str) {
+    if std::env::var_os("MEADA_BLESS").is_some_and(|v| v == "1") {
+        return;
+    }
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/golden")
+        .join(name);
+    let expected = fs::read_to_string(&path).unwrap();
+    let without = |export: &str| -> String {
+        (export.split_inclusive('\n'))
+            .filter(|l| !l.starts_with("  \"commit\": ") && !l.starts_with("  \"dirty\": "))
+            .collect()
+    };
+    assert!(
+        without(actual) == without(&expected),
+        "{name} differs from its golden file but for commit and dirty\n--- actual ---\n{actual}"
+    );
+}
+
 /// `export` without its `processes`, for an export golden whose test is about something else:
 /// the steps repeat the calls and links, so each change to the walk or to what it crosses would
 /// re-bless every export golden. The chain's own exports (spec #31), the conformance export and

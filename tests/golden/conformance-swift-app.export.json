@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/conformance",
+  "commit": "8352bfeb36a357de57555149840ef96073969d2c",
+  "dirty": false,
   "files": [
     {
       "path": "Sources/App.swift",

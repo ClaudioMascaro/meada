@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/conformance",
+  "commit": "32a63bdffda0b516daaa4292da3f5d29d276721e",
+  "dirty": false,
   "files": [
     {
       "path": "src/app.ts",

@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/backend",
+  "commit": "e42eef933918d03fd33fc68d5a4c1cee90f68582",
+  "dirty": false,
   "files": [
     {
       "path": "src/handlers.ts",

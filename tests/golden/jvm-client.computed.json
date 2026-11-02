@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/jvm/client",
+  "commit": "363e164e7ee29cb727adba2ba115fed24f86c407",
+  "dirty": true,
   "files": [
     {
       "path": "src/main/java/example/batch/Wild.java",

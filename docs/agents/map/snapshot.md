@@ -78,7 +78,8 @@ this file, and a change to these modules updates it.
   `snapshot/serve.rs` is what serving reads from a node (`--generations`): `node` (the
   manifest's `[snapshot]` section and `local_dir`), `held` (the current generation: the
   pointer file through `pull::current`, then `generation.json`, bounded and checked as the
-  generation's own), `Current` (the last generation `held` read, kept while the pointer names
+  generation's own), `Held::head` (the commit the document records for an identity, an export's indexed
+  commit at that generation), `Current` (the last generation `held` read, kept while the pointer names
   it; `Current::pinned` keeps one `Held` per pinned id, read once while held and dropped once
   `ids` no longer lists it, so what it keeps is bounded by what the node holds; a read that fails
   because a pull deleted the directory after the listing is `None`, the pin's 404, through
@@ -203,7 +204,7 @@ this file, and a change to these modules updates it.
   `Msg::WorkspaceNoCurrent`, naming `meada workspace apply`) and the document (at most
   `VERSION_MAX`, `checked`) before anything on disk changes, then, under `<index_dir>/workspace/`
   (`DIR`) and its `pull.lock` (an advisory lock, one pull at a time), writes `<id>.json` (the
-  document as stored, through `<id>.json.new` and a rename) and swaps `current` (one line `<id>
+  document as stored, through `pull::replace`: `<id>.json.new` synced, then renamed; the helper `swap`, `write_contexts` and the exclusions file share) and swaps `current` (one line `<id>
   <fence>`, `pull::swap`); a pointer whose fence is below the current file's, or equal with
   another id, is `Msg::WorkspaceFenceBelow` naming both fences and the file, and the same id and
   fence is `Pulled::Current` (the id on stdout, `Msg::WorkspaceAlreadyCurrent` on stderr). Only

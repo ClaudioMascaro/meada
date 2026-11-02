@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/documents/shapes",
+  "commit": "96d3c86ebef33e4a365b027d4c3d8449c1027033",
+  "dirty": false,
   "files": [],
   "symbols": [],
   "calls": [],

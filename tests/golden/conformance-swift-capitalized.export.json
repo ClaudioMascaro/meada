@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/conformance",
+  "commit": "e10cf5485efc65ac43bee97026db602445e38398",
+  "dirty": false,
   "files": [
     {
       "path": "Sources/Plain.swift",

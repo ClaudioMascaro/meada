@@ -113,11 +113,14 @@ The sections of the cloud modules (`[valkey]`, `[snapshot]`, `[oidc]` and the re
 
 ### The `meada export` format
 
-A repository's export is indented JSON ending in a newline, with every list sorted: the same files give identical bytes. An empty top-level list is left out of the document, except `files`, `symbols`, `calls`, `providers`, `consumers` and `links`, which always appear; nested lists (`members`, `steps`, `contracts`, `fields`) are always written. The document carries no format version field: the format grows only by additions, and a reader of the export ignores the fields it does not know.
+A repository's export is indented JSON ending in a newline, with every list sorted: the same files give identical bytes. An empty top-level list is left out of the document, except `files`, `symbols`, `calls`, `providers`, `consumers` and `links`, which always appear; nested lists (`members`, `steps`, `contracts`, `fields`) are always written. The `format` field names the export format (1 today). It rises only for a change a reader of the previous format would misread; an added optional field does not raise it, so a reader of the export ignores the fields it does not know.
 
 | Field | Content |
 | --- | --- |
+| `format` | The export format, 1 today. |
 | `repository` | The repository's identity. |
+| `commit` | The indexed commit; left out outside git, before the first commit and when nothing trustworthy is known. |
+| `dirty` | Whether the checkout differed from `commit`; left out with it. |
 | `files` | `path`, `hash`. |
 | `symbols` | `id`, `span` (`path`, `start`, `end`), `hash`. |
 | `calls` | `id`, `caller`, `target`, `level`, `candidates`, `span`, `narrowed`, `decorates`. |

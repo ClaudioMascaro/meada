@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/conformance",
+  "commit": "007371e3a08908ce0090a5c07faa9d21081040d2",
+  "dirty": false,
   "files": [
     {
       "path": "Sources/App/Aliases.swift",

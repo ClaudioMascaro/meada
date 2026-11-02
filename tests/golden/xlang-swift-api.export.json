@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/xlang-swift/api",
+  "commit": "005845064aff0eb6d6869d43c289373134d48ae0",
+  "dirty": false,
   "files": [
     {
       "path": "Sources/Audit.swift",

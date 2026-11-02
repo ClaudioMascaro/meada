@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/conformance",
+  "commit": "3a0e38844cf19bbe2fb6369d9dd83d8af424d05e",
+  "dirty": false,
   "files": [
     {
       "path": "bindings.py",

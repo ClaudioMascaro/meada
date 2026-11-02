@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/jvm/gradle-client",
+  "commit": "4e26949e1c2df9f8177ebcde5043dc495235f348",
+  "dirty": true,
   "files": [
     {
       "path": "src/main/java/example/worker/Job.java",

@@ -34,30 +34,33 @@ impl Console {
     /// whatever its role. A token without the claim, or a user the directory never held, is
     /// admitted. When the directory cannot be read, reads are admitted and a `write` is the 503
     /// `audit_unavailable`, since the console cannot tell whether the subject is deprovisioned;
-    /// the audit insert is not attempted. The second item is the line the audit prints.
+    /// the audit insert is not attempted, and its line is empty (#451): the directory's own line
+    /// stands for the request. The second item is the line the audit prints. `Ok(true)`
+    /// is an admitted read whose lookup failed: the `Session` remembers it (`directory_down`), so
+    /// the request's later directory reads take that answer and write no second line.
     #[cfg_attr(not(feature = "oidc"), allow(dead_code))]
     pub(super) fn directory_refusal(
         &self,
         user: Option<&str>,
         write: bool,
-    ) -> Option<(Box<Answer>, String)> {
-        let (directory, user) = (self.directory.as_ref()?, user?);
+    ) -> std::result::Result<bool, (Box<Answer>, String)> {
+        let (Some(directory), Some(user)) = (self.directory.as_ref(), user) else {
+            return Ok(false);
+        };
         match blocking(directory, directory.deprovisioned(user)) {
-            Some(false) => None,
+            Some(false) => Ok(false),
             Some(true) => {
                 let message = Msg::UiDeprovisioned.text();
                 let answer = error(StatusCode::FORBIDDEN, "deprovisioned", &message);
-                Some((Box::new(answer), message))
+                Err((Box::new(answer), message))
             }
             None if write => {
                 let message = Msg::AuditUnavailable.text();
                 let status = StatusCode::SERVICE_UNAVAILABLE;
-                Some((
-                    Box::new(error(status, "audit_unavailable", &message)),
-                    message,
-                ))
+                let answer = error(status, "audit_unavailable", &message);
+                Err((Box::new(answer), String::new()))
             }
-            None => None,
+            None => Ok(true),
         }
     }
 
@@ -92,7 +95,13 @@ impl Console {
         if prefix.contains('\0') {
             return json_answer(StatusCode::OK, &json!({"groups": []}));
         }
-        match blocking(directory, directory.groups(&prefix)) {
+        // Down at admission: the same 503, with no second line.
+        let groups = if session.directory_down {
+            None
+        } else {
+            blocking(directory, directory.groups(&prefix))
+        };
+        match groups {
             Some(groups) => json_answer(StatusCode::OK, &json!({"groups": groups})),
             None => {
                 let message = Msg::DirectoryUnavailable.text();
@@ -104,12 +113,15 @@ impl Console {
     /// `owner_missing: true` on each of `entries` whose `owner` names no group of the directory,
     /// once a group was ever provisioned (a directory that lost its final group flags every
     /// owned entry). An entry without an owner is never flagged. A directory that cannot be read
-    /// flags nothing, with one stderr line.
+    /// flags nothing, with one stderr line (none when `session` saw it down at admission).
     #[cfg_attr(not(feature = "generation-pointer"), allow(dead_code))]
-    pub(super) async fn flag_missing_owners(&self, entries: &mut [Value]) {
+    pub(super) async fn flag_missing_owners(&self, entries: &mut [Value], session: &Session) {
         let Some(directory) = &self.directory else {
             return;
         };
+        if session.directory_down {
+            return;
+        }
         let owners: std::collections::BTreeSet<&str> =
             entries.iter().filter_map(|e| e["owner"].as_str()).collect();
         if owners.is_empty() {
@@ -131,11 +143,16 @@ impl Console {
     /// `document`, the admission answer, with the directory's counts: `directory` is
     /// `{"users", "groups", "last_write"}`, or null when it cannot be read.
     #[cfg_attr(not(feature = "oidc"), allow(dead_code))]
-    pub(super) fn with_directory_counts(&self, document: &mut Value) {
+    pub(super) fn with_directory_counts(&self, document: &mut Value, session: &Session) {
         let Some(directory) = &self.directory else {
             return;
         };
-        document["directory"] = match blocking(directory, directory.counts()) {
+        let counts = if session.directory_down {
+            None
+        } else {
+            blocking(directory, directory.counts())
+        };
+        document["directory"] = match counts {
             Some(counts) => json!({
                 "users": counts.users,
                 "groups": counts.groups,

@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/channels/worker",
+  "commit": "1ce43da47b3a8c7441c307618d8027e1073a4cd8",
+  "dirty": false,
   "files": [
     {
       "path": "src/consumer.ts",

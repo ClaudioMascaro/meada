@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/pkg/fork",
+  "commit": "bce3d8dbb384c8f9d88821f07b9361be6195b6b2",
+  "dirty": false,
   "files": [],
   "symbols": [],
   "calls": [],

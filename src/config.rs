@@ -124,15 +124,10 @@ pub(crate) fn error_at(
     meada_core::manifest::error_at(&file.display().to_string(), src, key, message).into()
 }
 
-/// The content of the regular file `path` a cloud module's section names (a secret, a CA), at
-/// most `max` bytes. What is not a regular file is refused before it is opened: a FIFO would
-/// block the open for ever. A symbolic link is followed: Kubernetes mounts a secret through one.
-#[cfg(any(
-    feature = "ui",
-    feature = "valkey",
-    feature = "snapshot",
-    feature = "postgres"
-))]
+/// The content of the regular file `path` an operator configured (a secret or a CA a cloud
+/// module's section names, the indexed commit beside a server-mode index), at most `max` bytes.
+/// What is not a regular file is refused before it is opened: a FIFO would block the open for
+/// ever. A symbolic link is followed: Kubernetes mounts a secret through one.
 pub(crate) fn read_bounded(path: &Path, max: u64) -> std::result::Result<Vec<u8>, String> {
     let problem = io_problem(path);
     if !fs::metadata(path).map_err(problem)?.is_file() {

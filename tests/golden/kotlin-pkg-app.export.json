@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/kotlin/app",
+  "commit": "60350194ee5b00559c536c158d8b64a5f3a95cdf",
+  "dirty": false,
   "files": [
     {
       "path": "src/main/kotlin/dev/shop/Bulk.kt",

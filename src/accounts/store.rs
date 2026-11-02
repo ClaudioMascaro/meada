@@ -1,7 +1,7 @@
 //! The accounts table (ADR 0024, migration 9): one row per local account in `[postgres] schema`,
 //! read and written by the console, and by `meada ui reset-admin` (`reset_admin`). Each call
 //! opens its own connection through `postgres::connected`, so a schema version this binary does
-//! not know counts as unreachable, and is bounded as the audit's calls are. Every row is hostile
+//! not know counts as unreachable, and runs within `postgres::Config::bound`. Every row is hostile
 //! when read: one that fails its checks admits nothing (`Attempt::Bad`), and its reader writes one
 //! line naming the table, never a value. A password attempt (`attempt`) holds the row while it
 //! checks and counts. Account administration (`list`, `create`, `change`, #557, groups #558) is
@@ -157,7 +157,7 @@ pub fn attempt(
         tx.commit().await.map_err(&scrub)?;
         Ok(Attempt::Checked(account, refusal))
     };
-    // Waiting for the row is one statement's bound, the hash under it another.
+    // Five of its own: begin, the row, the update, commit, and the hash under the row's lock.
     crate::modules::within(config.bound(5), run, Msg::PostgresTimeout)
 }
 
@@ -208,6 +208,7 @@ pub fn rehash(config: &Config, username: &str, old: &str, new: &str) -> Result<b
             .await;
         Ok(done.map_err(|e| opened.scrub(e))? == 1)
     };
+    // One statement of its own: the update.
     crate::modules::within(config.bound(1), run, Msg::PostgresTimeout)
 }
 
@@ -224,7 +225,8 @@ pub fn set_password(config: &Config, username: &str, hash: &str) -> Result<bool,
         let done = (opened.client).execute(&sql, &[&username, &hash]).await;
         Ok(done.map_err(|e| opened.scrub(e))? == 1)
     };
-    crate::modules::within(config.bound(3), run, Msg::PostgresTimeout)
+    // One statement of its own: the update.
+    crate::modules::within(config.bound(1), run, Msg::PostgresTimeout)
 }
 
 /// `meada ui reset-admin`: `admin` created, or made an active operator again with its lock and
@@ -247,6 +249,7 @@ pub fn reset_admin(config: &Config, hash: &str) -> Result<bool, String> {
         let row = row.map_err(|e| opened.scrub(e))?;
         row.try_get::<_, bool>(0).map_err(|e| opened.scrub(e))
     };
+    // One statement of its own: the upsert.
     crate::modules::within(config.bound(1), run, Msg::PostgresTimeout)
 }
 
@@ -302,6 +305,8 @@ pub fn bootstrap(
         tx.commit().await.map_err(&scrub)?;
         Ok(Ok(true))
     };
+    // Six of its own: begin, the lock, the emptiness check, the deployer's password and its hash
+    // (`initial`), the insert and commit.
     match crate::modules::within(config.bound(6), run, Msg::PostgresTimeout) {
         Ok(Ok(created)) => Ok(created),
         Ok(Err(problem)) => Err(Refused::Password(problem)),
@@ -403,7 +408,8 @@ pub fn list(config: &Config) -> Result<(Vec<Listed>, usize), String> {
         let rows = (opened.client).query(&sql, &[]).await;
         rows.map_err(|e| opened.scrub(e))
     };
-    let rows = crate::modules::within(config.bound(2), run, Msg::PostgresTimeout)?;
+    // One statement of its own: the listing.
+    let rows = crate::modules::within(config.bound(1), run, Msg::PostgresTimeout)?;
     let accounts: Vec<Listed> = rows.iter().filter_map(listed).collect();
     let skipped = rows.len() - accounts.len();
     Ok((accounts, skipped))
@@ -444,7 +450,8 @@ pub fn create(
             None => Changed::Taken,
         })
     };
-    crate::modules::within(config.bound(2), run, Msg::PostgresTimeout)
+    // One statement of its own: the insert.
+    crate::modules::within(config.bound(1), run, Msg::PostgresTimeout)
 }
 
 /// One change of account administration (#557).
@@ -581,8 +588,9 @@ pub fn change(config: &Config, username: &str, change: &Change) -> Result<Change
         tx.commit().await.map_err(&scrub)?;
         Ok(Changed::Done(done))
     };
-    // Waiting for the lock is one statement's bound, the change under it a few more.
-    crate::modules::within(config.bound(5), run, Msg::PostgresTimeout)
+    // Six of its own: begin, the lock (waiting for it is one statement's bound), the row, the
+    // other operators, the change and commit.
+    crate::modules::within(config.bound(6), run, Msg::PostgresTimeout)
 }
 
 /// An account's standing, read before each of its console writes (ADR 0024).
@@ -608,6 +616,7 @@ pub fn standing(config: &Config, username: &str) -> Result<Standing, String> {
         let rows = (opened.client).query(&sql, &[&username]).await;
         rows.map_err(|e| opened.scrub(e))
     };
+    // One statement of its own: the standing.
     let rows = crate::modules::within(config.bound(1), run, Msg::PostgresTimeout)?;
     let Some(row) = rows.first() else {
         return Ok(Standing::Unknown);

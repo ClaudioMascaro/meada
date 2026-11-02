@@ -588,7 +588,7 @@ impl Console {
         if let Some(Value::Array(entries)) = version.get_mut("repositories") {
             filter_entries(entries, "repo", session);
             #[cfg(feature = "directory")]
-            self.flag_missing_owners(entries).await;
+            self.flag_missing_owners(entries, session).await;
             #[cfg(feature = "oidc")]
             self.flag_excluded(id, entries);
         }

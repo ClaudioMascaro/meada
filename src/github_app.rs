@@ -1309,7 +1309,12 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     };
     // A check that cannot reach Postgres has failed all the same: the file goes, so a pulled
     // version that did not change admits no previous check's exclusions.
-    let (mut client, scrub, row) = match reached.await {
+    // One statement of its own, the fence's: a Postgres that stops answering after it accepted
+    // the connection must not hold the run (the server's `statement_timeout` does not fire then).
+    let one = postgres.bound(1);
+    let late = |after: Duration| Msg::PostgresTimeout(after.as_millis() as u64).text();
+    let reached = tokio::time::timeout(one, reached);
+    let (mut client, scrub, row) = match reached.await.unwrap_or_else(|_| Err(late(one))) {
         Ok(reached) => reached,
         Err(why) => {
             remove_excluded()?;
@@ -1429,70 +1434,81 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         Some(dir) => Some(crate::snapshot::versions::lock_excluded(dir)?),
         None => None,
     };
-    let tx = client.transaction().await.map_err(&scrub)?;
-    let lock = format!("LOCK TABLE {q}.permission_sets IN EXCLUSIVE MODE");
-    tx.batch_execute(&lock).await.map_err(&scrub)?;
-    let max = format!("SELECT max(fence) FROM {q}.permission_sets");
-    held_fence(tx.query_one(&max, &[]).await.map_err(&scrub)?.get(0))?;
-    // Past the fence, under the local lock: a file another run here wrote meanwhile goes.
-    #[cfg(feature = "generation-pointer")]
-    if let Some(dir) = &dir {
-        crate::snapshot::versions::remove_excluded(dir)?;
-    }
-    let insert = format!(
-        "INSERT INTO {q}.permission_sets (fence, version, started, repositories) \
+    // Nine statements of its own, after the listing (which has no Postgres in it): begin, the
+    // lock, the fence, the set, its rows, its coverage, its exclusions, the older sets and commit.
+    // Past the bound the file stays removed, so no reader admits an exclusion of this run or the
+    // one before it.
+    let writing = postgres.bound(9);
+    let written = async {
+        let tx = client.transaction().await.map_err(&scrub)?;
+        let lock = format!("LOCK TABLE {q}.permission_sets IN EXCLUSIVE MODE");
+        tx.batch_execute(&lock).await.map_err(&scrub)?;
+        let max = format!("SELECT max(fence) FROM {q}.permission_sets");
+        held_fence(tx.query_one(&max, &[]).await.map_err(&scrub)?.get(0))?;
+        // Past the fence, under the local lock: a file another run here wrote meanwhile goes.
+        #[cfg(feature = "generation-pointer")]
+        if let Some(dir) = &dir {
+            crate::snapshot::versions::remove_excluded(dir)?;
+        }
+        let insert = format!(
+            "INSERT INTO {q}.permission_sets (fence, version, started, repositories) \
          VALUES ($1, $2, $3::text::timestamptz, $4) RETURNING id"
-    );
-    let (fence, count) = (fence as i64, repositories as i32);
-    let params: [&(dyn tokio_postgres::types::ToSql + Sync); 4] =
-        [&fence, &version, &started, &count];
-    let id: String = tx.query_one(&insert, &params).await.map_err(&scrub)?.get(0);
-    let (mut identities, mut logins, mut roles) = (Vec::new(), Vec::new(), Vec::new());
-    for ((identity, login), role) in &rows {
-        identities.push(identity.as_str());
-        logins.push(login.as_str());
-        roles.push(role.as_str());
-    }
-    let insert = format!(
-        "INSERT INTO {q}.permission_rows (set_id, identity, login, role) \
+        );
+        let (fence, count) = (fence as i64, repositories as i32);
+        let params: [&(dyn tokio_postgres::types::ToSql + Sync); 4] =
+            [&fence, &version, &started, &count];
+        let id: String = tx.query_one(&insert, &params).await.map_err(&scrub)?.get(0);
+        let (mut identities, mut logins, mut roles) = (Vec::new(), Vec::new(), Vec::new());
+        for ((identity, login), role) in &rows {
+            identities.push(identity.as_str());
+            logins.push(login.as_str());
+            roles.push(role.as_str());
+        }
+        let insert = format!(
+            "INSERT INTO {q}.permission_rows (set_id, identity, login, role) \
          SELECT $1, i, l, r FROM unnest($2::text[], $3::text[], $4::text[]) AS t (i, l, r)"
-    );
-    let params: [&(dyn tokio_postgres::types::ToSql + Sync); 4] =
-        [&id, &identities, &logins, &roles];
-    tx.execute(&insert, &params).await.map_err(&scrub)?;
-    let identities: Vec<&str> = coverage.iter().map(|(i, _, _)| *i).collect();
-    let shown: Vec<&str> = coverage.iter().map(|(_, c, _)| *c).collect();
-    let sources: Vec<&str> = coverage.iter().map(|(_, _, s)| *s).collect();
-    let insert = format!(
-        "INSERT INTO {q}.permission_repositories (set_id, identity, coverage, source) \
+        );
+        let params: [&(dyn tokio_postgres::types::ToSql + Sync); 4] =
+            [&id, &identities, &logins, &roles];
+        tx.execute(&insert, &params).await.map_err(&scrub)?;
+        let identities: Vec<&str> = coverage.iter().map(|(i, _, _)| *i).collect();
+        let shown: Vec<&str> = coverage.iter().map(|(_, c, _)| *c).collect();
+        let sources: Vec<&str> = coverage.iter().map(|(_, _, s)| *s).collect();
+        let insert = format!(
+            "INSERT INTO {q}.permission_repositories (set_id, identity, coverage, source) \
          SELECT $1, i, c, s FROM unnest($2::text[], $3::text[], $4::text[]) AS t (i, c, s)"
-    );
-    let params: [&(dyn tokio_postgres::types::ToSql + Sync); 4] =
-        [&id, &identities, &shown, &sources];
-    tx.execute(&insert, &params).await.map_err(&scrub)?;
-    // The deployment workspace's (context ''), then each named workspace's, which have no
-    // `added_by`.
-    let mut contexts_col: Vec<&str> = vec![""; excluded.len()];
-    let mut identities: Vec<&str> = excluded.keys().copied().collect();
-    let mut added: Vec<Option<&str>> = excluded.values().map(|(login, _)| Some(*login)).collect();
-    let mut reasons: Vec<&str> = excluded.values().map(|(_, reason)| *reason).collect();
-    for (context, identity) in &named_out {
-        contexts_col.push(context);
-        identities.push(identity);
-        added.push(None);
-        reasons.push("no_sponsor");
-    }
-    let insert = format!(
-        "INSERT INTO {q}.permission_exclusions (set_id, context, identity, added_by, reason) \
+        );
+        let params: [&(dyn tokio_postgres::types::ToSql + Sync); 4] =
+            [&id, &identities, &shown, &sources];
+        tx.execute(&insert, &params).await.map_err(&scrub)?;
+        // The deployment workspace's (context ''), then each named workspace's, which have no
+        // `added_by`.
+        let mut contexts_col: Vec<&str> = vec![""; excluded.len()];
+        let mut identities: Vec<&str> = excluded.keys().copied().collect();
+        let mut added: Vec<Option<&str>> =
+            excluded.values().map(|(login, _)| Some(*login)).collect();
+        let mut reasons: Vec<&str> = excluded.values().map(|(_, reason)| *reason).collect();
+        for (context, identity) in &named_out {
+            contexts_col.push(context);
+            identities.push(identity);
+            added.push(None);
+            reasons.push("no_sponsor");
+        }
+        let insert = format!(
+            "INSERT INTO {q}.permission_exclusions (set_id, context, identity, added_by, reason) \
          SELECT $1, c, i, a, r FROM \
          unnest($2::text[], $3::text[], $4::text[], $5::text[]) AS t (c, i, a, r)"
-    );
-    let params: [&(dyn tokio_postgres::types::ToSql + Sync); 5] =
-        [&id, &contexts_col, &identities, &added, &reasons];
-    tx.execute(&insert, &params).await.map_err(&scrub)?;
-    let older = format!("DELETE FROM {q}.permission_sets WHERE id <> $1");
-    tx.execute(&older, &[&id]).await.map_err(&scrub)?;
-    tx.commit().await.map_err(&scrub)?;
+        );
+        let params: [&(dyn tokio_postgres::types::ToSql + Sync); 5] =
+            [&id, &contexts_col, &identities, &added, &reasons];
+        tx.execute(&insert, &params).await.map_err(&scrub)?;
+        let older = format!("DELETE FROM {q}.permission_sets WHERE id <> $1");
+        tx.execute(&older, &[&id]).await.map_err(&scrub)?;
+        tx.commit().await.map_err(&scrub)?;
+        Ok::<String, String>(id)
+    };
+    let id = tokio::time::timeout(writing, written).await;
+    let id = id.unwrap_or_else(|_| Err(late(writing)))?;
 
     #[cfg(feature = "generation-pointer")]
     // An empty deployment workspace under `[workspaces]` has no version: the file names the
@@ -1507,11 +1523,10 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     let file_version = version.clone();
     if let (Some(dir), Some(version)) = (&dir, &file_version) {
         let newest = format!("SELECT EXISTS (SELECT 1 FROM {q}.permission_sets WHERE id = $1)");
-        let newest: bool = client
-            .query_one(&newest, &[&id])
-            .await
-            .map_err(&scrub)?
-            .get(0);
+        // One statement of its own.
+        let params: [&(dyn tokio_postgres::types::ToSql + Sync); 1] = [&id];
+        let ask = tokio::time::timeout(one, client.query_one(&newest, &params));
+        let newest: bool = ask.await.map_err(|_| late(one))?.map_err(&scrub)?.get(0);
         if !newest {
             return Err(Msg::RolesReplaced.text());
         }

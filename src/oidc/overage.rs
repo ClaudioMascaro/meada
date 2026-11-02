@@ -25,8 +25,8 @@ use crate::msg::Msg;
 // ponytail: how long an overage answer is kept, so a membership change reaches a subject at most
 // this late; `MEADA_OVERAGE_TTL_MS` shortens it in debug builds.
 const OVERAGE_TTL: Duration = Duration::from_secs(300);
-/// The statements of one lookup: the two of the version check, and the groups.
-const STATEMENTS: u32 = 3;
+/// The statements of one lookup besides the version check's: the groups.
+const STATEMENTS: u32 = 1;
 
 /// How long an answer is kept. In debug builds `MEADA_OVERAGE_TTL_MS` shortens it (a knob for
 /// tests and not documented, as `MEADA_DRAIN_MS` is; a release binary ignores it).

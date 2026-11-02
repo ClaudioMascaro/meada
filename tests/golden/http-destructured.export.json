@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/portal",
+  "commit": "e5d8b2d18bfebf1acf6ff5359881c4369ad481f6",
+  "dirty": false,
   "files": [
     {
       "path": "src/call.ts",

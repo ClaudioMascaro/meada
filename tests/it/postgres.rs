@@ -624,11 +624,24 @@ impl Relay {
         });
     }
 
-    /// Opens the relay again, on its port, after `close`.
+    /// Opens the relay again, on its port, after `close`. The freed port can be held for a moment
+    /// by another test's socket under a loaded run, so the bind is retried for up to five seconds.
     #[cfg(feature = "github-app")]
     pub(crate) fn open(&self) {
         self.open.store(true, std::sync::atomic::Ordering::SeqCst);
-        let listener = TcpListener::bind(("127.0.0.1", self.port)).unwrap();
+        let start = Instant::now();
+        let listener = loop {
+            match TcpListener::bind(("127.0.0.1", self.port)) {
+                Ok(listener) => break listener,
+                Err(e)
+                    if e.kind() == std::io::ErrorKind::AddrInUse
+                        && start.elapsed() < Duration::from_secs(5) =>
+                {
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                Err(e) => panic!("the relay cannot bind its port again: {e}"),
+            }
+        };
         Self::serve(listener, self.to.clone(), self.open.clone());
     }
 
@@ -645,6 +658,61 @@ impl Relay {
             );
             std::thread::sleep(Duration::from_millis(20));
         }
+    }
+}
+
+/// A Postgres that stops answering without closing the connection: it takes the connection,
+/// completes the startup (no password asked) and then reads every statement and answers none, so
+/// only the client's own deadline ends a call (the server's `statement_timeout` never fires).
+#[cfg(any(
+    feature = "directory",
+    all(
+        feature = "github-app",
+        feature = "oidc",
+        feature = "generation-pointer"
+    )
+))]
+pub(crate) struct Stalled {
+    /// A URL naming it.
+    pub(crate) url: String,
+}
+
+#[cfg(any(
+    feature = "directory",
+    all(
+        feature = "github-app",
+        feature = "oidc",
+        feature = "generation-pointer"
+    )
+))]
+impl Stalled {
+    pub(crate) fn start() -> Self {
+        use std::io::{Read, Write};
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("postgres://meada@{}/meada", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            for mut stream in listener.incoming().flatten() {
+                std::thread::spawn(move || {
+                    // The startup message: its length, itself included, then the rest.
+                    let mut length = [0u8; 4];
+                    if stream.read_exact(&mut length).is_err() {
+                        return;
+                    }
+                    let rest = (u32::from_be_bytes(length) as usize).saturating_sub(4);
+                    if stream.read_exact(&mut vec![0u8; rest]).is_err() {
+                        return;
+                    }
+                    // AuthenticationOk, then ReadyForQuery (idle).
+                    let ready = [b'R', 0, 0, 0, 8, 0, 0, 0, 0, b'Z', 0, 0, 0, 5, b'I'];
+                    if stream.write_all(&ready).is_err() {
+                        return;
+                    }
+                    let mut sink = [0u8; 4096];
+                    while stream.read(&mut sink).is_ok_and(|n| n > 0) {}
+                });
+            }
+        });
+        Self { url }
     }
 }
 

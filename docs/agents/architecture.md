@@ -195,8 +195,11 @@ module by module: [map/workspaces.md](map/workspaces.md).
   `channel::kafka::orders.created` (name kept as evaluated; `channel::kafka` alone for an
   unresolved side). A path parameter of any spelling (`:id`, `[id]`, `{id}`, `<id>`, `<int:id>`)
   is `{}`. A provider of every method is `http::ANY::<path>`.
-- Export JSON: `{repository, files, symbols, calls, providers, consumers, bindings, documents,
-  publishes, packages, dependencies, imports, communities, links, processes}`;
+- Export JSON: `{format, repository, commit, dirty, files, symbols, calls, providers, consumers,
+  bindings, documents, publishes, packages, dependencies, imports, communities, links, processes}`;
+  `format` is `meada_core::export::FORMAT` (ADR 0004); `commit` and `dirty` (absent together) are
+  the indexed commit and whether the checkout differed from it, read around the refresh locally
+  and from the recorded commit or the generation's `head` in server mode (`Engine::export`);
   each `symbols` entry is `{id, span, hash}`, `hash` the hex BLAKE3 of the span's exact bytes (`search` kind
   `duplicate` groups by it); `communities` (absent when empty) lists each community as `{name, members}`, by name, with
   its sorted member identities; `processes` (absent when

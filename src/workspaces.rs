@@ -206,14 +206,8 @@ pub fn read_contexts(dir: &Path) -> Result<Option<(Vec<Context>, String)>, Strin
 /// Writes the contexts file of `dir` by rename; its digest.
 pub fn write_contexts(dir: &Path, contexts: &[Context]) -> Result<String, String> {
     let text = contexts_text(contexts);
-    let (file, new) = (dir.join(CONTEXTS), dir.join(format!("{CONTEXTS}.new")));
-    let at = crate::snapshot::pull::io_at;
-    let written = (std::fs::write(&new, &text).map_err(at(&new)))
-        .and_then(|()| std::fs::rename(&new, &file).map_err(at(&file)));
-    if written.is_err() {
-        let _ = std::fs::remove_file(&new);
-    }
-    written.map(|()| contexts_digest(&text))
+    crate::snapshot::pull::replace(&dir.join(CONTEXTS), text.as_bytes())?;
+    Ok(contexts_digest(&text))
 }
 
 /// What the pulled contexts and the role check's exclusions decide (ADR 0021): the named

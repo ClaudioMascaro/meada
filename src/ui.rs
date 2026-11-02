@@ -323,6 +323,10 @@ struct Session {
     /// hostile, `Console::standing`): its subject operates no named workspace (ADR 0024).
     #[cfg(feature = "accounts")]
     suspended: bool,
+    /// The directory could not be read at admission (#451): the request's later directory reads
+    /// take that answer and write no second stderr line.
+    #[cfg(feature = "directory")]
+    directory_down: bool,
 }
 
 impl Session {
@@ -342,6 +346,8 @@ impl Session {
             account: false,
             #[cfg(feature = "accounts")]
             suspended: false,
+            #[cfg(feature = "directory")]
+            directory_down: false,
         }
     }
 
@@ -372,6 +378,8 @@ impl Session {
             account: false,
             #[cfg(feature = "accounts")]
             suspended: false,
+            #[cfg(feature = "directory")]
+            directory_down: false,
         }
     }
 
@@ -904,7 +912,10 @@ impl Console {
         let session = match self.admit(headers, route, writes) {
             Ok(session) => session,
             Err((refused, message)) => {
-                audit(None, &message);
+                // Empty when the directory's line already stands for the request (#451).
+                if !message.is_empty() {
+                    audit(None, &message);
+                }
                 return Err(refused);
             }
         };
@@ -983,7 +994,7 @@ impl Console {
     /// token for `[ui] audience`, except for the static files and `config`, which the browser
     /// needs to log in. With `[directory]`, the token's `user_claim` is then
     /// looked up (`deprovisioned`) before any role is computed. A refusal comes with the line
-    /// the pre-authentication audit prints.
+    /// the pre-authentication audit prints, empty when the directory's line stands for it.
     fn admit(
         self: &Arc<Self>,
         headers: &HeaderMap,
@@ -1013,14 +1024,18 @@ impl Console {
             ) {
                 Ok((admitted, user)) => {
                     #[cfg(feature = "directory")]
-                    if let Some(refused) = self.directory_refusal(user.as_deref(), write) {
-                        return Err(refused);
-                    }
+                    let down = self.directory_refusal(user.as_deref(), write)?;
                     #[cfg(not(feature = "directory"))]
                     let _ = user;
                     let teams =
                         self.teams_on(route, admitted.operator, &admitted.groups, &admitted.grant);
-                    Ok(Session::admitted(admitted, teams))
+                    #[allow(unused_mut)]
+                    let mut session = Session::admitted(admitted, teams);
+                    #[cfg(feature = "directory")]
+                    {
+                        session.directory_down = down;
+                    }
+                    Ok(session)
                 }
                 Err((status, challenge)) => {
                     let (code, message) = match status {
@@ -1154,7 +1169,7 @@ impl Console {
                     #[allow(unused_mut)]
                     let mut document = o.admission(&|i| session.reads(i));
                     #[cfg(feature = "directory")]
-                    self.with_directory_counts(&mut document);
+                    self.with_directory_counts(&mut document, session);
                     document
                 });
                 // With `[accounts]`, its mode and key beside, or alone without `[oidc]` (#558).

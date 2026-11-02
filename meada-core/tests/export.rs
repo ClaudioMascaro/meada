@@ -25,7 +25,10 @@ fn every_export_golden_reads_and_writes_back_byte_for_byte() {
 }
 
 const EXPORT: &str = r#"{
+  "format": 1,
   "repository": "example.com/acme/web",
+  "commit": "0123456789abcdef0123456789abcdef01234567",
+  "dirty": false,
   "files": [
     {
       "path": "src/a.ts",
@@ -56,13 +59,29 @@ const EXPORT: &str = r#"{
 fn a_valid_export_reads() {
     let export = parse(EXPORT).unwrap();
     assert_eq!(export.calls[0].span.end, 5);
+    assert_eq!(export.format, meada_core::export::FORMAT);
+    assert_eq!(export.dirty, Some(false));
     assert_eq!(export.write().unwrap(), EXPORT);
+}
+
+/// `commit` and `dirty` are optional and left out when absent; `format` is not (#512).
+#[test]
+fn an_export_without_a_commit_writes_neither_provenance_field() {
+    let bare = EXPORT.replace(
+        "  \"commit\": \"0123456789abcdef0123456789abcdef01234567\",\n  \"dirty\": false,\n",
+        "",
+    );
+    let export = parse(&bare).unwrap();
+    assert_eq!((export.commit.as_deref(), export.dirty), (None, None));
+    assert_eq!(export.write().unwrap(), bare);
 }
 
 #[test]
 fn a_missing_required_field_is_refused_by_name() {
     let top = EXPORT.replace("  \"repository\": \"example.com/acme/web\",\n", "");
     assert_eq!(parse(&top).unwrap_err(), "missing field `repository`");
+    let unversioned = EXPORT.replace("  \"format\": 1,\n", "");
+    assert_eq!(parse(&unversioned).unwrap_err(), "missing field `format`");
     let nested = EXPORT.replace(",\n        \"end\": 5", "");
     assert_eq!(
         parse(&nested).unwrap_err(),

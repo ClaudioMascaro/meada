@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/pkg/api",
+  "commit": "d6e13b87634f6b34720cec651460fbb09b2342ff",
+  "dirty": false,
   "files": [
     {
       "path": "src/label.js",

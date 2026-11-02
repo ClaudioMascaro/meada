@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/acme/billing",
+  "commit": "87901d17d88b4ceb24561aecf3c26f8bd0a5a830",
+  "dirty": false,
   "files": [
     {
       "path": "app/audit/route.ts",

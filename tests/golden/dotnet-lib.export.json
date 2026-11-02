@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/dotnet/lib",
+  "commit": "4cd3e14d57f2cab30e57b6223eeca1077184c39e",
+  "dirty": false,
   "files": [
     {
       "path": "src/Kit/Pricing/Order.cs",

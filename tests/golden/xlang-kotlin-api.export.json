@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/xlang-kotlin/api",
+  "commit": "019a732cef87a2f6a857c70b1a75efd32c8390d9",
+  "dirty": false,
   "files": [
     {
       "path": "src/main/kotlin/com/example/api/AuditClient.kt",

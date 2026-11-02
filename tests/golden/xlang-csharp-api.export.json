@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/xlang-csharp/api",
+  "commit": "0b6ba22a0dcd436c456227a8281c68379a10f63d",
+  "dirty": false,
   "files": [
     {
       "path": "Clients/AuditClient.cs",

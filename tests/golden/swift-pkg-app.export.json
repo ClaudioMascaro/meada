@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/apps/shop",
+  "commit": "2611000d673aa85022973a8156660f29e4fa926b",
+  "dirty": false,
   "files": [
     {
       "path": "Sources/App/main.swift",

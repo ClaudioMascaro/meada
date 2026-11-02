@@ -35,6 +35,11 @@ pub const SCIM_RESOURCE_MAX: usize = 64 << 10;
 // ponytail: the most resources a page holds, and how many without `count`.
 const PAGE_MAX: i64 = 100;
 
+/// The statements of the longest request besides the version check's: a group `PATCH`, which
+/// begins, takes the lock, loads the group and its members, checks the name, the members, writes
+/// the group, marks groups provisioned, drops and adds the members, stamps the state and commits.
+const STATEMENTS: u32 = 12;
+
 const ERROR: &str = "urn:ietf:params:scim:api:messages:2.0:Error";
 const LIST: &str = "urn:ietf:params:scim:api:messages:2.0:ListResponse";
 const USER: &str = "urn:ietf:params:scim:schemas:core:2.0:User";
@@ -758,8 +763,17 @@ impl Scim {
         blake3::hash(presented.unwrap_or("").as_bytes()) == self.token
     }
 
+    /// How long a request's database work may take, all told: a connection, the version check
+    /// and `STATEMENTS` of its own.
+    pub fn bound(&self) -> std::time::Duration {
+        self.postgres.bound(STATEMENTS)
+    }
+
     /// The answer to an admitted request: `method` on `path` (under `/scim/v2`) with `query`
-    /// and `body`, at most `SCIM_BODY_MAX` bytes.
+    /// and `body`, at most `SCIM_BODY_MAX` bytes, within `bound`. A request still running then is
+    /// a 503 like an unreachable Postgres, and its client is dropped: the connection closes once
+    /// Postgres answers the statement it stalled on (tokio-postgres waits for a pending
+    /// response), so Postgres rolls the transaction back and the directory's lock is released.
     pub async fn answer(
         &self,
         method: &Method,
@@ -767,6 +781,18 @@ impl Scim {
         query: Option<&str>,
         body: &[u8],
     ) -> Reply {
+        let bound = self.bound();
+        let routed = self.route(method, path, query, body);
+        tokio::time::timeout(bound, routed)
+            .await
+            .unwrap_or_else(|_| {
+                let Fail(status, scim_type, detail) =
+                    unavailable(&Msg::PostgresTimeout(bound.as_millis() as u64).text());
+                Reply::error(status, scim_type, detail)
+            })
+    }
+
+    async fn route(&self, method: &Method, path: &str, query: Option<&str>, body: &[u8]) -> Reply {
         let mut named = None;
         let path = path.strip_prefix("/scim/v2").unwrap_or(path);
         let steps: Vec<&str> = path.trim_start_matches('/').split('/').collect();

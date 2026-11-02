@@ -113,11 +113,14 @@ As seções dos módulos de nuvem (`[valkey]`, `[snapshot]`, `[oidc]` e as demai
 
 ### Formato do `meada export`
 
-O export de um repositório é JSON indentado e terminado por uma quebra de linha, com toda lista ordenada: os mesmos arquivos dão bytes idênticos. Uma lista vazia do nível superior some do documento, exceto `files`, `symbols`, `calls`, `providers`, `consumers` e `links`, que sempre aparecem; as listas aninhadas (`members`, `steps`, `contracts`, `fields`) sempre são escritas. O documento não traz um campo de versão do formato: o formato só cresce por acréscimos, e quem lê o export deve ignorar os campos que não conhece.
+O export de um repositório é JSON indentado e terminado por uma quebra de linha, com toda lista ordenada: os mesmos arquivos dão bytes idênticos. Uma lista vazia do nível superior some do documento, exceto `files`, `symbols`, `calls`, `providers`, `consumers` e `links`, que sempre aparecem; as listas aninhadas (`members`, `steps`, `contracts`, `fields`) sempre são escritas. O campo `format` nomeia o formato do export (1 hoje). Ele só sobe numa mudança que quem lê o formato anterior leria errado; um campo opcional acrescentado não o sobe, então quem lê o export deve ignorar os campos que não conhece.
 
 | Campo | Conteúdo |
 | --- | --- |
+| `format` | O formato do export, hoje 1. |
 | `repository` | Identidade do repositório. |
+| `commit` | O commit indexado; some fora do git, antes do primeiro commit e quando nada confiável se sabe. |
+| `dirty` | Se o checkout diferia de `commit`; some com ele. |
 | `files` | `path`, `hash`. |
 | `symbols` | `id`, `span` (`path`, `start`, `end`), `hash`. |
 | `calls` | `id`, `caller`, `target`, `level`, `candidates`, `span`, `narrowed`, `decorates`. |

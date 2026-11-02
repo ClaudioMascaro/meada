@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/gopkg/web",
+  "commit": "7f46576f1e67cae82e0ec24ff0ac65ca3788587a",
+  "dirty": false,
   "files": [
     {
       "path": "main.go",

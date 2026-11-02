@@ -29,6 +29,7 @@ mod gopkg;
 mod grammar;
 mod hostile;
 mod index;
+mod indexed_commit;
 mod items;
 mod jvmpkg;
 mod kotlinpkg;

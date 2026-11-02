@@ -1,5 +1,8 @@
 {
+  "format": 1,
   "repository": "example.com/swift/kit",
+  "commit": "0524eadb2ee88e622587fef67f63b0f3c82bd6f0",
+  "dirty": false,
   "files": [
     {
       "path": "Sources/Hidden/Hidden.swift",
