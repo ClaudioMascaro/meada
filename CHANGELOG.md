@@ -31,6 +31,11 @@ All notable changes to Meada are recorded here. The format follows
   a refused entry show the server's message and the page reads the versions again. In pt-BR and
   English.
 
+### Fixed
+
+- The container build copies every top-level `tests/fixtures/*.json` in the UI stage with one
+  `COPY`, so a UI test importing a new fixture no longer breaks the image.
+
 ## [1.1.0] - 2026-11-02
 
 A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md):
