@@ -1,0 +1,10 @@
+# name	packs	url	sha
+# Pinned inputs for the base-vs-head drive. `self` is this checkout's HEAD, committed files only.
+# Change a pin only with the maintainer's OK: the same input must reach both binaries.
+meada	rust,ts	self	-
+click	python	https://github.com/pallets/click	2247b35ea1c47c727d7a06e51fa280e12a863ff6
+pflag	go	https://github.com/spf13/pflag	f8a990678a6d44385313e9b19e40737f889f9b14
+petclinic	java	https://github.com/spring-petclinic/spring-petclinic-rest	4dffa9c342bd16c06ff98a9b5b03e65c349ef414
+turbine	kotlin	https://github.com/cashapp/turbine	8c4e8c9b391d75ac9d7a168cca34b1bf99ed2cb0
+serilog	csharp	https://github.com/serilog/serilog-sinks-console	9b75d510787f5d54cf76584a3c3341d7eab0ee0a
+swiftlog	swift	https://github.com/apple/swift-log	d0f784af9ea2bc75e557c3d2bb628a68248605f3

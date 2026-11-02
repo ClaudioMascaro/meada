@@ -10,3 +10,5 @@
 /DESIGN.md
 /PRODUCT.md
 /scripts/docs/__pycache__/
+/.prove-it/runs/
+/.prove-it/audits/
