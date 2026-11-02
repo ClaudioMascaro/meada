@@ -964,6 +964,251 @@ fn a_deleted_user_is_blocked_from_every_lifecycle_route_until_provisioned_active
     case.github.clean(&case.console.stderr(), &[]);
 }
 
+/// A deleted, and separately a deactivated, SCIM user is refused with 403 `deprovisioned` on the
+/// catalog and on every named-workspace route, `operators` included, until provisioned active
+/// again; a user never provisioned keeps normal admission and nothing moves meanwhile.
+#[cfg(feature = "directory")]
+#[test]
+fn a_deprovisioned_user_is_blocked_from_operators_and_the_catalog_until_provisioned_active() {
+    use super::super::directory::{USER, expect, patch};
+    let Some(case) = Case::start("ws_scim_catalog", true) else {
+        return;
+    };
+    case.refresh();
+    case.ready();
+    let scim_user = |active: bool| -> String {
+        let body = json!({"schemas": [USER], "userName": "root", "active": active});
+        let reply = expect(&case.console, "POST", "/Users", Some(&body), 201);
+        reply["id"].as_str().unwrap().to_string()
+    };
+    let ya = id_of(&case.create("root", "Y and A", &["Y", "A"]));
+    let text = case.hosted(&[("Y", Some("y.example")), ("A", None)]);
+    let version = case.save("root", &ya, &text, 1).json()["version"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let token = case.token("root");
+    let path = |op: &str| format!("/api/v1/workspaces/{ya}/{op}");
+    let dave = json!({"subject": case.subject("dave"), "login": "dave"});
+    let routes = [
+        ("GET", "/api/v1/catalog".to_string(), json!(null)),
+        (
+            "POST",
+            "/api/v1/catalog/check".to_string(),
+            json!({"identities": [case.identity("Y")]}),
+        ),
+        ("GET", format!("/api/v1/workspaces/{ya}"), json!(null)),
+        (
+            "POST",
+            path("versions"),
+            json!({"entries": text, "message": "m", "base": 1}),
+        ),
+        (
+            "POST",
+            path("apply"),
+            json!({"version": version, "base": 1}),
+        ),
+        (
+            "POST",
+            path("rename"),
+            json!({"name": "Blocked", "base": 1}),
+        ),
+        ("POST", path("operators"), json!({"add": [dave], "base": 1})),
+        ("POST", path("delete"), json!({"base": 1})),
+    ];
+    let call = |(method, path, body): &(&str, String, Value)| match *method {
+        "GET" => case.get(path, &token),
+        _ => case.post(path, &token, body),
+    };
+    let admin = crate::postgres::Admin::new(&case.github.url);
+    let schema = &case.github.schema;
+    let rows = || -> Vec<String> {
+        let tables = ["workspaces", "workspace_operators", "workspace_versions"];
+        let tables = tables.iter().chain(&["workspace_history"]);
+        let select = |table: &&str| format!("SELECT t::text FROM {schema}.{table} t ORDER BY 1");
+        tables
+            .flat_map(|table| admin.texts(&select(table)))
+            .collect()
+    };
+    let held = rows();
+    let (catalog, check, operators) = (&routes[0], &routes[1], &routes[6]);
+    let blocked = || {
+        for route in &routes {
+            let reply = call(route);
+            assert_eq!(
+                (reply.status, code(&reply)),
+                (403, "deprovisioned".into()),
+                "{} {}: {}",
+                route.0,
+                route.1,
+                reply.body
+            );
+        }
+        assert_eq!(rows(), held, "a refused route wrote");
+        let never = case.get("/api/v1/catalog", &case.token("carol"));
+        assert_eq!(
+            never.status, 200,
+            "a user never provisioned is admitted: {}",
+            never.body
+        );
+    };
+
+    // Deactivated, then provisioned active again.
+    let id = scim_user(true);
+    assert_eq!(call(catalog).status, 200);
+    let off = patch(json!([{"op": "Replace", "path": "active", "value": false}]));
+    expect(
+        &case.console,
+        "PATCH",
+        &format!("/Users/{id}"),
+        Some(&off),
+        200,
+    );
+    blocked();
+    let on = patch(json!([{"op": "Replace", "path": "active", "value": true}]));
+    expect(
+        &case.console,
+        "PATCH",
+        &format!("/Users/{id}"),
+        Some(&on),
+        200,
+    );
+    assert_eq!(call(catalog).status, 200);
+    assert_eq!(call(check).status, 200);
+
+    // Deleted, then created again and provisioned active.
+    expect(&case.console, "DELETE", &format!("/Users/{id}"), None, 204);
+    blocked();
+    let again = scim_user(false);
+    blocked();
+    let put = json!({"schemas": [USER], "userName": "root", "active": true});
+    expect(
+        &case.console,
+        "PUT",
+        &format!("/Users/{again}"),
+        Some(&put),
+        200,
+    );
+    assert_eq!(call(catalog).status, 200);
+    let delegated = call(operators);
+    assert_eq!(delegated.status, 200, "{}", delegated.body);
+    case.github.clean(&case.console.stderr(), &[]);
+}
+
+/// With the audit unable to record, every named-workspace write answers 503 `audit_unavailable`
+/// before anything is written: the workspaces, their operators, versions and history in Postgres
+/// and the documents of the snapshot store stay as they were, a rollback included, and the reads still
+/// answer. The audit table is renamed in place rather than the Postgres relay closed, since the
+/// workspaces share that Postgres and a read of theirs would fail first with `unavailable`.
+#[test]
+fn without_the_audit_no_named_workspace_write_runs_and_reads_still_answer() {
+    let Some(case) = Case::new("ws_audit_down") else {
+        return;
+    };
+    case.refresh();
+    case.ready();
+    let ya = id_of(&case.create("root", "Y and A", &["Y", "A"]));
+    let first = case.at("root", &ya).0;
+    let hosted = |host: &str| case.hosted(&[("Y", Some(host)), ("A", None)]);
+    let second = case.save("root", &ya, &hosted("two.example"), 1).json()["version"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(case.apply("root", &ya, &second, 1).status, 200);
+    let third = case.save("root", &ya, &hosted("three.example"), 2).json()["version"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let admin = crate::postgres::Admin::new(&case.github.url);
+    let schema = &case.github.schema;
+    let s3 = bucket(&case.endpoint, &bucket_name(&case.name));
+    let state = || {
+        let rows: Vec<String> = [
+            "workspaces",
+            "workspace_operators",
+            "workspace_versions",
+            "workspace_history",
+        ]
+        .iter()
+        .flat_map(|table| {
+            admin.texts(&format!(
+                "SELECT t::text FROM {schema}.{table} t ORDER BY 1"
+            ))
+        })
+        .collect();
+        let token = case.token("root");
+        let reads = [
+            "/api/v1/workspaces".to_string(),
+            format!("/api/v1/workspaces/{ya}"),
+            format!("/api/v1/workspaces/{ya}/versions"),
+            format!("/api/v1/workspaces/{ya}/history"),
+        ]
+        .map(|path| {
+            let reply = case.get(&path, &token);
+            assert_eq!(reply.status, 200, "{path}: {}", reply.body);
+            reply.json()
+        });
+        let keys: Vec<String> = crate::snapshot::objects(&s3, "")
+            .iter()
+            .map(|o| o.location.to_string())
+            .collect();
+        (rows, reads, keys)
+    };
+    let before = state();
+
+    admin.run(&format!("ALTER TABLE {schema}.audit RENAME TO audit_gone"));
+    let fresh = hosted("four.example");
+    let path = |op: &str| format!("/api/v1/workspaces/{ya}/{op}");
+    let writes = [
+        (
+            "/api/v1/workspaces".to_string(),
+            json!({"name": "Other", "description": "", "entries": case.entries(&["Y"]),
+                   "message": "first"}),
+        ),
+        (
+            path("versions"),
+            json!({"entries": fresh, "message": "m", "base": 2}),
+        ),
+        (path("apply"), json!({"version": third, "base": 2})),
+        // The version that was current before the second: a rollback.
+        (path("apply"), json!({"version": first, "base": 2})),
+        (path("rename"), json!({"name": "Renamed", "base": 2})),
+        (
+            path("operators"),
+            json!({"add": [{"subject": case.subject("dave"), "login": "dave"}], "base": 2}),
+        ),
+        (path("delete"), json!({"base": 2})),
+    ];
+    let token = case.token("root");
+    for (route, body) in &writes {
+        let reply = case.post(route, &token, body);
+        assert_eq!(
+            (reply.status, code(&reply)),
+            (503, "audit_unavailable".into()),
+            "{route} {body}: {}",
+            reply.body
+        );
+    }
+    assert_eq!(state(), before);
+    // The reads outside the workspaces answer as the console's audit-down test expects.
+    assert_eq!(case.get("/api/v1/session", &token).status, 200);
+    let page = case.get("/api/v1/audit", &token);
+    assert_eq!(
+        (page.status, code(&page)),
+        (503, "audit_unavailable".into())
+    );
+
+    // The audit back, the same write goes through: the refusals were the audit's alone.
+    admin.run(&format!("ALTER TABLE {schema}.audit_gone RENAME TO audit"));
+    let renamed = case.post(
+        &path("rename"),
+        &token,
+        &json!({"name": "Renamed", "base": 2}),
+    );
+    assert_eq!(renamed.status, 200, "{}", renamed.body);
+    case.github.clean(&case.console.stderr(), &[]);
+}
+
 /// `meada workspaces` does what the console does as the platform administrator, through the same
 /// atomic boundary: a stale base is refused, every write is a `cli` audit record naming the
 /// workspace, and the console sees the result.

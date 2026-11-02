@@ -44,6 +44,13 @@ const en = {
   diagnostic_peer_missing: 'The peer is not in this workspace',
   diagnostic_documents_not_indexed: 'Serve hosts declared, but no provider documents are indexed for this repository',
   none: 'None',
+  versionsTitle: 'Versions', versionsEmpty: 'No version to show.', moreVersions: 'More versions', currentVersion: 'current', savedAt: 'Saved', author: 'Author',
+  showVersion: 'Show version', versionOf: 'Version', manifestOfVersion: 'Manifest of this version', versionEntries: 'Entries of this version',
+  versionDiff: 'Difference from the current version', noDiff: 'No difference from the current version.',
+  history: 'History', showHistory: 'Show history', moreHistory: 'More history', noHistory: 'No history to show.',
+  seq: 'Sequence', action: 'Action', actor: 'Actor', authority: 'Authority', time: 'Time',
+  applyVersion: 'Apply this version', applyConfirm: 'Apply this version?', applyConfirmNote: 'This version becomes the current one, at the base you read. Going back to an earlier version is recorded as a rollback. The server checks your authority and the base again.',
+  applying: 'Applying…', reloadVersions: 'Reload versions',
 };
 export type NamedCopy = { [K in keyof typeof en]: (typeof en)[K] extends string ? string : (typeof en)[K] };
 export const namedCopy: Record<Language, NamedCopy> = {
@@ -92,5 +99,12 @@ export const namedCopy: Record<Language, NamedCopy> = {
     diagnostic_peer_missing: 'O peer não está neste workspace',
     diagnostic_documents_not_indexed: 'Hosts de serve declarados, mas nenhum documento de provedor é indexado para este repositório',
     none: 'Nenhum',
+    versionsTitle: 'Versões', versionsEmpty: 'Nenhuma versão para mostrar.', moreVersions: 'Mais versões', currentVersion: 'atual', savedAt: 'Gravada', author: 'Autor',
+    showVersion: 'Mostrar versão', versionOf: 'Versão', manifestOfVersion: 'Manifesto desta versão', versionEntries: 'Entradas desta versão',
+    versionDiff: 'Diferença em relação à versão atual', noDiff: 'Nenhuma diferença em relação à versão atual.',
+    history: 'Histórico', showHistory: 'Mostrar histórico', moreHistory: 'Mais histórico', noHistory: 'Nenhum histórico para mostrar.',
+    seq: 'Sequência', action: 'Ação', actor: 'Ator', authority: 'Autoridade', time: 'Hora',
+    applyVersion: 'Aplicar esta versão', applyConfirm: 'Aplicar esta versão?', applyConfirmNote: 'Esta versão passa a ser a atual, na base que você leu. Voltar a uma versão anterior fica registrado como rollback. O servidor verifica de novo a sua autoridade e a base.',
+    applying: 'Aplicando…', reloadVersions: 'Recarregar versões',
   },
 };

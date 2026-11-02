@@ -785,6 +785,147 @@ fn a_proposal_changes_nothing_and_a_person_saves_it_in_the_console() {
     case.github.clean(&case.console.stderr(), &[]);
 }
 
+/// The console's preview (`POST workspaces/effective`, what the guided editor shows) and
+/// `propose` share one core: for the same caller (alice, an operator reading Y and A) and the same
+/// manifest text they give the same effective configuration, and what `propose` says is
+/// applicable the console's save then accepts, what it refuses the save refuses, leaving the
+/// console as it was. The preview has no refusals of its own (the save decides eligibility): for
+/// an entry the caller cannot read it shows the repository as pending, as for any repository no
+/// generation holds, where `propose` composes over it and leaves it out.
+#[test]
+fn the_guided_preview_and_propose_agree_on_the_same_text() {
+    let Some(case) = Case::new("ws_preview_propose") else {
+        return;
+    };
+    case.bare("Y");
+    case.refresh();
+    case.ready();
+    let reply = case.create("alice", "Y and A", &["Y", "A"]);
+    assert_eq!(reply.status, 201, "{}", reply.body);
+    let ya = reply.json()["id"].as_str().unwrap().to_string();
+    case.publish();
+    let server = case.proposals();
+    let (token, alice) = (case.token("alice"), case.agent("alice"));
+    read_a_set(&server, &alice);
+    let (y, a, b) = (case.identity("Y"), case.identity("A"), case.identity("B"));
+    let entry = |repo: &str, extra: &str| format!("[[repository]]\nrepo = \"{repo}\"\n{extra}");
+    let join = |entries: &[String]| entries.join("\n");
+    // What each text is, and what it must give.
+    let clean = join(&[entry(&y, ""), entry(&a, "")]);
+    let diagnosed = join(&[
+        entry(&y, "[[repository.peer]]\nrepo = \"github.com/acme/b\"\n"),
+        entry(&a, "[repository.serve]\nhosts = [\"a.example\"]\n"),
+    ]);
+    let invalid = join(&[entry(&y, "path = \"/etc\"\n"), entry(&a, "")]);
+    let refused = join(&[entry(&y, ""), entry(&a, ""), entry(&b, "")]);
+
+    let preview = |text: &str| {
+        let body = json!({"entries": text});
+        case.post("/api/v1/workspaces/effective", &token, &body)
+    };
+    let propose = |text: &str| {
+        let arguments = json!({"workspace": ya, "entries": text});
+        answer(&server, &alice, "propose", arguments)
+    };
+    let before = case.state(&[&ya]);
+
+    // Clean and diagnosed: both answer the same view, entry by entry, diagnostics included.
+    for (label, text, diagnostics) in [
+        ("clean", &clean, vec![]),
+        (
+            "diagnosed",
+            &diagnosed,
+            vec!["peer_missing", "ignored_by_repository"],
+        ),
+    ] {
+        let shown = preview(text);
+        assert_eq!(shown.status, 200, "{label}: {}", shown.body);
+        let (shown, proposal) = (shown.json(), propose(text));
+        assert_eq!(proposal["applicable"], true, "{label}: {proposal}");
+        assert_eq!(proposal["diagnostics"], json!([]), "{label}");
+        assert_eq!(proposal["refusals"], json!([]), "{label}");
+        assert_eq!(
+            shown["entries"], proposal["effective"]["entries"],
+            "{label}"
+        );
+        assert_eq!(shown["generation"], proposal["effective"]["generation"]);
+        let found: Vec<&str> = (shown["entries"].as_array().unwrap().iter())
+            .flat_map(|e| e["diagnostics"].as_array().unwrap())
+            .map(|d| d["code"].as_str().unwrap())
+            .collect();
+        assert_eq!(found, diagnostics, "{label}");
+        assert_eq!(
+            case.state(&[&ya]),
+            before,
+            "{label}: neither stores anything"
+        );
+    }
+
+    // Invalid text: the preview's 422 carries the problems `propose` lists as diagnostics.
+    let shown = preview(&invalid);
+    assert_eq!(shown.status, 422, "{}", shown.body);
+    assert_eq!(shown.json()["error"]["code"], "invalid_entries");
+    let proposal = propose(&invalid);
+    assert_eq!(proposal["applicable"], false, "{proposal}");
+    let problems: Vec<&str> = (proposal["diagnostics"].as_array().unwrap().iter())
+        .inspect(|d| assert_eq!(d["code"], "invalid_entries", "{proposal}"))
+        .map(|d| d["message"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        shown.json()["error"]["message"].as_str().unwrap(),
+        problems.join("\n")
+    );
+    assert_eq!(proposal["effective"], Value::Null);
+    let saved = case.save("alice", &ya, &invalid, 1);
+    assert_eq!(
+        (
+            saved.status,
+            saved.json()["error"]["code"].as_str().unwrap().to_string()
+        ),
+        (422, "invalid_entries".into())
+    );
+
+    // An entry alice cannot read: `propose` refuses and composes over it, the save refuses, the
+    // preview shows B as pending and the rest as `propose` does.
+    let shown = preview(&refused);
+    assert_eq!(shown.status, 200, "{}", shown.body);
+    let (shown, proposal) = (shown.json(), propose(&refused));
+    assert_eq!(proposal["applicable"], false, "{proposal}");
+    assert_eq!(proposal["refusals"][0]["code"], "entries_refused");
+    let entries = proposal["effective"]["entries"].as_array().unwrap();
+    let kept: Vec<&Value> = (shown["entries"].as_array().unwrap().iter())
+        .filter(|e| e["repo"] != json!(b))
+        .collect();
+    assert_eq!(kept, entries.iter().collect::<Vec<_>>());
+    let beyond = (shown["entries"].as_array().unwrap().iter())
+        .find(|e| e["repo"] == json!(b))
+        .unwrap();
+    assert_eq!(beyond["coverage"], "pending_ingestion", "{shown}");
+    let saved = case.save("alice", &ya, &refused, 1);
+    assert_eq!(
+        (
+            saved.status,
+            saved.json()["error"]["code"].as_str().unwrap().to_string()
+        ),
+        (403, "entries_refused".into())
+    );
+    // The refusal is audited; no workspace, version or history changes.
+    assert_eq!(case.state(&[&ya])[1..], before[1..], "nothing is stored");
+
+    // The same text, saved and applied through the console, then shows what `propose` previewed.
+    let proposal = propose(&diagnosed);
+    let saved = case.save("alice", &ya, &diagnosed, 1);
+    assert_eq!(saved.status, 201, "{}", saved.body);
+    let version = saved.json()["version"].as_str().unwrap().to_string();
+    let applied = case.apply("alice", &ya, &version, 1);
+    assert_eq!(applied.status, 200, "{}", applied.body);
+    let now = case.get(&format!("/api/v1/workspaces/{ya}/effective"), &token);
+    assert_eq!(now.status, 200, "{}", now.body);
+    assert_eq!(now.json()["entries"], proposal["effective"]["entries"]);
+    case.github.clean(&server.stderr(), &[alice]);
+    case.github.clean(&case.console.stderr(), &[]);
+}
+
 /// Eligibility is read from the newest set, never cached past its age: once the set is stale,
 /// a proposal that was applicable is pending `stale_set` for everyone, the administrator
 /// included, and the catalog lists nothing.

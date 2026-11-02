@@ -6,6 +6,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { EditWorkspace } from './EditWorkspace';
 import type { Outcome } from './EditWorkspace';
 import { EffectiveList } from './EffectiveList';
+import { WorkspaceVersions } from './WorkspaceVersions';
 import { loadCore, namedAuthorize, namedEntriesJson, namedEntriesText } from './core';
 import { guidedCopy } from './guided-i18n';
 import { copy } from './i18n';
@@ -97,6 +98,9 @@ export function NamedWorkspacesPage({ api, locale, session, maxEntries }: { api:
           <p>{t.findings}</p>
           <ul>{outcome.findings.map(finding => <li key={finding}>{finding}</li>)}</ul>
         </section>}</>}
+      <WorkspaceVersions key={detail.id} api={api} locale={locale} detail={detail}
+        onApplied={result => { setOutcome(result); void show(detail.id, true); reload(); }}
+        onStale={() => { void show(detail.id, true); reload(); }} />
       {detail.operate && <EditWorkspace key={`${detail.id}:${detail.base}`} api={api} locale={locale} session={session} detail={detail} savedView={effective} catalog={catalog} maxEntries={maxEntries}
         onChanged={result => { setOutcome(result); void show(detail.id, true); reload(); }}
         onReload={() => { void show(detail.id); reload(); }}

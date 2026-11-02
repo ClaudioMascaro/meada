@@ -1434,6 +1434,19 @@ fn compose_job(dir: &Path) {
     }
 }
 
+/// The managed compose job, `deploy/compose/managed-refresh.sh`, in `dir/ops/` with `/etc/meada/`
+/// moved to `ops/` and the pulled list to `ops/pulled.toml`.
+#[cfg_attr(
+    not(all(feature = "github-app", feature = "postgres", feature = "oidc")),
+    allow(dead_code)
+)]
+pub(crate) fn compose_managed(dir: &Path) {
+    let deploy = Path::new(env!("CARGO_MANIFEST_DIR")).join("deploy/compose");
+    let src = fs::read_to_string(deploy.join("managed-refresh.sh")).unwrap();
+    let moved = (src.replace("/etc/meada/", "ops/")).replace("/tmp/pulled.toml", "ops/pulled.toml");
+    fs::write(dir.join("ops/managed-refresh.sh"), moved).unwrap();
+}
+
 /// A commit adding `src/later.ts` to the mirror `repo`, not indexed.
 fn commit_later(repo: &Path) {
     fs::write(repo.join("src/later.ts"), "export const later = 1;\n").unwrap();
@@ -1445,11 +1458,20 @@ fn commit_later(repo: &Path) {
 /// git allowed no transport but local files, so a fetch from the chain's https remotes fails
 /// without the network.
 fn compose_refresh(dir: &Path, repositories: &str) -> (String, String, Option<i32>) {
+    compose_run(dir, "refresh.sh", repositories)
+}
+
+/// `compose_refresh` for the script `ops/<script>`.
+pub(crate) fn compose_run(
+    dir: &Path,
+    script: &str,
+    repositories: &str,
+) -> (String, String, Option<i32>) {
     let bin = Path::new(MEADA).parent().unwrap().display().to_string();
     let path = format!("{bin}:{}", std::env::var("PATH").unwrap_or_default());
     let args = ["snapshot", "lock", "--workspace", MANIFEST, "--"];
     let mut job = meada(dir, &args);
-    job.args(["sh", "ops/refresh.sh"])
+    job.args(["sh", &format!("ops/{script}")])
         .env("PATH", path)
         .env("PUBLISH", "1")
         .env("REPOSITORIES", repositories)

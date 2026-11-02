@@ -212,6 +212,37 @@ fn refused_with_outcome(
     error(status, code, message)
 }
 
+/// Debug builds only, a knob for tests, not in the user docs (a release binary has none): with
+/// `MEADA_PAUSE_BEFORE_LOCK=<path>` set and the file `<path>` present, the first save or apply to
+/// get here removes it, creates `<path>.reached` and waits (30 seconds at most) for
+/// `<path>.go`, so a test can move the pointer between admission and the refresh lock.
+#[cfg(all(debug_assertions, feature = "refresh-lock"))]
+fn pause_before_lock() {
+    let Some(path) = std::env::var_os("MEADA_PAUSE_BEFORE_LOCK") else {
+        return;
+    };
+    let beside = |end: &str| {
+        let mut name = path.clone();
+        name.push(end);
+        std::path::PathBuf::from(name)
+    };
+    // The removal is the claim: a request that finds nothing to remove does not pause.
+    if std::fs::remove_file(&path).is_err() {
+        return;
+    }
+    let _ = std::fs::write(beside(".reached"), "");
+    for _ in 0..300 {
+        if beside(".go").exists() {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    eprintln!(
+        "ui: MEADA_PAUSE_BEFORE_LOCK: no {}.go after 30 s, going on",
+        path.to_string_lossy()
+    );
+}
+
 /// A team operator that lost its role between admission and the lock gets a viewer's refusal.
 #[cfg(feature = "refresh-lock")]
 fn role_lost(record: PendingRecord, session: &Session, action: &str, arguments: &str) -> Answer {
@@ -456,6 +487,8 @@ impl Console {
                 Err(answer) => return *answer,
             };
             let grant = grant(session);
+            #[cfg(all(debug_assertions, feature = "refresh-lock"))]
+            pause_before_lock();
             return match crate::snapshot::versions::save(
                 &self.file,
                 &save.entries,
@@ -523,6 +556,8 @@ impl Console {
                 };
             let author = session.subject.as_deref().expect("write subject admitted");
             let grant = grant(session);
+            #[cfg(all(debug_assertions, feature = "refresh-lock"))]
+            pause_before_lock();
             let done = crate::snapshot::versions::apply(
                 &self.file,
                 version,

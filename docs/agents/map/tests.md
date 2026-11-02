@@ -311,7 +311,10 @@ all repository fixtures; it contains no private corpus data. Existing tests own 
   addition absent from the published generation, a refresh stopping at the role check
   publishing nothing, `show` and `import` carrying `added_by` to the same id, an adopted entry
   published once its index can be written (the failed index keeping the current generation,
-  #316), and an attribution-only change publishing the same generation), `ui` (`meada ui` as a child
+  #316), an attribution-only change publishing the same generation, and `deploy/compose/managed-refresh.sh`
+  itself under the lock with its fetch stubbed: a failed check exiting 1 before the pulled list or
+  the fetch, a check with one excluded entry handing the fetch the eligible ones and publishing,
+  exit 0), `ui` (`meada ui` as a child
   process over a `[ui] dir` it writes, with a `meada-ui.json` naming this build's version, in
   plain HTTP over raw sockets so no path is normalised: the `config`, `session` and `manifest`
   documents, the JSON 404, the `manifest` errors of a file broken after the start; the
@@ -383,7 +386,11 @@ all repository fixtures; it contains no private corpus data. Existing tests own 
   outside the grant kept in place, its subject as author) and its apply and rollback, two teams
   in one save, each refusal reason as a 403 `entries_refused` with nothing written and the lock
   free, an apply naming what the grant reads and counting the rest in `hidden`, an apply checked
-  against the version current then, a team that removes its last entry turning viewer, the
+  against the version current then, a team that removes its last entry turning viewer, a save
+  and an apply that lose the role between admission and the refresh lock (#477: the debug-only
+  `MEADA_PAUSE_BEFORE_LOCK` knob of `ui/write.rs` holds the request while the global operator
+  moves the pointer; the 403 has the admission refusal's text and its stderr line names the
+  teams, `as ["team-billing"]`, which an admitted viewer's never does), the
   generation operations refused by role before the body is read, and the `as <owners>` stderr
   line;
   serialized workspace versions refused before storage even when their uploads fit the cap;
@@ -1070,7 +1077,11 @@ with the GitHub identity in `grant`, a group owning an entry only GitHub grants 
 `sources` (`claims` and `github`, sorted, `*` for a machine token) with no request to the
 loopback issuer or the fake GitHub; `admission`'s `github` with the set's id, `finished`, age,
 `max_age_seconds` and the counts the job wrote; an audited write's record carrying the login;
-then `expired`, a viewer with an empty grant.
+then `expired`, a viewer with an empty grant. A second case (#316) commits a set through a
+`snapshot lock` refresh (role check, then an index that cannot be written) that exits 1: the
+pointer and the node's held generation stay, the grant is `current`, then `expired` past
+`max_age_seconds` with no refresh to renew it, `current` again only through a role check, and
+empty under a later set without the login.
 
 `tests/it/ui/oidc/catalog.rs` (#341, feature `workspaces`) runs a console with `[oidc.github]`,
 `[postgres]` and `[catalog]` over a permissions set the real `meada github-app roles` wrote
