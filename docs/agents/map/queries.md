@@ -287,7 +287,7 @@ this file, and a change to these modules updates it.
   and `--min-p`, which require `--decider`; `mcp --listen` and `--workspace`, which require
   each other). `search`, `context` and `trace`
   are reachable through MCP and the library, not the CLI.
-- `msg.rs`: the CLI message catalog (pt-BR and English, one arm per `Msg`). The messages of the
+- `msg.rs`: the CLI message catalog (pt-BR, English and Spanish, one arm per `Msg`). The messages of the
   checks `meada-core` holds are `meada_core::msg`'s (a few arms delegate to it), and so is the
-  language flag: `msg::init` sets it for both. Only `main.rs` calls
+  language setting: `msg::init` sets it for both. Only `main.rs` calls
   `msg::init`; `meada mcp` forces English, so the MCP surface and library tests are English.

@@ -28,9 +28,10 @@ fn meada(repo: &Path, lang: &str, arg: &str) -> String {
 }
 
 /// `LANG` values and the golden suffix each one gets; the last one falls back to English.
-const LANGS: [(&str, &str); 3] = [
+const LANGS: [(&str, &str); 4] = [
     ("pt_BR.UTF-8", "pt"),
     ("en_US.UTF-8", "en"),
+    ("es_ES.UTF-8", "es"),
     ("de_DE.UTF-8", "fallback"),
 ];
 
@@ -85,7 +86,7 @@ fn config_errors_follow_lang() {
 #[test]
 fn help_follows_lang() {
     let repo = fixture_repo("cli_help", "ts-basic", None);
-    for (lang, name) in &LANGS[..2] {
+    for (lang, name) in &LANGS[..3] {
         assert_golden(
             &format!("cli.help.{name}.txt"),
             &meada(&repo, lang, "--help"),

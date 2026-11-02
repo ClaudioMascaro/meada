@@ -175,7 +175,7 @@ all repository fixtures; it contains no private corpus data. Existing tests own 
   `freshness` (cold vs refreshed, also an edited zod schema dropping a field, edited calls moving
   every repository's communities and processes, and the chain's export byte-identical under
   `meada::with_reversed_walk`), `items` (open items and their `search` goldens, fixtures
-  `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US and de_DE `LANG`;
+  `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US, es_ES and de_DE `LANG`;
   with `oidc`, the identity provider's errors: an unknown `type`, `[oidc.entra]` under `okta` and
   an `overage` other than `ignore` and `directory`; with `oidc` and `directory`,
   `overage = "directory"` without `groups_claim` and without `[directory]` (#336); without `directory`, `[directory]` naming the feature; with
@@ -438,7 +438,7 @@ all repository fixtures; it contains no private corpus data. Existing tests own 
   and the pattern depth limit are unit tests in `lang/ts/uses.rs`; `context` on the documented,
   zod, literals and drift-free routes (goldens `chain-drift.context-route-*.txt`), `search` with
   the kind `drift` (`chain-drift.search-drift.txt`) and `status` (`chain-drift.status.txt`, and
-  `cli.status-drift.*` in `cli` for pt-BR and English) show it),
+  `cli.status-drift.*` in `cli` for pt-BR, English and Spanish) show it),
   `documents` (provider documents over `documented_chain`: export, `trace` to "documented
   only", `search` (routes and kind `document`), `status`, listed documents, `context` on the
   merged route with its documented fields, `context` on a route (documented only and merged);

@@ -1,0 +1,9 @@
+example.com/chain/web (.) indexado, 5 archivos
+  decisión obsoleta: example.com/chain/web::src/status.ts::gone::fetch#0 -> example.com/chain/catalog::http::POST::/api/events (llamada eliminada)
+  decisión a la espera del par ausente example.com/chain/billing: example.com/chain/web::src/status.ts::health::fetch#0 -> example.com/chain/billing::http::GET::/api/health
+  decisión a la espera del par ausente example.com/chain/billing: example.com/chain/web::src/status.ts::track::fetch#0 -> example.com/chain/billing::http::POST::/api/events
+  ¿conclusión errónea? repórtala: https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml
+example.com/chain/gateway (../chain-gateway) indexado, 8 archivos
+example.com/chain/catalog (../chain-catalog) indexado, 4 archivos
+example.com/chain/worker (../chain-worker) indexado, 3 archivos
+par no encontrado: example.com/chain/billing, citado por example.com/chain/web

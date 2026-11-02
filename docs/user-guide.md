@@ -573,7 +573,7 @@ No modo servidor, as decisões são feitas em um pipeline, não pelo servidor; v
 meada <COMANDO>
 ```
 
-As mensagens seguem o `LANG` (português ou inglês); as do MCP são sempre em inglês. Toda
+As mensagens seguem o `LANG` (português, inglês ou espanhol); as do MCP são sempre em inglês. Toda
 invocação aceita `--help` e `--version`.
 
 ### Os cinco comandos do build padrão

@@ -1,0 +1,15 @@
+Grafo de código sin LLM para agentes y personas
+
+Usage: meada <COMMAND>
+
+Commands:
+  index   Construye los índices del workspace del repositorio en el directorio actual.
+  status  Muestra el workspace: cada repositorio, el estado del índice y los pares no encontrados.
+  export  Imprime el índice como JSON ordenado, con los links que lo tocan.
+  mcp     Sirve el repositorio del directorio actual a agentes por MCP (stdio).
+  decide  Resuelve los elementos abiertos de este repositorio, links ambiguos y URL dinámicas, y registra las elecciones en meada.decisions.toml.
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
