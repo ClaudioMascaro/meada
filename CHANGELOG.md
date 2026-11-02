@@ -6,6 +6,23 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-02
+
+A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md):
+local accounts (ADR 0024) in the console, the proposal server and the nodes, carried by the
+`cloud` image, the Compose recipe and the Helm chart; the export's `format` and indexed commit;
+client-side deadlines on every Postgres call; durable pulled-generation writes; resolver fixes
+for C#, Kotlin, Rust and Swift (tier b3); and the fixes of tiers b1 and b2. The index schema
+version changes, so existing indexes are rebuilt once on first use. `meada-core` 1.1.0 adds `format`, `commit` and `dirty` to `Export`, and its
+`export::parse` refuses a document without `format`: re-export with 1.1.0 before parsing an export
+written by 1.0.0. The tree, the `meada-core` pin, the Dockerfile, the compose defaults and the
+Helm chart declare `1.1.0`, and the `v1.1.0` tag follows this entry's merge on main. Publication
+(crates, the staged npm package, the GitHub draft release) belongs to the maintainer.
+Release notes are available in
+[pt-BR](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.1.0.md),
+[English](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.1.0.en.md) and
+[Spanish](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.1.0.es.md).
+
 ### Added
 
 - The export format and the indexed commit (#512, ADR 0004 "Canonical export"): every export
@@ -1063,6 +1080,7 @@ and `trace` from the two longest processes. The spec adds about 0.3 MB and 0.03 
 The rise of the single-file reindex since 2026-10-14 predates it (specs #22 and #23), and at
 692 files it is close to its target.
 
-[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.1.0
 [1.0.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.0.0
 [0.1.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v0.1.0
