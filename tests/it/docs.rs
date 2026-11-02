@@ -219,3 +219,39 @@ fn a_module_lead_is_what_a_bullet_with_an_area_link_names_before_its_colon() {
     let map = "- `a.rs`: one. [x](map/x.md)\n- `b.rs`: no link\n- `e.rs` no colon [z](map/z.md)\n- `c.rs`, `d/`: two,\n  wrapped. [y](map/y.md)\n";
     assert_eq!(module_leads(map), vec!["- `a.rs`", "- `c.rs`, `d/`"]);
 }
+
+/// `CHANGELOG.md merge=union` (#576): two branches adding a bullet under the same heading merge
+/// clean and keep both.
+#[test]
+fn changelog_union_merge_keeps_both_bullets() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("changelog-union");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    fs::copy(root.join(".gitattributes"), dir.join(".gitattributes")).unwrap();
+    let git = |args: &[&str]| {
+        crate::common::git(&dir, args);
+    };
+    let write = |bullet: &str| {
+        let text = format!("## [Unreleased]\n\n### Added\n\n- base\n{bullet}");
+        fs::write(dir.join("CHANGELOG.md"), text).unwrap();
+    };
+    git(&["init", "-q", "-b", "main"]);
+    write("");
+    git(&["add", "."]);
+    git(&["commit", "-qm", "base"]);
+    git(&["checkout", "-qb", "side"]);
+    write("- side\n");
+    git(&["commit", "-qam", "side"]);
+    git(&["checkout", "-q", "main"]);
+    write("- main\n");
+    git(&["commit", "-qam", "main"]);
+    git(&["merge", "-q", "--no-edit", "side"]);
+    let merged = fs::read_to_string(dir.join("CHANGELOG.md")).unwrap();
+    fs::remove_dir_all(&dir).unwrap();
+    assert!(
+        merged.contains("- main") && merged.contains("- side"),
+        "{merged}"
+    );
+    assert!(!merged.contains("<<<<<<<"), "{merged}");
+}
