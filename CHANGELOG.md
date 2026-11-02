@@ -6,12 +6,6 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
-### Fixed
-
-- `[postgres] schema` starting with `pg_` (reserved by Postgres) is refused at manifest read with
-  Meada's own message, in pt-BR and English, instead of Postgres's raw error at `meada postgres
-  migrate` (#482).
-
 ### Changed
 
 - The console asks `meada-core` through WebAssembly (`namedNameProblem`, `namedDescriptionProblem`,
@@ -20,12 +14,6 @@ All notable changes to Meada are recorded here. The format follows
   its bounds and the role list (#501). A version message is refused when empty by the same
   function on the browser, the console API and `meada workspaces`: the empty-message refusal now
   reads "a message is 1 to 500 characters, ..." instead of the request-body shape.
-
-### Fixed
-
-- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
-  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
-  node unready (#448).
 
 ### Added
 
@@ -36,7 +24,6 @@ All notable changes to Meada are recorded here. The format follows
   `scripts/helm-check` assert both. The identity provider recipes say how a person or an agent
   gets a token whose `aud` is `[proposals] audience` (Entra ID, Okta, Keycloak, local accounts; Okta
   needs a second authorization server the chart cannot render), in pt-BR, English and Spanish (#504).
-
 - Over TLS, the Postgres client of the data layer authenticates with SCRAM channel binding
   (`tls-server-end-point`, RFC 5929): it runs `SCRAM-SHA-256-PLUS` whenever the server offers
   it, so a client that requires channel binding connects (#483). Loopback without TLS keeps plain
@@ -51,8 +38,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- `[postgres] schema` starting with `pg_` (reserved by Postgres) is refused at manifest read with
+  Meada's own message, in pt-BR and English, instead of Postgres's raw error at `meada postgres
+  migrate` (#482).
+
+- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
+  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
+  node unready (#448).
+
 - The container build copies every top-level `tests/fixtures/*.json` in the UI stage with one
-  `COPY`, so a UI test importing a new fixture no longer breaks the image.
+  `COPY`, so a UI test importing a new fixture no longer breaks the image (#495).
 
 ## [1.1.0] - 2026-11-02
 
