@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { PREFIX_MAX } from './catalog';
-import { resourceRoles } from './core';
 import { lines, removeAt, replaceAt } from './guided';
 import type { Entry, PeerDecl, ResourceDecl, ServeDecl } from './guided';
 import type { GuidedCopy } from './guided-i18n';
@@ -29,15 +28,15 @@ function ServeFields({ serve, disabled, t, onChange }: { serve: ServeDecl | unde
   </fieldset>;
 }
 
-function ResourceFields({ resources, disabled, t, onChange }: { resources: ResourceDecl[]; disabled: boolean; t: GuidedCopy; onChange: (resources: ResourceDecl[]) => void }) {
+function ResourceFields({ resources, roles, disabled, t, onChange }: { resources: ResourceDecl[]; roles: string[]; disabled: boolean; t: GuidedCopy; onChange: (resources: ResourceDecl[]) => void }) {
   return <fieldset disabled={disabled}>
     <legend>{t.resources}</legend>
     {resources.map((resource, at) => <fieldset key={at}>
       <legend>{t.resource(at + 1)}</legend>
       <label>{t.kind}<input value={resource.kind} onChange={event => onChange(replaceAt(resources, at, { ...resource, kind: event.target.value }))} /></label>
       <label>{t.id}<input value={resource.id} onChange={event => onChange(replaceAt(resources, at, { ...resource, id: event.target.value }))} /></label>
-      <label>{t.role}<select value={resource.role} onChange={event => onChange(replaceAt(resources, at, { ...resource, role: event.target.value as ResourceDecl['role'] }))}>
-        {(JSON.parse(resourceRoles()) as ResourceDecl['role'][]).map(role => <option key={role} value={role}>{t[role]}</option>)}
+      <label>{t.role}<select value={resource.role} onChange={event => onChange(replaceAt(resources, at, { ...resource, role: event.target.value }))}>
+        {roles.map(role => <option key={role} value={role}>{(t as unknown as Record<string, string>)[role] ?? role}</option>)}
       </select></label>
       <LinesField label={t.via} value={resource.via ?? []} disabled={disabled} onChange={via => onChange(replaceAt(resources, at, { ...resource, via }))} />
       <button type="button" className="secondary" aria-label={`${t.remove} ${t.resource(at + 1)}`} onClick={() => onChange(removeAt(resources, at))}>{t.remove}</button>
@@ -70,8 +69,8 @@ function PeerFields({ peers, targets, disabled, t, onChange }: { peers: PeerDecl
  * rule about what an entry may contain. `status` is the eligibility, ingestion and effective
  * configuration of each entry, in words.
  */
-export function GuidedForm({ entries, disabled, t, status, catalog, onChange }: {
-  entries: Entry[]; disabled: boolean; t: GuidedCopy; status: Record<string, EntryStatus>; catalog: CatalogView; onChange: (entries: Entry[]) => void;
+export function GuidedForm({ entries, roles, disabled, t, status, catalog, onChange }: {
+  entries: Entry[]; roles: string[]; disabled: boolean; t: GuidedCopy; status: Record<string, EntryStatus>; catalog: CatalogView; onChange: (entries: Entry[]) => void;
 }) {
   const [typed, setTyped] = useState('');
   const [pick, setPick] = useState('');
@@ -99,7 +98,7 @@ export function GuidedForm({ entries, disabled, t, status, catalog, onChange }: 
           {s.diagnostics.map(diagnostic => <li key={diagnostic}>{diagnostic}</li>)}
         </ul>}
         <ServeFields serve={entry.serve} disabled={disabled} t={t} onChange={serve => set({ ...entry, serve })} />
-        <ResourceFields resources={entry.resource ?? []} disabled={disabled} t={t} onChange={resource => set({ ...entry, resource })} />
+        <ResourceFields resources={entry.resource ?? []} roles={roles} disabled={disabled} t={t} onChange={resource => set({ ...entry, resource })} />
         <PeerFields peers={entry.peer ?? []} targets={targets} disabled={disabled} t={t} onChange={peer => set({ ...entry, peer })} />
         <button type="button" className="secondary" aria-label={`${t.removeRepository} ${entry.repo}`} onClick={() => onChange(removeAt(entries, at))}>{t.remove}</button>
       </fieldset>;

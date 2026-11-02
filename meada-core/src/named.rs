@@ -236,7 +236,7 @@ mod tests {
     }
 
     #[test]
-    fn names_and_descriptions_are_bounded_and_plain() {
+    fn names_descriptions_and_messages_are_bounded_and_plain() {
         assert!(name_problem("Payments").is_none());
         for bad in ["", " x", "x ", "a\nb", &"x".repeat(NAME_MAX + 1)] {
             assert!(name_problem(bad).is_some(), "{bad:?}");

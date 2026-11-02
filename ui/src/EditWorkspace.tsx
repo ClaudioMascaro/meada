@@ -4,7 +4,7 @@ import type { Api, Session } from './api';
 import { CHECK_IDENTITIES } from './catalog';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EffectiveList } from './EffectiveList';
-import { loadCore, namedAuthorize, namedChanged, namedDiff, namedEntriesJson, namedEntriesText, namedMessageProblem } from './core';
+import { loadCore, namedAuthorize, namedChanged, namedDiff, namedEntriesJson, namedEntriesText, namedMessageProblem, resourceRoles } from './core';
 import { GuidedForm } from './GuidedForm';
 import type { EntryStatus } from './GuidedForm';
 import { diffLines, entriesJson } from './guided';
@@ -128,7 +128,9 @@ export function EditWorkspace({ api, locale, session, detail, savedView, catalog
   }
 
   const changed = original !== undefined && current !== original;
-  const ok = ready && invalid === undefined && changed && authorization.allowed && namedMessageProblem(message) === undefined;
+  const messageProblem = ready ? namedMessageProblem(message) : undefined;
+  const roles: string[] = ready ? JSON.parse(resourceRoles()) : [];
+  const ok = ready && invalid === undefined && changed && authorization.allowed && messageProblem === undefined;
   const shown = view ?? savedView;
   const changes = diff ? diffLines(diff, g) : [];
   const status: Record<string, EntryStatus> = {};
@@ -157,7 +159,7 @@ export function EditWorkspace({ api, locale, session, detail, savedView, catalog
     {catalog.answer?.state === 'pending' && <p role="status">{pendingText(catalog.answer.reason ?? undefined, t)}</p>}
     <p className="notice">{g.guidedNote}</p>
     {!formOk && <p className="error" role="status">{g.textInvalid}</p>}
-    <GuidedForm entries={model} disabled={!ready || !formOk} t={g} status={status} catalog={catalog} onChange={editForm} />
+    <GuidedForm entries={model} roles={roles} disabled={!ready || !formOk} t={g} status={status} catalog={catalog} onChange={editForm} />
     <label>{t.manifestText}<textarea value={current} rows={12} spellCheck={false} onChange={event => edit(event.target.value)} /></label>
     {invalid && <p className="error" role="alert">{invalid}</p>}
     {!authorization.allowed && <section role="alert" aria-label={g.notEligible}>
@@ -166,6 +168,7 @@ export function EditWorkspace({ api, locale, session, detail, savedView, catalog
       {authorization.hidden > 0 && <p>{g.notEligibleHidden(authorization.hidden)}</p>}
     </section>}
     <label>{t.message}<input value={message} onChange={event => setMessage(event.target.value)} /></label>
+    {message && messageProblem && <p className="error" role="status">{messageProblem}</p>}
     <button type="button" className="secondary" disabled={!ready || checking || unverified.length === 0} onClick={() => { void verify(); }}>{checking ? g.verifying : g.verify}</button>
     <button type="button" className="secondary" disabled={!ready || invalid !== undefined} onClick={() => { void check(); }}>{t.checkEffective}</button>
     <section aria-label={g.diffTitle}>

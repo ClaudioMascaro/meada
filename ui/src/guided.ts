@@ -6,8 +6,7 @@ import type { GuidedCopy } from './guided-i18n';
  * hold and what the session may select are decided by `meada-core` (WebAssembly) and by the server.
  */
 export interface PeerDecl { repo: string; base_url_env?: string[] }
-export type ResourceRole = 'read' | 'write' | 'read-write';
-export interface ResourceDecl { kind: string; id: string; role: ResourceRole; via?: string[] }
+export interface ResourceDecl { kind: string; id: string; role: string; via?: string[] }
 export interface ServeDecl { hosts?: string[]; prefix?: string; strip?: string }
 export interface Entry { repo: string; serve?: ServeDecl; resource?: ResourceDecl[]; peer?: PeerDecl[] }
 

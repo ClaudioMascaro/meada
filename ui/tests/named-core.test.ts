@@ -96,8 +96,11 @@ test('names, descriptions and messages are bounded and plain, as the core says',
   expect(namedDescriptionProblem('')).toBeUndefined();
   expect(namedDescriptionProblem('\tx')).toContain('500');
   expect(namedDescriptionProblem('x'.repeat(501))).toContain('500');
+  expect(namedDescriptionProblem('x'.repeat(500))).toBeUndefined();
+  expect(namedMessageProblem('x'.repeat(500))).toBeUndefined();
+  expect(namedMessageProblem('\uFEFFx')).toBeUndefined();
   expect(namedMessageProblem('why')).toBeUndefined();
-  for (const bad of ['', ' x', 'a\u0085b', 'x'.repeat(501)]) expect(namedMessageProblem(bad), JSON.stringify(bad)).toContain('1 to 500');
+  for (const bad of ['', ' x', 'a\u0085b', '\u3000x', 'x'.repeat(501)]) expect(namedMessageProblem(bad), JSON.stringify(bad)).toContain('1 to 500');
 });
 
 test('the resource roles are the manifest\'s spelling', () => {
