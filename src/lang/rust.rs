@@ -1311,7 +1311,7 @@ fn built<'t>(
     out
 }
 
-/// The bodies of the item macros a file invokes in a module (`macros::bodies`), by the start of
+/// The bodies of the item macros a file invokes (`macros::bodies`), by the start of
 /// the invocation, and what the file's setting says of each macro.
 struct Expand<'t, 's> {
     roots: HashMap<usize, Node<'t>>,
@@ -1358,7 +1358,8 @@ impl<'t> Built<'_, 't, '_> {
                         // then by those the arm writes on each: a module in it may be one a
                         // test build compiles.
                         Some(&body) if on || on_test => {
-                            let name = field(child, "macro").map(|m| text(m, src));
+                            let name =
+                                field(child, "macro").and_then(|m| macros::invoked_name(m, src));
                             let predicates = name.and_then(|n| self.expand.table.get(n));
                             let holds = |test| {
                                 (predicates.into_iter().flatten())

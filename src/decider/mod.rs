@@ -186,11 +186,11 @@ pub(crate) struct Offer {
 }
 
 impl Question {
-    fn new(root: &Path, item: &OpenItem) -> Result<Self> {
+    fn new(root: &Path, stored: Stored, item: &OpenItem) -> Result<Self> {
         let enclosing = match &item.enclosing {
             Some(symbol) => {
                 let source = fs::read(root.join(&item.path))?;
-                function_like(root, &item.path, &source, &symbol.span).then(|| {
+                function_like(root, stored, &item.path, &source, &symbol.span).then(|| {
                     let text = source.get(symbol.span.clone()).unwrap_or_default();
                     String::from_utf8_lossy(text).into_owned()
                 })
@@ -235,6 +235,9 @@ impl Question {
     }
 }
 
+/// The setting the index stored for a file, by its path in the repository.
+pub(crate) type Stored<'a> = &'a dyn Fn(&str) -> Option<String>;
+
 /// The `LanguagePack::settings` of the file at `path`, from the config files of the pack in
 /// the directories above it (the nearest one decides, as in the index).
 fn setting_on_disk(pack: &dyn lang::LanguagePack, root: &Path, path: &str) -> String {
@@ -270,14 +273,22 @@ fn setting_on_disk(pack: &dyn lang::LanguagePack, root: &Path, path: &str) -> St
 
 /// Whether the definition at `span` of the file at `path` is a function, a method or an inline
 /// function, by the language pack's own parse of `source`. The index keeps no symbol kind, so
-/// the file is parsed again; anything else, or a file no pack parses, is not.
-fn function_like(root: &Path, path: &str, source: &[u8], span: &Range<usize>) -> bool {
+/// the file is parsed again, under the setting the index stored for it (the item macros of
+/// `LanguagePack::extend` are in it), or under the one its config files make when it has none;
+/// anything else, or a file no pack parses, is not.
+fn function_like(
+    root: &Path,
+    stored: Stored,
+    path: &str,
+    source: &[u8],
+    span: &Range<usize>,
+) -> bool {
     use lang::Kind::{Function, Inline, Method};
     let Some(pack) = lang::pack_for(path).map(lang::pack) else {
         return false;
     };
     // An allowlist: a kind added later sends its span only once it is listed here.
-    let setting = setting_on_disk(pack, root, path);
+    let setting = stored(path).unwrap_or_else(|| setting_on_disk(pack, root, path));
     (pack.parse_with(path, source, &setting)).is_ok_and(|facts| {
         (facts.defs.iter())
             .any(|d| d.range == *span && matches!(d.kind, Function | Method | Inline))
@@ -400,6 +411,7 @@ impl Config {
 pub(crate) fn run(
     config: &Config,
     root: &Path,
+    stored: Stored,
     items: &[OpenItem],
     show_request: bool,
     min_p: f64,
@@ -415,7 +427,7 @@ pub(crate) fn run(
                 max: MAX_CANDIDATES,
             },
             _ => {
-                questions.push(Question::new(root, item)?);
+                questions.push(Question::new(root, stored, item)?);
                 continue;
             }
         };
@@ -501,4 +513,40 @@ pub(crate) struct Outcome {
     pub decisions: Vec<Decision>,
     /// How many items had a failed request or an invalid answer.
     pub failed: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SRC: &str =
+        "macro_rules! cfg_rt { ($($i:item)*) => { $($i)* } }\ncfg_rt! { pub fn spawn() {} }\n";
+
+    fn span() -> Range<usize> {
+        let start = SRC.find("pub fn spawn").unwrap();
+        start..start + "pub fn spawn() {}".len()
+    }
+
+    #[test]
+    fn a_function_in_an_item_macro_body_is_function_like_under_the_stored_setting() {
+        let root = Path::new("/nonexistent");
+        // What the index stored: the settings of the configs, then the item macros the file invokes.
+        let stored = |_: &str| Some(lang::setting("", "cfg_rt"));
+        assert!(function_like(
+            root,
+            &stored,
+            "src/lib.rs",
+            SRC.as_bytes(),
+            &span()
+        ));
+        // A file with no stored setting is read under its configs alone, which add no item macro.
+        let none = |_: &str| None;
+        assert!(!function_like(
+            root,
+            &none,
+            "src/lib.rs",
+            SRC.as_bytes(),
+            &span()
+        ));
+    }
 }

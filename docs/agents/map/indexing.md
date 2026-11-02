@@ -481,10 +481,13 @@ from ...", with the whole list. A value the index now stores joins it.
   (`Facts::invokes`, inside macro tokens too). `Rust::extend` gives each file the item macros it
   invokes whose every definition in the repository agrees, a line each after the features (the
   name, then the `cfg` predicates of its attributes, tab-separated); `table` reads them back.
-  `bodies` parses, before the walk, the braced body of each such invocation written by a plain
-  name among the items of the file or of a module written in place, over the file's bytes
-  (`set_included_ranges`, so spans are the file's), `ITEM_MACRO_DEPTH` deep; a body with an
-  error is left out. `built` gives a built invocation's body items in its place, each judged by
+  `bodies` parses, before the walk, the braced body of each such invocation written as `m!` or
+  `crate::m!` (`invoked_name`; any other path is skipped) among the items of the file, of a
+  module written in place, or among the associated items of an `impl` or a trait in either,
+  over the file's bytes (`set_included_ranges`, so spans are the file's), `ITEM_MACRO_DEPTH`
+  deep; a body with an error is left out. The decider reads the setting the index stored for a
+  file (`files.setting`, `Engine::stored_setting`), so a function from such a body is
+  function-like there. `built` gives a built invocation's body items in its place, each judged by
   its own attributes after the arm's predicates (`Built::keep`), so a `mod x;` in one is a `mod`
   declaration of the module and reaches its file. Conditional compilation (`lang/rust/cfg.rs`): `parse` skips a node whose
   preceding `#[cfg(..)]` attributes are not all true (`compiled`), for the fixed target

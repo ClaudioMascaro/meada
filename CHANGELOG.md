@@ -8,6 +8,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Rust item macros in associated-item position and by `crate::` (#505, after #398): an
+  invocation of a qualifying item macro among the items of an `impl` or a trait gives its
+  body's methods, associated consts and types to that block, under the same rules (first arm
+  only, the attributes on the invocation, the same `cfg` handling), and `crate::m! { .. }`
+  qualifies as `m!` does; `other::m!`, `self::m!` and `super::m!` stay unread. `meada decide
+  --decider` now parses a file under the setting the index stored for it, so a function from an
+  item macro body is function-like and its span is sent.
 - The export format and the indexed commit (#512, ADR 0004 "Canonical export"): every export
   starts with `format` (`meada_core::export::FORMAT`, 1), which rises only when a reader of the
   previous shape would misread the new one, never for an added optional field; then
