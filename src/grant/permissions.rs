@@ -23,6 +23,8 @@ use tokio_postgres::IsolationLevel;
 
 use super::{Github, GrantState, role_ok};
 use crate::msg::Msg;
+#[cfg(feature = "workspaces")]
+use crate::workspaces::Reason;
 
 // ponytail: how often the newest set is read, so a revocation on GitHub reaches a process at most
 // this long after the refresh that recorded it; `MEADA_PERMISSIONS_POLL_MS` shortens it in debug
@@ -126,7 +128,7 @@ pub(crate) struct SetInfo {
 /// identities it may select, sorted.
 #[cfg(feature = "workspaces")]
 pub(crate) struct Catalog {
-    pub(crate) reason: Option<&'static str>,
+    pub(crate) reason: Option<Reason>,
     pub(crate) set: Option<SetInfo>,
     pub(crate) selectable: BTreeSet<String>,
     /// The GitHub grant provider's `host`: identities on it compare case-insensitively (#508).
@@ -135,7 +137,7 @@ pub(crate) struct Catalog {
 
 #[cfg(feature = "workspaces")]
 impl Catalog {
-    fn pending(reason: &'static str, set: Option<SetInfo>, host: &str) -> Self {
+    fn pending(reason: Reason, set: Option<SetInfo>, host: &str) -> Self {
         Self {
             reason: Some(reason),
             set,
@@ -276,7 +278,7 @@ impl Permissions {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
         let now = Instant::now();
         let Some(set) = &state.set else {
-            return Catalog::pending("no_set", None, &self.github.host);
+            return Catalog::pending(Reason::NoSet, None, &self.github.host);
         };
         let age = set.age(now);
         let info = Some(SetInfo {
@@ -285,11 +287,13 @@ impl Permissions {
             max_age_seconds: self.github.max_age.as_secs(),
         });
         if age > self.github.max_age {
-            return Catalog::pending("stale_set", info, &self.github.host);
+            return Catalog::pending(Reason::StaleSet, info, &self.github.host);
         }
         let selectable = match (administrator, login) {
             (true, _) => set.catalog.clone(),
-            (false, None) => return Catalog::pending("missing_login", info, &self.github.host),
+            (false, None) => {
+                return Catalog::pending(Reason::MissingLogin, info, &self.github.host);
+            }
             (false, Some(login)) => {
                 let roles = set.logins.get(login).map(Vec::as_slice).unwrap_or_default();
                 roles
@@ -761,7 +765,11 @@ mod tests {
                 let seen = cache.catalog(caller.login.as_deref(), caller.platform_administrator);
                 let name = format!("{} selects {:?}", case.caller, case.select);
                 if let Some(pending) = &case.pending {
-                    assert_eq!(seen.reason, Some(pending.as_str()), "{name}");
+                    assert_eq!(
+                        seen.reason.map(Reason::as_str),
+                        Some(pending.as_str()),
+                        "{name}"
+                    );
                     assert!(seen.selectable.is_empty(), "{name}");
                     continue;
                 }
@@ -792,13 +800,19 @@ mod tests {
     fn the_catalog_needs_a_set_and_both_coverage_and_a_role() {
         let mut cache = cache(60);
         cache.github.catalog = true;
-        assert_eq!(cache.catalog(Some("ana"), false).reason, Some("no_set"));
+        assert_eq!(
+            cache.catalog(Some("ana"), false).reason,
+            Some(Reason::NoSet)
+        );
         let mut loaded = set(0, Instant::now());
         loaded.catalog = ["github.com/acme/other".to_string()].into();
         cache.state.write().unwrap().set = Some(loaded);
         let seen = cache.catalog(Some("ana"), false);
         assert_eq!((seen.reason, seen.selectable.len()), (None, 0));
-        assert_eq!(cache.catalog(None, false).reason, Some("missing_login"));
+        assert_eq!(
+            cache.catalog(None, false).reason,
+            Some(Reason::MissingLogin)
+        );
         assert_eq!(cache.catalog(None, true).selectable.len(), 1);
     }
 

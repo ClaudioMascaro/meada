@@ -12,6 +12,7 @@ use std::collections::BTreeSet;
 use meada_core::authorize::Grant;
 
 use super::*;
+use crate::workspaces::Authority;
 use crate::workspaces::lifecycle::{self as ops, Error, Op, Target};
 
 // ponytail: the request bodies of the lifecycle routes (ADR 0021): a save carries a manifest of
@@ -258,10 +259,7 @@ impl Console {
             }
         };
         let administrator = session.operator;
-        let authority = match administrator {
-            true => "platform_administrator",
-            false => "workspace_operator",
-        };
+        let authority = Authority::of(administrator);
         let grant = Self::read_grant(session);
         // What a refusal may name: the platform administrator reads every entry of a management
         // view, anyone else what its grant reads.

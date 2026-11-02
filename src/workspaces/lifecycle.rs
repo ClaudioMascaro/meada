@@ -17,6 +17,7 @@ use meada_core::authorize::Grant;
 use meada_core::named::{self, Creation};
 
 use super::store::{Creator, Gate, Policy, TIME, eligible};
+use super::{Authority, Reason};
 use crate::msg::Msg;
 use crate::postgres;
 
@@ -60,7 +61,7 @@ pub(crate) enum Error {
     /// The operation is the platform administrator's.
     NotAdministrator,
     /// A condition of the platform or the caller that stops every selection (fail closed).
-    Pending(&'static str),
+    Pending(Reason),
     /// Some entry the operation adds or changes is not eligible for the actor.
     Refused(Creation),
     /// The version is not one of this workspace's.
@@ -133,13 +134,6 @@ pub(crate) struct Done {
     pub action: &'static str,
     /// For a save: whether the row was new (a version already stored is not stored again).
     pub saved: bool,
-}
-
-fn authority(actor: &Creator<'_>) -> &'static str {
-    match actor.administrator {
-        true => "platform_administrator",
-        false => "workspace_operator",
-    }
 }
 
 /// Runs `op` on the workspace `target` as `actor` in one transaction. `grant` is what the actor
@@ -375,7 +369,7 @@ async fn history(
         &action,
         &version,
         &actor.subject,
-        &authority(actor),
+        &Authority::of(actor.administrator).as_str(),
         &message,
     ];
     tx.execute(&insert, &params).await.map_err(db)?;

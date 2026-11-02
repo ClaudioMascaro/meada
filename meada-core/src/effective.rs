@@ -50,16 +50,27 @@ pub enum Coverage {
     Excluded,
 }
 
+/// What a [`Diagnostic`] observes: the stable text the front end words in either language.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DiagnosticCode {
+    IgnoredByRepository,
+    UnknownUntilIngested,
+    ExcludedNoSponsor,
+    PeerMissing,
+    DocumentsNotIndexed,
+}
+
 /// One observation about an entry's configuration: a stable `code` the front end words in
 /// either language, and the `detail` it is about (a block, a peer) when it has one.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Diagnostic {
-    pub code: &'static str,
+    pub code: DiagnosticCode,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
 }
 
-fn diagnostic(code: &'static str, detail: Option<String>) -> Diagnostic {
+fn diagnostic(code: DiagnosticCode, detail: Option<String>) -> Diagnostic {
     Diagnostic { code, detail }
 }
 
@@ -135,26 +146,32 @@ pub fn effective(entries: &[Json], facts: &BTreeMap<String, Facts>) -> Vec<Effec
             };
             let mut diagnostics = Vec::new();
             if facts.excluded {
-                diagnostics.push(diagnostic("excluded_no_sponsor", None));
+                diagnostics.push(diagnostic(DiagnosticCode::ExcludedNoSponsor, None));
             } else if !facts.held && !declared.is_empty() {
-                diagnostics.push(diagnostic("unknown_until_ingested", None));
+                diagnostics.push(diagnostic(DiagnosticCode::UnknownUntilIngested, None));
             }
             let (applied, ignored) = match overridden {
                 true => (Json::Object(Default::default()), declared),
                 false => (blocks, Vec::new()),
             };
             for label in &ignored {
-                diagnostics.push(diagnostic("ignored_by_repository", Some(label.clone())));
+                diagnostics.push(diagnostic(
+                    DiagnosticCode::IgnoredByRepository,
+                    Some(label.clone()),
+                ));
             }
             for peer in applied["peer"].as_array().into_iter().flatten() {
                 let name = peer["repo"].as_str().unwrap_or_default();
                 if !members.contains(name) {
-                    diagnostics.push(diagnostic("peer_missing", Some(name.to_string())));
+                    diagnostics.push(diagnostic(
+                        DiagnosticCode::PeerMissing,
+                        Some(name.to_string()),
+                    ));
                 }
             }
             let hosts = applied["serve"]["hosts"].as_array().map_or(0, Vec::len);
             if facts.held && !facts.documents && hosts > 0 {
-                diagnostics.push(diagnostic("documents_not_indexed", None));
+                diagnostics.push(diagnostic(DiagnosticCode::DocumentsNotIndexed, None));
             }
             let coverage = match (facts.excluded, facts.held) {
                 (true, _) => Coverage::Excluded,
@@ -188,7 +205,7 @@ mod tests {
         }
     }
 
-    fn codes(effective: &Effective) -> Vec<&str> {
+    fn codes(effective: &Effective) -> Vec<DiagnosticCode> {
         effective.diagnostics.iter().map(|d| d.code).collect()
     }
 
@@ -215,7 +232,7 @@ mod tests {
                 "[[repository.resource]] postgres orders"
             ]
         );
-        assert_eq!(codes(one), ["ignored_by_repository"; 2]);
+        assert_eq!(codes(one), [DiagnosticCode::IgnoredByRepository; 2]);
         assert_eq!(one.coverage, Coverage::Indexed);
     }
 
@@ -263,14 +280,14 @@ mod tests {
             ),
         ]);
         let found = effective(&entries, &held);
-        assert_eq!(codes(&found[0]), ["peer_missing"]);
+        assert_eq!(codes(&found[0]), [DiagnosticCode::PeerMissing]);
         assert_eq!(
             found[0].diagnostics[0].detail.as_deref(),
             Some("github.com/acme/b")
         );
-        assert_eq!(codes(&found[1]), ["unknown_until_ingested"]);
+        assert_eq!(codes(&found[1]), [DiagnosticCode::UnknownUntilIngested]);
         assert_eq!(found[1].coverage, Coverage::PendingIngestion);
-        assert_eq!(codes(&found[2]), ["excluded_no_sponsor"]);
+        assert_eq!(codes(&found[2]), [DiagnosticCode::ExcludedNoSponsor]);
         assert_eq!(found[2].coverage, Coverage::Excluded);
     }
 
@@ -283,12 +300,27 @@ mod tests {
         )]);
         assert_eq!(
             codes(&effective(&entries, &without)[0]),
-            ["documents_not_indexed"]
+            [DiagnosticCode::DocumentsNotIndexed]
         );
         let with = BTreeMap::from([(
             "github.com/acme/y".to_string(),
             facts(true, false, true, false),
         )]);
         assert!(effective(&entries, &with)[0].diagnostics.is_empty());
+    }
+
+    #[test]
+    fn each_diagnostic_code_serializes_to_its_text() {
+        use DiagnosticCode::*;
+        let all = [
+            (IgnoredByRepository, "ignored_by_repository"),
+            (UnknownUntilIngested, "unknown_until_ingested"),
+            (ExcludedNoSponsor, "excluded_no_sponsor"),
+            (PeerMissing, "peer_missing"),
+            (DocumentsNotIndexed, "documents_not_indexed"),
+        ];
+        for (code, text) in all {
+            assert_eq!(serde_json::to_value(code).unwrap(), json!(text));
+        }
     }
 }

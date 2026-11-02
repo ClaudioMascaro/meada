@@ -13,12 +13,13 @@ use meada_core::authorize::Grant;
 use meada_core::named;
 use serde_json::{Value as Json, json};
 
+use super::Authority;
 use super::lifecycle::{self as ops, Error, Op, Target};
 use super::store::{self, CreateError, Creator, New, Policy, Record};
 use crate::msg::Msg;
 use crate::workspace::Manifest;
 
-const ADMINISTRATOR: &str = "platform_administrator";
+const ADMINISTRATOR: Authority = Authority::PlatformAdministrator;
 
 /// The sections a command reads, from the bootstrap manifest.
 struct Env {
