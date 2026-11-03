@@ -1495,7 +1495,7 @@ impl<'a> Resolver<'a> {
         }
         let bare = head.is_none() && self.members_in_scope;
         let on_receiver = || self.on_receiver(path, call);
-        let all = self.candidates(
+        let mut all = self.candidates(
             path,
             callee,
             call.by_path,
@@ -1503,6 +1503,8 @@ impl<'a> Resolver<'a> {
             bare,
             &on_receiver,
         );
+        // A `private` constructor is the class's own to call (Kotlin), by name too.
+        all.retain(|t| !self.sealed_from(scope, *t));
         let mut written = false;
         // A type from outside the repository the receiver is of (`outside_type`).
         let mut outside = None;
@@ -11801,8 +11803,14 @@ class S {
     fun again() = S(1)
 }
 class I internal constructor(val n: Int)
+class Q private constructor(val n: Int) {
+    constructor() : this(1)
+    class N { fun go() = Q(1) }
+}
+fun top() = P(1)
 class Out {
-    fun go() { P(1); S(1); I(1) }
+    fun go() { P(1); S(1); I(1); Q() }
+    fun one() = Q(1)
 }
 ",
         )]);
@@ -11816,6 +11824,12 @@ class Out {
         assert_eq!(get("p/A.kt p.P.again() P"), "exact p/A.kt::p.P");
         assert_eq!(get("p/A.kt p.P.Companion.make() P"), "exact p/A.kt::p.P");
         assert_eq!(get("p/A.kt p.S.again() S"), "exact p/A.kt::p.S.S(Int)");
+        // A public secondary beside a private primary stays callable; a nested class is inside.
+        assert_eq!(get("p/A.kt p.Out.go() Q"), "exact p/A.kt::p.Q.Q()");
+        assert_eq!(get("p/A.kt p.Q.N.go() Q"), "exact p/A.kt::p.Q");
+        assert_eq!(get("p/A.kt p.Out.one() Q"), "none");
+        // From a top-level function too: no name match to the class (turbine's `unexpectedEvent`).
+        assert_eq!(get("p/A.kt p.top() P"), "none");
         assert!(get("p/A.kt p.Out.go() I").starts_with("exact"), "{found:?}");
     }
 
