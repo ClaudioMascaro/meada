@@ -43,6 +43,8 @@ Give each ticket its **blocking edges**: the other tickets that must complete be
 
 **Release level**: a ticket that changes a crate's release names the semver level ("a minor bump of meada-core"), never the next number. The implementer reads the number from `CHANGELOG.md` and `Cargo.toml`.
 
+**Cited premises**: a ticket that says "today X resolves at level L" cites the test, the fixture or the command output that shows it. A ticket that states a language rule cites the language reference (spec section or official docs). The implementer asserts what the citation shows.
+
 **Wide refactors are the exception to vertical slicing.** A **wide refactor** is one mechanical change (rename a column, retype a shared symbol) whose **blast radius** fans across the whole codebase, so a single edit breaks thousands of call sites at once and no vertical slice can land green. Don't force it into a tracer bullet; sequence it as **expand–contract**. First expand: add the new form beside the old so nothing breaks. Then migrate the call sites over in batches sized by blast radius (per package, per directory), each batch its own ticket blocked by the expand, keeping CI green batch to batch because the old form still exists. Finally contract: delete the old form once no caller remains, in a ticket blocked by every migrate batch. When even the batches can't stay green alone, keep the sequence but let them share an integration branch that all block a final integrate-and-verify ticket; green is promised only there.
 
 ### 4. Quiz the user
