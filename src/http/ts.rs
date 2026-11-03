@@ -81,13 +81,25 @@ fn next_route(path: &str) -> Option<String> {
 /// What `express()`, `Router()` and `express.Router()` return: an app or a router.
 const ROUTERS: &[&str] = &["express", "Router", "express.Router"];
 
+/// The package whose default export is a router factory, under any local name.
+const PROMISE_ROUTER: &str = "express-promise-router";
+
 /// Whether the call `router` creates an Express app or router: `express()`, `Router()` or
-/// `express.Router()`, unless an import from another module than `express` binds the name.
+/// `express.Router()`, unless an import from another module than `express` binds the name; or
+/// a call of the default import of `express-promise-router`, whatever it is named.
 fn is_express<'a>(code: &Code<'a>, (path, n): CallAt<'a>) -> bool {
     let call = &code.files()[path].calls[n];
+    let outside = code.outside(path, &call.scope, &call.callee, false);
+    if let Some(o) = &outside
+        && o.direct
+        && o.imported
+            .as_ref()
+            .is_some_and(|(p, _)| *p == PROMISE_ROUTER)
+    {
+        return true;
+    }
     ROUTERS.contains(&call.callee.as_str())
-        && (code.outside(path, &call.scope, &call.callee, false))
-            .is_none_or(|outside| outside.spelled.starts_with("express."))
+        && outside.is_none_or(|o| o.spelled.starts_with("express."))
 }
 
 /// The shape the handler `name` of `path` gives its route from what the code returns (spec

@@ -1032,8 +1032,9 @@ top-level `const` define `o.m`.
 | Consumer | global `fetch`, and a call to a parameter whose default is `fetch` |
 | Provider | Next.js (app router: route files) and Express |
 
-In Express, a route holds under each prefix where the router is mounted (`use`, `Router()`). A
-prefix or a path with an unreadable part (a template-literal hole, a parameter, an environment
+In Express, a route holds under each prefix where the router is mounted (`use`, `Router()`). The
+`Router()` of `express-promise-router` (the default in Backstage backend plugins) counts like
+`express.Router()`. A prefix or a path with an unreadable part (a template-literal hole, a parameter, an environment
 read) generates no route, and a router mounted only under such a prefix is left with no prefix at
 all. A literal `:id` is still a parameter. No client besides `fetch` is read: `axios`, `got` and
 `XMLHttpRequest` generate no consumer.

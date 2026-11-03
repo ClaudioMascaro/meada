@@ -11013,6 +11013,42 @@ fn python_environment_reads_name_the_base_url_variable() {
 }
 
 #[test]
+fn express_promise_router_routers_export_their_routes_like_express_routers() {
+    let repo = fixture_repo("express_promise_router", "ts-basic", Some(ORIGIN));
+    let routes = |import: &str, make: &str| -> Vec<String> {
+        let src = format!(
+            "{import}\nexport function createRouter() {{\n  const router = {make};\n  router.post(\n    '/requests',\n    (req, res) => res.json({{}}),\n  );\n  router.get('/requests/:id', (req, res) => res.json({{}}));\n  return router;\n}}\n"
+        );
+        std::fs::write(repo.join("src/router.ts"), src).unwrap();
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        let json: Value = serde_json::from_str(&export).unwrap();
+        let mut found: Vec<String> = (json["providers"].as_array().unwrap().iter())
+            .map(|p| p["contract"].as_str().unwrap().to_string())
+            .collect();
+        found.sort();
+        found
+    };
+    let expected = ["http::GET::/requests/{}", "http::POST::/requests"];
+    assert_eq!(
+        routes("import express from 'express';", "express.Router()"),
+        expected
+    );
+    assert_eq!(
+        routes("import Router from 'express-promise-router';", "Router()"),
+        expected
+    );
+    assert_eq!(
+        routes(
+            "import PromiseRouter from 'express-promise-router';",
+            "PromiseRouter()"
+        ),
+        expected
+    );
+    // A `Router` another package makes is still no Express router.
+    assert!(routes("import Router from 'koa-router';", "Router()").is_empty());
+}
+
+#[test]
 fn express_router_passed_to_a_function_found_only_by_name_is_no_provider() {
     let repo = fixture_repo("express_by_name", "ts-basic", Some(ORIGIN));
     let providers = |file: &str, src: &str| -> Vec<String> {

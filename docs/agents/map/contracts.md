@@ -89,7 +89,7 @@ this file, and a change to these modules updates it.
   contract). That link is `inferred` with the form's reason (`gateway prefix <p>`, `gateway
   strip <s>` or both), read from the provider, not recomputed from the configuration; within
   one repository a code path match wins over gateway path matches. An app or router
-  (Express `express()`, `Router()`; FastAPI `FastAPI()`, `APIRouter()`; Flask `Flask()`,
+  (Express `express()`, `Router()`, and the default import of `express-promise-router` under any name; FastAPI `FastAPI()`, `APIRouter()`; Flask `Flask()`,
   `Blueprint()`) is the call creating it (axum's `Router::new()`, read by `http::rust::axum`: `route`,
   `nest` and `merge` calls on a receiver chain that `Code::origins` follows through
   `Call::receiver` where `LanguagePack::fluent` is true, a method router `get(a).post(b)` or

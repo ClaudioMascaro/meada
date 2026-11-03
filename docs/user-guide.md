@@ -1034,8 +1034,9 @@ atribui o nome de novo. As funções do objeto literal de um `const` do topo def
 | Consumidor | `fetch` global, e uma chamada a um parâmetro cujo padrão é `fetch` |
 | Provedor | Next.js (app router: arquivos de rota) e Express |
 
-No Express, uma rota vale sob cada prefixo em que o roteador é montado (`use`, `Router()`). Um
-prefixo ou um caminho com uma parte ilegível (um buraco de template literal, um parâmetro, uma
+No Express, uma rota vale sob cada prefixo em que o roteador é montado (`use`, `Router()`). O
+`Router()` de `express-promise-router` (o padrão dos plugins de backend do Backstage) vale como o
+`express.Router()`. Um prefixo ou um caminho com uma parte ilegível (um buraco de template literal, um parâmetro, uma
 leitura de ambiente) não gera rota, e um roteador montado só sob um prefixo assim fica sem prefixo
 algum. Um `:id` literal continua sendo parâmetro. Nenhum cliente além do `fetch` é lido: `axios`,
 `got` e `XMLHttpRequest` não geram consumidor.

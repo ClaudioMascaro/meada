@@ -52,6 +52,8 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Express routes registered on an `express-promise-router` router (the Backstage backend default)
+  are provided: its default import counts as a router factory under any local name (#614).
 - A refresh resolves a Swift file as a cold index does: the type parameters of a type or
   function (`Page<Item>`) are kept in the index, so an `Item()` in an extension of `Page` in
   another file is no construction of a type named `Item` after an edit to an unrelated Swift file

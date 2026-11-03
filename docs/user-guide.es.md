@@ -1051,8 +1051,9 @@ asignar el nombre. Las funciones del objeto literal de un `const` de nivel super
 | Consumidor | `fetch` global, y una llamada a un parámetro cuyo valor predeterminado es `fetch` |
 | Proveedor | Next.js (app router: archivos de ruta) y Express |
 
-En Express, una ruta vale bajo cada prefijo en que se monta el router (`use`, `Router()`). Un
-prefijo o una ruta con una parte ilegible (un hueco de template literal, un parámetro, una
+En Express, una ruta vale bajo cada prefijo en que se monta el router (`use`, `Router()`). El
+`Router()` de `express-promise-router` (el predeterminado en los plugins de backend de Backstage)
+vale como el `express.Router()`. Un prefijo o una ruta con una parte ilegible (un hueco de template literal, un parámetro, una
 lectura de entorno) no genera ruta, y un router montado solo bajo un prefijo así queda sin
 prefijo alguno. Un `:id` literal sigue siendo parámetro. Ningún cliente además de `fetch` se
 lee: `axios`, `got` y `XMLHttpRequest` no generan consumidor.
