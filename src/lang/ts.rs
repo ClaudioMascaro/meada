@@ -163,7 +163,7 @@ impl LanguagePack for TsJs {
                 }) = assignment(node, src, &parents)
             {
                 facts.exports.push(Export::Local {
-                    exported: name.clone(),
+                    exported: name.strip_prefix("exports.").unwrap_or(&name).to_string(),
                     local: name,
                 });
             }
@@ -838,8 +838,8 @@ fn binds<'t>(node: Node<'t>, src: &[u8], up: &Parents) -> Option<(Node<'t>, Stri
 
 /// A top-level assignment of a function or class to a member, as `binds` and `exports` read it.
 struct Assigned {
-    /// The name it defines: `obj.y`, `X.y` for `X.prototype.y`, `y` for `exports.y` and
-    /// `module.exports.y`, `default` for `module.exports`.
+    /// The name it defines: `obj.y`, `X.y` for `X.prototype.y`, `exports.y` for `exports.y` and
+    /// `module.exports.y` (exported as `y`), `default` for `module.exports`.
     name: String,
     /// `X.prototype.y`: a method of `X`.
     method: bool,
@@ -871,7 +871,8 @@ fn assignment(node: Node, src: &[u8], up: &Parents) -> Option<Assigned> {
     }
     let (name, method, exported) = match names.as_slice() {
         ["module", "exports"] => ("default".to_string(), false, true),
-        ["exports", y] | ["module", "exports", y] => (y.to_string(), false, true),
+        // The symbol is `exports.y`, not `y`: Node binds no local `y`, so a bare `y()` must not reach it.
+        ["exports", y] | ["module", "exports", y] => (format!("exports.{y}"), false, true),
         ["exports" | "module", ..] => return None,
         [.., "prototype"] => return None,
         ["prototype", _] => return None,
@@ -1608,21 +1609,28 @@ mod tests {
             defined(&facts),
             [
                 ("V.m", "method"),
-                ("a", "function"),
                 ("app.use", "function"),
-                ("b", "function"),
                 ("default", "function"),
+                ("exports.a", "function"),
+                ("exports.b", "function"),
                 ("f", "function"),
                 ("x.y.z", "function"),
             ]
         );
         let exported: Vec<_> = (facts.exports.iter())
             .filter_map(|e| match e {
-                Export::Local { exported, local } if exported == local => Some(exported.as_str()),
+                Export::Local { exported, local } => Some((exported.as_str(), local.as_str())),
                 _ => None,
             })
             .collect();
-        assert_eq!(exported, ["a", "b", "default"]);
+        assert_eq!(
+            exported,
+            [
+                ("a", "exports.a"),
+                ("b", "exports.b"),
+                ("default", "default")
+            ]
+        );
     }
 
     #[test]

@@ -52,6 +52,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- TypeScript and JavaScript: `exports.y = function () {}` and `module.exports.y = ..` define the
+  symbol `exports.y` (exported as `y`), so a bare `y()` in the file no longer links to it and
+  `m.y()` through an import still does (#457).
 - A PyPI package in the consumer's own repository that no uv source names links `inferred`, not
   `exact`, when it is the one package of the name, with the reason "no uv source names the local
   package, the registry package is the likely provider": pip and uv install the registry's

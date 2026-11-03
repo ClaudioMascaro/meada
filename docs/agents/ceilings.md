@@ -1733,3 +1733,7 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   what the modules of its repository it depends on pass on up to `MODULE_DEPTH` (32) modules
   deep (`package/maven.rs`); a module's parent pom adds nothing to what it passes on, and a
   Gradle dependency passes nothing on.
+
+- A call to `send` inside `exports.send = function () {}` resolves to `exports.send` itself, not to
+  a top-level `function send`: the resolver's scope walk reads the symbol `exports.send` as `send`
+  in the scope `exports`, as it does `use()` inside `app.use = function use() {}` (#457).

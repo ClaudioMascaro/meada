@@ -5660,8 +5660,8 @@ fn typescript_and_javascript() {
             "src/assigned.js::app.use",
             "src/assigned.js::caller",
             "src/assigned.js::decl",
-            "src/assigned.js::expA",
-            "src/assigned.js::expB",
+            "src/assigned.js::exports.expA",
+            "src/assigned.js::exports.expB",
             "src/assigned.js::hidden",
             "src/assigned.js::innerCatch",
             "src/assigned.js::innerDef",
@@ -14407,4 +14407,57 @@ fn python_nested_pyproject_that_cannot_be_read_declares_no_roots() {
         let a = nested_pyproject_call(&json, "a", "f").0;
         assert_eq!(a.as_deref(), Some("exact"), "{case}");
     }
+}
+
+/// A CommonJS `exports.y = function () {}` defines the symbol `exports.y`, exported as `y`: Node
+/// binds no local `y`, so a bare `y()` reaches nothing, and `m.y()` through the module does.
+#[test]
+fn ts_js_a_commonjs_export_binds_no_bare_name() {
+    let repo = fixture_repo("ts_commonjs_bare", "conformance-ts-js", Some(ORIGIN));
+    std::fs::write(
+        repo.join("src/cjs.js"),
+        "function send() {}\nexports.send = function () { send(); };\nexports.y = function () {};\n\
+         function bare() { y(); }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("src/cjs-user.js"),
+        "import * as m from './cjs.js';\nfunction use() { m.y(); }\n",
+    )
+    .unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let call = |suffix: &str| {
+        (json["calls"].as_array().unwrap().iter())
+            .find(|c| c["id"].as_str().unwrap().ends_with(suffix))
+            .unwrap_or_else(|| panic!("{suffix}"))
+            .clone()
+    };
+    assert_eq!(call("cjs.js::bare::y#0")["level"], Value::Null);
+    let through = call("cjs-user.js::use::m.y#0");
+    assert_eq!(through["level"], "exact");
+    assert!(
+        through["target"]
+            .as_str()
+            .unwrap()
+            .ends_with("cjs.js::exports.y")
+    );
+    // Known ceiling (docs/agents/ceilings.md): the inner `send()` reaches `exports.send`.
+    let send = call("cjs.js::exports.send::send#0");
+    assert!(
+        send["target"]
+            .as_str()
+            .unwrap()
+            .ends_with("cjs.js::exports.send")
+    );
+    let mut ids: Vec<&str> = (json["symbols"].as_array().unwrap().iter())
+        .map(|s| s["id"].as_str().unwrap())
+        .filter(|i| i.contains("cjs.js::"))
+        .collect();
+    ids.sort();
+    let names: Vec<&str> = ids
+        .iter()
+        .map(|i| i.split("cjs.js::").nth(1).unwrap())
+        .collect();
+    assert_eq!(names, ["bare", "exports.send", "exports.y", "send"]);
 }

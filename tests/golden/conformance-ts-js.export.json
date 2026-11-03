@@ -165,7 +165,7 @@
       "hash": "854a01a98eab388eee21bc104d63dafd094fbbbebfa3d6ace3274f203ef7bc2f"
     },
     {
-      "id": "example.com/acme/conformance::src/assigned.js::expA",
+      "id": "example.com/acme/conformance::src/assigned.js::exports.expA",
       "span": {
         "path": "src/assigned.js",
         "start": 72,
@@ -174,7 +174,7 @@
       "hash": "69c5bd3601d422bc4db2d6859c4cddb686a4adc2b7e67e089987c2cc7e8fb0c3"
     },
     {
-      "id": "example.com/acme/conformance::src/assigned.js::expB",
+      "id": "example.com/acme/conformance::src/assigned.js::exports.expB",
       "span": {
         "path": "src/assigned.js",
         "start": 103,
@@ -3992,30 +3992,30 @@
       ]
     },
     {
-      "entry_point": "example.com/acme/conformance::src/assigned.js::expA",
+      "entry_point": "example.com/acme/conformance::src/assigned.js::exports.expA",
       "kind": "export",
-      "label": "expA",
+      "label": "exports.expA",
       "steps": [
         {
           "depth": 0,
           "repository": "example.com/acme/conformance",
           "level": null,
           "via": "entry",
-          "node": "example.com/acme/conformance::src/assigned.js::expA"
+          "node": "example.com/acme/conformance::src/assigned.js::exports.expA"
         }
       ]
     },
     {
-      "entry_point": "example.com/acme/conformance::src/assigned.js::expB",
+      "entry_point": "example.com/acme/conformance::src/assigned.js::exports.expB",
       "kind": "export",
-      "label": "expB",
+      "label": "exports.expB",
       "steps": [
         {
           "depth": 0,
           "repository": "example.com/acme/conformance",
           "level": null,
           "via": "entry",
-          "node": "example.com/acme/conformance::src/assigned.js::expB"
+          "node": "example.com/acme/conformance::src/assigned.js::exports.expB"
         }
       ]
     },
