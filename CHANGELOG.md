@@ -52,6 +52,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Swift parameter written as a name from outside the repository (`Ext.CompletionHandler`, which
+  may be an alias of a function type) neither takes nor refuses a trailing closure with certainty:
+  a call that fits an overload only through it is `ambiguous` among its overloads (`inferred` when
+  it is the only one), no longer `exact` to a sibling overload that reads as a function type or
+  absent. A parameter written as a type the repository declares or a standard value type still
+  refuses it (#456).
 - TypeScript and JavaScript: `exports.y = function () {}` and `module.exports.y = ..` define the
   symbol `exports.y` (exported as `y`), so a bare `y()` in the file no longer links to it and
   `m.y()` through an import still does (#457).

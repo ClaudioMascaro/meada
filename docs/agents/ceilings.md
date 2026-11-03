@@ -200,7 +200,7 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   symbol and a callee is `(navigation_expression)`); `QUALIFICATION_BYTES` (4 MiB) bounds the
   enclosing-name bytes a file's definitions, calls and bindings store, past which the file
   keeps no facts and `Facts::budget`, which `meada status` names; `ALIAS_DEPTH` (16) bounds the aliases of aliases of a function type `join`
-  follows (`function_aliases`), past which a parameter written as one takes no trailing closure.
+  follows (`function_aliases`), past which a parameter written as one is `Closure::Unknown`.
   The pack's unit tests exceed each. Beyond the limits, what the pack leaves out
   (spec #29, #117): a target's `sources:` and `exclude:`, a closure,
   deinitializer, subscript or accessor (their calls and locals are the enclosing symbol's, so
@@ -209,8 +209,11 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   parameter's type (#118), a typed local of a nested block, closure or accessor (a name match
   where Java and C# keep it function-wide), a `typealias` as a symbol, one written in a type
   seen from another file (its extensions included), an outside alias of a function type
-  (`Ext.Handler`, which takes no trailing closure, as the brief of #411 decides for every
-  outside name), and the protocols a conformed protocol inherits when the conformance is
+  (`Ext.Handler`: a parameter written as an outside name is `Closure::Unknown`, so a call that
+  fits an overload only through its trailing closure is `inferred` or `ambiguous`, never `exact`,
+  #456; a name the repository declares as a type or a standard value type, `VALUE_TYPES`, refuses it, and
+  a `typealias` of a type of the repository is read as an outside name),
+  and the protocols a conformed protocol inherits when the conformance is
   written on an extension. As in Java, an outside base the pack does not list among its known outside members (`NSObject`, `View`) keeps a type's own
   overloads from `exact`, and a listed one (`Codable`, a raw value type) the names it declares.
 - `http/swift/client.rs`: `CLIENT_DEPTH` (8) bounds the locals, properties and constants followed

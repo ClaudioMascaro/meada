@@ -910,11 +910,17 @@ pub enum Closure {
     /// It may: a function type, a type parameter, or a pack that does not tell.
     #[default]
     Takes,
-    /// It may not: any other written type, a named one outside the repository included.
+    /// It may not: any other written type, and a name the pack reads as no function type (a type
+    /// of the repository, a standard value type).
     Refuses,
+    /// Written as a name the pack cannot read: a type from outside the repository, which may be
+    /// an alias of a function type. A call that fits only if it takes the trailing closure is
+    /// never `exact`, and never absent (`Closure::Unknown` fits as `Fit::Maybe`).
+    Unknown,
     /// Written as this name, which `LanguagePack::join` reads among the repository's aliases of
     /// a function type (Swift's `typealias Handler = (Int) -> Void`): `Takes` when one is so
-    /// named, else `Refuses`. The resolver reads one left as `Takes`.
+    /// named, `Refuses` for a type the repository declares or a standard value type, else `Unknown`. The
+    /// resolver reads one left as `Takes`.
     Named(String),
 }
 
@@ -1415,6 +1421,7 @@ mod tests {
         ("rust/values.rs:KEEPS", "runtime"),
         ("rust/values.rs:KEEPS_NAMES", "runtime"),
         ("rust/values.rs:METHOD_CRATES", "exception"),
+        ("swift.rs:VALUE_TYPES", "runtime"),
         ("swift/values.rs:STRING_METHODS", "runtime"),
         ("ts.rs:BODIES", "syntax"),
         ("ts.rs:EXTENSIONS", "syntax"),

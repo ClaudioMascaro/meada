@@ -14260,6 +14260,17 @@ fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
         app("Box"),
         app("Box.g(_:)"),
         app("untyped()"),
+        app("Loader"),
+        app("Loader.load(completion:(Int)->Void)"),
+        app("Loader.load(completion:Ext.CompletionHandler)"),
+        app("Holder"),
+        app("Holder.CompletionHandler"),
+        app("Lone"),
+        app("Lone.fetch(completion:)"),
+        app("Pair"),
+        app("Pair.put(_:then:)"),
+        app("Pair.put(_:wheel:)"),
+        app("outside(_:_:_:)"),
     ];
     let symbols: Vec<&str> = symbols.iter().map(String::as_str).collect();
     let (send, init, internal) = (
@@ -14338,6 +14349,29 @@ fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
         (trailing("run#0"), EXACT, vec![app("run(_:)")]),
         // An alias its module keeps to itself types nothing in another module.
         (app("hidden(_:)::x.send#0"), None, vec![]),
+        // A parameter written as a name from outside the repository (`Ext.CompletionHandler`)
+        // may be an alias of a function type (issue #456): a trailing closure that fits an
+        // overload only through one is never `exact`, whether it has a sibling that reads as a
+        // function type or none (a lone candidate is a name match). A parameter written as a
+        // type of the repository (`Wheel?`) still refuses it.
+        (
+            app("outside(_:_:_:)::x.load#0"),
+            AMBIGUOUS,
+            vec![
+                app("Loader.load(completion:(Int)->Void)"),
+                app("Loader.load(completion:Ext.CompletionHandler)"),
+            ],
+        ),
+        (
+            app("outside(_:_:_:)::y.fetch#0"),
+            INFERRED,
+            vec![app("Lone.fetch(completion:)")],
+        ),
+        (
+            app("outside(_:_:_:)::z.put#0"),
+            EXACT,
+            vec![app("Pair.put(_:then:)")],
+        ),
     ];
     let targets: Vec<Vec<&str>> = (calls.iter())
         .map(|(_, _, t)| t.iter().map(String::as_str).collect())

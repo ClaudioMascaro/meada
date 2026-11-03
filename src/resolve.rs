@@ -508,15 +508,28 @@ impl<'a> Arity<'a> {
 
     /// `fits` for a call whose form `on_receiver` tells, only when the function takes its
     /// receiver as a first parameter, and whose labels, when it writes them, the parameters
-    /// take (`labelled`).
-    fn fits_call(self, args: Args, on_receiver: &dyn Fn() -> bool) -> bool {
+    /// take (`fit`).
+    fn fits_call(self, args: Args, on_receiver: &dyn Fn() -> bool) -> Fit {
         let arity = args.count + usize::from(self.receiver && on_receiver());
-        self.fits(arity)
-            && (args.awaited || !self.suspends)
-            && args
-                .labels
-                .is_none_or(|labels| labelled(self.params, labels))
+        if !self.fits(arity) || !(args.awaited || !self.suspends) {
+            return Fit::No;
+        }
+        args.labels
+            .map_or(Fit::Yes, |labels| fit(self.params, labels))
     }
+}
+
+/// Whether a call fits a function. A candidate that is `Maybe` is never `exact`.
+#[derive(Clone, Copy, PartialEq)]
+enum Fit {
+    /// The call does not fit, whatever a parameter of a type Meada cannot read
+    /// (`Closure::Unknown`) takes.
+    No,
+    /// It fits only if such a parameter takes the call's trailing closure.
+    Maybe,
+    /// It fits, and the parameters take the same arguments whether such a parameter takes the
+    /// trailing closure or not.
+    Yes,
 }
 
 /// What a call gives the function it reaches to fit (`Arity::fits_call`): its argument count
@@ -544,12 +557,30 @@ impl<'c> Args<'c> {
 // ponytail: real calls pass a handful of arguments; this keeps a crafted one cheap.
 const LABELLED_CELLS: usize = 1 << 16;
 
+/// `fit` as a yes or no, for a caller whose parameters are read from a manifest and never
+/// `Closure::Unknown`.
+pub(crate) fn labelled(params: &[Param], labels: &[String]) -> bool {
+    fit(params, labels) != Fit::No
+}
+
 /// Whether parameters with labels (`Param::label`, `_` when none) take the arguments of a call
 /// with `labels` (`labelled_args`). A parameter without a label (another language's) takes
-/// whatever it is given.
-pub(crate) fn labelled(params: &[Param], labels: &[String]) -> bool {
-    (!params.is_empty() && params.iter().all(|p| p.label.is_none()))
-        || labelled_args(params, labels).is_some()
+/// whatever it is given. A parameter of a type Meada cannot read (`Closure::Unknown`) makes the
+/// fit `Maybe` when the call fits only if it takes the trailing closure: the arguments each
+/// parameter takes differ between reading it as one that refuses and one that takes.
+fn fit(params: &[Param], labels: &[String]) -> Fit {
+    if !params.is_empty() && params.iter().all(|p| p.label.is_none()) {
+        return Fit::Yes;
+    }
+    let sure = labelled_args(params, labels);
+    if !params.iter().any(|p| p.closure == Closure::Unknown) {
+        return if sure.is_some() { Fit::Yes } else { Fit::No };
+    }
+    match (sure, labelled_args_as(params, labels, true)) {
+        (_, None) => Fit::No,
+        (Some(sure), Some(maybe)) if sure == maybe => Fit::Yes,
+        _ => Fit::Maybe,
+    }
 }
 
 /// The argument (an index into `labels`) each parameter takes when parameters with labels take
@@ -560,6 +591,21 @@ pub(crate) fn labelled(params: &[Param], labels: &[String]) -> bool {
 /// left out, else any that accepts one. `None` when the call does not fit, or weighs more than
 /// `LABELLED_CELLS`.
 fn labelled_args(params: &[Param], labels: &[String]) -> Option<Vec<Option<usize>>> {
+    labelled_args_as(params, labels, false)
+}
+
+/// `labelled_args`, reading a parameter of `Closure::Unknown` as one that takes a trailing closure
+/// (`unknown_takes`) or as one that refuses it.
+fn labelled_args_as(
+    params: &[Param],
+    labels: &[String],
+    unknown_takes: bool,
+) -> Option<Vec<Option<usize>>> {
+    let refuses = |p: &Param| match p.closure {
+        Closure::Refuses => true,
+        Closure::Unknown => !unknown_takes,
+        Closure::Takes | Closure::Named(_) => false,
+    };
     let skips = |p: &Param| matches!(p.binds, Binds::Optional | Binds::Rest);
     // The ends of the arguments `p` may take from the `j`th on: one of its label, then for a
     // variadic one the unlabelled ones after it.
@@ -570,7 +616,7 @@ fn labelled_args(params: &[Param], labels: &[String]) -> Option<Vec<Option<usize
         if first != p.label.as_deref().unwrap_or("_") && !first.is_empty() {
             return j..j;
         }
-        if first.is_empty() && p.closure == Closure::Refuses {
+        if first.is_empty() && refuses(p) {
             return j..j;
         }
         let mut k = j + 1;
@@ -1324,7 +1370,7 @@ impl<'a> Resolver<'a> {
             Binding::Def(t) => Resolution::Exact(t),
             // A call's result is read from an exact target alone (`result_of`): no name match.
             _ if !matching => Resolution::Unresolved,
-            Binding::Several(all) => Resolution::Ambiguous(all),
+            Binding::Several(all) => one_of(all),
             Binding::External(..) => Resolution::Unresolved,
             Binding::Unknown if self.owned_outside(path, call) || self.lacks(path, call) => {
                 Resolution::Unresolved
@@ -1569,7 +1615,7 @@ impl<'a> Resolver<'a> {
                 );
                 match self.narrow(found, Args::of(call), &|| self.on_receiver(path, call)) {
                     Binding::Def(t) => narrowed(t, all.len().max(1)),
-                    Binding::Several(several) => Resolution::Ambiguous(several),
+                    Binding::Several(several) => one_of(several),
                     _ => Resolution::Unresolved,
                 }
             }
@@ -1705,15 +1751,27 @@ impl<'a> Resolver<'a> {
         on_receiver: &dyn Fn() -> bool,
     ) -> Binding<'a> {
         let Some(args) = args else { return binding };
-        let fits =
-            |t: &Target<'a>| (self.arities.get(t)).is_none_or(|n| n.fits_call(args, on_receiver));
+        let fit = |t: &Target<'a>| {
+            (self.arities.get(t)).map_or(Fit::Yes, |n| n.fits_call(args, on_receiver))
+        };
         match binding {
-            Binding::Def(t) if !fits(&t) => Binding::Unknown,
-            Binding::Several(all) => match all.into_iter().filter(fits).collect::<Vec<_>>()[..] {
-                [] => Binding::Unknown,
-                [one] => Binding::Def(one),
-                ref several => Binding::Several(several.to_vec()),
+            Binding::Def(t) => match fit(&t) {
+                Fit::No => Binding::Unknown,
+                // A lone candidate that may not fit is a name match (`one_of`), never `exact`.
+                Fit::Maybe => Binding::Several(vec![t]),
+                Fit::Yes => Binding::Def(t),
             },
+            Binding::Several(all) => {
+                let kept: Vec<_> = (all.into_iter())
+                    .map(|t| (fit(&t), t))
+                    .filter(|(fit, _)| *fit != Fit::No)
+                    .collect();
+                match kept[..] {
+                    [] => Binding::Unknown,
+                    [(Fit::Yes, one)] => Binding::Def(one),
+                    _ => Binding::Several(kept.into_iter().map(|(_, t)| t).collect()),
+                }
+            }
             found => found,
         }
     }
@@ -2977,7 +3035,9 @@ impl<'a> Resolver<'a> {
             found.retain(|t| !self.hidden(path, *t));
         }
         if let Some(args) = args {
-            found.retain(|t| (self.arities.get(t)).is_none_or(|n| n.fits_call(args, on_receiver)));
+            found.retain(|t| {
+                (self.arities.get(t)).is_none_or(|n| n.fits_call(args, on_receiver) != Fit::No)
+            });
         }
         // A file whose calls reach no extension function (Java's) matches none by name either.
         if !self.extending.contains(path) {
@@ -7562,6 +7622,26 @@ mod tests {
         let params = [labelled_param("_", any), refusing("animation", optional)];
         assert_eq!(labelled_args(&params, &strings(&["_", ""])), None);
         assert!(labelled_args(&params, &strings(&["_"])).is_some());
+        // A parameter of a type Meada cannot read (`Closure::Unknown`) fits a trailing closure
+        // only maybe, and anything else as a sure one does.
+        let unknown = |label: &str, binds| Param {
+            closure: Closure::Unknown,
+            ..labelled_param(label, binds)
+        };
+        let params = [labelled_param("_", any), unknown("completion", any)];
+        assert!(fit(&params, &strings(&["_", ""])) == Fit::Maybe);
+        assert!(fit(&params, &strings(&["_", "completion"])) == Fit::Yes);
+        assert!(fit(&params, &strings(&["_"])) == Fit::No);
+        // A later parameter that takes the closure and cannot be left out is the one it fills.
+        let params = [
+            labelled_param("_", any),
+            unknown("animation", optional),
+            labelled_param("body", any),
+        ];
+        assert!(fit(&params, &strings(&["_", ""])) == Fit::Yes);
+        let params = [labelled_param("_", any), unknown("animation", optional)];
+        assert!(fit(&params, &strings(&["_", ""])) == Fit::Maybe);
+        assert!(fit(&params, &strings(&["_"])) == Fit::Yes);
         // A call too wide to weigh fits nothing.
         let wide = |n: usize| -> (Vec<Param>, Vec<String>) {
             (
