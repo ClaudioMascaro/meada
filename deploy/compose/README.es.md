@@ -17,8 +17,9 @@ docker compose up -d
 docker compose ps
 ```
 
-Requiere Docker Compose v2.24 o posterior (`!reset`) e imágenes 1.1.0 o posteriores, las primeras
-con `[accounts]` (ADR 0024); la 1.0.0 no las tiene. Para ejecutar este checkout antes de un release,
+Requiere Docker Compose v2.24 o posterior (`!reset`) e imágenes 1.2.0 o posteriores: la 1.1.0 es la
+primera con `[accounts]` (ADR 0024), y la 1.2.0 la primera que genera la primera contraseña de
+`admin` que se lee abajo. Para ejecutar este checkout antes de un release,
 construya sus dos imágenes y apunte `MEADA_VERSION` a la etiqueta:
 
 ```sh
