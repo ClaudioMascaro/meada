@@ -537,7 +537,9 @@ all repository fixtures; it contains no private corpus data. Existing tests own 
   root `requirements.txt` and adds `worker/requirements.txt`. The fixture `pkg-uv-sources` (#533)
   holds two `bird-feeder` packages under two uv workspace roots and consumers that choose with
   `workspace = true` and `path`, each `exact` to its own, and one with no source, `ambiguous` to
-  both (golden `pkg-uv-sources.export.json`); with the peer `pkg-uv-feeder`, a `git` source keeps
+  both (golden `pkg-uv-sources.export.json`; its `stub`, `registry` and `local` (#535) hold a lone `anyio` of the
+  repository: the `registry` consumer with no source (in its `pyproject.toml` and its `requirements.txt`) links it `inferred`, `local` with a `path`
+  `exact`); with the peer `pkg-uv-feeder`, a `git` source keeps
   the repository of its URL and a `url` or `index` source links nothing. Its `pinned/requirements*.txt` pin
   `bird-feeder==24.4.2` and `>=1,<2` against local `1.0.0` and `2.0.0` (`range mismatch` for the
   pin, and for `>=1,<2` against `2.0.0` alone, #534). Unit tests in `package/pypi.rs` (PEP 503

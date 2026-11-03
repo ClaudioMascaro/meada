@@ -1235,7 +1235,9 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   (a longer glob fits nothing); an outer root whose globs hold a project an inner root excludes
   takes it as a member (uv may treat it as standalone); a `path` to a file (a wheel or an sdist) names no provider; an index built before
   the uv sources were read keeps its stored entries until the `pyproject.toml` changes or the
-  schema version does. A
+  schema version does; a PyPI entry with no uv source and one package of the name in its own
+  repository is `inferred` (#535), whatever the source: a Poetry `path` dependency is not read,
+  so it is `inferred` too (a package of another repository stays `exact`). A
   Python import is looked up in the distributions every PyPI manifest of a directory holding
   the file depends on (the nearest naming one gives the range), among the top-level modules under each provider's roots (its directory, then the roots its
   `pyproject.toml` declares, or `src`); a namespace package (a directory without

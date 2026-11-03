@@ -397,7 +397,9 @@ this file, and a change to these modules updates it.
   `pyproject.toml` at or above the consumer whose `Summary::uv_workspace` globs hold it
   (`member`, `glob`), the member its one `pyproject.toml` of the name; with no root or no single
   member the entry keeps no source. `Pypi::reaches` is `sourced`, and `resolutions` skips the
-  providers it refuses. A call from a `.py` file (`of_source`) resolves through
+  providers it refuses. `Pypi::unsourced` (#535) lowers the link of an entry with no source to
+  `inferred` when its one fit shares the consumer's repository (`Packages::link`; the calls through
+  its imports take the weaker level). A call from a `.py` file (`of_source`) resolves through
   PyPI's `resolutions`: the import names a module, so each distribution a PyPI manifest of a
   directory holding the file depends on (`holding`: every `pyproject.toml` and
   `requirements*.txt` above it, the nearest first, whose entry gives the range) is a candidate when a provider exposes the import's top-level module under its roots

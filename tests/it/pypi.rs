@@ -284,8 +284,35 @@ fn a_uv_source_keeps_the_one_package_it_names() {
             expected.push(want(&entry, &format!("{id}{to}"), "ambiguous"));
         }
     }
+    // `stub` is a lone package of the consumer's own repository named like a registry one (#535):
+    // with no uv source (`registry`) it is only `inferred`, with its path named (`local`) `exact`.
+    let (stub, call) = ("stub/pyproject.toml", "stub/anyio/__init__.py::sleep");
+    for (dir, level) in [("registry", "inferred"), ("local", "exact")] {
+        let entry = format!("{dir}/pyproject.toml::project.dependencies::anyio");
+        expected.push(want(&entry, &format!("{id}{stub}"), level));
+        let site = format!("{dir}/{dir}/main.py::run::sleep#0");
+        expected.push(want(&site, &format!("{id}{call}"), level));
+    }
+    // A `requirements.txt` names no source either.
+    let entry = "registry/requirements.txt::requirements::anyio";
+    expected.push(want(entry, &format!("{id}{stub}"), "inferred"));
     expected.sort();
     assert_eq!(ends(&json), expected);
+    let reason = |consumer: &str| {
+        let consumer = format!("{id}{consumer}/pyproject.toml::project.dependencies::anyio");
+        let mut link = json["links"].as_array().unwrap().iter();
+        let link = link.find(|l| l["consumer"] == consumer.as_str()).unwrap();
+        link["reason"].as_str().unwrap().to_string()
+    };
+    assert_eq!(
+        reason("registry"),
+        "no uv source names the local package, the registry package is the likely provider; \
+         package::pypi::anyio >=4,<5 (local 4.3.0+foo)"
+    );
+    assert_eq!(
+        reason("local"),
+        "package::pypi::anyio >=4,<5 (local 4.3.0+foo)"
+    );
 
     // A pin no local version satisfies says `range mismatch`; a range one satisfies adds no
     // words, and one rejects the other version (#534). Neither drops a candidate.

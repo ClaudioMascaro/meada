@@ -1,0 +1,3 @@
+[project]
+name = "anyio"
+version = "4.3.0+foo"

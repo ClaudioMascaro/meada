@@ -370,6 +370,14 @@ impl Ecosystem for Pypi {
         }
     }
 
+    /// A package of the consumer's own repository that no uv source names is not what pip and uv
+    /// install: they take the registry's package of the name.
+    fn unsourced(&self, via: Option<&str>) -> Option<&'static str> {
+        via.is_none().then_some(
+            "no uv source names the local package, the registry package is the likely provider",
+        )
+    }
+
     /// A uv source (`uv_source`) keeps the provider it names, as Cargo's does (`sourced`).
     fn reaches(
         &self,
@@ -572,6 +580,14 @@ mod tests {
         assert_eq!(flag(Some("==1.0"), Some("local")), unchecked);
         let long = format!("{}1.0", "!=2.0,".repeat(MAX_RANGE));
         assert_eq!(flag(Some(&long), Some("9.0")), unchecked);
+    }
+
+    #[test]
+    fn only_an_entry_with_no_source_leaves_a_local_package_unproven() {
+        assert!(Pypi.unsourced(None).is_some());
+        for via in ["path a/pyproject.toml", "git example.com/a/b", "outside"] {
+            assert_eq!(Pypi.unsourced(Some(via)), None, "{via}");
+        }
     }
 
     #[test]

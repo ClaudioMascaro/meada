@@ -124,6 +124,13 @@ trait Ecosystem {
         None
     }
 
+    /// Why a lone provider in the consumer's own repository is not certain, if any: the entry's
+    /// source (`via`) names none, and the ecosystem installs by name from a registry. Not asked
+    /// for a provider in another repository, where the workspace holds the published package.
+    fn unsourced(&self, _via: Option<&str>) -> Option<&'static str> {
+        None
+    }
+
     /// Whether `target`, a symbol an import reaches, is a member of the class `class` (a
     /// constructor or a method of its own), so the call reaching it is a consumer of the class
     /// too (`context` on a public class). An ecosystem whose imports reach a class itself has
@@ -1916,9 +1923,10 @@ impl ContractKind for Packages {
         }
     }
 
-    /// The dependency entry links to the providers of its package: one candidate is `exact`,
-    /// several are each `ambiguous`. A `workspace:` range keeps the providers of its own
-    /// repository. The reason is `reason()`'s, flag included. A call through a package import
+    /// The dependency entry links to the providers of its package: one candidate is `exact`
+    /// (`inferred` when it shares the consumer's repository and `Ecosystem::unsourced` says no
+    /// source names it), several are each `ambiguous`. A `workspace:` range keeps the providers
+    /// of its own repository. The reason is `reason()`'s, flag included. A call through a package import
     /// (`Consumer::hops`) links instead to the symbol it reaches in each provider, at the
     /// weaker of that level and the import's, the reason followed by `; import <how>`.
     fn link(
@@ -1955,8 +1963,16 @@ impl ContractKind for Packages {
             })
             .collect();
         let uncertain = ecosystem.uncertainty(consumer.via.as_deref());
+        // The one fit shares the consumer's repository and no source names it: a candidate only.
+        let unsourced = match fits.as_slice() {
+            [(repo, _)] if uncertain.is_none() && repo.identity == from.identity => {
+                ecosystem.unsourced(consumer.via.as_deref())
+            }
+            _ => None,
+        };
         let (level, n) = match fits.len() {
             0 => return Vec::new(),
+            1 if unsourced.is_some() => (Level::Inferred, None),
             1 if uncertain.is_none() => (Level::Exact, None),
             1 => (Level::Ambiguous, None),
             n => (Level::Ambiguous, Some(n)),
@@ -1964,7 +1980,7 @@ impl ContractKind for Packages {
         fits.into_iter()
             .flat_map(|(_, p)| {
                 let said = reason(contract, range, p.version.as_deref());
-                let said = match uncertain {
+                let said = match uncertain.or(unsourced) {
                     Some(why) => format!("{why}; {said}"),
                     None => said,
                 };

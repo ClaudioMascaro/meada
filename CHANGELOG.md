@@ -77,6 +77,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A PyPI package in the consumer's own repository that no uv source names links `inferred`, not
+  `exact`, when it is the one package of the name, with the reason "no uv source names the local
+  package, the registry package is the likely provider": pip and uv install the registry's
+  package, so a same-named stub (uv's `anyio_local`) is only a candidate. A source naming it
+  (`workspace = true`, `path`) and a single provider in another repository stay `exact` (#535).
 - The `golden_diff` example exits with a message naming the range's refs and the `--range A...B`
   flag when a merge-base cannot be found (a shallow or single-branch clone has no `origin/main`),
   and with a usage error for `--range` without a value, instead of panicking (#592).
