@@ -49,6 +49,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- The deploy fetch scripts (Compose `fetch-pulled.sh` and the chart `workspace.fetch`) read a
+  repositories manifest whose `repo` and `path` keys are written as quoted keys (`"repo" = ...`);
+  the shared awk program skipped them. Its test now takes the expected pairs of every case from the
+  `toml` crate instead of hand-written lists (#568).
+
 - `[postgres] schema` starting with `pg_` (reserved by Postgres) is refused at manifest read with
   Meada's own message, in pt-BR and English, instead of Postgres's raw error at `meada postgres
   migrate` (#482).
