@@ -1,0 +1,16 @@
+{"tool": "search", "arguments": {"query": "kind"}}
+{"tool": "context", "arguments": {"symbol": "github.com/claudiomascaro/meada::src/http/rust.rs::Web.kind"}}
+{"tool": "trace", "arguments": {"from": "github.com/claudiomascaro/meada::src/http/rust.rs::Web.kind"}}
+{"tool": "search", "arguments": {"query": "push"}}
+{"tool": "context", "arguments": {"symbol": "github.com/claudiomascaro/meada::src/trace.rs::Walk.push"}}
+{"tool": "trace", "arguments": {"from": "github.com/claudiomascaro/meada::src/trace.rs::Walk.push"}}
+{"tool": "search", "arguments": {"query": "text"}}
+{"tool": "context", "arguments": {"symbol": "github.com/claudiomascaro/meada::src/lang/mod.rs::text"}}
+{"tool": "trace", "arguments": {"from": "github.com/claudiomascaro/meada::src/lang/mod.rs::text"}}
+{"tool": "search", "arguments": {"query": "kind", "budget": 300}}
+{"tool": "search", "arguments": {"query": "kind", "kind": "contract"}}
+{"tool": "context", "arguments": {"symbol": "github.com/claudiomascaro/meada::src/http/rust.rs::Web.kind", "budget": 300}}
+{"tool": "trace", "arguments": {"from": "github.com/claudiomascaro/meada::src/http/rust.rs::Web.kind", "direction": "up", "budget": 300}}
+{"tool": "search", "arguments": {"query": "channel::amqp", "kind": "contract"}}
+{"tool": "search", "arguments": {"query": "zz_prove_missing", "kind": "zz_prove_kind"}}
+{"tool": "context", "arguments": {"symbol": "zz_prove_missing"}}

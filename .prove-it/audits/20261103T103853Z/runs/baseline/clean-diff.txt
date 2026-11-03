@@ -1,0 +1,70 @@
+## base: warm vs cold
+  calls: +0 -0 ~3
+    level: exact -> None: 1
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.build()::Item#0
+    level: exact -> inferred: 2
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.show(_:)::item.label#0
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Scopes.swift::Shelf.stock(_:)::item.label#0
+    target: set -> None: 1
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.build()::Item#0
+  communities: +1 -1
+## base: original vs warm
+  dirty: False -> True
+  symbols: +1 -1 ~2
+    + github.com/claudiomascaro/meada::meada-core/src/authorize.rs::ChangQ
+    - github.com/claudiomascaro/meada::meada-core/src/authorize.rs::Change
+  calls: +0 -0 ~3
+    level: None -> exact: 1
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.build()::Item#0
+    level: inferred -> exact: 2
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.show(_:)::item.label#0
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Scopes.swift::Shelf.stock(_:)::item.label#0
+    target: None -> set: 1
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.build()::Item#0
+  files: +1 -1
+  communities: +1 -1
+## base: original vs restored (export1 vs export6)
+  calls: +0 -0 ~3
+    level: None -> exact: 1
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.build()::Item#0
+    level: inferred -> exact: 2
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.show(_:)::item.label#0
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Scopes.swift::Shelf.stock(_:)::item.label#0
+    target: None -> set: 1
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.build()::Item#0
+  communities: +1 -1
+## head: warm vs cold
+  calls: +0 -0 ~3
+    level: exact -> None: 1
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.build()::Item#0
+    level: exact -> inferred: 2
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.show(_:)::item.label#0
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Scopes.swift::Shelf.stock(_:)::item.label#0
+    target: set -> None: 1
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.build()::Item#0
+  communities: +1 -1
+## head: original vs warm
+  dirty: False -> True
+  symbols: +1 -1 ~2
+    + github.com/claudiomascaro/meada::meada-core/src/authorize.rs::ChangQ
+    - github.com/claudiomascaro/meada::meada-core/src/authorize.rs::Change
+  calls: +0 -0 ~3
+    level: None -> exact: 1
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.build()::Item#0
+    level: inferred -> exact: 2
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.show(_:)::item.label#0
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Scopes.swift::Shelf.stock(_:)::item.label#0
+    target: None -> set: 1
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.build()::Item#0
+  files: +1 -1
+  communities: +1 -1
+## head: original vs restored (export1 vs export6)
+  calls: +0 -0 ~3
+    level: None -> exact: 1
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.build()::Item#0
+    level: inferred -> exact: 2
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.show(_:)::item.label#0
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Scopes.swift::Shelf.stock(_:)::item.label#0
+    target: None -> set: 1
+      github.com/claudiomascaro/meada::tests/fixtures/conformance-swift-app/Sources/Page+Show.swift::Page.build()::Item#0
+  communities: +1 -1
