@@ -12,7 +12,7 @@
 //! modules, `ambiguous` when several distributions expose it). The source roots (`roots`), the
 //! module lookup (`module`) and the console scripts (`programs`) are its own rules.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
 use super::{
@@ -127,10 +127,16 @@ pub fn read_pyproject(dir: &str, src: &[u8]) -> Summary {
         }
     }
     let mut dependencies = entries(PROJECT, pep621.into_iter());
-    let sources = p.uv_sources();
+    // Normalized once, so a crafted file reads in time linear in its entries; the first key of
+    // a name wins, as a scan would.
+    let mut sources = BTreeMap::new();
+    for (key, source) in p.uv_sources() {
+        if let Some(name) = normalize(key) {
+            sources.entry(name).or_insert(source);
+        }
+    }
     for e in &mut dependencies {
-        let source = (sources.iter()).find(|(key, _)| normalize(key).as_ref() == Some(&e.name));
-        if let Some((_, source)) = source {
+        if let Some(source) = sources.get(&e.name) {
             uv_source(dir, source, e);
         }
     }
@@ -399,10 +405,13 @@ impl Ecosystem for Pypi {
             .filter(|m| pyproject(m))
             .filter_map(|m| Some((bare_directory(&m.path), m.summary.uv_workspace.as_ref()?)))
             .collect();
-        let named: Vec<(&str, &str)> = (manifests.iter())
-            .filter(|m| pyproject(m))
-            .filter_map(|m| Some((m.path.as_str(), m.summary.name.as_deref()?)))
-            .collect();
+        // By name, so each entry looks only at the packages of its name.
+        let mut named: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+        for m in manifests.iter().filter(|m| pyproject(m)) {
+            if let Some(name) = m.summary.name.as_deref() {
+                named.entry(name).or_default().push(m.path.as_str());
+            }
+        }
         let mut found = Vec::new();
         for (i, m) in manifests.iter().enumerate().filter(|(_, m)| pyproject(m)) {
             let dir = bare_directory(&m.path);
@@ -414,10 +423,9 @@ impl Ecosystem for Pypi {
                     continue;
                 }
                 let via = root.and_then(|(root, globs)| {
-                    let mut of = (named.iter()).filter(|(path, name)| {
-                        *name == e.name && member(root, globs, bare_directory(path))
-                    });
-                    let (path, _) = of.next()?;
+                    let mut of = (named.get(e.name.as_str())?.iter())
+                        .filter(|path| member(root, globs, bare_directory(path)));
+                    let path = of.next()?;
                     of.next().is_none().then(|| format!("path {path}"))
                 });
                 found.push((i, j, via));

@@ -201,6 +201,14 @@ fn probes() -> Vec<Probe> {
             );
             manifest("pyproject.toml", text)
         }),
+        ("pyproject: many dependencies and uv sources", || {
+            let deps = fill(2, |i| format!("\"d{i}\",\n"));
+            let sources = fill(2, |i| format!("s{i} = {{ path = \"s\" }}\n"));
+            let text = format!(
+                "[project]\nname=\"p\"\ndependencies=[{deps}]\n[tool.uv.sources]\n{sources}"
+            );
+            manifest("pyproject.toml", text)
+        }),
         ("pyproject: deep arrays", || {
             let nest = "[".repeat(NESTING) + &"]".repeat(NESTING);
             manifest("pyproject.toml", format!("[project]\nx={nest}\n"))

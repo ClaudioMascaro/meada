@@ -129,6 +129,36 @@ impl Version {
         })
     }
 
+    /// The normalized text, as `packaging`'s `str(Version)` writes it (`1.0-RC1` is `1.0rc1`).
+    fn normalized(&self) -> String {
+        let join = |parts: Vec<String>, sep: &str| parts.join(sep);
+        let mut out = String::new();
+        if self.epoch != 0 {
+            out += &format!("{}!", self.epoch);
+        }
+        out += &join(self.release.iter().map(u64::to_string).collect(), ".");
+        if let Some((kind, n)) = self.pre {
+            out += &format!("{}{n}", ["a", "b", "rc"][usize::from(kind.min(2))]);
+        }
+        if let Some(n) = self.post {
+            out += &format!(".post{n}");
+        }
+        if let Some(n) = self.dev {
+            out += &format!(".dev{n}");
+        }
+        if let Some(local) = &self.local {
+            let segment = |(_, n, text): &Segment| {
+                if text.is_empty() {
+                    n.to_string()
+                } else {
+                    text.clone()
+                }
+            };
+            out += &format!("+{}", join(local.iter().map(segment).collect(), "."));
+        }
+        out
+    }
+
     /// The order key. A dev-release with no pre- or post-release sorts before every pre-release
     /// of its release, and a release with no pre-release after them.
     fn key(&self, local: bool) -> Key {
@@ -176,7 +206,7 @@ enum Op {
 
 /// One clause of a specifier set.
 enum Clause {
-    /// `===`: the version's text equals this one, ignoring case.
+    /// `===`: the version's normalized text equals this one, ignoring case.
     Arbitrary(String),
     /// An operator and a version; `true` when written with a trailing `.*` (`==` and `!=` only,
     /// on a version that is a release alone).
@@ -227,10 +257,11 @@ impl Clause {
         }
     }
 
-    /// Whether the version `v`, written `text`, satisfies the clause.
-    fn holds(&self, text: &str, v: &Version) -> bool {
+    /// Whether the version `v` satisfies the clause; `===` compares its normalized text, as
+    /// `packaging` does.
+    fn holds(&self, v: &Version) -> bool {
         let Clause::Compare(op, s, wildcard) = self else {
-            return matches!(self, Clause::Arbitrary(want) if text.trim().to_ascii_lowercase() == *want);
+            return matches!(self, Clause::Arbitrary(want) if v.normalized() == *want);
         };
         let public = v.key(false);
         match op {
@@ -274,7 +305,7 @@ pub fn accepts(range: &str, version: &str) -> Option<bool> {
     if v.is_pre() && !clauses.iter().any(Clause::names_pre) {
         return Some(false);
     }
-    Some(clauses.iter().all(|c| c.holds(version, &v)))
+    Some(clauses.iter().all(|c| c.holds(&v)))
 }
 
 #[cfg(test)]
@@ -415,6 +446,14 @@ mod tests {
         assert_eq!(at("===1.0.0", "1.0"), Some(false));
         assert_eq!(at("===1.0RC1", "1.0rc1"), Some(true));
         assert_eq!(at("===1.0-custom", "1.0.0"), Some(false));
+        // The version is normalized first, the clause is not.
+        assert_eq!(at("===1.0rc1", "1.0-RC1"), Some(true));
+        assert_eq!(at("===1.0", "v1.0"), Some(true));
+        assert_eq!(
+            at("===1!2.0b3.post4.dev5+Ab.6", "1!2.0-beta3-4.dev5+ab-6"),
+            Some(true)
+        );
+        assert_eq!(at("===1.0-rc1", "1.0rc1"), Some(false));
         assert_eq!(at("===", "1.0"), None);
     }
 
