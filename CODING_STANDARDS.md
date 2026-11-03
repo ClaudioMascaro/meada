@@ -63,6 +63,12 @@ a review finding.
 - **Unreadable parts.** A path or prefix with a part that cannot be read (an unfolded template or
   f-string hole, a parameter, an environment read) yields no provider, never a `{}` segment. A
   parameter written in the literal (`:id`, `{id}`, `<int:id>`) stays one.
+- **Composed operators.** A change that types a value through a new chain operator (`?`, `.await`,
+  `!!`, `?.`, an unwrap) adds a test that combines it, in both orders, with every operator the
+  same pack already reads. A combination the change does not type stays a name match (`inferred`
+  or `ambiguous`), never `exact`: #435 typed `?` and `.await` apart, and `f()?.await.port()` with
+  `fn f() -> Result<Cfg>` linked `exact` to `Cfg.port`. This is review guidance, not a mechanical
+  check.
 
 ## Equivalence tests
 
