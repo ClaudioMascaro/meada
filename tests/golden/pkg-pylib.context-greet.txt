@@ -7,5 +7,5 @@ callers: none
 callees:
 example.com/pkg/pylib src/shared_lib/text.py:1 shout
 consumers:
-example.com/pkg/pyweb app/main.py:10 welcome [range unchecked]
-example.com/pkg/pyweb tests/test_api.py:5 test_greet [range unchecked]
+example.com/pkg/pyweb app/main.py:10 welcome
+example.com/pkg/pyweb tests/test_api.py:5 test_greet

@@ -49,6 +49,7 @@ mod hostile;
 mod maven;
 mod npm;
 mod nuget;
+mod pep440;
 mod pypi;
 mod swiftpm;
 
@@ -2673,8 +2674,16 @@ mod tests {
         assert_eq!(named(of_contract("package::npm::x")), Some("npm"));
         // The reason says the flag of the contract's ecosystem.
         assert_eq!(
+            reason("package::pypi::a", Some(">=2"), Some("1.2")),
+            "package::pypi::a >=2 (local 1.2), range mismatch"
+        );
+        assert_eq!(
             reason("package::pypi::a", Some(">=1"), Some("1.2")),
-            "package::pypi::a >=1 (local 1.2), range unchecked"
+            "package::pypi::a >=1 (local 1.2)"
+        );
+        assert_eq!(
+            reason("package::pypi::a", Some("^1"), Some("1.2")),
+            "package::pypi::a ^1 (local 1.2), range unchecked"
         );
     }
 

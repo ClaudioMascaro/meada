@@ -1218,7 +1218,13 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   URLs and paths skipped (a Poetry `git` or `url` source too), and what `-r` names is not
   followed; environment markers and extras
   are dropped and a direct reference (`name @ url`) is no entry; Poetry groups and
-  `[project.optional-dependencies]` are not read; a range is never evaluated (no marker). A
+  `[project.optional-dependencies]` are not read; a range is checked as PEP 440 says by a
+  hand-written subset (`package/pep440.rs`: `==`, `!=`, `<`, `<=`, `>`, `>=`, `~=`, `==X.*` and
+  `===`), and a range or a local version it cannot read (a Poetry `^`, `~` or `*`, a `||`, a
+  space between clauses, a wildcard past the release (`==1.0a1.*`), a local label after an
+  operator that allows none, `~=1`, a version past `u64`) or a range past `MAX_RANGE` (256
+  bytes, npm's) is `range unchecked`, never a mismatch; a mismatch removes no candidate (a pin
+  can still `exact`-link a versionless copy); environment markers are dropped (no marker). A
   `[tool.uv.sources]` entry is read only for `[project] dependencies`, and only as a table naming
   one of `workspace = true`, `path`, `git`, `url` and `index`: a list of sources (one per
   marker) keeps the name rule; a `workspace = true` source whose root (the nearest

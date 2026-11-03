@@ -57,7 +57,7 @@ fn each_import_level_reads_from_the_module_it_names() {
     // The distribution's own name, through a re-export and through a submodule: `exact`. A
     // `requirements.txt` in `tests/` that names other packages leaves the root's in force, and
     // the one in the library's `src/shared_lib/` takes no file from its `pyproject.toml`.
-    let range = "package::pypi::shared-lib >=1.0,<2 (local 1.2.0), range unchecked";
+    let range = "package::pypi::shared-lib >=1.0,<2 (local 1.2.0)";
     let exact = format!("{range}; import module name");
     for (caller, target) in [
         ("app/main.py::welcome::", "src/shared_lib/core.py::greet"),
@@ -277,8 +277,48 @@ fn a_uv_source_keeps_the_one_package_it_names() {
         let call = format!("{dir}/{module}/main.py::run::feed#0");
         expected.push(want(&call, &feed(to), level));
     }
+    // The requirements files of `pinned` have no code, so only the entries link, to both packages.
+    for file in ["requirements.txt", "requirements-dev.txt"] {
+        for to in [a, b] {
+            let entry = format!("pinned/{file}::requirements::bird-feeder");
+            expected.push(want(&entry, &format!("{id}{to}"), "ambiguous"));
+        }
+    }
     expected.sort();
     assert_eq!(ends(&json), expected);
+
+    // A pin no local version satisfies says `range mismatch`; a range one satisfies adds no
+    // words, and one rejects the other version (#534). Neither drops a candidate.
+    let mut reasons: Vec<(String, String)> = (json["links"].as_array().unwrap().iter())
+        .filter_map(|l| {
+            let consumer = l["consumer"]
+                .as_str()?
+                .strip_prefix(id)?
+                .strip_prefix("pinned/")?;
+            let provider = l["provider"].as_str()?.strip_prefix(id)?;
+            let reason = l["reason"]
+                .as_str()?
+                .strip_prefix("2 providers fit; package::pypi::")?;
+            Some((format!("{consumer} {provider}"), reason.to_string()))
+        })
+        .collect();
+    reasons.sort();
+    let pin = "requirements.txt::requirements::bird-feeder";
+    let dev = "requirements-dev.txt::requirements::bird-feeder";
+    let said = |consumer: &str, provider: &str, reason: &str| {
+        (
+            format!("{consumer} {provider}"),
+            format!("bird-feeder {reason}"),
+        )
+    };
+    let mut want = vec![
+        said(pin, a, "==24.4.2 (local 1.0.0), range mismatch"),
+        said(pin, b, "==24.4.2 (local 2.0.0), range mismatch"),
+        said(dev, a, ">=1,<2 (local 1.0.0)"),
+        said(dev, b, ">=1,<2 (local 2.0.0), range mismatch"),
+    ];
+    want.sort();
+    assert_eq!(reasons, want);
 }
 
 #[test]

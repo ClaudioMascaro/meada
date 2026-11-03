@@ -1,10 +1,11 @@
 //! The PyPI ecosystem (spec #24): a `pyproject.toml` or a `requirements*.txt` read into the same
 //! `Summary` a `package.json` gives, its names normalized as PEP 503 does. Ranges are kept as
-//! written and never evaluated: every PyPI package link says `range unchecked`.
+//! written and checked against the provider's version as PEP 440 says (`pep440`): `range
+//! mismatch` when the specifiers reject it, `range unchecked` when either cannot be read.
 //!
 //! `Pypi` answers the trait's six required questions, `entries` among them (every distribution
 //! the manifests holding the importing file depend on, nearest first, the import's module as
-//! the subpath), and overrides two of the rest: `owns` (only a `pyproject.toml` bounds a
+//! the subpath), and overrides some of the rest: `flag`, `owns` (only a `pyproject.toml` bounds a
 //! package) and `resolutions`, whole: an import names a module, not a distribution, so a distribution is a
 //! candidate when a provider of it exposes the import's top-level module under its source roots
 //! (`exact` when that is the distribution's own name, `inferred` when it is another of its
@@ -15,9 +16,10 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use super::{
-    Ecosystem, Entry, How, MAX_BYTES, MAX_NAME, Manifest, Provided, Providers, Resolution,
-    Resolved, Summary, bare_directory, directory, holding, npm::split, owner, pattern_fits,
-    sourced,
+    Ecosystem, Entry, Flag, How, MAX_BYTES, MAX_NAME, Manifest, Provided, Providers, Resolution,
+    Resolved, Summary, bare_directory, directory, holding,
+    npm::{MAX_RANGE, split},
+    owner, pattern_fits, pep440, sourced,
 };
 use crate::contract::Level;
 use crate::index::Export;
@@ -353,6 +355,21 @@ impl Ecosystem for Pypi {
             .collect()
     }
 
+    /// Whether the dependency `range` (PEP 440 specifiers) accepts the provider's `version`:
+    /// `None` when it does, else the `Flag`. A missing range or version, a range or version
+    /// that is not valid PEP 440 (a Poetry `^1.2`, an unknown operator, `==1.0a1.*`) and a range
+    /// past `MAX_RANGE` are `Unchecked`; an unparseable specifier is never a mismatch.
+    fn flag(&self, range: Option<&str>, version: Option<&str>) -> Option<Flag> {
+        let (Some(range), Some(version)) = (range, version) else {
+            return Some(Flag::Unchecked);
+        };
+        match (range.len() <= MAX_RANGE).then(|| pep440::accepts(range, version)) {
+            Some(Some(true)) => None,
+            Some(Some(false)) => Some(Flag::Mismatch),
+            _ => Some(Flag::Unchecked),
+        }
+    }
+
     /// A uv source (`uv_source`) keeps the provider it names, as Cargo's does (`sourced`).
     fn reaches(
         &self,
@@ -517,8 +534,7 @@ mod tests {
     }
 
     #[test]
-    fn a_pypi_range_is_never_evaluated_and_keeps_to_no_repository() {
-        assert_eq!(Pypi.flag(Some("==1.0"), Some("1.0")), Some(Flag::Unchecked));
+    fn a_pypi_range_keeps_to_no_repository() {
         let (a, b) = (("a", Path::new("/w/a")), ("b", Path::new("/w/b")));
         assert!(Pypi.reaches((None, Some("workspace:*")), a, (b, "package.json")));
         // A uv source keeps what it names, as Cargo's does: `git` the repository of its remote,
@@ -533,6 +549,29 @@ mod tests {
             a,
             (a, "x/pyproject.toml")
         ));
+    }
+
+    #[test]
+    fn a_pypi_range_is_checked_against_the_local_version() {
+        let flag = |range, version| Pypi.flag(range, version);
+        let (mismatch, unchecked) = (Some(Flag::Mismatch), Some(Flag::Unchecked));
+        // The real case of #534: a pin no workspace version satisfies.
+        assert_eq!(flag(Some("==24.4.2"), Some("0.1.0")), mismatch);
+        assert_eq!(flag(Some("==24.4.2"), Some("24.4.2")), None);
+        // A range the version satisfies adds no words, a set needs every clause.
+        assert_eq!(flag(Some(">=0.1,<1"), Some("0.5.0")), None);
+        assert_eq!(flag(Some(">=0.1,<1"), Some("1.0")), mismatch);
+        assert_eq!(flag(Some("~=1.4.5"), Some("1.5")), mismatch);
+        assert_eq!(flag(Some("==1.4.*"), Some("1.4.2")), None);
+        assert_eq!(flag(Some(">=1.0"), Some("2.0rc1")), mismatch);
+        // Nothing that cannot be read is a mismatch.
+        assert_eq!(flag(Some("==1.0"), None), unchecked);
+        assert_eq!(flag(None, Some("1.0")), unchecked);
+        assert_eq!(flag(Some("^1.0"), Some("2.0")), unchecked);
+        assert_eq!(flag(Some(">=1,<"), Some("2.0")), unchecked);
+        assert_eq!(flag(Some("==1.0"), Some("local")), unchecked);
+        let long = format!("{}1.0", "!=2.0,".repeat(MAX_RANGE));
+        assert_eq!(flag(Some(&long), Some("9.0")), unchecked);
     }
 
     #[test]

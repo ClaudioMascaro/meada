@@ -363,7 +363,7 @@ this file, and a change to these modules updates it.
   (every provider), `owns` (every manifest of the ecosystem), `ways` and `resolve` (Node's
   rule), `resolutions` (the single-entry loop), `shapes` (false), `programs` (none) and
   `inherit` (nothing). The overrides: npm answers `flag` (semver), `reaches` (a `workspace:`
-  range keeps the dependent's own repository) and `shapes`; PyPI `owns`, `resolutions`,
+  range keeps the dependent's own repository) and `shapes`; PyPI `flag` (PEP 440), `owns`, `resolutions`,
   `programs`, `reaches` and `inherit`; Cargo `reaches`, `owns`, `ways`, `resolve` and `inherit`; Go `reaches` and
   `resolve`. `Providers` is keyed by ecosystem name and package name, so an npm and a PyPI
   package of one name never link, and `nearest` takes the ecosystem (a file's nearest
@@ -377,8 +377,18 @@ this file, and a change to these modules updates it.
   `roots` and the console `scripts`, `[project.scripts]` else `[tool.poetry.scripts]`, as
   `(module, function)`) and a `requirements*.txt` (line by line, comments, option lines, URLs and paths
   skipped), each name normalized as PEP 503 does (`normalize`) and each specifier kept as
-  written, extras and markers dropped (`requirement`). A PyPI range is never evaluated:
-  `reason` ends `, range unchecked`; a Poetry `git` or `url` source without a `path` is a direct
+  written, extras and markers dropped (`requirement`). A PyPI range is checked by
+  `package/pep440.rs` (`Pypi::flag`, a hand-written subset: a comma-separated set of `==`, `!=`,
+  `<`, `<=`, `>`, `>=`, `~=`, `==X.*` and `===`, over PEP 440 versions with epoch, pre-, post-,
+  dev-releases and local labels, no crate: the subset is small, and the evaluator stays inside the clean-room rules and the
+  dependency policy): `, range mismatch` when the set rejects the local
+  version, nothing when it accepts it, `, range unchecked` for a provider without a version, a
+  specifier or version it cannot read (a Poetry `^1.2`, `~1.2` or `*`, an unknown operator, a
+  local label after `<`, `>=`..., `~=1`, `==1.0a1.*`) and a range past npm's `MAX_RANGE`. As
+  `packaging` does, a pre-release or dev-release local version is rejected unless a clause of
+  `==`, `>=`, `<=`, `~=` or `===` names one, `==1.0` ignores a local label of the version, and
+  `>1.0` takes neither a post-release nor a local version of 1.0. A mismatch removes no
+  candidate. A Poetry `git` or `url` source without a `path` is a direct
   reference, no entry, as `name @ url` is, and a requirements line ending in `\` continues on
   the next. A `[project] dependencies` entry takes its `[tool.uv.sources]` source as `via`, as
   Cargo's do (`uv_source`): `path <manifest>` (folded from the manifest's directory), `git

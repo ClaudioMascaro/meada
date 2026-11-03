@@ -1,7 +1,7 @@
 {
   "format": 1,
   "repository": "example.com/pkg/uv-sources",
-  "commit": "c00c5c2d7c209475657e63831b48d2dbf32d12ea",
+  "commit": "2fc3c43cdbad9927bbcef281b346bb982dba392a",
   "dirty": false,
   "files": [
     {
@@ -206,6 +206,16 @@
     },
     {
       "contract": "package::pypi::bird-feeder",
+      "site": "example.com/pkg/uv-sources::pinned/requirements-dev.txt::requirements::bird-feeder",
+      "via": null
+    },
+    {
+      "contract": "package::pypi::bird-feeder",
+      "site": "example.com/pkg/uv-sources::pinned/requirements.txt::requirements::bird-feeder",
+      "via": null
+    },
+    {
+      "contract": "package::pypi::bird-feeder",
       "site": "example.com/pkg/uv-sources::plain/plain/main.py::run::feed#0",
       "via": null
     },
@@ -274,6 +284,18 @@
       "manifest": "pathy/pyproject.toml",
       "field": "project.dependencies",
       "name": "bird-feeder"
+    },
+    {
+      "manifest": "pinned/requirements-dev.txt",
+      "field": "requirements",
+      "name": "bird-feeder",
+      "range": ">=1,<2"
+    },
+    {
+      "manifest": "pinned/requirements.txt",
+      "field": "requirements",
+      "name": "bird-feeder",
+      "range": "==24.4.2"
     },
     {
       "manifest": "plain/pyproject.toml",
@@ -365,6 +387,34 @@
       "contract": "package::pypi::bird-feeder",
       "level": "exact",
       "reason": "package::pypi::bird-feeder none (local 1.0.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::pinned/requirements-dev.txt::requirements::bird-feeder",
+      "provider": "example.com/pkg/uv-sources::alpha/packages/bird-feeder/pyproject.toml",
+      "contract": "package::pypi::bird-feeder",
+      "level": "ambiguous",
+      "reason": "2 providers fit; package::pypi::bird-feeder >=1,<2 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::pinned/requirements-dev.txt::requirements::bird-feeder",
+      "provider": "example.com/pkg/uv-sources::beta/libs/bird-feeder/pyproject.toml",
+      "contract": "package::pypi::bird-feeder",
+      "level": "ambiguous",
+      "reason": "2 providers fit; package::pypi::bird-feeder >=1,<2 (local 2.0.0), range mismatch"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::pinned/requirements.txt::requirements::bird-feeder",
+      "provider": "example.com/pkg/uv-sources::alpha/packages/bird-feeder/pyproject.toml",
+      "contract": "package::pypi::bird-feeder",
+      "level": "ambiguous",
+      "reason": "2 providers fit; package::pypi::bird-feeder ==24.4.2 (local 1.0.0), range mismatch"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::pinned/requirements.txt::requirements::bird-feeder",
+      "provider": "example.com/pkg/uv-sources::beta/libs/bird-feeder/pyproject.toml",
+      "contract": "package::pypi::bird-feeder",
+      "level": "ambiguous",
+      "reason": "2 providers fit; package::pypi::bird-feeder ==24.4.2 (local 2.0.0), range mismatch"
     },
     {
       "consumer": "example.com/pkg/uv-sources::plain/plain/main.py::run::feed#0",

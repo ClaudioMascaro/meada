@@ -8,6 +8,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- A PyPI version specifier is checked against the provider's version as PEP 440 says, as npm's
+  range is: `range mismatch` when the specifiers (`==`, `!=`, `<`, `<=`, `>`, `>=`, `~=`, `==X.*`
+  and `===`, joined by commas) reject the local version, nothing added when they accept it, and
+  `range unchecked` kept for a provider without a version and for a specifier it cannot read (a
+  Poetry `^1.2`, an unknown operator). A pre-release version is rejected unless a specifier
+  names one, and a mismatch removes no candidate (#534).
 - A TypeScript or JavaScript `fetch` whose URL a function of the repository builds is a consumer:
   a call to a function whose body is one returned string (an arrow function's expression body, or
   a lone `return`) folds to it with the call's arguments, at the `fetch` and through a constant,
