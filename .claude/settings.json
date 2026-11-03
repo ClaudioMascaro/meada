@@ -27,5 +27,18 @@
     "migrate-to-shoehorn": "off",
     "scaffold-exercises": "off",
     "setup-pre-commit": "off"
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/prove-stop.sh",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
   }
 }
