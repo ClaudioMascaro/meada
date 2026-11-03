@@ -11,7 +11,15 @@ For each corpus entry (`scripts/corpus.tsv`), with the head binary first and the
 2. `meada index` twice from cold (`.meada/` removed), each followed by `meada export`: wall time
    and peak RSS of each, and whether the two exports are byte-equal (determinism, ADR 0002).
 3. An mtime touch of the first tracked file and `meada export` again: the refresh path must give
-   the cold export's bytes.
+   the cold export's bytes. Then one symbol's name is rewritten in place with the same size (the
+   first symbol by id whose name is an identifier of 3 or more characters, its last character
+   replaced by `Q`), `meada export` warm, `.meada/` removed, `meada index` and `meada export`
+   cold: the warm and cold exports must be equal (ignoring `commit` and `dirty`, checkout facts
+   absent while an index is not fresh), differ from the first one, and the warm one must contain
+   the renamed id. The file is restored and `meada export` warm must give the first export again,
+   with the original id back; the queries below run on that restored tree. When one of these
+   fails, `compare.md` prints the `export_diff` of warm against cold and of the first export
+   against the restored one, per side.
 4. `meada mcp` over stdio, `initialize` (2025-11-25), `tools/list`, then every query of
    `$RUN/queries/<entry>.jsonl`.
 
@@ -25,9 +33,12 @@ Exit 0 means no difference at all, 1 differences or budget overruns, 2 BLOCKED.
 ## Queries
 
 Without `--queries`, the head's first export picks them: the three symbols with the most
-resolved callers, each through `search` (its short name), `context` and `trace`; one `search` of
-the first provided contract with `kind: contract`; and `context` of `zz_prove_missing`, the error
-parity probe. The base reuses the same file.
+resolved callers, each through `search` (its short name), `context` and `trace`; on the first of
+them, every tool argument once (`search` with `budget: 300` and with `kind: contract`, `context`
+with `budget: 300`, `trace` with `direction: up` and `budget: 300`); one `search` of the first
+provided contract with `kind: contract`; and the error parity probes, `search` with
+`kind: zz_prove_kind` and `context` of `zz_prove_missing`. The base reuses the same file.
+`trace`'s `changes` has no automatic query: pass one with `--queries` when Scope reaches it.
 
 For a change about a named symbol, route or channel, write the queries before the run, one JSON
 object per line, and pass the file with `--queries`:
