@@ -1110,7 +1110,9 @@ provider returns, through zod schemas or object literals. See section 10.
 **Environment.** `os.environ["X"]`, `os.environ.get("X")` and `os.getenv("X")` (also bare
 `environ` and `getenv`, matched as written and not through imports), alone or in an f-string hole,
 with an `or` fallback, with a default argument and with text methods such as `strip` and
-`replace`.
+`replace`. A field `f` of a `BaseSettings` subclass (pydantic-settings) in the same file is the
+variable `<env_prefix><F>` in upper case, or its `alias` / `validation_alias` when given; a class
+that is not a `BaseSettings` is not read.
 
 **Manifests.** `pyproject.toml` (`[project]` and `[tool.poetry]`, including `[project.scripts]`)
 and `requirements*.txt`. See PyPI in section 8.5.

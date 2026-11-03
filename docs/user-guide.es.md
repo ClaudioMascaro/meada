@@ -1128,7 +1128,9 @@ declara o `src`) a los archivos debajo de él, y por ellas un `import` encuentra
 **Entorno.** `os.environ["X"]`, `os.environ.get("X")` y `os.getenv("X")` (también `environ` y
 `getenv` sueltos, casados tal como están escritos y no por los imports), solos o en un hueco de
 f-string, con fallback `or`, con argumento predeterminado y con métodos de texto como `strip` y
-`replace`.
+`replace`. El campo `f` de una subclase de `BaseSettings` (pydantic-settings) del mismo archivo es
+la variable `<env_prefix><F>` en mayúsculas, o su `alias` / `validation_alias` si existe; una
+clase que no es `BaseSettings` no se lee.
 
 **Manifiestos.** `pyproject.toml` (`[project]` y `[tool.poetry]`, incluido `[project.scripts]`) y
 `requirements*.txt`. Vea PyPI en la sección 8.5.

@@ -183,7 +183,7 @@ this file, and a change to these modules updates it.
   read on the left, no other variable on the right), a default argument (ignored, unless it
   reads another variable) and string methods (`strip`, `rstrip`, `replace`, ...). A leading
   `Part::Env` is `via = env:X` in `http::locate`, linked through `base_url_env`; Meada never
-  reads the value. Java (#89): `System.getenv("X")` is a `Part::Env` in the pack, and a Spring
+  reads the value. A pydantic-settings field is a `Settings.field` constant holding its `Part::Env` (`settings_consts`, #619). Java (#89): `System.getenv("X")` is a `Part::Env` in the pack, and a Spring
   `@Value("${key}")` field or constructor parameter holds what `jvm/spring.rs` reads of the
   module's `application.properties`, `application.yml` or `application.yaml` (the module of the
   main source root a Maven or Gradle build declares for the file, else of its `src/main/`)

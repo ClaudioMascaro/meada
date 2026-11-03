@@ -1760,3 +1760,4 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   holds, a receiver that is not a `Config`, and a read passed in from another file's wrapper
   leave the base unresolved. The pack reads the call by its member name alone, so the receiver is
   not checked: a `getString` of another library with a key a config holds reads the same.
+- pydantic-settings reads (#619, `settings_consts` in `lang/python.rs`): a field of a `BaseSettings` subclass is read as `<env_prefix><FIELD>` uppercased or its literal `alias` / `validation_alias`, with `env_prefix` a literal of `model_config = SettingsConfigDict(...)` or an inner `class Config`. A base class defined in another file or inherited settings, `AliasChoices`, `case_sensitive` and `env_nested_delimiter` leave the base unresolved or read the unprefixed name.

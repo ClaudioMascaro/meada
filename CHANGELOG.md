@@ -8,6 +8,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- A Python pydantic-settings field is an environment read: a field `f` of a `BaseSettings`
+  subclass of the same file is the variable `<env_prefix><F>` (upper case), or its `alias` /
+  `validation_alias`, so the peer's `base_url_env` links `f"{settings.f}/orders"` as an
+  environment read does instead of leaving it `ambiguous`; other classes are unchanged (#619).
 - A TypeScript or JavaScript base URL read through Backstage's `config.getString('a.b')` or
   `getOptionalString('a.b')` is the variable `VAR` when an `app-config*.yaml` of the repository
   holds `a.b: ${VAR}`, so the peer's `base_url_env` links the call as an environment read does
