@@ -1767,6 +1767,15 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   a top-level `function send`: the resolver's scope walk reads the symbol `exports.send` as `send`
   in the scope `exports`, as it does `use()` inside `app.use = function use() {}` (#457).
 
+- A Go struct field tagged `env:"X"` or `envconfig:"X"` reads `X` only when its struct is declared
+  in the same file as the read, and a selector matches it by its field path (`cfg.API.URL` is
+  `API.URL`) whatever the variable's type: an untagged field of another struct with the same path
+  is read as `X` too, a path two tags read differently is no read, and a named struct type nested
+  in another is not followed, nor is an embedded struct's promoted field; a package-level selector
+  (`config.URL`) whose tail matches a tagged path reads as `X` too; the key prefixes of the
+  libraries (`env-prefix`, `envPrefix`, envconfig's `Process("app")`) are not applied; nesting past
+  64 levels is not read (#618).
+
 - Backstage configuration reads (#617, `CONFIG_READS` in `lang/ts.rs`, read by `http/ts/config.rs`): `config.getString('a.b')`
   and `getOptionalString('a.b')` with a literal key are read from the `app-config*.yaml` files of
   the repository, `app-config.yaml` first and the first file holding the key winning, whatever

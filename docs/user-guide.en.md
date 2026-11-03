@@ -1169,7 +1169,10 @@ argument of `SetBaseURL`.
 
 **Environment.** `os.Getenv` and `os.LookupEnv`, including the pattern written with `if v == ""`,
 `len(v) == 0`, `!ok` or `!ok || v == ""` when the `ok` comes from the same `os.LookupEnv`, and
-then `strings.TrimSuffix`, `TrimRight` and `TrimSpace`.
+then `strings.TrimSuffix`, `TrimRight` and `TrimSpace`. A field of a struct tagged `env:"X"`
+(cleanenv, caarlos0/env) or `envconfig:"X"` (kelseyhightower/envconfig) is the read of `X`
+where the field is read (`cfg.API.URL`), nested structs included, when the struct is declared in
+the same file.
 
 **Manifests.** `go.mod` (`module`, `require`, `replace`). `go.sum` is not read. See Go in section
 8.5.

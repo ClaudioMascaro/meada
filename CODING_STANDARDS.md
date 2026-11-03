@@ -202,7 +202,7 @@ budget of 64 KB (`tests/it/docs.rs` fails above it):
   (`infer`, `output`, `TypeOf`) in `lang/ts/types.rs`, because it unwraps a handler's declared
   return type at parse time to reach the schema a type infers (`z.infer<typeof S>`, io-ts
   `t.TypeOf<typeof S>`), which no kind can do after the fact, and those are the words that walk
-  reads. A pack may recognise the one call that reads the platform's environment, as a
+  reads. The Go pack also reads the `env:"X"` and `envconfig:"X"` struct tags as environment reads (`tagged` in `lang/go/values.rs`, #618), because the read happens where the field is selected, which no kind can see after the fact. A pack may recognise the one call that reads the platform's environment, as a
   form and not a table: Java's and Kotlin's `System.getenv` (`getenv` in `lang/java.rs` and
   `lang/kotlin.rs`) and C#'s `GetEnvironmentVariable` (`ENVIRONMENT_READ` in `lang/csharp.rs`,
   which leaves the kind to decide whether the `Environment` is the framework's); the TypeScript pack does the same for Backstage's `config.getString('a.b')` and

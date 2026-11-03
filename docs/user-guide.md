@@ -1169,7 +1169,10 @@ A base de um cliente resty é o argumento de `SetBaseURL`.
 
 **Ambiente.** `os.Getenv` e `os.LookupEnv`, inclusive o padrão escrito com `if v == ""`,
 `len(v) == 0`, `!ok` ou `!ok || v == ""` quando o `ok` vem do mesmo `os.LookupEnv`, e depois
-`strings.TrimSuffix`, `TrimRight` e `TrimSpace`.
+`strings.TrimSuffix`, `TrimRight` e `TrimSpace`. Um campo de struct com a tag `env:"X"`
+(cleanenv, caarlos0/env) ou `envconfig:"X"` (kelseyhightower/envconfig) é a leitura de `X` onde
+o campo é lido (`cfg.API.URL`), com structs aninhados, quando o struct é declarado no mesmo
+arquivo.
 
 **Manifestos.** `go.mod` (`module`, `require`, `replace`). `go.sum` não é lido. Veja o Go na
 seção 8.5.

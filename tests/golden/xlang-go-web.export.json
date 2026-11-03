@@ -348,6 +348,13 @@
       "reason": "base URL from STOCK_URL, a base_url_env of peer example.com/xlang-go/web"
     },
     {
+      "consumer": "example.com/xlang-go/api::tags.go::stockByTag::http.Get#0",
+      "provider": "example.com/xlang-go/web::app/api/stock/route.ts::GET",
+      "contract": "http::GET::/api/stock",
+      "level": "inferred",
+      "reason": "base URL from STOCK_URL, a base_url_env of peer example.com/xlang-go/web"
+    },
+    {
       "consumer": "example.com/xlang-go/web::src/orders.ts::reserveOrder::fetch#0",
       "provider": "example.com/xlang-go/api::orders.go::reserve",
       "contract": "http::POST::/orders/reserve",

@@ -239,6 +239,13 @@ fn go_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_ho
 
     for (repo, name) in [(web, "web"), (api, "api")] {
         let export = Engine::open(&repo).unwrap().export().unwrap();
+        if name == "api" {
+            // A struct field tagged `envconfig:"STOCK_URL"` is the base of `stockByTag`.
+            assert!(
+                export.contains("tags.go::stockByTag::http.Get#0")
+                    && export.contains("env:STOCK_URL")
+            );
+        }
         assert_golden(
             &format!("xlang-go-{name}.export.json"),
             &without_processes(&export),
@@ -283,6 +290,9 @@ fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
         ("lengthFallback", "LEN_URL"),
         ("formatted", "FORMAT_URL"),
         ("packageLevel", "PKG_URL"),
+        ("tagNested", "TAG_API_URL"),
+        ("tagEnvconfig", "TAG_ENVCONFIG_URL"),
+        ("tagOptions", "TAG_CAARLO_URL"),
     ];
     for (function, variable) in read {
         let expected = format!("env:{variable}");
@@ -315,6 +325,7 @@ fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
         "okAssignedAgain",
         "lengthShadowed",
         "lookedUpToAVariable",
+        "tagUntagged",
     ];
     for function in unread {
         assert_eq!(vias.get(function), Some(&None), "{function}");

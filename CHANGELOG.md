@@ -8,6 +8,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Go: a struct field tagged `env:"X"` (cleanenv, caarlos0/env) or `envconfig:"X"`
+  (kelseyhightower/envconfig) is the environment read `X` where the field is read
+  (`cfg.API.URL`), so `base_url_env` links such a call as `inferred` instead of `ambiguous`
+  (#618).
+
 - A Python pydantic-settings field is an environment read: a field `f` of a `BaseSettings`
   subclass of the same file is the variable `<env_prefix><F>` (upper case), or its `alias` /
   `validation_alias`, so the peer's `base_url_env` links `f"{settings.f}/orders"` as an

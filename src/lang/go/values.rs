@@ -27,6 +27,9 @@ pub(super) struct Std {
     os: Option<String>,
     strings: Option<String>,
     aws: Option<String>,
+    /// The environment variable each tagged struct field of the file reads (`env:"X"`,
+    /// `envconfig:"X"`), by the path of field names from its type (`API.URL`).
+    env_by_path: HashMap<String, String>,
     /// The names a statement of a function's own block binds once, by scope and name (`base :=
     /// os.Getenv("X")`), with whether the value is an environment read. Filled in source order,
     /// so a name is known where it is used after it is bound.
@@ -59,6 +62,7 @@ impl Std {
             os: free(os),
             strings: free(strings),
             aws: free(aws),
+            env_by_path: tagged(root, src),
             held: RefCell::default(),
         }
     }
@@ -67,6 +71,15 @@ impl Std {
     pub(super) fn note(&self, scope: &str, name: &str, value: &Value) {
         let env = is_env(value);
         (self.held.borrow_mut()).insert((scope.to_string(), name.to_string()), env);
+    }
+
+    /// The read of the tagged field `cfg.API.URL` names, by the longest path after its first name.
+    fn field_env(&self, name: &str) -> Option<Value> {
+        let segments: Vec<&str> = name.split('.').collect();
+        (1..segments.len()).find_map(|from| {
+            let env = self.env_by_path.get(&segments[from..].join("."))?;
+            Some(Value::Str(vec![Part::Env(env.clone())]))
+        })
     }
 
     /// Whether `name`, written in `scope`, is bound by the nearest statement noted for it to an
@@ -84,6 +97,97 @@ impl Std {
             at = crate::parent(at);
         }
     }
+}
+
+/// The environment variable each struct field tagged `env:"X"` or `envconfig:"X"` reads, by the
+/// path of field names from the declared type, nested anonymous structs included.
+// shortcut: same file only, and a selector matches by its field path whatever the variable's
+// type; a named struct type nested in another and a config declared in another file are not
+// seen, a path two tags read differently is dropped. Upgrade when typed fields reach values.
+fn tagged(root: Node, src: &[u8]) -> HashMap<String, String> {
+    fn walk(
+        node: Node,
+        src: &[u8],
+        prefix: &str,
+        level: usize,
+        out: &mut HashMap<String, Option<String>>,
+    ) {
+        if level >= VALUE_DEPTH {
+            return;
+        }
+        for field in named(node).filter(|f| f.kind() == "field_declaration") {
+            let mut cursor = field.walk();
+            let names: Vec<Node> = field.children_by_field_name("name", &mut cursor).collect();
+            let tag = field.child_by_field_name("tag").map(|t| text(t, src));
+            let env = tag.and_then(env_tag);
+            for name in names {
+                let path = format!("{prefix}{}", text(name, src));
+                if let Some(ty) = field.child_by_field_name("type")
+                    && ty.kind() == "struct_type"
+                {
+                    let body = named(ty).find(|n| n.kind() == "field_declaration_list");
+                    walk(body.unwrap_or(ty), src, &format!("{path}."), level + 1, out);
+                }
+                if let Some(env) = &env {
+                    let slot = out.entry(path).or_insert_with(|| Some(env.clone()));
+                    if slot.as_ref() != Some(env) {
+                        *slot = None;
+                    }
+                }
+            }
+        }
+    }
+    let mut out = HashMap::new();
+    let mut cursor = root.walk();
+    for decl in root
+        .children(&mut cursor)
+        .filter(|d| d.kind() == "type_declaration")
+    {
+        for spec in named(decl).filter(|s| s.kind() == "type_spec") {
+            let body = spec
+                .child_by_field_name("type")
+                .filter(|t| t.kind() == "struct_type");
+            if let Some(body) =
+                body.and_then(|b| named(b).find(|n| n.kind() == "field_declaration_list"))
+            {
+                walk(body, src, "", 0, &mut out);
+            }
+        }
+    }
+    out.into_iter()
+        .filter_map(|(k, v)| v.map(|v| (k, v)))
+        .collect()
+}
+
+/// The variable a struct tag literal (`` `env:"X" env-required:"true"` ``) reads: the value of
+/// its `env` or `envconfig` key, before any option (`X,required`). Keys are read as Go's
+/// `reflect.StructTag` does, so a quoted value holding `env:` is no key; `-` skips the field.
+fn env_tag(tag: &str) -> Option<String> {
+    let body = tag.get(1..tag.len().saturating_sub(1))?;
+    let mut rest = body.trim_start();
+    while let Some((key, after)) = rest.split_once(':') {
+        let quoted = after.strip_prefix('"')?;
+        let mut end = None;
+        let mut escaped = false;
+        for (at, c) in quoted.char_indices() {
+            match c {
+                _ if escaped => escaped = false,
+                '\\' => escaped = true,
+                '"' => {
+                    end = Some(at);
+                    break;
+                }
+                _ => {}
+            }
+        }
+        let end = end?;
+        let name = quoted[..end].split(',').next().unwrap_or_default();
+        if matches!(key, "env" | "envconfig") && !matches!(name, "" | "-") {
+            return Some(name.to_string());
+        }
+        rest = quoted[end + 1..].trim_start();
+    }
+    None
 }
 
 /// Whether `value` is nothing but one environment read.
@@ -147,7 +251,9 @@ fn read(node: Node, files: (&[u8], &Std), scope: &str, depth: usize, level: usiz
         "identifier" => Value::Ref(text(node, src).to_string()),
         "selector_expression" => match callee(node, src) {
             name if name.starts_with('(') => Value::Unknown,
-            name => method_constant(&name, std).unwrap_or(Value::Ref(name)),
+            name => method_constant(&name, std)
+                .or_else(|| std.field_env(&name))
+                .unwrap_or(Value::Ref(name)),
         },
         "binary_expression"
             if node
@@ -726,6 +832,17 @@ pub(super) fn receiver(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_struct_tag_reads_its_env_key_as_reflect_does() {
+        use super::env_tag;
+        let tag = |t: &str| env_tag(&format!("`{t}`"));
+        assert_eq!(tag(r#"env:"A,required" json:"b""#).as_deref(), Some("A"));
+        assert_eq!(tag(r#"json:"b" envconfig:"C""#).as_deref(), Some("C"));
+        assert_eq!(tag(r#"default:"x env:B""#), None);
+        assert_eq!(tag(r#"env:"-""#), None);
+        assert_eq!(tag(r#"json:"b""#), None);
+    }
+
     use super::*;
     use crate::lang::LanguagePack;
 
