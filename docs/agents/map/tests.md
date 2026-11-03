@@ -560,7 +560,7 @@ all repository fixtures; it contains no private corpus data. Existing tests own 
   `../../gopkg-lib/extras`), and `gopkg-fork` (a second provider of `kit`, added as a peer, which
   makes the `require` and the import `ambiguous`). The tests check each `require` link and reason,
   every import into `lib` (`exact`, `; import module path`), a directory the provider lacks, a
-  module outside the workspace, a local that hides the import, a name only a test file, a file built for another target or two files of the directory define, a directory of a nested module, and a `replace` by another module (no link), a module path with no dot, and the freshness of
+  module outside the workspace, a local that hides the import, a name only a test file, a file built for another target or two files of the directory define, a directory of a nested module, a `replace` by another module (no link when no repository holds it; with `gopkg-replace`, `gopkg-replace-orig` and `gopkg-replace-fork`, which declare one module path, an `exact` link to the fork alone, `ambiguous` to both without the `replace`, and none when the fork declares another path; golden `gopkg-replace.export.json`), a module path with no dot, and the freshness of
   an edited `go.mod`. Goldens `gopkg-{web,lib}.export.json`, `gopkg-lib.context-greet.txt` and
   `gopkg-web.trace-down.txt`. Unit tests in `package/go.rs` and `lang/go/modfile.rs`.
 

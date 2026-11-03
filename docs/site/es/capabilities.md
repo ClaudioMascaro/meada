@@ -178,7 +178,7 @@ El vínculo es `exact`, con el rango escrito y `range unchecked`, porque no se c
 
 ## Módulos Go
 
-Cada `go.mod` con `module` genera `package::go::<ruta del módulo>`. `require` y `replace` a carpetas locales se vinculan con el proveedor en el workspace. Un `replace` que sale del repositorio se resuelve por texto, como `path` de Cargo; un reemplazo por otro módulo queda fuera.
+Cada `go.mod` con `module` genera `package::go::<ruta del módulo>`. `require` y `replace` a carpetas locales se vinculan con el proveedor en el workspace. Un `replace` que sale del repositorio se resuelve por texto, como `path` de Cargo; un `replace` por otro módulo (`replace a => github.com/owner/repo`) conserva, entre los proveedores del módulo requerido, el del repositorio del workspace cuya identidad es el inicio de esa ruta (se descarta un sufijo `/vN`; un subdirectorio indica la carpeta del `go.mod`), en `exact`, para la entrada y para las llamadas a través de sus imports. Un reemplazo que ningún repositorio del workspace contiene, o cuyo `go.mod` declara otra ruta de módulo, queda fuera.
 
 El vínculo es `exact`, con la versión del `require` como rango, `(local none)` como versión local y `range unchecked`. Un import de `<módulo>/<carpeta>` llega a sus funciones, tipos y métodos exportados. Si existe la carpeta, el vínculo es `exact`, con `; import module path` en la razón.
 

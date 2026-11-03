@@ -62,6 +62,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- A Go `replace` by another module (`replace a => github.com/owner/repo`) keeps, among the providers
+  of the required module, the one in the workspace repository that path names, `exact`, for the
+  `require` and for the calls through its imports, instead of dropping the dependency; a
+  replacement no repository holds stays out (#532).
 - The CLI messages (`--help`, `status`, `meada.toml` and index errors, and every other message of
   the catalogs) are also in Spanish, selected when `LANG` starts with `es`; other values keep
   falling back to English, and the MCP output stays English (#103).

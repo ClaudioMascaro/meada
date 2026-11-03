@@ -178,7 +178,7 @@ The link is `exact`, with the range as written and `range unchecked`, because Ca
 
 ## Go modules
 
-Each `go.mod` with `module` produces `package::go::<module path>`. `require` and local-directory `replace` entries link to the workspace provider. A `replace` leaving the repository resolves from text, like Cargo's `path`; a replacement by another module stays out.
+Each `go.mod` with `module` produces `package::go::<module path>`. `require` and local-directory `replace` entries link to the workspace provider. A `replace` leaving the repository resolves from text, like Cargo's `path`; a `replace` by another module (`replace a => github.com/owner/repo`) keeps, among the providers of the required module, the one in the workspace repository whose identity is the start of that path (a `/vN` suffix dropped, a subdirectory naming the directory of the `go.mod`), at `exact`, for the entry and for the calls through its imports. A replacement no repository of the workspace holds, or one whose `go.mod` declares another module path, stays out.
 
 The link is `exact`, with the `require` version as its range, `(local none)` as the local version and `range unchecked`. An import of `<module>/<directory>` reaches the directory's exported functions, types and methods. When the directory exists, the link is `exact`, with `; import module path` in its reason.
 

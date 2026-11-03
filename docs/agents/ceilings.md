@@ -431,7 +431,16 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
 - `package/go.rs`: a `replace` applies to every version of the module it names (its old version is
   read and dropped, as `lang/go/modfile.rs` does for imports); a `go.work` is not read; a `vendor/`
   directory and an `internal/` package are no different from any other directory of the provider;
-  a `replace` to an absolute directory leaves the module outside.
+  a `replace` to an absolute directory leaves the module outside. A `replace` by another module
+  (`via module <path>`) keeps the one provider whose repository identity starts that path (the
+  lower-cased path, a `/vN` suffix dropped, the rest naming the `go.mod`'s directory) and no
+  other: the replacement's own `go.mod` is not consulted, so a fork that declares another module
+  path than the required one is no provider of the required module and the dependency links to
+  nothing; the identity must be the start of the path, so a mirror under another host stays out too, and
+  two repositories whose identities nest (`host/g` and `host/g/sub`) may both fit one target.
+  An index built before #532 keeps `via outside` for such a `go.mod` until the file changes or the
+  schema version does (`tests/golden/schema.txt` has no `go.mod` sample), so the new links appear
+  after the first edit of that `go.mod` or the next schema change.
 - `workspace.rs`: a sibling with an invalid `meada.toml` or `meada.decisions.toml` is skipped
   silently. Every read of a mirror's `meada.toml` and `meada.decisions.toml`, in a pulled
   generation and in a server-mode manifest's entry (`mirror()`, behind `Manifest::read`) alike,

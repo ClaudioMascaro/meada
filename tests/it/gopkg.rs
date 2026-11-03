@@ -7,7 +7,7 @@ use crate::common;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use common::{age, assert_golden, fixture_repo, without_processes};
+use common::{age, assert_golden, fixture_repo, git, without_processes};
 use meada::engine::{Direction, Engine, Start};
 use serde_json::Value;
 
@@ -280,4 +280,97 @@ fn a_module_path_without_a_dot_links_through_its_local_replace() {
             format!("{reason}; import module path")
         )]
     );
+}
+
+/// The consumer that replaces `example.com/orig/lib` by the fork, and the two repositories that
+/// declare it, as siblings; the consumer (`example.com/gopkg/app`) is the one returned.
+fn replaced(case: &str) -> PathBuf {
+    let repo = |fixture: &str, origin: &str| fixture_repo(case, fixture, Some(origin));
+    repo("gopkg-replace-orig", "https://example.com/orig/lib.git");
+    repo("gopkg-replace-fork", "https://example.com/fork/lib.git");
+    repo("gopkg-replace", "https://example.com/gopkg/app.git")
+}
+
+const APP: &str = "example.com/gopkg/app::";
+
+#[test]
+fn a_replace_by_a_module_the_workspace_holds_keeps_only_that_provider() {
+    let app = replaced("gopkg_replace_held");
+
+    let json: Value = serde_json::from_str(&export(&app)).unwrap();
+
+    assert_eq!(
+        ends(&json, &format!("{APP}go.mod::require::")),
+        [("example.com/fork/lib::go.mod", "exact")]
+    );
+    assert_eq!(
+        ends(&json, &format!("{APP}main.go::main::")),
+        [("example.com/fork/lib::text/text.go::Greet", "exact")]
+    );
+    assert_golden(
+        "gopkg-replace.export.json",
+        &without_processes(&export(&app)),
+    );
+}
+
+#[test]
+fn without_the_replace_both_providers_stay_ambiguous() {
+    let app = replaced("gopkg_replace_absent");
+    replace(
+        &app,
+        "go.mod",
+        "\nreplace example.com/orig/lib => example.com/fork/lib v1.0.0-fork.1\n",
+        "",
+    );
+
+    let json: Value = serde_json::from_str(&export(&app)).unwrap();
+
+    assert_eq!(
+        ends(&json, &format!("{APP}go.mod::require::")),
+        [
+            ("example.com/fork/lib::go.mod", "ambiguous"),
+            ("example.com/orig/lib::go.mod", "ambiguous")
+        ]
+    );
+    assert_eq!(
+        ends(&json, &format!("{APP}main.go::main::")),
+        [
+            ("example.com/fork/lib::text/text.go::Greet", "ambiguous"),
+            ("example.com/orig/lib::text/text.go::Greet", "ambiguous"),
+        ]
+    );
+}
+
+#[test]
+fn a_replace_whose_repository_declares_another_module_path_links_to_nothing() {
+    let app = replaced("gopkg_replace_other_path");
+    let fork = app.parent().unwrap().join("gopkg-replace-fork");
+    replace(
+        &fork,
+        "go.mod",
+        "example.com/orig/lib",
+        "example.com/fork/lib",
+    );
+    git(&fork, &["commit", "-q", "-am", "own path"]);
+
+    let json: Value = serde_json::from_str(&export(&app)).unwrap();
+
+    assert!(links(&json, &format!("{APP}go.mod")).is_empty());
+    assert!(links(&json, &format!("{APP}main.go")).is_empty());
+}
+
+#[test]
+fn a_replace_by_a_module_no_repository_holds_keeps_the_dependency_out() {
+    let app = replaced("gopkg_replace_unheld");
+    replace(
+        &app,
+        "go.mod",
+        "example.com/fork/lib",
+        "example.com/elsewhere/lib",
+    );
+
+    let json: Value = serde_json::from_str(&export(&app)).unwrap();
+
+    assert!(links(&json, &format!("{APP}go.mod")).is_empty());
+    assert!(links(&json, &format!("{APP}main.go")).is_empty());
 }

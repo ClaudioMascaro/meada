@@ -1,0 +1,96 @@
+{
+  "format": 1,
+  "repository": "example.com/gopkg/app",
+  "commit": "5df6c7374c15f1a9397f8d3428830cc3b8591412",
+  "dirty": false,
+  "files": [
+    {
+      "path": "main.go",
+      "hash": "f8d1dbae546f50b25a17c416a27e7ce94e5bb21339e5d15462b3e23bbc4d3ae3"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/gopkg/app::main.go::main",
+      "span": {
+        "path": "main.go",
+        "start": 50,
+        "end": 84
+      },
+      "hash": "a9e826a91adbcb706fa82af4ea5394d5053807011959b783d3ae164f333069af"
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/gopkg/app::main.go::main::text.Greet#0",
+      "caller": "example.com/gopkg/app::main.go::main",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 65,
+        "end": 82
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::go::example.com/gopkg/app",
+      "site": "example.com/gopkg/app::go.mod"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "package::go::example.com/orig/lib",
+      "site": "example.com/gopkg/app::go.mod::require::example.com/orig/lib",
+      "via": "module example.com/fork/lib"
+    },
+    {
+      "contract": "package::go::example.com/orig/lib",
+      "site": "example.com/gopkg/app::main.go::main::text.Greet#0",
+      "via": "module example.com/fork/lib"
+    }
+  ],
+  "packages": [
+    {
+      "name": "example.com/gopkg/app",
+      "repository": "example.com/gopkg/app",
+      "directory": ".",
+      "ecosystem": "go"
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "go.mod",
+      "field": "require",
+      "name": "example.com/orig/lib",
+      "range": "v1.0.0"
+    }
+  ],
+  "imports": [
+    {
+      "site": "example.com/gopkg/app::main.go::main::text.Greet#0",
+      "specifier": "example.com/orig/lib/text",
+      "name": "Greet",
+      "level": "exact",
+      "how": "modulePath",
+      "target": "example.com/fork/lib::text/text.go::Greet"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/gopkg/app::go.mod::require::example.com/orig/lib",
+      "provider": "example.com/fork/lib::go.mod",
+      "contract": "package::go::example.com/orig/lib",
+      "level": "exact",
+      "reason": "package::go::example.com/orig/lib v1.0.0 (local none), range unchecked"
+    },
+    {
+      "consumer": "example.com/gopkg/app::main.go::main::text.Greet#0",
+      "provider": "example.com/fork/lib::text/text.go::Greet",
+      "contract": "package::go::example.com/orig/lib",
+      "level": "exact",
+      "reason": "package::go::example.com/orig/lib v1.0.0 (local none), range unchecked; import module path"
+    }
+  ]
+}
