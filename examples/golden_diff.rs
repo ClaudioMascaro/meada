@@ -187,33 +187,43 @@ fn load(rev: Option<&str>, path: &str) -> Option<Value> {
     serde_json::from_str(&text).ok()
 }
 
+/// Splits a range into the base revision and the optional head.
+fn resolve(range: &str) -> Result<(String, Option<String>), String> {
+    match range.split_once("...") {
+        Some((a, b)) => git(&["merge-base", a, b])
+            .map(|m| (m.trim().to_string(), Some(b.to_string())))
+            .ok_or_else(|| {
+                format!("no merge-base for `{a}` and `{b}`: a ref is missing or git failed (a shallow or single-branch clone has no `origin/main`); pass --range A...B with refs that exist")
+            }),
+        None => Ok((range.to_string(), None)),
+    }
+}
+
+fn die(msg: &str) -> ! {
+    eprintln!("golden_diff: {msg}");
+    std::process::exit(2)
+}
+
 fn main() {
     let mut range = "origin/main...HEAD".to_string();
     let mut files = Vec::new();
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         if a == "--range" {
-            range = args.next().expect("--range needs a value");
+            range = args
+                .next()
+                .unwrap_or_else(|| die("--range needs a value: --range A...B"));
         } else {
             files.push(a);
         }
     }
-    let (base, head) = match range.split_once("...") {
-        Some((a, b)) => (
-            git(&["merge-base", a, b])
-                .expect("no merge-base")
-                .trim()
-                .to_string(),
-            Some(b.to_string()),
-        ),
-        None => (range.clone(), None),
-    };
+    let (base, head) = resolve(&range).unwrap_or_else(|e| die(&e));
     if files.is_empty() {
         let mut diff = vec!["diff", "--name-only", &base];
         diff.extend(head.as_deref());
         diff.extend(["--", "tests/golden/*.export.json"]);
         files = git(&diff)
-            .expect("git diff failed")
+            .unwrap_or_else(|| die(&format!("git diff failed for {range}")))
             .lines()
             .map(String::from)
             .collect();
@@ -239,6 +249,15 @@ fn main() {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_missing_base_ref_is_an_error_naming_the_ref_and_the_flag() {
+        let err = resolve("no-such-ref-592...HEAD").unwrap_err();
+        assert!(
+            err.contains("no-such-ref-592") && err.contains("--range"),
+            "{err}"
+        );
+    }
 
     #[test]
     fn groups_call_level_moves_and_ignores_unchanged_sections() {

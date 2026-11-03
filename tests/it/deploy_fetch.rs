@@ -46,47 +46,85 @@ fn the_deploy_fetch_reads_each_repository_table_by_its_own_keys() {
         );
         String::from_utf8_lossy(&out.stdout).into_owned()
     };
+    // The oracle: the `repository` array of tables as the toml crate reads the input.
+    let expected = |input: &str| -> String {
+        let doc: toml::Table = toml::from_str(input).expect("the case is valid TOML");
+        let get =
+            |t: &toml::Table, k: &str| t.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
+        doc.get("repository")
+            .and_then(|v| v.as_array())
+            .into_iter()
+            .flatten()
+            .filter_map(|v| v.as_table())
+            .map(|t| format!("{} {}\n", get(t, "repo"), get(t, "path")))
+            .collect()
+    };
     let web = "[[repository]]\nrepo = \"github.com/a/web\"\npath = \"/data/mirrors/web\"\n";
-    let want = "github.com/a/web /data/mirrors/web\n";
-    assert_eq!(parse(web), want, "a plain entry");
-    let issue = "[[repository]]\nrepo = \"github.com/a/web\"\npath = \"/data/mirrors/web\" # note\n\n\
-                 [[repository.peer]]\nrepo = \"github.com/other/x\"\n";
-    assert_eq!(parse(issue), want, "the entry of the issue");
-    let peer =
-        format!("{web}\n[[repository.peer]]\nrepo = \"github.com/other/x\"\npath = \"/p\"\n");
-    assert_eq!(parse(&peer), want, "a peer table");
-    let resource = format!("{web}\n[[repository.resource]]\nrepo = \"x\"\npath = \"/r\"\n");
-    assert_eq!(parse(&resource), want, "a resource table");
-    let other = format!("{web}\n[workspace]\nrepo = \"x\"\n\n[[other]]\npath = \"/o\"\n");
-    assert_eq!(parse(&other), want, "any other table header");
-    let comments = "# lead\n[[repository]] # entry\nrepo = \"github.com/a/web\" # why\n\
-                    path = \"/data/mirrors/web\"   # where\n";
-    assert_eq!(parse(comments), want, "a comment after a value or a header");
-    assert_eq!(
-        parse("[[repository]]\nrepo=\"github.com/a/web\"\npath=\"/data/mirrors/web\"\n"),
-        want
-    );
-    let two = format!(
-        "{web}\n[[repository.peer]]\nrepo = \"x\"\n\n[[repository]]\n\
-                       repo = \"github.com/b/api\"\npath = \"/data/mirrors/api\"\n"
-    );
-    let both = format!("{want}github.com/b/api /data/mirrors/api\n");
-    assert_eq!(parse(&two), both, "two entries with a peer table between");
-    let rows = "[[repository]]\nrepo = \"github.com/a/web\"\npath = \"/data/mirrors/web\"\n\
-                [[repository]]\nrepo = \"github.com/b/api\"\npath = \"/data/mirrors/api\"\n";
-    assert_eq!(parse(rows), both, "two entries in a row");
-    let spaced = "[[ repository ]]\nrepo = \"github.com/a/web\"\npath = \"/data/mirrors/web\"\n\
-                  [[ repository.peer ]]\nrepo = \"x\"\n";
-    assert_eq!(
-        parse(spaced),
-        want,
-        "spaces inside the brackets of a header"
-    );
-    let before = "repo = \"github.com/x/y\"\n[[repository]]\nrepo = \"github.com/a/web\"\n";
-    assert_eq!(
-        parse(before),
-        "github.com/a/web \n",
-        "keys outside a repository table are not read"
-    );
-    assert_eq!(parse(""), "", "no entry");
+    let api = "[[repository]]\nrepo = \"github.com/b/api\"\npath = \"/data/mirrors/api\"\n";
+    let cases: Vec<(&str, String)> = vec![
+        ("a plain entry", web.into()),
+        (
+            "the entry of the issue",
+            "[[repository]]\nrepo = \"github.com/a/web\"\npath = \"/data/mirrors/web\" # note\n\n\
+             [[repository.peer]]\nrepo = \"github.com/other/x\"\n"
+                .into(),
+        ),
+        (
+            "a peer table",
+            format!("{web}\n[[repository.peer]]\nrepo = \"x\"\npath = \"/p\"\n"),
+        ),
+        (
+            "a resource table",
+            format!("{web}\n[[repository.resource]]\nrepo = \"x\"\npath = \"/r\"\n"),
+        ),
+        (
+            "any other table header",
+            format!("{web}\n[workspace]\nrepo = \"x\"\n\n[[other]]\npath = \"/o\"\n"),
+        ),
+        (
+            "a comment after a value or a header",
+            "# lead\n[[repository]] # entry\nrepo = \"github.com/a/web\" # why\n\
+             path = \"/data/mirrors/web\"   # where\n"
+                .into(),
+        ),
+        (
+            "no spaces around the equals sign",
+            "[[repository]]\nrepo=\"github.com/a/web\"\npath=\"/data/mirrors/web\"\n".into(),
+        ),
+        (
+            "two entries with a peer table between",
+            format!("{web}\n[[repository.peer]]\nrepo = \"x\"\n\n{api}"),
+        ),
+        ("two entries in a row", format!("{web}{api}")),
+        (
+            "spaces inside the brackets of a header",
+            "[[ repository ]]\nrepo = \"github.com/a/web\"\npath = \"/data/mirrors/web\"\n\
+             [[ repository.peer ]]\nrepo = \"x\"\n"
+                .into(),
+        ),
+        (
+            "keys in either order",
+            "[[repository]]\npath = \"/data/mirrors/web\"\nrepo = \"github.com/a/web\"\n".into(),
+        ),
+        (
+            "keys outside a repository table are not read",
+            "repo = \"github.com/x/y\"\n[[repository]]\nrepo = \"github.com/a/web\"\n".into(),
+        ),
+        (
+            "a table between entries and tabs around the header",
+            format!(
+                "{web}\n[workspace]\nname = \"w\"\n\n\t[[\trepository\t]]\t# e\n\
+                     repo = \"github.com/b/api\"\npath = \"/data/mirrors/api\"\n"
+            ),
+        ),
+        (
+            "quoted keys",
+            "[[repository]]\n\"repo\" = \"github.com/a/web\"\n\"path\" = \"/data/mirrors/web\"\n"
+                .into(),
+        ),
+        ("no entry", String::new()),
+    ];
+    for (name, input) in &cases {
+        assert_eq!(parse(input), expected(input), "{name}");
+    }
 }

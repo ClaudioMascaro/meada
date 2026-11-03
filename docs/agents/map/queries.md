@@ -15,6 +15,7 @@ this file, and a change to these modules updates it.
   `Graph`, the walk and the process walk (`Graph::process`, the step list `trace` renders and the
   export carries); `meada-core`'s `trace.rs` closes the chain with its footer.
   `entry.rs`: entry points (spec #31), found when an index is written.
+  `lib.rs`: the crate root, re-exporting the modules the CLI, the MCP server and the tests share.
   `partial.rs`: the partial export a query reads (#396): the contract rows whole, and the code
   rows the query asks for, read through `index`'s filtered readers and kept in `index::export`'s
   order.

@@ -269,9 +269,9 @@ fn the_architecture_map_stays_within_its_budget() {
     );
 }
 
-/// The leads of the map's bullets that link a file in `map/`: what they name before the first `: `.
-/// A bullet with no `: ` has no lead.
-fn module_leads(map: &str) -> Vec<String> {
+/// The map's bullets that link a file in `map/`, as (lead, linked files): the lead is what they name
+/// before the first `: `, the files are the `map/*.md` they link. A bullet with no `: ` has no lead.
+fn module_leads(map: &str) -> Vec<(String, Vec<String>)> {
     let mut bullets: Vec<String> = Vec::new();
     for line in map.lines() {
         if line.starts_with("- ") {
@@ -285,7 +285,12 @@ fn module_leads(map: &str) -> Vec<String> {
     (bullets.iter())
         // A bullet that names an area file points to it with a link into `map/`.
         .filter(|b| b.contains("](map/"))
-        .filter_map(|b| b.split_once(": ").map(|(lead, _)| lead.to_string()))
+        .filter_map(|b| {
+            let (lead, _) = b.split_once(": ")?;
+            let files = b.split("](map/").skip(1);
+            let files = files.map(|r| r.split([')', '#']).next().unwrap().to_string());
+            Some((lead.to_string(), files.collect()))
+        })
         .collect()
 }
 
@@ -298,6 +303,7 @@ fn every_module_has_a_line_in_the_map_naming_its_area_file() {
         .expect("a Console frontend section")];
     let leads = module_leads(modules);
     let mut missing = Vec::new();
+    let mut unnamed = Vec::new();
     for dir in ["src", "meada-core/src"] {
         let mut stems = BTreeSet::new();
         for entry in fs::read_dir(dir).unwrap() {
@@ -307,13 +313,36 @@ fn every_module_has_a_line_in_the_map_naming_its_area_file() {
             }
         }
         for stem in stems {
-            let named = leads.iter().any(|lead| {
+            let mut named = false;
+            for (lead, files) in &leads {
+                let forms = [
+                    format!("`{stem}.rs`"),
+                    format!("`{stem}/`"),
+                    format!("`meada-core/src/{stem}.rs`"),
+                ];
                 // `meada-core` shares file names with the binary's crate: its lines say so.
-                (lead.contains("meada-core") == (dir != "src"))
-                    && (lead.contains(&format!("`{stem}.rs`"))
-                        || lead.contains(&format!("`{stem}/`"))
-                        || lead.contains(&format!("`meada-core/src/{stem}.rs`")))
-            });
+                if (lead.contains("meada-core") != (dir != "src"))
+                    || !forms.iter().any(|f| lead.contains(f.as_str()))
+                {
+                    continue;
+                }
+                named = true;
+                // The linked file holds the module's detail: it names the module as the line does.
+                let written: Vec<String> = (forms.iter())
+                    .filter(|f| lead.contains(f.as_str()))
+                    .map(|f| f.trim_matches('`').to_string())
+                    .collect();
+                for file in files {
+                    match fs::read_to_string(format!("docs/agents/map/{file}")) {
+                        Err(_) => unnamed.push(format!(
+                            "{dir}/{stem}: links map/{file}, which does not exist"
+                        )),
+                        Ok(text) if !written.iter().any(|w| text.contains(w.as_str())) => unnamed
+                            .push(format!("{dir}/{stem}: map/{file} never names {written:?}")),
+                        Ok(_) => {}
+                    }
+                }
+            }
             if !named {
                 missing.push(format!("{dir}/{stem}"));
             }
@@ -323,12 +352,22 @@ fn every_module_has_a_line_in_the_map_naming_its_area_file() {
         missing.is_empty(),
         "modules with no line in the architecture map naming their area file: {missing:?}"
     );
+    assert!(
+        unnamed.is_empty(),
+        "module lines linking an area file that lacks the module: {unnamed:#?}"
+    );
 }
 
 #[test]
 fn a_module_lead_is_what_a_bullet_with_an_area_link_names_before_its_colon() {
     let map = "- `a.rs`: one. [x](map/x.md)\n- `b.rs`: no link\n- `e.rs` no colon [z](map/z.md)\n- `c.rs`, `d/`: two,\n  wrapped. [y](map/y.md)\n";
-    assert_eq!(module_leads(map), vec!["- `a.rs`", "- `c.rs`, `d/`"]);
+    assert_eq!(
+        module_leads(map),
+        vec![
+            ("- `a.rs`".to_string(), vec!["x.md".to_string()]),
+            ("- `c.rs`, `d/`".to_string(), vec!["y.md".to_string()]),
+        ]
+    );
 }
 
 /// `CHANGELOG.md merge=union` (#576): two branches adding a bullet under the same heading merge

@@ -461,6 +461,13 @@ pub struct Resolver<'a> {
     actuals: HashMap<&'a str, Vec<&'a str>>,
 }
 
+#[cfg(test)]
+thread_local! {
+    /// The module candidates `Resolver::module` has looked at on this thread: the work a lookup
+    /// does over a namespace's file list, counted for the cost tests (#595). Test builds only.
+    static CANDIDATES_VISITED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// Whether `inner` is a class nested directly in the class `outer`.
 fn nested_in(inner: Target, outer: Target) -> bool {
     inner.path == outer.path && crate::parent(inner.name) == outer.name
@@ -4269,7 +4276,11 @@ impl<'a> Resolver<'a> {
     fn module(&self, path: &str, specifier: &str) -> Option<&'a str> {
         (self.modules)(path, specifier)
             .iter()
-            .find_map(|candidate| self.files.get_key_value(candidate.as_str()))
+            .find_map(|candidate| {
+                #[cfg(test)]
+                CANDIDATES_VISITED.with(|n| n.set(n.get() + 1));
+                self.files.get_key_value(candidate.as_str())
+            })
             .map(|(path, _)| *path)
     }
 }
@@ -10658,9 +10669,9 @@ mod csharp_tests {
         ))
     }
 
-    /// How long the 10000 unbound calls of a file that imports `P` take when `P` holds `files`
-    /// files: the fastest of three passes, against a loaded runner.
-    fn unbound_calls_against(files: usize) -> std::time::Duration {
+    /// How many module candidates (files of the imported namespace) the 10000 unbound calls of
+    /// a file that imports `P` visit when `P` holds `files` files.
+    fn unbound_calls_against(files: usize) -> usize {
         let calls: String = (0..10_000).map(|i| format!("Missing{i}();\n")).collect();
         let app = format!("using P;\nnamespace Q;\nclass C {{ void F() {{\n{calls}}} }}\n");
         let mut sources: Vec<(String, String)> = (0..files)
@@ -10673,25 +10684,23 @@ mod csharp_tests {
         let sources: Vec<(&str, &str)> = sources.iter().map(|(p, s)| (&**p, &**s)).collect();
         with_resolver(&sources, &[("App/App.csproj", PROJECT)], |resolver| {
             let facts = resolver.files["App/C.cs"];
-            let pass = || {
-                let start = std::time::Instant::now();
-                for call in &facts.calls {
-                    let found = resolver.call("App/C.cs", call);
-                    assert!(matches!(found, Resolution::Unresolved));
-                }
-                start.elapsed()
-            };
-            (0..3).map(|_| pass()).min().unwrap()
+            CANDIDATES_VISITED.with(|n| n.set(0));
+            for call in &facts.calls {
+                let found = resolver.call("App/C.cs", call);
+                assert!(matches!(found, Resolution::Unresolved));
+            }
+            CANDIDATES_VISITED.with(|n| n.get())
         })
     }
 
     #[test]
     fn unbound_calls_cost_the_same_whatever_the_namespaces_they_import_hold() {
+        // A lookup that walks the namespace's file list (it once copied it) visits 4000
+        // candidates per call instead of the first. Counted work does not move under load, as
+        // elapsed time does (#595).
         let (one, many) = (unbound_calls_against(1), unbound_calls_against(4000));
-        // Each lookup copied the namespace's file list, about 0.17 us per file: 4000 files made
-        // a debug build several times slower (50 files, as on bitwarden, only 1.4 times in a
-        // release build, too close to the noise to pin).
-        assert!(many < one * 3 / 2, "{one:?} {many:?}");
+        assert!(one > 0, "the lookups no longer reach `Resolver::module`");
+        assert!(many <= one, "{one} {many}");
     }
 
     /// `resolved` over the project files `configs`.
