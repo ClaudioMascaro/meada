@@ -844,8 +844,9 @@ pub struct Def {
     /// the index (see `Call::args`).
     #[serde(skip)]
     pub returns: Option<Ty>,
-    /// The names of a function's type parameters in order (`get<T>`). Not kept in the index.
-    #[serde(skip)]
+    /// The names of a function's or type's type parameters in order (`get<T>`). Kept in the
+    /// index: Swift's join reads them from every file of its pack, kept or parsed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub type_params: Vec<String>,
     /// The class a function's written return type names (`Self`, `Store`, a trait of `impl
     /// Trait`), as a callee-like name resolved from the function's own scope: what a call to

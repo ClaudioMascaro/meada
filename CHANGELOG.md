@@ -52,6 +52,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A refresh resolves a Swift file as a cold index does: the type parameters of a type or
+  function (`Page<Item>`) are kept in the index, so an `Item()` in an extension of `Page` in
+  another file is no construction of a type named `Item` after an edit to an unrelated Swift file
+  (the stored format changes, so an existing index is rebuilt once) (#609).
 - A Kotlin `private` constructor, primary (`class C private constructor(..)`) or secondary, is
   called only from inside its class: a call from another class no longer resolves to it, one from
   the class, its companion or a nested class stays `exact`. `internal` is still not enforced
