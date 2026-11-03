@@ -52,6 +52,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Rust name two globs give (`use x::*; use y::*;`, which compiles only under `cfg`
+  alternatives) is `ambiguous` between them, not `exact` to the latest glob; an explicit item or
+  `use` beside the globs still wins (#439).
+
 - A Swift parameter written as a name from outside the repository (`Ext.CompletionHandler`, which
   may be an alias of a function type) neither takes nor refuses a trailing closure with certainty:
   a call that fits an overload only through it is `ambiguous` among its overloads (`inferred` when

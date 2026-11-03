@@ -333,6 +333,7 @@ pub struct Resolver<'a> {
     assigned_members: bool,
     guesses_constructs: bool,
     unordered_globs: bool,
+    combines_globs: bool,
     qualified_types: bool,
     /// The pack's `LanguagePack::static_imports_inherit`.
     static_imports_inherit: bool,
@@ -970,6 +971,7 @@ impl<'a> Resolver<'a> {
             assigned_members: language.assigned_members(),
             guesses_constructs: language.guesses_constructs(),
             unordered_globs: language.unordered_globs(),
+            combines_globs: language.combines_globs(),
             qualified_types: language.qualified_types(),
             static_imports_inherit: language.static_imports_inherit(),
             namespaced: language.namespaced(),
@@ -3813,7 +3815,7 @@ impl<'a> Resolver<'a> {
                     | Binding::External(..)
                     | Binding::Module(_)
             ) {
-                match (self.unordered_globs, *inside) {
+                match (self.combines_globs, *inside) {
                     (false, _) => return Some(found),
                     (true, true) if inside_found.is_empty() && self.own_glob(path, target) => {
                         return Some(found);
@@ -8561,6 +8563,11 @@ mod tests {
 
     /// What each call resolves to, by `file scope callee`.
     fn calls(files: &[(&'static str, &str)]) -> BTreeMap<String, String> {
+        calls_with(files, false)
+    }
+
+    /// `calls`, an ambiguous one followed by its candidates when `candidates`.
+    fn calls_with(files: &[(&'static str, &str)], candidates: bool) -> BTreeMap<String, String> {
         let parsed = parsed(files);
         let map: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
         let resolver = resolver(&map);
@@ -8571,6 +8578,13 @@ mod tests {
                     Resolution::Exact(t) => format!("exact {}::{}", t.path, t.name),
                     Resolution::Inferred(t) | Resolution::Narrowed(t) => {
                         format!("inferred {}::{}", t.path, t.name)
+                    }
+                    Resolution::Ambiguous(all) if candidates => {
+                        let all: Vec<_> = all
+                            .iter()
+                            .map(|t| format!("{}::{}", t.path, t.name))
+                            .collect();
+                        format!("ambiguous {}", all.join(" "))
                     }
                     Resolution::Ambiguous(_) => "ambiguous".to_string(),
                     Resolution::Unresolved => "none".to_string(),
@@ -8599,7 +8613,8 @@ mod tests {
     #[test]
     fn a_name_a_glob_reaches_past_the_limit_is_taken_from_no_other_glob() {
         // `x()` in `main.rs`, where the latest glob reaches `x` through `n` modules, each
-        // re-exporting it from the next by a glob or by name, and an earlier glob gives `x` too.
+        // re-exporting it from the next by a glob or by name, and an earlier glob gives `x` too (so
+        // within the limit it is ambiguous, past it nothing is exact).
         let x = |n: usize, by_name: bool| {
             let mut files = vec![("main.rs".to_string(), String::new())];
             let mut main = String::from("mod near;\n");
@@ -8624,7 +8639,8 @@ mod tests {
             calls(&files)["main.rs main x"].clone()
         };
         for by_name in [false, true] {
-            assert_eq!(x(3, by_name), "exact m3.rs::x", "by name: {by_name}");
+            // Rust combines the two globs that give `x`.
+            assert_eq!(x(3, by_name), "ambiguous", "by name: {by_name}");
             let past = x(3 * LINK_DEPTH, by_name);
             assert!(!past.starts_with("exact"), "by name: {by_name}: {past}");
         }
@@ -8836,9 +8852,45 @@ mod tests {
                 "pub struct Def;\nimpl Def { pub fn new() -> Self { Def } }\npub fn free() {}\n",
             ),
         ]);
-        // The latest glob, for both.
-        assert_eq!(found["main.rs m.f Def.new"], "exact y.rs::Def.new");
-        assert_eq!(found["main.rs m.f free"], "exact y.rs::free");
+        // Both globs give the names (only `cfg` alternatives get here): ambiguous.
+        assert!(found["main.rs m.f Def.new"].starts_with("ambiguous"));
+        assert!(found["main.rs m.f free"].starts_with("ambiguous"));
+    }
+
+    #[test]
+    fn two_pub_use_globs_giving_one_name_are_ambiguous_with_both_candidates() {
+        let found = calls_with(
+            &[
+                (
+                    "main.rs",
+                    "mod x;\nmod y;\nmod m { pub use crate::x::*; pub use crate::y::*; }\n\
+                 mod user { use crate::m::*; fn f() { free(); } }\n",
+                ),
+                ("x.rs", "pub fn free() {}\n"),
+                ("y.rs", "pub fn free() {}\n"),
+            ],
+            true,
+        );
+        assert_eq!(
+            found["main.rs user.f free"],
+            "ambiguous x.rs::free y.rs::free"
+        );
+    }
+
+    #[test]
+    fn an_item_or_use_beside_two_globs_still_wins() {
+        let found = calls(&[
+            (
+                "main.rs",
+                "mod x;\nmod y;\nmod m { use crate::x::*; use crate::y::*; use crate::x::free;\n\
+             fn f() { free(); } }\n\
+             mod n { use crate::x::*; use crate::y::*; fn free() {}\nfn f() { free(); } }\n",
+            ),
+            ("x.rs", "pub fn free() {}\n"),
+            ("y.rs", "pub fn free() {}\n"),
+        ]);
+        assert_eq!(found["main.rs m.f free"], "exact x.rs::free");
+        assert_eq!(found["main.rs n.f free"], "exact main.rs::n.free");
     }
 
     #[test]

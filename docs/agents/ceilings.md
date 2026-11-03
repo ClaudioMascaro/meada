@@ -1737,6 +1737,10 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   deep (`package/maven.rs`); a module's parent pom adds nothing to what it passes on, and a
   Gradle dependency passes nothing on.
 
+- Rust globs: a name two `use m::*;` globs give is `ambiguous` between them (#439). Meada does not
+  evaluate `cfg`, so `#[cfg(a)] use x::*; #[cfg(not(a))] use y::*;` reads as two globs and the
+  call stays `ambiguous` though only one compiles.
+
 - A call to `send` inside `exports.send = function () {}` resolves to `exports.send` itself, not to
   a top-level `function send`: the resolver's scope walk reads the symbol `exports.send` as `send`
   in the scope `exports`, as it does `use()` inside `app.use = function use() {}` (#457).

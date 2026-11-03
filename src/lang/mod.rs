@@ -132,6 +132,12 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether the globs giving one name combine into `ambiguous` (Rust: two globs that both
+    /// give a name are E0659, so only `cfg` alternatives reach here). Implied by `unordered_globs`.
+    fn combines_globs(&self) -> bool {
+        self.unordered_globs()
+    }
+
     /// Whether a static import of a type (`import static a.B.*;`) takes the members its bases
     /// declare too. C#'s `using static T` takes only those `T` declares: inherited members
     /// aren't imported.
