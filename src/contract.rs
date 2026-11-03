@@ -3,7 +3,8 @@
 //! HTTP (`http::`), resources (`resource::`, spec #19), channels (`channel::`, spec #20) and
 //! packages (`package::`, spec #22); later kinds plug in behind the same trait.
 
-use std::collections::HashMap;
+use std::cell::Cell;
+use std::collections::{HashMap, HashSet};
 
 use crate::channel::Channel;
 use crate::entry::EntryKind;
@@ -91,6 +92,18 @@ pub enum Site {
     },
     /// The call at this position of the file's `Facts::calls`.
     Call { path: String, index: usize },
+}
+
+impl Site {
+    /// The file the contract sits in.
+    pub fn path(&self) -> &str {
+        match self {
+            Site::Def { path, .. }
+            | Site::Inline { path, .. }
+            | Site::File(path)
+            | Site::Call { path, .. } => path,
+        }
+    }
 }
 
 /// How `search` selects a kind with its `kind` argument.
@@ -437,6 +450,11 @@ pub fn entry(role: Role, contract: &str) -> Option<EntryKind> {
 pub struct Names {
     /// `(path, "@<offset>")` to the segment that replaces it.
     named: HashMap<(String, String), String>,
+    /// The files whose inline definitions these names do not know: a refresh kept their
+    /// contracts without extracting them again (#391).
+    unknown: HashSet<String>,
+    /// Whether an inline definition of an `unknown` file was asked about.
+    missed: Cell<bool>,
 }
 
 impl Names {
@@ -472,8 +490,28 @@ impl Names {
         names
     }
 
+    /// These names, not knowing the inline definitions of `paths`.
+    pub fn without(mut self, paths: HashSet<String>) -> Self {
+        self.unknown = paths;
+        self
+    }
+
+    /// Whether an inline definition of a file these names do not know was asked about: what
+    /// was answered about it may be wrong.
+    pub fn missed(&self) -> bool {
+        self.missed.get()
+    }
+
+    /// Marks `missed` when `name` holds an inline definition of a file not known.
+    fn note(&self, path: &str, name: &str) {
+        if name.contains('@') && self.unknown.contains(path) {
+            self.missed.set(true);
+        }
+    }
+
     /// The name of the definition `name` of `path`; `None` for an inline one that folds.
     pub fn def(&self, path: &str, name: &str) -> Option<String> {
+        self.note(path, name);
         let last = name.rsplit('.').next().unwrap_or(name);
         if last.starts_with('@') && !self.named.contains_key(&(path.into(), last.into())) {
             return None;
@@ -483,6 +521,7 @@ impl Names {
 
     /// A qualified name of `path` with each inline definition in it named or folded away.
     pub fn scope(&self, path: &str, scope: &str) -> String {
+        self.note(path, scope);
         if !scope.contains('@') {
             return scope.to_string();
         }
@@ -676,5 +715,33 @@ mod tests {
         Http.after_links(&mut links, &[]);
         Channel.after_links(&mut links, &[]);
         assert!(links[0].drift.is_none());
+    }
+
+    /// Names that do not know a file's inline definitions say when one was asked about, and
+    /// only then: a name with no inline segment, or a file they know, answers as before.
+    #[test]
+    fn names_without_a_file_mark_a_question_about_its_inline_definitions() {
+        let inline = |path: &str| super::Found {
+            role: super::Role::Provider,
+            site: super::Site::Inline {
+                path: path.into(),
+                def: "app.@40".into(),
+                name: "GET /a".into(),
+            },
+            contract: None,
+            via: None,
+            method: None,
+            fragments: Vec::new(),
+            shape: None,
+        };
+        let names = super::Names::new(&[inline("a.ts")]).without(["b.ts".to_string()].into());
+        assert_eq!(names.scope("a.ts", "app.@40").as_str(), "app.GET /a");
+        assert_eq!(
+            names.def("b.ts", "app.handler").as_deref(),
+            Some("app.handler")
+        );
+        assert!(!names.missed());
+        assert_eq!(names.def("b.ts", "app.@40"), None);
+        assert!(names.missed());
     }
 }

@@ -577,20 +577,40 @@ pub struct Indexed<'a> {
 
 /// Brings the index up to date with the files a language pack handles under `root`: tracked
 /// and untracked, minus what `.gitignore` excludes. Only files whose mtime or size differ
-/// from the index are hashed, and only those whose hash differs are parsed. Every file's
-/// calls are then resolved against the new facts, and a file's symbol and call rows are
+/// from the index are hashed, and only those whose hash differs are parsed. The calls of every
+/// file of a group (the packs that resolve together, `lang::resolver_of`) holding a changed
+/// file are then resolved against the new facts, and a file's symbol and call rows are
 /// rewritten when the file changed or its rows now differ: that covers importers of a changed
 /// file's exports, re-export chains, name inference, config changes and inline route
-/// handlers renamed by a mount elsewhere alike. Contracts are extracted again for the whole
-/// repository, since constants and client wrappers reach across files, over the values of the
-/// files the last extraction read (`valued`), parsed again up front. Deleted files leave
+/// handlers renamed by a mount elsewhere alike. Contracts are extracted again for the whole of
+/// such a group, since constants and client wrappers reach across its files, over the values of
+/// the files the last extraction read (`valued`), parsed again up front. Deleted files leave
 /// the index. The result equals a refresh of an empty index over the same files. Stored facts
 /// that do not parse (a change whose golden was not re-blessed) rebuild the index.
+///
+/// A group nothing of which changed keeps its rows (#391): its contracts, symbols and calls
+/// are neither extracted nor resolved again, and its values are not parsed. That holds while
+/// what its extraction reads beside its own files did not move: the config files and manifests
+/// (`meta.configs`, with the version of Meada), the files of every group and what they export.
+/// A group's extraction reads no other group's files, and each contract it finds sits in one of
+/// its own; an entry point that asks the name of an inline definition of a kept group (which
+/// only its extraction gives) makes the refresh start over without keeping any group.
 ///
 /// Documents (spec #21) are refreshed first, the same way, when `serve` is declared; without
 /// a `[serve]` table the repository has none. They hold no code, so an edited document changes
 /// no code row: `Http::declare` reads them at query time.
 pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Result<()> {
+    refresh_keeping(db, root, identity, serve, true)
+}
+
+/// `refresh`, keeping the rows of the groups nothing changed in when `keep` says so.
+fn refresh_keeping(
+    db: &Connection,
+    root: &Path,
+    identity: &str,
+    serve: &Serve,
+    keep: bool,
+) -> Result<()> {
     let now = SystemTime::now();
     let tx = db.unchecked_transaction()?;
     let known = tx
@@ -784,6 +804,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             restamp.push((path.clone(), facts.usings));
         }
     }
+    let restamped: Vec<String> = restamp.iter().map(|(p, _)| p.clone()).collect();
     for (path, usings) in restamp {
         let stored: String = tx.query_row(
             "SELECT facts FROM files WHERE path = ?1",
@@ -853,6 +874,28 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         )?;
     }
     let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
+    let kept_groups = match keep && known_configs.as_deref() == Some(&digest) {
+        true => unchanged_groups(
+            &tx,
+            &stored,
+            &groups,
+            &exported,
+            |path| {
+                let pack = packs.get(path).copied().or_else(|| lang::pack_for(path));
+                pack.map(lang::resolver_of)
+            },
+            changed_paths
+                .iter()
+                .map(String::as_str)
+                .chain(deleted.iter().map(|p| p.as_str()))
+                .chain(restamped.iter().map(String::as_str)),
+        )?,
+        false => BTreeSet::new(),
+    };
+    // The files of the kept groups: their rows stay as they are.
+    let kept_files: HashSet<&str> = (kept_groups.iter())
+        .flat_map(|g| groups[g].keys().copied())
+        .collect();
     let pack_configs: Vec<(&str, &[u8])> = (configs.values().flatten())
         .map(|(path, src)| (*path, src.as_slice()))
         .collect();
@@ -864,11 +907,11 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         configs: &pack_configs,
     };
 
-    // Contracts, from every file. Values are not kept in the index, so the files whose
-    // values a kind reads are parsed again: up front those the last extraction read (`valued`),
-    // then those a kind misses, until no kind misses one. A kind only looks files up, so a file
-    // parsed for nothing changes no contract.
-    // ponytail: every contract is extracted again on any change, since a kind reads the whole
+    // Contracts, from every file of the groups not kept. Values are not kept in the index, so
+    // the files whose values a kind reads are parsed again: up front those the last extraction
+    // read (`valued`), then those a kind misses, until no kind misses one. A kind only looks
+    // files up, so a file parsed for nothing changes no contract.
+    // ponytail: a group holding a changed file is extracted whole, since a kind reads the whole
     // pack at once (mounts across files, budgets spent in walk order); narrowing it per file
     // needs each kind to say what its contracts read (#391).
     let reparse = |path: &str| -> Result<Facts> {
@@ -888,7 +931,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         .collect::<rusqlite::Result<BTreeSet<String>>>()?;
     let mut reparsed: BTreeMap<String, Facts> = BTreeMap::new();
     for path in &valued {
-        if packs.contains_key(path.as_str()) {
+        if packs.contains_key(path.as_str()) && !kept_files.contains(path.as_str()) {
             reparsed.insert(path.clone(), reparse(path)?);
         }
     }
@@ -903,7 +946,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             .collect();
         let mut misses = Vec::new();
         for (&pack, resolver) in &resolvers {
-            if done.contains_key(&pack) {
+            if done.contains_key(&pack) || kept_groups.contains(&pack) {
                 continue;
             }
             let code = Code::new(resolver, &full, lang::pack(pack));
@@ -911,6 +954,19 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             for kind in contract::KINDS {
                 found.extend(kind.extract(&code, &indexed));
             }
+            // What keeping a group rests on: its extraction reads its own files alone, and
+            // finds contracts in them alone.
+            debug_assert!(
+                (code.read().into_iter().chain(code.misses()))
+                    .all(|p| groups[&pack].contains_key(p)),
+                "a group's extraction read another group's file"
+            );
+            debug_assert!(
+                found
+                    .iter()
+                    .all(|f| groups[&pack].contains_key(f.site.path())),
+                "a group's contract sits in another group's file"
+            );
             match code.misses() {
                 missed if missed.is_empty() => {
                     read.extend(code.read().into_iter().map(String::from));
@@ -930,6 +986,9 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
             reparsed.insert(path, facts);
         }
     };
+    // A kept group read what it read last time.
+    let in_kept = |path: &&String| kept_files.contains(path.as_str());
+    read.extend(valued.iter().filter(in_kept).cloned());
     if read != valued {
         tx.execute("DELETE FROM valued", [])?;
         for path in &read {
@@ -938,15 +997,19 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
     }
     // The values are not needed past the extraction.
     drop(reparsed);
-    let names = Names::new(&found);
+    let unknown = kept_files.iter().map(|p| p.to_string()).collect();
+    let names = Names::new(&found).without(unknown);
 
-    // ponytail: every file's calls are resolved again on any change, in memory; only the
-    // rows that differ are written. A reverse-import graph can narrow the set if resolution
-    // shows up in profiles.
-    // The symbols and the targets of every call, for the entry points.
-    let mut symbols: HashSet<String> = HashSet::new();
-    let mut called: HashSet<String> = HashSet::new();
-    let mut order: Vec<(&&str, &&Facts)> = all.iter().collect();
+    // The calls of every file of the groups not kept are resolved again, in memory; only the
+    // rows that differ are written. A kept group resolves among its own files, which did not
+    // change, under names its own contracts give, which did not either.
+    // ponytail: a group holding a changed file resolves whole; a reverse-import graph can narrow
+    // it if resolution shows up in profiles.
+    // The symbols and the targets of every call, for the entry points; a kept file's, as stored.
+    let (mut symbols, mut called) = stored_reach(&tx, &kept_files)?;
+    let mut order: Vec<(&&str, &&Facts)> = (all.iter())
+        .filter(|(path, _)| !kept_files.contains(**path))
+        .collect();
     if REVERSED_WALK.get() {
         order.reverse();
     }
@@ -1004,13 +1067,41 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         )?;
     }
 
-    tx.execute("DELETE FROM contracts", [])?;
+    // A kept file keeps its contracts, which give its doors as a cold index would.
+    let mut providers: Vec<entry::Side> = Vec::new();
+    let mut consumers: Vec<entry::Side> = Vec::new();
+    let stored_contracts: Vec<(String, String, Option<String>, String)> = tx
+        .prepare("SELECT path, role, contract, site FROM contracts")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    let mut dropped: BTreeSet<&str> = BTreeSet::new();
+    for (path, role, contract, site) in &stored_contracts {
+        if !kept_files.contains(path.as_str()) {
+            dropped.insert(path);
+            continue;
+        }
+        let side = |contract: &String| entry::Side {
+            site: site.clone(),
+            contract: contract.clone(),
+        };
+        match (role.as_str(), contract) {
+            ("provider", Some(contract)) => providers.push(side(contract)),
+            ("consumer", Some(contract)) => consumers.push(side(contract)),
+            _ => {}
+        }
+    }
+    match kept_files.is_empty() {
+        true => tx.execute("DELETE FROM contracts", []).map(|_| ())?,
+        false => {
+            for path in dropped {
+                tx.execute("DELETE FROM contracts WHERE path = ?1", params![path])?;
+            }
+        }
+    }
     let mut calls: HashMap<&str, Vec<(String, String)>> = HashMap::new();
     // One row per side; the shapes of the Founds of one side (a site reached through several
     // wrapper paths) merge into it.
     let mut rows: BTreeMap<_, Option<Shape>> = BTreeMap::new();
-    let mut providers: Vec<entry::Side> = Vec::new();
-    let mut consumers: Vec<entry::Side> = Vec::new();
     for f in &found {
         let (path, site) = match &f.site {
             // An inline definition no kind names folds into the one enclosing it, or into the
@@ -1111,8 +1202,15 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         consumers: &consumers,
         programs: &programs,
     };
+    let doors = entry::find(&local);
+    if names.missed() {
+        // An entry point asked the name of an inline definition of a kept file: only its
+        // group's extraction knows it, so start over without keeping any group.
+        drop(tx);
+        return refresh_keeping(db, root, identity, serve, false);
+    }
     tx.execute("DELETE FROM entry_points", [])?;
-    for e in entry::find(&local) {
+    for e in doors {
         tx.execute(
             "INSERT INTO entry_points VALUES (?1, ?2, ?3, ?4)",
             params![e.identity, e.kind.name(), e.label, e.site],
@@ -1221,12 +1319,90 @@ fn packs_of<'a>(root: &Path, all: &'a [(String, PathBuf)]) -> Packs<'a> {
     }
 }
 
-/// `meta.configs`: the config files' digest with the stored manifests folded in.
+/// `meta.configs`: the config files' digest with the stored manifests folded in, and the
+/// version of Meada, whose kinds a refresh trusts to keep a group's rows (`refresh`).
 fn configs_digest(mut digest: blake3::Hasher, manifest_rows: &[(String, String)]) -> String {
     for (path, summary) in manifest_rows {
         digest.update(format!("{path}\0{summary}\0").as_bytes());
     }
+    digest.update(env!("CARGO_PKG_VERSION").as_bytes());
     digest.finalize().to_hex().to_string()
+}
+
+/// The groups (`lang::resolver_of`) whose rows a refresh keeps: none when the files of the
+/// groups or what they export moved since the last refresh (each group's extraction reads
+/// them), else every group no `touched` path (changed, deleted, or stamped by a join) is of.
+fn unchanged_groups<'p>(
+    db: &Connection,
+    stored: &HashMap<String, Stored>,
+    groups: &BTreeMap<usize, BTreeMap<&str, &Facts>>,
+    exported: &[Exported],
+    group_of: impl Fn(&str) -> Option<usize>,
+    touched: impl Iterator<Item = &'p str>,
+) -> Result<BTreeSet<usize>> {
+    let before = (stored.iter()).filter(|(_, s)| !s.resolved.is_empty());
+    let before: BTreeSet<&str> = before.map(|(path, _)| path.as_str()).collect();
+    let now: BTreeSet<&str> = groups.values().flat_map(|f| f.keys().copied()).collect();
+    if before != now {
+        return Ok(BTreeSet::new());
+    }
+    let mut statement =
+        db.prepare("SELECT path, name, file, target FROM exports ORDER BY rowid")?;
+    let rows = statement.query_map([], |r| {
+        Ok(Exported {
+            path: r.get(0)?,
+            name: r.get(1)?,
+            file: r.get(2)?,
+            target: r.get(3)?,
+        })
+    })?;
+    let stored_exports = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+    if stored_exports != exported {
+        return Ok(BTreeSet::new());
+    }
+    let touched: BTreeSet<usize> = touched.filter_map(group_of).collect();
+    Ok(groups
+        .keys()
+        .copied()
+        .filter(|g| !touched.contains(g))
+        .collect())
+}
+
+/// The symbols of the files `kept`, and what their calls reach but the caller itself (a self-call
+/// is no caller), as stored.
+fn stored_reach(
+    db: &Connection,
+    kept: &HashSet<&str>,
+) -> Result<(HashSet<String>, HashSet<String>)> {
+    let (mut symbols, mut called) = (HashSet::new(), HashSet::new());
+    if kept.is_empty() {
+        return Ok((symbols, called));
+    }
+    let mut statement = db.prepare("SELECT path, id FROM symbols")?;
+    let rows = statement.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get(1)?)))?;
+    for row in rows {
+        let (path, id) = row?;
+        if kept.contains(path.as_str()) {
+            symbols.insert(id);
+        }
+    }
+    for query in [
+        "SELECT path, caller, target FROM calls WHERE target IS NOT NULL",
+        "SELECT calls.path, calls.caller, candidates.target FROM candidates \
+         JOIN calls ON calls.id = candidates.call",
+    ] {
+        let mut statement = db.prepare(query)?;
+        let rows = statement.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get(2)?))
+        })?;
+        for row in rows {
+            let (path, caller, target): (String, String, String) = row?;
+            if kept.contains(path.as_str()) && caller != target {
+                called.insert(target);
+            }
+        }
+    }
+    Ok((symbols, called))
 }
 
 /// Whether `refresh` would find nothing to change in the index `db` holds for the checkout at

@@ -119,6 +119,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- A refresh keeps the rows of each group of language packs that resolve together (TypeScript and
+  JavaScript, Rust, Python, ...) when no file of the group changed and the config files,
+  manifests, file list and exports did not move: its contracts are not extracted again, its calls
+  are not resolved again and its files are not parsed again for their values. A one-line edit of
+  a Rust file of this repository refreshes in 3.3 s where it took 3.9 s (release build, median of
+  five); the export stays byte-identical to a cold one. A change of Meada's version re-extracts
+  every group once (#391).
 - The console no longer creates the default account `admin` with a published password: without
   `admin_password_env` or `admin_password_file`, the start that creates it generates the first
   password, stores it with a change required, and prints it once on stderr (`accounts: default

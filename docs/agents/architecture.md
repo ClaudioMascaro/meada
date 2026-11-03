@@ -435,6 +435,10 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   of the `symbols`, `calls` and `candidates` rows, and the chain's export must stay
   byte-identical. The in-memory order is normalized by path (`BTreeMap`s), so the switch covers
   nothing beyond that. Indexing runs on one thread, so there is no worker count to vary.
+  A refresh keeps the rows of a group of packs that resolve together when nothing it reads
+  moved (#391): that rests on a group's extraction reading only its own files and finding
+  contracts only in them, which `refresh` checks with debug assertions
+  ([map/indexing.md](map/indexing.md)).
 - The schema version (`index::schema_version`) is derived from `tests/golden/schema.txt`, the
   stored format: `SCHEMA`, the facts of each pack's `tests/fixtures/schema/sample.<extension>`
   and the summaries of the document and manifest samples there. A unit test in `index.rs`

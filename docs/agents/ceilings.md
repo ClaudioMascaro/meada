@@ -420,10 +420,18 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   indexed lookups and takes longer than a whole read did (no marker).
 - `engine.rs`: `search` scans every symbol. Kind `duplicate` folds no nested groups (a duplicated
   class and each of its methods are groups of their own) and has no minimum span size (#254).
-- `index.rs`: every contract is extracted again and every call resolved again on any change
-  (rows rewritten only when they differ), and every file whose values the last extraction read
-  (`valued`) is parsed again for it: on this repository, a one-line edit of a Rust file parses
-  about 530 files again (#391). An unreadable `contracts.fragments` value is read as
+- `index.rs`: a refresh keeps the rows of a group of packs that resolve together only while no
+  file of it changed and nothing every group reads moved (config files and manifests, Meada's
+  version, the file list, the exports of every group): a file added or deleted anywhere, or an
+  edit that changes what a file exports, extracts and resolves every group again. A group holding
+  a changed file is extracted and resolved whole, and every file of it whose values the last
+  extraction read (`valued`) is parsed again: on this repository, a one-line edit of a Rust file
+  parses the 220 Rust files of the crate's module trees again (2.0 s of a 3.3 s refresh), since
+  the actix-web and Rocket reader reads every call's values (`Web::read`, under one `ITEM_WORK`
+  budget spent in walk order) and every file's mentions (`Web::mentioned`). Narrowing a group per
+  file needs each kind to say what its contracts read (#391). A dev build that changes a kind
+  without changing the version keeps the rows an older build gave the groups it does not touch.
+  An unreadable `contracts.fragments` value is read as
   no fragments, since only `refresh` writes it. A manifest or pack config file (`package.json`,
   `pyproject.toml`, `requirements*.txt`, `Cargo.toml`, `go.mod`, `tsconfig.json`, `jsconfig.json`) is read up to one
   byte past `lang::MAX_BYTES`, and a provider document up to one byte past
