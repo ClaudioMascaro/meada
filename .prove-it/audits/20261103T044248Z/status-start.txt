@@ -1,0 +1,3 @@
+HEAD 392e09c75333aefd73d1e13fb6bdfa005376b496
+branch audit/prove-meada-cli-mcp
+status --porcelain:

@@ -1,0 +1,20 @@
+== base search {"query":"kind","budget":1}
+{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"… cut after 0 of 104 lines (budget 1 tokens); raise budget for more\n"}],"isError":false}}
+== base search {"query":"kind","kind":"nonsense"}
+{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"`kind` takes `symbol`, `contract`, `route`, `resource`, `channel`, `document`, `package`, `drift`, `community`, `process`, `duplicate`, `ambiguous` or `unresolved`, not `nonsense`"}],"isError":true}}
+== base trace {"from":"zz_prove_missing"}
+{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"no symbol, route or call site matches `zz_prove_missing`\n"}],"isError":false}}
+== base trace {"from":"x","direction":"sideways"}
+{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"`direction` takes `down` or `up`, not `sideways`"}],"isError":true}}
+== base context {}
+{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"failed to deserialize parameters: missing field `symbol`"}],"isError":true}}
+== head search {"query":"kind","budget":1}
+{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"… cut after 0 of 104 lines (budget 1 tokens); raise budget for more\n"}],"isError":false}}
+== head search {"query":"kind","kind":"nonsense"}
+{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"`kind` takes `symbol`, `contract`, `route`, `resource`, `channel`, `document`, `package`, `drift`, `community`, `process`, `duplicate`, `ambiguous` or `unresolved`, not `nonsense`"}],"isError":true}}
+== head trace {"from":"zz_prove_missing"}
+{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"no symbol, route or call site matches `zz_prove_missing`\n"}],"isError":false}}
+== head trace {"from":"x","direction":"sideways"}
+{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"`direction` takes `down` or `up`, not `sideways`"}],"isError":true}}
+== head context {}
+{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"failed to deserialize parameters: missing field `symbol`"}],"isError":true}}

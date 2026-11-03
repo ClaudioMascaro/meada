@@ -1,0 +1,6 @@
+{"tool": "search", "arguments": {"query": "kind", "budget": 1}}
+{"tool": "search", "arguments": {"query": "kind", "kind": "zz_nokind"}}
+{"tool": "trace", "arguments": {"from": "github.com/claudiomascaro/meada::src/trace.rs::Walk.push", "budget": 1, "direction": "up"}}
+{"tool": "trace", "arguments": {"from": "zz_prove_missing", "direction": "sideways"}}
+{"tool": "context", "arguments": {"symbol": "github.com/claudiomascaro/meada::src/trace.rs::Walk.push", "budget": 1}}
+{"tool": "nosuchtool", "arguments": {}}
