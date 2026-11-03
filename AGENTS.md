@@ -97,4 +97,5 @@ The `mattpocock/skills` set and the prove-it trio of `ray-amjad/skills` live in 
 `path` in the upstream repository, `upstreamTree` and `tree`; the upstream is the skill's own
 `upstream` (`repo`, `commit`) or, without one, the top-level `upstream`. A skill whose `tree`
 differs from `upstreamTree` carries a local adjustment. After staging an edit to a skill, set its
-`tree` to `git rev-parse $(git write-tree):.agents/skills/<name>`.
+`tree` to `git rev-parse $(git write-tree):.agents/skills/<name>`. The plugins that ship the same
+skills stay disabled in `.claude/settings.json`, so a session lists each skill once.
