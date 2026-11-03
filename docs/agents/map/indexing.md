@@ -207,7 +207,7 @@ from ...", with the whole list. A value the index now stores joins it.
   the files whose values the last extraction read (the `valued` table, `Code::read`) before its
   first pass, then each file a kind misses (`Code::misses`) until none does; a pack that missed
   nothing in a pass is done and is not extracted again (#391). A group of packs that resolve
-  together (`lang::resolver_of`) none of whose files changed, deleted or was stamped by a join is
+  together (`lang::resolver_of`) none of whose files was changed, deleted or stamped by a join is
   kept when `meta.configs` (which folds Meada's version in), the member files and the stored
   `exports` match what this refresh found (`unchanged_groups`): its files are neither re-parsed
   for values, extracted nor resolved, its `contracts`, `symbols` and `calls` rows stay, and the

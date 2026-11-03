@@ -2416,3 +2416,22 @@ fn a_refresh_keeps_untouched_groups_and_follows_edits_across_files_like_a_cold_i
         );
     }
 }
+
+/// A refresh does not read a kept group's files again (#391): the Python job's file, rewritten
+/// under its old stamp with a host of the same length, still gives its old consumer after an
+/// edit of the TypeScript group, since its values are not parsed again.
+#[test]
+fn a_refresh_does_not_parse_a_kept_group_again() {
+    let repo = catalog("fresh_kept_unread");
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    engine.export().unwrap();
+    replace(&repo, "jobs/report.py", "billing", "bulling");
+    age(&repo);
+    answer_one(&repo);
+
+    let refreshed = engine.export().unwrap();
+
+    assert!(refreshed.contains("billing.example.com"), "{refreshed}");
+    assert!(!refreshed.contains("bulling"), "{refreshed}");
+}

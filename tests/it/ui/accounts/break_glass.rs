@@ -189,13 +189,13 @@ impl BreakGlass {
 
 /// The demo: with the identity provider's tokens still admitted, the default account signs in
 /// with the first password the console generated, changes its password and is the global
-/// operator, reaching a pointer recovery;
-/// a colleague's local account, and every other username, gets the wrong password's 401, recorded
-/// `not_break_glass`. Account administration, agent tokens and login verification answer 404. A
-/// bearer reaches one verifier by its issuer: a token of the console's issuer signed by the
-/// identity provider, one of the identity provider's issuer signed by the console's key, a
-/// colleague's session token from before the switch and a token for another surface are all
-/// 401s, and an identity provider's session gets the password change's 404. With the identity
+/// operator, reaching a pointer recovery; a colleague's local account, and every other username,
+/// gets the wrong password's 401, recorded `not_break_glass`. Account administration, agent
+/// tokens and login verification answer 404. A bearer reaches one verifier by its issuer: a token
+/// of the console's issuer signed by the identity provider, one of the identity provider's issuer
+/// signed by the console's key, a colleague's session token from before the switch and a token
+/// for another surface are all 401s, and an identity provider's session gets the password
+/// change's 404. With the identity
 /// provider's keys unreachable, the default account still signs in. No answer, record or stderr
 /// line holds a password, a hash or a token.
 #[test]

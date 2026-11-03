@@ -431,6 +431,8 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   budget spent in walk order) and every file's mentions (`Web::mentioned`). Narrowing a group per
   file needs each kind to say what its contracts read (#391). A dev build that changes a kind
   without changing the version keeps the rows an older build gave the groups it does not touch.
+  An entry point that asks the name of an inline definition of a kept file makes the refresh
+  roll back and run again keeping no group, a second full pass.
   An unreadable `contracts.fragments` value is read as
   no fragments, since only `refresh` writes it. A manifest or pack config file (`package.json`,
   `pyproject.toml`, `requirements*.txt`, `Cargo.toml`, `go.mod`, `tsconfig.json`, `jsconfig.json`) is read up to one

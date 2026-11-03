@@ -84,7 +84,8 @@ fn section() -> String {
 
 /// The first password `console` generated, read from its one line right after the listening
 /// line: 24 characters of the generator's alphabet, the shape `accounts::generated` gives only
-/// once the policy takes it.
+/// once the policy takes it. The prefix, length and alphabet are copied, not imported: they pin
+/// what a deployer greps for and reads, and the crate's `accounts` module is private.
 fn first_password(console: &mut Server) -> String {
     let line = console.next_line();
     let password = (line.strip_prefix(FIRST)).unwrap_or_else(|| panic!("{line:?}"));
@@ -402,9 +403,9 @@ fn assert_leaks_nothing(
 /// The tracer bullet: the console with no password set generates the default account's first
 /// password and shows it on one stderr line, never again; the account signs in with it, its token
 /// opens only the password change; after the change, a fresh token is the global operator's
-/// session, and a viewer seeded beside it reads and cannot write. Every sign-in, refusal and change leaves a
-/// record the audit page lists, and no answer, record or stderr line holds a password, a hash or
-/// a token; no answer sets a cookie or a CORS header.
+/// session, and a viewer seeded beside it reads and cannot write. Every sign-in, refusal and
+/// change leaves a record the audit page lists, and no answer, record or stderr line holds a
+/// password, a hash or a token; no answer sets a cookie or a CORS header.
 #[test]
 fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator() {
     let Some(local) = local("accounts_flow", &[]) else {
