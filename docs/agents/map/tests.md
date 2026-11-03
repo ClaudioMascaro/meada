@@ -534,9 +534,13 @@ all repository fixtures; it contains no private corpus data. Existing tests own 
   through `toolkit`. Goldens `pkg-{pyweb,pylib}.export.json`, `pkg-pylib.context-greet.txt`,
   `pkg-pylib.search-package.txt` (the PyPI and the npm `shared-lib` apart) and
   `pkg-pyweb.trace-down.txt`; the freshness test edits both repositories' `pyproject.toml`, the
-  root `requirements.txt` and adds `worker/requirements.txt`. Unit tests in `package/pypi.rs`
-  (PEP 503 names, requirement lines and continuations, both readers, the limits) and
-  `lang/python/pyproject.rs`.
+  root `requirements.txt` and adds `worker/requirements.txt`. The fixture `pkg-uv-sources` (#533)
+  holds two `bird-feeder` packages under two uv workspace roots and consumers that choose with
+  `workspace = true` and `path`, each `exact` to its own, and one with no source, `ambiguous` to
+  both (golden `pkg-uv-sources.export.json`); with the peer `pkg-uv-feeder`, a `git` source keeps
+  the repository of its URL and a `url` or `index` source links nothing. Unit tests in `package/pypi.rs`
+  (PEP 503 names, requirement lines and continuations, both readers, the limits, uv sources,
+  workspace members and `inherit`) and `lang/python/pyproject.rs`.
 - `tests/it/cargo.rs` (spec #30): the Cargo fixtures `cargo-lib` and `cargo-web` as siblings
   (`web` names `lib` as its peer). `lib` is a workspace of `shared-core` (`pub use text::{greet,
   shout}` of a private module, `pub mod api` with `Client::create`), `shared-extras` and

@@ -164,6 +164,8 @@ Calls to imported functions cross into provider code through `exports`, `types`,
 
 Each `pyproject.toml` with a name under `[project]` or `[tool.poetry]` produces `package::pypi::<name>`, normalized by PEP 503. Dependencies in `[project] dependencies`, `[tool.poetry.dependencies]` and `requirements*.txt` link to workspace packages. Ranges stay as written, with `range unchecked`: PyPI ranges are not checked.
 
+A uv project's `[tool.uv.sources]` picks the package a `[project] dependencies` entry installs, as Cargo's sources do: `{ workspace = true }` the member of the consumer's uv workspace (the nearest `pyproject.toml` at or above it with `[tool.uv.workspace]` whose `members` globs, less `exclude`, hold it), `{ path = "..." }` the package in that directory, and `{ git = "..." }` the workspace repository of that URL, each at `exact`, for the entry and for the calls through its imports. The other packages of the name get no link. A `url` or `index` source stays out. A list of sources (one per marker), and a workspace source whose root or single member of the name is not found, keep the rule above.
+
 An import reaches provider code as `exact` when its module matches the distribution name, `inferred` for one of its top-level modules and `ambiguous` when several distributions expose it. Same-named npm and PyPI packages do not link.
 
 ## Rust packages

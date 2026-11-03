@@ -12,15 +12,18 @@
 //! module lookup (`module`) and the console scripts (`programs`) are its own rules.
 
 use std::collections::HashSet;
+use std::path::Path;
 
 use super::{
     Ecosystem, Entry, How, MAX_BYTES, MAX_NAME, Manifest, Provided, Providers, Resolution,
-    Resolved, Summary, bare_directory, directory, holding, npm::split, owner,
+    Resolved, Summary, bare_directory, directory, holding, npm::split, owner, pattern_fits,
+    sourced,
 };
 use crate::contract::Level;
 use crate::index::Export;
 use crate::lang::python;
-use crate::lang::python::pyproject::{Pyproject, Requirement};
+use crate::lang::python::pyproject::{Pyproject, Requirement, UvSource};
+use crate::repo::{normalize_remote, relative};
 
 /// The dependency fields, as entries and consumer sites name them.
 pub const PROJECT: &str = "project.dependencies";
@@ -100,10 +103,12 @@ fn entries(field: &str, found: impl Iterator<Item = (String, Option<String>)>) -
     entries
 }
 
-/// Reads a `pyproject.toml`. Hostile input, as for a `package.json`: a file over `MAX_BYTES`,
-/// not UTF-8 or not TOML reads as empty; a name that is not a valid distribution name makes no
-/// provider, and a dependency that is not a valid requirement is left out.
-pub fn read_pyproject(src: &[u8]) -> Summary {
+/// Reads the `pyproject.toml` in the directory `dir` (empty at the root). Hostile input, as for
+/// a `package.json`: a file over `MAX_BYTES`, not UTF-8 or not TOML reads as empty; a name that
+/// is not a valid distribution name makes no provider, and a dependency that is not a valid
+/// requirement is left out. A `[project] dependencies` entry takes its `[tool.uv.sources]` source
+/// (`uv_source`).
+pub fn read_pyproject(dir: &str, src: &[u8]) -> Summary {
     let Some(p) = (src.len() <= MAX_BYTES)
         .then(|| Pyproject::parse(src).ok())
         .flatten()
@@ -120,6 +125,13 @@ pub fn read_pyproject(src: &[u8]) -> Summary {
         }
     }
     let mut dependencies = entries(PROJECT, pep621.into_iter());
+    let sources = p.uv_sources();
+    for e in &mut dependencies {
+        let source = (sources.iter()).find(|(key, _)| normalize(key).as_ref() == Some(&e.name));
+        if let Some((_, source)) = source {
+            uv_source(dir, source, e);
+        }
+    }
     dependencies.extend(entries(POETRY, poetry.into_iter()));
     Summary {
         name: p.name().and_then(normalize),
@@ -127,8 +139,83 @@ pub fn read_pyproject(src: &[u8]) -> Summary {
         dependencies,
         roots: p.roots(),
         scripts: p.scripts(),
+        uv_workspace: p.uv_workspace(),
         ..Summary::default()
     }
+}
+
+/// Gives `entry`, of a `pyproject.toml` in `dir`, what its uv `source` says, as Cargo's sources
+/// do (`sourced`): `path <manifest>` for a path (the `pyproject.toml` there, folded from `dir`),
+/// `git <identity>` for a git URL, `outside` for a URL, an index or a path that cannot be read
+/// (absolute), and `inherits` for `workspace = true` until `Pypi::inherit` names the member.
+fn uv_source(dir: &str, source: &UvSource, entry: &mut Entry) {
+    entry.via = match source {
+        UvSource::Workspace => {
+            entry.inherits = true;
+            None
+        }
+        UvSource::Path(path) => Some(match relative(dir, path).as_deref() {
+            Some("") => "path pyproject.toml".to_string(),
+            Some(at) => format!("path {at}/pyproject.toml"),
+            None => "outside".to_string(),
+        }),
+        UvSource::Git(url) => Some(format!("git {}", normalize_remote(url))),
+        UvSource::Outside => Some("outside".to_string()),
+    };
+}
+
+/// The `members` and `exclude` globs of a uv workspace (`Summary::uv_workspace`).
+type Globs = (Vec<String>, Vec<String>);
+
+/// Whether the directory `dir` is a member of the uv workspace whose root is `root` (each a
+/// repository path, empty at the root) and whose `members` and `exclude` globs are `globs`: the
+/// root itself, or a directory one of `members` fits and none of `exclude` does (`glob`).
+fn member(root: &str, (members, exclude): &Globs, dir: &str) -> bool {
+    let rel = match root {
+        "" => dir,
+        root if dir == root => "",
+        root => match dir.strip_prefix(root).and_then(|r| r.strip_prefix('/')) {
+            Some(rel) => rel,
+            None => return false,
+        },
+    };
+    let fits = |globs: &[String]| (globs.iter()).any(|g| glob(g, rel));
+    rel.is_empty() || (fits(members) && !fits(exclude))
+}
+
+/// The most parts (`/`-separated) a uv workspace glob is read with; a longer one fits nothing.
+// ponytail: real `members` globs have a few parts; this bounds the match over a hostile one.
+const MAX_GLOB_PARTS: usize = 64;
+
+/// Whether the glob `pattern`, relative and `/`-separated, fits the relative path `path`: `**`
+/// is any number of directories, and `*` in a part any run of characters within it. Matched
+/// part by part without recursion, each pair of parts once, so a hostile glob stays bounded.
+// shortcut: `?` and `[...]` are matched literally; read them when a real workspace uses one.
+fn glob(pattern: &str, path: &str) -> bool {
+    let (Some(pattern), Some(path)) = (relative("", pattern), relative("", path)) else {
+        return false;
+    };
+    let parts = |s: &'_ str| -> Vec<String> {
+        (s.split('/').filter(|p| !p.is_empty()).map(String::from)).collect()
+    };
+    let (pattern, path) = (parts(&pattern), parts(&path));
+    if pattern.len() > MAX_GLOB_PARTS {
+        return false;
+    }
+    // `fits[j]`: the pattern's parts so far fit the first `j` parts of the path.
+    let mut fits = vec![false; path.len() + 1];
+    fits[0] = true;
+    for part in &pattern {
+        let mut next = vec![false; path.len() + 1];
+        for j in 0..=path.len() {
+            next[j] = match part.as_str() {
+                "**" => fits[j] || (j > 0 && next[j - 1]),
+                part => j > 0 && fits[j - 1] && pattern_fits(part, &path[j - 1]),
+            };
+        }
+        fits = next;
+    }
+    fits[path.len()]
 }
 
 /// Reads a `requirements*.txt` line by line, a line ending in `\` joined to the next as pip does:
@@ -236,7 +323,7 @@ impl Ecosystem for Pypi {
 
     fn read(&self, path: &str, src: &[u8]) -> Summary {
         match path.ends_with("pyproject.toml") {
-            true => read_pyproject(src),
+            true => read_pyproject(bare_directory(path), src),
             false => read_requirements(src),
         }
     }
@@ -264,6 +351,58 @@ impl Ecosystem for Pypi {
             .filter(|e| seen.insert(e.name.as_str()))
             .map(|e| (e, specifier.to_string()))
             .collect()
+    }
+
+    /// A uv source (`uv_source`) keeps the provider it names, as Cargo's does (`sourced`).
+    fn reaches(
+        &self,
+        (via, _): (Option<&str>, Option<&str>),
+        from: (&str, &Path),
+        to: ((&str, &Path), &str),
+    ) -> bool {
+        sourced(via, from, to)
+    }
+
+    /// Names the member of the consumer's uv workspace that a `workspace = true` entry of a
+    /// `pyproject.toml` takes, as `path <manifest>`: the workspace's root is the nearest
+    /// `pyproject.toml` with `[tool.uv.workspace]`, at or above the consumer, whose members hold
+    /// it (`member`), and the member the one `pyproject.toml` of the entry's name among them.
+    /// When there is no such root, or no single such member, the entry keeps no source.
+    fn inherit(&self, manifests: &mut [Manifest]) {
+        let pyproject = |m: &Manifest| self.owns(m);
+        let roots: Vec<(&str, &Globs)> = (manifests.iter())
+            .filter(|m| pyproject(m))
+            .filter_map(|m| Some((bare_directory(&m.path), m.summary.uv_workspace.as_ref()?)))
+            .collect();
+        let named: Vec<(&str, &str)> = (manifests.iter())
+            .filter(|m| pyproject(m))
+            .filter_map(|m| Some((m.path.as_str(), m.summary.name.as_deref()?)))
+            .collect();
+        let mut found = Vec::new();
+        for (i, m) in manifests.iter().enumerate().filter(|(_, m)| pyproject(m)) {
+            let dir = bare_directory(&m.path);
+            let root = (roots.iter())
+                .filter(|(root, globs)| member(root, globs, dir))
+                .max_by_key(|(root, _)| if root.is_empty() { 0 } else { root.len() + 1 });
+            for (j, e) in m.summary.dependencies.iter().enumerate() {
+                if !e.inherits {
+                    continue;
+                }
+                let via = root.and_then(|(root, globs)| {
+                    let mut of = (named.iter()).filter(|(path, name)| {
+                        *name == e.name && member(root, globs, bare_directory(path))
+                    });
+                    let (path, _) = of.next()?;
+                    of.next().is_none().then(|| format!("path {path}"))
+                });
+                found.push((i, j, via));
+            }
+        }
+        for (i, j, via) in found {
+            let e = &mut manifests[i].summary.dependencies[j];
+            e.inherits = false;
+            e.via = via;
+        }
     }
 
     /// Only a `pyproject.toml`: a `requirements*.txt` names no package, so it bounds none.
@@ -309,8 +448,13 @@ impl Ecosystem for Pypi {
         let mut out = Vec::new();
         for (entry, _) in self.entries(exports, providers, from, specifier) {
             let (mut exposed, mut resolved) = (false, Vec::new());
+            let source = (entry.via.as_deref(), entry.range.as_deref());
             for &(m, i) in providers.of(self.name(), &entry.name) {
                 let (at, manifest) = (at(m), &exports[m].manifests[i]);
+                let to = (exports[m].place(), manifest.path.as_str());
+                if !self.reaches(source, exports[from.0].place(), to) {
+                    continue;
+                }
                 if module(at, manifest, top).is_none() {
                     continue;
                 }
@@ -377,6 +521,178 @@ mod tests {
         assert_eq!(Pypi.flag(Some("==1.0"), Some("1.0")), Some(Flag::Unchecked));
         let (a, b) = (("a", Path::new("/w/a")), ("b", Path::new("/w/b")));
         assert!(Pypi.reaches((None, Some("workspace:*")), a, (b, "package.json")));
+        // A uv source keeps what it names, as Cargo's does: `git` the repository of its remote,
+        // `outside` none.
+        let reaches = |via| Pypi.reaches((Some(via), None), a, (b, "x/pyproject.toml"));
+        assert!(reaches("git b"));
+        assert!(!reaches("git c"));
+        assert!(!reaches("outside"));
+        assert!(!reaches("path y/pyproject.toml"));
+        assert!(Pypi.reaches(
+            (Some("path x/pyproject.toml"), None),
+            a,
+            (a, "x/pyproject.toml")
+        ));
+    }
+
+    #[test]
+    fn a_uv_source_gives_the_entry_where_its_package_comes_from() {
+        let s = read_pyproject(
+            "apps/web",
+            br#"
+[project]
+dependencies = ["Bird_Feeder>=1", "near", "far", "remote", "wheel", "pinned", "plain", "abs"]
+[tool.poetry.dependencies]
+near = "1"
+[tool.uv.sources]
+bird-feeder = { workspace = true }
+near = { path = "lib" }
+far = { path = "../../../vendor/far" }
+remote = { git = "https://github.com/Acme/Remote.git" }
+wheel = { url = "https://example.com/wheel.whl" }
+pinned = { index = "internal" }
+abs = { path = "/opt/abs" }
+"#,
+        );
+        let got: Vec<_> = (s.dependencies.iter())
+            .map(|e| {
+                (
+                    e.field.as_str(),
+                    e.name.as_str(),
+                    e.via.as_deref(),
+                    e.inherits,
+                )
+            })
+            .collect();
+        // A Poetry entry takes no uv source.
+        assert_eq!(
+            got,
+            [
+                (PROJECT, "abs", Some("outside"), false),
+                (PROJECT, "bird-feeder", None, true),
+                (
+                    PROJECT,
+                    "far",
+                    Some("path ../vendor/far/pyproject.toml"),
+                    false
+                ),
+                (
+                    PROJECT,
+                    "near",
+                    Some("path apps/web/lib/pyproject.toml"),
+                    false
+                ),
+                (PROJECT, "pinned", Some("outside"), false),
+                (PROJECT, "plain", None, false),
+                (PROJECT, "remote", Some("git github.com/acme/remote"), false),
+                (PROJECT, "wheel", Some("outside"), false),
+                (POETRY, "near", None, false),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_members_glob_less_exclude_names_the_workspace_members() {
+        let globs = (
+            vec!["packages/*".to_string(), "./tools/**".to_string()],
+            vec!["packages/old".to_string()],
+        );
+        let at = |root: &str, dir: &str| member(root, &globs, dir);
+        assert!(at("ws", "ws"));
+        assert!(at("ws", "ws/packages/bird-feeder"));
+        assert!(!at("ws", "ws/packages/old"));
+        assert!(!at("ws", "ws/packages/a/b"));
+        assert!(at("ws", "ws/tools/a/b"));
+        assert!(!at("ws", "wsx/packages/a"));
+        assert!(!at("ws", "other"));
+        assert!(at("", "packages/a"));
+        assert!(at("", ""));
+        assert!(glob("lib-*/py", "lib-a/py"));
+        assert!(!glob("lib-*", "lib-a/py"));
+        assert!(glob("**", ""));
+        assert!(glob("a/**/b", "a/b"));
+        assert!(glob("a/**/b", "a/x/y/b"));
+        assert!(!glob("a/**/b", "a/x/y"));
+    }
+
+    #[test]
+    fn a_hostile_glob_stays_bounded() {
+        // Past `MAX_GLOB_PARTS` a glob fits nothing; under it, many `**` against a deep path
+        // finish at once.
+        let deep = "**/".repeat(100_000);
+        assert!(!glob(&deep, "a"));
+        let many = vec!["**"; MAX_GLOB_PARTS - 1].join("/") + "/z";
+        assert!(!glob(&many, &vec!["a"; 2_000].join("/")));
+        assert!(glob(&many, "a/b/z"));
+    }
+
+    #[test]
+    fn a_workspace_source_takes_the_member_of_the_nearest_workspace_that_holds_it() {
+        let manifest = |path: &str, name: Option<&str>, ws: Option<(&str, &str)>, dep: bool| {
+            let workspace = |e: &str| Entry {
+                field: PROJECT.to_string(),
+                name: e.to_string(),
+                inherits: true,
+                ..Entry::default()
+            };
+            Manifest {
+                path: path.to_string(),
+                summary: Summary {
+                    name: name.map(String::from),
+                    uv_workspace: ws.map(|(m, x)| (vec![m.to_string()], vec![x.to_string()])),
+                    dependencies: if dep {
+                        vec![workspace("bird-feeder")]
+                    } else {
+                        vec![]
+                    },
+                    ..Summary::default()
+                },
+            }
+        };
+        let mut manifests = vec![
+            manifest("pyproject.toml", None, Some(("*", "ws")), true),
+            manifest(
+                "ws/pyproject.toml",
+                Some("ws"),
+                Some(("packages/*", "packages/old")),
+                true,
+            ),
+            manifest(
+                "ws/packages/bird-feeder/pyproject.toml",
+                Some("bird-feeder"),
+                None,
+                false,
+            ),
+            manifest(
+                "ws/packages/old/pyproject.toml",
+                Some("bird-feeder"),
+                None,
+                false,
+            ),
+            manifest("ws/packages/app/pyproject.toml", Some("app"), None, true),
+            manifest("ws/tools/x/pyproject.toml", Some("x"), None, true),
+            manifest(
+                "bird-feeder/pyproject.toml",
+                Some("bird-feeder"),
+                None,
+                false,
+            ),
+            manifest("bird-feeder/requirements.txt", None, None, true),
+        ];
+        Pypi.inherit(&mut manifests);
+        let via = |i: usize| {
+            let e = &manifests[i].summary.dependencies[0];
+            assert!(!e.inherits || i == 7, "{i}");
+            e.via.as_deref()
+        };
+        // The excluded `packages/old` is no member; `ws/tools/x` is no member of `ws`, whose
+        // root the top-level workspace excludes, so it finds none.
+        let member = Some("path ws/packages/bird-feeder/pyproject.toml");
+        assert_eq!(via(0), Some("path bird-feeder/pyproject.toml"));
+        assert_eq!(via(1), member);
+        assert_eq!(via(4), member);
+        assert_eq!(via(5), None);
+        assert!(manifests[7].summary.dependencies[0].inherits);
     }
 
     fn deps(s: &Summary) -> Vec<(&str, &str, Option<&str>)> {
@@ -501,7 +817,7 @@ where = ["src"]
 [project.scripts]
 serve = "acme.cli:main"
 "#;
-        let s = read_pyproject(src.as_bytes());
+        let s = read_pyproject("", src.as_bytes());
         assert_eq!(s.name.as_deref(), Some("acme-billing"));
         assert_eq!(s.version.as_deref(), Some("1.2.0"));
         assert_eq!(
@@ -514,25 +830,27 @@ serve = "acme.cli:main"
         );
         assert_eq!(s.roots, ["src"]);
         assert_eq!(s.scripts, [("acme.cli".to_string(), "main".to_string())]);
-        let poetry =
-            read_pyproject(b"[tool.poetry]\nname = \"shared.tools\"\nversion = \"0.3.0\"\n");
+        let poetry = read_pyproject(
+            "",
+            b"[tool.poetry]\nname = \"shared.tools\"\nversion = \"0.3.0\"\n",
+        );
         assert_eq!(poetry.name.as_deref(), Some("shared-tools"));
-        let invalid = read_pyproject(b"[project]\nname = \"-x\"\n");
+        let invalid = read_pyproject("", b"[project]\nname = \"-x\"\n");
         assert_eq!(invalid.name, None);
     }
 
     #[test]
     fn a_manifest_too_large_or_unreadable_reads_as_empty() {
         let pad = format!("[project]\nname = \"a\"\n#{}", " ".repeat(MAX_BYTES));
-        assert_eq!(read_pyproject(pad.as_bytes()), Summary::default());
+        assert_eq!(read_pyproject("", pad.as_bytes()), Summary::default());
         let reqs = format!("a\n#{}", " ".repeat(MAX_BYTES));
         assert_eq!(read_requirements(reqs.as_bytes()), Summary::default());
         for bad in [&b"[project\n"[..], b"\xff", b"name = "] {
-            assert_eq!(read_pyproject(bad), Summary::default());
+            assert_eq!(read_pyproject("", bad), Summary::default());
         }
         assert_eq!(read_requirements(b"\xffa"), Summary::default());
         let nested = format!("a = {}{}", "[".repeat(100_000), "]".repeat(100_000));
-        assert_eq!(read_pyproject(nested.as_bytes()), Summary::default());
+        assert_eq!(read_pyproject("", nested.as_bytes()), Summary::default());
     }
 
     /// A repository `name` whose manifests are `manifests` (path, text) read as PyPI reads them,

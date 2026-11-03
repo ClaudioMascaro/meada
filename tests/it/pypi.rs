@@ -222,3 +222,118 @@ fn an_edited_pyproject_or_requirements_file_relinks_like_a_cold_export() {
     let levels: Vec<&str> = extra.iter().map(|(_, _, l, _)| *l).collect();
     assert_eq!(levels, ["inferred"]);
 }
+
+/// The `(consumer, provider, level)` of every link of `json`, sorted.
+fn ends(json: &Value) -> Vec<(String, String, String)> {
+    let mut found: Vec<_> = (json["links"].as_array().into_iter().flatten())
+        .map(|l| {
+            let at = |k: &str| l[k].as_str().unwrap().to_string();
+            (at("consumer"), at("provider"), at("level"))
+        })
+        .collect();
+    found.sort();
+    found
+}
+
+#[test]
+fn a_uv_source_keeps_the_one_package_it_names() {
+    let origin = "https://example.com/pkg/uv-sources.git";
+    let repo = fixture_repo("pypi_uv_sources", "pkg-uv-sources", Some(origin));
+    let out = without_processes(&export(&repo));
+    assert_golden("pkg-uv-sources.export.json", &out);
+    let json: Value = serde_json::from_str(&out).unwrap();
+
+    // `alpha` and `beta/libs/app` take the member of their own uv workspace, `pathy` the package
+    // its path names; `plain`, with no uv source, fits both packages of the name.
+    let id = "example.com/pkg/uv-sources::";
+    let (a, b) = (
+        "alpha/packages/bird-feeder/pyproject.toml",
+        "beta/libs/bird-feeder/pyproject.toml",
+    );
+    let feed = |package: &str| {
+        format!(
+            "{id}{}bird_feeder/__init__.py::feed",
+            package.trim_end_matches("pyproject.toml")
+        )
+    };
+    let want = |consumer: &str, provider: &str, level: &str| {
+        (
+            format!("{id}{consumer}"),
+            provider.to_string(),
+            level.to_string(),
+        )
+    };
+    let mut expected = Vec::new();
+    for (dir, to, level) in [
+        ("alpha", a, "exact"),
+        ("beta/libs/app", b, "exact"),
+        ("pathy", a, "exact"),
+        ("plain", a, "ambiguous"),
+        ("plain", b, "ambiguous"),
+    ] {
+        let module = dir.rsplit('/').next().unwrap();
+        let entry = format!("{dir}/pyproject.toml::project.dependencies::bird-feeder");
+        expected.push(want(&entry, &format!("{id}{to}"), level));
+        let call = format!("{dir}/{module}/main.py::run::feed#0");
+        expected.push(want(&call, &feed(to), level));
+    }
+    expected.sort();
+    assert_eq!(ends(&json), expected);
+}
+
+#[test]
+fn a_uv_git_source_keeps_the_repository_of_its_url_and_a_url_source_stays_out() {
+    let case = "pypi_uv_git";
+    fixture_repo(
+        case,
+        "pkg-uv-feeder",
+        Some("https://example.com/pkg/uv-feeder.git"),
+    );
+    let origin = "https://example.com/pkg/uv-sources.git";
+    let repo = fixture_repo(case, "pkg-uv-sources", Some(origin));
+    fs::write(
+        repo.join("meada.toml"),
+        "[[peer]]\nrepo = \"example.com/pkg/uv-feeder\"\n",
+    )
+    .unwrap();
+    let pathy = repo.join("pathy/pyproject.toml");
+    let source = |line: &str| {
+        let text = fs::read_to_string(&pathy).unwrap();
+        let (head, _) = text.split_once("bird-feeder = {").unwrap();
+        fs::write(&pathy, format!("{head}{line}\n")).unwrap();
+    };
+    let of = |json: &Value, consumer: &str| -> Vec<(String, String)> {
+        (ends(json).into_iter())
+            .filter(|(c, ..)| c.ends_with(consumer))
+            .map(|(_, p, level)| (p, level))
+            .collect()
+    };
+    let entry = "pathy/pyproject.toml::project.dependencies::bird-feeder";
+
+    source("bird-feeder = { git = \"https://example.com/pkg/uv-feeder.git\", tag = \"v3\" }");
+    let json: Value = serde_json::from_str(&export(&repo)).unwrap();
+    let feeder = "example.com/pkg/uv-feeder::pyproject.toml".to_string();
+    assert_eq!(of(&json, entry), [(feeder.clone(), "exact".to_string())]);
+    // `plain`, with no source, fits the peer's package too.
+    let plain = of(
+        &json,
+        "plain/pyproject.toml::project.dependencies::bird-feeder",
+    );
+    assert_eq!(plain.len(), 3);
+    assert!(plain.contains(&(feeder, "ambiguous".to_string())));
+
+    for outside in [
+        "bird-feeder = { git = \"https://example.com/pkg/elsewhere.git\" }",
+        "bird-feeder = { url = \"https://example.com/bird_feeder-3.0.0.whl\" }",
+        "bird-feeder = { index = \"internal\" }",
+    ] {
+        source(outside);
+        let json: Value = serde_json::from_str(&export(&repo)).unwrap();
+        assert_eq!(of(&json, entry), [], "{outside}");
+        assert_eq!(
+            of(&json, "pathy/pathy/main.py::run::feed#0"),
+            [],
+            "{outside}"
+        );
+    }
+}

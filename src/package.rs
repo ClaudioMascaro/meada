@@ -440,6 +440,10 @@ pub struct Summary {
     /// The console scripts a `pyproject.toml` declares, as `(module, function)` (PyPI only).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scripts: Vec<(String, String)>,
+    /// PyPI only: the `members` and `exclude` globs of a uv workspace root's
+    /// `[tool.uv.workspace]`, which the seam's `inherit` reads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uv_workspace: Option<(Vec<String>, Vec<String>)>,
     /// The `[workspace.dependencies]` entries of a `Cargo.toml` (Cargo only). For Cargo,
     /// `main` is the library's root file, as a path of the repository.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -490,11 +494,13 @@ pub struct Entry {
     /// Cargo only: the key the entry is written under when it renames the package.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
-    /// Where the package comes from: Cargo's `path <manifest>` or `git <identity>`,
+    /// Where the package comes from: Cargo's (and a uv source's) `path <manifest>` or
+    /// `git <identity>`, `outside` for a source no repository of the workspace holds,
     /// or `computed` for a coordinate whose literal fragments only constrain candidates.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub via: Option<String>,
-    /// Cargo only: `workspace = true`, until the seam's `inherit` fills the entry.
+    /// Cargo and PyPI only: `workspace = true` (a uv source for PyPI), until the seam's
+    /// `inherit` fills the entry.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub inherits: bool,
     /// NuGet and a `pom.xml` only: the entry does not pass on to the manifest's dependents, so a
@@ -710,7 +716,7 @@ fn bare_directory(path: &str) -> &str {
     path.rsplit_once('/').map_or("", |(dir, _)| dir)
 }
 
-/// Whether a Cargo or Go entry of source `via` may reach the provider whose manifest is
+/// Whether a Cargo, Go or PyPI entry of source `via` may reach the provider whose manifest is
 /// `provider` in the repository `to`, from a manifest of `from` (each repository by identity and
 /// root): a `path` entry only the package at that path, a `git` one only the repository of that
 /// remote; an entry with no source every provider. A path that leaves its repository (`../`) is

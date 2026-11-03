@@ -1219,6 +1219,17 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   followed; environment markers and extras
   are dropped and a direct reference (`name @ url`) is no entry; Poetry groups and
   `[project.optional-dependencies]` are not read; a range is never evaluated (no marker). A
+  `[tool.uv.sources]` entry is read only for `[project] dependencies`, and only as a table naming
+  one of `workspace = true`, `path`, `git`, `url` and `index`: a list of sources (one per
+  marker) keeps the name rule; a `workspace = true` source whose root (the nearest
+  `pyproject.toml` at or above the consumer with `[tool.uv.workspace]` whose members hold it)
+  is not found, or whose workspace holds no single `pyproject.toml` of the name, keeps the name
+  rule too; the `members` and `exclude` globs read `**` and `*` only (`?` and `[...]` are
+  literal), at most `MAX_GLOBS` (256) of each list and `MAX_GLOB_PARTS` (64) parts of each glob
+  (a longer glob fits nothing); an outer root whose globs hold a project an inner root excludes
+  takes it as a member (uv may treat it as standalone); a `path` to a file (a wheel or an sdist) names no provider; an index built before
+  the uv sources were read keeps its stored entries until the `pyproject.toml` changes or the
+  schema version does. A
   Python import is looked up in the distributions every PyPI manifest of a directory holding
   the file depends on (the nearest naming one gives the range), among the top-level modules under each provider's roots (its directory, then the roots its
   `pyproject.toml` declares, or `src`); a namespace package (a directory without

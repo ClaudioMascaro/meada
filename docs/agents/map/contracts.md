@@ -363,8 +363,8 @@ this file, and a change to these modules updates it.
   (every provider), `owns` (every manifest of the ecosystem), `ways` and `resolve` (Node's
   rule), `resolutions` (the single-entry loop), `shapes` (false), `programs` (none) and
   `inherit` (nothing). The overrides: npm answers `flag` (semver), `reaches` (a `workspace:`
-  range keeps the dependent's own repository) and `shapes`; PyPI `owns`, `resolutions` and
-  `programs`; Cargo `reaches`, `owns`, `ways`, `resolve` and `inherit`; Go `reaches` and
+  range keeps the dependent's own repository) and `shapes`; PyPI `owns`, `resolutions`,
+  `programs`, `reaches` and `inherit`; Cargo `reaches`, `owns`, `ways`, `resolve` and `inherit`; Go `reaches` and
   `resolve`. `Providers` is keyed by ecosystem name and package name, so an npm and a PyPI
   package of one name never link, and `nearest` takes the ecosystem (a file's nearest
   `package.json` and nearest `pyproject.toml` are apart). A file belongs to the package of its
@@ -380,7 +380,14 @@ this file, and a change to these modules updates it.
   written, extras and markers dropped (`requirement`). A PyPI range is never evaluated:
   `reason` ends `, range unchecked`; a Poetry `git` or `url` source without a `path` is a direct
   reference, no entry, as `name @ url` is, and a requirements line ending in `\` continues on
-  the next. A call from a `.py` file (`of_source`) resolves through
+  the next. A `[project] dependencies` entry takes its `[tool.uv.sources]` source as `via`, as
+  Cargo's do (`uv_source`): `path <manifest>` (folded from the manifest's directory), `git
+  <identity>`, `outside` for `url`, `index` or an absolute path, and `inherits` for `workspace =
+  true`, which `Pypi::inherit` turns into `path <member>`: the root is the nearest
+  `pyproject.toml` at or above the consumer whose `Summary::uv_workspace` globs hold it
+  (`member`, `glob`), the member its one `pyproject.toml` of the name; with no root or no single
+  member the entry keeps no source. `Pypi::reaches` is `sourced`, and `resolutions` skips the
+  providers it refuses. A call from a `.py` file (`of_source`) resolves through
   PyPI's `resolutions`: the import names a module, so each distribution a PyPI manifest of a
   directory holding the file depends on (`holding`: every `pyproject.toml` and
   `requirements*.txt` above it, the nearest first, whose entry gives the range) is a candidate when a provider exposes the import's top-level module under its roots

@@ -164,6 +164,8 @@ Chamadas a funções importadas atravessam para o código do provedor por `expor
 
 Cada `pyproject.toml` com nome em `[project]` ou `[tool.poetry]` gera `package::pypi::<nome>`, normalizado pelo PEP 503. Dependências em `[project] dependencies`, `[tool.poetry.dependencies]` e `requirements*.txt` se ligam aos pacotes do workspace. A faixa permanece como escrita, com `range unchecked`: faixas PyPI não são conferidas.
 
+O `[tool.uv.sources]` de um projeto uv escolhe o pacote que uma entrada de `[project] dependencies` instala, como as fontes do Cargo: `{ workspace = true }` o membro do workspace uv do consumidor (o `pyproject.toml` mais próximo, nele ou acima, com `[tool.uv.workspace]` cujos globs de `members`, menos `exclude`, o incluem), `{ path = "..." }` o pacote desse diretório e `{ git = "..." }` o repositório do workspace dessa URL, cada um com nível `exact`, para a entrada e para as chamadas pelos seus imports. Os outros pacotes do mesmo nome não recebem ligação. Uma fonte `url` ou `index` fica de fora. Uma lista de fontes (uma por marker), e uma fonte workspace cuja raiz ou cujo único membro com o nome não se encontra, seguem a regra acima.
+
 Um import chega ao código do provedor com nível `exact` quando o módulo tem o nome da distribuição, `inferred` quando é um módulo de topo dela e `ambiguous` quando várias distribuições o expõem. Pacotes npm e PyPI com o mesmo nome não se ligam.
 
 ## Pacotes Rust
