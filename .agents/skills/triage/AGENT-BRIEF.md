@@ -37,6 +37,11 @@ A criterion that needs a service the session may lack (Valkey, S3, Postgres) nam
 - **Good:** "A unit test on the TTL comparison fails for `holder = lock + margin + 1`", or "the `cloud` CI job runs the refresh-lock test green"
 - **Bad:** "Show the refresh-lock test still fails after a local edit of the holder TTL"
 
+When a criterion is a mechanical check (a command, a byte comparison, a count), the brief states the check and leaves out the enumeration it implies, or marks such a list as illustrative. A hand-made list can only disagree with the check, and the check carries the ticket.
+
+- **Good:** "`CHANGELOG.md` `[Unreleased]` has no entry that `v1.0.0` already shipped: the `v1.0.0` section is byte-identical to the one in the tag"
+- **Bad:** "Move these nine entries to `v1.0.0`: ..." (the tag held twelve, so the list and the check disagreed)
+
 ### Explicit scope boundaries
 
 State what is out of scope. This prevents the agent from gold-plating or making assumptions about adjacent features.

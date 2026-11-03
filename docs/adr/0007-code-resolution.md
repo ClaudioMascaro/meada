@@ -22,6 +22,7 @@ pack.
 - v0.1 ships the TypeScript and JavaScript pack (`.ts`, `.tsx`, `.js`, `.mjs`, `.cjs`). Track B
   adds Python, Go, Java, Kotlin, C#, Swift and Rust, one spec each. (Amended 2026-10-21:
   Python, Go and Rust are in 1.0; Java, Kotlin, C# and Swift follow as 1.x minors, ADR 0003.)
+  (Amended 2026-10-31: the four packs are in 1.0, ADR 0003.)
 
 ## Considered options
 

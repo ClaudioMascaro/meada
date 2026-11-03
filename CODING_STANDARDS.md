@@ -13,6 +13,15 @@ decide` closes. A rule that cannot tell yields nothing, or a name match at `infe
 `ambiguous`; a guess never becomes `exact`, a provider or a consumer. In an export golden, read
 each changed level, target, provider and consumer with `cargo run --example golden_diff`.
 
+## Exactly N, only X
+
+A test that proves "exactly N" or "only X" asserts over the whole output (every line of the
+stream, every row of the answer), then checks each item's shape. A count over a pre-filtered
+subset proves only that subset. In #451, counting the `ui: directory: unreadable` lines missed
+the pre-authentication audit line a refused write also printed; the strict test counts every
+`ui: ` line against reads plus picker plus writes and checks each line's shape. No lint can tell
+which filter hides the criterion, so this is a reviewer's rule.
+
 ## Probes
 
 A change to resolution, a contract kind or a language pack is checked against every probe that
@@ -54,6 +63,12 @@ a review finding.
 - **Unreadable parts.** A path or prefix with a part that cannot be read (an unfolded template or
   f-string hole, a parameter, an environment read) yields no provider, never a `{}` segment. A
   parameter written in the literal (`:id`, `{id}`, `<int:id>`) stays one.
+- **Composed operators.** A change that types a value through a new chain operator (`?`, `.await`,
+  `!!`, `?.`, an unwrap) adds a test that combines it, in both orders, with every operator the
+  same pack already reads. A combination the change does not type stays a name match (`inferred`
+  or `ambiguous`), never `exact`: #435 typed `?` and `.await` apart, and `f()?.await.port()` with
+  `fn f() -> Result<Cfg>` linked `exact` to `Cfg.port`. This is review guidance, not a mechanical
+  check.
 
 ## Equivalence tests
 

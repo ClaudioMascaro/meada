@@ -63,6 +63,11 @@ change touches, then read the files it names.
 - Read its answers as Meada's own levels say: `exact` is certain, `inferred` and `ambiguous` are
   name matches, and a missing caller is unproven, since calls inside macros (`assert!`,
   `format!`, `vec!`) are not indexed.
+- The index follows the default features (ADR 0012 keeps the cloud modules behind features) and
+  covers each crate's module tree from `src/lib.rs` and `src/main.rs`. For code under `accounts`,
+  `directory`, `github-app`, `oidc`, `postgres`, `proposals`, `snapshot`, `ui`, `valkey` or
+  `workspaces`, and for anything under `tests/`, `examples/` or `benches/`, go straight to grep: an
+  empty answer there is expected, not a stale index.
 - Results under `tests/fixtures/` are test data.
 - A wrong answer on Meada's own code is a bug: open an issue with the query, the answer and the
   expected one.

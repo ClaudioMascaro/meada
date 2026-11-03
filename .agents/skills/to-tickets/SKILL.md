@@ -39,6 +39,14 @@ Give each ticket its **blocking edges**: the other tickets that must complete be
 
 **Scope widening**: a ticket that widens a scope (one repository becomes a workspace, one tenant becomes many) also widens every operation earlier tickets built on the narrower scope. List each of those operations in that ticket's acceptance criteria, so none stays behind on the old scope.
 
+**User-visible capability**: a ticket that adds or changes a user-visible capability (a language, a framework, a contract kind, a command or MCP behavior) lists "the capabilities page in pt, en and es" in its acceptance criteria, naming `docs/site/pt/capabilities.md`, `docs/site/en/capabilities.md` and `docs/site/es/capabilities.md`, as `CODING_STANDARDS.md` ("Docs move with the capability") requires.
+
+**Release level**: a ticket that changes a crate's release names the semver level ("a minor bump of meada-core"), never the next number. The implementer reads the number from `CHANGELOG.md` and `Cargo.toml`.
+
+**Cited premises**: a ticket that says "today X resolves at level L" cites the test, the fixture or the command output that shows it. A ticket that states a language rule cites the language reference (spec section or official docs). The implementer asserts what the citation shows.
+
+**Mechanical checks**: when an acceptance criterion is a mechanical check (a command, a byte comparison, a count), the ticket states the check and leaves out the enumeration it implies, or marks such a list as illustrative. A hand-made list can only disagree with the check.
+
 **Wide refactors are the exception to vertical slicing.** A **wide refactor** is one mechanical change (rename a column, retype a shared symbol) whose **blast radius** fans across the whole codebase, so a single edit breaks thousands of call sites at once and no vertical slice can land green. Don't force it into a tracer bullet; sequence it as **expand–contract**. First expand: add the new form beside the old so nothing breaks. Then migrate the call sites over in batches sized by blast radius (per package, per directory), each batch its own ticket blocked by the expand, keeping CI green batch to batch because the old form still exists. Finally contract: delete the old form once no caller remains, in a ticket blocked by every migrate batch. When even the batches can't stay green alone, keep the sequence but let them share an integration branch that all block a final integrate-and-verify ticket; green is promised only there.
 
 ### 4. Quiz the user

@@ -110,7 +110,7 @@ Meada 1.0 delivers the whole v1 scope of [ADR 0003](docs/adr/0003-v1-scope-and-r
 - **Levels**: a level on every link, chains that cross repositories and decisions with an
   optional decider (`meada decide`).
 - **Analyses**: shape drift, communities and processes.
-- **Languages in 1.0**: nine, TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, C# and
+- **Languages in 1.0**: nine: TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, C# and
   Swift (#26 to #29, ADR 0003).
 
 **Stability promise.** From 1.0 on, semver holds: a breaking change to any of these items needs
