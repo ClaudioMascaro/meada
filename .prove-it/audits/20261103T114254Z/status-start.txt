@@ -1,0 +1,5 @@
+ M .claude/skills/prove-meada/SKILL.md
+ M .claude/skills/prove-meada/references/cli-mcp.md
+ M .claude/skills/prove-meada/references/deploy.md
+ M .claude/skills/prove-meada/scripts/prove.py
+aaded2f4d0c26c13a9aa4886c231b207e3a9612d
