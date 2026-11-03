@@ -6,6 +6,43 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The `golden_diff` example exits with a message naming the range's refs and the `--range A...B`
+  flag when a merge-base cannot be found (a shallow or single-branch clone has no `origin/main`),
+  and with a usage error for `--range` without a value, instead of panicking (#592).
+- `[postgres] schema` starting with `pg_` (reserved by Postgres) is refused at manifest read with
+  Meada's own message, in pt-BR and English, instead of Postgres's raw error at `meada postgres
+  migrate` (#482).
+- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
+  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
+  node unready (#448).
+
+- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
+  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
+  node unready (#448).
+
+- The container build copies every top-level `tests/fixtures/*.json` in the UI stage with one
+  `COPY`, so a UI test importing a new fixture no longer breaks the image (#495).
+- The deploy fetch scripts (Compose `fetch-pulled.sh` and the chart `workspace.fetch`) read a
+  repositories manifest whose `repo` and `path` keys are written as quoted keys (`"repo" = ...`);
+  the shared awk program skipped them. Its test now takes the expected pairs of every case from the
+  `toml` crate instead of hand-written lists (#568).
+
+- `[postgres] schema` starting with `pg_` (reserved by Postgres) is refused at manifest read with
+  Meada's own message, in pt-BR and English, instead of Postgres's raw error at `meada postgres
+  migrate` (#482).
+- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
+  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
+  node unready (#448).
+
+- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
+  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
+  node unready (#448).
+
+- The container build copies every top-level `tests/fixtures/*.json` in the UI stage with one
+  `COPY`, so a UI test importing a new fixture no longer breaks the image (#495).
+
 ### Changed
 
 - The console asks `meada-core` through WebAssembly (`namedNameProblem`, `namedDescriptionProblem`,
@@ -46,27 +83,6 @@ All notable changes to Meada are recorded here. The format follows
   current before, through the editor's confirmation at the base the page read. A stale base and
   a refused entry show the server's message and the page reads the versions again. In pt-BR and
   English.
-
-### Fixed
-
-- The deploy fetch scripts (Compose `fetch-pulled.sh` and the chart `workspace.fetch`) read a
-  repositories manifest whose `repo` and `path` keys are written as quoted keys (`"repo" = ...`);
-  the shared awk program skipped them. Its test now takes the expected pairs of every case from the
-  `toml` crate instead of hand-written lists (#568).
-
-- `[postgres] schema` starting with `pg_` (reserved by Postgres) is refused at manifest read with
-  Meada's own message, in pt-BR and English, instead of Postgres's raw error at `meada postgres
-  migrate` (#482).
-- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
-  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
-  node unready (#448).
-
-- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
-  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
-  node unready (#448).
-
-- The container build copies every top-level `tests/fixtures/*.json` in the UI stage with one
-  `COPY`, so a UI test importing a new fixture no longer breaks the image (#495).
 
 ## [1.1.0] - 2026-11-02
 
