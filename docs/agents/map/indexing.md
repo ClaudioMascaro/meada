@@ -200,13 +200,21 @@ from ...", with the whole list. A value the index now stores joins it.
   `refresh`: stat (mtime/size, trusted only if older than `RACY` = 2 s), hash with BLAKE3, parse
   only changed files (or those whose `settings` line moved, under the rest of their stored
   setting), parse again each file whose setting `LanguagePack::extend` now makes differ
-  (`settle`, once: a kept file so parsed joins the changed ones), resolve every file's calls in memory, rewrite rows only when a file's
-  `resolved` digest changed, re-extract contracts for the whole repository (one row per side, the
+  (`settle`, once: a kept file so parsed joins the changed ones), resolve in memory the calls of every file of a group not kept (below), rewrite rows only when a file's
+  `resolved` digest changed, re-extract contracts for every group not kept (one row per side, the
   `Found::shape`s of a side reached several ways merged, as JSON in `contracts.shape`, which `export` loads into `Provider::shape` and
   `Consumer::shape`). The extraction reads values the index does not keep, so it parses again
   the files whose values the last extraction read (the `valued` table, `Code::read`) before its
   first pass, then each file a kind misses (`Code::misses`) until none does; a pack that missed
-  nothing in a pass is done and is not extracted again (#391). `refresh(db, root,
+  nothing in a pass is done and is not extracted again (#391). A group of packs that resolve
+  together (`lang::resolver_of`) none of whose files was changed, deleted or stamped by a join is
+  kept when `meta.configs` (which folds Meada's version in), the member files and the stored
+  `exports` match what this refresh found (`unchanged_groups`): its files are neither re-parsed
+  for values, extracted nor resolved, its `contracts`, `symbols` and `calls` rows stay, and the
+  entry points read its sides and reach from them (`stored_reach`). That rests on a group's
+  extraction reading only its own files and finding contracts only in them (debug assertions
+  in `refresh`); `Names::without` marks a question about an inline definition of a kept file,
+  which makes the refresh start over keeping nothing (`refresh_keeping`). `refresh(db, root,
   identity, serve)` first brings the `documents` table (path, hash, mtime, size, `summary`) up
   to date the same way (`refresh_documents`, sharing `stat`), before the early exit and apart
   from the code rows: a document edit re-extracts no code. Without `serve.declared` the

@@ -187,9 +187,12 @@ this file, and a change to these modules updates it.
   Local accounts (#554, ADR 0024, `ui/accounts.rs`, feature `accounts`): with `[accounts]`,
   `Console::start` runs `accounts::Local::start` once every other check passed: the key pair
   (`Config::keys`), `accounts::dummy`, then `store::bootstrap`, whose initial password is
-  `admin123` with a change required, or the deployer's (`Config::admin_password`), which must
+  `accounts::generated` with a change required, or the deployer's (`Config::admin_password`), which must
   pass the policy (else the start is refused naming `accounts.admin_password_env` or `_file`)
-  and then needs no change; Postgres unreachable there refuses the start
+  and then needs no change; a generated one comes back from `bootstrap` once the row is
+  committed and `Local::announce` prints it on one stderr line
+  (`accounts: default account admin created; first password: `), right after the listening line
+  or, when the console stops before it, as `Local` drops; Postgres unreachable there refuses the start
   (`Msg::AccountsBootstrap`, at `postgres`). The proposal server's `Console` has no `Local`.
   Admission (`Console::admit_local`, before the OIDC branch): the static files, `config` and
   `login` need no token; every other route a bearer `Keys::verify` passes for `[ui] public_url`

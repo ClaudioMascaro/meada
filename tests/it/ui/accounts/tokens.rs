@@ -43,6 +43,7 @@ fn console(case: &'static str) -> Option<(Local, String)> {
         audit,
         console,
         keys,
+        first: None,
     };
     Some((local, admin))
 }

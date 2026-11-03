@@ -41,9 +41,11 @@ El demo, desde un checkout limpio:
 
 1. Copie la CA del proxy de la consola y confíe en ella en el navegador, o use `curl --cacert`:
    `docker compose cp console-proxy:/data/caddy/pki/authorities/local/root.crt ./console-ca.crt`.
-2. Abra `https://localhost:8444` e ingrese con `admin` / `admin123`. La cuenta predeterminada solo
-   puede cambiar su contraseña: la consola lleva directo al cambio (12 a 128 caracteres, fuera de
-   la lista de contraseñas comunes).
+2. Lea la primera contraseña de la cuenta `admin`, que la consola genera e imprime una vez en el
+   stderr al crear la cuenta: `docker compose logs console | grep 'first password'`. Abra
+   `https://localhost:8444` e ingrese con `admin` y esa contraseña. La cuenta predeterminada solo
+   puede cambiar su contraseña: la consola lleva directo al cambio (12 a 128 caracteres, fuera de la
+   lista de contraseñas comunes).
 3. En el perfil, genere un token de agente para los nodos (de 1 a 168 horas, 8 por defecto). Se
    muestra una vez; cópielo.
 4. Consulte un nodo por el proxy, que reenvía `Authorization` y no tiene bearer estático:
@@ -70,12 +72,13 @@ emisor de los tokens) reemplazan los manifiestos por mounts; los perfiles siguie
 
 ### `MEADA_ADMIN_PASSWORD`
 
-Vacía (el valor de `.env.accounts.example`), la cuenta `admin` nace con `admin123` y un cambio
-obligatorio en el primer ingreso. Con un valor (12 a 128 caracteres, fuera de la lista de
-contraseñas comunes), esa es la primera contraseña y no se exige cambio: una instalación
-automatizada nunca expone el valor publicado. La variable se lee solo cuando la consola crea la
-cuenta, con la tabla vacía; un valor inválido rechaza el arranque, nombrando
-`accounts.admin_password_env`.
+Vacía (el valor de `.env.accounts.example`), la consola genera la primera contraseña de la cuenta
+`admin`, con un cambio obligatorio en el primer ingreso, y la imprime una sola vez, en una línea del
+stderr que empieza con `accounts: default account admin created; first password:` (`docker compose
+logs console | grep 'first password'`); ningún arranque posterior la vuelve a imprimir. Con un valor
+(12 a 128 caracteres, fuera de la lista de contraseñas comunes), esa es la primera contraseña y no
+se exige cambio. La variable se lee solo cuando la consola crea la cuenta, con la tabla vacía; un
+valor inválido rechaza el arranque, nombrando `accounts.admin_password_env`.
 
 ### Recuperar la cuenta predeterminada: `meada ui reset-admin`
 

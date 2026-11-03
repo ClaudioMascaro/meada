@@ -268,13 +268,15 @@ fn lock_key(schema: &str) -> i64 {
 }
 
 /// The console's start: when the table is empty, the default account `admin`, an operator, with
-/// the hash and change required `initial` gives, in one transaction under an advisory lock, so
-/// two consoles started together create one row. A table that is not empty is never touched, and
-/// `initial` (which reads the deployer's password) is then never called. Whether it created it.
+/// the hash `initial` gives and a change required when it also gives the password it generated,
+/// in one transaction under an advisory lock, so two consoles started together create one row. A
+/// table that is not empty is never touched, and `initial` (which reads the deployer's password
+/// or generates one) is then never called. The generated password once the row is committed;
+/// none when it created nothing or the deployer set the password.
 pub fn bootstrap(
     config: &Config,
-    initial: impl FnOnce() -> Result<(String, bool), Problem>,
-) -> Result<bool, Refused> {
+    initial: impl FnOnce() -> Result<(String, Option<String>), Problem>,
+) -> Result<Option<String>, Refused> {
     let quoted = config.quoted();
     let key = lock_key(config.schema());
     let run = async {
@@ -288,9 +290,9 @@ pub fn bootstrap(
         let any = format!("SELECT EXISTS (SELECT 1 FROM {quoted}.accounts)");
         let any: bool = tx.query_one(&any, &[]).await.map_err(&scrub)?.get(0);
         if any {
-            return Ok(Ok(false));
+            return Ok(Ok(None));
         }
-        let (hash, change_required) = match initial() {
+        let (hash, generated) = match initial() {
             Ok(initial) => initial,
             Err(problem) => return Ok(Err(problem)),
         };
@@ -299,16 +301,17 @@ pub fn bootstrap(
              VALUES ($1, $2, 'operator', $3)"
         );
         let username = crate::accounts::DEFAULT_USERNAME;
+        let change_required = generated.is_some();
         let values: [&(dyn tokio_postgres::types::ToSql + Sync); 3] =
             [&username, &hash, &change_required];
         tx.execute(&insert, &values).await.map_err(&scrub)?;
         tx.commit().await.map_err(&scrub)?;
-        Ok(Ok(true))
+        Ok(Ok(generated))
     };
-    // Six of its own: begin, the lock, the emptiness check, the deployer's password and its hash
+    // Six of its own: begin, the lock, the emptiness check, the password and its hash
     // (`initial`), the insert and commit.
     match crate::modules::within(config.bound(6), run, Msg::PostgresTimeout) {
-        Ok(Ok(created)) => Ok(created),
+        Ok(Ok(generated)) => Ok(generated),
         Ok(Err(problem)) => Err(Refused::Password(problem)),
         Err(reason) => Err(Refused::Postgres(reason)),
     }

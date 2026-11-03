@@ -88,9 +88,9 @@ test('the forced change checks the repeat locally, shows the server rule on a re
     .mockResolvedValueOnce(issued('t2'));
   vi.stubGlobal('fetch', fetch);
   const auth = new LocalAuth(config);
-  await auth.signIn('admin', 'admin123');
+  await auth.signIn('admin', 'first password here');
   await act(() => root.render(<ForcedChangePage auth={auth} locale="en" />));
-  type(t.currentPassword, 'admin123'); type(t.newPassword, 'one password here'); type(t.repeatPassword, 'two');
+  type(t.currentPassword, 'first password here'); type(t.newPassword, 'one password here'); type(t.repeatPassword, 'two');
   await submit();
   expect(getByRole(host, 'alert').textContent).toBe(t.mismatch);
   expect(fetch).toHaveBeenCalledTimes(1);
@@ -101,7 +101,7 @@ test('the forced change checks the repeat locally, shows the server rule on a re
   type(t.newPassword, 'correct horse battery staple'); type(t.repeatPassword, 'correct horse battery staple');
   await submit();
   expect(auth.stage()).toBe('in');
-  expect(JSON.parse(fetch.mock.calls[2]![1].body)).toEqual({ current: 'admin123', new: 'correct horse battery staple' });
+  expect(JSON.parse(fetch.mock.calls[2]![1].body)).toEqual({ current: 'first password here', new: 'correct horse battery staple' });
 });
 
 test('the profile shows the subject and role, changes the password voluntarily and signs out', async () => {

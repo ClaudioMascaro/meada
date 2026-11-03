@@ -214,9 +214,10 @@ public-key`):
   Nenhum nó, o job de refresh nem o Postgres de exemplo o monta, e o chart recusa usar o mesmo Secret
   nos dois nomes.
 - `meada-accounts-public` (chave `public-key`): montado na console e nos nós, que só verificam tokens.
-- `modules.accounts.adminPasswordSecret` (chave `password`, opcional): a senha inicial da conta `admin`,
-  só na console. Sem ela, a console cria `admin` com a senha publicada, que a conta precisa trocar no
-  primeiro acesso.
+- `modules.accounts.adminPasswordSecret` (chave `password`, opcional): a senha inicial da conta
+  `admin`, só na console. Sem ela, a console gera a primeira senha de `admin` e a imprime uma vez no
+  seu stderr (`kubectl logs` do pod da console, a linha `accounts: default account admin created;
+  first password: ...`), e a conta precisa trocá-la no primeiro acesso.
 
 Os nós leem o emissor dos tokens em `[ui] public_url`, que o chart preenche com `console.publicUrl`, e
 precisam de `[postgres]` (`read-url`). `modules.accounts.groups` mapeia grupos de contas locais a

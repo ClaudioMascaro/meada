@@ -37,7 +37,7 @@ test('a sign-in posts the credentials to login, keeps the token in sessionStorag
 test('a change-required sign-in is bound to the password change, also after a reload of the tab', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(token('t1', true))));
   const auth = new LocalAuth(config);
-  expect(await auth.signIn('admin', 'admin123')).toBe('forced');
+  expect(await auth.signIn('admin', 'first password here')).toBe('forced');
   expect(new LocalAuth(config).stage()).toBe('forced');
 });
 
@@ -81,12 +81,12 @@ test('a password change sends the bearer and keeps the fresh token without the m
     .mockResolvedValueOnce(Response.json(token('t2')));
   vi.stubGlobal('fetch', fetch);
   const auth = new LocalAuth(config);
-  await auth.signIn('admin', 'admin123');
-  await auth.changePassword('admin123', 'correct horse battery staple');
+  await auth.signIn('admin', 'first password here');
+  await auth.changePassword('first password here', 'correct horse battery staple');
   const [url, init] = fetch.mock.calls[1]!;
   expect(url).toBe('/api/v1/account/password');
   expect(new Headers(init.headers).get('Authorization')).toBe('Bearer t1');
-  expect(JSON.parse(init.body)).toEqual({ current: 'admin123', new: 'correct horse battery staple' });
+  expect(JSON.parse(init.body)).toEqual({ current: 'first password here', new: 'correct horse battery staple' });
   expect(auth.stage()).toBe('in');
   expect(auth.token).toBe('t2');
   expect(JSON.parse(sessionStorage.getItem(SESSION_KEY)!)).toMatchObject({ token: 't2', change_required: false });
@@ -99,12 +99,12 @@ test('a refused current password keeps the session; a 401 of the session itself 
     .mockResolvedValueOnce(refusal(401, 'unauthorized'));
   vi.stubGlobal('fetch', fetch);
   const auth = new LocalAuth(config);
-  await auth.signIn('admin', 'admin123');
+  await auth.signIn('admin', 'first password here');
   await expect(auth.changePassword('typo', 'long enough password')).rejects.toBeInstanceOf(ApiError);
   expect(auth.stage()).toBe('forced');
-  await expect(auth.changePassword('admin123', 'short')).rejects.toMatchObject({ code: 'password_policy' });
+  await expect(auth.changePassword('first password here', 'short')).rejects.toMatchObject({ code: 'password_policy' });
   expect(auth.stage()).toBe('forced');
-  await expect(auth.changePassword('admin123', 'long enough password')).rejects.toMatchObject({ status: 401 });
+  await expect(auth.changePassword('first password here', 'long enough password')).rejects.toMatchObject({ status: 401 });
   expect(auth.stage()).toBe('out');
   expect(auth.expired).toBe(true);
   expect(sessionStorage.length).toBe(0);

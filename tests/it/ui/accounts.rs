@@ -34,6 +34,8 @@ const ADMIN_ENV: &str = "MEADA_TEST_ADMIN_PASSWORD_554";
 const CHANGED: &str = "correct horse battery staple";
 /// The initial password the lockout and recovery tests set, so `admin` needs no change first.
 const CHOSEN: &str = "deployer chose this one";
+/// The fixed start of the one stderr line of a generated first password.
+const FIRST: &str = "accounts: default account admin created; first password: ";
 
 /// A fresh Ed25519 key pair in PEM, generated with ring: the private half (PKCS #8) and the
 /// public half (SPKI).
@@ -78,6 +80,21 @@ fn section() -> String {
         "\n[accounts]\npublic_key_file = \"public.pem\"\nprivate_key_file = \"private.pem\"\n\
          admin_password_env = \"{ADMIN_ENV}\"\n"
     )
+}
+
+/// The first password `console` generated, read from its one line right after the listening
+/// line: 24 characters of the generator's alphabet, the shape `accounts::generated` gives only
+/// once the policy takes it. The prefix, length and alphabet are copied, not imported: they pin
+/// what a deployer greps for and reads, and the crate's `accounts` module is private.
+fn first_password(console: &mut Server) -> String {
+    let line = console.next_line();
+    let password = (line.strip_prefix(FIRST)).unwrap_or_else(|| panic!("{line:?}"));
+    let alphabet = "abcdefghijkmnpqrstuvwxyz23456789";
+    assert!(
+        password.chars().count() == 24 && password.chars().all(|c| alphabet.contains(c)),
+        "{line:?}"
+    );
+    password.to_string()
 }
 
 /// `meada ui` on `dir`'s manifest, refused: its stderr.
@@ -251,6 +268,8 @@ struct Local {
     console: Server,
     /// The key pair's PEM texts, which no output may carry.
     keys: (String, String),
+    /// The first password the console generated, when `env` set none.
+    first: Option<String>,
 }
 
 /// The console of `case` with `operations` and `[accounts]`, started with `env`.
@@ -267,12 +286,15 @@ fn local_with(case: &'static str, operations: bool, env: &[(&str, &str)]) -> Opt
     let manifest = dir.join(MANIFEST);
     let text = fs::read_to_string(&manifest).unwrap();
     fs::write(&manifest, format!("{text}{}{}", audit.section, section())).unwrap();
-    let console = start(&dir, env);
+    let mut console = start(&dir, env);
+    let generates = !env.iter().any(|(key, _)| *key == ADMIN_ENV);
+    let first = generates.then(|| first_password(&mut console));
     Some(Local {
         dir,
         audit,
         console,
         keys,
+        first,
     })
 }
 
@@ -378,16 +400,19 @@ fn assert_leaks_nothing(
     audit.assert_no_url(text);
 }
 
-/// The tracer bullet: the default account signs in with `admin123`, its token opens only the
-/// password change; after the change, a fresh token is the global operator's session, and a
-/// viewer seeded beside it reads and cannot write. Every sign-in, refusal and change leaves a
-/// record the audit page lists, and no answer, record or stderr line holds a password, a hash or
-/// a token; no answer sets a cookie or a CORS header.
+/// The tracer bullet: the console with no password set generates the default account's first
+/// password and shows it on one stderr line, never again; the account signs in with it, its token
+/// opens only the password change; after the change, a fresh token is the global operator's
+/// session, and a viewer seeded beside it reads and cannot write. Every sign-in, refusal and
+/// change leaves a record the audit page lists, and no answer, record or stderr line holds a
+/// password, a hash or a token; no answer sets a cookie or a CORS header.
 #[test]
 fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator() {
     let Some(local) = local("accounts_flow", &[]) else {
         return;
     };
+    let generated = local.first.clone().unwrap();
+    let generated = generated.as_str();
     let console = &local.console;
     let mut replies = Vec::new();
 
@@ -400,7 +425,7 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
     assert_eq!(get(console, "/").status, 200);
 
     // The `Origin` checks come first: a sign-in is a write.
-    let body = json!({"username": "admin", "password": "admin123"}).to_string();
+    let body = json!({"username": "admin", "password": generated}).to_string();
     let bare = send_body(console, "POST", "/api/v1/login", &[], &body);
     assert_eq!(bare.status, 403);
     let foreign = [("Origin", "https://evil.example")];
@@ -420,7 +445,7 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
     assert_eq!(post(console, "login", None, &huge).status, 413);
 
     // The default account: its token opens the password change alone.
-    let first = login(console, "admin", "admin123");
+    let first = login(console, "admin", generated);
     let changing = token(&first);
     let answer = first.json();
     assert_eq!(answer["change_required"], true);
@@ -440,11 +465,11 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
     assert_eq!(refusal(&tokenless), (401, "unauthorized".into()));
     let early = post(console, "pointer", Some(&changing), &pointer);
     assert_eq!(refusal(&early), (403, "password_change_required".into()));
-    let huge = json!({"current": "admin123", "new": "x".repeat(8 << 10)}).to_string();
+    let huge = json!({"current": generated, "new": "x".repeat(8 << 10)}).to_string();
     let reply = post(console, "account/password", Some(&changing), &huge);
     assert_eq!(reply.status, 413);
     // Unknown username and wrong password alike; a tampered token is a 401 before routing.
-    let unknown = login(console, "nobody", "admin123");
+    let unknown = login(console, "nobody", generated);
     let wrong = login(console, "admin", "admin124");
     assert_eq!(refusal(&unknown), (401, "invalid_credentials".into()));
     assert_eq!(unknown.body, wrong.body);
@@ -485,12 +510,12 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
     }
 
     // The change: the policy first, then the current password.
-    let short = change(console, &changing, "admin123", "too short");
+    let short = change(console, &changing, generated, "too short");
     assert_eq!(refusal(&short), (422, "password_policy".into()));
     assert_eq!(short.json()["error"]["rule"], "too_short");
     let bad_current = change(console, &changing, "admin124", CHANGED);
     assert_eq!(refusal(&bad_current), (401, "invalid_credentials".into()));
-    let changed = change(console, &changing, "admin123", CHANGED);
+    let changed = change(console, &changing, generated, CHANGED);
     let operator = token(&changed);
     assert_eq!(changed.json()["change_required"], false);
     let session = ask(console, "/api/v1/session", &operator);
@@ -503,7 +528,7 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
     // The token issued before the change keeps its mark until it expires.
     let reply = ask(console, "/api/v1/session", &changing);
     assert_eq!(refusal(&reply), (403, "password_change_required".into()));
-    assert_eq!(refusal(&login(console, "admin", "admin123")).0, 401);
+    assert_eq!(refusal(&login(console, "admin", generated)).0, 401);
     let again = login(console, "admin", CHANGED);
     assert_eq!(again.json()["change_required"], false);
     let operator_again = token(&again);
@@ -614,7 +639,7 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
     for reply in &replies {
         reply.assert_no_cookie_or_cors();
     }
-    let passwords = ["admin123", "admin124", CHANGED, "too short"];
+    let passwords = [generated, "admin124", CHANGED, "too short"];
     let mut tokens = vec![
         changing.as_str(),
         operator.as_str(),
@@ -662,6 +687,7 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
     let bad = format!("ui: accounts: a row of {table} fails its checks and admits nothing\n");
     assert_eq!(stderr.matches(&bad).count(), 1, "{stderr}");
     assert!(!stderr.contains("'root'"), "{stderr}");
+    assert!(!stderr.contains(FIRST), "{stderr}");
     assert_leaks_nothing(&audit, &keys, &stderr, &passwords, &tokens);
 }
 
@@ -680,7 +706,6 @@ fn the_default_account_is_created_once_from_the_setting_and_never_again() {
     let console = &local.console;
     let first = login(console, "admin", "deployer chose this one");
     assert_eq!(first.json()["change_required"], false, "{}", first.body);
-    assert_eq!(refusal(&login(console, "admin", "admin123")).0, 401);
     let Local {
         dir,
         audit,
@@ -699,7 +724,8 @@ fn the_default_account_is_created_once_from_the_setting_and_never_again() {
         login(&restarted, "admin", "another one entirely").status,
         401
     );
-    drop(restarted);
+    let stderr = restarted.stderr();
+    assert!(!stderr.contains(FIRST), "{stderr}");
 
     // On an empty table, a setting that fails the policy refuses the start, naming its key.
     audit
@@ -718,8 +744,8 @@ fn the_default_account_is_created_once_from_the_setting_and_never_again() {
         "{stderr}"
     );
 
-    // Two consoles started together on an empty table: both start, one account, `admin123`
-    // with a change required.
+    // Two consoles started together on an empty table: both start, one account, and one of
+    // them shows its generated password, on one line.
     let together: Vec<Server> = std::thread::scope(|scope| {
         let starts: Vec<_> = (0..2).map(|_| scope.spawn(|| start(&dir, &[]))).collect();
         starts.into_iter().map(|s| s.join().unwrap()).collect()
@@ -729,10 +755,23 @@ fn the_default_account_is_created_once_from_the_setting_and_never_again() {
         audit.schema
     ));
     assert_eq!(count, ["1"]);
+    // An answer comes after the line: it is printed before the console accepts a connection.
     for console in &together {
-        let reply = login(console, "admin", "admin123");
-        assert_eq!(reply.json()["change_required"], true, "{}", reply.body);
+        assert_eq!(get(console, "/api/v1/config").status, 200);
     }
+    let stderr: String = together.into_iter().map(Server::stderr).collect();
+    let shown: Vec<&str> = (stderr.lines())
+        .filter_map(|line| line.strip_prefix(FIRST))
+        .collect();
+    assert_eq!(shown.len(), 1, "{stderr}");
+    assert_eq!(stderr.matches(FIRST).count(), 1, "{stderr}");
+    // The next start of the same workspace shows nothing; the password signs in, and demands
+    // its change.
+    let again = start(&dir, &[]);
+    let reply = login(&again, "admin", shown[0]);
+    assert_eq!(reply.json()["change_required"], true, "{}", reply.body);
+    let stderr = again.stderr();
+    assert!(!stderr.contains(FIRST), "{stderr}");
 }
 
 /// A sign-in whose audit record cannot be written gives no token: a 503 `audit_unavailable`;
@@ -742,11 +781,13 @@ fn no_token_without_its_record_and_no_hash_past_the_bound() {
     let Some(local) = local("accounts_audit", &[]) else {
         return;
     };
+    let generated = local.first.clone().unwrap();
+    let generated = generated.as_str();
     let console = &local.console;
     // Past the bound: a burst of sign-ins, each a hash, gets some 503 `busy`, the rest the 401.
     let burst: Vec<Reply> = std::thread::scope(|scope| {
         let sent: Vec<_> = (0..24)
-            .map(|_| scope.spawn(|| login(console, "nobody", "admin123")))
+            .map(|_| scope.spawn(|| login(console, "nobody", generated)))
             .collect();
         sent.into_iter().map(|s| s.join().unwrap()).collect()
     });
@@ -762,7 +803,7 @@ fn no_token_without_its_record_and_no_hash_past_the_bound() {
         "ALTER TABLE \"{}\".audit RENAME TO audit_gone",
         local.audit.schema
     ));
-    let reply = login(console, "admin", "admin123");
+    let reply = login(console, "admin", generated);
     assert_eq!(refusal(&reply), (503, "audit_unavailable".into()));
     assert!(
         reply.json().get("token").is_none() && !reply.body.contains("ey"),
@@ -773,12 +814,12 @@ fn no_token_without_its_record_and_no_hash_past_the_bound() {
         "ALTER TABLE \"{}\".audit_gone RENAME TO audit",
         local.audit.schema
     ));
-    let changing = token(&login(console, "admin", "admin123"));
+    let changing = token(&login(console, "admin", generated));
     // Postgres gone: no sign-in, no change.
     local.audit.relay.close();
-    let reply = login(console, "admin", "admin123");
+    let reply = login(console, "admin", generated);
     assert_eq!(refusal(&reply), (503, "audit_unavailable".into()));
-    let reply = change(console, &changing, "admin123", CHANGED);
+    let reply = change(console, &changing, generated, CHANGED);
     assert_eq!(refusal(&reply), (503, "audit_unavailable".into()));
     let Local {
         console,
@@ -787,7 +828,7 @@ fn no_token_without_its_record_and_no_hash_past_the_bound() {
         ..
     } = local;
     let stderr = console.stderr();
-    assert_leaks_nothing(&audit, &keys, &stderr, &["admin123", CHANGED], &[&changing]);
+    assert_leaks_nothing(&audit, &keys, &stderr, &[generated, CHANGED], &[&changing]);
 }
 
 /// The demo's end: the default account, its password changed, saves a workspace version as the
@@ -829,10 +870,12 @@ fn the_global_operator_saves_a_workspace_version_audited_under_its_local_subject
     fs::write(fleet.dir.join("ops/console.toml"), bootstrap).unwrap();
     super::front_end(&fleet.dir, Some(VERSION));
     let args = ["--listen", "127.0.0.1:0", "--workspace", "ops/console.toml"];
-    let console = Server::start_command(&fleet.dir, "ui", &args, &[("MEADA_TEST_S3_KEY", KEY_ID)]);
+    let env = [("MEADA_TEST_S3_KEY", KEY_ID)];
+    let mut console = Server::start_command(&fleet.dir, "ui", &args, &env);
+    let generated = first_password(&mut console);
 
-    let changing = token(&login(&console, "admin", "admin123"));
-    let operator = token(&change(&console, &changing, "admin123", CHANGED));
+    let changing = token(&login(&console, "admin", &generated));
+    let operator = token(&change(&console, &changing, &generated, CHANGED));
     let body = json!({"entries": entries(&[ONE]), "message": "only one"}).to_string();
     let refused = post(&console, "workspace/versions", Some(&changing), &body);
     assert_eq!(refusal(&refused), (403, "password_change_required".into()));

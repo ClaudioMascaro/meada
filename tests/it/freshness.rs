@@ -2341,3 +2341,97 @@ fn a_new_nested_pyproject_binds_its_imports_like_a_cold_index() {
         )
     );
 }
+
+const CATALOG: Option<&str> = Some("https://example.com/acme/catalog.git");
+
+/// The catalog of the drift chain with a TypeScript consumer of its comments route in another
+/// file, and a Python job beside them: a group of its own, which no edit below reaches.
+fn catalog(case: &str) -> PathBuf {
+    let repo = fixture_repo(case, "chain-drift/catalog", CATALOG);
+    fs::create_dir_all(repo.join("web")).unwrap();
+    fs::write(
+        repo.join("web/comments.ts"),
+        "export async function titles() {\n  const response = await fetch(\"/api/comments\");\n  \
+         const comments = await response.json();\n  return comments.map((c) => c.title);\n}\n",
+    )
+    .unwrap();
+    fs::create_dir_all(repo.join("jobs")).unwrap();
+    fs::write(
+        repo.join("jobs/report.py"),
+        "import requests\n\nBASE = \"https://billing.example.com\"\n\n\ndef report():\n    \
+         return requests.get(BASE + \"/api/invoices\")\n",
+    )
+    .unwrap();
+    repo
+}
+
+/// Makes the provider of the route the consumer of another file calls answer one comment, not
+/// a list: the link's drift follows. What the file exports stays, so the Python job's group is
+/// kept.
+fn answer_one(repo: &Path) {
+    let parse = "const comments = Comments.parse(await load());";
+    let one = "const comments = Comment.parse(await load());";
+    replace(repo, "app/api/comments/route.ts", parse, one);
+}
+
+/// Adds a field to the schema another file's routes answer with.
+fn widen_schema(repo: &Path) {
+    replace(
+        repo,
+        "lib/schemas.ts",
+        "  id: z.string(),\n  title",
+        "  id: z.string(),\n  rating: z.number(),\n  title",
+    );
+}
+
+/// A refresh keeps the rows of the group nothing changed in (#391), and the group a file changed
+/// in follows its edit across files: the link of a consumer in another file to the edited
+/// provider, and the routes whose shape a schema of another file gives. Dropping the kept
+/// group's contract rows turns either case red.
+#[test]
+fn a_refresh_keeps_untouched_groups_and_follows_edits_across_files_like_a_cold_index() {
+    for (case, edit) in [
+        ("fresh_kept_provider", answer_one as fn(&Path)),
+        ("fresh_kept_schema", widen_schema),
+    ] {
+        let repo = catalog(case);
+        age(&repo);
+        let engine = Engine::open(&repo).unwrap();
+        let before = engine.export().unwrap();
+        assert!(
+            before.contains("billing.example.com"),
+            "{case}: the job's consumer"
+        );
+        edit(&repo);
+
+        let refreshed = engine.export().unwrap();
+
+        assert_ne!(refreshed, before, "{case}");
+        let cold = catalog(&format!("{case}_cold"));
+        edit(&cold);
+        assert_eq!(
+            refreshed,
+            Engine::open(&cold).unwrap().export().unwrap(),
+            "{case}"
+        );
+    }
+}
+
+/// A refresh does not read a kept group's files again (#391): the Python job's file, rewritten
+/// under its old stamp with a host of the same length, still gives its old consumer after an
+/// edit of the TypeScript group, since its values are not parsed again.
+#[test]
+fn a_refresh_does_not_parse_a_kept_group_again() {
+    let repo = catalog("fresh_kept_unread");
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    engine.export().unwrap();
+    replace(&repo, "jobs/report.py", "billing", "bulling");
+    age(&repo);
+    answer_one(&repo);
+
+    let refreshed = engine.export().unwrap();
+
+    assert!(refreshed.contains("billing.example.com"), "{refreshed}");
+    assert!(!refreshed.contains("bulling"), "{refreshed}");
+}

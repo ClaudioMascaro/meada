@@ -47,7 +47,7 @@ test('the first sign-in of the default account goes through the forced change to
   expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe(t.signInTitle);
   expect(queryByRole(host, 'navigation')).toBeNull();
   expect(fetch).not.toHaveBeenCalled();
-  type(t.username, 'admin'); type(t.password, 'admin123');
+  type(t.username, 'admin'); type(t.password, 'first password here');
   await submit();
   // Change required: the forced page, with nothing to navigate to and no other request.
   await waitFor(() => expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe(t.forcedTitle));
@@ -56,7 +56,7 @@ test('the first sign-in of the default account goes through the forced change to
   await act(async () => { history.pushState(null, '', '/workspace'); dispatchEvent(new PopStateEvent('popstate')); });
   expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe(t.forcedTitle);
   expect(fetch.mock.calls.map(call => call[0])).toEqual(['/api/v1/login']);
-  type(t.currentPassword, 'admin123'); type(t.newPassword, 'correct horse battery staple'); type(t.repeatPassword, 'correct horse battery staple');
+  type(t.currentPassword, 'first password here'); type(t.newPassword, 'correct horse battery staple'); type(t.repeatPassword, 'correct horse battery staple');
   await submit();
   await waitFor(() => expect(location.pathname).toBe('/workspace'));
   await waitFor(() => expect(host.textContent).toContain('local:admin'));

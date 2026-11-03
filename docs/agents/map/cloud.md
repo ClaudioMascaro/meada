@@ -373,7 +373,7 @@ section of `meada.workspace.toml`:
   names and a `login`, when present, that `grant::login_ok` takes (a lowercase GitHub login).
   `policy(password, username)` is the password policy, one pure function returning the first `Rule`
   failed: fewer than `PASSWORD_MIN` (12) or more than `PASSWORD_MAX` (128) Unicode
-  scalar values, the default password, the username ignoring case, an entry of the
+  scalar values, the username ignoring case, an entry of the
   common-password list ignoring case (`Rule::Common`, #555: `accounts/common-passwords.txt`,
   embedded with `include_str!`, the entries of 12 to 128 characters of SecLists' million most
   common passwords, lowercase and sorted by bytes for a binary search, its source, commit,

@@ -37,8 +37,6 @@ pub(crate) mod store;
 
 /// The default account's username.
 pub const DEFAULT_USERNAME: &str = "admin";
-/// The default account's published password, which must be changed before anything else.
-pub const DEFAULT_PASSWORD: &str = "admin123";
 /// The variable `admin_password_env` names by default.
 pub const ADMIN_PASSWORD_ENV: &str = "MEADA_ADMIN_PASSWORD";
 /// The audience of a session token: the console's surface.
@@ -400,8 +398,8 @@ impl Config {
     }
 
     /// The default account's initial password the deployer set: `None` when the variable is
-    /// unset or empty (the published default applies), the problem naming the key when the file
-    /// cannot be read. Read only when the default account is created.
+    /// unset or empty (the console generates the first password), the problem naming the key
+    /// when the file cannot be read. Read only when the default account is created.
     pub fn admin_password(&self) -> Result<Option<String>, Problem> {
         match &self.admin_password {
             // A value that is not UTF-8 is refused, never taken for an unset variable.
@@ -626,8 +624,6 @@ pub enum Rule {
     Short,
     /// More than `PASSWORD_MAX` characters.
     Long,
-    /// The published default password.
-    Default,
     /// The username, ignoring case.
     Username,
     /// An entry of the common-password list, ignoring case.
@@ -642,7 +638,6 @@ impl Rule {
         match self {
             Rule::Short => "too_short",
             Rule::Long => "too_long",
-            Rule::Default => "default_password",
             Rule::Username => "username",
             Rule::Common => "common_password",
             Rule::Current => "current_password",
@@ -654,7 +649,6 @@ impl Rule {
         match self {
             Rule::Short => Msg::AccountsPasswordShort(PASSWORD_MIN).text(),
             Rule::Long => Msg::AccountsPasswordLong(PASSWORD_MAX).text(),
-            Rule::Default => Msg::AccountsPasswordDefault.text(),
             Rule::Username => Msg::AccountsPasswordUsername.text(),
             Rule::Common => Msg::AccountsPasswordCommon.text(),
             Rule::Current => Msg::AccountsPasswordCurrent.text(),
@@ -664,8 +658,8 @@ impl Rule {
 
 /// The password policy (OWASP ASVS), shared by every route and the CLI: 12 to 128 characters
 /// counted as Unicode scalar values, any character, no composition rule and no truncation;
-/// refused when it is the default password, the username ignoring case, or an entry of the
-/// common-password list ignoring case. The first rule it fails, in that order.
+/// refused when it is the username ignoring case, or an entry of the common-password list
+/// ignoring case. The first rule it fails, in that order.
 pub fn policy(password: &str, username: &str) -> Result<(), Rule> {
     let length = password.chars().count();
     let lower = password.to_lowercase();
@@ -673,8 +667,6 @@ pub fn policy(password: &str, username: &str) -> Result<(), Rule> {
         Err(Rule::Short)
     } else if length > PASSWORD_MAX {
         Err(Rule::Long)
-    } else if password == DEFAULT_PASSWORD {
-        Err(Rule::Default)
     } else if lower == username.to_lowercase() {
         Err(Rule::Username)
     } else if common().binary_search(&lower.as_str()).is_ok() {
@@ -690,8 +682,9 @@ fn common() -> &'static [&'static str] {
     LIST.get_or_init(|| COMMON.lines().collect())
 }
 
-/// A password for `meada ui reset-admin`: `GENERATED_LENGTH` characters of `GENERATED` from the
-/// operating system's generator, one the policy takes.
+/// A password for the default account's first start and `meada ui reset-admin`:
+/// `GENERATED_LENGTH` characters of `GENERATED` from the operating system's generator, one the
+/// policy takes.
 pub fn generated() -> String {
     use password_hash::rand_core::RngCore;
     loop {
@@ -948,14 +941,9 @@ mod tests {
         ] {
             assert_eq!(policy(password, username), expected, "{password}");
         }
-        // The default password is shorter than the minimum: the length rule names it first, and
-        // the default rule stands for a longer default or a shorter minimum.
-        assert!(DEFAULT_PASSWORD.chars().count() < PASSWORD_MIN);
-        assert_eq!(policy(DEFAULT_PASSWORD, "admin"), Err(Rule::Short));
         let rules = [
             Rule::Short,
             Rule::Long,
-            Rule::Default,
             Rule::Username,
             Rule::Common,
             Rule::Current,
@@ -1387,10 +1375,10 @@ mod tests {
         assert_ne!(hash("correct horse battery").unwrap(), phc);
         for bad in [
             "",
-            "admin123",
+            "not a hash",
             "$argon2i$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$aGFzaA",
         ] {
-            assert!(!is_hash(bad) && !verify("admin123", bad), "{bad}");
+            assert!(!is_hash(bad) && !verify("not a hash", bad), "{bad}");
         }
         assert!(is_hash(dummy()));
         // A hostile row's parameters are bounded: one past a ceiling is no stored hash and is
@@ -1451,6 +1439,6 @@ mod tests {
             assert!(is_hash(&weak) && weaker(&weak), "{weak}");
             assert!(verify("correct horse battery", &weak), "{weak}");
         }
-        assert!(!weaker("admin123") && !weaker(""));
+        assert!(!weaker("not a hash") && !weaker(""));
     }
 }
