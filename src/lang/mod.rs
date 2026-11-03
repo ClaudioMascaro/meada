@@ -1388,9 +1388,13 @@ fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
 
 // Tree-sitter helpers every pack uses.
 
+/// The named children of `node`, tree-sitter extras (comments) left out: a comment inside a
+/// parameter or argument list is no parameter and no argument, and must not take a position.
+/// An `ERROR` node the grammar recovered with is an extra too, and stays (the Java pack reads one).
 pub(crate) fn named<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
     let mut cursor = node.walk();
-    node.named_children(&mut cursor)
+    (node.named_children(&mut cursor))
+        .filter(|n| !n.is_extra() || n.is_error())
         .collect::<Vec<_>>()
         .into_iter()
 }
@@ -1407,6 +1411,96 @@ fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
+
+    /// What a pack reads of positions: each definition's parameters, each call's arity, labels
+    /// and argument counts. A comment inside a parameter or argument list changes none of it
+    /// (#613); only ranges, which a comment shifts, are left out.
+    fn positions(pack: &dyn super::LanguagePack, path: &str, src: &str) -> Vec<String> {
+        let facts = pack.parse(path, src.as_bytes()).unwrap();
+        let defs = facts.defs.iter().map(|d| {
+            let params = serde_json::to_string(&d.params).unwrap();
+            format!("def {} {params}", d.name)
+        });
+        let calls = facts.calls.iter().map(|c| {
+            let labels = serde_json::to_string(&c.labels).unwrap();
+            let (args, kwargs) = (c.args.len(), c.kwargs.len());
+            format!("call {} {:?} {labels} {args} {kwargs}", c.callee, c.arity)
+        });
+        defs.chain(calls).collect()
+    }
+
+    /// A line comment first in a parameter list and an argument list, and a block comment between
+    /// two of them, in each pack: the facts equal those of the source without comments.
+    #[test]
+    fn a_comment_in_a_parameter_or_argument_list_takes_no_position() {
+        use super::LanguagePack;
+        // (path, pack, source with a placeholder `#` for each comment)
+        let cases: [(&str, &dyn LanguagePack, &str); 8] = [
+            (
+                "x.go",
+                &super::go::Go,
+                "package x\nfunc f(# a int, # b int) {}\nfunc g() { f(# 1, # 2) }\n",
+            ),
+            (
+                "x.rs",
+                &super::rust::Rust,
+                "fn f(# a: i32, # b: i32) {}\nfn g() { f(# 1, # 2) }\n",
+            ),
+            (
+                "X.java",
+                &super::java::Java,
+                "class X { void f(# int a, # int b) {} void g() { f(# 1, # 2); } }\n",
+            ),
+            (
+                "x.kt",
+                &super::kotlin::Kotlin,
+                "fun f(# a: Int, # b: Int) {}\nfun g() { f(# 1, # 2) }\n",
+            ),
+            (
+                "x.swift",
+                &super::swift::Swift,
+                "func f(# a: Int, # b: Int) {}\nfunc g() { f(# a: 1, # b: 2) }\n",
+            ),
+            (
+                "x.py",
+                &super::python::Python,
+                "def f(# a, # b): pass\ndef g(): f(# 1, # 2)\n",
+            ),
+            (
+                "x.ts",
+                &super::ts::TsJs,
+                "function f(# a, # b) {}\nfunction g() { f(# 1, # 2) }\n",
+            ),
+            (
+                "X.cs",
+                &super::csharp::CSharp,
+                "class X { void F(# int a, # int b) {} void G() { F(# 1, # 2); } }\n",
+            ),
+        ];
+        let comments = ["// first\n", "/* middle */"];
+        let python = ["# first\n", ""];
+        for (path, pack, template) in cases {
+            let [first, middle] = if path.ends_with(".py") {
+                python
+            } else {
+                comments
+            };
+            // `#` stands for the first comment at each opening and the middle one after the comma.
+            let mut with = String::new();
+            for (i, part) in template.split('#').enumerate() {
+                with.push_str(part);
+                if i + 1 < template.split('#').count() {
+                    with.push_str(if part.ends_with('(') { first } else { middle });
+                }
+            }
+            let without = template.replace('#', "");
+            assert_eq!(
+                positions(pack, path, &with),
+                positions(pack, path, &without),
+                "{path}"
+            );
+        }
+    }
 
     /// Every `&[&str]` or `[&str; N]` table a pack holds, as `file:NAME` below `src/lang`, with
     /// its class

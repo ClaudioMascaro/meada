@@ -9165,6 +9165,44 @@ fn a_chi_subrouter_passed_on_past_the_limit_is_not_read() {
     assert!(!export.contains("http::GET::/long/end"));
 }
 
+/// A line comment inside a Go parameter list or argument list (`func NewRouter( //nolint:funlen`)
+/// is no parameter and no argument (#613): the router handed to `NewRouter` still reaches its
+/// routes. The fixture writes a comment in the call and in the signature (each shifts a
+/// position, so together they cancel); each file is also read without its comments, alone and
+/// together, and all four give the same three HTTP providers.
+#[test]
+fn a_go_comment_in_a_parameter_or_argument_list_shifts_no_position() {
+    let expected = [
+        "http::GET::/clusters",
+        "http::GET::/clusters/{}",
+        "http::GET::/healthcheck",
+    ];
+    for (case, bare) in [
+        ("both", &[][..]),
+        ("call", &["cmd/main.go"][..]),
+        ("signature", &["http/router.go"][..]),
+        ("neither", &["cmd/main.go", "http/router.go"][..]),
+    ] {
+        let repo = fixture_repo(&format!("go_comments_{case}"), "go-comments", Some(ORIGIN));
+        for file in bare {
+            let source = std::fs::read_to_string(repo.join(file)).unwrap();
+            let stripped: String = (source.lines())
+                .map(|line| line.split("//").next().unwrap().trim_end())
+                .map(|line| format!("{line}\n"))
+                .collect();
+            std::fs::write(repo.join(file), stripped).unwrap();
+        }
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        let json: Value = serde_json::from_str(&export).unwrap();
+        let mut routes: Vec<&str> = (json["providers"].as_array().unwrap().iter())
+            .map(|p| p["contract"].as_str().unwrap())
+            .filter(|c| c.starts_with("http::"))
+            .collect();
+        routes.sort();
+        assert_eq!(routes, expected, "comments kept: {case}");
+    }
+}
+
 /// The routers of the Go fixture (spec #25): `net/http` patterns, and gin, echo, chi and
 /// gorilla/mux groups, with every prefix a router is registered under (chi's `Route`, `Group`
 /// and `Mount`, gorilla's `PathPrefix(..).Subrouter()`), a group passed to or returned from a

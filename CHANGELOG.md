@@ -57,6 +57,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A comment inside a Go parameter list or argument list (`func NewRouter( //nolint:funlen`,
+  `NewRouter( // engine`) is no longer read as a parameter or an argument: it took position 0, so
+  a router handed to such a function reached none of its routes. The shared child walk of the
+  packs now skips comments, which also fixes the same shift in the TypeScript pack (#613).
+
 - Express routes registered on an `express-promise-router` router (the Backstage backend default)
   are provided: its default import counts as a router factory under any local name (#614).
 - A refresh resolves a Swift file as a cold index does: the type parameters of a type or
