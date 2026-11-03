@@ -7,6 +7,13 @@ a ticket accepted, each with its value and its reason. Detail behind the
 
 ## Known ceilings
 
+- `lang/kotlin.rs`, `resolve.rs` (#455): only `private` constructors are enforced (`Facts::sealed`,
+  primary or secondary: callable from the class's own scope, its companion and nested classes
+  included). `internal` is not enforced: an `internal` class or constructor is visible
+  repository-wide, since the Kotlin pack has no module unit (`Facts::unit`: Gradle module or
+  source set), so `Foo()` of an `internal` class of another module can still resolve. A class
+  with a `private` primary and public secondary constructors keeps the secondaries as
+  candidates.
 - `names.rs`, `http/csharp.rs`, `channel/java.rs` (#466): two cases are not pinned.
   (1) #358: a Rabbit `convertAndSend("orders", o)` whose `o` is a parameter of a type the
   repository does not declare (`void f(Order o)`) reads as the named producer `amqp orders

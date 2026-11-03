@@ -79,7 +79,7 @@ from ...", with the whole list. A value the index now stores joins it.
   of a Swift file's aliases of a function type (`Facts::function_aliases`), the place of the call a
   chained call is made on and whether it is reached through `?` (`Call::on`, `Call::unwraps`), the class `?` unwraps a Rust function's written result to and the one `.await` yields from a future signature (`Def::unwrapped`, `Def::output`, `Call::awaits`), whether a Swift call is written under `await` and
   whether a function needs one (`Call::awaited`, `Def::suspends`), the modules a Swift file imports
-  `@testable` and the names only their file sees (`Facts::testable`, `Facts::confined`), whether an `inferred` call was narrowed from several
+  `@testable` and the names only their file sees (`Facts::testable`, `Facts::confined`), the Kotlin constructors only their own class calls (`Facts::sealed`), whether an `inferred` call was narrowed from several
   definitions of its name (`calls.narrowed`), the definition a decorating call decorates (`calls.decorates`, the
   call site's `decorates`), callable-to-signature and
   static-member names (`Facts::overloads`, `Facts::constructors` and

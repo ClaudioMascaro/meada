@@ -540,6 +540,10 @@ pub struct Facts {
     /// even a module imported `testable` keeps to itself.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub confined: Vec<String>,
+    /// The constructors only their own class calls (Kotlin's `private`), as the family member
+    /// that builds: the class's name for a primary one, `C.C(types)` for a secondary one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sealed: Vec<String>,
     /// The compilations (`unit`) whose `private` declarations the file sees, which
     /// `LanguagePack::join` sets (Swift's `testable` imports, as the modules they name here).
     /// Not kept in the index: it is joined again.

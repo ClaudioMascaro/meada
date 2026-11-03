@@ -343,6 +343,8 @@ pub struct Resolver<'a> {
     /// The types each file of a compilation keeps to it (`Facts::private` of a file with a
     /// `Facts::unit`), for `hidden`.
     internal: HashMap<&'a str, HashSet<&'a str>>,
+    /// The constructors each file keeps to their own class (`Facts::sealed`).
+    sealed: HashMap<&'a str, HashSet<&'a str>>,
     /// The names of each file with some (`Facts::confined`).
     confined: HashMap<&'a str, HashSet<&'a str>>,
     /// The names some file of the repository writes through a selector (`cfg.Base = ..`): a
@@ -870,6 +872,10 @@ impl<'a> Resolver<'a> {
             .filter(|(_, facts)| !facts.confined.is_empty())
             .map(|(path, facts)| (*path, facts.confined.iter().map(String::as_str).collect()))
             .collect();
+        let sealed = (files.iter())
+            .filter(|(_, facts)| !facts.sealed.is_empty())
+            .map(|(path, facts)| (*path, facts.sealed.iter().map(String::as_str).collect()))
+            .collect();
         let locals = files
             .iter()
             .map(|(path, facts)| (*path, facts.locals.iter().map(String::as_str).collect()))
@@ -980,6 +986,7 @@ impl<'a> Resolver<'a> {
             consts,
             internal,
             confined,
+            sealed,
             locals,
             receivers,
             params,
@@ -1301,7 +1308,9 @@ impl<'a> Resolver<'a> {
         };
         let binding = match binding {
             Binding::Several(all) if constructs => {
-                let classes: Vec<_> = all.into_iter().filter(|t| self.is_class(*t)).collect();
+                let classes: Vec<_> = (all.into_iter())
+                    .filter(|t| self.is_class(*t) && !self.sealed_from(call.scope.as_str(), *t))
+                    .collect();
                 match classes[..] {
                     [] => return Resolution::Unresolved,
                     [one] => Binding::Def(one),
@@ -1333,6 +1342,14 @@ impl<'a> Resolver<'a> {
                     .collect();
                 all.sort();
                 all.dedup();
+                // A `private` constructor is the class's own to call (Kotlin).
+                all.retain(|t| !self.sealed_from(call.scope.as_str(), *t));
+                let absent = match absent {
+                    Binding::Def(t) if self.sealed_from(call.scope.as_str(), t) => {
+                        return Resolution::Unresolved;
+                    }
+                    absent => absent,
+                };
                 // An initializer the type's compilation keeps to itself is no candidate from
                 // another one, as a member is not (`accessible`).
                 match all.is_empty() {
@@ -3431,6 +3448,19 @@ impl<'a> Resolver<'a> {
             return false;
         };
         from.internals.contains(&at.unit)
+    }
+
+    /// Whether `t` is a `private` constructor (`Facts::sealed`) of a class a call in `scope` is
+    /// not inside, nested classes and the companion included.
+    fn sealed_from(&self, scope: &str, t: Target) -> bool {
+        if !(self.sealed.get(t.path)).is_some_and(|s| s.contains(t.name)) {
+            return false;
+        }
+        let class = match self.defs[t.path][t.name].kind {
+            Kind::Class => t.name,
+            _ => crate::parent(t.name),
+        };
+        !(scope == class || scope.starts_with(&format!("{class}.")))
     }
 
     /// Whether `t` is, or is declared in, a type its file keeps to its compilation
@@ -11751,6 +11781,42 @@ mod kotlin_tests {
             }
         }
         out
+    }
+
+    /// A `private` constructor, primary or secondary, is its class's to call (#455): from
+    /// another class the call resolves to nothing, from a method or the companion it is
+    /// `exact`. An `internal` one is not enforced (`docs/agents/ceilings.md`).
+    #[test]
+    fn a_private_constructor_is_called_from_inside_its_class_alone() {
+        let found = resolved(&[(
+            "p/A.kt",
+            "package p
+class P private constructor(val n: Int) {
+    fun again() = P(1)
+    companion object { fun make() = P(2) }
+}
+class S {
+    private constructor(n: Int) {}
+    constructor() : this(1)
+    fun again() = S(1)
+}
+class I internal constructor(val n: Int)
+class Out {
+    fun go() { P(1); S(1); I(1) }
+}
+",
+        )]);
+        let get = |key: &str| {
+            found
+                .get(key)
+                .unwrap_or_else(|| panic!("{key} in {found:?}"))
+        };
+        assert_eq!(get("p/A.kt p.Out.go() P"), "none");
+        assert_eq!(get("p/A.kt p.Out.go() S"), "none");
+        assert_eq!(get("p/A.kt p.P.again() P"), "exact p/A.kt::p.P");
+        assert_eq!(get("p/A.kt p.P.Companion.make() P"), "exact p/A.kt::p.P");
+        assert_eq!(get("p/A.kt p.S.again() S"), "exact p/A.kt::p.S.S(Int)");
+        assert!(get("p/A.kt p.Out.go() I").starts_with("exact"), "{found:?}");
     }
 
     /// `val v{i} = v{i + 1}.C()` through star imports, Kotlin's: the class of each local is

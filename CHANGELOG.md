@@ -52,6 +52,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Kotlin `private` constructor, primary (`class C private constructor(..)`) or secondary, is
+  called only from inside its class: a call from another class no longer resolves to it, one from
+  the class, its companion or a nested class stays `exact`. `internal` is still not enforced
+  (#455).
 - A Rust name two globs give (`use x::*; use y::*;`, which compiles only under `cfg`
   alternatives) is `ambiguous` between them, not `exact` to the latest glob; an explicit item or
   `use` beside the globs still wins (#439).
