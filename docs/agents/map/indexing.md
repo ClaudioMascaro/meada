@@ -114,7 +114,9 @@ from ...", with the whole list. A value the index now stores joins it.
   `manifests` summaries of each `package.json` (name, version, the dependency ranges as
   written, `exports` as written, `types`, `module` and `main`) and, spec #24, of each
   `pyproject.toml` (normalized name, version, the dependency specifiers as written, the source
-  roots and the console scripts it declares) and `requirements*.txt` (the dependency specifiers as written), of
+  roots and the console scripts it declares, a `[project] dependencies` entry's uv source as
+  `via` or `inherits` (#533), and a uv workspace root's `members` and `exclude` globs as
+  `uv_workspace`) and `requirements*.txt` (the dependency specifiers as written), of
   each `Cargo.toml` (spec #30: name, version or the flag that it inherits one, the library root
   as a path of the repository and the `[lib] name` when it differs from the package's, the
   entries with the version requirement as written, the `alias` when the key renames the crate
@@ -616,6 +618,9 @@ from ...", with the whole list. A value the index now stores joins it.
   `Code`
   folds constants and client wrapper arguments into values for contract kinds, a destructured
   object parameter reading its names (`Param::fields`) off the literal object the caller passes.
+  A call to a function that only returns a string (`Def::lone_string`, filled by the TS/JS pack for an
+  expression body or one lone `return`) folds to it with the call's arguments (`Code::built`, #536):
+  `exact` calls alone, every part known or the call stays as written.
   `Code::expand` returns, for each site, the wrapper calls it
   climbed (`Expanded::frames`, `Frame {def, path, index}`, innermost first), and `Code::uses(path, index)` reads
   `Call::uses` like `args` (a file without full facts is a miss). An argument binds a parameter as its `Param::binds` says: by position or by

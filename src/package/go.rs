@@ -6,15 +6,17 @@
 //! An entry keeps where its module comes from in `Entry::via`, as Cargo's does: `path
 //! <go.mod>` for a `replace` to a local directory (folded lexically from the manifest's
 //! directory: a path of the repository, or one that starts with `../` when it leaves it),
-//! `outside` for a `replace` by anything else (a module, an absolute path), which leaves the
-//! module out of the workspace, and nothing otherwise. Ranges are never checked, and neither
-//! `go.sum` nor the module proxy is read.
+//! `module <path>` for a `replace` by another module (the module path as written), which keeps
+//! only the provider in the repository that path names, and `outside` for any other target (an
+//! absolute path), which leaves the module out of the workspace; nothing otherwise. Ranges are
+//! never checked, and neither `go.sum` nor the module proxy is read.
 //!
 //! Each rule answers one question of `Ecosystem`:
 //! - `names_package`: any valid contract name may name a module (a module path needs no dot).
 //! - `entries`: the entry of the owning `go.mod` with the longest module path the import starts
 //!   with, the rest of the import as the subpath.
-//! - `reaches`: a local `replace` is a path source, the rule Cargo's `path` follows (`sourced`).
+//! - `reaches`: a local `replace` is a path source, the rule Cargo's `path` follows (`sourced`);
+//!   a `replace` by a module reaches the `go.mod` of the repository the module path names.
 //! - `resolve`: the one package directory the subpath names in the module, test files and the
 //!   files of a nested module left out, through the provider view's directory table.
 
@@ -34,6 +36,9 @@ use crate::repo::relative;
 const REQUIRE: &str = "require";
 /// The field of an entry only a `replace` gives (a module some other module requires).
 const REPLACE: &str = "replace";
+
+/// The start of a `via` that names a module (`module <path>`).
+const MODULE: &str = "module";
 
 /// The Go ecosystem.
 pub struct Go;
@@ -67,6 +72,7 @@ impl Ecosystem for Go {
             Some(match local.flatten() {
                 Some(at) if at.is_empty() => "path go.mod".to_string(),
                 Some(at) => format!("path {at}/go.mod"),
+                None if modfile::module_target(target) => format!("{MODULE} {target}"),
                 None => "outside".to_string(),
             })
         };
@@ -138,14 +144,18 @@ impl Ecosystem for Go {
             .collect()
     }
 
-    /// A local `replace` by the folded location, as Cargo's `path` (`sourced`).
+    /// A local `replace` by the folded location, as Cargo's `path` (`sourced`); a `replace` by a
+    /// module only the `go.mod` that module's repository holds (`modfile::held_by`).
     fn reaches(
         &self,
         (via, _): (Option<&str>, Option<&str>),
         from: (&str, &Path),
         to: ((&str, &Path), &str),
     ) -> bool {
-        sourced(via, from, to)
+        match via.and_then(|v| v.strip_prefix(MODULE)?.strip_prefix(' ')) {
+            Some(target) => modfile::held_by(target, to.0.0, to.1),
+            None => sourced(via, from, to),
+        }
     }
 
     /// The symbol `chain` names in the Go package at `subpath` (`.` for the module's root, else
@@ -221,6 +231,7 @@ mod tests {
               replace example.com/b v1.1.0 => example.com/fork v1.0.0\n\
               replace example.com/c => ./vendor/c\n\
               replace example.com/e => ../../e\n\
+              replace example.com/g => /abs/g\n\
               replace example.com/f => example.com/fork v1.0.0\n",
         );
         assert_eq!(s.name.as_deref(), Some("example.com/app"));
@@ -235,7 +246,12 @@ mod tests {
                     Some("v1.0.0"),
                     Some("path a/go.mod")
                 ),
-                ("require", "example.com/b", Some("v1.1.0"), Some("outside")),
+                (
+                    "require",
+                    "example.com/b",
+                    Some("v1.1.0"),
+                    Some("module example.com/fork")
+                ),
                 (
                     "require",
                     "example.com/c",
@@ -245,6 +261,33 @@ mod tests {
                 ("require", "example.com/d", Some("v1.3.0"), None),
             ]
         );
+    }
+
+    #[test]
+    fn a_replace_by_a_module_reaches_the_go_mod_of_the_repository_that_path_names() {
+        let s = Go.read(
+            "app/go.mod",
+            b"require (\n\texample.com/lib v1.0.0\n\texample.com/abs v1.0.0\n)\n\
+              replace example.com/lib => github.com/Acme/Fork/v2 v2.0.0\n\
+              replace example.com/abs => /abs/dir\n",
+        );
+        let vias: Vec<_> = s.dependencies.iter().map(|e| e.via.as_deref()).collect();
+        assert_eq!(
+            vias,
+            [Some("outside"), Some("module github.com/Acme/Fork/v2")]
+        );
+        let from = ("app", Path::new("/w/app"));
+        let to = |id| ((id, Path::new("/w/x")), "go.mod");
+        let reaches = |via, id| Go.reaches((via, None), from, to(id));
+        assert!(reaches(vias[1], "github.com/acme/fork"));
+        assert!(!reaches(vias[1], "github.com/acme/other"));
+        // An `outside` entry reaches no repository.
+        assert!(!reaches(vias[0], "github.com/acme/fork"));
+        assert!(!Go.reaches(
+            (vias[1], None),
+            from,
+            (("github.com/acme/fork", Path::new("/w/x")), "sub/go.mod")
+        ));
     }
 
     #[test]

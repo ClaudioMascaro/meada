@@ -1,0 +1,7 @@
+[project]
+name = "local"
+version = "0.1.0"
+dependencies = ["anyio>=4,<5"]
+
+[tool.uv.sources]
+anyio = { path = "../stub" }

@@ -199,6 +199,29 @@ pub fn local_target(target: &str) -> bool {
     target.starts_with("./") || target.starts_with("../") || matches!(target, "." | "..")
 }
 
+/// Whether a `replace` target that is no local directory is a module path (not an absolute
+/// path, a Windows path or a URL).
+pub fn module_target(target: &str) -> bool {
+    !target.starts_with(['/', '\\', '.']) && !target.contains([':', '\\'])
+}
+
+/// Whether the `go.mod` at `manifest` of the repository `identity` is the module a `replace`
+/// target names: the repository's identity is the target's `<host>/<owner>/<repo>` prefix (the
+/// identity is lower-cased, a module path is not) and what follows the prefix is the directory of
+/// the `go.mod`, with or without the `/vN` major version element (a `v2/go.mod` holds `.../v2`,
+/// and so does a root `go.mod` that declares it). The prefix is matched first, so an identity may
+/// hold a `vN` element itself.
+pub fn held_by(target: &str, identity: &str, manifest: &str) -> bool {
+    let dir = manifest.rsplit_once('/').map_or("", |(d, _)| d);
+    // Only the prefix is lower-cased: the directory after it keeps its case.
+    let lower = target.to_ascii_lowercase();
+    let Some(rest) = inside(&lower, identity).map(|r| &target[target.len() - r.len()..]) else {
+        return false;
+    };
+    let versioned = unversioned(&format!("_/{rest}"));
+    rest == dir || versioned[1..].trim_start_matches('/') == dir
+}
+
 /// The repository directory a `replace` target names, relative to the `go.mod` in `dir`: only a
 /// local path (`local_target`) that stays inside the repository.
 fn local(dir: &str, target: &str) -> Option<String> {
@@ -233,6 +256,54 @@ mod tests {
                 ],
             }
         );
+    }
+
+    #[test]
+    fn a_target_names_the_go_mod_of_the_repository_whose_identity_prefixes_it() {
+        let id = "github.com/regen-network/protobuf";
+        let held = |target: &str, manifest: &str| held_by(target, id, manifest);
+        assert!(held("github.com/regen-network/protobuf", "go.mod"));
+        // A mixed-case path, as module paths are case-sensitive and identities are not.
+        assert!(held("github.com/Regen-Network/protobuf", "go.mod"));
+        assert!(held("github.com/regen-network/protobuf/v2", "go.mod"));
+        assert!(held("github.com/regen-network/protobuf/v2", "v2/go.mod"));
+        assert!(held(
+            "github.com/regen-network/protobuf/v2/sub",
+            "sub/go.mod"
+        ));
+        // The identity may hold a `vN` element of its own.
+        assert!(held_by(
+            "github.com/acme/v2",
+            "github.com/acme/v2",
+            "go.mod"
+        ));
+        // A subdirectory places the module inside the repository.
+        assert!(held("github.com/regen-network/protobuf/sub", "sub/go.mod"));
+        assert!(!held("github.com/regen-network/protobuf/sub", "go.mod"));
+        assert!(!held("github.com/regen-network/protobuf", "sub/go.mod"));
+        // The directory after the prefix keeps its case.
+        assert!(held(
+            "github.com/Regen-Network/protobuf/SubDir",
+            "SubDir/go.mod"
+        ));
+        assert!(!held(
+            "github.com/regen-network/protobuf/SubDir",
+            "subdir/go.mod"
+        ));
+        // Another repository, or a longer name: no.
+        assert!(!held("github.com/regen-network/protobuf2", "go.mod"));
+        assert!(!held("github.com/regen-network", "go.mod"));
+        assert!(!held("github.com/other/protobuf", "go.mod"));
+    }
+
+    #[test]
+    fn only_a_module_path_is_a_module_target() {
+        assert!(module_target("github.com/a/b"));
+        assert!(module_target("kit"));
+        assert!(!module_target("/abs/dir"));
+        assert!(!module_target("C:\\dir"));
+        assert!(!module_target("./x"));
+        assert!(!module_target("https://x"));
     }
 
     #[test]

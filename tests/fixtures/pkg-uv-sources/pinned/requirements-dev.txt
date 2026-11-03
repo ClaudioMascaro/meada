@@ -1,0 +1,1 @@
+bird-feeder>=1,<2

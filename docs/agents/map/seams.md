@@ -197,7 +197,10 @@ entries per library of the HTTP and channel kinds. The architecture map keeps th
     build files leave without a literal (a pom property, `project.groupId` or `project.artifactId`,
     a parent pom's property through `inherit`; a Gradle name assigned once to a plain string).
     `uncertainty`: none; Maven's `computed` source keeps even one match ambiguous.
-  - `flag`: the range is unchecked (`range unchecked`); npm checks semver.
+  - `unsourced`: none; PyPI says an entry with no uv source names no local package, so a lone
+    fit in the consumer's own repository is `inferred` (#535).
+  - `flag`: the range is unchecked (`range unchecked`); npm checks semver and
+    PyPI PEP 440 (`package/pep440.rs`).
   - `reaches`: every provider; npm's `workspace:` keeps the dependent's own repository, Cargo
     and Go share `sourced`, in the seam (a `path` by the folded location, a `git` by the
     remote's identity); NuGet's `ProjectReference` (a `path <project file>` source) uses it too

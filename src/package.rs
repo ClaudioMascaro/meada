@@ -49,6 +49,7 @@ mod hostile;
 mod maven;
 mod npm;
 mod nuget;
+mod pep440;
 mod pypi;
 mod swiftpm;
 
@@ -120,6 +121,13 @@ trait Ecosystem {
 
     /// Why the dependency's source cannot establish an exact coordinate, if any.
     fn uncertainty(&self, _via: Option<&str>) -> Option<&'static str> {
+        None
+    }
+
+    /// Why a lone provider in the consumer's own repository is not certain, if any: the entry's
+    /// source (`via`) names none, and the ecosystem installs by name from a registry. Not asked
+    /// for a provider in another repository, where the workspace holds the published package.
+    fn unsourced(&self, _via: Option<&str>) -> Option<&'static str> {
         None
     }
 
@@ -440,6 +448,10 @@ pub struct Summary {
     /// The console scripts a `pyproject.toml` declares, as `(module, function)` (PyPI only).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scripts: Vec<(String, String)>,
+    /// PyPI only: the `members` and `exclude` globs of a uv workspace root's
+    /// `[tool.uv.workspace]`, which the seam's `inherit` reads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uv_workspace: Option<(Vec<String>, Vec<String>)>,
     /// The `[workspace.dependencies]` entries of a `Cargo.toml` (Cargo only). For Cargo,
     /// `main` is the library's root file, as a path of the repository.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -490,11 +502,13 @@ pub struct Entry {
     /// Cargo only: the key the entry is written under when it renames the package.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
-    /// Where the package comes from: Cargo's `path <manifest>` or `git <identity>`,
+    /// Where the package comes from: Cargo's (and a uv source's) `path <manifest>` or
+    /// `git <identity>`, `outside` for a source no repository of the workspace holds,
     /// or `computed` for a coordinate whose literal fragments only constrain candidates.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub via: Option<String>,
-    /// Cargo only: `workspace = true`, until the seam's `inherit` fills the entry.
+    /// Cargo and PyPI only: `workspace = true` (a uv source for PyPI), until the seam's
+    /// `inherit` fills the entry.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub inherits: bool,
     /// NuGet and a `pom.xml` only: the entry does not pass on to the manifest's dependents, so a
@@ -710,7 +724,7 @@ fn bare_directory(path: &str) -> &str {
     path.rsplit_once('/').map_or("", |(dir, _)| dir)
 }
 
-/// Whether a Cargo or Go entry of source `via` may reach the provider whose manifest is
+/// Whether a Cargo, Go or PyPI entry of source `via` may reach the provider whose manifest is
 /// `provider` in the repository `to`, from a manifest of `from` (each repository by identity and
 /// root): a `path` entry only the package at that path, a `git` one only the repository of that
 /// remote; an entry with no source every provider. A path that leaves its repository (`../`) is
@@ -1909,9 +1923,10 @@ impl ContractKind for Packages {
         }
     }
 
-    /// The dependency entry links to the providers of its package: one candidate is `exact`,
-    /// several are each `ambiguous`. A `workspace:` range keeps the providers of its own
-    /// repository. The reason is `reason()`'s, flag included. A call through a package import
+    /// The dependency entry links to the providers of its package: one candidate is `exact`
+    /// (`inferred` when it shares the consumer's repository and `Ecosystem::unsourced` says no
+    /// source names it), several are each `ambiguous`. A `workspace:` range keeps the providers
+    /// of its own repository. The reason is `reason()`'s, flag included. A call through a package import
     /// (`Consumer::hops`) links instead to the symbol it reaches in each provider, at the
     /// weaker of that level and the import's, the reason followed by `; import <how>`.
     fn link(
@@ -1948,8 +1963,16 @@ impl ContractKind for Packages {
             })
             .collect();
         let uncertain = ecosystem.uncertainty(consumer.via.as_deref());
+        // The one fit shares the consumer's repository and no source names it: a candidate only.
+        let unsourced = match fits.as_slice() {
+            [(repo, _)] if uncertain.is_none() && repo.identity == from.identity => {
+                ecosystem.unsourced(consumer.via.as_deref())
+            }
+            _ => None,
+        };
         let (level, n) = match fits.len() {
             0 => return Vec::new(),
+            1 if unsourced.is_some() => (Level::Inferred, None),
             1 if uncertain.is_none() => (Level::Exact, None),
             1 => (Level::Ambiguous, None),
             n => (Level::Ambiguous, Some(n)),
@@ -1957,7 +1980,7 @@ impl ContractKind for Packages {
         fits.into_iter()
             .flat_map(|(_, p)| {
                 let said = reason(contract, range, p.version.as_deref());
-                let said = match uncertain {
+                let said = match uncertain.or(unsourced) {
                     Some(why) => format!("{why}; {said}"),
                     None => said,
                 };
@@ -2667,8 +2690,16 @@ mod tests {
         assert_eq!(named(of_contract("package::npm::x")), Some("npm"));
         // The reason says the flag of the contract's ecosystem.
         assert_eq!(
+            reason("package::pypi::a", Some(">=2"), Some("1.2")),
+            "package::pypi::a >=2 (local 1.2), range mismatch"
+        );
+        assert_eq!(
             reason("package::pypi::a", Some(">=1"), Some("1.2")),
-            "package::pypi::a >=1 (local 1.2), range unchecked"
+            "package::pypi::a >=1 (local 1.2)"
+        );
+        assert_eq!(
+            reason("package::pypi::a", Some("^1"), Some("1.2")),
+            "package::pypi::a ^1 (local 1.2), range unchecked"
         );
     }
 

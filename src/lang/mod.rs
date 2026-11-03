@@ -824,6 +824,11 @@ pub struct Def {
     /// `Call::args`).
     #[serde(skip)]
     pub return_values: Vec<Value>,
+    /// The string a function returns when that is all its body does (an arrow function's
+    /// expression body, or one lone `return`): a call to it folds to this string, its parameters
+    /// replaced by the call's arguments (`Code::eval`). Not kept in the index (see `Call::args`).
+    #[serde(skip)]
+    pub lone_string: Option<Value>,
     /// A function's declared return type, inside the `Promise` and `NextResponse` it is wrapped
     /// in (`Promise<z.infer<typeof S>>` gives that schema), when it lists any fields. Not kept in
     /// the index (see `Call::args`).
@@ -864,6 +869,7 @@ impl Def {
             bases: Vec::new(),
             decorators: Vec::new(),
             return_values: Vec::new(),
+            lone_string: None,
             returns: None,
             type_params: Vec::new(),
             result: None,

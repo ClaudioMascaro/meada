@@ -57,7 +57,7 @@ fn each_import_level_reads_from_the_module_it_names() {
     // The distribution's own name, through a re-export and through a submodule: `exact`. A
     // `requirements.txt` in `tests/` that names other packages leaves the root's in force, and
     // the one in the library's `src/shared_lib/` takes no file from its `pyproject.toml`.
-    let range = "package::pypi::shared-lib >=1.0,<2 (local 1.2.0), range unchecked";
+    let range = "package::pypi::shared-lib >=1.0,<2 (local 1.2.0)";
     let exact = format!("{range}; import module name");
     for (caller, target) in [
         ("app/main.py::welcome::", "src/shared_lib/core.py::greet"),
@@ -221,4 +221,186 @@ fn an_edited_pyproject_or_requirements_file_relinks_like_a_cold_export() {
     let extra = links(&json, "example.com/pkg/pyweb::app/main.py::extra::");
     let levels: Vec<&str> = extra.iter().map(|(_, _, l, _)| *l).collect();
     assert_eq!(levels, ["inferred"]);
+}
+
+/// The `(consumer, provider, level)` of every link of `json`, sorted.
+fn ends(json: &Value) -> Vec<(String, String, String)> {
+    let mut found: Vec<_> = (json["links"].as_array().into_iter().flatten())
+        .map(|l| {
+            let at = |k: &str| l[k].as_str().unwrap().to_string();
+            (at("consumer"), at("provider"), at("level"))
+        })
+        .collect();
+    found.sort();
+    found
+}
+
+#[test]
+fn a_uv_source_keeps_the_one_package_it_names() {
+    let origin = "https://example.com/pkg/uv-sources.git";
+    let repo = fixture_repo("pypi_uv_sources", "pkg-uv-sources", Some(origin));
+    let out = without_processes(&export(&repo));
+    assert_golden("pkg-uv-sources.export.json", &out);
+    let json: Value = serde_json::from_str(&out).unwrap();
+
+    // `alpha` and `beta/libs/app` take the member of their own uv workspace, `pathy` the package
+    // its path names; `plain`, with no uv source, fits both packages of the name.
+    let id = "example.com/pkg/uv-sources::";
+    let (a, b) = (
+        "alpha/packages/bird-feeder/pyproject.toml",
+        "beta/libs/bird-feeder/pyproject.toml",
+    );
+    let feed = |package: &str| {
+        format!(
+            "{id}{}bird_feeder/__init__.py::feed",
+            package.trim_end_matches("pyproject.toml")
+        )
+    };
+    let want = |consumer: &str, provider: &str, level: &str| {
+        (
+            format!("{id}{consumer}"),
+            provider.to_string(),
+            level.to_string(),
+        )
+    };
+    let mut expected = Vec::new();
+    for (dir, to, level) in [
+        ("alpha", a, "exact"),
+        ("beta/libs/app", b, "exact"),
+        ("pathy", a, "exact"),
+        ("plain", a, "ambiguous"),
+        ("plain", b, "ambiguous"),
+    ] {
+        let module = dir.rsplit('/').next().unwrap();
+        let entry = format!("{dir}/pyproject.toml::project.dependencies::bird-feeder");
+        expected.push(want(&entry, &format!("{id}{to}"), level));
+        let call = format!("{dir}/{module}/main.py::run::feed#0");
+        expected.push(want(&call, &feed(to), level));
+    }
+    // The requirements files of `pinned` have no code, so only the entries link, to both packages.
+    for file in ["requirements.txt", "requirements-dev.txt"] {
+        for to in [a, b] {
+            let entry = format!("pinned/{file}::requirements::bird-feeder");
+            expected.push(want(&entry, &format!("{id}{to}"), "ambiguous"));
+        }
+    }
+    // `stub` is a lone package of the consumer's own repository named like a registry one (#535):
+    // with no uv source (`registry`) it is only `inferred`, with its path named (`local`) `exact`.
+    let (stub, call) = ("stub/pyproject.toml", "stub/anyio/__init__.py::sleep");
+    for (dir, level) in [("registry", "inferred"), ("local", "exact")] {
+        let entry = format!("{dir}/pyproject.toml::project.dependencies::anyio");
+        expected.push(want(&entry, &format!("{id}{stub}"), level));
+        let site = format!("{dir}/{dir}/main.py::run::sleep#0");
+        expected.push(want(&site, &format!("{id}{call}"), level));
+    }
+    // A `requirements.txt` names no source either.
+    let entry = "registry/requirements.txt::requirements::anyio";
+    expected.push(want(entry, &format!("{id}{stub}"), "inferred"));
+    expected.sort();
+    assert_eq!(ends(&json), expected);
+    let reason = |consumer: &str| {
+        let consumer = format!("{id}{consumer}/pyproject.toml::project.dependencies::anyio");
+        let mut link = json["links"].as_array().unwrap().iter();
+        let link = link.find(|l| l["consumer"] == consumer.as_str()).unwrap();
+        link["reason"].as_str().unwrap().to_string()
+    };
+    assert_eq!(
+        reason("registry"),
+        "no uv source names the local package, the registry package is the likely provider; \
+         package::pypi::anyio >=4,<5 (local 4.3.0+foo)"
+    );
+    assert_eq!(
+        reason("local"),
+        "package::pypi::anyio >=4,<5 (local 4.3.0+foo)"
+    );
+
+    // A pin no local version satisfies says `range mismatch`; a range one satisfies adds no
+    // words, and one rejects the other version (#534). Neither drops a candidate.
+    let mut reasons: Vec<(String, String)> = (json["links"].as_array().unwrap().iter())
+        .filter_map(|l| {
+            let consumer = l["consumer"]
+                .as_str()?
+                .strip_prefix(id)?
+                .strip_prefix("pinned/")?;
+            let provider = l["provider"].as_str()?.strip_prefix(id)?;
+            let reason = l["reason"]
+                .as_str()?
+                .strip_prefix("2 providers fit; package::pypi::")?;
+            Some((format!("{consumer} {provider}"), reason.to_string()))
+        })
+        .collect();
+    reasons.sort();
+    let pin = "requirements.txt::requirements::bird-feeder";
+    let dev = "requirements-dev.txt::requirements::bird-feeder";
+    let said = |consumer: &str, provider: &str, reason: &str| {
+        (
+            format!("{consumer} {provider}"),
+            format!("bird-feeder {reason}"),
+        )
+    };
+    let mut want = vec![
+        said(pin, a, "==24.4.2 (local 1.0.0), range mismatch"),
+        said(pin, b, "==24.4.2 (local 2.0.0), range mismatch"),
+        said(dev, a, ">=1,<2 (local 1.0.0)"),
+        said(dev, b, ">=1,<2 (local 2.0.0), range mismatch"),
+    ];
+    want.sort();
+    assert_eq!(reasons, want);
+}
+
+#[test]
+fn a_uv_git_source_keeps_the_repository_of_its_url_and_a_url_source_stays_out() {
+    let case = "pypi_uv_git";
+    fixture_repo(
+        case,
+        "pkg-uv-feeder",
+        Some("https://example.com/pkg/uv-feeder.git"),
+    );
+    let origin = "https://example.com/pkg/uv-sources.git";
+    let repo = fixture_repo(case, "pkg-uv-sources", Some(origin));
+    fs::write(
+        repo.join("meada.toml"),
+        "[[peer]]\nrepo = \"example.com/pkg/uv-feeder\"\n",
+    )
+    .unwrap();
+    let pathy = repo.join("pathy/pyproject.toml");
+    let source = |line: &str| {
+        let text = fs::read_to_string(&pathy).unwrap();
+        let (head, _) = text.split_once("bird-feeder = {").unwrap();
+        fs::write(&pathy, format!("{head}{line}\n")).unwrap();
+    };
+    let of = |json: &Value, consumer: &str| -> Vec<(String, String)> {
+        (ends(json).into_iter())
+            .filter(|(c, ..)| c.ends_with(consumer))
+            .map(|(_, p, level)| (p, level))
+            .collect()
+    };
+    let entry = "pathy/pyproject.toml::project.dependencies::bird-feeder";
+
+    source("bird-feeder = { git = \"https://example.com/pkg/uv-feeder.git\", tag = \"v3\" }");
+    let json: Value = serde_json::from_str(&export(&repo)).unwrap();
+    let feeder = "example.com/pkg/uv-feeder::pyproject.toml".to_string();
+    assert_eq!(of(&json, entry), [(feeder.clone(), "exact".to_string())]);
+    // `plain`, with no source, fits the peer's package too.
+    let plain = of(
+        &json,
+        "plain/pyproject.toml::project.dependencies::bird-feeder",
+    );
+    assert_eq!(plain.len(), 3);
+    assert!(plain.contains(&(feeder, "ambiguous".to_string())));
+
+    for outside in [
+        "bird-feeder = { git = \"https://example.com/pkg/elsewhere.git\" }",
+        "bird-feeder = { url = \"https://example.com/bird_feeder-3.0.0.whl\" }",
+        "bird-feeder = { index = \"internal\" }",
+    ] {
+        source(outside);
+        let json: Value = serde_json::from_str(&export(&repo)).unwrap();
+        assert_eq!(of(&json, entry), [], "{outside}");
+        assert_eq!(
+            of(&json, "pathy/pathy/main.py::run::feed#0"),
+            [],
+            "{outside}"
+        );
+    }
 }

@@ -1,0 +1,6 @@
+# Depends on both providers of the module: the replace picks the fork.
+[[peer]]
+repo = "example.com/orig/lib"
+
+[[peer]]
+repo = "example.com/fork/lib"

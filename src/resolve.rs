@@ -6580,11 +6580,51 @@ impl<'a> Code<'a> {
                     range: call.range.clone(),
                 })
             }
+            Value::Call(call) => self
+                .built(path, call, frames, depth, fold, wants)
+                .unwrap_or_else(|| value.clone()),
             Value::Ref(name) => self.name(path, scope, name, frames, depth, fold, wants),
             other => other.clone(),
         };
         fold.nested -= 1;
         folded
+    }
+
+    /// What `call`, written in `path`, folds to when it is an exact call of a function that only
+    /// returns a string (`Def::lone_string`): that string, its parameters replaced by the call's
+    /// arguments, when every part of it folds. A call a name match answered is not folded: it may
+    /// reach another function.
+    fn built(
+        &self,
+        path: &'a str,
+        call: &'a Invocation,
+        frames: &[Frame<'a>],
+        depth: usize,
+        fold: &mut Fold<'a, '_>,
+        wants: &mut Option<Target<'a>>,
+    ) -> Option<Value> {
+        let calls = &self.resolver.files[path].calls;
+        let index = call_at(calls, &call.range)?;
+        let Resolution::Exact(function) = self.resolver.call(path, &calls[index]) else {
+            return None;
+        };
+        let body = self
+            .def(function.path, function.name)?
+            .lone_string
+            .as_ref()?;
+        // The function's own parameters are bound by this call, then its callers' by the frames
+        // the call was folded under.
+        let mut bound = vec![Frame {
+            def: function,
+            path,
+            index,
+        }];
+        bound.extend_from_slice(frames.get(depth..).unwrap_or_default());
+        let folded = self.eval(function.path, function.name, body, &bound, 0, fold, wants);
+        // A part that does not fold (a base read from the environment, a hole, a budget spent)
+        // leaves the call as written: the URL stays unresolved, never a guessed path.
+        let known = |p: &Part| matches!(p, Part::Text(_) | Part::Ref(_));
+        matches!(&folded, Value::Str(parts) if parts.iter().all(known)).then_some(folded)
     }
 
     #[expect(clippy::too_many_arguments)]

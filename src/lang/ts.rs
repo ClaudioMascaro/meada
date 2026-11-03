@@ -92,6 +92,7 @@ impl LanguagePack for TsJs {
                     returns: (node.child_by_field_name("return_type"))
                         .and_then(|t| types::returned(t, src, &parents)),
                     type_params: types::type_parameters(node, src),
+                    lone_string: lone_string(node, src, &inner, &parents),
                     ..Def::new(inner.clone(), kind, range)
                 });
             }
@@ -589,6 +590,31 @@ impl<'t> Parents<'t> {
     fn of(&self, node: Node) -> Option<Node<'t>> {
         self.up.get(&node.id()).copied()
     }
+}
+
+/// The string a function returns when that is all its body does: an arrow function's expression
+/// body, or a body of one `return`. An `async` function returns a promise, not a string.
+fn lone_string(node: Node, src: &[u8], scope: &str, up: &Parents) -> Option<Value> {
+    if !(FUNCTIONS.contains(&node.kind()) || node.kind() == "function_declaration")
+        || node.kind() == "generator_function"
+        || node.children(&mut node.walk()).any(|c| c.kind() == "async")
+    {
+        return None;
+    }
+    let body = node.child_by_field_name("body")?;
+    let returned = if body.kind() == "statement_block" {
+        let mut statements = named(body).filter(|s| s.kind() != "comment");
+        let (Some(only), None) = (statements.next(), statements.next()) else {
+            return None;
+        };
+        if only.kind() != "return_statement" {
+            return None;
+        }
+        named(only).next()?
+    } else {
+        body
+    };
+    Some(value(returned, src, scope, up)).filter(|v| matches!(v, Value::Str(_)))
 }
 
 /// The kinds of anonymous function expressions.

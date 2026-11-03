@@ -1,0 +1,7 @@
+[project]
+name = "pathy"
+version = "0.1.0"
+dependencies = ["bird-feeder"]
+
+[tool.uv.sources]
+bird-feeder = { path = "../alpha/packages/bird-feeder" }

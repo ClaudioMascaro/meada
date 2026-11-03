@@ -1,0 +1,643 @@
+{
+  "format": 1,
+  "repository": "example.com/pkg/uv-sources",
+  "commit": "94fec10a82fd85d8e072eba0e64fc88387c833ed",
+  "dirty": false,
+  "files": [
+    {
+      "path": "alpha/alpha/__init__.py",
+      "hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+    },
+    {
+      "path": "alpha/alpha/main.py",
+      "hash": "f0207023e7f228abaae6c973b1a947a29da44c6e01b81165a81b9d99c64e22d8"
+    },
+    {
+      "path": "alpha/packages/bird-feeder/bird_feeder/__init__.py",
+      "hash": "d119580aa63e167092b0d6ca15321e8c4e642352ab43c7c110862e021e73b95a"
+    },
+    {
+      "path": "beta/libs/app/app/__init__.py",
+      "hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+    },
+    {
+      "path": "beta/libs/app/app/main.py",
+      "hash": "f0207023e7f228abaae6c973b1a947a29da44c6e01b81165a81b9d99c64e22d8"
+    },
+    {
+      "path": "beta/libs/bird-feeder/bird_feeder/__init__.py",
+      "hash": "86c7c9ed0ca1bb617fef5ba4cbef5487324158ff1f10ffc8079daba6cb13c6d2"
+    },
+    {
+      "path": "local/local/__init__.py",
+      "hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+    },
+    {
+      "path": "local/local/main.py",
+      "hash": "996cd2ae0d4b639e7b6a641f5cf6d8219c597df727b46152e320ed4cc3395f73"
+    },
+    {
+      "path": "pathy/pathy/__init__.py",
+      "hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+    },
+    {
+      "path": "pathy/pathy/main.py",
+      "hash": "f0207023e7f228abaae6c973b1a947a29da44c6e01b81165a81b9d99c64e22d8"
+    },
+    {
+      "path": "plain/plain/__init__.py",
+      "hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+    },
+    {
+      "path": "plain/plain/main.py",
+      "hash": "f0207023e7f228abaae6c973b1a947a29da44c6e01b81165a81b9d99c64e22d8"
+    },
+    {
+      "path": "registry/registry/__init__.py",
+      "hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+    },
+    {
+      "path": "registry/registry/main.py",
+      "hash": "996cd2ae0d4b639e7b6a641f5cf6d8219c597df727b46152e320ed4cc3395f73"
+    },
+    {
+      "path": "stub/anyio/__init__.py",
+      "hash": "641fc9d5573e3fb543d47da4536a357e4a1152885c406f837e6e9291e5d4b760"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/pkg/uv-sources::alpha/alpha/main.py::run",
+      "span": {
+        "path": "alpha/alpha/main.py",
+        "start": 31,
+        "end": 59
+      },
+      "hash": "0d27d6d0e4c7592740f994a08afcf728d27720fabcfaf4bb73b5a5455e2fdb55"
+    },
+    {
+      "id": "example.com/pkg/uv-sources::alpha/packages/bird-feeder/bird_feeder/__init__.py::feed",
+      "span": {
+        "path": "alpha/packages/bird-feeder/bird_feeder/__init__.py",
+        "start": 0,
+        "end": 51
+      },
+      "hash": "dca66fe78062bac345dc746802bcc27fc9a3ed275b6c5062ee6585461176cad8"
+    },
+    {
+      "id": "example.com/pkg/uv-sources::beta/libs/app/app/main.py::run",
+      "span": {
+        "path": "beta/libs/app/app/main.py",
+        "start": 31,
+        "end": 59
+      },
+      "hash": "0d27d6d0e4c7592740f994a08afcf728d27720fabcfaf4bb73b5a5455e2fdb55"
+    },
+    {
+      "id": "example.com/pkg/uv-sources::beta/libs/bird-feeder/bird_feeder/__init__.py::feed",
+      "span": {
+        "path": "beta/libs/bird-feeder/bird_feeder/__init__.py",
+        "start": 0,
+        "end": 46
+      },
+      "hash": "9930bb3e1a87805b404f055528813b4110380e7b108a0e3cb36a609e05862f88"
+    },
+    {
+      "id": "example.com/pkg/uv-sources::local/local/main.py::run",
+      "span": {
+        "path": "local/local/main.py",
+        "start": 26,
+        "end": 55
+      },
+      "hash": "83f1dba7b38930e3dc71ad9f97a3328e544dcf1218319a5dfdd59f6c844be65d"
+    },
+    {
+      "id": "example.com/pkg/uv-sources::pathy/pathy/main.py::run",
+      "span": {
+        "path": "pathy/pathy/main.py",
+        "start": 31,
+        "end": 59
+      },
+      "hash": "0d27d6d0e4c7592740f994a08afcf728d27720fabcfaf4bb73b5a5455e2fdb55"
+    },
+    {
+      "id": "example.com/pkg/uv-sources::plain/plain/main.py::run",
+      "span": {
+        "path": "plain/plain/main.py",
+        "start": 31,
+        "end": 59
+      },
+      "hash": "0d27d6d0e4c7592740f994a08afcf728d27720fabcfaf4bb73b5a5455e2fdb55"
+    },
+    {
+      "id": "example.com/pkg/uv-sources::registry/registry/main.py::run",
+      "span": {
+        "path": "registry/registry/main.py",
+        "start": 26,
+        "end": 55
+      },
+      "hash": "83f1dba7b38930e3dc71ad9f97a3328e544dcf1218319a5dfdd59f6c844be65d"
+    },
+    {
+      "id": "example.com/pkg/uv-sources::stub/anyio/__init__.py::sleep",
+      "span": {
+        "path": "stub/anyio/__init__.py",
+        "start": 0,
+        "end": 36
+      },
+      "hash": "b72455a723dd30a1865d89e4e556c785cda252fdda54fa0f1085e86bf68e140b"
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/pkg/uv-sources::alpha/alpha/main.py::run::feed#0",
+      "caller": "example.com/pkg/uv-sources::alpha/alpha/main.py::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "alpha/alpha/main.py",
+        "start": 53,
+        "end": 59
+      }
+    },
+    {
+      "id": "example.com/pkg/uv-sources::beta/libs/app/app/main.py::run::feed#0",
+      "caller": "example.com/pkg/uv-sources::beta/libs/app/app/main.py::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "beta/libs/app/app/main.py",
+        "start": 53,
+        "end": 59
+      }
+    },
+    {
+      "id": "example.com/pkg/uv-sources::local/local/main.py::run::sleep#0",
+      "caller": "example.com/pkg/uv-sources::local/local/main.py::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "local/local/main.py",
+        "start": 48,
+        "end": 55
+      }
+    },
+    {
+      "id": "example.com/pkg/uv-sources::pathy/pathy/main.py::run::feed#0",
+      "caller": "example.com/pkg/uv-sources::pathy/pathy/main.py::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "pathy/pathy/main.py",
+        "start": 53,
+        "end": 59
+      }
+    },
+    {
+      "id": "example.com/pkg/uv-sources::plain/plain/main.py::run::feed#0",
+      "caller": "example.com/pkg/uv-sources::plain/plain/main.py::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "plain/plain/main.py",
+        "start": 53,
+        "end": 59
+      }
+    },
+    {
+      "id": "example.com/pkg/uv-sources::registry/registry/main.py::run::sleep#0",
+      "caller": "example.com/pkg/uv-sources::registry/registry/main.py::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "registry/registry/main.py",
+        "start": 48,
+        "end": 55
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::pypi::alpha",
+      "site": "example.com/pkg/uv-sources::alpha/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::anyio",
+      "site": "example.com/pkg/uv-sources::stub/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::app",
+      "site": "example.com/pkg/uv-sources::beta/libs/app/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::bird-feeder",
+      "site": "example.com/pkg/uv-sources::alpha/packages/bird-feeder/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::bird-feeder",
+      "site": "example.com/pkg/uv-sources::beta/libs/bird-feeder/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::local",
+      "site": "example.com/pkg/uv-sources::local/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::pathy",
+      "site": "example.com/pkg/uv-sources::pathy/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::plain",
+      "site": "example.com/pkg/uv-sources::plain/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::registry",
+      "site": "example.com/pkg/uv-sources::registry/pyproject.toml"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "package::pypi::bird-feeder",
+      "site": "example.com/pkg/uv-sources::alpha/alpha/main.py::run::feed#0",
+      "via": "path alpha/packages/bird-feeder/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::bird-feeder",
+      "site": "example.com/pkg/uv-sources::alpha/pyproject.toml::project.dependencies::bird-feeder",
+      "via": "path alpha/packages/bird-feeder/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::bird-feeder",
+      "site": "example.com/pkg/uv-sources::beta/libs/app/app/main.py::run::feed#0",
+      "via": "path beta/libs/bird-feeder/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::bird-feeder",
+      "site": "example.com/pkg/uv-sources::beta/libs/app/pyproject.toml::project.dependencies::bird-feeder",
+      "via": "path beta/libs/bird-feeder/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::anyio",
+      "site": "example.com/pkg/uv-sources::local/local/main.py::run::sleep#0",
+      "via": "path stub/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::anyio",
+      "site": "example.com/pkg/uv-sources::local/pyproject.toml::project.dependencies::anyio",
+      "via": "path stub/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::bird-feeder",
+      "site": "example.com/pkg/uv-sources::pathy/pathy/main.py::run::feed#0",
+      "via": "path alpha/packages/bird-feeder/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::bird-feeder",
+      "site": "example.com/pkg/uv-sources::pathy/pyproject.toml::project.dependencies::bird-feeder",
+      "via": "path alpha/packages/bird-feeder/pyproject.toml"
+    },
+    {
+      "contract": "package::pypi::bird-feeder",
+      "site": "example.com/pkg/uv-sources::pinned/requirements-dev.txt::requirements::bird-feeder",
+      "via": null
+    },
+    {
+      "contract": "package::pypi::bird-feeder",
+      "site": "example.com/pkg/uv-sources::pinned/requirements.txt::requirements::bird-feeder",
+      "via": null
+    },
+    {
+      "contract": "package::pypi::bird-feeder",
+      "site": "example.com/pkg/uv-sources::plain/plain/main.py::run::feed#0",
+      "via": null
+    },
+    {
+      "contract": "package::pypi::bird-feeder",
+      "site": "example.com/pkg/uv-sources::plain/pyproject.toml::project.dependencies::bird-feeder",
+      "via": null
+    },
+    {
+      "contract": "package::pypi::anyio",
+      "site": "example.com/pkg/uv-sources::registry/pyproject.toml::project.dependencies::anyio",
+      "via": null
+    },
+    {
+      "contract": "package::pypi::anyio",
+      "site": "example.com/pkg/uv-sources::registry/registry/main.py::run::sleep#0",
+      "via": null
+    },
+    {
+      "contract": "package::pypi::anyio",
+      "site": "example.com/pkg/uv-sources::registry/requirements.txt::requirements::anyio",
+      "via": null
+    }
+  ],
+  "packages": [
+    {
+      "name": "alpha",
+      "version": "0.1.0",
+      "repository": "example.com/pkg/uv-sources",
+      "directory": "alpha",
+      "ecosystem": "pypi"
+    },
+    {
+      "name": "anyio",
+      "version": "4.3.0+foo",
+      "repository": "example.com/pkg/uv-sources",
+      "directory": "stub",
+      "ecosystem": "pypi"
+    },
+    {
+      "name": "app",
+      "version": "0.1.0",
+      "repository": "example.com/pkg/uv-sources",
+      "directory": "beta/libs/app",
+      "ecosystem": "pypi"
+    },
+    {
+      "name": "bird-feeder",
+      "version": "1.0.0",
+      "repository": "example.com/pkg/uv-sources",
+      "directory": "alpha/packages/bird-feeder",
+      "ecosystem": "pypi"
+    },
+    {
+      "name": "bird-feeder",
+      "version": "2.0.0",
+      "repository": "example.com/pkg/uv-sources",
+      "directory": "beta/libs/bird-feeder",
+      "ecosystem": "pypi"
+    },
+    {
+      "name": "local",
+      "version": "0.1.0",
+      "repository": "example.com/pkg/uv-sources",
+      "directory": "local",
+      "ecosystem": "pypi"
+    },
+    {
+      "name": "pathy",
+      "version": "0.1.0",
+      "repository": "example.com/pkg/uv-sources",
+      "directory": "pathy",
+      "ecosystem": "pypi"
+    },
+    {
+      "name": "plain",
+      "version": "0.1.0",
+      "repository": "example.com/pkg/uv-sources",
+      "directory": "plain",
+      "ecosystem": "pypi"
+    },
+    {
+      "name": "registry",
+      "version": "0.1.0",
+      "repository": "example.com/pkg/uv-sources",
+      "directory": "registry",
+      "ecosystem": "pypi"
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "alpha/pyproject.toml",
+      "field": "project.dependencies",
+      "name": "bird-feeder"
+    },
+    {
+      "manifest": "beta/libs/app/pyproject.toml",
+      "field": "project.dependencies",
+      "name": "bird-feeder"
+    },
+    {
+      "manifest": "local/pyproject.toml",
+      "field": "project.dependencies",
+      "name": "anyio",
+      "range": ">=4,<5"
+    },
+    {
+      "manifest": "pathy/pyproject.toml",
+      "field": "project.dependencies",
+      "name": "bird-feeder"
+    },
+    {
+      "manifest": "pinned/requirements-dev.txt",
+      "field": "requirements",
+      "name": "bird-feeder",
+      "range": ">=1,<2"
+    },
+    {
+      "manifest": "pinned/requirements.txt",
+      "field": "requirements",
+      "name": "bird-feeder",
+      "range": "==24.4.2"
+    },
+    {
+      "manifest": "plain/pyproject.toml",
+      "field": "project.dependencies",
+      "name": "bird-feeder"
+    },
+    {
+      "manifest": "registry/pyproject.toml",
+      "field": "project.dependencies",
+      "name": "anyio",
+      "range": ">=4,<5"
+    },
+    {
+      "manifest": "registry/requirements.txt",
+      "field": "requirements",
+      "name": "anyio"
+    }
+  ],
+  "imports": [
+    {
+      "site": "example.com/pkg/uv-sources::alpha/alpha/main.py::run::feed#0",
+      "specifier": "bird_feeder",
+      "name": "feed",
+      "level": "exact",
+      "how": "moduleName",
+      "target": "example.com/pkg/uv-sources::alpha/packages/bird-feeder/bird_feeder/__init__.py::feed"
+    },
+    {
+      "site": "example.com/pkg/uv-sources::beta/libs/app/app/main.py::run::feed#0",
+      "specifier": "bird_feeder",
+      "name": "feed",
+      "level": "exact",
+      "how": "moduleName",
+      "target": "example.com/pkg/uv-sources::beta/libs/bird-feeder/bird_feeder/__init__.py::feed"
+    },
+    {
+      "site": "example.com/pkg/uv-sources::local/local/main.py::run::sleep#0",
+      "specifier": "anyio",
+      "name": "sleep",
+      "level": "exact",
+      "how": "moduleName",
+      "target": "example.com/pkg/uv-sources::stub/anyio/__init__.py::sleep"
+    },
+    {
+      "site": "example.com/pkg/uv-sources::pathy/pathy/main.py::run::feed#0",
+      "specifier": "bird_feeder",
+      "name": "feed",
+      "level": "exact",
+      "how": "moduleName",
+      "target": "example.com/pkg/uv-sources::alpha/packages/bird-feeder/bird_feeder/__init__.py::feed"
+    },
+    {
+      "site": "example.com/pkg/uv-sources::plain/plain/main.py::run::feed#0",
+      "specifier": "bird_feeder",
+      "name": "feed",
+      "level": "exact",
+      "how": "moduleName",
+      "target": "example.com/pkg/uv-sources::alpha/packages/bird-feeder/bird_feeder/__init__.py::feed"
+    },
+    {
+      "site": "example.com/pkg/uv-sources::plain/plain/main.py::run::feed#0",
+      "specifier": "bird_feeder",
+      "name": "feed",
+      "level": "exact",
+      "how": "moduleName",
+      "target": "example.com/pkg/uv-sources::beta/libs/bird-feeder/bird_feeder/__init__.py::feed"
+    },
+    {
+      "site": "example.com/pkg/uv-sources::registry/registry/main.py::run::sleep#0",
+      "specifier": "anyio",
+      "name": "sleep",
+      "level": "exact",
+      "how": "moduleName",
+      "target": "example.com/pkg/uv-sources::stub/anyio/__init__.py::sleep"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/pkg/uv-sources::alpha/alpha/main.py::run::feed#0",
+      "provider": "example.com/pkg/uv-sources::alpha/packages/bird-feeder/bird_feeder/__init__.py::feed",
+      "contract": "package::pypi::bird-feeder",
+      "level": "exact",
+      "reason": "package::pypi::bird-feeder none (local 1.0.0), range unchecked; import module name"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::alpha/pyproject.toml::project.dependencies::bird-feeder",
+      "provider": "example.com/pkg/uv-sources::alpha/packages/bird-feeder/pyproject.toml",
+      "contract": "package::pypi::bird-feeder",
+      "level": "exact",
+      "reason": "package::pypi::bird-feeder none (local 1.0.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::beta/libs/app/app/main.py::run::feed#0",
+      "provider": "example.com/pkg/uv-sources::beta/libs/bird-feeder/bird_feeder/__init__.py::feed",
+      "contract": "package::pypi::bird-feeder",
+      "level": "exact",
+      "reason": "package::pypi::bird-feeder none (local 2.0.0), range unchecked; import module name"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::beta/libs/app/pyproject.toml::project.dependencies::bird-feeder",
+      "provider": "example.com/pkg/uv-sources::beta/libs/bird-feeder/pyproject.toml",
+      "contract": "package::pypi::bird-feeder",
+      "level": "exact",
+      "reason": "package::pypi::bird-feeder none (local 2.0.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::local/local/main.py::run::sleep#0",
+      "provider": "example.com/pkg/uv-sources::stub/anyio/__init__.py::sleep",
+      "contract": "package::pypi::anyio",
+      "level": "exact",
+      "reason": "package::pypi::anyio >=4,<5 (local 4.3.0+foo); import module name"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::local/pyproject.toml::project.dependencies::anyio",
+      "provider": "example.com/pkg/uv-sources::stub/pyproject.toml",
+      "contract": "package::pypi::anyio",
+      "level": "exact",
+      "reason": "package::pypi::anyio >=4,<5 (local 4.3.0+foo)"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::pathy/pathy/main.py::run::feed#0",
+      "provider": "example.com/pkg/uv-sources::alpha/packages/bird-feeder/bird_feeder/__init__.py::feed",
+      "contract": "package::pypi::bird-feeder",
+      "level": "exact",
+      "reason": "package::pypi::bird-feeder none (local 1.0.0), range unchecked; import module name"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::pathy/pyproject.toml::project.dependencies::bird-feeder",
+      "provider": "example.com/pkg/uv-sources::alpha/packages/bird-feeder/pyproject.toml",
+      "contract": "package::pypi::bird-feeder",
+      "level": "exact",
+      "reason": "package::pypi::bird-feeder none (local 1.0.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::pinned/requirements-dev.txt::requirements::bird-feeder",
+      "provider": "example.com/pkg/uv-sources::alpha/packages/bird-feeder/pyproject.toml",
+      "contract": "package::pypi::bird-feeder",
+      "level": "ambiguous",
+      "reason": "2 providers fit; package::pypi::bird-feeder >=1,<2 (local 1.0.0)"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::pinned/requirements-dev.txt::requirements::bird-feeder",
+      "provider": "example.com/pkg/uv-sources::beta/libs/bird-feeder/pyproject.toml",
+      "contract": "package::pypi::bird-feeder",
+      "level": "ambiguous",
+      "reason": "2 providers fit; package::pypi::bird-feeder >=1,<2 (local 2.0.0), range mismatch"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::pinned/requirements.txt::requirements::bird-feeder",
+      "provider": "example.com/pkg/uv-sources::alpha/packages/bird-feeder/pyproject.toml",
+      "contract": "package::pypi::bird-feeder",
+      "level": "ambiguous",
+      "reason": "2 providers fit; package::pypi::bird-feeder ==24.4.2 (local 1.0.0), range mismatch"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::pinned/requirements.txt::requirements::bird-feeder",
+      "provider": "example.com/pkg/uv-sources::beta/libs/bird-feeder/pyproject.toml",
+      "contract": "package::pypi::bird-feeder",
+      "level": "ambiguous",
+      "reason": "2 providers fit; package::pypi::bird-feeder ==24.4.2 (local 2.0.0), range mismatch"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::plain/plain/main.py::run::feed#0",
+      "provider": "example.com/pkg/uv-sources::alpha/packages/bird-feeder/bird_feeder/__init__.py::feed",
+      "contract": "package::pypi::bird-feeder",
+      "level": "ambiguous",
+      "reason": "2 providers fit; package::pypi::bird-feeder none (local 1.0.0), range unchecked; import module name"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::plain/plain/main.py::run::feed#0",
+      "provider": "example.com/pkg/uv-sources::beta/libs/bird-feeder/bird_feeder/__init__.py::feed",
+      "contract": "package::pypi::bird-feeder",
+      "level": "ambiguous",
+      "reason": "2 providers fit; package::pypi::bird-feeder none (local 2.0.0), range unchecked; import module name"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::plain/pyproject.toml::project.dependencies::bird-feeder",
+      "provider": "example.com/pkg/uv-sources::alpha/packages/bird-feeder/pyproject.toml",
+      "contract": "package::pypi::bird-feeder",
+      "level": "ambiguous",
+      "reason": "2 providers fit; package::pypi::bird-feeder none (local 1.0.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::plain/pyproject.toml::project.dependencies::bird-feeder",
+      "provider": "example.com/pkg/uv-sources::beta/libs/bird-feeder/pyproject.toml",
+      "contract": "package::pypi::bird-feeder",
+      "level": "ambiguous",
+      "reason": "2 providers fit; package::pypi::bird-feeder none (local 2.0.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::registry/pyproject.toml::project.dependencies::anyio",
+      "provider": "example.com/pkg/uv-sources::stub/pyproject.toml",
+      "contract": "package::pypi::anyio",
+      "level": "inferred",
+      "reason": "no uv source names the local package, the registry package is the likely provider; package::pypi::anyio >=4,<5 (local 4.3.0+foo)"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::registry/registry/main.py::run::sleep#0",
+      "provider": "example.com/pkg/uv-sources::stub/anyio/__init__.py::sleep",
+      "contract": "package::pypi::anyio",
+      "level": "inferred",
+      "reason": "no uv source names the local package, the registry package is the likely provider; package::pypi::anyio >=4,<5 (local 4.3.0+foo); import module name"
+    },
+    {
+      "consumer": "example.com/pkg/uv-sources::registry/requirements.txt::requirements::anyio",
+      "provider": "example.com/pkg/uv-sources::stub/pyproject.toml",
+      "contract": "package::pypi::anyio",
+      "level": "inferred",
+      "reason": "no uv source names the local package, the registry package is the likely provider; package::pypi::anyio none (local 4.3.0+foo), range unchecked"
+    }
+  ]
+}

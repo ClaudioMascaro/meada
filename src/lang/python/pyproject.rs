@@ -6,6 +6,10 @@ use std::collections::HashSet;
 
 use crate::Result;
 
+/// The most `members` or `exclude` globs read of a uv workspace; the rest are left out.
+// ponytail: real workspaces list a few; this bounds the member walk over a hostile file.
+const MAX_GLOBS: usize = 256;
+
 /// A parsed `pyproject.toml`.
 pub struct Pyproject(toml::Table);
 
@@ -17,6 +21,19 @@ pub enum Requirement<'a> {
     /// An entry of `[tool.poetry.dependencies]`: the name, and the version constraint when it
     /// is a string or the `version` of an inline table.
     Poetry(&'a str, Option<&'a str>),
+}
+
+/// Where `[tool.uv.sources]` says a dependency comes from, as written.
+#[derive(Debug, PartialEq)]
+pub enum UvSource<'a> {
+    /// `{ workspace = true }`: the member of the consumer's uv workspace.
+    Workspace,
+    /// `{ path = "..." }`, relative to the directory of the `pyproject.toml`.
+    Path(&'a str),
+    /// `{ git = "..." }`: the remote's URL.
+    Git(&'a str),
+    /// `{ url = "..." }` or `{ index = "..." }`: from outside the workspace.
+    Outside,
 }
 
 impl Pyproject {
@@ -75,6 +92,51 @@ impl Pyproject {
                 Some(Requirement::Poetry(name, version))
             });
         pep621.chain(poetry).collect()
+    }
+
+    /// The sources of `[tool.uv.sources]`, by the key as written: a table that names exactly one
+    /// of `workspace = true`, `path`, `git`, `url` and `index` (as a string). A list of sources
+    /// (one per marker), `workspace = false` and any other value give none.
+    pub fn uv_sources(&self) -> Vec<(&str, UvSource<'_>)> {
+        let table = self
+            .at(&["tool", "uv", "sources"])
+            .and_then(|v| v.as_table());
+        (table.into_iter().flatten())
+            .filter_map(|(name, v)| {
+                let t = v.as_table()?;
+                let text = |key: &str| t.get(key).and_then(|v| v.as_str());
+                let found: Vec<UvSource> = [
+                    (t.get("workspace").and_then(|v| v.as_bool()) == Some(true))
+                        .then_some(UvSource::Workspace),
+                    text("path").map(UvSource::Path),
+                    text("git").map(UvSource::Git),
+                    text("url").map(|_| UvSource::Outside),
+                    text("index").map(|_| UvSource::Outside),
+                ]
+                .into_iter()
+                .flatten()
+                .collect();
+                let [source] = <[UvSource; 1]>::try_from(found).ok()?;
+                Some((name.as_str(), source))
+            })
+            .collect()
+    }
+
+    /// The `members` and `exclude` globs of `[tool.uv.workspace]`, the first `MAX_GLOBS` strings
+    /// of each list, when the file declares that table: it is then a uv workspace root.
+    pub fn uv_workspace(&self) -> Option<(Vec<String>, Vec<String>)> {
+        let table = self.at(&["tool", "uv", "workspace"])?.as_table()?;
+        let globs = |key: &str| -> Vec<String> {
+            (table
+                .get(key)
+                .and_then(|v| v.as_array())
+                .into_iter()
+                .flatten())
+            .filter_map(|g| Some(g.as_str()?.to_string()))
+            .take(MAX_GLOBS)
+            .collect()
+        };
+        Some((globs("members"), globs("exclude")))
     }
 
     /// The console scripts of `[project.scripts]` (else Poetry's `[tool.poetry.scripts]`) as
@@ -237,6 +299,54 @@ h = "1"
                 Poetry("g", None),
                 Poetry("k", None),
             ]
+        );
+    }
+
+    #[test]
+    fn uv_sources_and_a_uv_workspace_are_read_as_written() {
+        let p = parse(
+            r#"
+[tool.uv.sources]
+a = { workspace = true }
+b = { path = "../b", editable = true }
+c = { git = "https://example.com/c.git", tag = "v1" }
+d = { url = "https://example.com/d.whl" }
+e = { index = "pytorch" }
+f = { workspace = false }
+g = [{ index = "a", marker = "sys_platform == 'linux'" }]
+h = { path = "../h", git = "https://example.com/h.git" }
+i = "1.0"
+[tool.uv.workspace]
+members = ["packages/*", 3]
+exclude = ["packages/old"]
+"#,
+        );
+        use UvSource::*;
+        assert_eq!(
+            p.uv_sources(),
+            [
+                ("a", Workspace),
+                ("b", Path("../b")),
+                ("c", Git("https://example.com/c.git")),
+                ("d", Outside),
+                ("e", Outside),
+            ]
+        );
+        let globs = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            p.uv_workspace(),
+            Some((globs(&["packages/*"]), globs(&["packages/old"])))
+        );
+        assert_eq!(parse("[tool.uv]\n").uv_workspace(), None);
+        let many = format!(
+            "[tool.uv.workspace]\nmembers = [{}]\n",
+            "\"a\",".repeat(1000)
+        );
+        let (members, _) = parse(&many).uv_workspace().unwrap();
+        assert_eq!(members.len(), MAX_GLOBS);
+        assert_eq!(
+            parse("[tool.uv.workspace]\n").uv_workspace(),
+            Some((vec![], vec![]))
         );
     }
 

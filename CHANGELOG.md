@@ -6,8 +6,57 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A PyPI version specifier is checked against the provider's version as PEP 440 says, as npm's
+  range is: `range mismatch` when the specifiers (`==`, `!=`, `<`, `<=`, `>`, `>=`, `~=`, `==X.*`
+  and `===`, joined by commas) reject the local version, nothing added when they accept it, and
+  `range unchecked` kept for a provider without a version and for a specifier it cannot read (a
+  Poetry `^1.2`, an unknown operator). A pre-release version is rejected unless a specifier
+  names one, and a mismatch removes no candidate (#534).
+- A TypeScript or JavaScript `fetch` whose URL a function of the repository builds is a consumer:
+  a call to a function whose body is one returned string (an arrow function's expression body, or
+  a lone `return`) folds to it with the call's arguments, at the `fetch` and through a constant,
+  across imports. A part that does not fold, such as a base read from `process.env`, leaves the
+  consumer unresolved (#536).
+- A Go `replace` by another module (`replace a => github.com/owner/repo`) keeps, among the providers
+  of the required module, the one in the workspace repository that path names, `exact`, for the
+  `require` and for the calls through its imports, instead of dropping the dependency; a
+  replacement no repository holds stays out (#532).
+- A PyPI dependency with a uv source in `[tool.uv.sources]` links to the one package it names,
+  `exact`, for the entry and for the calls through its imports: `workspace = true` the member of
+  the consumer's uv workspace (`[tool.uv.workspace] members` less `exclude`), `path` the package
+  at that path, `git` the workspace repository of its URL; a `url` or `index` source stays out.
+  An entry without a uv source keeps linking to every package of its name (#533).
+- The CLI messages (`--help`, `status`, `meada.toml` and index errors, and every other message of
+  the catalogs) are also in Spanish, selected when `LANG` starts with `es`; other values keep
+  falling back to English, and the MCP output stays English (#103).
+- The workspaces profiles run the proposal server: `compose.proposals.yaml` and
+  `proposals.workspace.toml` in Compose (its own pull and volume, the read role, TLS on
+  `127.0.0.1:8445`) and an opt-in `proposals` block in the Helm chart (Deployment, Service,
+  bootstrap and probes with `timeoutSeconds`, absent by default); `scripts/compose-check` and
+  `scripts/helm-check` assert both. The identity provider recipes say how a person or an agent
+  gets a token whose `aud` is `[proposals] audience` (Entra ID, Okta, Keycloak, local accounts; Okta
+  needs a second authorization server the chart cannot render), in pt-BR, English and Spanish (#504).
+- Over TLS, the Postgres client of the data layer authenticates with SCRAM channel binding
+  (`tls-server-end-point`, RFC 5929): it runs `SCRAM-SHA-256-PLUS` whenever the server offers
+  it, so a client that requires channel binding connects (#483). Loopback without TLS keeps plain
+  `SCRAM-SHA-256`.
+- The console's named workspace view gains a versions page (#503): the versions newest first,
+  paged with the server's cursor; one version's entries, manifest text and diff against the
+  current one as the route answers; the history for operators and the administrator (a viewer
+  has no history control); and applying a listed version, which is a rollback when it was
+  current before, through the editor's confirmation at the base the page read. A stale base and
+  a refused entry show the server's message and the page reads the versions again. In pt-BR and
+  English.
+
 ### Fixed
 
+- A PyPI package in the consumer's own repository that no uv source names links `inferred`, not
+  `exact`, when it is the one package of the name, with the reason "no uv source names the local
+  package, the registry package is the likely provider": pip and uv install the registry's
+  package, so a same-named stub (uv's `anyio_local`) is only a candidate. A source naming it
+  (`workspace = true`, `path`) and a single provider in another repository stay `exact` (#535).
 - The `golden_diff` example exits with a message naming the range's refs and the `--range A...B`
   flag when a merge-base cannot be found (a shallow or single-branch clone has no `origin/main`),
   and with a usage error for `--range` without a value, instead of panicking (#592).
@@ -33,30 +82,6 @@ All notable changes to Meada are recorded here. The format follows
   function on the browser, the console API and `meada workspaces`: the empty-message refusal now
   reads "a message is 1 to 500 characters, ..." instead of the request-body shape, and the
   refusal of a too-long or control-bearing message reads "1 to 500" where it read "at most 500".
-
-### Added
-
-- The CLI messages (`--help`, `status`, `meada.toml` and index errors, and every other message of
-  the catalogs) are also in Spanish, selected when `LANG` starts with `es`; other values keep
-  falling back to English, and the MCP output stays English (#103).
-- The workspaces profiles run the proposal server: `compose.proposals.yaml` and
-  `proposals.workspace.toml` in Compose (its own pull and volume, the read role, TLS on
-  `127.0.0.1:8445`) and an opt-in `proposals` block in the Helm chart (Deployment, Service,
-  bootstrap and probes with `timeoutSeconds`, absent by default); `scripts/compose-check` and
-  `scripts/helm-check` assert both. The identity provider recipes say how a person or an agent
-  gets a token whose `aud` is `[proposals] audience` (Entra ID, Okta, Keycloak, local accounts; Okta
-  needs a second authorization server the chart cannot render), in pt-BR, English and Spanish (#504).
-- Over TLS, the Postgres client of the data layer authenticates with SCRAM channel binding
-  (`tls-server-end-point`, RFC 5929): it runs `SCRAM-SHA-256-PLUS` whenever the server offers
-  it, so a client that requires channel binding connects (#483). Loopback without TLS keeps plain
-  `SCRAM-SHA-256`.
-- The console's named workspace view gains a versions page (#503): the versions newest first,
-  paged with the server's cursor; one version's entries, manifest text and diff against the
-  current one as the route answers; the history for operators and the administrator (a viewer
-  has no history control); and applying a listed version, which is a rollback when it was
-  current before, through the editor's confirmation at the base the page read. A stale base and
-  a refused entry show the server's message and the page reads the versions again. In pt-BR and
-  English.
 
 ## [1.1.0] - 2026-11-02
 

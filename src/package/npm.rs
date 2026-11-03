@@ -41,7 +41,7 @@ const MAX_CONDITIONS: usize = 32;
 /// The longest range checked, in bytes; a longer one is `range unchecked`. The crate sets no
 /// limit of its own on a range, and a real one is a few dozen bytes.
 // ponytail: a flat 256 (the crate's own limit for versions); a measured need lifts it.
-const MAX_RANGE: usize = 256;
+pub const MAX_RANGE: usize = 256;
 
 /// The npm ecosystem.
 pub struct Npm;
