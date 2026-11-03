@@ -153,12 +153,12 @@
     "to-tickets": {
       "path": "skills/engineering/to-tickets",
       "upstreamTree": "2dee20ad722a31c04ededf9f2d83842473573045",
-      "tree": "5258021ec2c657a0a6e3b1a1309eea9f20574a67"
+      "tree": "285b340742eb724777ddba45b40e8777bf94d11d"
     },
     "triage": {
       "path": "skills/engineering/triage",
       "upstreamTree": "4cb951d62ecccaed601cdc5f9a1b7b3d8a799635",
-      "tree": "991ce8c02aacded5d9fe609ba8ef4c988b32074a"
+      "tree": "c61672a8c5061cfe052d2d6b5215e20941baef5c"
     },
     "wait-what": {
       "path": "skills/productivity/wait-what",
