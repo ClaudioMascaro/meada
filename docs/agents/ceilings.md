@@ -32,6 +32,9 @@ a ticket accepted, each with its value and its reason. Detail behind the
   by hand, and only a limit-named marked `const` must be unique (each language pack keeps its own
   `VALUE_DEPTH`).
 
+- `deploy/` (#568): the fetch scripts' awk program (Compose `fetch-pulled.sh`, the chart's
+  `workspace.fetch`) reads bare and double-quoted `repo` and `path` keys, not single-quoted literal
+  keys (`'repo' = ...`): a `'` would end the shell's single-quoted program.
 - `deploy/` (#504): the proposal server's Helm block renders no Ingress (the operator exposes its
   Service behind their own TLS at `proposals.publicUrl`), and Compose's `proposals.workspace.toml`
   keeps `[oidc]`, `[catalog]` and `[workspaces]` commented, so the service does not start until the

@@ -23,31 +23,6 @@ All notable changes to Meada are recorded here. The format follows
   of the required module, the one in the workspace repository that path names, `exact`, for the
   `require` and for the calls through its imports, instead of dropping the dependency; a
   replacement no repository holds stays out (#532).
-- The CLI messages (`--help`, `status`, `meada.toml` and index errors, and every other message of
-  the catalogs) are also in Spanish, selected when `LANG` starts with `es`; other values keep
-  falling back to English, and the MCP output stays English (#103).
-- The workspaces profiles run the proposal server: `compose.proposals.yaml` and
-  `proposals.workspace.toml` in Compose (its own pull and volume, the read role, TLS on
-  `127.0.0.1:8445`) and an opt-in `proposals` block in the Helm chart (Deployment, Service,
-  bootstrap and probes with `timeoutSeconds`, absent by default); `scripts/compose-check` and
-  `scripts/helm-check` assert both. The identity provider recipes say how a person or an agent
-  gets a token whose `aud` is `[proposals] audience` (Entra ID, Okta, Keycloak, local accounts; Okta
-  needs a second authorization server the chart cannot render), in pt-BR, English and Spanish (#504).
-- Over TLS, the Postgres client of the data layer authenticates with SCRAM channel binding
-  (`tls-server-end-point`, RFC 5929): it runs `SCRAM-SHA-256-PLUS` whenever the server offers
-  it, so a client that requires channel binding connects (#483). Loopback without TLS keeps plain
-  `SCRAM-SHA-256`.
-- The console's named workspace view gains a versions page (#503): the versions newest first,
-  paged with the server's cursor; one version's entries, manifest text and diff against the
-  current one as the route answers; the history for operators and the administrator (a viewer
-  has no history control); and applying a listed version, which is a rollback when it was
-  current before, through the editor's confirmation at the base the page read. A stale base and
-  a refused entry show the server's message and the page reads the versions again. In pt-BR and
-  English.
-- A Go `replace` by another module (`replace a => github.com/owner/repo`) keeps, among the providers
-  of the required module, the one in the workspace repository that path names, `exact`, for the
-  `require` and for the calls through its imports, instead of dropping the dependency; a
-  replacement no repository holds stays out (#532).
 - A PyPI dependency with a uv source in `[tool.uv.sources]` links to the one package it names,
   `exact`, for the entry and for the calls through its imports: `workspace = true` the member of
   the consumer's uv workspace (`[tool.uv.workspace] members` less `exclude`), `path` the package
@@ -91,31 +66,12 @@ All notable changes to Meada are recorded here. The format follows
 - The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
   Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
   node unready (#448).
-
-- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
-  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
-  node unready (#448).
-
 - The container build copies every top-level `tests/fixtures/*.json` in the UI stage with one
   `COPY`, so a UI test importing a new fixture no longer breaks the image (#495).
 - The deploy fetch scripts (Compose `fetch-pulled.sh` and the chart `workspace.fetch`) read a
   repositories manifest whose `repo` and `path` keys are written as quoted keys (`"repo" = ...`);
   the shared awk program skipped them. Its test now takes the expected pairs of every case from the
   `toml` crate instead of hand-written lists (#568).
-
-- `[postgres] schema` starting with `pg_` (reserved by Postgres) is refused at manifest read with
-  Meada's own message, in pt-BR and English, instead of Postgres's raw error at `meada postgres
-  migrate` (#482).
-- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
-  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
-  node unready (#448).
-
-- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
-  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
-  node unready (#448).
-
-- The container build copies every top-level `tests/fixtures/*.json` in the UI stage with one
-  `COPY`, so a UI test importing a new fixture no longer breaks the image (#495).
 
 ### Changed
 
@@ -133,13 +89,6 @@ All notable changes to Meada are recorded here. The format follows
   logs console` in the Compose recipe). No later start prints it; a lost one is recovered with
   `meada ui reset-admin`. The password policy's `default_password` rule goes with the published
   password, and ADR 0024 is amended (#579).
-- The console asks `meada-core` through WebAssembly (`namedNameProblem`, `namedDescriptionProblem`,
-  `namedMessageProblem`, `resourceRoles`) whether a workspace name, description and version
-  message are valid and which resource roles exist, instead of keeping its own copy of the rule,
-  its bounds and the role list (#501). A version message is refused when empty by the same
-  function on the browser, the console API and `meada workspaces`: the empty-message refusal now
-  reads "a message is 1 to 500 characters, ..." instead of the request-body shape, and the
-  refusal of a too-long or control-bearing message reads "1 to 500" where it read "at most 500".
 - The console asks `meada-core` through WebAssembly (`namedNameProblem`, `namedDescriptionProblem`,
   `namedMessageProblem`, `resourceRoles`) whether a workspace name, description and version
   message are valid and which resource roles exist, instead of keeping its own copy of the rule,

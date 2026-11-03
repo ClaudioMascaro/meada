@@ -212,9 +212,10 @@ pub fn module_target(target: &str) -> bool {
 /// and so does a root `go.mod` that declares it). The prefix is matched first, so an identity may
 /// hold a `vN` element itself.
 pub fn held_by(target: &str, identity: &str, manifest: &str) -> bool {
-    let target = target.to_lowercase();
     let dir = manifest.rsplit_once('/').map_or("", |(d, _)| d);
-    let Some(rest) = inside(&target, identity) else {
+    // Only the prefix is lower-cased: the directory after it keeps its case.
+    let lower = target.to_ascii_lowercase();
+    let Some(rest) = inside(&lower, identity).map(|r| &target[target.len() - r.len()..]) else {
         return false;
     };
     let versioned = unversioned(&format!("_/{rest}"));
@@ -280,6 +281,15 @@ mod tests {
         assert!(held("github.com/regen-network/protobuf/sub", "sub/go.mod"));
         assert!(!held("github.com/regen-network/protobuf/sub", "go.mod"));
         assert!(!held("github.com/regen-network/protobuf", "sub/go.mod"));
+        // The directory after the prefix keeps its case.
+        assert!(held(
+            "github.com/Regen-Network/protobuf/SubDir",
+            "SubDir/go.mod"
+        ));
+        assert!(!held(
+            "github.com/regen-network/protobuf/SubDir",
+            "subdir/go.mod"
+        ));
         // Another repository, or a longer name: no.
         assert!(!held("github.com/regen-network/protobuf2", "go.mod"));
         assert!(!held("github.com/regen-network", "go.mod"));

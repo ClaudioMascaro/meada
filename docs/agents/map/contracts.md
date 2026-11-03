@@ -387,7 +387,8 @@ this file, and a change to these modules updates it.
   local label after `<`, `>=`..., `~=1`, `==1.0a1.*`) and a range past npm's `MAX_RANGE`. As
   `packaging` does, a pre-release or dev-release local version is rejected unless a clause of
   `==`, `>=`, `<=`, `~=` or `===` names one, `==1.0` ignores a local label of the version, and
-  `>1.0` takes neither a post-release nor a local version of 1.0. A mismatch removes no
+  `>1.0` takes neither a post-release nor a local version of 1.0, and `===` compares the
+  normalized version (`1.0-RC1` is `1.0rc1`). A mismatch removes no
   candidate. A Poetry `git` or `url` source without a `path` is a direct
   reference, no entry, as `name @ url` is, and a requirements line ending in `\` continues on
   the next. A `[project] dependencies` entry takes its `[tool.uv.sources]` source as `via`, as
