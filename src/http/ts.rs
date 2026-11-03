@@ -10,6 +10,7 @@
 //! `prefixes`, `join`, `normalize_path`, `provider`, `METHODS`, `HTTP_METHODS`.
 
 mod clients;
+mod config;
 
 pub(super) use clients::consumers;
 

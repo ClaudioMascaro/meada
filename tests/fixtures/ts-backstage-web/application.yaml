@@ -1,0 +1,2 @@
+api:
+  spring: ${SPRING_URL}

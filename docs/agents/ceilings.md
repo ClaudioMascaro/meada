@@ -1751,3 +1751,12 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
 - A call to `send` inside `exports.send = function () {}` resolves to `exports.send` itself, not to
   a top-level `function send`: the resolver's scope walk reads the symbol `exports.send` as `send`
   in the scope `exports`, as it does `use()` inside `app.use = function use() {}` (#457).
+
+- Backstage configuration reads (#617, `CONFIG_READS` in `lang/ts.rs`, read by `http/ts/config.rs`): `config.getString('a.b')`
+  and `getOptionalString('a.b')` with a literal key are read from the `app-config*.yaml` files of
+  the repository, `app-config.yaml` first and the first file holding the key winning, whatever
+  their directory: profiles are not merged and a monorepo's apps share one lookup. A value that is
+  not exactly `${VAR}` (a literal, `${VAR:-default}`, text around the placeholder), a key no file
+  holds, a receiver that is not a `Config`, and a read passed in from another file's wrapper
+  leave the base unresolved. The pack reads the call by its member name alone, so the receiver is
+  not checked: a `getString` of another library with a key a config holds reads the same.

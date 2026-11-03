@@ -581,7 +581,7 @@ impl ContractKind for Http {
         let mut found = Vec::new();
         // One reader of each shape source for the whole extraction: each budget per file once.
         let mut literals = Literals::default();
-        found.extend(ts::consumers(code, &mut literals));
+        found.extend(ts::consumers(code, indexed, &mut literals));
         found.extend(ts::providers(code, &mut literals));
         found.extend(python::consumers(code));
         found.extend(rust::providers(code));

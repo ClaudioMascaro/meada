@@ -306,10 +306,15 @@ const PACKS: &[&dyn LanguagePack] = &[
 ];
 
 /// Whether a file named `file` is one a `**/` name of `config_files` names (`pattern`, past
-/// the `**/`): that name, or for `*.ext` any name ending so.
+/// the `**/`): that name, for `*.ext` any name ending so, and for `start*.ext` any name with
+/// that start and ending (`app-config*.yaml`: `app-config.yaml`, `app-config.local.yaml`).
 pub fn names_config(pattern: &str, file: &str) -> bool {
-    match pattern.strip_prefix('*') {
-        Some(ending) => file.len() > ending.len() && file.ends_with(ending),
+    match pattern.split_once('*') {
+        Some((start, ending)) => {
+            // `*.ext` needs a name before the extension; `start*.ext` may match `start.ext`.
+            let shortest = start.len() + ending.len() + usize::from(start.is_empty());
+            file.len() >= shortest && file.starts_with(start) && file.ends_with(ending)
+        }
         None => file == pattern,
     }
 }
@@ -1435,6 +1440,7 @@ mod tests {
         ("swift.rs:VALUE_TYPES", "runtime"),
         ("swift/values.rs:STRING_METHODS", "runtime"),
         ("ts.rs:BODIES", "syntax"),
+        ("ts.rs:CONFIG_READS", "exception"),
         ("ts.rs:EXTENSIONS", "syntax"),
         ("ts.rs:FUNCTIONS", "syntax"),
         ("ts.rs:STRING_METHODS", "runtime"),

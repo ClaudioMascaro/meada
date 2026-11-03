@@ -205,7 +205,9 @@ budget of 64 KB (`tests/it/docs.rs` fails above it):
   reads. A pack may recognise the one call that reads the platform's environment, as a
   form and not a table: Java's and Kotlin's `System.getenv` (`getenv` in `lang/java.rs` and
   `lang/kotlin.rs`) and C#'s `GetEnvironmentVariable` (`ENVIRONMENT_READ` in `lang/csharp.rs`,
-  which leaves the kind to decide whether the `Environment` is the framework's); C# also keeps
+  which leaves the kind to decide whether the `Environment` is the framework's); the TypeScript pack does the same for Backstage's `config.getString('a.b')` and
+  `getOptionalString` (`CONFIG_READS` in `lang/ts.rs`, #617): the call is a config read the kind
+  (`http/ts/config.rs`) looks up in `app-config*.yaml`. C# also keeps
   the trims of `System.String` (`TRIMS`) as runtime. The tables of known outside members
   (`LanguagePack::known_outside`) are runtime, apart from Swift's entry for Vapor's
   `RouteCollection`, an exception decided in ADR 0019. The test in `lang/mod.rs`

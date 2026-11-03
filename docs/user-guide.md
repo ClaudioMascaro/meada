@@ -1043,7 +1043,11 @@ algum. Um `:id` literal continua sendo parâmetro. Nenhum cliente além do `fetc
 
 **Ambiente.** `process.env.X`, `process.env["X"]` e `import.meta.env.X`, sozinhos ou passando por
 métodos de texto como `trim()`, `replace(...)` e `toLowerCase()`. A URL que começa por uma leitura
-assim liga pelo `base_url_env` do par. Arquivos `.env` não são lidos.
+assim liga pelo `base_url_env` do par. Arquivos `.env` não são lidos. O mesmo vale para a
+leitura de configuração do Backstage, `config.getString('a.b')` ou `config.getOptionalString('a.b')`,
+quando algum `app-config*.yaml` do repositório guarda `a.b: ${VAR}` (o `app-config.yaml` primeiro, e
+vale o primeiro arquivo que tem a chave): a leitura é a variável `VAR`. Um valor literal ou uma
+chave que nenhum arquivo tem deixam a base sem resolver.
 
 **Manifestos.** `package.json` (`name`, `version`, os quatro campos de dependências, `exports`,
 `types`, `module` e `main`) e `tsconfig.json` (`paths`, `baseUrl`, `outDir`, `rootDir`). Veja o

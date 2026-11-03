@@ -233,7 +233,12 @@ impl LanguagePack for TsJs {
     }
 
     fn config_files(&self) -> &'static [&'static str] {
-        &["**/tsconfig.json", "**/jsconfig.json"]
+        &[
+            "**/tsconfig.json",
+            "**/jsconfig.json",
+            // Backstage's configuration, which `http::ts` reads for `config.getString`.
+            "**/app-config*.yaml",
+        ]
     }
 
     fn receiver(&self) -> Option<&'static str> {
@@ -262,6 +267,9 @@ impl LanguagePack for TsJs {
         let mut nearest: HashMap<&str, &str> = HashMap::new();
         for (path, src) in configs {
             let dir = path.rsplit_once('/').map_or("", |(dir, _)| dir);
+            if !path.ends_with("tsconfig.json") && !path.ends_with("jsconfig.json") {
+                continue;
+            }
             if !path.split('/').any(|s| s == "node_modules") {
                 nearest.entry(dir).or_insert(path);
                 options.insert(path.to_string(), Options::read(dir, src));
@@ -1255,6 +1263,9 @@ fn env_read(node: Node, src: &[u8], depth: usize) -> Option<Part> {
         "call_expression" => {
             let function = callee_node(node)?;
             let method = function.child_by_field_name("property")?;
+            if CONFIG_READS.contains(&text(method, src)) {
+                return config_read(node, function, src);
+            }
             if !STRING_METHODS.contains(&text(method, src)) {
                 return None;
             }
@@ -1266,6 +1277,28 @@ fn env_read(node: Node, src: &[u8], depth: usize) -> Option<Part> {
         }
         _ => None,
     }
+}
+
+/// The members whose call with one string literal reads a key of Backstage's configuration
+/// (`config.getString('a.b')`); the kind decides whether the receiver is one and what the key
+/// holds, as it does for C#'s `GetEnvironmentVariable`.
+// ponytail: the one library form of this pack beside C#'s (`CODING_STANDARDS.md`); see `docs/agents/ceilings.md`.
+const CONFIG_READS: &[&str] = &["getString", "getOptionalString"];
+
+/// `config.getString('a.b')` as a `Part::Read` of the key, for the kind to decide.
+fn config_read(call: Node, function: Node, src: &[u8]) -> Option<Part> {
+    let args = call.child_by_field_name("arguments")?;
+    let mut args = named(args);
+    let key = args.next().filter(|k| k.kind() == "string")?;
+    if args.next().is_some() {
+        return None;
+    }
+    Some(Part::Read {
+        scope: std::sync::Arc::from(""),
+        callee: callee(function, src),
+        key: unquote(key, src),
+        then: Vec::new(),
+    })
 }
 
 /// The environment read that makes up all of `parts`, if that is what they are.

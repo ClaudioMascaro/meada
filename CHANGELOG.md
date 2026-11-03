@@ -8,6 +8,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- A TypeScript or JavaScript base URL read through Backstage's `config.getString('a.b')` or
+  `getOptionalString('a.b')` is the variable `VAR` when an `app-config*.yaml` of the repository
+  holds `a.b: ${VAR}`, so the peer's `base_url_env` links the call as an environment read does
+  instead of leaving it `ambiguous`; a literal value or a key no file holds leaves the base
+  unresolved (#617).
 - A PyPI version specifier is checked against the provider's version as PEP 440 says, as npm's
   range is: `range mismatch` when the specifiers (`==`, `!=`, `<`, `<=`, `>`, `>=`, `~=`, `==X.*`
   and `===`, joined by commas) reject the local version, nothing added when they accept it, and

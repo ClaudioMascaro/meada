@@ -1041,7 +1041,11 @@ all. A literal `:id` is still a parameter. No client besides `fetch` is read: `a
 
 **Environment.** `process.env.X`, `process.env["X"]` and `import.meta.env.X`, alone or passing
 through text methods such as `trim()`, `replace(...)` and `toLowerCase()`. A URL that starts with
-such a read links through the peer's `base_url_env`. `.env` files are not read.
+such a read links through the peer's `base_url_env`. `.env` files are not read. So does
+Backstage's configuration read, `config.getString('a.b')` or `config.getOptionalString('a.b')`,
+when an `app-config*.yaml` of the repository holds `a.b: ${VAR}` (`app-config.yaml` first, the
+first file with the key wins): the read is the variable `VAR`. A literal value or a key no file
+holds leaves the base unresolved.
 
 **Manifests.** `package.json` (`name`, `version`, the four dependency fields, `exports`, `types`,
 `module` and `main`) and `tsconfig.json` (`paths`, `baseUrl`, `outDir`, `rootDir`). See npm in

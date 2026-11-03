@@ -1,0 +1,4 @@
+api:
+  baseUrl: ${API_URL}
+  optionalUrl: ${OPT_URL}
+  literalUrl: http://other.example.com

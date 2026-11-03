@@ -976,3 +976,71 @@ fn a_declarative_client_method_is_an_open_item_at_its_definition() {
     assert!(list.contains(&format!("{catalog}\nsrc/main/java/com/example/api/CatalogClient.java:10  @GetMapping(\"/api/catalog\") String all();\n  1) ")), "{list}");
     assert!(list.contains(fetch), "{list}");
 }
+
+/// A Backstage service reads a base URL through `config.getString('a.b')` and the key holds
+/// `${VAR}` in `app-config*.yaml` (#617): the read is the variable, which the peer's
+/// `base_url_env` maps, so two providers of the route no longer leave the link `ambiguous`. A
+/// literal value and a key no file holds leave the host unresolved.
+#[test]
+fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
+    let case = "xlang_backstage";
+    let web = common::fixture_repo(
+        case,
+        "ts-backstage-web",
+        Some("https://example.com/backstage/web.git"),
+    );
+    for (fixture, origin) in [
+        ("ts-backstage-api", "https://example.com/backstage/api.git"),
+        (
+            "ts-backstage-other",
+            "https://example.com/backstage/other.git",
+        ),
+    ] {
+        common::fixture_repo(case, fixture, Some(origin));
+    }
+    let export: serde_json::Value =
+        serde_json::from_str(&Engine::open(&web).unwrap().export().unwrap()).unwrap();
+    let vias: std::collections::BTreeMap<&str, Option<&str>> = export["consumers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| {
+            let site = c["site"].as_str().unwrap();
+            (site.split("::").nth(2).unwrap(), c["via"].as_str())
+        })
+        .collect();
+    let expected = [
+        ("viaGetString", Some("env:API_URL")),
+        ("viaOptional", Some("env:OPT_URL")),
+        ("viaLocalFile", Some("env:LOCAL_URL")),
+        ("literalValue", None),
+        ("missingKey", None),
+        // Another pack's config file (`application.yaml`) is no Backstage config.
+        ("notAppConfig", None),
+    ];
+    for (function, via) in expected {
+        assert_eq!(vias.get(function), Some(&via), "{function}");
+    }
+
+    let links: Vec<(&str, &str, &str)> = export["links"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|l| l["consumer"].as_str().unwrap().contains("viaGetString"))
+        .map(|l| {
+            (
+                l["provider"].as_str().unwrap(),
+                l["level"].as_str().unwrap(),
+                l["reason"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        links,
+        [(
+            "example.com/backstage/api::src/server.ts::GET /orders",
+            "inferred",
+            "base URL from API_URL, a base_url_env of peer example.com/backstage/api"
+        )]
+    );
+}

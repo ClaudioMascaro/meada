@@ -1060,7 +1060,12 @@ lee: `axios`, `got` y `XMLHttpRequest` no generan consumidor.
 
 **Entorno.** `process.env.X`, `process.env["X"]` e `import.meta.env.X`, solos o pasando por
 métodos de texto como `trim()`, `replace(...)` y `toLowerCase()`. La URL que empieza por una
-lectura así enlaza por el `base_url_env` del par. Los archivos `.env` no se leen.
+lectura así enlaza por el `base_url_env` del par. Los archivos `.env` no se leen. Lo mismo vale
+para la lectura de configuración de Backstage, `config.getString('a.b')` o
+`config.getOptionalString('a.b')`, cuando algún `app-config*.yaml` del repositorio guarda
+`a.b: ${VAR}` (primero `app-config.yaml`, y vale el primer archivo que tiene la clave): la lectura
+es la variable `VAR`. Un valor literal o una clave que ningún archivo tiene dejan la base sin
+resolver.
 
 **Manifiestos.** `package.json` (`name`, `version`, los cuatro campos de dependencias, `exports`,
 `types`, `module` y `main`) y `tsconfig.json` (`paths`, `baseUrl`, `outDir`, `rootDir`). Vea npm

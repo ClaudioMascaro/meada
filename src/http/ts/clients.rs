@@ -5,16 +5,23 @@
 //! the root reused: its `fetch(args)` reader (`locate`, `method`, `fragments`) and `consumer`.
 
 use super::super::{consumer, fetch};
+use super::config::Config;
 use crate::contract::Found;
 use crate::declared::{self, Declared, Types};
+use crate::index::Indexed;
 use crate::lang::{Step, Ty};
 use crate::literals::Literals;
 use crate::resolve::{Code, Expand, Expanded, Frame, Target};
 use crate::shape::{self, Import, Shape, Source, under};
 
 /// `fetch` consumers with the shape each reads of its response (spec #23).
-pub(in crate::http) fn consumers(code: &Code, literals: &mut Literals) -> Vec<Found> {
+pub(in crate::http) fn consumers(
+    code: &Code,
+    indexed: &Indexed,
+    literals: &mut Literals,
+) -> Vec<Found> {
     let mut found = Vec::new();
+    let config = Config::new(indexed.configs);
     // `fetch` is a consumer only where the language binds it everywhere.
     let global = code.binds_everywhere("fetch");
     for (&path, facts) in code.files() {
@@ -25,7 +32,9 @@ pub(in crate::http) fn consumers(code: &Code, literals: &mut Literals) -> Vec<Fo
             if !is_fetch || code.args(path, n).is_none_or(<[_]>::is_empty) {
                 continue;
             }
-            let expanded = code.expand(Expand::Call(path, n), &|args, _| fetch(args));
+            let expanded = code.expand(Expand::Call(path, n), &|args, _| {
+                fetch(&config.decided(args))
+            });
             for Expanded {
                 site: (site, at),
                 frames,
