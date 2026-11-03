@@ -2489,6 +2489,19 @@ sample.swift
       },
       "params": [],
       "hash": "c9b9a0bd7799123ad3d1d8e1ed94caa3785e3f3782b3355abd240943746d2bc9"
+    },
+    {
+      "name": "Page",
+      "kind": "Class",
+      "range": {
+        "start": 518,
+        "end": 538
+      },
+      "params": [],
+      "type_params": [
+        "Item"
+      ],
+      "hash": "3b2836f7b577cb3b8ef754b803047b20f9ea52d031c68f7213c968746cd0ad3a"
     }
   ],
   "overloads": {
@@ -2584,6 +2597,12 @@ sample.swift
       "Local": {
         "exported": "Orders",
         "local": "Orders"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Page",
+        "local": "Page"
       }
     },
     {
@@ -2723,6 +2742,7 @@ sample.swift
     "settle()",
     "local()",
     "shared()",
+    "Page",
     "on",
     "settle",
     "shared"

@@ -356,6 +356,10 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 if params.is_some() {
                     let family = facts.overloads.entry(inner.as_ref().clone()).or_default();
                     family.push(inner.as_ref().clone());
+                    let primary = named(node).find(|n| n.kind() == "primary_constructor");
+                    if primary.is_some_and(|p| own_access(p, src) == Access::Private) {
+                        facts.sealed.push(inner.as_ref().clone());
+                    }
                 }
                 let def = Def {
                     bases,
@@ -618,6 +622,9 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 });
                 if access.max(own_access(node, src)) != Access::Public {
                     facts.hidden.push(ctor.clone());
+                }
+                if own_access(node, src) == Access::Private {
+                    facts.sealed.push(ctor.clone());
                 }
                 (facts.overloads.entry(scope.as_ref().clone()).or_default()).push(ctor);
                 inner_place = Place::Init;

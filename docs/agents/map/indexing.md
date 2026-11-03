@@ -76,10 +76,12 @@ from ...", with the whole list. A value the index now stores joins it.
   labels and constructor form of an overloaded call (`Call::arity`, `Call::labels`,
   `Call::constructs`), the argument label of a parameter and whether its written type takes a
   trailing closure, or the name it is written as (`Param::label`, `Param::closure`), the names
-  of a Swift file's aliases of a function type (`Facts::function_aliases`), the place of the call a
+  of a Swift file's aliases of a function type (`Facts::function_aliases`), the type
+  parameters of a function or type, which Swift's join reads from every file of its pack
+  (`Def::type_params`), the place of the call a
   chained call is made on and whether it is reached through `?` (`Call::on`, `Call::unwraps`), the class `?` unwraps a Rust function's written result to and the one `.await` yields from a future signature (`Def::unwrapped`, `Def::output`, `Call::awaits`), whether a Swift call is written under `await` and
   whether a function needs one (`Call::awaited`, `Def::suspends`), the modules a Swift file imports
-  `@testable` and the names only their file sees (`Facts::testable`, `Facts::confined`), whether an `inferred` call was narrowed from several
+  `@testable` and the names only their file sees (`Facts::testable`, `Facts::confined`), the Kotlin constructors only their own class calls (`Facts::sealed`), whether an `inferred` call was narrowed from several
   definitions of its name (`calls.narrowed`), the definition a decorating call decorates (`calls.decorates`, the
   call site's `decorates`), callable-to-signature and
   static-member names (`Facts::overloads`, `Facts::constructors` and
@@ -154,7 +156,7 @@ from ...", with the whole list. A value the index now stores joins it.
   each entry point's identity, kind, label and start symbol, rewritten with the contracts),
   each community's name and member identities (`communities`, spec #31), and the paths of the
   files whose values the last contract extraction read (`valued`, #391). `Call::args`,
-  `Call::kwargs`, `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::return_values`, `Def::type_params`, `Param::default`,
+  `Call::kwargs`, `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::return_values`, `Param::default`,
   `Field::default`, `Const::value` and `Const::ty` are `serde(skip)`, so unchanged files come
   back from SQLite without them. An `interface` or `type` declaration is a `Const` too, so its
   name is stored (its members are not). `Code` records every file it needs but lacks as a miss, and

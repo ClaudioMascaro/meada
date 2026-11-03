@@ -52,6 +52,26 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A refresh resolves a Swift file as a cold index does: the type parameters of a type or
+  function (`Page<Item>`) are kept in the index, so an `Item()` in an extension of `Page` in
+  another file is no construction of a type named `Item` after an edit to an unrelated Swift file
+  (the stored format changes, so an existing index is rebuilt once) (#609).
+- A Kotlin `private` constructor, primary (`class C private constructor(..)`) or secondary, is
+  called only from inside its class: a call from another class no longer resolves to it, one from
+  the class, its companion or a nested class stays `exact`. `internal` is still not enforced
+  (#455).
+- A Rust name two globs give (`use x::*; use y::*;`, which compiles only under `cfg`
+  alternatives) is `ambiguous` between them, not `exact` to the latest glob; an explicit item or
+  `use` beside the globs still wins (#439).
+- A Swift parameter written as a name from outside the repository (`Ext.CompletionHandler`, which
+  may be an alias of a function type) neither takes nor refuses a trailing closure with certainty:
+  a call that fits an overload only through it is `ambiguous` among its overloads (`inferred` when
+  it is the only one), no longer `exact` to a sibling overload that reads as a function type or
+  absent. A parameter written as a type the repository declares or a standard value type still
+  refuses it (#456).
+- TypeScript and JavaScript: `exports.y = function () {}` and `module.exports.y = ..` define the
+  symbol `exports.y` (exported as `y`), so a bare `y()` in the file no longer links to it and
+  `m.y()` through an import still does (#457).
 - A PyPI package in the consumer's own repository that no uv source names links `inferred`, not
   `exact`, when it is the one package of the name, with the reason "no uv source names the local
   package, the registry package is the likely provider": pip and uv install the registry's

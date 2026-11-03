@@ -37,9 +37,33 @@ const PATH_DEPTH: usize = 256;
 // ponytail: a long nested name must not multiply across a broad file without a budget.
 const QUALIFICATION_BYTES: usize = 4 * 1024 * 1024;
 /// How many aliases deep an alias of an alias of a function type is followed
-/// (`function_aliases`): a parameter written as one past it takes no trailing closure.
+/// (`function_aliases`): a parameter written as one past it is `Closure::Unknown`.
 // ponytail: real aliases chain once or twice; this keeps a crafted chain cheap.
 const ALIAS_DEPTH: usize = 16;
+
+/// The standard library's value and collection types that are no function type: a parameter
+/// written as one refuses a trailing closure, as a type of the repository does (`join`).
+const VALUE_TYPES: &[&str] = &[
+    "Array",
+    "Bool",
+    "Character",
+    "Dictionary",
+    "Double",
+    "Float",
+    "Int",
+    "Int16",
+    "Int32",
+    "Int64",
+    "Int8",
+    "Set",
+    "String",
+    "Substring",
+    "UInt",
+    "UInt16",
+    "UInt32",
+    "UInt64",
+    "UInt8",
+];
 
 /// The module of the files no target of a `Package.swift` holds, which no import can name.
 const NO_TARGET: &str = "(no target)";
@@ -85,6 +109,13 @@ impl LanguagePack for Swift {
             }
         }
         let function_aliases = function_aliases(files);
+        // The types the repository declares, by qualified name and, for a name written without
+        // a qualifier, by last segment: a parameter written as one holds no closure. A qualified
+        // outside name (`Ext.Handler`) is one of them only when written as a declared name, so a
+        // type of that last segment elsewhere in the repository does not read it.
+        let classes = || (files.values().flat_map(|f| &f.defs)).filter(|d| d.kind == Kind::Class);
+        let declared: HashSet<String> = classes().map(|d| d.name.clone()).collect();
+        let by_last: HashSet<String> = classes().map(|d| last(&d.name).to_string()).collect();
         Box::new(move |path, facts| {
             let module = targets.module_of(path);
             wildcard(module, true, facts);
@@ -105,10 +136,16 @@ impl LanguagePack for Swift {
                     let Closure::Named(ty) = &param.closure else {
                         continue;
                     };
-                    let takes = held(&def.name, ty) || function_aliases.contains(last(ty));
-                    param.closure = match takes {
-                        true => Closure::Takes,
-                        false => Closure::Refuses,
+                    param.closure = if held(&def.name, ty) || function_aliases.contains(last(ty)) {
+                        Closure::Takes
+                    } else if declared.contains(ty)
+                        || (!ty.contains('.') && by_last.contains(ty))
+                        || VALUE_TYPES.contains(&ty.as_str())
+                    {
+                        Closure::Refuses
+                    } else {
+                        // An outside name may be an alias of a function type.
+                        Closure::Unknown
                     };
                 }
             }
@@ -2422,7 +2459,7 @@ mod tests {
     }
 
     /// `join` follows an alias of an alias of a function type `ALIAS_DEPTH` deep: a parameter
-    /// written as one past it takes no trailing closure, and a cycle ends.
+    /// written as one past it is `Closure::Unknown`, and a cycle ends.
     #[test]
     fn an_alias_chain_of_a_function_type_is_followed_to_its_limit() {
         let mut src = String::from("typealias A0 = () -> Void\ntypealias X = Y\ntypealias Y = X\n");

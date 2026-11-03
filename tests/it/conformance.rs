@@ -5660,8 +5660,8 @@ fn typescript_and_javascript() {
             "src/assigned.js::app.use",
             "src/assigned.js::caller",
             "src/assigned.js::decl",
-            "src/assigned.js::expA",
-            "src/assigned.js::expB",
+            "src/assigned.js::exports.expA",
+            "src/assigned.js::exports.expB",
             "src/assigned.js::hidden",
             "src/assigned.js::innerCatch",
             "src/assigned.js::innerDef",
@@ -14260,6 +14260,17 @@ fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
         app("Box"),
         app("Box.g(_:)"),
         app("untyped()"),
+        app("Loader"),
+        app("Loader.load(completion:(Int)->Void)"),
+        app("Loader.load(completion:Ext.CompletionHandler)"),
+        app("Holder"),
+        app("Holder.CompletionHandler"),
+        app("Lone"),
+        app("Lone.fetch(completion:)"),
+        app("Pair"),
+        app("Pair.put(_:then:)"),
+        app("Pair.put(_:wheel:)"),
+        app("outside(_:_:_:)"),
     ];
     let symbols: Vec<&str> = symbols.iter().map(String::as_str).collect();
     let (send, init, internal) = (
@@ -14338,6 +14349,29 @@ fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
         (trailing("run#0"), EXACT, vec![app("run(_:)")]),
         // An alias its module keeps to itself types nothing in another module.
         (app("hidden(_:)::x.send#0"), None, vec![]),
+        // A parameter written as a name from outside the repository (`Ext.CompletionHandler`)
+        // may be an alias of a function type (issue #456): a trailing closure that fits an
+        // overload only through one is never `exact`, whether it has a sibling that reads as a
+        // function type or none (a lone candidate is a name match). A parameter written as a
+        // type of the repository (`Wheel?`) still refuses it.
+        (
+            app("outside(_:_:_:)::x.load#0"),
+            AMBIGUOUS,
+            vec![
+                app("Loader.load(completion:(Int)->Void)"),
+                app("Loader.load(completion:Ext.CompletionHandler)"),
+            ],
+        ),
+        (
+            app("outside(_:_:_:)::y.fetch#0"),
+            INFERRED,
+            vec![app("Lone.fetch(completion:)")],
+        ),
+        (
+            app("outside(_:_:_:)::z.put#0"),
+            EXACT,
+            vec![app("Pair.put(_:then:)")],
+        ),
     ];
     let targets: Vec<Vec<&str>> = (calls.iter())
         .map(|(_, _, t)| t.iter().map(String::as_str).collect())
@@ -14407,4 +14441,57 @@ fn python_nested_pyproject_that_cannot_be_read_declares_no_roots() {
         let a = nested_pyproject_call(&json, "a", "f").0;
         assert_eq!(a.as_deref(), Some("exact"), "{case}");
     }
+}
+
+/// A CommonJS `exports.y = function () {}` defines the symbol `exports.y`, exported as `y`: Node
+/// binds no local `y`, so a bare `y()` reaches nothing, and `m.y()` through the module does.
+#[test]
+fn ts_js_a_commonjs_export_binds_no_bare_name() {
+    let repo = fixture_repo("ts_commonjs_bare", "conformance-ts-js", Some(ORIGIN));
+    std::fs::write(
+        repo.join("src/cjs.js"),
+        "function send() {}\nexports.send = function () { send(); };\nexports.y = function () {};\n\
+         function bare() { y(); }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("src/cjs-user.js"),
+        "import * as m from './cjs.js';\nfunction use() { m.y(); }\n",
+    )
+    .unwrap();
+    let json: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let call = |suffix: &str| {
+        (json["calls"].as_array().unwrap().iter())
+            .find(|c| c["id"].as_str().unwrap().ends_with(suffix))
+            .unwrap_or_else(|| panic!("{suffix}"))
+            .clone()
+    };
+    assert_eq!(call("cjs.js::bare::y#0")["level"], Value::Null);
+    let through = call("cjs-user.js::use::m.y#0");
+    assert_eq!(through["level"], "exact");
+    assert!(
+        through["target"]
+            .as_str()
+            .unwrap()
+            .ends_with("cjs.js::exports.y")
+    );
+    // Known ceiling (docs/agents/ceilings.md): the inner `send()` reaches `exports.send`.
+    let send = call("cjs.js::exports.send::send#0");
+    assert!(
+        send["target"]
+            .as_str()
+            .unwrap()
+            .ends_with("cjs.js::exports.send")
+    );
+    let mut ids: Vec<&str> = (json["symbols"].as_array().unwrap().iter())
+        .map(|s| s["id"].as_str().unwrap())
+        .filter(|i| i.contains("cjs.js::"))
+        .collect();
+    ids.sort();
+    let names: Vec<&str> = ids
+        .iter()
+        .map(|i| i.split("cjs.js::").nth(1).unwrap())
+        .collect();
+    assert_eq!(names, ["bare", "exports.send", "exports.y", "send"]);
 }

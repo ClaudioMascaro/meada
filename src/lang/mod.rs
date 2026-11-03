@@ -132,6 +132,12 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether the globs giving one name combine into `ambiguous` (Rust: two globs that both
+    /// give a name are E0659, so only `cfg` alternatives reach here). Implied by `unordered_globs`.
+    fn combines_globs(&self) -> bool {
+        self.unordered_globs()
+    }
+
     /// Whether a static import of a type (`import static a.B.*;`) takes the members its bases
     /// declare too. C#'s `using static T` takes only those `T` declares: inherited members
     /// aren't imported.
@@ -534,6 +540,10 @@ pub struct Facts {
     /// even a module imported `testable` keeps to itself.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub confined: Vec<String>,
+    /// The constructors only their own class calls (Kotlin's `private`), as the family member
+    /// that builds: the class's name for a primary one, `C.C(types)` for a secondary one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sealed: Vec<String>,
     /// The compilations (`unit`) whose `private` declarations the file sees, which
     /// `LanguagePack::join` sets (Swift's `testable` imports, as the modules they name here).
     /// Not kept in the index: it is joined again.
@@ -834,8 +844,9 @@ pub struct Def {
     /// the index (see `Call::args`).
     #[serde(skip)]
     pub returns: Option<Ty>,
-    /// The names of a function's type parameters in order (`get<T>`). Not kept in the index.
-    #[serde(skip)]
+    /// The names of a function's or type's type parameters in order (`get<T>`). Kept in the
+    /// index: Swift's join reads them from every file of its pack, kept or parsed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub type_params: Vec<String>,
     /// The class a function's written return type names (`Self`, `Store`, a trait of `impl
     /// Trait`), as a callee-like name resolved from the function's own scope: what a call to
@@ -910,11 +921,17 @@ pub enum Closure {
     /// It may: a function type, a type parameter, or a pack that does not tell.
     #[default]
     Takes,
-    /// It may not: any other written type, a named one outside the repository included.
+    /// It may not: any other written type, and a name the pack reads as no function type (a type
+    /// of the repository, a standard value type).
     Refuses,
+    /// Written as a name the pack cannot read: a type from outside the repository, which may be
+    /// an alias of a function type. A call that fits only if it takes the trailing closure is
+    /// never `exact`, and never absent (`Closure::Unknown` fits as `Fit::Maybe`).
+    Unknown,
     /// Written as this name, which `LanguagePack::join` reads among the repository's aliases of
     /// a function type (Swift's `typealias Handler = (Int) -> Void`): `Takes` when one is so
-    /// named, else `Refuses`. The resolver reads one left as `Takes`.
+    /// named, `Refuses` for a type the repository declares or a standard value type, else
+    /// `Unknown`. The resolver reads one left as `Takes`.
     Named(String),
 }
 
@@ -1415,6 +1432,7 @@ mod tests {
         ("rust/values.rs:KEEPS", "runtime"),
         ("rust/values.rs:KEEPS_NAMES", "runtime"),
         ("rust/values.rs:METHOD_CRATES", "exception"),
+        ("swift.rs:VALUE_TYPES", "runtime"),
         ("swift/values.rs:STRING_METHODS", "runtime"),
         ("ts.rs:BODIES", "syntax"),
         ("ts.rs:EXTENSIONS", "syntax"),
