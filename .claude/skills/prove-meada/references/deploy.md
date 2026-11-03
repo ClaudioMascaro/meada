@@ -10,8 +10,11 @@ It renders, at the base (a detached worktree under `$RUN`, removed after) and in
 tree: the Compose profiles `scripts/compose-check` checks (`local`, `generations`, `console`,
 `postgres` and the accounts stack of `.env.accounts.example`) with `docker compose ... config
 --format json`, and with `helm` on `PATH` the chart once per `deploy/helm/meada/values*.yaml`.
-Paths are normalised to `<root>`. Each render is compared line by line and every difference shows
-in `$RUN/deploy.md`. A render that fails at the head is a difference of its own.
+Paths are normalised to `<root>`. The files the stack mounts (`Caddyfile*`, `*.toml`, `*.sh`,
+`.env*`) are copied beside the renders as `mounted-<name>`, since a render carries only their
+path. Each render and each mounted file is compared line by line and every difference shows in
+`$RUN/deploy.md`. A render that fails at the head is a difference of its own. Without `docker`
+the Compose renders are Not covered (a note in `deploy.md`), with `helm` missing the chart is.
 
 Every difference must be one the issue names (a new service, a changed limit, a version bump in a
 release PR). An image tag that moves outside a release PR is BROKEN.

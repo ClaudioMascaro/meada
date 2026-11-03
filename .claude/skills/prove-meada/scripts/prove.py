@@ -17,6 +17,7 @@ import argparse
 import difflib
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -41,7 +42,7 @@ KEYED = {
     "consumers": ("contract", "site"),
 }
 WATCHED = {"calls": ("level", "target", "candidates"), "links": ("level",), "packages": ("version",), "consumers": ("via",)}
-OTHER = ("files", "bindings", "publishes", "dependencies", "communities", "processes")
+OTHER = ("files", "imports", "documents", "bindings", "publishes", "dependencies", "communities", "processes")
 FIXED_GIT = {
     "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1",
     "GIT_AUTHOR_NAME": "prove-meada", "GIT_AUTHOR_EMAIL": "prove@example.com", "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z",
@@ -169,8 +170,14 @@ def answer(msg):
     return ("TOOL ERROR " if result.get("isError") else "") + text
 
 
+def short_name(sym):
+    return sym.rsplit("::", 1)[-1].split("(")[0].rsplit(".", 1)[-1]  # Kotlin and Swift signatures carry dots
+
+
 def auto_queries(export):
-    """Three symbols with the most resolved callers, each through every tool."""
+    """Three symbols with the most resolved callers, each through every tool; then every tool
+    argument once, on the first of them: an argument the server parses and drops leaves the
+    default answers identical (audit 2026-11-03, M1 and M2)."""
     count = {}
     for c in export.get("calls", []):
         if c.get("target"):
@@ -178,16 +185,53 @@ def auto_queries(export):
     top = sorted(count, key=lambda s: (-count[s], s))[:3]
     queries = []
     for sym in top:
-        name = sym.rsplit("::", 1)[-1].split("(")[0].rsplit(".", 1)[-1]  # Kotlin and Swift signatures carry dots
-        queries += [{"tool": "search", "arguments": {"query": name}},
+        queries += [{"tool": "search", "arguments": {"query": short_name(sym)}},
                     {"tool": "context", "arguments": {"symbol": sym}},
                     {"tool": "trace", "arguments": {"from": sym}}]
+    if top:
+        sym, name = top[0], short_name(top[0])
+        queries += [{"tool": "search", "arguments": {"query": name, "budget": 300}},
+                    {"tool": "search", "arguments": {"query": name, "kind": "contract"}},  # a symbol name: contracts only
+                    {"tool": "context", "arguments": {"symbol": sym, "budget": 300}},
+                    {"tool": "trace", "arguments": {"from": sym, "direction": "up", "budget": 300}}]
     contracts = sorted({p["contract"] for p in export.get("providers", [])})
     if contracts:
         queries.append({"tool": "search", "arguments": {"query": contracts[0], "kind": "contract"}})
-    # Error parity: an unknown symbol must be refused the same way by both binaries.
+    # Error parity: an unknown kind and an unknown symbol must be refused the same way by both binaries.
+    queries.append({"tool": "search", "arguments": {"query": "zz_prove_missing", "kind": "zz_prove_kind"}})
     queries.append({"tool": "context", "arguments": {"symbol": "zz_prove_missing"}})
     return queries
+
+
+def body(export_bytes):
+    """An export without `commit` and `dirty`: checkout facts read at export time (ADR 0004, #512),
+    absent while an index is not fresh, so they never say whether the index itself moved."""
+    return re.sub(rb'(?m)^  "(commit|dirty)": [^\n]*\n', b"", export_bytes)
+
+
+def quoted(sym_id):
+    return ('"' + sym_id + '"').encode()
+
+
+def rename_in_place(repo, export):
+    """A same-size edit of one symbol's name in its file, so the refresh path has new content to
+    pick up (audit 2026-11-03, M7: a size-only shortcut never re-indexed it). Returns the file,
+    its original bytes, the edit, the symbol's id and its renamed id, or None when no symbol suits."""
+    for s in sorted(export.get("symbols", []), key=lambda s: s["id"]):
+        name = short_name(s["id"])
+        rel = s.get("span", {}).get("path", "")
+        path = repo / rel
+        head, sep, tail = s["id"].partition(f"::{rel}::")
+        if len(name) < 3 or not name.isidentifier() or name.endswith("Q") or not sep or not path.is_file():
+            continue
+        data = path.read_bytes()
+        word = re.compile(rb"\b" + re.escape(name.encode()) + rb"\b")
+        new = word.sub(name[:-1].encode() + b"Q", data)
+        if new != data:
+            path.write_bytes(new)
+            new_id = f"{head}::{rel}::" + word.sub(name[:-1].encode() + b"Q", tail.encode()).decode()
+            return path, data, f"{rel}: {name} -> {name[:-1]}Q", s["id"], new_id
+    return None
 
 
 def drive(bin, repo, out, queries_file):
@@ -202,22 +246,49 @@ def drive(bin, repo, out, queries_file):
             rec["failed"] = f"index or export {n} exited non-zero, see {out}/*{n}.err"
             (out / "record.json").write_text(json.dumps(rec, indent=1, sort_keys=True))
             return rec
-    if not json.loads((out / "export1.json").read_text()).get("symbols"):
+    export = json.loads((out / "export1.json").read_text())
+    if not export.get("symbols"):
         rec["failed"] = f"the export of {repo} has no symbol: an empty index proves nothing"
         (out / "record.json").write_text(json.dumps(rec, indent=1, sort_keys=True))
         return rec
-    rec["deterministic"] = (out / "export1.json").read_bytes() == (out / "export2.json").read_bytes()
+    cold1 = (out / "export1.json").read_bytes()
+    rec["deterministic"] = cold1 == (out / "export2.json").read_bytes()
     tracked = git("ls-files", cwd=repo).splitlines()
     if tracked:
         os.utime(repo / tracked[0])  # same bytes, new mtime: the freshness path must give the same export
         rec["refresh"] = timed([bin, "export"], repo, out / "export3.json", out / "export3.err")
-        rec["refresh_equal"] = (out / "export3.json").read_bytes() == (out / "export1.json").read_bytes()
-    rec["export_bytes"] = (out / "export1.json").stat().st_size
+        rec["refresh_equal"] = (out / "export3.json").read_bytes() == cold1
+    edited = rename_in_place(repo, export)
+    if edited:  # same size, new bytes: the warm export must equal a cold index of the edited tree
+        path, original, rec["content_refresh_edit"], old_id, new_id = edited
+        rec["content_refresh"] = timed([bin, "export"], repo, out / "export4.json", out / "export4.err")
+        shutil.rmtree(repo / ".meada", ignore_errors=True)
+        rec["index3"] = timed([bin, "index"], repo, out / "index3.out", out / "index3.err")
+        rec["export5"] = timed([bin, "export"], repo, out / "export5.json", out / "export5.err")
+        if rec["index3"]["exit"] or rec["export5"]["exit"]:
+            rec["failed"] = f"index or export after the in-place edit exited non-zero, see {out}/*3.err and export5.err"
+            (out / "record.json").write_text(json.dumps(rec, indent=1, sort_keys=True))
+            return rec
+        warm, cold = (out / "export4.json").read_bytes(), (out / "export5.json").read_bytes()
+        rec["content_refresh_equal"] = body(warm) == body(cold)
+        rec["content_refresh_changed"] = body(cold) != body(cold1)  # else the edit reached nothing indexed: inconclusive
+        rec["content_refresh_stale"] = body(warm) == body(cold1)  # the edit never reached the index: the M7 symptom itself
+        rec["content_refresh_renamed"] = quoted(new_id) in warm  # the direct question: is the renamed symbol in the warm export
+        if rec["content_refresh_equal"]:
+            (out / "export4.json").unlink()
+            (out / "export5.json").unlink()
+        path.write_bytes(original)  # back through the refresh path: the queries below are about the original tree
+        rec["restore"] = timed([bin, "export"], repo, out / "export6.json", out / "export6.err")
+        back = (out / "export6.json").read_bytes()
+        rec["restore_equal"] = body(back) == body(cold1)
+        rec["restore_original"] = quoted(old_id) in back and quoted(new_id) not in back
+        if rec["restore_equal"]:
+            (out / "export6.json").unlink()
+    rec["export_bytes"] = len(cold1)
     for n in ("export2.json", "export3.json"):  # kept only when they differ: an export can be 28 MB
-        if (out / n).exists() and (out / n).read_bytes() == (out / "export1.json").read_bytes():
+        if (out / n).exists() and (out / n).read_bytes() == cold1:
             (out / n).unlink()
     if not queries_file.exists():
-        export = json.loads((out / "export1.json").read_text())
         queries_file.write_text("".join(json.dumps(q) + "\n" for q in auto_queries(export)))
     queries = [json.loads(line) for line in queries_file.read_text().splitlines() if line.strip()]
     try:
@@ -394,11 +465,29 @@ def cmd_run(a):
             blocked = True
             report.append(f"BLOCKED: base {b.get('failed')}; head {h.get('failed')}\n")
             continue
-        det = [r["deterministic"] and r.get("refresh_equal", True) for r in (b, h)]
+        flags = ("refresh_equal", "content_refresh_equal", "content_refresh_changed", "content_refresh_renamed",
+                 "restore_equal", "restore_original")
+        det = [r["deterministic"] and all(r.get(k, True) for k in flags) for r in (b, h)]
         differences += det.count(False)
         report.append(f"Determinism: cold twice equal base {b['deterministic']}, head {h['deterministic']}; "
-                      f"refresh equal base {b.get('refresh_equal')}, head {h.get('refresh_equal')}"
+                      f"refresh equal base {b.get('refresh_equal')}, head {h.get('refresh_equal')}; "
+                      f"content refresh equal base {b.get('content_refresh_equal')}, head {h.get('content_refresh_equal')} "
+                      f"(edit {h.get('content_refresh_edit')}); renamed symbol in the warm export base "
+                      f"{b.get('content_refresh_renamed')}, head {h.get('content_refresh_renamed')}; "
+                      f"restore equal base {b.get('restore_equal')}, head {h.get('restore_equal')}; "
+                      f"original symbol back base {b.get('restore_original')}, head {h.get('restore_original')}"
+                      + ("" if all(r.get("content_refresh_changed", True) for r in (b, h)) else "  EDIT CHANGED NOTHING: inconclusive")
+                      + ("" if not any(r.get("content_refresh_stale") for r in (b, h)) else
+                         f"  STALE: the edit never reached the index (base {b.get('content_refresh_stale')}, head {h.get('content_refresh_stale')})")
                       + ("" if all(det) else "  NOT DETERMINISTIC"))
+        if not all(det):  # the diff the checker would otherwise make by hand on 28 MB; a head-only move shows next to a shared one
+            for side in ("base", "head"):
+                d = run / side / name
+                for label, x, y in (("warm vs cold (edited tree)", "export4.json", "export5.json"),
+                                    ("original vs restored", "export1.json", "export6.json")):
+                    if (d / x).exists() and (d / y).exists():
+                        lines, _ = export_diff(json.loads((d / x).read_text()), json.loads((d / y).read_text()), cap=4)
+                        report.append(f"  {side} {label}:\n" + ("\n".join("  " + l for l in lines) or "    identical"))
         budget = []
         bt, ht = min(b["index1"]["seconds"], b["index2"]["seconds"]), min(h["index1"]["seconds"], h["index2"]["seconds"])
         br, hr = max(b["index1"]["rss_kb"], b["export1"]["rss_kb"]), max(h["index1"]["rss_kb"], h["export1"]["rss_kb"])
@@ -485,11 +574,17 @@ def renders(root, out):
     out.mkdir(parents=True)
     notes = []
     compose = root / "deploy/compose"
-    for name, args, env in COMPOSE if compose.is_dir() else ():
+    if compose.is_dir() and not shutil.which("docker"):
+        notes.append("docker not on PATH: no Compose render (Not covered; CI's compose.yml renders it)")
+    for name, args, env in COMPOSE if compose.is_dir() and shutil.which("docker") else ():
         r = subprocess.run(["docker", "compose", "--env-file", env, *args, "config", "--format", "json"],
                            cwd=compose, capture_output=True, text=True)
         text = r.stdout if r.returncode == 0 else f"render failed ({r.returncode}): {r.stderr}"
         (out / f"compose-{name}.json").write_text(text.replace(str(root), "<root>"))
+    # A render carries a mounted file's path, never its text (audit 2026-11-03, D3): the files the
+    # stack mounts join the diff as they are.
+    for f in sorted(p for pat in ("Caddyfile*", "*.toml", "*.sh", ".env*") for p in compose.glob(pat)) if compose.is_dir() else ():
+        shutil.copy(f, out / f"mounted-{f.name}")
     if shutil.which("helm"):
         chart = root / "deploy/helm/meada"
         for values in sorted(chart.glob("values*.yaml")):
@@ -557,6 +652,23 @@ def cmd_selftest(_):
     q = auto_queries({"calls": [{"target": "r::k.kt::p.Flow.test(Duration?,String?)"}], "providers": []})
     assert q[0] == {"tool": "search", "arguments": {"query": "test"}}, q[0]
     assert q[-1]["arguments"] == {"symbol": "zz_prove_missing"}
+    assert q[-2]["arguments"]["kind"] == "zz_prove_kind" and q[3]["arguments"]["budget"] == 300, q
+    assert {"tool": "context", "arguments": {"symbol": "r::k.kt::p.Flow.test(Duration?,String?)", "budget": 300}} in q
+    assert auto_queries({"calls": [], "providers": []})[-1]["arguments"] == {"symbol": "zz_prove_missing"}
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        f = Path(d) / "a.rs"
+        f.write_bytes(b"fn foo() {}\nfn fooBar() { foo() }\n")
+        got = rename_in_place(Path(d), {"symbols": [{"id": "r::a.rs::fooBar", "span": {"path": "a.rs"}},
+                                                     {"id": "r::a.rs::foo", "span": {"path": "a.rs"}}]})
+        assert got and got[2] == "a.rs: foo -> foQ" and got[1] == b"fn foo() {}\nfn fooBar() { foo() }\n", got
+        assert got[3] == "r::a.rs::foo" and got[4] == "r::a.rs::foQ", got
+        assert f.read_bytes() == b"fn foQ() {}\nfn fooBar() { foQ() }\n", f.read_bytes()
+        assert rename_in_place(Path(d), {"symbols": [{"id": "r::a.rs::ab", "span": {"path": "a.rs"}}]}) is None
+        assert rename_in_place(Path(d), {"symbols": [{"id": "r::other::fooBar", "span": {"path": "a.rs"}}]}) is None
+    e = b'{\n  "format": 1,\n  "repository": "r",\n  "commit": "abc",\n  "dirty": false,\n  "files": []\n}\n'
+    assert body(e) == b'{\n  "format": 1,\n  "repository": "r",\n  "files": []\n}\n', body(e)
+    assert body(e) == body(e.replace(b'  "commit": "abc",\n  "dirty": false,\n', b"")) and quoted("r::a") == b'"r::a"'
     print("selftest passed")
 
 
