@@ -17,11 +17,6 @@ All notable changes to Meada are recorded here. The format follows
 - The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
   Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
   node unready (#448).
-
-- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
-  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
-  node unready (#448).
-
 - The container build copies every top-level `tests/fixtures/*.json` in the UI stage with one
   `COPY`, so a UI test importing a new fixture no longer breaks the image (#495).
 - The deploy fetch scripts (Compose `fetch-pulled.sh` and the chart `workspace.fetch`) read a
@@ -29,29 +24,8 @@ All notable changes to Meada are recorded here. The format follows
   the shared awk program skipped them. Its test now takes the expected pairs of every case from the
   `toml` crate instead of hand-written lists (#568).
 
-- `[postgres] schema` starting with `pg_` (reserved by Postgres) is refused at manifest read with
-  Meada's own message, in pt-BR and English, instead of Postgres's raw error at `meada postgres
-  migrate` (#482).
-- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
-  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
-  node unready (#448).
-
-- The Helm node readiness probe sets `timeoutSeconds` (`readiness.timeoutSeconds`, default 8), so a
-  Postgres or Valkey that drops packets no longer exceeds the kubelet's 1 s default and marks every
-  node unready (#448).
-
-- The container build copies every top-level `tests/fixtures/*.json` in the UI stage with one
-  `COPY`, so a UI test importing a new fixture no longer breaks the image (#495).
-
 ### Changed
 
-- The console asks `meada-core` through WebAssembly (`namedNameProblem`, `namedDescriptionProblem`,
-  `namedMessageProblem`, `resourceRoles`) whether a workspace name, description and version
-  message are valid and which resource roles exist, instead of keeping its own copy of the rule,
-  its bounds and the role list (#501). A version message is refused when empty by the same
-  function on the browser, the console API and `meada workspaces`: the empty-message refusal now
-  reads "a message is 1 to 500 characters, ..." instead of the request-body shape, and the
-  refusal of a too-long or control-bearing message reads "1 to 500" where it read "at most 500".
 - The console asks `meada-core` through WebAssembly (`namedNameProblem`, `namedDescriptionProblem`,
   `namedMessageProblem`, `resourceRoles`) whether a workspace name, description and version
   message are valid and which resource roles exist, instead of keeping its own copy of the rule,
