@@ -1106,7 +1106,13 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   inside literals written without their type sets the fields of a type not read. Only the
   libraries of the table (`net/http`, resty v2 and v3, `resty.dev`) are
   clients; a client assigned more than once, one held in a map, a slice or a channel, or an
-  interface, is untraced and its requests are no consumer. A `fmt.Sprintf` format with a verb
+  interface, is untraced and its requests are no consumer. A resty verb called on a struct field
+  with no `R()` before it (`s.repo.Get(..)`, #621) is a request only when a literal gives the
+  field a traced request or a value written as `resty.Request`; a field of another type, or one
+  written through a selector, is no request (the field's declared type is not read), so a
+  `*resty.Request` field set only that way, or from a helper outside the repository
+  (`&T{req: sdk.NewReq()}`), loses its consumer; a field met again while it is followed still
+  gives an unknown request. A `fmt.Sprintf` format with a verb
   other than `%s`, `%d` and `%v`, a count of verbs and values that differ, a `var` assigned
   anywhere but its declaration (or written through a selector), fold to nothing: the consumer is
   unresolved (no marker). A verb with flags, width or precision is a hole, and so is `%d` of

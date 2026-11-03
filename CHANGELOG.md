@@ -61,6 +61,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Go: a method named like a resty verb (`Get`, `Post`, `Put`, `Patch`, `Delete`, `Head`,
+  `Options`) called on a struct field that holds a repository, a Kubernetes client or a cache
+  client (`s.repo.Get(ctx, id)`) is no longer an HTTP consumer with an unresolved URL, so
+  `meada decide` lists no open item for it; a field holding a resty request or client keeps its
+  consumers (#621).
 - A route whose handler sits in a test file (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`,
   `*_test.py`, a `tests` or `__tests__` directory, `src/test`) is no provider: a test's router
   or fake upstream no longer shows in `search` and the export, and no longer makes the client
