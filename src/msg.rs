@@ -1148,8 +1148,6 @@ pub enum Msg<'a> {
     #[cfg(feature = "accounts")]
     AccountsPasswordLong(usize),
     #[cfg(feature = "accounts")]
-    AccountsPasswordDefault,
-    #[cfg(feature = "accounts")]
     AccountsPasswordUsername,
     #[cfg(feature = "accounts")]
     AccountsPasswordCurrent,
@@ -4502,12 +4500,6 @@ impl Msg<'_> {
                 format!("the password has more than {max} characters"),
                 format!("a senha tem mais de {max} caracteres"),
                 format!("la contraseña tiene más de {max} caracteres"),
-            ),
-            #[cfg(feature = "accounts")]
-            Msg::AccountsPasswordDefault => pick(
-                "the password is the published default password".into(),
-                "a senha é a senha padrão publicada".into(),
-                "la contraseña es la contraseña predeterminada publicada".into(),
             ),
             #[cfg(feature = "accounts")]
             Msg::AccountsPasswordUsername => pick(

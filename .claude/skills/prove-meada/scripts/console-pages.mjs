@@ -34,7 +34,8 @@ function chrome() {
 }
 
 const browser = await chromium.launch({ executablePath: chrome() });
-const context = await browser.newContext();
+// axe goes in as an inline script, which the console's CSP refuses.
+const context = await browser.newContext({ bypassCSP: true });
 await context.addInitScript(() => {
   window.__cls = 0;
   new PerformanceObserver(list => {

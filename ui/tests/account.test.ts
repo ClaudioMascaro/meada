@@ -25,7 +25,7 @@ test.each(['en', 'pt-BR'] as const)('a refused sign-in is one generic message, b
 
 test.each(['en', 'pt-BR'] as const)('a refused password change names the rule in %s, with the server text only for an unknown rule', locale => {
   const t = accountCopy[locale];
-  for (const rule of ['too_short', 'too_long', 'default_password', 'username', 'current_password'] as const) {
+  for (const rule of ['too_short', 'too_long', 'username', 'current_password'] as const) {
     expect(changeProblem(refuse(422, 'password_policy', { rule }), t)).toBe(t[`rule_${rule}`]);
   }
   expect(changeProblem(refuse(422, 'password_policy', { rule: 'novel' }), t)).toBe(`${t.rule_unknown} server password_policy`);

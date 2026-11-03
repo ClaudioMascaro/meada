@@ -56,7 +56,10 @@ a ticket accepted, each with its value and its reason. Detail behind the
   `GITHUB_ANSWER_MAX` (64 KiB) its answer (a 503 `github_unavailable` past either). The lockout
   (#555, `accounts.rs`): `LOCKOUT_FAILURES` (10) consecutive failed password checks, counted under
   the account row's lock, lock an account for `LOCKOUT_MINUTES` (15), never extended by an attempt
-  while it holds.
+  while it holds. The generated first password (#579, `ui/accounts.rs`) is printed after its row
+  commits, by `Local::announce` or on drop: a console killed in between (SIGKILL, a crash) leaves
+  the account with a password nobody saw, and no later start prints it; `meada ui reset-admin`
+  recovers it.
 
 - `ui/workspaces/proposals.rs` (#346, ADR 0022): `BODY_MAX` (80 KiB) bounds a request's body
   (413), `OUTPUT_MAX` (192 KiB) a tool's answer (`too_large` with its counts, never cut),

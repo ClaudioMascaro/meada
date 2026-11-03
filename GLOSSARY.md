@@ -264,8 +264,8 @@ _Avoid_: user, local user, Meada account, login (a GitHub login is the verified 
 
 **Default account**:
 The local account `admin`, an operator, that the console creates when no account exists. Until
-its published initial password is changed it may do nothing else, unless the deployer chose that
-password (ADR 0024).
+its initial password, generated and printed once on the console's stderr, is changed it may do
+nothing else, unless the deployer chose that password (ADR 0024).
 _Avoid_: admin user, root, superuser, bootstrap account
 
 **Break-glass account**:

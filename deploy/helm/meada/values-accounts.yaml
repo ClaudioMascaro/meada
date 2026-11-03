@@ -6,8 +6,9 @@
 #   meada-accounts-public    public-key   (the matching public PEM): the console and the nodes
 #   meada-postgres           migrate-url, write-url, read-url   (postgres:// URLs)
 # Optional: modules.accounts.adminPasswordSecret (key password) sets the default account's initial
-# password; without it the console creates `admin` with the published default, which the account
-# must change at its first sign-in. Generate the pair with:
+# password; without it the console generates `admin`'s first password, prints it once on its stderr
+# (`kubectl logs` of the console pod, the line `accounts: default account admin created; first
+# password: ...`), and the account must change it at its first sign-in. Generate the pair with:
 #   openssl genpkey -algorithm ed25519 -out private-key
 #   openssl pkey -in private-key -pubout -out public-key
 # Own the store (modules.snapshot), Valkey and Postgres as in values-console.yaml and

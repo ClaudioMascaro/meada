@@ -81,10 +81,10 @@ test('the break-glass page signs the default account in through its forced chang
   expect(queryByRole(host, 'navigation')).toBeNull();
   expect(document.title).toBe(`${t.breakGlassTitle} · Meada`);
   expect(fetch).not.toHaveBeenCalled();
-  type(t.username, 'admin'); type(t.password, 'admin123');
+  type(t.username, 'admin'); type(t.password, 'first password here');
   await submit();
   await waitFor(() => expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe(t.forcedTitle));
-  type(t.currentPassword, 'admin123'); type(t.newPassword, 'correct horse battery staple'); type(t.repeatPassword, 'correct horse battery staple');
+  type(t.currentPassword, 'first password here'); type(t.newPassword, 'correct horse battery staple'); type(t.repeatPassword, 'correct horse battery staple');
   await submit();
   await waitFor(() => expect(location.pathname).toBe('/workspace'));
   await waitFor(() => expect(host.textContent).toContain('local:admin'));

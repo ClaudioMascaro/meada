@@ -131,6 +131,8 @@ struct BreakGlass {
     issuer: Issuer,
     /// The identity provider's signing key, `k1`.
     signing: EncodingKey,
+    /// The default account's generated first password.
+    first: String,
 }
 
 /// The console of `case`: `[oidc]` over a loopback issuer, `[accounts]` under break glass,
@@ -148,13 +150,15 @@ fn break_glass_console(case: &'static str) -> Option<BreakGlass> {
         format!("{text}{}{}", audit.section, break_glass_section()),
     )
     .unwrap();
-    let console = start(&dir, &[]);
+    let mut console = start(&dir, &[]);
+    let first = first_password(&mut console);
     Some(BreakGlass {
         audit,
         console,
         keys,
         issuer,
         signing,
+        first,
     })
 }
 
@@ -184,7 +188,8 @@ impl BreakGlass {
 }
 
 /// The demo: with the identity provider's tokens still admitted, the default account signs in
-/// with `admin123`, changes its password and is the global operator, reaching a pointer recovery;
+/// with the first password the console generated, changes its password and is the global
+/// operator, reaching a pointer recovery;
 /// a colleague's local account, and every other username, gets the wrong password's 401, recorded
 /// `not_break_glass`. Account administration, agent tokens and login verification answer 404. A
 /// bearer reaches one verifier by its issuer: a token of the console's issuer signed by the
@@ -198,6 +203,7 @@ fn the_break_glass_account_signs_in_beside_the_identity_provider() {
     let Some(glass) = break_glass_console("accounts_break_glass") else {
         return;
     };
+    let generated = glass.first.as_str();
     let console = &glass.console;
     let mut replies = Vec::new();
 
@@ -225,13 +231,14 @@ fn the_break_glass_account_signs_in_beside_the_identity_provider() {
     let missing = get(console, "/api/v1/session");
     assert_eq!(missing.status, 401);
 
-    // The default account: `admin123` opens the password change alone, then the global operator.
-    let first = login(console, "admin", "admin123");
+    // The default account: its first password opens the password change alone, then the global
+    // operator.
+    let first = login(console, "admin", generated);
     let changing = token(&first);
     assert_eq!(first.json()["change_required"], true);
     let early = ask(console, "/api/v1/session", &changing);
     assert_eq!(refusal(&early), (403, "password_change_required".into()));
-    let changed = change(console, &changing, "admin123", CHANGED);
+    let changed = change(console, &changing, generated, CHANGED);
     let operator = token(&changed);
     let session = ask(console, "/api/v1/session", &operator);
     assert_eq!(
@@ -405,7 +412,7 @@ fn the_break_glass_account_signs_in_beside_the_identity_provider() {
     for reply in &replies {
         reply.assert_no_cookie_or_cors();
     }
-    let passwords = ["admin123", CHANGED, "not the password"];
+    let passwords = [generated, CHANGED, "not the password"];
     let mut tokens = vec![
         changing.as_str(),
         operator.as_str(),

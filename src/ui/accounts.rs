@@ -72,6 +72,10 @@ pub(super) const TOKENS_BODY_MAX: usize = 1 << 10;
 // further sign-in or password change is a 503 `busy` without hashing.
 pub(super) const HASHES_MAX: usize = 4;
 
+/// The fixed start of the line that shows a generated first password: English in every locale,
+/// as `listening on` is, so a deployer's `grep` finds it.
+pub(super) const FIRST_PASSWORD: &str = "accounts: default account admin created; first password: ";
+
 /// The routes of this module.
 pub(super) const LOGIN: &str = "login";
 pub(super) const PASSWORD: &str = "account/password";
@@ -84,6 +88,9 @@ pub(super) struct Local {
     hashes: tokio::sync::Semaphore,
     /// Beside `[oidc]`: the default account alone, as the global operator (#563).
     pub(super) break_glass: bool,
+    /// The default account's first password when this start generated it, until `announce`
+    /// prints it.
+    first: std::sync::Mutex<Option<String>>,
     /// With `[accounts.github]` (#561): its `api`, the one endpoint the console calls, and the
     /// agent it calls it with.
     github: Option<github::Verifier>,
@@ -91,9 +98,9 @@ pub(super) struct Local {
 
 impl Local {
     /// The console's local accounts of `config`: the key pair read and checked, then the default
-    /// account created when the table is empty, its initial password `admin123` with a change
-    /// required, or the one the deployer set (which must pass the policy) without. Each problem
-    /// is a key and its message.
+    /// account created when the table is empty, its initial password generated with a change
+    /// required (`announce` shows it once), or the one the deployer set (which must pass the
+    /// policy) without. Each problem is a key and its message.
     pub(super) fn start(
         config: &accounts::Config,
     ) -> std::result::Result<Self, crate::modules::Problem> {
@@ -105,27 +112,42 @@ impl Local {
         let initial = || {
             let hashed = |password: &str| accounts::hash(password).map_err(|e| ("accounts", e));
             match config.admin_password()? {
-                None => Ok((hashed(accounts::DEFAULT_PASSWORD)?, true)),
+                None => {
+                    let password = accounts::generated();
+                    Ok((hashed(&password)?, Some(password)))
+                }
                 Some(password) => {
                     let username = accounts::DEFAULT_USERNAME;
                     let key = config.admin_password_key();
                     accounts::policy(&password, username).map_err(|rule| (key, rule.text()))?;
-                    Ok((hashed(&password)?, false))
+                    Ok((hashed(&password)?, None))
                 }
             }
         };
         match store::bootstrap(&postgres, initial) {
-            Ok(_) => Ok(Self {
+            Ok(first) => Ok(Self {
                 keys,
                 postgres,
                 hashes: tokio::sync::Semaphore::new(HASHES_MAX),
                 break_glass: config.break_glass,
+                first: std::sync::Mutex::new(first),
                 github: config.api.clone().map(github::Verifier::new),
             }),
             Err(store::Refused::Password(problem)) => Err(problem),
             Err(store::Refused::Postgres(reason)) => {
                 Err(("postgres", Msg::AccountsBootstrap(&reason).text()))
             }
+        }
+    }
+
+    /// The one stderr line of the first password this start generated (ADR 0024, amended
+    /// 2026-11-02), printed once and never through the audit: right after the listening line, or
+    /// on drop when the console stops before it (a later start check or the bind failing), since
+    /// the account exists either way.
+    pub(super) fn announce(&self) {
+        let first = self.first.lock().unwrap_or_else(|e| e.into_inner()).take();
+        if let Some(password) = first {
+            eprintln!("{FIRST_PASSWORD}{password}");
         }
     }
 
@@ -148,6 +170,12 @@ impl Local {
                 login: account.login.as_deref(),
             },
         }
+    }
+}
+
+impl Drop for Local {
+    fn drop(&mut self) {
+        self.announce();
     }
 }
 

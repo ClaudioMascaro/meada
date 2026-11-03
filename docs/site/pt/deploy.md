@@ -36,7 +36,7 @@ docker compose up -d
 docker compose ps       # espere os servidores ficarem healthy
 ```
 
-Para a prova de conceito com [contas locais](console.md#contas-locais), copie `.env.accounts.example` para `.env` e rode `docker compose up -d`: a mesma pilha ganha Postgres, a console gravável com `[accounts]` e o par de chaves Ed25519, que o passo `certificates` gera uma vez (a chave privada só na console; a pública na console e nos nós). Entre como `admin` com `admin123` (ou o valor de `MEADA_ADMIN_PASSWORD`), troque a senha, gere um token de agente no perfil e use-o como bearer nos nós. Os nós admitem esse token em vez do bearer compartilhado do proxy. Remover os dois volumes de chaves gera um par novo e encerra todos os tokens.
+Para a prova de conceito com [contas locais](console.md#contas-locais), copie `.env.accounts.example` para `.env` e rode `docker compose up -d`: a mesma pilha ganha Postgres, a console gravável com `[accounts]` e o par de chaves Ed25519, que o passo `certificates` gera uma vez (a chave privada só na console; a pública na console e nos nós). Entre como `admin` com a primeira senha, que a console gera e imprime uma vez no primeiro início (`docker compose logs console | grep 'first password'`), ou com o valor de `MEADA_ADMIN_PASSWORD`, troque a senha, gere um token de agente no perfil e use-o como bearer nos nós. Os nós admitem esse token em vez do bearer compartilhado do proxy. Remover os dois volumes de chaves gera um par novo e encerra todos os tokens.
 
 O teste com `curl` pelo TLS, a atualização dos índices e os outros perfis estão no
 [README do Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/README.md).

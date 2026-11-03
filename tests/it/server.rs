@@ -90,6 +90,14 @@ impl Server {
         rest
     }
 
+    /// The next line the server writes on stderr, waiting for it, without its newline.
+    #[cfg_attr(not(feature = "accounts"), expect(dead_code))]
+    pub(crate) fn next_line(&mut self) -> String {
+        let mut line = String::new();
+        self.stderr.read_line(&mut line).unwrap();
+        line.trim_end_matches('\n').to_string()
+    }
+
     /// An MCP client of the endpoint at `path`.
     pub(crate) async fn client(&self, path: &str) -> RunningService<RoleClient, ()> {
         crate::common::crypto_provider();

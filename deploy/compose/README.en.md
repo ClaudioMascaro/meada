@@ -40,7 +40,9 @@ The demo, from a clean checkout:
 
 1. Copy the console proxy's CA and trust it in the browser, or use `curl --cacert`:
    `docker compose cp console-proxy:/data/caddy/pki/authorities/local/root.crt ./console-ca.crt`.
-2. Open `https://localhost:8444` and sign in as `admin` / `admin123`. The default account can only
+2. Read the `admin` account's first password, which the console generates and prints once on stderr
+   when it creates the account: `docker compose logs console | grep 'first password'`. Open
+   `https://localhost:8444` and sign in as `admin` with that password. The default account can only
    change its password: the console sends you straight to the change (12 to 128 characters, not a
    common password).
 3. In the profile, generate an agent token for the nodes (1 to 168 hours, 8 by default). It is
@@ -69,11 +71,13 @@ the tokens' issuer) replace the manifests by mounts; the profiles below do not c
 
 ### `MEADA_ADMIN_PASSWORD`
 
-Empty (the `.env.accounts.example` default), the `admin` account starts as `admin123` with a
-change required at the first sign-in. With a value (12 to 128 characters, not a common password),
-that is the first password and no change is required: an automated install never exposes the
-published default. The variable is read only when the console creates the account, with an empty
-table; an invalid value refuses the start, naming `accounts.admin_password_env`.
+Empty (the `.env.accounts.example` default), the console generates the `admin` account's first
+password, with a change required at the first sign-in, and prints it once, on a stderr line that
+starts with `accounts: default account admin created; first password:`
+(`docker compose logs console | grep 'first password'`); no later start prints it again. With a value (12 to 128 characters, not a
+common password), that is the first password and no change is required. The variable is read only
+when the console creates the account, with an empty table; an invalid value refuses the start,
+naming `accounts.admin_password_env`.
 
 ### Recovering the default account: `meada ui reset-admin`
 

@@ -119,6 +119,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- The console no longer creates the default account `admin` with a published password: without
+  `admin_password_env` or `admin_password_file`, the start that creates it generates the first
+  password, stores it with a change required, and prints it once on stderr (`accounts: default
+  account admin created; first password: ...`, right after the listening line; `docker compose
+  logs console` in the Compose recipe). No later start prints it; a lost one is recovered with
+  `meada ui reset-admin`. The password policy's `default_password` rule goes with the published
+  password, and ADR 0024 is amended (#579).
 - The console asks `meada-core` through WebAssembly (`namedNameProblem`, `namedDescriptionProblem`,
   `namedMessageProblem`, `resourceRoles`) whether a workspace name, description and version
   message are valid and which resource roles exist, instead of keeping its own copy of the rule,

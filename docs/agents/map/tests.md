@@ -776,7 +776,8 @@ unreadable or missing key and, with a good pair, on the default account Postgres
 never a key or the URL in stderr, and a node over the chain fixture whose `[accounts]` names a
 private key file that does not exist starting and answering 401 without a token (#560). Against Postgres (`postgres::audited`, a schema
 of each test's own behind the relay): the tracer bullet (`config`'s `sign_in`, the 401 before
-routing, the `Origin` 403s of `login`, fixed 400s and the 413, `admin123` giving a token that
+routing, the `Origin` 403s of `login`, fixed 400s and the 413, the generated first password,
+read from its one stderr line (`first_password`, absent from the rest of stderr), giving a token that
 opens only the password change (a write without a token a 401, with that token a 403
 `password_change_required`, the change's body past its cap a 413), one body for an unknown
 username and a wrong password, a
@@ -790,7 +791,9 @@ role) answering as an unknown username with one line naming the table, no cookie
 and no password, token part, hash, key or URL in any error body, record or stderr line; the
 default account created from the deployer's password without a change required, never touched
 once the table holds a row, refused at start for a password failing the policy (the key named,
-never the value), and created once by two consoles started together; a burst of sign-ins past
+never the value), and created once by two consoles started together, one of them printing the
+generated first password on one line, a third start printing none and the password demanding its
+change; a burst of sign-ins past
 `HASHES_MAX` answered 503 `busy`, no token when the audit table cannot take the record, and every
 sign-in and change a 503 `audit_unavailable` with the relay closed. With the fleet's Valkey and
 store too, the default account saves a workspace version after its change, audited as
@@ -966,7 +969,7 @@ the section rules through `meada status` (`break_glass` without `[oidc]`, `[acco
 one line; the accepted section stopping only at Postgres) and the start refused for an
 `[oidc] issuer` equal to `[ui] public_url`, before any key is read. Against the local Postgres
 (skipped without it): `config` naming `oidc` with `break_glass`, the identity provider's viewer
-and operator tokens admitted as before, `admin` through `admin123` and its forced change to the
+and operator tokens admitted as before, `admin` through its generated first password and its forced change to the
 global operator's session (`account: true`), a colleague's seeded account and an unknown username
 answered with the wrong password's body and recorded `not_break_glass` with no subject, the
 routes of account administration, agent tokens and login verification answering 404, a fence

@@ -379,3 +379,22 @@ tickets build.
   renaming accounts, teams as a table, SCIM for local accounts, key rotation with overlapping
   keys, and the token check for Meada-signed tokens.
 - The spec's tickets land as a loop tier of their own, this ADR first.
+
+## Amendment (2026-11-02): the first password is generated (#579)
+
+The published default password goes. When `[accounts]` names neither `admin_password_env` nor
+`admin_password_file` (or the variable it names is unset or empty), the start that creates the
+default account generates its first password with the generator `meada ui reset-admin` uses, stores
+its hash with a change required, and, once the transaction that creates the account commits, prints
+it on one line of the console's stderr: `accounts: default account admin created; first password:
+<password>`, right after the listening line (or, when the console stops before listening, as it
+stops). No later start prints it, and it never reaches the audit; a deployer who loses it runs
+`meada ui reset-admin`. The policy loses its default-password rule, which no password can fail any
+more. A password the deployer set keeps the path the decision above describes: it passes the policy
+and needs no change.
+
+`meada ui reset-admin` is unchanged: the password it generates, printed once on stdout, is
+operator-facing output by design, so the CodeQL `rust/cleartext-logging` alert on it is dismissed as
+won't fix, as is one CodeQL raises on the console's first-password line, for the same reason. The
+decision's text above (the published default and the forced change that retires it) stays as the
+history of the first release.

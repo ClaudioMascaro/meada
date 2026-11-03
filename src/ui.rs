@@ -498,6 +498,11 @@ pub fn listen(listen: &str, manifest: &Path) -> Result<()> {
     let address = crate::mcp::address(listen)?;
     let console = Arc::new(Console::start(manifest)?);
     crate::mcp::serve_http(address, move |bound, _| {
+        // The password's line first: the providers' poll may write its own lines.
+        #[cfg(feature = "accounts")]
+        if let Some(local) = &console.accounts {
+            local.announce();
+        }
         #[cfg(feature = "oidc")]
         console.providers.listening();
         move |request: Request<Incoming>| {

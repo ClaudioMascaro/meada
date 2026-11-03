@@ -217,8 +217,9 @@ public-key`):
 - `meada-accounts-public` (clave `public-key`): montado en la consola y en los nodos, que solo verifican
   tokens.
 - `modules.accounts.adminPasswordSecret` (clave `password`, opcional): la contraseña inicial de la
-  cuenta `admin`, solo en la consola. Sin ella, la consola crea `admin` con la contraseña publicada,
-  que la cuenta debe cambiar en su primer acceso.
+  cuenta `admin`, solo en la consola. Sin ella, la consola genera la primera contraseña de `admin` y
+  la imprime una vez en su stderr (`kubectl logs` del pod de la consola, la línea `accounts: default
+  account admin created; first password: ...`), y la cuenta debe cambiarla en su primer acceso.
 
 Los nodos leen el emisor de los tokens en `[ui] public_url`, que el chart rellena con
 `console.publicUrl`, y necesitan `[postgres]` (`read-url`). `modules.accounts.groups` asigna grupos de

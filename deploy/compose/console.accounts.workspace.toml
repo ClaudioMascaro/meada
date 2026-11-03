@@ -30,7 +30,8 @@ keep = 3
 ttl_seconds = 300
 
 # Local accounts (ADR 0024, compose.accounts.yaml): the sign-in is the console's own, so there is
-# no [oidc] here. The default account reads MEADA_ADMIN_PASSWORD (empty: admin / admin123).
+# no [oidc] here. The default account reads MEADA_ADMIN_PASSWORD (empty: a generated password,
+# printed once on the console's stderr).
 [postgres]
 url_env = "MEADA_POSTGRES_URL"
 ca_file = "/etc/meada/ca/ca.pem"

@@ -41,8 +41,10 @@ O demo, do checkout limpo:
 
 1. Copie a CA do proxy da console e confie nela no browser, ou use `curl --cacert`:
    `docker compose cp console-proxy:/data/caddy/pki/authorities/local/root.crt ./console-ca.crt`.
-2. Abra `https://localhost:8444` e entre com `admin` / `admin123`. A conta padrão só pode trocar a
-   senha: a console leva direto à troca (12 a 128 caracteres, fora a lista de senhas comuns).
+2. Leia a primeira senha da conta `admin`, que a console gera e imprime uma vez no stderr ao criar a
+   conta: `docker compose logs console | grep 'first password'`. Abra `https://localhost:8444` e
+   entre com `admin` e essa senha. A conta padrão só pode trocar a senha: a console leva direto à
+   troca (12 a 128 caracteres, fora a lista de senhas comuns).
 3. No perfil, gere um token de agente para os nós (de 1 a 168 horas, 8 por padrão). Ele aparece
    uma vez; copie-o.
 4. Consulte um nó pelo proxy, que repassa `Authorization` e não tem bearer estático:
@@ -69,11 +71,13 @@ o emissor dos tokens) substituem os manifestos por mounts; os perfis abaixo não
 
 ### `MEADA_ADMIN_PASSWORD`
 
-Vazia (o padrão do `.env.accounts.example`), a conta `admin` nasce com `admin123` e uma troca
-obrigatória no primeiro acesso. Com um valor (12 a 128 caracteres, fora a lista de senhas comuns),
-essa é a primeira senha e nenhuma troca é exigida: uma instalação automatizada nunca expõe o
-padrão publicado. A variável é lida só quando a console cria a conta, com a tabela vazia; um
-valor inválido recusa o início, nomeando `accounts.admin_password_env`.
+Vazia (o padrão do `.env.accounts.example`), a console gera a primeira senha da conta `admin`, com
+uma troca obrigatória no primeiro acesso, e a imprime uma única vez, numa linha do stderr que começa
+com `accounts: default account admin created; first password:` (`docker compose logs console | grep
+'first password'`); nenhum outro início a imprime de novo. Com um valor (12 a 128 caracteres, fora a
+lista de senhas comuns), essa é a primeira senha e nenhuma troca é exigida. A variável é lida só
+quando a console cria a conta, com a tabela vazia; um valor inválido recusa o início, nomeando
+`accounts.admin_password_env`.
 
 ### Recuperar a conta padrão: `meada ui reset-admin`
 

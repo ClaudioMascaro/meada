@@ -79,7 +79,7 @@ def cmd_start(a):
         subprocess.run(["openssl", "pkey", "-in", d / "private.pem", "-pubout", "-out", d / "public.pem"], check=True, capture_output=True)
         os.chmod(d / "private.pem", 0o600)
         env["PROVE_ADMIN_PASSWORD"] = admin_password(d)
-        text += (f'\n[postgres]\nurl_env = "MEADA_TEST_POSTGRES_URL"\nschema = "zz_prove_{run.name.replace("-", "_")[:40]}"\n'
+        text += (f'\n[postgres]\nurl_env = "MEADA_TEST_POSTGRES_URL"\nschema = "zz_prove_{run.name.replace("-", "_").lower()[:40]}"\n'
                  '\n[accounts]\npublic_key_file = "public.pem"\nprivate_key_file = "private.pem"\n'
                  'admin_password_env = "PROVE_ADMIN_PASSWORD"\n')
     (d / "meada.workspace.toml").write_text(text)
@@ -87,6 +87,12 @@ def cmd_start(a):
     (d / "index.err").write_text(idx.stderr)
     if idx.returncode:
         sys.exit(f"BLOCKED: meada index --workspace exited {idx.returncode}, see {d}/index.err")
+    if a.accounts:  # the console refuses a schema below its version
+        mig = subprocess.run([a.bin, "postgres", "migrate", "--workspace", "meada.workspace.toml"], cwd=d, env=env,
+                             capture_output=True, text=True)
+        (d / "migrate.err").write_text(mig.stderr)
+        if mig.returncode:
+            sys.exit(f"BLOCKED: meada postgres migrate exited {mig.returncode}, see {d}/migrate.err")
     log = open(d / "ui.log", "wb")
     p = subprocess.Popen([a.bin, "ui", "--listen", f"127.0.0.1:{port}", "--workspace", "meada.workspace.toml"], cwd=d,
                          env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
