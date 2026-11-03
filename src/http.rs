@@ -171,6 +171,51 @@ fn fragments(parts: &[Part]) -> Vec<String> {
         .collect()
 }
 
+/// Whether a repository-relative `path` is a test file by its language's convention: `*_test.go`,
+/// `*.test.*` and `*.spec.*`, `test_*.py` and `*_test.py`, a `tests` or `__tests__` directory
+/// and a JVM `src/test` tree.
+// shortcut: only the conventions the ticket names (#620), not `*Test.java` or `*Tests.cs`; add
+// one when a repository needs it, or let it set `test_routes`.
+fn is_test_file(path: &str) -> bool {
+    let parts: Vec<&str> = path.split('/').collect();
+    let Some((name, dirs)) = parts.split_last() else {
+        return false;
+    };
+    let named = name.ends_with("_test.go")
+        || name.contains(".test.")
+        || name.contains(".spec.")
+        || (name.starts_with("test_") && name.ends_with(".py"))
+        || name.ends_with("_test.py");
+    named
+        || dirs.iter().any(|d| matches!(*d, "tests" | "__tests__"))
+        || dirs.windows(2).any(|w| w == ["src", "test"])
+}
+
+/// Drops the providers whose site is in a test file, and the route entry points of those sites:
+/// a test builds a router or a fake upstream to exercise the code, it serves nothing. The
+/// site is where the handler is defined, so a route a test registers with a handler of the
+/// repository's own code stays a provider. A document's route is not read here.
+fn drop_test_providers(repo: &Repository, export: &mut IndexExport) {
+    let in_test = |site: &str| {
+        let own = site
+            .strip_prefix(repo.identity.as_str())
+            .and_then(|s| s.strip_prefix("::"));
+        own.and_then(|s| s.split("::").next())
+            .is_some_and(is_test_file)
+    };
+    let mut dropped = HashSet::new();
+    export.providers.retain(|p| {
+        let keep = route(&p.contract).is_none() || !in_test(&p.site);
+        if !keep {
+            dropped.insert(format!("{}::{}", p.site, p.contract));
+        }
+        keep
+    });
+    export
+        .entry_points
+        .retain(|e| !dropped.contains(&e.identity));
+}
+
 /// The method and path of an HTTP contract identifier: `("GET", "/users/{}")`.
 fn route(contract: &str) -> Option<(&str, &str)> {
     contract.strip_prefix("http::")?.split_once("::")
@@ -618,6 +663,9 @@ impl ContractKind for Http {
     /// adds those of the documents listing it. The hosts of every HTTP provider are the
     /// `[serve]` hosts and the hosts of every document's servers.
     fn declare(&self, repo: &Repository, export: &mut IndexExport) {
+        if !repo.config.test_routes {
+            drop_test_providers(repo, export);
+        }
         let serve = &repo.config.serve;
         let code: HashSet<String> = (export.providers.iter())
             .map(|p| p.contract.clone())
@@ -878,6 +926,35 @@ mod tests {
             let found = super::fetches(&[url, text("GET")]).unwrap();
             assert_eq!(found[0].contract.as_deref(), Some("http::GET::/a"));
             assert_eq!(found[0].via, None);
+        }
+    }
+
+    #[test]
+    fn test_files_follow_each_languages_conventions() {
+        for path in [
+            "client/client_test.go",
+            "src/orders.test.ts",
+            "src/orders.spec.js",
+            "web/__tests__/orders.ts",
+            "app/test_api.py",
+            "app/api_test.py",
+            "tests/api.rs",
+            "svc/tests/it/main.rs",
+            "svc/src/test/java/example/A.java",
+        ] {
+            assert!(super::is_test_file(path), "{path}");
+        }
+        for path in [
+            "main.go",
+            "src/orders.ts",
+            "src/contest.ts",
+            "app/testing.py",
+            "app/latest_api.py",
+            "src/main/java/example/A.java",
+            "src/testdata/a.go",
+            "mytests/a.go",
+        ] {
+            assert!(!super::is_test_file(path), "{path}");
         }
     }
 

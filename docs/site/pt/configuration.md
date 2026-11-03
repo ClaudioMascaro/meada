@@ -38,6 +38,19 @@ via = ["src/orders.ts::cancelOrder"]     # opcional: os símbolos que fazem o ac
 Cada escritor liga a cada leitor do mesmo recurso em outro repositório, no nível `declared`.
 Sem `via`, ou se nenhum `via` corresponde a um símbolo, o lado é o repositório inteiro.
 
+Uma rota que só um arquivo de teste registra (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`,
+`*_test.py`, um diretório `tests` ou `__tests__`, `src/test` em JVM) não é provedora do
+repositório: um roteador ou um upstream falso de teste não serve nada, e deixá-lo contar faria
+o repositório cliente parecer provedor da rota que ele consome. O código de teste continua
+indexado, com chamadas e símbolos. Quem quer essas rotas como provedoras liga a chave na
+raiz do `meada.toml`:
+
+```toml
+test_routes = true                       # opcional: rotas registradas em arquivos de teste servem
+```
+
+A chave vale só no `meada.toml` do repositório (uma entrada de manifesto de workspace não a tem) e só para rotas HTTP; a rota conta pelo arquivo onde o handler é definido.
+
 Meada acha os pares pelo remoto git, mesmo que o clone fique em outro caminho em cada máquina.
 Uma chave desconhecida ou mal escrita dá um erro com o arquivo, a linha e a chave. Sem
 `meada.toml`, o repositório não declara nenhum par.

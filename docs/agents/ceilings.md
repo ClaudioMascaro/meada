@@ -7,6 +7,15 @@ a ticket accepted, each with its value and its reason. Detail behind the
 
 ## Known ceilings
 
+- `http.rs` (`is_test_file`, `drop_test_providers`, #620): a route is a test's by where its
+  handler is defined, so a test registering a handler of the repository's own code
+  (`mux.HandleFunc("GET /orders", realHandler)` in a `_test.go`) leaves it a provider; and only the
+  conventions the ticket names are test files (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`,
+  `*_test.py`, `tests/`, `__tests__/`, `src/test/`), not `*Test.java`, `*Tests.cs` or
+  `conftest.py`, nor a singular `test/` or a `spec/` directory, `*.e2e-spec.ts` apart from `*.spec.*`,
+  Swift's `Tests/` (the match is case-sensitive), Go `testdata/` or Gradle `src/integrationTest`.
+  A fake defined in a non-test helper file stays a provider. Channel providers and every other
+  kind are untouched. `test_routes = true` keeps every one.
 - `lang/kotlin.rs`, `resolve.rs` (#455): only `private` constructors are enforced (`Facts::sealed`,
   primary or secondary: callable from the class's own scope, its companion and nested classes
   included). `internal` is not enforced: an `internal` class or constructor is visible

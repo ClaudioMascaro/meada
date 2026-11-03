@@ -29,6 +29,10 @@ this file, and a change to these modules updates it.
   contracts (specs #22, #24, #30, #25, #26, #28 and #29), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225).
 
+- `http.rs` `declare` first drops the providers whose site is in a test file (`is_test_file`,
+  #620) and the route entry points of those sites, unless `meada.toml` has `test_routes = true`
+  (`Config::test_routes`, a top-level key a workspace manifest entry does not carry). It runs at
+  query time, so the key needs no reindex; the test code stays indexed.
 - `contract.rs`: `ContractKind` trait, the whole interface of a kind: `prefix`, `extract` and
   `link` are required, every other question (see "New contract kind" in the architecture map)
   has a default body. The engine fixes the phase order (every `declare`, every `workspace_step`,

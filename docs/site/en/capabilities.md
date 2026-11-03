@@ -77,7 +77,7 @@ Names resolve within the file's module first, then within the modules it imports
 
 ## HTTP and contract documents
 
-Meada connects consumers and providers across languages, including behind gateways:
+Meada connects consumers and providers across languages, including behind gateways. A route whose handler is in a test file (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`, a `tests` directory or `src/test`) is no provider unless `meada.toml` sets `test_routes = true` (see [Configuration](configuration.md)):
 
 | Language | HTTP consumers | HTTP providers |
 | --- | --- | --- |

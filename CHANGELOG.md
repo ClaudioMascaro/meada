@@ -61,6 +61,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A route whose handler sits in a test file (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`,
+  `*_test.py`, a `tests` or `__tests__` directory, `src/test`) is no provider: a test's router
+  or fake upstream no longer shows in `search` and the export, and no longer makes the client
+  repository a candidate for the route it consumes, so those calls link to the only real server
+  instead of turning `ambiguous`. The test code stays indexed; `test_routes = true` in
+  `meada.toml` keeps the routes as providers (#620).
 - A comment inside a Go parameter list or argument list (`func NewRouter( //nolint:funlen`,
   `NewRouter( // engine`) is no longer read as a parameter or an argument: it took position 0, so
   a router handed to such a function reached none of its routes. The shared child walk of the

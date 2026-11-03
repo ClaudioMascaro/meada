@@ -77,7 +77,7 @@ Los nombres se resuelven primero en el módulo del archivo y después en los mó
 
 ## HTTP y documentos de contrato
 
-Meada conecta consumidores y proveedores entre lenguajes, incluso detrás de gateways:
+Meada conecta consumidores y proveedores entre lenguajes, incluso detrás de gateways. Una ruta cuyo handler está en un archivo de prueba (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`, un directorio `tests` o `src/test`) no es proveedora, salvo que `meada.toml` tenga `test_routes = true` (véase [Configuración](configuration.md)):
 
 | Lenguaje | Consumidores HTTP | Proveedores HTTP |
 | --- | --- | --- |

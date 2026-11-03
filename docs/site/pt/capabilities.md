@@ -77,7 +77,7 @@ Os nomes resolvem primeiro no módulo do arquivo e depois nos módulos que ele i
 
 ## HTTP e documentos de contrato
 
-O Meada liga consumidores e provedores, inclusive entre linguagens e atrás de gateways:
+O Meada liga consumidores e provedores, inclusive entre linguagens e atrás de gateways. Uma rota cujo handler está num arquivo de teste (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`, um diretório `tests` ou `src/test`) não conta como provedora, a menos que o `meada.toml` tenha `test_routes = true` (veja [Configuração](configuration.md)):
 
 | Linguagem | Consumidores HTTP | Provedores HTTP |
 | --- | --- | --- |
