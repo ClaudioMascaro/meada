@@ -292,3 +292,55 @@ fn a_java_consumer_through_a_wrapper_links_a_spring_route_of_a_peer() {
         ]
     );
 }
+
+#[test]
+fn a_url_a_function_only_builds_folds_at_the_call_and_through_a_constant() {
+    let case = "urls_builder";
+    let repo = fixture_repo(
+        case,
+        "http-url-builder",
+        Some("https://example.com/acme/vets-web.git"),
+    );
+    fixture_repo(
+        case,
+        "http-url-builder-api",
+        Some("https://example.com/acme/vets-api.git"),
+    );
+
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+
+    assert_golden("http-url-builder.export.json", &without_processes(&export));
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let linked = |file: &str| -> Vec<String> {
+        let mut out: Vec<String> = (json["links"].as_array().unwrap())
+            .iter()
+            .filter(|l| l["consumer"].as_str().is_some_and(|c| c.contains(file)))
+            .map(|l| l["contract"].as_str().unwrap().to_string())
+            .collect();
+        out.sort();
+        out
+    };
+    // The builder imported, called in the argument, held by a constant, and with a lone `return`.
+    assert_eq!(
+        linked("src/pages.ts"),
+        [
+            "http::GET::/api/owners",
+            "http::GET::/api/owners",
+            "http::GET::/api/vets",
+        ]
+    );
+    assert_eq!(linked("src/local.ts"), ["http::GET::/api/vets"]);
+    assert_eq!(linked("src/plain.js"), ["http::GET::/api/vets"]);
+    // An arrow function with a block body folds when the block is one `return` and not otherwise.
+    assert_eq!(linked("src/block.ts"), ["http::GET::/api/vets"]);
+    // A base read from the environment, a body of two statements, a name match and a name a
+    // parameter, a `catch` binding or a local hides fold nothing.
+    for file in [
+        "src/env.ts",
+        "src/statements.ts",
+        "src/names.ts",
+        "src/hidden.ts",
+    ] {
+        assert_eq!(linked(file), Vec::<String>::new(), "{file}");
+    }
+}

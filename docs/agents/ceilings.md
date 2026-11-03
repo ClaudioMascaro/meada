@@ -517,6 +517,20 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   `RECEIVER_DEPTH` cuts a walk, or `LINK_DEPTH` cuts one begun past an import, the families
   being linearized give up and none is kept: each is linearized again when asked for, and does
   not depend on the walk that first reached it.
+- `resolve.rs`, `lang/ts.rs` (#536): a call folds to the string its function returns
+  (`Code::built`, `Def::lone_string`) only for TypeScript and JavaScript (the other packs leave
+  `lone_string` empty), for a `function` declaration or an arrow or function expression with an
+  expression body or a body of one lone `return`, not `async` or a generator, whose value is a
+  string (a template, a literal or `+`), and for a call that resolves `exact` (a name match may
+  reach another function); the parameters bind to the call's arguments, so the fold costs the
+  `EVAL_DEPTH` and `EVAL_BUDGET` of the file it reads. Misses, the URL staying an unresolved
+  consumer: a `return` after other statements (a local, a guard, a `const`), a returned
+  value that is not a string (a call, a conditional, a member), a class method (`lone_string` reads
+  functions and arrow or function expressions, never a `method_definition`), and a string with a part that does not
+  fold, an environment read (`process.env.API_URL`) or a build-time global included: the builder
+  gives up as a whole where a template written in the `fetch` call keeps the environment read and
+  links by `base_url_env`, so a base that is a conditional over a build-time global, as
+  spring-petclinic-reactjs writes it, stays a separate gap.
 - `lang/go/values.rs`: `VALUE_DEPTH` (64): a value (an argument, a returned or held expression)
   nested deeper (`f(g(h(..)))`) is unknown. A name is a constant only when it is bound once in
   the function (`:=` or `var`, one name, never assigned, in a statement of the function body, not

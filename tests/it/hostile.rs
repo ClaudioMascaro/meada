@@ -124,6 +124,21 @@ fn ts() -> Vec<Case> {
         t("arrays", x(nest("[", "1", "]", DEEP))),
         t("objects", x(nest("{a:", "1", "}", DEEP))),
         t("calls", x(nest("f(", "1", ")", DEEP))),
+        // A builder that uses its parameter twice, folded at each level: 2^n parts if unbounded.
+        t(
+            "builder-nest",
+            format!(
+                "const d = (p: string) => `${{p}}${{p}}`;\nfetch({});\n",
+                nest("d(", "'/a'", ")", 300)
+            ),
+        ),
+        t(
+            "builder-locals",
+            format!(
+                "const d = (p: string) => `${{p}}${{p}}`;\nconst a0 = '/a';\n{}\nfetch(a{LONG});\n",
+                lines(LONG, |i| format!("const a{} = d(a{i});", i + 1))
+            ),
+        ),
         t("arrows", x(nest("() => ", "1", "", DEEP))),
         t("ternaries", x(nest("a ? 1 : ", "1", "", DEEP))),
         t("templates", x(nest("`${", "1", "}`", DEEP))),
