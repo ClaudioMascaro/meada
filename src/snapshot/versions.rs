@@ -280,7 +280,8 @@ impl Acting<'_> {
 /// Anyone but the global operator (`acting`) is authorized under the lock against the version
 /// then current, which two writes cannot move at once: its role recomputed, the submitted
 /// entries composed over the current entries its grant reads (`compose_entries`, which under the
-/// GitHub grant provider attributes its additions, so a forged `added_by` decides nothing),
+/// GitHub grant provider attributes its additions, so a forged `added_by` decides nothing, and
+/// which stamps each `added_by` it writes with the save's time, #454),
 /// `authorize_entries` over that change, an addition of an identity the version holds outside
 /// the grant refused `outside_grant` (`collisions`), then the version stored is
 /// `compose_entries`' over the whole current version (ADR 0015, #333). The global operator's
@@ -322,12 +323,13 @@ pub(crate) fn save(
                 .cloned()
                 .collect();
             let submitted = &version.repositories;
-            let seen = compose_entries(grant, login, github_host, &read, submitted);
+            let now = rfc3339(now());
+            let seen = compose_entries(grant, login, github_host, &now, &read, submitted);
             let refused = collisions(grant, &current, &seen, acting.refused(&read, &seen));
             if !refused.is_empty() {
                 return Ok(Err(SaveError::Unauthorized(refused)));
             }
-            let composed = compose_entries(grant, login, github_host, &current, submitted);
+            let composed = compose_entries(grant, login, github_host, &now, &current, submitted);
             owners = touched_owners(&current, &composed);
             let text = entries_text(&composed).ok_or_else(|| Msg::UiEntriesInvalid.text())?;
             version = match prepared("entries", &text, message, author) {
@@ -443,18 +445,7 @@ fn checked(key: &str, id: &str, bytes: &[u8]) -> Result<(Version, String), Strin
     Ok((version, text))
 }
 
-/// Whether `text` is a time as a version records it: `YYYY-MM-DDTHH:MM:SSZ`.
-pub(crate) fn is_time(text: &str) -> bool {
-    let shape = "dddd-dd-ddTdd:dd:ddZ";
-    text.len() == shape.len()
-        && (text.bytes().zip(shape.bytes())).all(|(b, s)| {
-            if s == b'd' {
-                b.is_ascii_digit()
-            } else {
-                b == s
-            }
-        })
-}
+pub(crate) use meada_core::manifest::is_time;
 
 /// `meada workspace list`: every version in the store and the current one.
 pub struct Listing {

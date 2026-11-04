@@ -21,7 +21,9 @@ The crates are described in the [architecture map](../architecture.md#crates). T
   too (`added_by_problem`: one string, 1 to 39 characters of lowercase ASCII letters, digits,
   `-` and `_`; compared exactly); attribution and no grant. Under the GitHub grant provider
   `authorize` reads it to decide a write (#333) and `meada github-app roles` excludes an addition
-  whose adder holds no accepted role (#331).
+  whose adder holds no accepted role (#331). `EntryFile::added_by_time` is when the console wrote
+  the `added_by` (#454, `is_time`: one string `YYYY-MM-DDTHH:MM:SSZ`), which the role check
+  compares with the first permissions set's start.
   `validate_import(file, src)`
   validates entries while ignoring other top-level keys, with CLI import's file prefix on
   identity errors; CLI, HTTP and WASM import validation share it, preserving empty workspaces and ignored
@@ -29,15 +31,16 @@ The crates are described in the [architecture map](../architecture.md#crates). T
 - `meada-core/src/ids.rs`: `bundle_id`, `generation_id` (ADR 0012), `workspace_version_id`
   (ADR 0014: the canonical JSON of the entries, `{"blocks","path","repo"}` in manifest order, with
   `"owner"` between `blocks` and `path` and, keys being sorted, `"added_by"` (#330) before
-  `blocks`, each only when the entry has one, so an entry without them keeps its text and its
-  version id), `is_id`, `fence`, `entry_blocks` (every key of an entry but `repo`, `path`,
-  `owner` and `added_by`; neither is a block, so no bundle id reads them).
+  `blocks` and `"added_by_time"` (#454) after it, each only when the entry has one, so an entry
+  without them keeps its text and its version id), `is_id`, `fence`, `entry_blocks` (every key of
+  an entry but `NON_BLOCK_KEYS`: `repo`, `path`, `owner`, `added_by` and `added_by_time`; none is
+  a block, so no bundle id reads them).
 - `meada-core/src/workspace.rs`: `diff(file, before, after)` validates through `validate_import`
   and lists added/removed/changed identities and changed dotted keys in manifest order. Array
   tables retain each field's row position and absence; common entries reordered relative to
   one another report the `repository` array key. Formatting is ignored. `entries_text` is the
   pure JSON-repositories-to-TOML conversion shared with `snapshot::versions` and WASM; it prints
-  an entry's `owner` and `added_by` right after its `path`, before the block tables, so the text reads back to
+  an entry's `owner`, `added_by` and `added_by_time` right after its `path`, before the block tables, so the text reads back to
   the same id. `version_entries` (`entriesJson`) is the opposite way, a text to the entries a
   version document holds, so the browser authorizes and composes the same entries the server
   stores: `entry`, which builds one, is the function `snapshot::versions` stores them with. An owner change alone is the
@@ -58,15 +61,19 @@ The crates are described in the [architecture map](../architecture.md#crates). T
   cleared or set), `not_your_team` (the owner is none of its teams: its groups owning an entry
   of `current` the `Grant` reads). `role` is admission's rule (#324): the global operator stays
   one, anyone else is a team operator while it has a team, else a viewer.
-  `compose_entries(grant, login, github_host, current, submitted)` is the version a team
+  `compose_entries(grant, login, github_host, now, current, submitted)` is the version a team
   operator's save stores: the current entries in place, those the grant reads replaced by their
   submitted form or dropped, those outside it kept, additions appended in submitted order; under
   the GitHub grant provider each addition is attributed (`added_by` the login on its host whatever the text
-  held, absent without a valid login; absent off it). The attribution step comes before
+  held, absent without a valid login; absent off it). Every entry it writes gets its
+  `added_by_time` from `now`, never from the text (#454): the current entry's while the
+  `added_by` is unchanged, `now` for another one under the GitHub grant provider, none without
+  the provider or without an `added_by`. The attribution step comes before
   authorization: the server and the browser both authorize the change from the entries the
   grant reads to `compose_entries` over them, so a forged `added_by` decides no reason. The
   binary's save and apply and the browser (`authorizeEntries`, `composeEntries` and `touchedOwners` in `meada-core/src/wasm.rs`,
-  `login` and `github_host` as `string | undefined`) call the same functions.
+  `login` and `github_host` as `string | undefined`, `composeEntries` with `now` the browser's
+  time) call the same functions.
 - `meada-core/src/msg.rs`: the messages of those checks and the language setting the binary's
   `msg.rs` reads too; `meada-core/src/http.rs`: `normalize_path` and `PARAM`, which the HTTP
   kind re-exports. `qualify` and `parent` (dotted names) live in its `meada-core/src/lib.rs`.

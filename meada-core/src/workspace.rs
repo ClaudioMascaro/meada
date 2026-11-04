@@ -178,8 +178,8 @@ fn fields(table: &DeTable<'_>, prefix: &str, out: &mut Vec<(String, Vec<Json>, u
     }
 }
 
-/// One entry of a version document: `repo` and `path`, the `owner` and `added_by` when there are
-/// any, then the entry's blocks (`entry_blocks`).
+/// One entry of a version document: `repo` and `path`, the `owner`, `added_by` and
+/// `added_by_time` when there are any, then the entry's blocks (`entry_blocks`).
 pub fn entry(e: &EntryFile, blocks: Json) -> Json {
     let mut entry = Map::new();
     entry.insert("repo".into(), e.repo.as_str().into());
@@ -189,6 +189,9 @@ pub fn entry(e: &EntryFile, blocks: Json) -> Json {
     }
     if let Some(added_by) = &e.added_by {
         entry.insert("added_by".into(), added_by.as_str().into());
+    }
+    if let Some(time) = &e.added_by_time {
+        entry.insert("added_by_time".into(), time.as_str().into());
     }
     if let Json::Object(blocks) = blocks {
         entry.extend(blocks);
@@ -240,7 +243,7 @@ pub fn touched_owners(current: &[Json], new: &[Json]) -> Vec<String> {
 }
 
 /// A document's entries as `[[repository]]` tables, `None` when they are not TOML tables. An
-/// entry's `owner` and `added_by` follow its `path`, before its block tables: a key after a block's header
+/// entry's `owner`, `added_by` and `added_by_time` follow its `path`, before its block tables: a key after a block's header
 /// would belong to the block.
 pub fn entries_text(repositories: &[Json]) -> Option<String> {
     if repositories.is_empty() {
@@ -260,10 +263,11 @@ pub fn entries_text(repositories: &[Json]) -> Option<String> {
                 let line = toml::Table::from_iter(value.map(|v| (name.to_string(), v)));
                 toml::to_string(&line).ok()
             };
-            let (path, owner, added_by) = (
+            let (path, owner, added_by, added_by_time) = (
                 table.remove("path"),
                 table.remove("owner"),
                 table.remove("added_by"),
+                table.remove("added_by_time"),
             );
             let rest = toml::Table::from_iter([(
                 "repository".to_string(),
@@ -272,10 +276,11 @@ pub fn entries_text(repositories: &[Json]) -> Option<String> {
             let rest = toml::to_string(&rest).ok()?;
             let (header, rest) = rest.split_once('\n')?;
             Some(format!(
-                "{header}\n{}{}{}{rest}",
+                "{header}\n{}{}{}{}{rest}",
                 key("path", path)?,
                 key("owner", owner)?,
-                key("added_by", added_by)?
+                key("added_by", added_by)?,
+                key("added_by_time", added_by_time)?
             ))
         })
         .collect::<Option<_>>()?;

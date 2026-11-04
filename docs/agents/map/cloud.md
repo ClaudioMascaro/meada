@@ -86,7 +86,10 @@ section of `meada.workspace.toml`:
   spells it) and `<schema>.permission_exclusions` (`identity`, `added_by`), both cascading from
   their set; migration 6 `permission_repositories.source` (#341); migration 7 the named
   workspaces' tables (#342); migration 8 `workspace_versions.entries` (#343); migration 9 the
-  local accounts' table, `<schema>.accounts` (#554, `accounts/store.rs`).
+  local accounts' table, `<schema>.accounts` (#554, `accounts/store.rs`); migration 10
+  `<schema>.permission_state` (`first_started`, one row: the start of the GitHub grant provider's
+  first permissions set, which the role check inserts once and a schema holding a set starts
+  from, #454).
   `connected` is `connect` keeping the password for scrubbing a later statement's
   error (`Opened::scrubber` a copy of it for a transaction, which borrows the client), and `probe` is the console's start check (a version refusal refuses the start, Postgres
   unreachable does not). `migrate` (`meada postgres migrate --workspace
@@ -497,7 +500,10 @@ section of `meada.workspace.toml`:
   number is followed, so the token reaches no other URL. `collaborator` keeps a row whose login
   `meada_core::manifest::added_by_problem` takes once lowercased and whose `role_name`
   `grant::role_ok` takes, else one line naming the identity (`Msg::RolesSkipped`); rows are keyed
-  by identity and login, the first kept. An entry with `added_by` on the host whose login holds
-  no role in `roles` among its repository's rows is excluded (`Msg::RolesExcluded`, the reason
-  and never the login). The line on stdout is `Msg::RolesSet`: the set's id, the repositories
+  by identity and login, the first kept. An entry with `added_by` on the host whose
+  `added_by_time` is absent or no later than the second `permission_state.first_started` names
+  (this run's start when none is written; the run inserts it in its transaction) is excluded
+  `unattributed` (`Msg::RolesUnattributed`, #454); else one whose login holds no role in
+  `roles` among its repository's rows is excluded (`Msg::RolesExcluded`, the reason and never
+  the login). The line on stdout is `Msg::RolesSet`: the set's id, the repositories
   listed, the rows and the exclusions.

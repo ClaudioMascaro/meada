@@ -34,7 +34,7 @@ test.each(authorizations)('WebAssembly and CLI share authorization: $name', row 
 
 test.each(compositions)('WebAssembly and CLI share a team operator\'s save: $name', row => {
   const login = row.login ?? undefined, host = row.github_host ?? undefined;
-  expect(JSON.parse(composeEntries(json(row.grant), login, host, json(row.current), json(row.new)))).toEqual(row.composed);
+  expect(JSON.parse(composeEntries(json(row.grant), login, host, row.now, json(row.current), json(row.new)))).toEqual(row.composed);
 });
 
 test('the shared table holds the GitHub grant provider\'s cases', () => {
@@ -44,7 +44,7 @@ test('the shared table holds the GitHub grant provider\'s cases', () => {
 
 test('WebAssembly refuses arguments that are not the shared formats', () => {
   expect(() => authorizeEntries('owner', '[]', '"*"', undefined, undefined, '[]', '[]')).toThrow();
-  expect(() => composeEntries('"a.com/x"', undefined, undefined, '[]', '[]')).toThrow();
+  expect(() => composeEntries('"a.com/x"', undefined, undefined, '2026-11-04T12:00:00Z', '[]', '[]')).toThrow();
 });
 
 test('WebAssembly uses the workspace entries to name a version', () => {

@@ -164,6 +164,22 @@ build, and wins where the two could disagree.
   2026-10-30; #340: ADR 0021 applies the same rule to a named workspace's entries, with its
   operators as sponsors: an entry no operator holds an accepted role on is excluded
   `no_sponsor`, per workspace and identity, in the set and in the exclusions file.)
+- (Amended 2026-11-04; #454: without the provider, a team operator's save keeps the `added_by`
+  it submits, so the attribution above holds only from the provider's start. Each entry records
+  when its `added_by` was written, `added_by_time` (UTC, to the second), part of the canonical
+  text after `added_by`: `compose_entries` stamps it from the save's clock, under the provider
+  only and never from the text, keeping the current entry's while the `added_by` is unchanged, so
+  an `added_by` written without the provider carries no time and the browser and the server still
+  answer alike given the time. Postgres migration 10 keeps the start of the first
+  permissions set (`<schema>.permission_state`, written once by the role check, a schema holding
+  a set starting from it). The role check reports an addition on the host whose `added_by` has
+  no time, or one no later than that second, `unattributed` (an exclusion like `no_role`), so an
+  `added_by` written before the provider grants nothing until the provider attributes it: a team
+  operator adds the entry again, or the global operator, having checked the login, writes a
+  current `added_by_time`, its text being stored as written. Entries saved before the field
+  existed have no time and are `unattributed` under the provider. The first set's time never
+  moves; an `added_by` written while the provider is turned off gets no time, so turning it off
+  and on again opens no window.)
 
 ### The directory
 

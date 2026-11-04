@@ -91,22 +91,32 @@ pub fn named_version_id(entries: &[(&str, &Json)]) -> String {
     id(&Json::Array(entries).to_string())
 }
 
-/// One entry as `workspace_version_id` hashes it: identity, path, blocks, owner, `added_by`.
-pub type VersionEntry<'a> = (&'a str, &'a str, &'a Json, Option<&'a str>, Option<&'a str>);
+/// One entry as `workspace_version_id` hashes it: identity, path, blocks, owner, `added_by` and
+/// `added_by_time`.
+pub type VersionEntry<'a> = (
+    &'a str,
+    &'a str,
+    &'a Json,
+    Option<&'a str>,
+    Option<&'a str>,
+    Option<&'a str>,
+);
 
 /// The workspace version id of `entries` (identity, path, blocks as `entry_blocks` gives them,
 /// the owner and the login that added it, if any), in manifest order: the hash of their canonical
 /// text, a JSON array of one object per entry with its keys sorted,
-/// `{"blocks":...,"path":...,"repo":...}`, plus `"owner":...` and `"added_by":...` (#330) each
+/// `{"blocks":...,"path":...,"repo":...}`, plus `"owner":...`, `"added_by":...` (#330) and
+/// `"added_by_time":...` (#454) each
 /// only when the entry has one, so an entry without them keeps the text it had before they
 /// existed. Nothing else is hashed: the same entries give the same id on any machine, whoever
 /// saves them, whenever and with whatever message.
 pub fn workspace_version_id(entries: &[VersionEntry]) -> String {
     let entries: Vec<Json> = (entries.iter())
-        .map(|(repo, path, blocks, owner, added_by)| {
+        .map(|(repo, path, blocks, owner, added_by, added_by_time)| {
             // Inserted in key order, so sorted whether or not the map keeps insertion order.
             let fields = [
                 ("added_by", added_by.map(Json::from)),
+                ("added_by_time", added_by_time.map(Json::from)),
                 ("blocks", Some((*blocks).clone())),
                 ("owner", owner.map(Json::from)),
                 ("path", Some((*path).into())),
@@ -120,7 +130,7 @@ pub fn workspace_version_id(entries: &[VersionEntry]) -> String {
 }
 
 /// The keys of an entry that are not a block: its identity, path and the platform's metadata.
-pub const NON_BLOCK_KEYS: [&str; 4] = ["repo", "path", "owner", "added_by"];
+pub const NON_BLOCK_KEYS: [&str; 5] = ["repo", "path", "owner", "added_by", "added_by_time"];
 
 /// Each `[[repository]]` of the manifest text `src`, in order, as its blocks were written
 /// (every key but `NON_BLOCK_KEYS`), as JSON with every table's keys sorted: TOML's spellings

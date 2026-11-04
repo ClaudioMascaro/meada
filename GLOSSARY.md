@@ -225,7 +225,8 @@ _Avoid_: permissions table, role cache, ACL
 
 **Exclusions file**:
 `<index_dir>/workspace/excluded`, which the role check writes beside the pulled version: its
-version id, then the additions whose `added_by` holds no accepted role. Every reader of the
+version id, then the additions whose `added_by` holds no accepted role or is `unattributed`
+(written before the GitHub grant provider's first permissions set, #454). Every reader of the
 pulled version treats them as absent from the workspace and refuses without a file of the pulled
 version (#331).
 _Avoid_: blocklist, deny list, skip list

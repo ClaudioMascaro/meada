@@ -15,7 +15,7 @@ export function editorModel(text: string, current: string, locale: Language) {
   };
 }
 
-export interface Entry { repo: string; path: string; owner?: string; added_by?: string; [key: string]: unknown }
+export interface Entry { repo: string; path: string; owner?: string; added_by?: string; added_by_time?: string; [key: string]: unknown }
 /** The identities of a version's entries carrying the response metadata `flag`, present only when true. */
 const flagged = (flag: string) => (repositories: Record<string, unknown>[]): Set<string> =>
   new Set(repositories.filter(entry => entry[flag] === true).map(entry => String(entry.repo)));
@@ -76,7 +76,9 @@ export function teamEditorModel(text: string, held: Entry[], who: Authority, loc
   const current = JSON.stringify(held);
   const base = editorModel(text, entriesText(current), locale);
   if (base.errors.length) return { errors: base.errors, diff: undefined, refusals: [] as Refusal[], owners: [] as string[] };
-  const composed = JSON.parse(composeEntries(JSON.stringify(who.grant), who.login, who.host, current, entriesJson(text))) as Entry[];
+  // The server stamps its own clock on an `added_by` it writes (#454); this preview stamps the browser's.
+  const now = new Date().toISOString().slice(0, 19) + 'Z';
+  const composed = JSON.parse(composeEntries(JSON.stringify(who.grant), who.login, who.host, now, current, entriesJson(text))) as Entry[];
   const diff = JSON.parse(workspaceDiff(entriesText(current), entriesText(JSON.stringify(composed)))) as WorkspaceDiff;
   return { errors: [], diff, refusals: refusals(who, held, composed), owners: owners(held, composed) };
 }

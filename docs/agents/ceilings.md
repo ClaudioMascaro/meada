@@ -388,6 +388,17 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
 - `meada-core/src/manifest.rs`: a GitHub login (an entry's `added_by`, and a token's `login_claim`
   value, which `grant/permissions.rs` reads through `added_by_problem`) holds at most `ADDED_BY_MAX`
   (39) characters; a longer one is an error in an entry and no GitHub grant in a token.
+- `github_app.rs` (#454): an `added_by_time` is compared with the first permissions set's start
+  to the second, and a time in that same second counts as before it, so an addition the provider
+  attributed within the second the first role check started is `unattributed` too. An addition
+  the console attributes after `[oidc.github]` is enabled but before the first role check runs is
+  older than the first set and `unattributed`. The stamp is the console host's clock and the first
+  set's start Postgres's: a console clock ahead of Postgres by k seconds lets an addition the
+  provider attributed in the k seconds before the first set pass as later (and a console behind
+  it, one just after as earlier); both are the provider's own attributions, since a save without
+  the provider writes no time. Entries saved before `added_by_time` existed carry none and are
+  `unattributed` under the provider. The global operator's text is stored as written, so an
+  `added_by_time` it writes is trusted as is.
 - `audit.rs`: the audit grows without bound, one `<schema>.audit` row per write and refusal, until
   the operator prunes it in SQL; Meada never deletes a record, and a page of `GET /api/v1/audit`
   answers at most 100.

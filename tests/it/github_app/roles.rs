@@ -23,6 +23,10 @@ const PULLED: &str = "store-indexes/workspace";
 /// The git host of the chain's identities, and of `[oidc.github]`.
 const HOST: &str = "example.com";
 
+/// The `added_by_time` of every attributed entry here (#454): after any permissions set a test
+/// writes, so the entry is checked by its roles.
+const AFTER: &str = "2999-01-01T00:00:00Z";
+
 const WEB: &str = "example.com/chain/web";
 const GATEWAY: &str = "example.com/chain/gateway";
 const CATALOG: &str = "example.com/chain/catalog";
@@ -247,7 +251,7 @@ fn on_bootstrap(dir: &Path, args: &[&str]) -> (String, String, Option<i32>) {
 fn pull_version(dir: &Path, entries: &[(&str, &str, Option<&str>)]) -> String {
     let blocks = serde_json::json!({});
     let hashed: Vec<meada_core::ids::VersionEntry> = (entries.iter())
-        .map(|(repo, path, login)| (*repo, *path, &blocks, None, *login))
+        .map(|(repo, path, login)| (*repo, *path, &blocks, None, *login, login.map(|_| AFTER)))
         .collect();
     let id = meada_core::ids::workspace_version_id(&hashed);
     let repositories: Vec<serde_json::Value> = (entries.iter())
@@ -255,6 +259,7 @@ fn pull_version(dir: &Path, entries: &[(&str, &str, Option<&str>)]) -> String {
             let mut entry = serde_json::json!({"repo": repo, "path": path});
             if let Some(login) = login {
                 entry["added_by"] = (*login).into();
+                entry["added_by_time"] = AFTER.into();
             }
             entry
         })
@@ -524,7 +529,8 @@ fn an_addition_without_an_accepted_role_is_left_out_by_every_reader() {
     assert_eq!(
         shown,
         format!(
-            "[[repository]]\npath = \"../chain-web\"\nadded_by = \"ana-souza\"\nrepo = \"{WEB}\"\n\n\
+            "[[repository]]\npath = \"../chain-web\"\nadded_by = \"ana-souza\"\n\
+             added_by_time = \"{AFTER}\"\nrepo = \"{WEB}\"\n\n\
              [[repository]]\npath = \"../chain-worker\"\nrepo = \"{WORKER}\"\n"
         )
     );
@@ -852,7 +858,8 @@ fn the_role_check_refuses_a_schema_version_it_does_not_know() {
     );
     case.clean(&stderr);
     assert_eq!((stdout.as_str(), code), ("", Some(1)));
-    assert!(stderr.contains('9') && stderr.contains('4'), "{stderr}");
+    let held = format!("version {}", crate::common::SCHEMA_VERSION);
+    assert!(stderr.contains(&held) && stderr.contains('4'), "{stderr}");
     assert!(case.listings().is_empty());
 }
 
@@ -952,7 +959,15 @@ fn managed(case: &Case, fleet: &Fleet) {
 #[cfg(feature = "refresh-lock")]
 fn apply_version(dir: &Path, text: &str, name: &str, logins: [Option<&str>; 4]) -> String {
     let file = format!("ops/{name}.toml");
-    fs::write(dir.join(&file), crate::generations::added(text, &logins)).unwrap();
+    let attributed = crate::generations::added(text, &logins);
+    let stamped = format!("\nadded_by_time = \"{AFTER}\"\n");
+    let attributed = (attributed.split_inclusive('\n'))
+        .map(|line| match line.starts_with("added_by = ") {
+            true => line.replacen('\n', &stamped, 1),
+            false => line.to_string(),
+        })
+        .collect::<String>();
+    fs::write(dir.join(&file), attributed).unwrap();
     let (id, _) = crate::generations::import(dir, &file, name, "alice");
     let (stdout, stderr, code) = meada(
         dir,

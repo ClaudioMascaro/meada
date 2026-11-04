@@ -752,6 +752,10 @@ pub enum Msg<'a> {
         identity: &'a str,
         listed: bool,
     },
+    /// An addition whose `added_by` has no time or was written by the first permissions set
+    /// (#454).
+    #[cfg(feature = "github-app")]
+    RolesUnattributed(&'a str),
     /// The role check's line on success.
     #[cfg(feature = "github-app")]
     RolesSet {
@@ -3465,6 +3469,21 @@ impl Msg<'_> {
                 ),
                 format!(
                     "{identity}: excluido: su added_by no tiene ningún rol en [oidc.github] roles"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesUnattributed(identity) => pick(
+                format!(
+                    "{identity}: excluded: unattributed, its added_by was written before the \
+                     GitHub grant provider's first permissions set"
+                ),
+                format!(
+                    "{identity}: excluído: sem atribuição, o seu added_by foi escrito antes do \
+                     primeiro conjunto de permissões do provedor de concessões do GitHub"
+                ),
+                format!(
+                    "{identity}: excluido: sin atribución, su added_by se escribió antes del \
+                     primer conjunto de permisos del proveedor de concesiones de GitHub"
                 ),
             ),
             #[cfg(feature = "github-app")]

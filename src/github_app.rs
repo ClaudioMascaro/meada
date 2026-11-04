@@ -1019,9 +1019,10 @@ impl<'a> Listing<'a> {
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 type Row = (String, String);
 
-/// An entry of the workspace as the role check reads it: its identity and its `added_by`.
+/// An entry of the workspace as the role check reads it: its identity, its `added_by` and when
+/// that was written (#454).
 #[cfg(all(feature = "postgres", feature = "oidc"))]
-type Entry = (String, Option<String>);
+type Entry = (String, Option<String>, Option<String>);
 
 /// A collaborator as `role_name`'s row: the login, lowercase, and the role as GitHub spells it;
 /// `None` for one whose login is not a GitHub login (1 to 39 ASCII letters, digits, `-` and `_`,
@@ -1172,7 +1173,7 @@ fn eligible_sets(
 }
 
 /// What `roles` reads of the workspace: the pulled version's id with `source = "store"` and each
-/// entry's identity and `added_by`, whole: the exclusions are this command's to write. With
+/// entry's identity, `added_by` and `added_by_time`, whole: the exclusions are this command's to write. With
 /// `[workspaces]` also the named workspaces the pull read (#342) and the digest of their file.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 fn checked_entries(manifest: &Path, read: &crate::workspace::Manifest) -> crate::Result<Checked> {
@@ -1197,7 +1198,7 @@ fn checked_entries(manifest: &Path, read: &crate::workspace::Manifest) -> crate:
             (pulled, _) => pulled,
         };
         let (id, entries, _) = pulled.ok_or_else(not_pulled)?;
-        let entries = entries.into_iter().map(|e| (e.repo, e.added_by));
+        let entries = (entries.into_iter()).map(|e| (e.repo, e.added_by, e.added_by_time));
         #[cfg(feature = "workspaces")]
         let (contexts, digest) = named.unzip();
         return Ok(Checked {
@@ -1213,7 +1214,7 @@ fn checked_entries(manifest: &Path, read: &crate::workspace::Manifest) -> crate:
     Ok(Checked {
         version: None,
         entries: (read.entries.iter())
-            .map(|l| (l.repo.clone(), None))
+            .map(|l| (l.repo.clone(), None, None))
             .collect(),
         #[cfg(feature = "workspaces")]
         contexts: Vec::new(),
@@ -1386,7 +1387,13 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         Ok(())
     };
     let q = postgres.quoted();
-    let first = format!("SELECT (SELECT max(fence) FROM {q}.permission_sets), now()::text");
+    // The time of the GitHub grant provider's first permissions set (#454), to the second: this
+    // run's start when none was written yet.
+    let first = format!(
+        "SELECT (SELECT max(fence) FROM {q}.permission_sets), now()::text, \
+         to_char(coalesce((SELECT first_started FROM {q}.permission_state), now()) \
+         AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')"
+    );
     let reached = async {
         let opened = crate::postgres::connected(postgres).await?;
         let scrub = opened.scrubber();
@@ -1416,6 +1423,7 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     };
     held_fence(row.get(0))?;
     let started: String = row.get(1);
+    let first_set: String = row.get(2);
     remove_excluded()?;
 
     // Every identity on the host, listed; rows keyed by identity and login, the first kept.
@@ -1428,7 +1436,7 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     #[cfg(feature = "workspaces")]
     if let Some(catalog) = catalog {
         let named: Vec<String> = contexts.iter().flat_map(|c| c.identities()).collect();
-        let selected = (entries.iter().map(|(i, _)| i.as_str()))
+        let selected = (entries.iter().map(|(i, _, _)| i.as_str()))
             .chain(named.iter().map(String::as_str))
             .collect();
         let listed = catalog::candidates(&mut run, apps, &github.host, catalog, &selected).await;
@@ -1440,7 +1448,7 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         contexts.iter().flat_map(|c| c.identities()).collect();
     #[cfg(not(feature = "workspaces"))]
     let named: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-    let own: Vec<&str> = entries.iter().map(|(i, _)| i.as_str()).collect();
+    let own: Vec<&str> = entries.iter().map(|(i, _, _)| i.as_str()).collect();
     let targets = targets_of(&github.host, &own, &named, &candidates);
     // Per identity on the host, what GitHub showed of it: the App and repository coverage.
     let mut coverage: Vec<(&str, &str, Source)> = Vec::new();
@@ -1476,13 +1484,20 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     let role_of = |identity: &str, login: &String| rows.get(&(identity.to_string(), login.clone()));
 
     // The additions whose `added_by` holds no accepted role on their repository, with
-    // `source = "store"` only (a file's entries have no `added_by`).
+    // `source = "store"` only (a file's entries have no `added_by`). An `added_by` without a
+    // time, or written by the end of the second the first permissions set started in, was not
+    // the GitHub grant provider's attribution (#454): `unattributed`, whatever its roles.
     let repositories = coverage.iter().filter(|(_, c, _)| *c == "listed").count();
     let mut excluded: BTreeMap<&str, (&str, &str)> = BTreeMap::new();
-    for (identity, added_by) in &entries {
+    for (identity, added_by, time) in &entries {
         let Some(login) = added_by.as_ref().filter(|_| identity.starts_with(&prefix)) else {
             continue;
         };
+        if time.as_ref().is_none_or(|time| *time <= first_set) {
+            notes.push(Msg::RolesUnattributed(identity).text());
+            excluded.insert(identity, (login, "unattributed"));
+            continue;
+        }
         let role = role_of(identity, login);
         if role.is_some_and(|role| github.roles.contains(role)) {
             continue;
@@ -1519,11 +1534,12 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         Some(dir) => Some(crate::snapshot::versions::lock_excluded(dir)?),
         None => None,
     };
-    // Nine statements of its own, after the listing (which has no Postgres in it): begin, the
-    // lock, the fence, the set, its rows, its coverage, its exclusions, the older sets and commit.
+    // Ten statements of its own, after the listing (which has no Postgres in it): begin, the
+    // lock, the fence, the first set's time, the set, its rows, its coverage, its exclusions, the
+    // older sets and commit.
     // Past the bound the file stays removed, so no reader admits an exclusion of this run or the
     // one before it.
-    let writing = postgres.bound(9);
+    let writing = postgres.bound(10);
     let written = async {
         let tx = client.transaction().await.map_err(&scrub)?;
         let lock = format!("LOCK TABLE {q}.permission_sets IN EXCLUSIVE MODE");
@@ -1535,6 +1551,12 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         if let Some(dir) = &dir {
             crate::snapshot::versions::remove_excluded(dir)?;
         }
+        // The first set's time is written once and never moved (#454).
+        let state = format!(
+            "INSERT INTO {q}.permission_state (first_started) VALUES ($1::text::timestamptz) \
+             ON CONFLICT DO NOTHING"
+        );
+        tx.execute(&state, &[&started]).await.map_err(&scrub)?;
         let insert = format!(
             "INSERT INTO {q}.permission_sets (fence, version, started, repositories) \
          VALUES ($1, $2, $3::text::timestamptz, $4) RETURNING id"

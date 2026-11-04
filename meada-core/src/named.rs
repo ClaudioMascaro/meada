@@ -123,7 +123,8 @@ pub fn creation(selected: &[String], eligible: &BTreeSet<String>, grant: &Grant)
 /// overwrite an entry it does not read by submitting its identity. It is ADR 0015's composition
 /// without owners or attribution: a named entry holds neither.
 pub fn compose(grant: &Grant, current: &[Json], submitted: &[Json]) -> Vec<Json> {
-    crate::authorize::compose_entries(grant, None, None, current, submitted)
+    // A named entry holds no `added_by`, and without a host no time is written.
+    crate::authorize::compose_entries(grant, None, None, "", current, submitted)
 }
 
 /// The identities `next` adds to `current` or changes (an entry whose blocks differ), in `next`

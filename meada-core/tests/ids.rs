@@ -147,8 +147,8 @@ fn api() -> Value {
 fn the_workspace_version_id_hashes_the_canonical_text_of_the_entries_alone() {
     let (web, api) = (web(), api());
     let entries = [
-        ("example.com/acme/web", "../web", &web, None, None),
-        ("example.com/acme/api", "/srv/api", &api, None, None),
+        ("example.com/acme/web", "../web", &web, None, None, None),
+        ("example.com/acme/api", "/srv/api", &api, None, None, None),
     ];
     let id = workspace_version_id(&entries);
     let text = "[{\"blocks\":{\"serve\":{\"documents\":[\"openapi.yaml\"]}},\"path\":\"../web\",\
@@ -168,7 +168,7 @@ fn the_same_entries_written_another_way_give_the_same_workspace_version_id() {
                 ("example.com/acme/web", "../web"),
                 ("example.com/acme/api", "api"),
             ])
-            .map(|(blocks, (repo, path))| (repo, path, blocks, None, None))
+            .map(|(blocks, (repo, path))| (repo, path, blocks, None, None, None))
             .collect();
         workspace_version_id(&entries)
     };
@@ -185,23 +185,23 @@ fn the_same_entries_written_another_way_give_the_same_workspace_version_id() {
 fn swapping_two_entries_or_changing_a_block_changes_the_workspace_version_id() {
     let (web, api) = (web(), api());
     let id = workspace_version_id(&[
-        ("example.com/acme/web", "web", &web, None, None),
-        ("example.com/acme/api", "api", &api, None, None),
+        ("example.com/acme/web", "web", &web, None, None, None),
+        ("example.com/acme/api", "api", &api, None, None, None),
     ]);
     let swapped = workspace_version_id(&[
-        ("example.com/acme/api", "api", &api, None, None),
-        ("example.com/acme/web", "web", &web, None, None),
+        ("example.com/acme/api", "api", &api, None, None, None),
+        ("example.com/acme/web", "web", &web, None, None, None),
     ]);
     assert_ne!(id, swapped);
     let other = json!({"serve": {"documents": ["openapi.json"]}});
     let changed = workspace_version_id(&[
-        ("example.com/acme/web", "web", &other, None, None),
-        ("example.com/acme/api", "api", &api, None, None),
+        ("example.com/acme/web", "web", &other, None, None, None),
+        ("example.com/acme/api", "api", &api, None, None, None),
     ]);
     assert_ne!(id, changed);
     let moved = workspace_version_id(&[
-        ("example.com/acme/web", "../web", &web, None, None),
-        ("example.com/acme/api", "api", &api, None, None),
+        ("example.com/acme/web", "../web", &web, None, None, None),
+        ("example.com/acme/api", "api", &api, None, None, None),
     ]);
     assert_ne!(id, moved);
 }
@@ -213,8 +213,8 @@ fn an_owner_joins_the_canonical_text_and_changes_the_workspace_version_id() {
     let (web, api) = (web(), api());
     let of = |owner: Option<&str>| {
         workspace_version_id(&[
-            ("example.com/acme/web", "../web", &web, owner, None),
-            ("example.com/acme/api", "/srv/api", &api, None, None),
+            ("example.com/acme/web", "../web", &web, owner, None, None),
+            ("example.com/acme/api", "/srv/api", &api, None, None, None),
         ])
     };
     let ownerless = "[{\"blocks\":{\"serve\":{\"documents\":[\"openapi.yaml\"]}},\"path\":\"../web\",\
@@ -240,8 +240,15 @@ fn an_added_by_joins_the_canonical_text_and_changes_the_workspace_version_id() {
     let (web, api) = (web(), api());
     let of = |owner: Option<&str>, added_by: Option<&str>| {
         workspace_version_id(&[
-            ("example.com/acme/web", "../web", &web, owner, added_by),
-            ("example.com/acme/api", "/srv/api", &api, None, None),
+            (
+                "example.com/acme/web",
+                "../web",
+                &web,
+                owner,
+                added_by,
+                None,
+            ),
+            ("example.com/acme/api", "/srv/api", &api, None, None, None),
         ])
     };
     let plain = "[{\"blocks\":{\"serve\":{\"documents\":[\"openapi.yaml\"]}},\"path\":\"../web\",\
@@ -258,6 +265,40 @@ fn an_added_by_joins_the_canonical_text_and_changes_the_workspace_version_id() {
     assert_eq!(of(Some("team-web"), Some("ana-souza")), short(&both));
     assert_ne!(of(None, Some("ana-souza")), of(None, Some("ana-souza2")));
     assert_ne!(of(None, Some("ana-souza")), of(Some("ana-souza"), None));
+}
+
+/// An `added_by_time` (#454) joins the canonical text after `added_by`, so the same entries
+/// stamped at two times are two versions; an entry without one keeps the text it had.
+#[test]
+fn an_added_by_time_joins_the_canonical_text_and_changes_the_workspace_version_id() {
+    let (web, api) = (web(), api());
+    let of = |time: Option<&str>| {
+        workspace_version_id(&[
+            (
+                "example.com/acme/web",
+                "../web",
+                &web,
+                None,
+                Some("ana"),
+                time,
+            ),
+            ("example.com/acme/api", "/srv/api", &api, None, None, None),
+        ])
+    };
+    let plain = "[{\"added_by\":\"ana\",\"blocks\":{\"serve\":{\"documents\":[\"openapi.yaml\"]}},\
+                 \"path\":\"../web\",\"repo\":\"example.com/acme/web\"},{\"blocks\":{\"peer\":[{\"repo\":\
+                 \"example.com/acme/web\"}]},\"path\":\"/srv/api\",\"repo\":\"example.com/acme/api\"}]";
+    assert_eq!(of(None), short(plain));
+    let timed = plain.replacen(
+        "\"ana\",",
+        "\"ana\",\"added_by_time\":\"2026-11-04T12:00:00Z\",",
+        1,
+    );
+    assert_eq!(of(Some("2026-11-04T12:00:00Z")), short(&timed));
+    assert_ne!(
+        of(Some("2026-11-04T12:00:00Z")),
+        of(Some("2026-11-04T12:00:01Z"))
+    );
 }
 
 #[test]

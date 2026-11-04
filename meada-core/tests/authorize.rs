@@ -22,6 +22,9 @@ struct Case {
     #[serde(default)]
     new: Vec<Json>,
     refused: Option<Vec<Refusal>>,
+    /// The time `compose_entries` stamps on an `added_by` it writes (#454).
+    #[serde(default)]
+    now: String,
     composed: Option<Vec<Json>>,
 }
 
@@ -74,11 +77,11 @@ fn every_composition_case_stores_the_entries_the_table_lists() {
             continue;
         };
         let (login, host) = (case.login.as_deref(), case.github_host.as_deref());
-        let answer = compose_entries(grant, login, host, &case.current, &case.new);
+        let answer = compose_entries(grant, login, host, &case.now, &case.current, &case.new);
         assert_eq!(&answer, composed, "{}", case.name);
         seen += 1;
     }
-    assert!(seen >= 5, "{seen} composition cases");
+    assert!(seen >= 7, "{seen} composition cases");
 }
 
 /// The role apply recomputes under the lock: a group owning an entry the grant reads.

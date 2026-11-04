@@ -269,13 +269,13 @@ fn migrate_creates_the_schema_once_and_a_second_run_changes_nothing() {
     };
     let before = outside();
     let (stdout, stderr, code) = migrate(&dir, &url, None);
-    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("9\n", "", 0));
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("10\n", "", 0));
     assert_eq!(outside(), before);
     let first = admin.snapshot(&schema);
     // Migration 2: the audit's table (#328); 3: the directory's (#334); 4: its state (#335);
     // 5: the permissions set (#331); 6: where a repository came from (#341); 7: the named
     // workspaces and the context of an exclusion (#342); 8: the identities of a version (#343);
-    // 9: the local accounts (#554).
+    // 9: the local accounts (#554); 10: the first permissions set's time (#454).
     let columns = [
         "accounts.change_required boolean",
         "accounts.created timestamp with time zone",
@@ -340,6 +340,8 @@ fn migrate_creates_the_schema_once_and_a_second_run_changes_nothing() {
         "permission_sets.repositories integer",
         "permission_sets.started timestamp with time zone",
         "permission_sets.version text",
+        "permission_state.first_started timestamp with time zone",
+        "permission_state.singleton boolean",
         "schema_version.version integer",
         "workspace_history.action text",
         "workspace_history.actor text",
@@ -372,16 +374,54 @@ fn migrate_creates_the_schema_once_and_a_second_run_changes_nothing() {
         "workspaces.seq bigint",
     ];
     assert_eq!(first[..columns.len()], columns);
-    assert!(first[columns.len()].starts_with("9 "), "{first:?}");
+    assert!(first[columns.len()].starts_with("10 "), "{first:?}");
     let (stdout, stderr, code) = migrate(&dir, &url, None);
-    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("9\n", "", 0));
+    assert_eq!((stdout.as_str(), stderr.as_str(), code), ("10\n", "", 0));
     assert_eq!(admin.snapshot(&schema), first);
     // A schema the operator created beforehand, empty, is kept and migrated.
     admin.run(&format!(
         "DROP SCHEMA \"{schema}\" CASCADE; CREATE SCHEMA \"{schema}\""
     ));
     let (stdout, _, code) = migrate(&dir, &url, None);
-    assert_eq!((stdout.as_str(), code), ("9\n", 0));
+    assert_eq!((stdout.as_str(), code), ("10\n", 0));
+    admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
+}
+
+/// Migration 10 (#454) moves a schema at 9 forward: a permissions set it holds stays readable and
+/// gives the first set's time; a schema without a set gets no time, which the first role check
+/// writes.
+#[test]
+fn migration_10_keeps_a_held_set_and_starts_from_its_time() {
+    let Some(url) = service() else { return };
+    let schema = schema("first_set");
+    let admin = Admin::new(&url);
+    let dir = manifest("postgres_first_set", &format!("schema = \"{schema}\"\n"));
+    let first = format!("SELECT first_started::text FROM \"{schema}\".permission_state");
+    for held in [true, false] {
+        admin.run(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"));
+        let (stdout, _, code) = migrate(&dir, &url, Some("9"));
+        assert_eq!((stdout.as_str(), code), ("9\n", 0));
+        if held {
+            admin.run(&format!(
+                "INSERT INTO \"{schema}\".permission_sets (id, fence, version, started, \
+                 repositories) VALUES ('s1', 1, 'v1', '2026-01-02 03:04:05+00', 2)"
+            ));
+        }
+        let (stdout, _, code) = migrate(&dir, &url, None);
+        assert_eq!((stdout.as_str(), code), ("10\n", 0));
+        let expected: &[&str] = if held {
+            &["2026-01-02 03:04:05+00"]
+        } else {
+            &[]
+        };
+        assert_eq!(admin.texts(&first), expected);
+        let sets = admin.texts(&format!(
+            "SELECT id || ' ' || fence || ' ' || version || ' ' || repositories FROM \
+             \"{schema}\".permission_sets"
+        ));
+        let expected: &[&str] = if held { &["s1 1 v1 2"] } else { &[] };
+        assert_eq!(sets, expected);
+    }
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
 }
 
@@ -432,7 +472,7 @@ fn two_migrations_serialize_on_the_advisory_lock() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert_eq!(out.stdout, b"9\n");
+    assert_eq!(out.stdout, b"10\n");
 
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
     // The default statement bound: two migrations' DDL on a loaded machine may outlast a second.
@@ -452,7 +492,7 @@ fn two_migrations_serialize_on_the_advisory_lock() {
             "{}",
             String::from_utf8_lossy(&out.stderr)
         );
-        assert_eq!(out.stdout, b"9\n");
+        assert_eq!(out.stdout, b"10\n");
     }
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
 }
@@ -817,7 +857,7 @@ pub(crate) fn audited(dir: &Path, case: &str) -> Option<Audited> {
     fs::write(dir.join("ops/postgres.toml"), toml).unwrap();
     let migrate = ["postgres", "migrate", "--workspace", "ops/postgres.toml"];
     let (stdout, stderr, code) = meada(dir, EN, &[], &migrate);
-    assert_eq!((stdout.as_str(), code), ("9\n", 0), "{stderr}");
+    assert_eq!((stdout.as_str(), code), ("10\n", 0), "{stderr}");
     Some(Audited {
         admin,
         schema,

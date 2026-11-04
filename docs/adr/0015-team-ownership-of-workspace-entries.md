@@ -102,7 +102,10 @@ remaining points. This ADR records the decisions; the spec fixes the details the
   already holds outside the grant is refused `outside_grant`, named as the subject submitted it,
   which tells the team operator it is present, accepted under shared trust. The job's role check
   writes the exclusions before the fetch, and the global operator may set, clear or replace
-  `added_by`.)
+  `added_by`. Amended 2026-11-04; #454: an `added_by` counts only when written after the GitHub
+  grant provider's first permissions set, which each entry's `added_by_time` records; one written
+  before, as a team operator may without the provider, is `unattributed` in the role check and
+  grants nothing. ADR 0016 spells the rule out.)
 - A change is authorized by its diff against the current version, entry by entry, keyed by
   identity. A refused change is a 403 that names every entry it may not change, with a reason
   each, and writes nothing. It never names an identity outside the subject's grant: those are
