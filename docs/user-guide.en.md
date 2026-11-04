@@ -1032,15 +1032,45 @@ top-level `const` define `o.m`.
 | Consumer | global `fetch`, and a call to a parameter whose default is `fetch` |
 | Provider | Next.js (app router: route files) and Express |
 
-In Express, a route holds under each prefix where the router is mounted (`use`, `Router()`). A
-prefix or a path with an unreadable part (a template-literal hole, a parameter, an environment
+In Express, a route holds under each prefix where the router is mounted (`use`, `Router()`). The
+`Router()` of `express-promise-router` (the default in Backstage backend plugins) counts like
+`express.Router()`. A prefix or a path with an unreadable part (a template-literal hole, a parameter, an environment
 read) generates no route, and a router mounted only under such a prefix is left with no prefix at
 all. A literal `:id` is still a parameter. No client besides `fetch` is read: `axios`, `got` and
 `XMLHttpRequest` generate no consumer.
 
+In Backstage, the router a backend plugin gives its `httpRouter` (`httpRouter.use(r)`, with
+`httpRouter` taken from `coreServices.httpRouter` in the `deps` of `registerInit`) holds under
+`/api/<pluginId>`, the path where the framework mounts it, when `createBackendPlugin`, imported
+from a `@backstage/` package, writes its `pluginId` as a literal or as a `const` of the same file
+bound to one. A plugin whose `pluginId` cannot be read that way (an environment read, an import)
+leaves its router at the root, as before, and `meada status` names the plugin. On the
+consumer side, a URL that starts with `discovery.getBaseUrl('<id>')` (held by a constant or
+written in the URL itself) starts at `/api/<id>`, and the link's reason names the plugin and that
+mount; a hostless URL of a route that the mount of a plugin of the same repository serves names it
+too.
+
+Backstage's `proxy` plugin holds through the `proxy.endpoints` table of an `app-config*.yaml` of
+the repository: a URL that starts with `/api/proxy/<endpoint>` (also the one written by
+`discovery.getBaseUrl('proxy')` plus `/<endpoint>`) is a call to that endpoint's `target`, and the
+rest of the URL follows the target. A `target` that is exactly `${VAR}` links through the peer's
+`base_url_env`, and the reason names the variable and the endpoint; a `target` that is a literal
+`http://` or `https://` URL counts as the host (with its path). Any other `target` (text around
+the variable, a default value) leaves the call unlinked, and `meada status` names the endpoint and
+how many calls go through it. A `pathRewrite` that only strips the endpoint (one rule,
+`'^/api/proxy/<endpoint>': ''`, or `'^/api/proxy/<endpoint>/': '/'` for a URL with a path) is what
+the proxy does anyway, so the rest of the URL goes to the target; any other `pathRewrite` (another
+replacement, several rules) is read like a target that cannot be read: no link, and `meada status`
+says so. `ignorePath`, `prependPath: false` and an endpoint the `app-config*.yaml` files give
+different values (which one a deployment loads is not known) are read the same way.
+
 **Environment.** `process.env.X`, `process.env["X"]` and `import.meta.env.X`, alone or passing
 through text methods such as `trim()`, `replace(...)` and `toLowerCase()`. A URL that starts with
-such a read links through the peer's `base_url_env`. `.env` files are not read.
+such a read links through the peer's `base_url_env`. `.env` files are not read. So does
+Backstage's configuration read, `config.getString('a.b')` or `config.getOptionalString('a.b')`,
+when an `app-config*.yaml` of the repository holds `a.b: ${VAR}` (`app-config.yaml` first, the
+first file with the key wins): the read is the variable `VAR`. A literal value or a key no file
+holds leaves the base unresolved.
 
 **Manifests.** `package.json` (`name`, `version`, the four dependency fields, `exports`, `types`,
 `module` and `main`) and `tsconfig.json` (`paths`, `baseUrl`, `outDir`, `rootDir`). See npm in
@@ -1105,7 +1135,9 @@ provider returns, through zod schemas or object literals. See section 10.
 **Environment.** `os.environ["X"]`, `os.environ.get("X")` and `os.getenv("X")` (also bare
 `environ` and `getenv`, matched as written and not through imports), alone or in an f-string hole,
 with an `or` fallback, with a default argument and with text methods such as `strip` and
-`replace`.
+`replace`. A field `f` of a `BaseSettings` subclass (pydantic-settings) in the same file is the
+variable `<env_prefix><F>` in upper case, or its `alias` / `validation_alias` when given; a class
+that is not a `BaseSettings` is not read.
 
 **Manifests.** `pyproject.toml` (`[project]` and `[tool.poetry]`, including `[project.scripts]`)
 and `requirements*.txt`. See PyPI in section 8.5.
@@ -1162,7 +1194,10 @@ argument of `SetBaseURL`.
 
 **Environment.** `os.Getenv` and `os.LookupEnv`, including the pattern written with `if v == ""`,
 `len(v) == 0`, `!ok` or `!ok || v == ""` when the `ok` comes from the same `os.LookupEnv`, and
-then `strings.TrimSuffix`, `TrimRight` and `TrimSpace`.
+then `strings.TrimSuffix`, `TrimRight` and `TrimSpace`. A field of a struct tagged `env:"X"`
+(cleanenv, caarlos0/env) or `envconfig:"X"` (kelseyhightower/envconfig) is the read of `X`
+where the field is read (`cfg.API.URL`), nested structs included, when the struct is declared in
+the same file.
 
 **Manifests.** `go.mod` (`module`, `require`, `replace`). `go.sum` is not read. See Go in section
 8.5.

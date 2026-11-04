@@ -29,3 +29,5 @@ func shared() {
     let session = URLSession.shared
     session.finishTasksAndInvalidate()
 }
+
+struct Page<Item> {}

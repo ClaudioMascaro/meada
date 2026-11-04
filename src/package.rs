@@ -2893,6 +2893,7 @@ mod tests {
             imports: Vec::new(),
             links: Vec::new(),
             stale_decisions: Vec::new(),
+            unmounted: Vec::new(),
         }
     }
 

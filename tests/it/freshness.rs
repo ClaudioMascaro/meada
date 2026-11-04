@@ -465,6 +465,49 @@ fn swift_refreshed_export_after_edit_add_delete_and_a_manifest_edit_equals_a_col
     assert!(level(&json, &format!("{run}Order#0")).is_null());
 }
 
+/// The conformance app beside a second Swift package, one repository: a type parameter an
+/// extension in another file sees (`Page<Item>`, `extension Page { Item() }`) is read from the
+/// files a refresh kept as it is from the ones it parsed, so an edit to an unrelated Swift file
+/// leaves the export a cold one (#609).
+#[test]
+fn swift_refreshed_export_after_an_unrelated_edit_equals_a_cold_export_beside_another_package() {
+    let beside = |repo: &Path| {
+        fs::create_dir_all(repo.join("Kit/Sources/Kit")).unwrap();
+        fs::write(
+            repo.join("Kit/Package.swift"),
+            "// swift-tools-version:5.9\nimport PackageDescription\nlet package = Package(name: \"Kit\", targets: [.target(name: \"Kit\")])\n",
+        )
+        .unwrap();
+        fs::write(
+            repo.join("Kit/Sources/Kit/Kit.swift"),
+            "public func kit() {}\n",
+        )
+        .unwrap();
+    };
+    let edit = |repo: &Path| {
+        fs::write(
+            repo.join("Kit/Sources/Kit/Kit.swift"),
+            "public func kit2() {}\n",
+        )
+        .unwrap();
+    };
+    let repo = fixture_repo("fresh_swift_beside", "conformance-swift-app", ORIGIN);
+    beside(&repo);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    let cold = fixture_repo("fresh_swift_beside_cold", "conformance-swift-app", ORIGIN);
+    beside(&cold);
+    edit(&cold);
+    assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
+    // `Item` is `Page`'s type parameter, so its construction is no construction of the struct.
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    assert!(level(&json, "Page.build()::Item#0").is_null());
+}
+
 fn cold_export(case: &str, fixture: &str, origin: Option<&str>, edit: impl Fn(&Path)) -> String {
     let repo = fixture_repo(case, fixture, origin);
     edit(&repo);

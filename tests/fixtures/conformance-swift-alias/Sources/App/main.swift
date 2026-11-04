@@ -27,6 +27,28 @@ func trailing(_ x: Sender) {
     run { }
 }
 
+// A name from outside the repository may be an alias of a function type (issue #456).
+final class Loader {
+    func load(completion: @escaping Ext.CompletionHandler) {}
+    func load(completion: @escaping (Int) -> Void) {}
+}
+
+// A type of the repository named like the outside alias's last segment does not read it.
+struct Holder { struct CompletionHandler {} }
+
+final class Lone { func fetch(completion: Ext.CompletionHandler) {} }
+
+final class Pair {
+    func put(_ a: Int, wheel: Wheel? = nil) {}
+    func put(_ a: Int, then: (() -> Void)? = nil) {}
+}
+
+func outside(_ x: Loader, _ y: Lone, _ z: Pair) {
+    x.load { _ in }
+    y.fetch { }
+    z.put(1) { }
+}
+
 func hidden(_ x: Hidden) { _ = x.send(1) }
 
 final class Wheel { func spin() {} }

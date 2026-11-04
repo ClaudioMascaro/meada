@@ -138,6 +138,8 @@ One section per surface. `/create-prove-it` adds a section when the app gains a 
 - A difference in `compare.md` is not a failure and "identical" is not a pass for a new flow: a change that should resolve something and leaves the export identical did nothing. BROKEN.
 - The corpus may not contain the construct the change handles. Then probe it with `--overlay` (Try to break it), and record that the corpus missed it under Not covered.
 - `inferred` and `ambiguous` are name matches, and calls inside macros are not indexed: a missing caller proves nothing.
+- An argument the server parses and drops (`kind`, `budget`, `direction`) leaves every default-budget answer identical. The automatic queries pass each argument once (`budget: 300`, `kind: contract` on a symbol name, `direction: up`, an unknown `kind`); a new argument needs a query of its own, or it is unproved (audit 2026-11-03, M1 and M2 passed the scripts).
+- Two cold indexes and an mtime touch never ask the refresh path to pick up new content, so a refresh that keeps stale state passes them. `prove.py run` therefore edits one symbol's name in place (same size), requires the warm export to equal a cold index of the edited tree, then restores it: `content refresh equal` and `restore equal` on the Determinism line. `renamed symbol in the warm export` and `original symbol back` ask the direct question (is the renamed id in the warm export, is the original id back after the restore); the equalities ignore `commit` and `dirty`, checkout facts that go missing while an index is not fresh. A `False` there is BROKEN: with `STALE`, or `renamed ... False`, the edit never reached the index (the M7 symptom, audit 2026-11-03); without them the refresh path gave an answer the cold index does not, and `compare.md` prints the `export_diff` of warm against cold and of original against restored for each side. A failure that base and head share is pre-existing (see Known and deliberate) and does not end the check: compare the head's diff with the base's and report any line that differs between them. `EDIT CHANGED NOTHING` means the entry gave no indexed symbol to rename.
 
 ### MCP over HTTP (server mode)
 
@@ -167,12 +169,14 @@ One section per surface. `/create-prove-it` adds a section when the app gains a 
 
 **Done looks like**: every render identical or its difference predicted, both check scripts exit 0.
 
-**Could fool you**: a render proves the configuration, not that the containers start; `scripts/container-smoke` does that, and needs Docker and an image build.
+**Could fool you**:
+- A render proves the configuration, not that the containers start; `scripts/container-smoke` does that, and needs Docker and an image build.
+- A render shows a mounted file's path, never its text: `prove.py deploy` copies the Caddyfiles, workspace manifests, shell scripts and env examples the stack mounts into the render folder (`mounted-*`) so the base/head diff covers them. `compose-check` asserts only a few strings of those files (a Caddyfile upstream on the wrong port passed it, audit 2026-11-03, D3); read the `mounted-*` diff as you read a render's.
 
 ### Varies by and deliberate
 
 - **Varies by**: cargo features (the default build serves the CLI and MCP; `ui`, `accounts` and the other modules change the binary); the message language (`LANG`, pt-BR or English, the same for both binaries in one run); the MCP era (the scripts speak the `initialize` era, 2025-11-25; the 2026-07-28 `server/discover` era is `tests/it/mcp.rs`'s). A flow isn't proved while a variant the change reaches is unproven.
-- **Known and deliberate**: the self entry is this checkout's HEAD with fixed git dates, so its `commit` is the same for both binaries; base 1.0.0 against a later head shows `format`, `commit` and `dirty` appearing in every export (issue #512, PR #585).
+- **Known and deliberate**: the self entry is this checkout's HEAD with fixed git dates, so its `commit` is the same for both binaries; base 1.0.0 against a later head shows `format`, `commit` and `dirty` appearing in every export (issue #512, PR #585). On `meada` at 392e09c7 (main, 2026-11-03) the content-refresh check fails on base and head alike: after the in-place edit of `meada-core/src/authorize.rs` the warm export resolves three Swift fixture calls (`tests/fixtures/conformance-swift-app`, `Page.build()::Item#0`, `item.label#0`) to `exact` that the cold index leaves `None` or `inferred`, `communities` moves, and the restore keeps them; `content refresh equal False` and `restore equal False` with `renamed ... True` and `original symbol back True` is that product bug, not the change under proof, until the refresh path is fixed (the loop's #391 handoff names it as a follow-up).
 
 ### Verifying a bug fix
 
@@ -186,6 +190,7 @@ After the happy path passes, run at least one probe that matches what you change
 - a query the change should refuse or cut: an unknown symbol (already in the automatic queries), `budget: 1`, a `kind` the tool does not know;
 - the same construct in the sibling pack (TypeScript and JavaScript, Java and Kotlin), or the same route through the other HTTP client the pack reads;
 - a cold start: no `.meada/`, no `meada.toml`, no network (indexing never reaches it, ADR 0002).
+- an edit in place that keeps the file's size, then `export` and one MCP query must show the new code: the scripts do one such edit per entry (the Determinism line); do another on the construct you changed when Scope reaches `src/index.rs`.
 
 ## Evidence and receipt
 

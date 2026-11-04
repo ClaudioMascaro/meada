@@ -239,6 +239,13 @@ fn go_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_ho
 
     for (repo, name) in [(web, "web"), (api, "api")] {
         let export = Engine::open(&repo).unwrap().export().unwrap();
+        if name == "api" {
+            // A struct field tagged `envconfig:"STOCK_URL"` is the base of `stockByTag`.
+            assert!(
+                export.contains("tags.go::stockByTag::http.Get#0")
+                    && export.contains("env:STOCK_URL")
+            );
+        }
         assert_golden(
             &format!("xlang-go-{name}.export.json"),
             &without_processes(&export),
@@ -283,6 +290,9 @@ fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
         ("lengthFallback", "LEN_URL"),
         ("formatted", "FORMAT_URL"),
         ("packageLevel", "PKG_URL"),
+        ("tagNested", "TAG_API_URL"),
+        ("tagEnvconfig", "TAG_ENVCONFIG_URL"),
+        ("tagOptions", "TAG_CAARLO_URL"),
     ];
     for (function, variable) in read {
         let expected = format!("env:{variable}");
@@ -315,6 +325,7 @@ fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
         "okAssignedAgain",
         "lengthShadowed",
         "lookedUpToAVariable",
+        "tagUntagged",
     ];
     for function in unread {
         assert_eq!(vias.get(function), Some(&None), "{function}");
@@ -975,4 +986,136 @@ fn a_declarative_client_method_is_an_open_item_at_its_definition() {
     assert!(ok, "{stderr}");
     assert!(list.contains(&format!("{catalog}\nsrc/main/java/com/example/api/CatalogClient.java:10  @GetMapping(\"/api/catalog\") String all();\n  1) ")), "{list}");
     assert!(list.contains(fetch), "{list}");
+}
+
+/// A Backstage service reads a base URL through `config.getString('a.b')` and the key holds
+/// `${VAR}` in `app-config*.yaml` (#617): the read is the variable, which the peer's
+/// `base_url_env` maps, so two providers of the route no longer leave the link `ambiguous`. A
+/// literal value and a key no file holds leave the host unresolved.
+#[test]
+fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
+    let case = "xlang_backstage";
+    let web = common::fixture_repo(
+        case,
+        "ts-backstage-web",
+        Some("https://example.com/backstage/web.git"),
+    );
+    for (fixture, origin) in [
+        ("ts-backstage-api", "https://example.com/backstage/api.git"),
+        (
+            "ts-backstage-other",
+            "https://example.com/backstage/other.git",
+        ),
+    ] {
+        common::fixture_repo(case, fixture, Some(origin));
+    }
+    let export: serde_json::Value =
+        serde_json::from_str(&Engine::open(&web).unwrap().export().unwrap()).unwrap();
+    let vias: std::collections::BTreeMap<&str, Option<&str>> = export["consumers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| {
+            let site = c["site"].as_str().unwrap();
+            (site.split("::").nth(2).unwrap(), c["via"].as_str())
+        })
+        .collect();
+    let expected = [
+        ("viaGetString", Some("env:API_URL")),
+        ("viaOptional", Some("env:OPT_URL")),
+        ("viaLocalFile", Some("env:LOCAL_URL")),
+        ("literalValue", None),
+        ("missingKey", None),
+        // Another pack's config file (`application.yaml`) is no Backstage config.
+        ("notAppConfig", None),
+    ];
+    for (function, via) in expected {
+        assert_eq!(vias.get(function), Some(&via), "{function}");
+    }
+
+    let links: Vec<(&str, &str, &str)> = export["links"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|l| l["consumer"].as_str().unwrap().contains("viaGetString"))
+        .map(|l| {
+            (
+                l["provider"].as_str().unwrap(),
+                l["level"].as_str().unwrap(),
+                l["reason"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        links,
+        [(
+            "example.com/backstage/api::src/server.ts::GET /orders",
+            "inferred",
+            "base URL from API_URL, a base_url_env of peer example.com/backstage/api"
+        )]
+    );
+}
+
+/// A Python service reads a base URL from a pydantic-settings field (#619): the read is
+/// `<env_prefix><FIELD>`, or the field's `alias`, which the peer's `base_url_env` maps, so two
+/// providers of the route no longer leave the link `ambiguous`. A class that is not a
+/// `BaseSettings` subclass keeps the host unresolved.
+#[test]
+fn a_pydantic_settings_field_is_the_variable_it_reads() {
+    let case = "xlang_py_settings";
+    let web = common::fixture_repo(
+        case,
+        "py-settings-web",
+        Some("https://example.com/pysettings/web.git"),
+    );
+    for (fixture, origin) in [
+        ("py-settings-api", "https://example.com/pysettings/api.git"),
+        (
+            "py-settings-other",
+            "https://example.com/pysettings/other.git",
+        ),
+    ] {
+        common::fixture_repo(case, fixture, Some(origin));
+    }
+    let export: serde_json::Value =
+        serde_json::from_str(&Engine::open(&web).unwrap().export().unwrap()).unwrap();
+    let links = |function: &str| -> Vec<(String, String, String)> {
+        (export["links"].as_array().unwrap().iter())
+            .filter(|l| {
+                l["consumer"]
+                    .as_str()
+                    .unwrap()
+                    .ends_with(&format!("::{function}"))
+                    || l["consumer"]
+                        .as_str()
+                        .unwrap()
+                        .contains(&format!("::{function}::"))
+            })
+            .map(|l| {
+                ["provider", "level", "reason"]
+                    .map(|k| l[k].as_str().unwrap().to_string())
+                    .into()
+            })
+            .collect()
+    };
+    for (function, variable) in [
+        ("via_prefix", "APP_API_URL"),
+        ("via_alias", "ORDERS_URL"),
+        ("no_default", "APP_REQUIRED"),
+        ("validation_alias", "BOTH_URL"),
+    ] {
+        let found = links(function);
+        assert_eq!(found.len(), 1, "{function}: {found:?}");
+        assert_eq!(found[0].0, "example.com/pysettings/api::server.py::orders");
+        assert_eq!(found[0].1, "inferred");
+        assert_eq!(
+            found[0].2,
+            format!("base URL from {variable}, a base_url_env of peer example.com/pysettings/api")
+        );
+    }
+    let plain = [links("not_settings"), links("class_var")].concat();
+    assert!(
+        !plain.is_empty() && plain.iter().all(|l| l.1 == "ambiguous"),
+        "{plain:?}"
+    );
 }

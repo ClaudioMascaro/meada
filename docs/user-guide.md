@@ -1034,15 +1034,45 @@ atribui o nome de novo. As funções do objeto literal de um `const` do topo def
 | Consumidor | `fetch` global, e uma chamada a um parâmetro cujo padrão é `fetch` |
 | Provedor | Next.js (app router: arquivos de rota) e Express |
 
-No Express, uma rota vale sob cada prefixo em que o roteador é montado (`use`, `Router()`). Um
-prefixo ou um caminho com uma parte ilegível (um buraco de template literal, um parâmetro, uma
+No Express, uma rota vale sob cada prefixo em que o roteador é montado (`use`, `Router()`). O
+`Router()` de `express-promise-router` (o padrão dos plugins de backend do Backstage) vale como o
+`express.Router()`. Um prefixo ou um caminho com uma parte ilegível (um buraco de template literal, um parâmetro, uma
 leitura de ambiente) não gera rota, e um roteador montado só sob um prefixo assim fica sem prefixo
 algum. Um `:id` literal continua sendo parâmetro. Nenhum cliente além do `fetch` é lido: `axios`,
 `got` e `XMLHttpRequest` não geram consumidor.
 
+No Backstage, o roteador que um plugin de backend entrega ao `httpRouter` (`httpRouter.use(r)`,
+com o `httpRouter` vindo de `coreServices.httpRouter` nos `deps` do `registerInit`) vale sob
+`/api/<pluginId>`, o caminho em que o framework o monta, quando o `createBackendPlugin`, importado
+de um pacote `@backstage/`, escreve o `pluginId` como literal ou como uma `const` do mesmo arquivo
+ligada a um literal. Um plugin cujo `pluginId` não se lê assim (uma leitura de ambiente, um
+import) deixa o roteador na raiz, como antes, e o `meada status` aponta o plugin. Do lado do
+consumidor, uma URL que começa por `discovery.getBaseUrl('<id>')` (numa constante ou escrito na
+própria URL) começa em `/api/<id>`, e o motivo da ligação nomeia o plugin e essa montagem; uma URL
+sem host de uma rota que a montagem de um plugin do mesmo repositório serve também o nomeia.
+
+O plugin `proxy` do Backstage vale pela tabela `proxy.endpoints` de um `app-config*.yaml` do
+repositório: uma URL que começa por `/api/proxy/<endpoint>` (também a que
+`discovery.getBaseUrl('proxy')` somada a `/<endpoint>` escreve) é uma chamada ao `target` desse
+endpoint, e o resto da URL segue o alvo. Um `target` que é exatamente `${VAR}` liga pelo
+`base_url_env` do par, e o motivo nomeia a variável e o endpoint; um `target` que é uma URL
+`http://` ou `https://` literal vale como o host (com o seu caminho). Qualquer outro `target` (um
+texto em volta da variável, um valor padrão) deixa a chamada sem ligação, e o `meada status` aponta
+o endpoint e quantas chamadas passam por ele. Um `pathRewrite` que só tira o endpoint (uma regra,
+`'^/api/proxy/<endpoint>': ''`, ou `'^/api/proxy/<endpoint>/': '/'` para uma URL com caminho) é o
+que o proxy faz de qualquer jeito, então o resto da URL segue para o alvo; qualquer outro
+`pathRewrite` (outra substituição, várias regras) é lido como um `target` ilegível: sem ligação, e
+o `meada status` aponta. `ignorePath`, `prependPath: false` e um endpoint a que os arquivos
+`app-config*.yaml` dão valores diferentes (não se sabe qual deles o deploy carrega) são lidos do
+mesmo jeito.
+
 **Ambiente.** `process.env.X`, `process.env["X"]` e `import.meta.env.X`, sozinhos ou passando por
 métodos de texto como `trim()`, `replace(...)` e `toLowerCase()`. A URL que começa por uma leitura
-assim liga pelo `base_url_env` do par. Arquivos `.env` não são lidos.
+assim liga pelo `base_url_env` do par. Arquivos `.env` não são lidos. O mesmo vale para a
+leitura de configuração do Backstage, `config.getString('a.b')` ou `config.getOptionalString('a.b')`,
+quando algum `app-config*.yaml` do repositório guarda `a.b: ${VAR}` (o `app-config.yaml` primeiro, e
+vale o primeiro arquivo que tem a chave): a leitura é a variável `VAR`. Um valor literal ou uma
+chave que nenhum arquivo tem deixam a base sem resolver.
 
 **Manifestos.** `package.json` (`name`, `version`, os quatro campos de dependências, `exports`,
 `types`, `module` e `main`) e `tsconfig.json` (`paths`, `baseUrl`, `outDir`, `rootDir`). Veja o
@@ -1105,6 +1135,9 @@ ele declara ou `src`) aos arquivos abaixo dele, e é por elas que um `import` en
 **Ambiente.** `os.environ["X"]`, `os.environ.get("X")` e `os.getenv("X")` (também `environ` e
 `getenv` soltos, casados como escritos e não pelos imports), sozinhos ou num buraco de f-string,
 com fallback `or`, com argumento padrão e com métodos de texto como `strip` e `replace`.
+O campo `f` de uma subclasse de `BaseSettings` (pydantic-settings) do mesmo arquivo é a variável
+`<env_prefix><F>` em maiúsculas, ou o `alias` / `validation_alias` quando existe; uma classe que
+não é `BaseSettings` não é lida.
 
 **Manifestos.** `pyproject.toml` (`[project]` e `[tool.poetry]`, incluindo `[project.scripts]`) e
 `requirements*.txt`. Veja o PyPI na seção 8.5.
@@ -1161,7 +1194,10 @@ A base de um cliente resty é o argumento de `SetBaseURL`.
 
 **Ambiente.** `os.Getenv` e `os.LookupEnv`, inclusive o padrão escrito com `if v == ""`,
 `len(v) == 0`, `!ok` ou `!ok || v == ""` quando o `ok` vem do mesmo `os.LookupEnv`, e depois
-`strings.TrimSuffix`, `TrimRight` e `TrimSpace`.
+`strings.TrimSuffix`, `TrimRight` e `TrimSpace`. Um campo de struct com a tag `env:"X"`
+(cleanenv, caarlos0/env) ou `envconfig:"X"` (kelseyhightower/envconfig) é a leitura de `X` onde
+o campo é lido (`cfg.API.URL`), com structs aninhados, quando o struct é declarado no mesmo
+arquivo.
 
 **Manifestos.** `go.mod` (`module`, `require`, `replace`). `go.sum` não é lido. Veja o Go na
 seção 8.5.

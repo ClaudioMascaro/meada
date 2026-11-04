@@ -176,6 +176,20 @@ assert "environment" not in poc["proxy"] and "Caddyfile.accounts" in mounted("pr
 for profile in [local, generations]:
     assert "MEADA_TOKEN" in profile["services"]["proxy"]["environment"]
     assert "Caddyfile" in {pathlib.Path(m["source"]).name for m in profile["services"]["proxy"]["volumes"] if m["type"] == "bind"}
-assert "MEADA_TOKEN" in (DEPLOY / "Caddyfile").read_text()
+
+
+def listen_port(services, alias):
+    """The --listen port of the backend the proxy reaches as `alias`."""
+    backend = next(s for s in services.values() if alias in ((s.get("networks") or {}).get("default") or {}).get("aliases", []))
+    return backend["command"][backend["command"].index("--listen") + 1].rsplit(":", 1)[1]
+
+
+# The main proxy, in every profile: loopback only, the exact token matcher, the upstream port the backends listen on.
+main_caddyfile = (DEPLOY / "Caddyfile").read_text()
+assert '@admitted header Authorization "Bearer {$MEADA_TOKEN}"' in main_caddyfile, "the exact token matcher"
+for services in [local["services"], generations["services"], console, postgres, proposals, poc]:
+    assert services["proxy"]["ports"][0]["host_ip"] == "127.0.0.1", "the proxy listens on loopback only"
+    upstream = f"reverse_proxy backend-one:{listen_port(services, 'backend-one')} backend-two:{listen_port(services, 'backend-two')}"
+    assert upstream in (caddyfile if services is poc else main_caddyfile), upstream
 assert "accounts" not in "".join(console_bootstrap) and "accounts" not in "".join(node_bootstrap)
 print("compose-check: local accounts profile, key pair, manifests, proxy and order passed")

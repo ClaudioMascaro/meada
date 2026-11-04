@@ -36,6 +36,19 @@ via = ["src/orders.ts::cancelOrder"]     # optional: the symbols that do the acc
 Every writer links to every reader of the same resource in another repository, at the level
 `declared`. Without `via`, or when no `via` matches a symbol, the side is the whole repository.
 
+A route only a test file registers (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`,
+`*_test.py`, a `tests` or `__tests__` directory, `src/test` in JVM) is no provider of the
+repository: a test's router or fake upstream serves nothing, and counting it would make the
+client repository look like a provider of the route it consumes. The test code stays indexed,
+with its calls and symbols. To keep those routes as providers, set the key at the top of
+`meada.toml`:
+
+```toml
+test_routes = true                       # optional: routes registered in test files serve
+```
+
+The key counts only in the repository's own `meada.toml` (a workspace manifest entry has none) and only for HTTP routes; a route is a test's by the file where its handler is defined.
+
 Meada finds peers by their git remote, even when the clone sits at a different path on each
 machine. An unknown or misspelled key gives an error naming the file, the line and the key.
 Without a `meada.toml`, the repository declares no peers.

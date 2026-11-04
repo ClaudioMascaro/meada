@@ -69,7 +69,9 @@ entries per library of the HTTP and channel kinds. The architecture map keeps th
   type `?` when it is not read): a literal by position, of a type not read or not known, or of
   a type that declares no such field, a value that is not traced, a field written through a
   selector anywhere (`Code::field_written`), or one met again while it is followed, makes the
-  base unknown, and so does a `SetBaseURL` called through a field. Wrapper climbing is
+  base unknown, and so does a `SetBaseURL` called through a field. A field read as a request
+  (`s.req.Get(..)`, no `R()` before it) holds a request only through a traced one or a value
+  written as `resty.Request`: untraced there, or written through a selector, it is no request. Wrapper climbing is
   `Code::expand`, as for every kind. A package `var` another file of the package assigns, or any
   file of the repository writes through a selector (`pkg.X = ..`, `&pkg.X`, `pkg.X++`: any write
   to a field called `X`, whatever it belongs to), is `Unknown` (`Resolver::redeclared`, read from

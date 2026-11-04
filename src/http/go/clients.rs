@@ -224,10 +224,13 @@ impl<'c, 'a> Clients<'c, 'a> {
     }
 
     /// The clients the struct field `field` holds: those of the values every composite literal
-    /// of the repository gives it. Unknown when a literal sets it to a value that is not traced
-    /// or that the source does not tell, when it is written through a selector anywhere
-    /// (`x.rc = ..`), or when it is met again while it is followed. `None` when no literal sets
-    /// it.
+    /// of the repository gives it. `None` when no literal sets it. A field read as a client is
+    /// Unknown when a literal sets it to a value that is not traced or that the source does not
+    /// tell, when it is written through a selector anywhere (`x.rc = ..`), or when it is met again
+    /// while it is followed. A field read as a request (`request`: `s.repo.Get(..)` with no `R()`
+    /// before it) holds a request only through a traced one or a value written as resty's
+    /// `Request`: untraced there is a repository, a cache or a Kubernetes client, not "maybe
+    /// resty", so those cases hold nothing (the cycle and depth guards stay Unknown).
     fn held(&self, field: Field<'a>, depth: usize, request: bool) -> Held<'a> {
         if depth >= CLIENT_DEPTH {
             return Some(vec![Client::Unknown]);
@@ -241,13 +244,15 @@ impl<'c, 'a> Clients<'c, 'a> {
             false => self.code.field_values(field),
         };
         let found = match values {
+            None if request => Some(Vec::new()),
             None => Some(vec![Client::Unknown]),
             Some(values) if values.is_empty() => None,
             Some(values) => {
                 let mut out = Vec::new();
                 for (path, scope, value) in values {
                     let clients = self.reaches(path, scope, value, depth + 1, request);
-                    let untraced = clients.is_empty() || clients.contains(&Client::Typed);
+                    let untraced =
+                        clients.contains(&Client::Typed) || (clients.is_empty() && !request);
                     let clients = clients.into_iter().map(|client| match client {
                         Client::Made(made, through, _) => Client::Made(made, through, true),
                         Client::Typed => Client::Unknown,
@@ -613,5 +618,50 @@ mod tests {
         // Past the file's budget the base is never claimed (the request itself may be absent).
         let past = held(crate::resolve::EVAL_BUDGET);
         assert!(past.iter().all(|(_, via)| via.is_none()), "{past:?}");
+    }
+
+    #[test]
+    fn a_resty_verb_on_a_field_that_is_no_traced_request_is_no_consumer() {
+        let src = "package x\n\nimport (\n\t\"context\"\n\t\"sigs.k8s.io/controller-runtime/pkg/client\"\n)\n\n\
+            type Repo interface {\n\tGet(ctx context.Context, id string) (string, error)\n\
+            \tDelete(ctx context.Context, id string) error\n\tPatch(ctx context.Context, id, v string) error\n}\n\n\
+            type Service struct {\n\trepo Repo\n\tk8s client.Client\n}\n\n\
+            func New(repo Repo, k8s client.Client) *Service { return &Service{repo: repo, k8s: k8s} }\n\n\
+            func (s *Service) Show(ctx context.Context, id string) (string, error) { return s.repo.Get(ctx, id) }\n\
+            func (s *Service) Remove(ctx context.Context, id string) error { return s.repo.Delete(ctx, id) }\n\
+            func (s *Service) Edit(ctx context.Context, id string) error { return s.repo.Patch(ctx, id, \"v\") }\n\
+            func (s *Service) Pod(ctx context.Context, k client.ObjectKey, o client.Object) error { return s.k8s.Get(ctx, k, o) }\n";
+        assert_eq!(requests(src), []);
+        // The control: a repository passed as a parameter.
+        let control = src.replace("s.repo.Get(ctx, id)", "repo.Get(ctx, id)");
+        assert_eq!(requests(&control), []);
+    }
+
+    #[test]
+    fn a_request_field_written_through_a_selector_is_no_consumer() {
+        // The ceiling of #621: the field's declared type is not read.
+        let src = format!(
+            "{HEAD}\ntype T struct {{ req *resty.Request }}\n\n\
+             func (t *T) Set(r *resty.Request) {{ t.req = r }}\n\n\
+             func (t *T) Go() {{ t.req.Get(\"/s\") }}\n"
+        );
+        assert_eq!(requests(&src), []);
+    }
+
+    #[test]
+    fn a_request_held_in_a_field_keeps_its_consumer() {
+        let held = |literal: &str| {
+            requests(&format!(
+                "{HEAD}\ntype T struct {{ req *resty.Request }}\n\n\
+                 func f(r *resty.Request) *T {{ return &T{{req: {literal}}} }}\n\n\
+                 func (t *T) Go() {{ t.req.Get(\"/s\") }}\n"
+            ))
+        };
+        assert_eq!(
+            held(&format!("{BASE}.R()")),
+            sent(Some("host:deep.example.com"))
+        );
+        // A request that only its type tells is a request with no known base.
+        assert_eq!(held("r"), sent(None));
     }
 }

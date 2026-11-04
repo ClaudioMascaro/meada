@@ -132,6 +132,12 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether the globs giving one name combine into `ambiguous` (Rust: two globs that both
+    /// give a name are E0659, so only `cfg` alternatives reach here). Implied by `unordered_globs`.
+    fn combines_globs(&self) -> bool {
+        self.unordered_globs()
+    }
+
     /// Whether a static import of a type (`import static a.B.*;`) takes the members its bases
     /// declare too. C#'s `using static T` takes only those `T` declares: inherited members
     /// aren't imported.
@@ -300,10 +306,15 @@ const PACKS: &[&dyn LanguagePack] = &[
 ];
 
 /// Whether a file named `file` is one a `**/` name of `config_files` names (`pattern`, past
-/// the `**/`): that name, or for `*.ext` any name ending so.
+/// the `**/`): that name, for `*.ext` any name ending so, and for `start*.ext` any name with
+/// that start and ending (`app-config*.yaml`: `app-config.yaml`, `app-config.local.yaml`).
 pub fn names_config(pattern: &str, file: &str) -> bool {
-    match pattern.strip_prefix('*') {
-        Some(ending) => file.len() > ending.len() && file.ends_with(ending),
+    match pattern.split_once('*') {
+        Some((start, ending)) => {
+            // `*.ext` needs a name before the extension; `start*.ext` may match `start.ext`.
+            let shortest = start.len() + ending.len() + usize::from(start.is_empty());
+            file.len() >= shortest && file.starts_with(start) && file.ends_with(ending)
+        }
         None => file == pattern,
     }
 }
@@ -534,6 +545,10 @@ pub struct Facts {
     /// even a module imported `testable` keeps to itself.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub confined: Vec<String>,
+    /// The constructors only their own class calls (Kotlin's `private`), as the family member
+    /// that builds: the class's name for a primary one, `C.C(types)` for a secondary one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sealed: Vec<String>,
     /// The compilations (`unit`) whose `private` declarations the file sees, which
     /// `LanguagePack::join` sets (Swift's `testable` imports, as the modules they name here).
     /// Not kept in the index: it is joined again.
@@ -834,8 +849,9 @@ pub struct Def {
     /// the index (see `Call::args`).
     #[serde(skip)]
     pub returns: Option<Ty>,
-    /// The names of a function's type parameters in order (`get<T>`). Not kept in the index.
-    #[serde(skip)]
+    /// The names of a function's or type's type parameters in order (`get<T>`). Kept in the
+    /// index: Swift's join reads them from every file of its pack, kept or parsed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub type_params: Vec<String>,
     /// The class a function's written return type names (`Self`, `Store`, a trait of `impl
     /// Trait`), as a callee-like name resolved from the function's own scope: what a call to
@@ -910,11 +926,17 @@ pub enum Closure {
     /// It may: a function type, a type parameter, or a pack that does not tell.
     #[default]
     Takes,
-    /// It may not: any other written type, a named one outside the repository included.
+    /// It may not: any other written type, and a name the pack reads as no function type (a type
+    /// of the repository, a standard value type).
     Refuses,
+    /// Written as a name the pack cannot read: a type from outside the repository, which may be
+    /// an alias of a function type. A call that fits only if it takes the trailing closure is
+    /// never `exact`, and never absent (`Closure::Unknown` fits as `Fit::Maybe`).
+    Unknown,
     /// Written as this name, which `LanguagePack::join` reads among the repository's aliases of
     /// a function type (Swift's `typealias Handler = (Int) -> Void`): `Takes` when one is so
-    /// named, else `Refuses`. The resolver reads one left as `Takes`.
+    /// named, `Refuses` for a type the repository declares or a standard value type, else
+    /// `Unknown`. The resolver reads one left as `Takes`.
     Named(String),
 }
 
@@ -1366,9 +1388,13 @@ fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
 
 // Tree-sitter helpers every pack uses.
 
+/// The named children of `node`, tree-sitter extras (comments) left out: a comment inside a
+/// parameter or argument list is no parameter and no argument, and must not take a position.
+/// An `ERROR` node the grammar recovered with is an extra too, and stays (the Java pack reads one).
 pub(crate) fn named<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
     let mut cursor = node.walk();
-    node.named_children(&mut cursor)
+    (node.named_children(&mut cursor))
+        .filter(|n| !n.is_extra() || n.is_error())
         .collect::<Vec<_>>()
         .into_iter()
 }
@@ -1385,6 +1411,96 @@ fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
+
+    /// What a pack reads of positions: each definition's parameters, each call's arity, labels
+    /// and argument counts. A comment inside a parameter or argument list changes none of it
+    /// (#613); only ranges, which a comment shifts, are left out.
+    fn positions(pack: &dyn super::LanguagePack, path: &str, src: &str) -> Vec<String> {
+        let facts = pack.parse(path, src.as_bytes()).unwrap();
+        let defs = facts.defs.iter().map(|d| {
+            let params = serde_json::to_string(&d.params).unwrap();
+            format!("def {} {params}", d.name)
+        });
+        let calls = facts.calls.iter().map(|c| {
+            let labels = serde_json::to_string(&c.labels).unwrap();
+            let (args, kwargs) = (c.args.len(), c.kwargs.len());
+            format!("call {} {:?} {labels} {args} {kwargs}", c.callee, c.arity)
+        });
+        defs.chain(calls).collect()
+    }
+
+    /// A line comment first in a parameter list and an argument list, and a block comment between
+    /// two of them, in each pack: the facts equal those of the source without comments.
+    #[test]
+    fn a_comment_in_a_parameter_or_argument_list_takes_no_position() {
+        use super::LanguagePack;
+        // (path, pack, source with a placeholder `#` for each comment)
+        let cases: [(&str, &dyn LanguagePack, &str); 8] = [
+            (
+                "x.go",
+                &super::go::Go,
+                "package x\nfunc f(# a int, # b int) {}\nfunc g() { f(# 1, # 2) }\n",
+            ),
+            (
+                "x.rs",
+                &super::rust::Rust,
+                "fn f(# a: i32, # b: i32) {}\nfn g() { f(# 1, # 2) }\n",
+            ),
+            (
+                "X.java",
+                &super::java::Java,
+                "class X { void f(# int a, # int b) {} void g() { f(# 1, # 2); } }\n",
+            ),
+            (
+                "x.kt",
+                &super::kotlin::Kotlin,
+                "fun f(# a: Int, # b: Int) {}\nfun g() { f(# 1, # 2) }\n",
+            ),
+            (
+                "x.swift",
+                &super::swift::Swift,
+                "func f(# a: Int, # b: Int) {}\nfunc g() { f(# a: 1, # b: 2) }\n",
+            ),
+            (
+                "x.py",
+                &super::python::Python,
+                "def f(# a, # b): pass\ndef g(): f(# 1, # 2)\n",
+            ),
+            (
+                "x.ts",
+                &super::ts::TsJs,
+                "function f(# a, # b) {}\nfunction g() { f(# 1, # 2) }\n",
+            ),
+            (
+                "X.cs",
+                &super::csharp::CSharp,
+                "class X { void F(# int a, # int b) {} void G() { F(# 1, # 2); } }\n",
+            ),
+        ];
+        let comments = ["// first\n", "/* middle */"];
+        let python = ["# first\n", ""];
+        for (path, pack, template) in cases {
+            let [first, middle] = if path.ends_with(".py") {
+                python
+            } else {
+                comments
+            };
+            // `#` stands for the first comment at each opening and the middle one after the comma.
+            let mut with = String::new();
+            for (i, part) in template.split('#').enumerate() {
+                with.push_str(part);
+                if i + 1 < template.split('#').count() {
+                    with.push_str(if part.ends_with('(') { first } else { middle });
+                }
+            }
+            let without = template.replace('#', "");
+            assert_eq!(
+                positions(pack, path, &with),
+                positions(pack, path, &without),
+                "{path}"
+            );
+        }
+    }
 
     /// Every `&[&str]` or `[&str; N]` table a pack holds, as `file:NAME` below `src/lang`, with
     /// its class
@@ -1415,8 +1531,10 @@ mod tests {
         ("rust/values.rs:KEEPS", "runtime"),
         ("rust/values.rs:KEEPS_NAMES", "runtime"),
         ("rust/values.rs:METHOD_CRATES", "exception"),
+        ("swift.rs:VALUE_TYPES", "runtime"),
         ("swift/values.rs:STRING_METHODS", "runtime"),
         ("ts.rs:BODIES", "syntax"),
+        ("ts.rs:CONFIG_READS", "exception"),
         ("ts.rs:EXTENSIONS", "syntax"),
         ("ts.rs:FUNCTIONS", "syntax"),
         ("ts.rs:STRING_METHODS", "runtime"),

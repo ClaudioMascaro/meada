@@ -9,6 +9,7 @@ use crate::entry::EntryKind;
 use crate::index::{self, Consumer, Export as IndexExport, Gateway, Indexed, Provider};
 use crate::lang::{Depends, Part, Value, literal, property};
 use crate::literals::Literals;
+use crate::msg::Msg;
 use crate::resolve::Code;
 use crate::shape::{self, Shape};
 use crate::workspace::Repository;
@@ -21,6 +22,8 @@ mod python;
 mod rust;
 mod swift;
 mod ts;
+#[cfg(test)]
+pub(crate) use ts::app_config_probe;
 
 pub use meada_core::http::{PARAM, normalize_path};
 
@@ -112,6 +115,11 @@ fn fetches(args: &[Value]) -> Option<Vec<Read>> {
 /// language's reader writes it.
 const CLIENT_VIA: &str = "client:";
 
+/// What a consumer's `via` holds between how it names the provider's repository and the proxy
+/// endpoint its URL went through (`env:API_URL through proxy endpoint /api`): the reason of its
+/// link names the endpoint.
+const PROXY_VIA: &str = " through proxy endpoint ";
+
 /// The mark of the default's reading of `${X:default}` (`fetches`), after its `host:` `via`.
 const DEFAULT: &str = "|default";
 
@@ -169,6 +177,51 @@ fn fragments(parts: &[Part]) -> Vec<String> {
     (path.split(GAP).filter(|f| !f.is_empty()))
         .map(str::to_string)
         .collect()
+}
+
+/// Whether a repository-relative `path` is a test file by its language's convention: `*_test.go`,
+/// `*.test.*` and `*.spec.*`, `test_*.py` and `*_test.py`, a `tests` or `__tests__` directory
+/// and a JVM `src/test` tree.
+// ponytail: only the conventions the ticket names (#620), not `*Test.java` or `*Tests.cs`; add
+// one when a repository needs it, or let it set `test_routes`.
+fn is_test_file(path: &str) -> bool {
+    let parts: Vec<&str> = path.split('/').collect();
+    let Some((name, dirs)) = parts.split_last() else {
+        return false;
+    };
+    let named = name.ends_with("_test.go")
+        || name.contains(".test.")
+        || name.contains(".spec.")
+        || (name.starts_with("test_") && name.ends_with(".py"))
+        || name.ends_with("_test.py");
+    named
+        || dirs.iter().any(|d| matches!(*d, "tests" | "__tests__"))
+        || dirs.windows(2).any(|w| w == ["src", "test"])
+}
+
+/// Drops the providers whose site is in a test file, and the route entry points of those sites:
+/// a test builds a router or a fake upstream to exercise the code, it serves nothing. The
+/// site is where the handler is defined, so a route a test registers with a handler of the
+/// repository's own code stays a provider. A document's route is not read here.
+fn drop_test_providers(repo: &Repository, export: &mut IndexExport) {
+    let in_test = |site: &str| {
+        let own = site
+            .strip_prefix(repo.identity.as_str())
+            .and_then(|s| s.strip_prefix("::"));
+        own.and_then(|s| s.split("::").next())
+            .is_some_and(is_test_file)
+    };
+    let mut dropped = HashSet::new();
+    export.providers.retain(|p| {
+        let keep = route(&p.contract).is_none() || !in_test(&p.site);
+        if !keep {
+            dropped.insert(format!("{}::{}", p.site, p.contract));
+        }
+        keep
+    });
+    export
+        .entry_points
+        .retain(|e| !dropped.contains(&e.identity));
 }
 
 /// The method and path of an HTTP contract identifier: `("GET", "/users/{}")`.
@@ -581,8 +634,11 @@ impl ContractKind for Http {
         let mut found = Vec::new();
         // One reader of each shape source for the whole extraction: each budget per file once.
         let mut literals = Literals::default();
-        found.extend(ts::consumers(code, &mut literals));
-        found.extend(ts::providers(code, &mut literals));
+        let mut consumers = ts::consumers(code, indexed, &mut literals);
+        let (providers, mounted) = ts::providers(code, &mut literals);
+        ts::name(&mut consumers, &mounted);
+        found.extend(consumers);
+        found.extend(providers);
         found.extend(python::consumers(code));
         found.extend(rust::providers(code));
         found.extend(go::providers(code));
@@ -618,6 +674,9 @@ impl ContractKind for Http {
     /// adds those of the documents listing it. The hosts of every HTTP provider are the
     /// `[serve]` hosts and the hosts of every document's servers.
     fn declare(&self, repo: &Repository, export: &mut IndexExport) {
+        if !repo.config.test_routes {
+            drop_test_providers(repo, export);
+        }
         let serve = &repo.config.serve;
         let code: HashSet<String> = (export.providers.iter())
             .map(|p| p.contract.clone())
@@ -702,7 +761,13 @@ impl ContractKind for Http {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
         };
-        let via = consumer.via.as_deref();
+        // The proxy endpoint a URL went through, which the reason names.
+        let (via, endpoint) = match consumer.via.as_deref().map(|v| v.split_once(PROXY_VIA)) {
+            Some(Some((via, endpoint))) => (Some(via), Some(endpoint)),
+            _ => (consumer.via.as_deref(), None),
+        };
+        let through = endpoint.map(|e| format!(" through the proxy endpoint {e}"));
+        let through = through.as_deref().unwrap_or_default();
         // A route serves a consumer by its code path, or by its gateway path with the reason
         // for the rewrite. Within one repository a code path match wins over gateway path
         // matches; across repositories both are candidates.
@@ -726,41 +791,46 @@ impl ContractKind for Http {
         let peers: Vec<&str> = var
             .map(|var| from.config.peers_reading(var).collect())
             .unwrap_or_default();
-        let (fits, level, reason): (Vec<_>, _, _) =
-            if let Some(host) = via.and_then(|v| v.strip_prefix("host:")) {
-                let fits = serving
-                    .filter(|(_, p, _)| p.hosts.iter().any(|h| h.eq_ignore_ascii_case(host)))
-                    .collect();
-                (fits, Level::Exact, format!("host {host} is served by"))
-            } else if let (Some(var), false) = (var, peers.is_empty()) {
-                let fits = serving
-                    .filter(|(m, ..)| peers.contains(&m.identity.as_str()))
-                    .collect();
-                (
-                    fits,
-                    Level::Inferred,
-                    format!("base URL from {var}, a base_url_env of peer"),
-                )
-            } else {
-                // The host is unresolved: a relative URL, an unknown base, or a variable no
-                // peer names. Exactly one repository serving the route is enough.
-                let fits: Vec<_> = serving.collect();
-                let mut repos: Vec<&str> = fits.iter().map(|(m, ..)| m.identity.as_str()).collect();
-                repos.sort();
-                repos.dedup();
-                // A client that names itself says so (`CLIENT_VIA`).
-                let client = via.and_then(|v| v.strip_prefix(CLIENT_VIA));
-                let why = match (var, client) {
-                    (Some(var), _) => format!("base URL from {var}, no peer's base_url_env"),
-                    (None, Some(client)) => format!("host unresolved ({client})"),
-                    (None, None) => "host unresolved".to_string(),
-                };
-                let reason = match repos.len() {
-                    1 => format!("{why}; the only repository serving it is"),
-                    _ => format!("{why}; served by"),
-                };
-                (fits, Level::Inferred, reason)
+        let (fits, level, reason): (Vec<_>, _, _) = if let Some(host) =
+            via.and_then(|v| v.strip_prefix("host:"))
+        {
+            let fits = serving
+                .filter(|(_, p, _)| p.hosts.iter().any(|h| h.eq_ignore_ascii_case(host)))
+                .collect();
+            (
+                fits,
+                Level::Exact,
+                format!("host {host}{through} is served by"),
+            )
+        } else if let (Some(var), false) = (var, peers.is_empty()) {
+            let fits = serving
+                .filter(|(m, ..)| peers.contains(&m.identity.as_str()))
+                .collect();
+            (
+                fits,
+                Level::Inferred,
+                format!("base URL from {var}{through}, a base_url_env of peer"),
+            )
+        } else {
+            // The host is unresolved: a relative URL, an unknown base, or a variable no
+            // peer names. Exactly one repository serving the route is enough.
+            let fits: Vec<_> = serving.collect();
+            let mut repos: Vec<&str> = fits.iter().map(|(m, ..)| m.identity.as_str()).collect();
+            repos.sort();
+            repos.dedup();
+            // A client that names itself says so (`CLIENT_VIA`).
+            let client = via.and_then(|v| v.strip_prefix(CLIENT_VIA));
+            let why = match (var, client) {
+                (Some(var), _) => format!("base URL from {var}{through}, no peer's base_url_env"),
+                (None, Some(client)) => format!("host unresolved ({client})"),
+                (None, None) => "host unresolved".to_string(),
             };
+            let reason = match repos.len() {
+                1 => format!("{why}; the only repository serving it is"),
+                _ => format!("{why}; served by"),
+            };
+            (fits, Level::Inferred, reason)
+        };
         let ambiguous = fits.len() > 1;
         fits.iter()
             .map(|(repo, provider, gateway)| {
@@ -799,6 +869,31 @@ impl ContractKind for Http {
     /// the route it consumes.
     fn calls_from_definition(&self) -> bool {
         true
+    }
+
+    /// The Backstage plugins whose routers stay at the root for want of a literal `pluginId`
+    /// (#615), and the proxy endpoints whose target is not read (#616), with their calls.
+    fn status(&self, repo: &Repository, export: &IndexExport, _links: &[Link]) -> Vec<String> {
+        let prefix = format!("{}::", repo.identity);
+        let mut lines: Vec<String> = (export.unmounted.iter())
+            .map(|site| {
+                let site = site.strip_prefix(&prefix).unwrap_or(site);
+                Msg::BackstageUnmounted { site }.text()
+            })
+            .collect();
+        let mut unread = std::collections::BTreeMap::new();
+        for endpoint in export
+            .consumers
+            .iter()
+            .filter_map(|c| ts::unread(c.via.as_deref()?))
+        {
+            *unread.entry(endpoint).or_insert(0) += 1;
+        }
+        lines.extend(
+            (unread.into_iter())
+                .map(|(endpoint, calls)| Msg::BackstageProxyTarget { endpoint, calls }.text()),
+        );
+        lines
     }
 
     /// The drift of the links, once the decisions are replayed (`drift`).
@@ -878,6 +973,35 @@ mod tests {
             let found = super::fetches(&[url, text("GET")]).unwrap();
             assert_eq!(found[0].contract.as_deref(), Some("http::GET::/a"));
             assert_eq!(found[0].via, None);
+        }
+    }
+
+    #[test]
+    fn test_files_follow_each_languages_conventions() {
+        for path in [
+            "client/client_test.go",
+            "src/orders.test.ts",
+            "src/orders.spec.js",
+            "web/__tests__/orders.ts",
+            "app/test_api.py",
+            "app/api_test.py",
+            "tests/api.rs",
+            "svc/tests/it/main.rs",
+            "svc/src/test/java/example/A.java",
+        ] {
+            assert!(super::is_test_file(path), "{path}");
+        }
+        for path in [
+            "main.go",
+            "src/orders.ts",
+            "src/contest.ts",
+            "app/testing.py",
+            "app/latest_api.py",
+            "src/main/java/example/A.java",
+            "src/testdata/a.go",
+            "mytests/a.go",
+        ] {
+            assert!(!super::is_test_file(path), "{path}");
         }
     }
 

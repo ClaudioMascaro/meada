@@ -11,7 +11,17 @@ this file, and a change to these modules updates it.
   the message libraries of each language): the
   `ContractKind` trait and the HTTP kind (`http.rs`: the contract and path rules, the mount
   machinery and the shared consumer readers; one submodule per language: `http/ts.rs` and
-  `http/ts/clients.rs`, Express and Next.js route-file providers and `fetch` consumers;
+  `http/ts/clients.rs`, Express and Next.js route-file providers and `fetch` consumers, with
+  `http/ts/backstage.rs` mounting each Backstage backend plugin's router at `/api/<pluginId>` (a
+  mount node per `createBackendPlugin` call in Express's `Mounts`) and folding a
+  `discovery.getBaseUrl('<id>')` base to `/api/<id>` (a `client:` `via`, so the reason names
+  it; `backstage::name` gives the same `via` to a hostless consumer of a route a plugin's mount
+  serves, from the routes `ts::providers` reports as mounted; a plugin whose `pluginId` is
+  neither a literal nor a `const` of the file bound to one is a `Role::Unmounted` row that
+  `Http::status` reports; `http/ts/config.rs` reads the `proxy.endpoints` of `app-config*.yaml`
+  (#616): a URL that starts with `/api/proxy/<ep>` is rewritten to the endpoint's `target`, the
+  consumer's `via` keeping the endpoint after `PROXY_VIA` for the reason, and an endpoint whose
+  target is not read gives the `client:` `via` that `backstage::unread` finds for `status`);
   `http/python.rs` and `http/python/clients.rs`, FastAPI, Flask and Django providers and the
   requests, httpx and aiohttp consumers, whose rows also list reqwest and ureq; `http/rust.rs`
   and `http/rust/axum.rs`, actix-web, Rocket and axum providers; `http/go.rs` and
@@ -29,6 +39,10 @@ this file, and a change to these modules updates it.
   contracts (specs #22, #24, #30, #25, #26, #28 and #29), the shared steps and one module per ecosystem behind
   the `Ecosystem` trait (spec #225).
 
+- `http.rs` `declare` first drops the providers whose site is in a test file (`is_test_file`,
+  #620) and the route entry points of those sites, unless `meada.toml` has `test_routes = true`
+  (`Config::test_routes`, a top-level key a workspace manifest entry does not carry). It runs at
+  query time, so the key needs no reindex; the test code stays indexed.
 - `contract.rs`: `ContractKind` trait, the whole interface of a kind: `prefix`, `extract` and
   `link` are required, every other question (see "New contract kind" in the architecture map)
   has a default body. The engine fixes the phase order (every `declare`, every `workspace_step`,
@@ -89,7 +103,7 @@ this file, and a change to these modules updates it.
   contract). That link is `inferred` with the form's reason (`gateway prefix <p>`, `gateway
   strip <s>` or both), read from the provider, not recomputed from the configuration; within
   one repository a code path match wins over gateway path matches. An app or router
-  (Express `express()`, `Router()`; FastAPI `FastAPI()`, `APIRouter()`; Flask `Flask()`,
+  (Express `express()`, `Router()`, and the default import of `express-promise-router` under any name; FastAPI `FastAPI()`, `APIRouter()`; Flask `Flask()`,
   `Blueprint()`) is the call creating it (axum's `Router::new()`, read by `http::rust::axum`: `route`,
   `nest` and `merge` calls on a receiver chain that `Code::origins` follows through
   `Call::receiver` where `LanguagePack::fluent` is true, a method router `get(a).post(b)` or
@@ -183,7 +197,7 @@ this file, and a change to these modules updates it.
   read on the left, no other variable on the right), a default argument (ignored, unless it
   reads another variable) and string methods (`strip`, `rstrip`, `replace`, ...). A leading
   `Part::Env` is `via = env:X` in `http::locate`, linked through `base_url_env`; Meada never
-  reads the value. Java (#89): `System.getenv("X")` is a `Part::Env` in the pack, and a Spring
+  reads the value. A pydantic-settings field is a `Settings.field` constant holding its `Part::Env` (`settings_consts`, #619). Java (#89): `System.getenv("X")` is a `Part::Env` in the pack, and a Spring
   `@Value("${key}")` field or constructor parameter holds what `jvm/spring.rs` reads of the
   module's `application.properties`, `application.yml` or `application.yaml` (the module of the
   main source root a Maven or Gradle build declares for the file, else of its `src/main/`)

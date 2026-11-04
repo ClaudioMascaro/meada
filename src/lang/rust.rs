@@ -84,6 +84,10 @@ impl LanguagePack for Rust {
         self.parse_with(path, src, "")
     }
 
+    fn combines_globs(&self) -> bool {
+        true
+    }
+
     fn parse_with(&self, _path: &str, src: &[u8], setting: &str) -> Result<Facts> {
         parse(src, setting)
     }

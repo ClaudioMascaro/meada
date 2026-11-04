@@ -333,6 +333,7 @@ pub struct Resolver<'a> {
     assigned_members: bool,
     guesses_constructs: bool,
     unordered_globs: bool,
+    combines_globs: bool,
     qualified_types: bool,
     /// The pack's `LanguagePack::static_imports_inherit`.
     static_imports_inherit: bool,
@@ -342,6 +343,8 @@ pub struct Resolver<'a> {
     /// The types each file of a compilation keeps to it (`Facts::private` of a file with a
     /// `Facts::unit`), for `hidden`.
     internal: HashMap<&'a str, HashSet<&'a str>>,
+    /// The constructors each file keeps to their own class (`Facts::sealed`).
+    sealed: HashMap<&'a str, HashSet<&'a str>>,
     /// The names of each file with some (`Facts::confined`).
     confined: HashMap<&'a str, HashSet<&'a str>>,
     /// The names some file of the repository writes through a selector (`cfg.Base = ..`): a
@@ -508,15 +511,28 @@ impl<'a> Arity<'a> {
 
     /// `fits` for a call whose form `on_receiver` tells, only when the function takes its
     /// receiver as a first parameter, and whose labels, when it writes them, the parameters
-    /// take (`labelled`).
-    fn fits_call(self, args: Args, on_receiver: &dyn Fn() -> bool) -> bool {
+    /// take (`fit`).
+    fn fits_call(self, args: Args, on_receiver: &dyn Fn() -> bool) -> Fit {
         let arity = args.count + usize::from(self.receiver && on_receiver());
-        self.fits(arity)
-            && (args.awaited || !self.suspends)
-            && args
-                .labels
-                .is_none_or(|labels| labelled(self.params, labels))
+        if !self.fits(arity) || !(args.awaited || !self.suspends) {
+            return Fit::No;
+        }
+        args.labels
+            .map_or(Fit::Yes, |labels| fit(self.params, labels))
     }
+}
+
+/// Whether a call fits a function. A candidate that is `Maybe` is never `exact`.
+#[derive(Clone, Copy, PartialEq)]
+enum Fit {
+    /// The call does not fit, whatever a parameter of a type Meada cannot read
+    /// (`Closure::Unknown`) takes.
+    No,
+    /// It fits only if such a parameter takes the call's trailing closure.
+    Maybe,
+    /// It fits, and the parameters take the same arguments whether such a parameter takes the
+    /// trailing closure or not.
+    Yes,
 }
 
 /// What a call gives the function it reaches to fit (`Arity::fits_call`): its argument count
@@ -544,12 +560,30 @@ impl<'c> Args<'c> {
 // ponytail: real calls pass a handful of arguments; this keeps a crafted one cheap.
 const LABELLED_CELLS: usize = 1 << 16;
 
+/// `fit` as a yes or no, for a caller whose parameters are read from a manifest and never
+/// `Closure::Unknown`.
+pub(crate) fn labelled(params: &[Param], labels: &[String]) -> bool {
+    fit(params, labels) != Fit::No
+}
+
 /// Whether parameters with labels (`Param::label`, `_` when none) take the arguments of a call
 /// with `labels` (`labelled_args`). A parameter without a label (another language's) takes
-/// whatever it is given.
-pub(crate) fn labelled(params: &[Param], labels: &[String]) -> bool {
-    (!params.is_empty() && params.iter().all(|p| p.label.is_none()))
-        || labelled_args(params, labels).is_some()
+/// whatever it is given. A parameter of a type Meada cannot read (`Closure::Unknown`) makes the
+/// fit `Maybe` when the call fits only if it takes the trailing closure: the arguments each
+/// parameter takes differ between reading it as one that refuses and one that takes.
+fn fit(params: &[Param], labels: &[String]) -> Fit {
+    if !params.is_empty() && params.iter().all(|p| p.label.is_none()) {
+        return Fit::Yes;
+    }
+    let sure = labelled_args(params, labels);
+    if !params.iter().any(|p| p.closure == Closure::Unknown) {
+        return if sure.is_some() { Fit::Yes } else { Fit::No };
+    }
+    match (sure, labelled_args_as(params, labels, true)) {
+        (_, None) => Fit::No,
+        (Some(sure), Some(maybe)) if sure == maybe => Fit::Yes,
+        _ => Fit::Maybe,
+    }
 }
 
 /// The argument (an index into `labels`) each parameter takes when parameters with labels take
@@ -560,6 +594,21 @@ pub(crate) fn labelled(params: &[Param], labels: &[String]) -> bool {
 /// left out, else any that accepts one. `None` when the call does not fit, or weighs more than
 /// `LABELLED_CELLS`.
 fn labelled_args(params: &[Param], labels: &[String]) -> Option<Vec<Option<usize>>> {
+    labelled_args_as(params, labels, false)
+}
+
+/// `labelled_args`, reading a parameter of `Closure::Unknown` as one that takes a trailing closure
+/// (`unknown_takes`) or as one that refuses it.
+fn labelled_args_as(
+    params: &[Param],
+    labels: &[String],
+    unknown_takes: bool,
+) -> Option<Vec<Option<usize>>> {
+    let refuses = |p: &Param| match p.closure {
+        Closure::Refuses => true,
+        Closure::Unknown => !unknown_takes,
+        Closure::Takes | Closure::Named(_) => false,
+    };
     let skips = |p: &Param| matches!(p.binds, Binds::Optional | Binds::Rest);
     // The ends of the arguments `p` may take from the `j`th on: one of its label, then for a
     // variadic one the unlabelled ones after it.
@@ -570,7 +619,7 @@ fn labelled_args(params: &[Param], labels: &[String]) -> Option<Vec<Option<usize
         if first != p.label.as_deref().unwrap_or("_") && !first.is_empty() {
             return j..j;
         }
-        if first.is_empty() && p.closure == Closure::Refuses {
+        if first.is_empty() && refuses(p) {
             return j..j;
         }
         let mut k = j + 1;
@@ -823,6 +872,10 @@ impl<'a> Resolver<'a> {
             .filter(|(_, facts)| !facts.confined.is_empty())
             .map(|(path, facts)| (*path, facts.confined.iter().map(String::as_str).collect()))
             .collect();
+        let sealed = (files.iter())
+            .filter(|(_, facts)| !facts.sealed.is_empty())
+            .map(|(path, facts)| (*path, facts.sealed.iter().map(String::as_str).collect()))
+            .collect();
         let locals = files
             .iter()
             .map(|(path, facts)| (*path, facts.locals.iter().map(String::as_str).collect()))
@@ -924,6 +977,7 @@ impl<'a> Resolver<'a> {
             assigned_members: language.assigned_members(),
             guesses_constructs: language.guesses_constructs(),
             unordered_globs: language.unordered_globs(),
+            combines_globs: language.combines_globs(),
             qualified_types: language.qualified_types(),
             static_imports_inherit: language.static_imports_inherit(),
             namespaced: language.namespaced(),
@@ -932,6 +986,7 @@ impl<'a> Resolver<'a> {
             consts,
             internal,
             confined,
+            sealed,
             locals,
             receivers,
             params,
@@ -1253,7 +1308,9 @@ impl<'a> Resolver<'a> {
         };
         let binding = match binding {
             Binding::Several(all) if constructs => {
-                let classes: Vec<_> = all.into_iter().filter(|t| self.is_class(*t)).collect();
+                let classes: Vec<_> = (all.into_iter())
+                    .filter(|t| self.is_class(*t) && !self.sealed_from(call.scope.as_str(), *t))
+                    .collect();
                 match classes[..] {
                     [] => return Resolution::Unresolved,
                     [one] => Binding::Def(one),
@@ -1285,6 +1342,14 @@ impl<'a> Resolver<'a> {
                     .collect();
                 all.sort();
                 all.dedup();
+                // A `private` constructor is the class's own to call (Kotlin).
+                all.retain(|t| !self.sealed_from(call.scope.as_str(), *t));
+                let absent = match absent {
+                    Binding::Def(t) if self.sealed_from(call.scope.as_str(), t) => {
+                        return Resolution::Unresolved;
+                    }
+                    absent => absent,
+                };
                 // An initializer the type's compilation keeps to itself is no candidate from
                 // another one, as a member is not (`accessible`).
                 match all.is_empty() {
@@ -1324,7 +1389,7 @@ impl<'a> Resolver<'a> {
             Binding::Def(t) => Resolution::Exact(t),
             // A call's result is read from an exact target alone (`result_of`): no name match.
             _ if !matching => Resolution::Unresolved,
-            Binding::Several(all) => Resolution::Ambiguous(all),
+            Binding::Several(all) => one_of(all),
             Binding::External(..) => Resolution::Unresolved,
             Binding::Unknown if self.owned_outside(path, call) || self.lacks(path, call) => {
                 Resolution::Unresolved
@@ -1430,7 +1495,7 @@ impl<'a> Resolver<'a> {
         }
         let bare = head.is_none() && self.members_in_scope;
         let on_receiver = || self.on_receiver(path, call);
-        let all = self.candidates(
+        let mut all = self.candidates(
             path,
             callee,
             call.by_path,
@@ -1438,6 +1503,8 @@ impl<'a> Resolver<'a> {
             bare,
             &on_receiver,
         );
+        // A `private` constructor is the class's own to call (Kotlin), by name too.
+        all.retain(|t| !self.sealed_from(scope, *t));
         let mut written = false;
         // A type from outside the repository the receiver is of (`outside_type`).
         let mut outside = None;
@@ -1569,7 +1636,7 @@ impl<'a> Resolver<'a> {
                 );
                 match self.narrow(found, Args::of(call), &|| self.on_receiver(path, call)) {
                     Binding::Def(t) => narrowed(t, all.len().max(1)),
-                    Binding::Several(several) => Resolution::Ambiguous(several),
+                    Binding::Several(several) => one_of(several),
                     _ => Resolution::Unresolved,
                 }
             }
@@ -1705,15 +1772,27 @@ impl<'a> Resolver<'a> {
         on_receiver: &dyn Fn() -> bool,
     ) -> Binding<'a> {
         let Some(args) = args else { return binding };
-        let fits =
-            |t: &Target<'a>| (self.arities.get(t)).is_none_or(|n| n.fits_call(args, on_receiver));
+        let fit = |t: &Target<'a>| {
+            (self.arities.get(t)).map_or(Fit::Yes, |n| n.fits_call(args, on_receiver))
+        };
         match binding {
-            Binding::Def(t) if !fits(&t) => Binding::Unknown,
-            Binding::Several(all) => match all.into_iter().filter(fits).collect::<Vec<_>>()[..] {
-                [] => Binding::Unknown,
-                [one] => Binding::Def(one),
-                ref several => Binding::Several(several.to_vec()),
+            Binding::Def(t) => match fit(&t) {
+                Fit::No => Binding::Unknown,
+                // A lone candidate that may not fit is a name match (`one_of`), never `exact`.
+                Fit::Maybe => Binding::Several(vec![t]),
+                Fit::Yes => Binding::Def(t),
             },
+            Binding::Several(all) => {
+                let kept: Vec<_> = (all.into_iter())
+                    .map(|t| (fit(&t), t))
+                    .filter(|(fit, _)| *fit != Fit::No)
+                    .collect();
+                match kept[..] {
+                    [] => Binding::Unknown,
+                    [(Fit::Yes, one)] => Binding::Def(one),
+                    _ => Binding::Several(kept.into_iter().map(|(_, t)| t).collect()),
+                }
+            }
             found => found,
         }
     }
@@ -2977,7 +3056,9 @@ impl<'a> Resolver<'a> {
             found.retain(|t| !self.hidden(path, *t));
         }
         if let Some(args) = args {
-            found.retain(|t| (self.arities.get(t)).is_none_or(|n| n.fits_call(args, on_receiver)));
+            found.retain(|t| {
+                (self.arities.get(t)).is_none_or(|n| n.fits_call(args, on_receiver) != Fit::No)
+            });
         }
         // A file whose calls reach no extension function (Java's) matches none by name either.
         if !self.extending.contains(path) {
@@ -3371,6 +3452,19 @@ impl<'a> Resolver<'a> {
         from.internals.contains(&at.unit)
     }
 
+    /// Whether `t` is a `private` constructor (`Facts::sealed`) of a class a call in `scope` is
+    /// not inside, nested classes and the companion included.
+    fn sealed_from(&self, scope: &str, t: Target) -> bool {
+        if !(self.sealed.get(t.path)).is_some_and(|s| s.contains(t.name)) {
+            return false;
+        }
+        let class = match self.defs[t.path][t.name].kind {
+            Kind::Class => t.name,
+            _ => crate::parent(t.name),
+        };
+        !(scope == class || scope.starts_with(&format!("{class}.")))
+    }
+
     /// Whether `t` is, or is declared in, a type its file keeps to its compilation
     /// (`Facts::private` of a file with a `Facts::unit`: C#'s `internal` types, and their non-public
     /// constructors and methods) and `path` is
@@ -3753,7 +3847,7 @@ impl<'a> Resolver<'a> {
                     | Binding::External(..)
                     | Binding::Module(_)
             ) {
-                match (self.unordered_globs, *inside) {
+                match (self.combines_globs, *inside) {
                     (false, _) => return Some(found),
                     (true, true) if inside_found.is_empty() && self.own_glob(path, target) => {
                         return Some(found);
@@ -7562,6 +7656,26 @@ mod tests {
         let params = [labelled_param("_", any), refusing("animation", optional)];
         assert_eq!(labelled_args(&params, &strings(&["_", ""])), None);
         assert!(labelled_args(&params, &strings(&["_"])).is_some());
+        // A parameter of a type Meada cannot read (`Closure::Unknown`) fits a trailing closure
+        // only maybe, and anything else as a sure one does.
+        let unknown = |label: &str, binds| Param {
+            closure: Closure::Unknown,
+            ..labelled_param(label, binds)
+        };
+        let params = [labelled_param("_", any), unknown("completion", any)];
+        assert!(fit(&params, &strings(&["_", ""])) == Fit::Maybe);
+        assert!(fit(&params, &strings(&["_", "completion"])) == Fit::Yes);
+        assert!(fit(&params, &strings(&["_"])) == Fit::No);
+        // A later parameter that takes the closure and cannot be left out is the one it fills.
+        let params = [
+            labelled_param("_", any),
+            unknown("animation", optional),
+            labelled_param("body", any),
+        ];
+        assert!(fit(&params, &strings(&["_", ""])) == Fit::Yes);
+        let params = [labelled_param("_", any), unknown("animation", optional)];
+        assert!(fit(&params, &strings(&["_", ""])) == Fit::Maybe);
+        assert!(fit(&params, &strings(&["_"])) == Fit::Yes);
         // A call too wide to weigh fits nothing.
         let wide = |n: usize| -> (Vec<Param>, Vec<String>) {
             (
@@ -8481,6 +8595,11 @@ mod tests {
 
     /// What each call resolves to, by `file scope callee`.
     fn calls(files: &[(&'static str, &str)]) -> BTreeMap<String, String> {
+        calls_with(files, false)
+    }
+
+    /// `calls`, an ambiguous one followed by its candidates when `candidates`.
+    fn calls_with(files: &[(&'static str, &str)], candidates: bool) -> BTreeMap<String, String> {
         let parsed = parsed(files);
         let map: BTreeMap<&str, &Facts> = parsed.iter().map(|(p, f)| (*p, f)).collect();
         let resolver = resolver(&map);
@@ -8491,6 +8610,13 @@ mod tests {
                     Resolution::Exact(t) => format!("exact {}::{}", t.path, t.name),
                     Resolution::Inferred(t) | Resolution::Narrowed(t) => {
                         format!("inferred {}::{}", t.path, t.name)
+                    }
+                    Resolution::Ambiguous(all) if candidates => {
+                        let all: Vec<_> = all
+                            .iter()
+                            .map(|t| format!("{}::{}", t.path, t.name))
+                            .collect();
+                        format!("ambiguous {}", all.join(" "))
                     }
                     Resolution::Ambiguous(_) => "ambiguous".to_string(),
                     Resolution::Unresolved => "none".to_string(),
@@ -8519,7 +8645,8 @@ mod tests {
     #[test]
     fn a_name_a_glob_reaches_past_the_limit_is_taken_from_no_other_glob() {
         // `x()` in `main.rs`, where the latest glob reaches `x` through `n` modules, each
-        // re-exporting it from the next by a glob or by name, and an earlier glob gives `x` too.
+        // re-exporting it from the next by a glob or by name, and an earlier glob gives `x` too (so
+        // within the limit it is ambiguous, past it nothing is exact).
         let x = |n: usize, by_name: bool| {
             let mut files = vec![("main.rs".to_string(), String::new())];
             let mut main = String::from("mod near;\n");
@@ -8544,7 +8671,8 @@ mod tests {
             calls(&files)["main.rs main x"].clone()
         };
         for by_name in [false, true] {
-            assert_eq!(x(3, by_name), "exact m3.rs::x", "by name: {by_name}");
+            // Rust combines the two globs that give `x`.
+            assert_eq!(x(3, by_name), "ambiguous", "by name: {by_name}");
             let past = x(3 * LINK_DEPTH, by_name);
             assert!(!past.starts_with("exact"), "by name: {by_name}: {past}");
         }
@@ -8756,9 +8884,45 @@ mod tests {
                 "pub struct Def;\nimpl Def { pub fn new() -> Self { Def } }\npub fn free() {}\n",
             ),
         ]);
-        // The latest glob, for both.
-        assert_eq!(found["main.rs m.f Def.new"], "exact y.rs::Def.new");
-        assert_eq!(found["main.rs m.f free"], "exact y.rs::free");
+        // Both globs give the names (only `cfg` alternatives get here): ambiguous.
+        assert!(found["main.rs m.f Def.new"].starts_with("ambiguous"));
+        assert!(found["main.rs m.f free"].starts_with("ambiguous"));
+    }
+
+    #[test]
+    fn two_pub_use_globs_giving_one_name_are_ambiguous_with_both_candidates() {
+        let found = calls_with(
+            &[
+                (
+                    "main.rs",
+                    "mod x;\nmod y;\nmod m { pub use crate::x::*; pub use crate::y::*; }\n\
+                 mod user { use crate::m::*; fn f() { free(); } }\n",
+                ),
+                ("x.rs", "pub fn free() {}\n"),
+                ("y.rs", "pub fn free() {}\n"),
+            ],
+            true,
+        );
+        assert_eq!(
+            found["main.rs user.f free"],
+            "ambiguous x.rs::free y.rs::free"
+        );
+    }
+
+    #[test]
+    fn an_item_or_use_beside_two_globs_still_wins() {
+        let found = calls(&[
+            (
+                "main.rs",
+                "mod x;\nmod y;\nmod m { use crate::x::*; use crate::y::*; use crate::x::free;\n\
+             fn f() { free(); } }\n\
+             mod n { use crate::x::*; use crate::y::*; fn free() {}\nfn f() { free(); } }\n",
+            ),
+            ("x.rs", "pub fn free() {}\n"),
+            ("y.rs", "pub fn free() {}\n"),
+        ]);
+        assert_eq!(found["main.rs m.f free"], "exact x.rs::free");
+        assert_eq!(found["main.rs n.f free"], "exact main.rs::n.free");
     }
 
     #[test]
@@ -11619,6 +11783,54 @@ mod kotlin_tests {
             }
         }
         out
+    }
+
+    /// A `private` constructor, primary or secondary, is its class's to call (#455): from
+    /// another class the call resolves to nothing, from a method or the companion it is
+    /// `exact`. An `internal` one is not enforced (`docs/agents/ceilings.md`).
+    #[test]
+    fn a_private_constructor_is_called_from_inside_its_class_alone() {
+        let found = resolved(&[(
+            "p/A.kt",
+            "package p
+class P private constructor(val n: Int) {
+    fun again() = P(1)
+    companion object { fun make() = P(2) }
+}
+class S {
+    private constructor(n: Int) {}
+    constructor() : this(1)
+    fun again() = S(1)
+}
+class I internal constructor(val n: Int)
+class Q private constructor(val n: Int) {
+    constructor() : this(1)
+    class N { fun go() = Q(1) }
+}
+fun top() = P(1)
+class Out {
+    fun go() { P(1); S(1); I(1); Q() }
+    fun one() = Q(1)
+}
+",
+        )]);
+        let get = |key: &str| {
+            found
+                .get(key)
+                .unwrap_or_else(|| panic!("{key} in {found:?}"))
+        };
+        assert_eq!(get("p/A.kt p.Out.go() P"), "none");
+        assert_eq!(get("p/A.kt p.Out.go() S"), "none");
+        assert_eq!(get("p/A.kt p.P.again() P"), "exact p/A.kt::p.P");
+        assert_eq!(get("p/A.kt p.P.Companion.make() P"), "exact p/A.kt::p.P");
+        assert_eq!(get("p/A.kt p.S.again() S"), "exact p/A.kt::p.S.S(Int)");
+        // A public secondary beside a private primary stays callable; a nested class is inside.
+        assert_eq!(get("p/A.kt p.Out.go() Q"), "exact p/A.kt::p.Q.Q()");
+        assert_eq!(get("p/A.kt p.Q.N.go() Q"), "exact p/A.kt::p.Q");
+        assert_eq!(get("p/A.kt p.Out.one() Q"), "none");
+        // From a top-level function too: no name match to the class (turbine's `unexpectedEvent`).
+        assert_eq!(get("p/A.kt p.top() P"), "none");
+        assert!(get("p/A.kt p.Out.go() I").starts_with("exact"), "{found:?}");
     }
 
     /// `val v{i} = v{i + 1}.C()` through star imports, Kotlin's: the class of each local is

@@ -7,6 +7,32 @@ a ticket accepted, each with its value and its reason. Detail behind the
 
 ## Known ceilings
 
+- `http.rs` (`is_test_file`, `drop_test_providers`, #620): a route is a test's by where its
+  handler is defined, so a test registering a handler of the repository's own code
+  (`mux.HandleFunc("GET /orders", realHandler)` in a `_test.go`) leaves it a provider; and only the
+  conventions the ticket names are test files (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`,
+  `*_test.py`, `tests/`, `__tests__/`, `src/test/`), not `*Test.java`, `*Tests.cs` or
+  `conftest.py`, nor a singular `test/` or a `spec/` directory, `*.e2e-spec.ts` apart from `*.spec.*`,
+  Swift's `Tests/` (the match is case-sensitive), Go `testdata/` or Gradle `src/integrationTest`.
+  A fake defined in a non-test helper file stays a provider. Channel providers and every other
+  kind are untouched. `test_routes = true` keeps every one.
+- `lang/kotlin.rs`, `resolve.rs` (#455): only `private` constructors are enforced (`Facts::sealed`,
+  primary or secondary: callable from the class's own scope, its companion and nested classes
+  included). `internal` is not enforced: an `internal` class or constructor is visible
+  repository-wide, since the Kotlin pack has no module unit (`Facts::unit`: Gradle module or
+  source set), so `Foo()` of an `internal` class of another module can still resolve. A class
+  with a `private` primary and public secondary constructors keeps the secondaries as
+  candidates.
+  A call `C(..)` from outside that Kotlin answers with the companion's `operator fun invoke`
+  (turbine's `TurbineAssertionError`, whose primary is `private`) resolves to nothing, not to
+  `Companion.invoke`: the resolver reads no `invoke` operator.
+- Rust globs: a name two `use m::*;` globs give is `ambiguous` between them (#439). Meada does not
+  evaluate `cfg`, so `#[cfg(a)] use x::*; #[cfg(not(a))] use y::*;` reads as two globs and the
+  call stays `ambiguous` though only one compiles.
+- `lang/ts.rs` (#457): a call to `send` inside `exports.send = function () {}` resolves to
+  `exports.send` itself, not to a top-level `function send`: the resolver's scope walk reads the
+  symbol `exports.send` as `send` in the scope `exports`, as it does `use()` inside
+  `app.use = function use() {}`.
 - `names.rs`, `http/csharp.rs`, `channel/java.rs` (#466): two cases are not pinned.
   (1) #358: a Rabbit `convertAndSend("orders", o)` whose `o` is a parameter of a type the
   repository does not declare (`void f(Order o)`) reads as the named producer `amqp orders
@@ -200,7 +226,7 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   symbol and a callee is `(navigation_expression)`); `QUALIFICATION_BYTES` (4 MiB) bounds the
   enclosing-name bytes a file's definitions, calls and bindings store, past which the file
   keeps no facts and `Facts::budget`, which `meada status` names; `ALIAS_DEPTH` (16) bounds the aliases of aliases of a function type `join`
-  follows (`function_aliases`), past which a parameter written as one takes no trailing closure.
+  follows (`function_aliases`), past which a parameter written as one is `Closure::Unknown`.
   The pack's unit tests exceed each. Beyond the limits, what the pack leaves out
   (spec #29, #117): a target's `sources:` and `exclude:`, a closure,
   deinitializer, subscript or accessor (their calls and locals are the enclosing symbol's, so
@@ -209,8 +235,11 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   parameter's type (#118), a typed local of a nested block, closure or accessor (a name match
   where Java and C# keep it function-wide), a `typealias` as a symbol, one written in a type
   seen from another file (its extensions included), an outside alias of a function type
-  (`Ext.Handler`, which takes no trailing closure, as the brief of #411 decides for every
-  outside name), and the protocols a conformed protocol inherits when the conformance is
+  (`Ext.Handler`: a parameter written as an outside name is `Closure::Unknown`, so a call that
+  fits an overload only through its trailing closure is `inferred` or `ambiguous`, never `exact`,
+  #456; a name the repository declares as a type or a standard value type, `VALUE_TYPES`,
+  refuses it, and a `typealias` of a type of the repository is read as an outside name), and the
+  protocols a conformed protocol inherits when the conformance is
   written on an extension. As in Java, an outside base the pack does not list among its known outside members (`NSObject`, `View`) keeps a type's own
   overloads from `exact`, and a listed one (`Codable`, a raw value type) the names it declares.
 - `http/swift/client.rs`: `CLIENT_DEPTH` (8) bounds the locals, properties and constants followed
@@ -1087,7 +1116,13 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   inside literals written without their type sets the fields of a type not read. Only the
   libraries of the table (`net/http`, resty v2 and v3, `resty.dev`) are
   clients; a client assigned more than once, one held in a map, a slice or a channel, or an
-  interface, is untraced and its requests are no consumer. A `fmt.Sprintf` format with a verb
+  interface, is untraced and its requests are no consumer. A resty verb called on a struct field
+  with no `R()` before it (`s.repo.Get(..)`, #621) is a request only when a literal gives the
+  field a traced request or a value written as `resty.Request`; a field of another type, or one
+  written through a selector, is no request (the field's declared type is not read), so a
+  `*resty.Request` field set only that way, or from a helper outside the repository
+  (`&T{req: sdk.NewReq()}`), loses its consumer; a field met again while it is followed still
+  gives an unknown request. A `fmt.Sprintf` format with a verb
   other than `%s`, `%d` and `%v`, a count of verbs and values that differ, a `var` assigned
   anywhere but its declaration (or written through a selector), fold to nothing: the consumer is
   unresolved (no marker). A verb with flags, width or precision is a hole, and so is `%d` of
@@ -1635,7 +1670,26 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   resource or Rocket instance) is not read.
 - `http/ts.rs`: `router.route(path)` chains and `require` are not followed. A route path or
   prefix that depends on a parameter is not read through callers (it yields no route;
-  `http.rs` `path_literal`, for every framework). `http/python.rs`: a FastAPI
+  `http.rs` `path_literal`, for every framework). `http/ts/backstage.rs` (#615): a backend
+  plugin mounts its routers under `/api/<pluginId>` only when `createBackendPlugin` is imported
+  from a `@backstage/` package and writes `pluginId` as a string literal or as a `const` of the
+  same file bound to one; any other `pluginId` (an environment read, an import, a parameter,
+  a `const` bound to another `const`)
+  mounts nothing, so its routers stay at the root, and `meada status` names the plugin
+  (`Msg::BackstageUnmounted`). Only
+  what `register` itself gives `<dep>.use(...)` is read, `<dep>` a `deps` key of a `registerInit`
+  written in `register` and bound to `coreServices.httpRouter`: a helper `register` calls and a
+  renamed destructured `httpRouter` (`{ httpRouter: r }`) are not followed, and such a plugin,
+  like one whose `register` is not a function written in place, is neither mounted nor named by
+  `meada status`. On the consumer side only
+  a URL whose first part is `<x>.getBaseUrl('<literal>')`, held by a constant or written in
+  place as the first call of the `fetch`, folds to `/api/<literal>`, and only when the receiver's
+  last name holds `discovery` (`discovery`, `this.discovery`, `discoveryApi`; by name, not by
+  type): another receiver, a base passed as a parameter and a non-literal id leave the base
+  unknown. A
+  hostless call names a plugin in its reason only for a route that plugin's mount serves in the
+  consumer's own repository (`backstage::name`); in another repository it links as any hostless
+  URL does. `http/python.rs`: a FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else
   mounts. Django: one `include()` whose argument cannot be read leaves no root URLconf; the
   walk reads at most `URLCONF_BUDGET` (2^15) entries over every root and `include()` (a
@@ -1733,3 +1787,40 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   what the modules of its repository it depends on pass on up to `MODULE_DEPTH` (32) modules
   deep (`package/maven.rs`); a module's parent pom adds nothing to what it passes on, and a
   Gradle dependency passes nothing on.
+
+- A Go struct field tagged `env:"X"` or `envconfig:"X"` reads `X` only when its struct is declared
+  in the same file as the read, and a selector matches it by its field path (`cfg.API.URL` is
+  `API.URL`) whatever the variable's type: an untagged field of another struct with the same path
+  is read as `X` too, a path two tags read differently is no read, and a named struct type nested
+  in another is not followed, nor is an embedded struct's promoted field; a package-level selector
+  (`config.URL`) whose tail matches a tagged path reads as `X` too; the key prefixes of the
+  libraries (`env-prefix`, `envPrefix`, envconfig's `Process("app")`) are not applied; nesting past
+  64 levels is not read (#618).
+
+- Backstage proxy endpoints (#616, `http/ts/config.rs`): a `fetch` URL whose leading literal text
+  is `/api/proxy/<ep>` (also what `getBaseUrl('proxy')` folds to), `<ep>` an endpoint of
+  `proxy.endpoints` in the `app-config*.yaml` files (the lookup of the configuration reads
+  above), the longest matching endpoint, followed by `/`, `?`, `#` or the end of the URL. Only
+  the `target` form is read: the string shorthand (`'/ep': 'https://...'`) and a `|` in an
+  endpoint name are not. A target that is exactly `${VAR}` is the variable, one that is
+  a literal `http(s)://` URL is the host (a trailing `/` dropped, its path kept); any other
+  target (`${VAR}/v2`, `${VAR:-default}`, a URL with a placeholder) leaves the URL as written, with a
+  `client:` `via` the link's reason shows, and `meada status` names the endpoint and its calls.
+  A `pathRewrite` is followed only when it is the one rule that strips the endpoint
+  (`'^/api/proxy/<ep>': ''`, or `'^/api/proxy/<ep>/': '/'`, which strips only a path that starts
+  with `/`) and the endpoint is plain text in a regex (letters, digits, `/`, `-`, `_`); any other
+  (another replacement, several rules, a regex character in the endpoint) makes the target
+  unread, so the call stays unlinked and `meada status` names it, as do `ignorePath`,
+  `prependPath: false` and an endpoint key two `app-config*.yaml` files give different values. A
+  rule with a null replacement, and a `pathRewrite: {}` or `null`, are not in the flattened keys
+  and read as no rule (Backstage's default, the strip, is assumed). The other options (`allowedMethods`,
+  headers) are not read. Only a consumer in the repository holding the `app-config` is rewritten
+  (#616).
+- Backstage configuration reads (#617, `CONFIG_READS` in `lang/ts.rs`, read by `http/ts/config.rs`): `config.getString('a.b')`
+  and `getOptionalString('a.b')` with a literal key are read from the `app-config*.yaml` files of
+  the repository, `app-config.yaml` first and the first file holding the key winning, whatever
+  their directory: profiles are not merged and a monorepo's apps share one lookup. A value that is
+  not exactly `${VAR}` (a literal, `${VAR:-default}`, text around the placeholder), a key no file
+  holds and a read passed in from another file's wrapper leave the base unresolved. The pack reads the call by its member name alone, so the receiver is
+  not checked: a `getString` of another library with a key a config holds reads the same.
+- pydantic-settings reads (#619, `settings_consts` in `lang/python.rs`): a field of a `BaseSettings` subclass is read as `<env_prefix><FIELD>` uppercased or its literal `alias` / `validation_alias`, with `env_prefix` a literal of `model_config = SettingsConfigDict(...)` or an inner `class Config`. A base class defined in another file, inherited settings, an instance a function returns (`@lru_cache def get_settings(): return Settings()`), `AliasChoices`, `case_sensitive` and `env_nested_delimiter` leave the base unresolved or read the unprefixed name.

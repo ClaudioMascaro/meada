@@ -39,6 +39,19 @@ Cada escritor enlaza con cada lector del mismo recurso en otro repositorio, en e
 `declared`. Sin `via`, o si ningún `via` corresponde a un símbolo, el lado es el repositorio
 entero.
 
+Una ruta que solo registra un archivo de prueba (`*_test.go`, `*.test.*`, `*.spec.*`,
+`test_*.py`, `*_test.py`, un directorio `tests` o `__tests__`, `src/test` en JVM) no es
+proveedora del repositorio: un enrutador o un upstream falso de prueba no sirve nada, y contarlo
+haría que el repositorio cliente pareciera proveedor de la ruta que consume. El código de prueba
+sigue indexado, con sus llamadas y símbolos. Para conservar esas rutas como proveedoras, activa
+la clave en la raíz de `meada.toml`:
+
+```toml
+test_routes = true                       # opcional: las rutas registradas en archivos de prueba sirven
+```
+
+La clave solo cuenta en el `meada.toml` del propio repositorio (una entrada del manifiesto de workspace no la tiene) y solo para rutas HTTP; una ruta es de prueba por el archivo donde se define su handler.
+
 Meada encuentra los pares por su remoto git, aunque el clon esté en otra ruta en cada máquina.
 Una clave desconocida o mal escrita da un error con el archivo, la línea y la clave. Sin
 `meada.toml`, el repositorio no declara ningún par.

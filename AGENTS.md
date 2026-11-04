@@ -35,6 +35,9 @@ write tools; one index per repository; determinism) live in
   `cargo clippy --all-targets --features <f> -- -D warnings` and `cargo test --features <f>` (CI's
   `clippy-features` matrix runs the clippy half for every feature alone and for the pairs the code
   gates on).
+- Before a change is called done, `/prove-meada` runs on it and the PR body's Evidence section
+  names its receipt (`.prove-it/runs/`, kept out of git); a change whose diff reaches a surface of
+  the skill's Scope table is not done on a BROKEN verdict.
 - `.githooks/` runs part of the gate locally: `cargo fmt --check` and no em dash in staged
   Markdown on commit; on push, a check against the maintainer's private-term list. Enable it
   once per clone with `git config core.hooksPath .githooks`.
@@ -89,7 +92,10 @@ Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents
 
 ### Vendored skills
 
-The `mattpocock/skills` set lives in `.agents/skills/` (linked from `.claude/skills/`), pinned by
-`.agents/skills-lock.json`: a skill whose `tree` differs from `upstreamTree` carries a local
-adjustment. After staging an edit to a skill, set its `tree` to
-`git rev-parse $(git write-tree):.agents/skills/<name>`.
+The `mattpocock/skills` set and the prove-it trio of `ray-amjad/skills` live in `.agents/skills/`
+(linked from `.claude/skills/`), pinned by `.agents/skills-lock.json`. Per skill the lock records
+`path` in the upstream repository, `upstreamTree` and `tree`; the upstream is the skill's own
+`upstream` (`repo`, `commit`) or, without one, the top-level `upstream`. A skill whose `tree`
+differs from `upstreamTree` carries a local adjustment. After staging an edit to a skill, set its
+`tree` to `git rev-parse $(git write-tree):.agents/skills/<name>`. The plugins that ship the same
+skills stay disabled in `.claude/settings.json`, so a session lists each skill once.

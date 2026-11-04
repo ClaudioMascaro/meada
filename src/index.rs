@@ -71,7 +71,8 @@ pub(crate) fn schema_version() -> i32 {
 /// row of `contracts` is a call through a binding imported from a bare specifier (`via`), naming `method` of it. A `shape`
 /// row (issue #175) is the shape of the module-level constant or type `method` a file exports,
 /// read for the view `via` (`shape::Want`), kept only in a repository with a named manifest.
-/// `exports` holds what each file exports (`resolve::Exported`): a `name` with the `file` and
+/// An `unmounted` row (#615) is a Backstage plugin whose `pluginId` cannot be read, at its
+/// `createBackendPlugin` call, no `contract`: `meada status` reports it. `exports` holds what each file exports (`resolve::Exported`): a `name` with the `file` and
 /// `target` definition, constant or type it names (`target`
 /// NULL for a whole file, `file` NULL for nothing the repository holds), or, with `name` NULL,
 /// an `export * from` the file `file`. Both are rewritten with the contracts, and read at query
@@ -778,12 +779,10 @@ fn refresh_keeping(
         .map(|(&pack, files)| (pack, lang::pack(pack).join(&found_configs(pack), files)))
         .collect();
     drop(raw);
-    // Past the joins, which read some values (`Def::type_params`), a changed file keeps what the
-    // index keeps, as a kept file does: the files a contract kind reads values of are parsed
-    // again by the miss loop below.
+    // Past the joins, a changed file keeps what the index keeps, as a kept file does: the files
+    // a contract kind reads values of are parsed again by the miss loop below.
     // ponytail: serializes each changed file a second time and holds every file's values until
-    // here, since a join reads some (`Def::type_params`); dropping them at parse needs those
-    // fields kept in the index.
+    // here, in case a join reads one (none does since #609); drop them at parse if none ever does.
     // A drop past a project's count (`Facts::usings`) is the project's, not the file's parse:
     // only a join sees it. The files whose mark a join set or cleared are stamped into their
     // stored facts below, which `contracts` reads for `meada status`.
@@ -2025,6 +2024,9 @@ pub(crate) struct Export {
     pub(crate) processes: Vec<Process>,
     /// The repository's decisions that do not apply, each with its cause (`meada export` only).
     pub(crate) stale_decisions: Vec<Stale>,
+    /// The sites of the Backstage plugins whose `pluginId` cannot be read (`unmounted` rows,
+    /// #615), sorted. Shown by `meada status` only.
+    pub(crate) unmounted: Vec<String>,
 }
 
 /// Puts `providers` back in the order `export` reads them in, after a kind's `declare` added
@@ -2291,6 +2293,10 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
             })
         })
         .collect::<Result<_>>()?;
+    let unmounted = db
+        .prepare("SELECT site FROM contracts WHERE role = 'unmounted' ORDER BY site")?
+        .query_map([], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
     let publishes = db
         .prepare(
             "SELECT via, method, site FROM contracts \
@@ -2447,6 +2453,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         processes: Vec::new(),
         documents,
         stale_decisions: Vec::new(),
+        unmounted,
     })
 }
 

@@ -94,7 +94,8 @@ environment reads; the architecture map keeps the lead of the first:
   bound once and never assigned): text, or names that are constants of the same file holding
   plain values; a call, a name bound to a read, a loop variable, a package `var` or a name from
   another file leaves `v` no constant, so the base is absent. `http/go/clients.rs` `one_read`
-  makes every read of a URL a hole when it holds two. `http.rs` `locate` and `link` map the
+  makes every read of a URL a hole when it holds two. `values::tagged` reads struct fields tagged `env:"X"`/`envconfig:"X"` as
+  `Str([Env(X)])` where the field is selected (`Std::field_env`). `http.rs` `locate` and `link` map the
   head `Env` as for every language. The `xlang-go-*` fixtures are the cross-language chain: a
   repository of another language joins by one more `common::xlang_go` entry.
 
@@ -380,8 +381,15 @@ environment reads; the architecture map keeps the lead of the first:
   `Param::closure` is read from the written type: a function type (through `?`, parentheses and
   attributes such as `@escaping`), a type parameter or `Any` takes a trailing closure, a name is
   `Closure::Named` until `join` looks it up among the repository's aliases of a function type
-  (`Facts::function_aliases`, and aliases of those to `ALIAS_DEPTH`, by last segment in any scope), and
-  any other type refuses it. A `typealias` of a named type is an `Imported::Path` import of its
+  (`Facts::function_aliases`, and aliases of those to `ALIAS_DEPTH`, by last segment in any scope):
+  `Takes` when one is so named, `Refuses` for a type the repository declares (any class, struct,
+  enum or protocol of that last segment) or a standard value type (`VALUE_TYPES`), else `Closure::Unknown`,
+  the name of a type from outside the repository, which may be an alias of a function type. Any
+  other written type refuses it. `resolve::fit` tells `Fit::Yes`, `Maybe` or `No`: a call that fits
+  only if an `Unknown` parameter takes its trailing closure (the arguments each parameter takes
+  differ between reading it as refusing and as taking) is `Maybe`, and `narrow` keeps such a
+  candidate beside the sure ones, so the call is `ambiguous` among them (`inferred` when it is
+  the only one), never `exact` (#456). A `typealias` of a named type is an `Imported::Path` import of its
   target under the alias's qualified name, exported by its access as a declaration is: a type
   written as the alias resolves through `Resolver::alias` (a cycle or `LINK_DEPTH` ends with
   nothing). An extension is no definition but a

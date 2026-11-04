@@ -1,0 +1,8 @@
+# A Backstage service reads its base URLs through `config.getString`, with `app-config.yaml`
+# holding `${VAR}`. `api` declares the variable; `other` serves the same route.
+[[peer]]
+repo = "example.com/backstage/api"
+base_url_env = ["API_URL"]
+
+[[peer]]
+repo = "example.com/backstage/other"
