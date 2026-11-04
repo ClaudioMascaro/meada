@@ -103,7 +103,8 @@ from ...", with the whole list. A value the index now stores joins it.
   `shape`: the exported name in `method`, the view (`shape::Want`) in `via`, and field paths, open
   parts, scalar leaves, declared and optional paths and the imports they leave to fill, issue
   #175; what crosses repositories is this shape of an exported name,
-  never its source text), the names of the Cargo features a Rust crate enables by default
+  never its source text), the Backstage plugins whose `pluginId` cannot be read (`contracts`
+  rows of role `unmounted`, no contract, at the `createBackendPlugin` call, issue #615), the names of the Cargo features a Rust crate enables by default
   (`files.setting`, a comma-separated list per file, from `[features] default`), the Rust item
   macros a file invokes (#398: the lines after it in `files.setting`, each a macro's name and the
   `cfg` predicates its arm writes, as tokens; `Facts::macro_rules`, the outer attributes each

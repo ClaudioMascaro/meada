@@ -11082,7 +11082,21 @@ fn express_promise_router_routers_export_their_routes_like_express_routers() {
         ),
         expected
     );
-    // A `Router` another package makes is still no Express router.
+    assert_eq!(
+        routes(
+            "import { default as PromiseRouter } from 'express-promise-router';",
+            "PromiseRouter()"
+        ),
+        expected
+    );
+    // A named export of the package, or a `Router` another package makes, is no Express router.
+    assert!(
+        routes(
+            "import { Other as Router } from 'express-promise-router';",
+            "Router()"
+        )
+        .is_empty()
+    );
     assert!(routes("import Router from 'koa-router';", "Router()").is_empty());
 }
 

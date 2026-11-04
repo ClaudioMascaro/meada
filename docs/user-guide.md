@@ -1049,8 +1049,22 @@ ligada a um literal. Um plugin cujo `pluginId` não se lê assim (uma leitura de
 import) deixa o roteador na raiz, como antes, e o `meada status` aponta o plugin. Do lado do
 consumidor, uma URL que começa por `discovery.getBaseUrl('<id>')` (numa constante ou escrito na
 própria URL) começa em `/api/<id>`, e o motivo da ligação nomeia o plugin e essa montagem; uma URL
-sem host de uma rota que a montagem de um plugin do mesmo repositório serve também o nomeia. O plugin `proxy` não
-é lido.
+sem host de uma rota que a montagem de um plugin do mesmo repositório serve também o nomeia.
+
+O plugin `proxy` do Backstage vale pela tabela `proxy.endpoints` de um `app-config*.yaml` do
+repositório: uma URL que começa por `/api/proxy/<endpoint>` (também a que
+`discovery.getBaseUrl('proxy')` somada a `/<endpoint>` escreve) é uma chamada ao `target` desse
+endpoint, e o resto da URL segue o alvo. Um `target` que é exatamente `${VAR}` liga pelo
+`base_url_env` do par, e o motivo nomeia a variável e o endpoint; um `target` que é uma URL
+`http://` ou `https://` literal vale como o host (com o seu caminho). Qualquer outro `target` (um
+texto em volta da variável, um valor padrão) deixa a chamada sem ligação, e o `meada status` aponta
+o endpoint e quantas chamadas passam por ele. Um `pathRewrite` que só tira o endpoint (uma regra,
+`'^/api/proxy/<endpoint>': ''`, ou `'^/api/proxy/<endpoint>/': '/'` para uma URL com caminho) é o
+que o proxy faz de qualquer jeito, então o resto da URL segue para o alvo; qualquer outro
+`pathRewrite` (outra substituição, várias regras) é lido como um `target` ilegível: sem ligação, e
+o `meada status` aponta. `ignorePath`, `prependPath: false` e um endpoint a que os arquivos
+`app-config*.yaml` dão valores diferentes (não se sabe qual deles o deploy carrega) são lidos do
+mesmo jeito.
 
 **Ambiente.** `process.env.X`, `process.env["X"]` e `import.meta.env.X`, sozinhos ou passando por
 métodos de texto como `trim()`, `replace(...)` e `toLowerCase()`. A URL que começa por uma leitura

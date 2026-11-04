@@ -101,7 +101,7 @@ impl Std {
 
 /// The environment variable each struct field tagged `env:"X"` or `envconfig:"X"` reads, by the
 /// path of field names from the declared type, nested anonymous structs included.
-// shortcut: same file only, and a selector matches by its field path whatever the variable's
+// ponytail: same file only, and a selector matches by its field path whatever the variable's
 // type; a named struct type nested in another and a config declared in another file are not
 // seen, a path two tags read differently is dropped. Upgrade when typed fields reach values.
 fn tagged(root: Node, src: &[u8]) -> HashMap<String, String> {
@@ -832,9 +832,11 @@ pub(super) fn receiver(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::lang::LanguagePack;
+
     #[test]
     fn a_struct_tag_reads_its_env_key_as_reflect_does() {
-        use super::env_tag;
         let tag = |t: &str| env_tag(&format!("`{t}`"));
         assert_eq!(tag(r#"env:"A,required" json:"b""#).as_deref(), Some("A"));
         assert_eq!(tag(r#"json:"b" envconfig:"C""#).as_deref(), Some("C"));
@@ -842,9 +844,6 @@ mod tests {
         assert_eq!(tag(r#"env:"-""#), None);
         assert_eq!(tag(r#"json:"b""#), None);
     }
-
-    use super::*;
-    use crate::lang::LanguagePack;
 
     /// How many calls deep the argument of the call `f` is read.
     fn read_depth(nesting: usize) -> usize {

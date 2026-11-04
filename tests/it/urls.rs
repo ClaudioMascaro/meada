@@ -455,3 +455,203 @@ fn backstage_plugins_serve_under_api_and_their_plugin_id() {
         "{status}"
     );
 }
+
+/// Backstage's proxy plugin (#616): `getBaseUrl('proxy')` plus `/<endpoint>` and
+/// `/api/proxy/<endpoint>` are calls to the `target` of the endpoint in `app-config*.yaml`. A
+/// `${VAR}` target goes through the peer's `base_url_env`, a literal URL is a host, and any
+/// other target leaves the call unlinked, which `meada status` says.
+#[test]
+fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
+    let case = "urls_backstage_proxy";
+    let web = fixture_repo(
+        case,
+        "ts-backstage-proxy",
+        Some("https://example.com/backstage/web.git"),
+    );
+    fixture_repo(
+        case,
+        "go-backstage-inventory",
+        Some("https://example.com/backstage/inventory.git"),
+    );
+
+    let export = Engine::open(&web).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let function = |site: &str| site.split("::").nth(2).unwrap().to_string();
+    let mut consumers: Vec<_> = (json["consumers"].as_array().unwrap())
+        .iter()
+        .map(|c| {
+            let site = function(c["site"].as_str().unwrap());
+            (site, c["contract"].as_str().unwrap(), c["via"].as_str())
+        })
+        .collect();
+    consumers.sort();
+    let inventory = Some("env:INVENTORY_URL through proxy endpoint /inventory");
+    let said = " (its target or the path it gets is not read: a target neither ${VAR} nor an http(s) URL, a pathRewrite that does more than strip the endpoint, ignorePath, prependPath, or app-config files that disagree)";
+    let legacy = format!("client:Backstage proxy endpoint /legacy{said}");
+    let (rewritten, slashed, twice) = (
+        format!("client:Backstage proxy endpoint /rewritten{said}"),
+        format!("client:Backstage proxy endpoint /slashed{said}"),
+        format!("client:Backstage proxy endpoint /twice{said}"),
+    );
+    let (ignored, disputed) = (
+        format!("client:Backstage proxy endpoint /ignored{said}"),
+        format!("client:Backstage proxy endpoint /disputed{said}"),
+    );
+    let stock = |endpoint: &str| {
+        Some(format!(
+            "host:stock.example.com through proxy endpoint {endpoint}"
+        ))
+    };
+    let (stripped_via, slashed_via) = (stock("/stripped"), stock("/slashed"));
+    let mut expected = [
+        // `/inventoryx` is no `/inventory`.
+        (
+            "otherEndpoint",
+            "http::GET::/api/proxy/inventoryx/clusters",
+            None,
+        ),
+        ("viaBrowserPath", "http::GET::/clusters", inventory),
+        ("viaDiscovery", "http::GET::/clusters", inventory),
+        (
+            "viaLiteralTarget",
+            "http::GET::/clusters",
+            Some("host:stock.example.com through proxy endpoint /stock"),
+        ),
+        ("viaTemplate", "http::GET::/clusters", inventory),
+        (
+            "viaUnreadAgain",
+            "http::GET::/api/proxy/legacy/clusters",
+            Some(legacy.as_str()),
+        ),
+        (
+            "viaUnreadTarget",
+            "http::GET::/api/proxy/legacy/clusters",
+            Some(legacy.as_str()),
+        ),
+        // A `pathRewrite` that only strips the endpoint is what the proxy does anyway: the call
+        // goes to the stripped path. Any other rewrite changes the path the target sees, which
+        // Meada does not evaluate; `/slashed` strips `<ep>/`, so a path without it is no strip.
+        (
+            "viaStripped",
+            "http::GET::/clusters",
+            stripped_via.as_deref(),
+        ),
+        ("viaSlashed", "http::GET::/clusters", slashed_via.as_deref()),
+        (
+            "viaSlashedBare",
+            "http::GET::/api/proxy/slashed",
+            Some(slashed.as_str()),
+        ),
+        (
+            "viaRewrite",
+            "http::GET::/api/proxy/rewritten/clusters",
+            Some(rewritten.as_str()),
+        ),
+        (
+            "viaTwoRules",
+            "http::GET::/api/proxy/twice/clusters",
+            Some(twice.as_str()),
+        ),
+        // `ignorePath` drops the path; a target `app-config.production.yaml` gives otherwise is
+        // not known to be the one deployed (`/stock`, the same in both, is).
+        (
+            "viaIgnorePath",
+            "http::GET::/api/proxy/ignored/clusters",
+            Some(ignored.as_str()),
+        ),
+        (
+            "viaDisputed",
+            "http::GET::/api/proxy/disputed/clusters",
+            Some(disputed.as_str()),
+        ),
+        // A part Meada cannot read in the endpoint, or right after it, names no endpoint.
+        ("holeAfterEndpoint", "http::GET::/api/proxy/{}", None),
+        ("holeInEndpoint", "http::GET::/api/proxy/{}/clusters", None),
+    ];
+    expected.sort();
+    assert_eq!(consumers, expected.map(|(f, c, v)| (f.to_string(), c, v)));
+
+    // The two calls of the issue and the template link to the peer; the unread target links
+    // nothing.
+    let links: Vec<_> = (json["links"].as_array().unwrap())
+        .iter()
+        .map(|l| {
+            let consumer = function(l["consumer"].as_str().unwrap());
+            let provider = l["provider"].as_str().unwrap();
+            (
+                consumer,
+                provider,
+                l["level"].as_str(),
+                l["reason"].as_str(),
+            )
+        })
+        .collect();
+    let peer = "example.com/backstage/inventory";
+    let through = format!(
+        "base URL from INVENTORY_URL through the proxy endpoint /inventory, a base_url_env of peer {peer}"
+    );
+    let served = |function: &str, level, reason: &str| {
+        (
+            function.to_string(),
+            format!("{peer}::main.go::clusters"),
+            Some(level),
+            Some(reason.to_string()),
+        )
+    };
+    let links: Vec<_> = (links.iter())
+        .map(|(c, p, l, r)| (c.clone(), p.to_string(), *l, r.map(str::to_string)))
+        .collect();
+    assert_eq!(
+        links,
+        [
+            served("viaBrowserPath", "inferred", &through),
+            served("viaDiscovery", "inferred", &through),
+            served(
+                "viaLiteralTarget",
+                "exact",
+                &format!(
+                    "host stock.example.com through the proxy endpoint /stock is served by {peer}"
+                ),
+            ),
+            served(
+                "viaSlashed",
+                "exact",
+                &format!(
+                    "host stock.example.com through the proxy endpoint /slashed is served by {peer}"
+                ),
+            ),
+            served(
+                "viaStripped",
+                "exact",
+                &format!(
+                    "host stock.example.com through the proxy endpoint /stripped is served by {peer}"
+                ),
+            ),
+            served("viaTemplate", "inferred", &through),
+        ]
+    );
+    let status = meada::engine::status(&web).unwrap();
+    // Every line of the status: each unread endpoint once, and nothing else.
+    let why = "its target or the path it gets is not read (a target neither ${VAR} nor an http(s) \
+               URL, a pathRewrite that does more than strip the endpoint, ignorePath, \
+               prependPath, or app-config files that disagree)";
+    let unread = |endpoint: &str, calls: usize| {
+        format!(
+            "  Backstage proxy endpoint {endpoint}: {why}, so {calls} call(s) through it stay unlinked"
+        )
+    };
+    let expected = [
+        "example.com/backstage/web (.) indexed, 1 files".to_string(),
+        unread("/disputed", 1),
+        unread("/ignored", 1),
+        unread("/legacy", 2),
+        unread("/rewritten", 1),
+        unread("/slashed", 1),
+        unread("/twice", 1),
+        "  wrong conclusion? report it: \
+         https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml"
+            .to_string(),
+        "example.com/backstage/inventory (../go-backstage-inventory) indexed, 1 files".to_string(),
+    ];
+    assert_eq!(status.lines().collect::<Vec<_>>(), expected, "{status}");
+}
