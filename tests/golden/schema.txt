@@ -44,12 +44,16 @@ CREATE TABLE config_files (
     summary TEXT NOT NULL
 );
 CREATE TABLE config_values (
-    path TEXT NOT NULL, key TEXT NOT NULL, value TEXT, type TEXT NOT NULL, line INTEGER NOT NULL,
+    id INTEGER PRIMARY KEY, path TEXT NOT NULL, key TEXT NOT NULL, value TEXT, type TEXT NOT NULL, line INTEGER NOT NULL,
     cut INTEGER NOT NULL, folded_key TEXT NOT NULL, folded_value TEXT
 );
 CREATE INDEX config_values_path ON config_values (path);
 CREATE INDEX config_values_folded_key ON config_values (folded_key);
 CREATE INDEX config_values_folded_value ON config_values (folded_value);
+CREATE VIRTUAL TABLE config_search USING fts5(
+    folded_key, folded_value, content='config_values', content_rowid='id',
+    tokenize='trigram case_sensitive 1'
+);
 
 sample.ts
 {

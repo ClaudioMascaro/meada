@@ -133,7 +133,9 @@ this file, and a change to these modules updates it.
   with a B-tree); `hits(identity, db, needle)` takes exact matches from the B-trees (rank 0),
   then prefixes from them (rank 1, the range from `needle` up to `successor(needle)`, the least
   text above every text that starts with it), then
-  substrings from a scan (`instr`, rank 2), a row keeping its first rank, and renders `<repository> <path>:<line> <key path> = <value>` (a string as JSON,
+  substrings (rank 2) from the trigram table `config_search` (`MATCH` on the needle as a quoted
+  phrase, for a needle of three characters or more without a NUL, narrowed again by `instr`;
+  else a scan of `instr`; `hits_by` takes the choice so a test compares both), a row keeping its first rank, and renders `<repository> <path>:<line> <key path> = <value>` (a string as JSON,
   `(cut)` after a cut one, `redacted` for a secret), tie-broken by repository, path, zero-padded
   line and key path; `Engine::search` answers `kind = "value"` with them, and the default search
   with them only when it found no symbol and no contract. `status(db)` is the `meada status`

@@ -2548,6 +2548,38 @@ fn an_edited_config_file_alone_refreshes_its_values_and_nothing_else() {
     assert_eq!(values("us-east-2"), "no matches for `us-east-2`\n");
 }
 
+/// A changed value is found by its new text and not its old one through the trigram index too
+/// (#647): a substring of three characters or more takes that path, so the rows of the old text
+/// must leave it with the file, and a removed file takes its rows along.
+#[test]
+fn an_edited_config_value_is_found_by_a_substring_of_its_new_text_only() {
+    let repo = catalog("fresh_config_trigram");
+    fs::write(repo.join("settings.yaml"), "billing:\n  region: eu-west\n").unwrap();
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let values = |q: &str| engine.search(q, Some("value"), None).unwrap();
+    assert!(
+        values("u-wes").contains("settings.yaml:2"),
+        "{}",
+        values("u-wes")
+    );
+    fs::write(
+        repo.join("settings.yaml"),
+        "billing:\n  region: us-east-2\n",
+    )
+    .unwrap();
+    age(&repo);
+
+    let found = values("s-eas");
+    assert!(
+        found.contains("settings.yaml:2 billing.region = \"us-east-2\""),
+        "{found}"
+    );
+    assert_eq!(values("u-wes"), "no matches for `u-wes`\n");
+    fs::remove_file(repo.join("settings.yaml")).unwrap();
+    assert_eq!(values("s-eas"), "no matches for `s-eas`\n");
+}
+
 /// A refresh does not read a kept group's files again (#391): the Python job's file, rewritten
 /// under its old stamp with a host of the same length, still gives its old consumer after an
 /// edit of the TypeScript group, since its values are not parsed again.

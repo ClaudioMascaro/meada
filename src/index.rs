@@ -103,8 +103,11 @@ pub(crate) fn schema_version() -> i32 {
 /// scalars but nulls: the `key` path, the `value` (cut at `config_values::VALUE_MAX`, `cut` 1,
 /// or NULL when a format marks it secret), its `type` (`string`, `number`, `boolean`), its
 /// `line`, and the key path and value lowercased (`folded_key`, `folded_value`, each with a
-/// B-tree for exact and prefix search), rewritten with the file. Neither reaches the export.
-const SCHEMA: &str = "
+/// B-tree for exact and prefix search), rewritten with the file. `config_search` is an FTS5
+/// trigram index over both folded columns (#647, no text of its own: it reads `config_values` by
+/// `id`), which serves substring search for a query of three characters or more. None of the
+/// three reaches the export.
+pub(crate) const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
@@ -151,12 +154,16 @@ CREATE TABLE config_files (
     summary TEXT NOT NULL
 );
 CREATE TABLE config_values (
-    path TEXT NOT NULL, key TEXT NOT NULL, value TEXT, type TEXT NOT NULL, line INTEGER NOT NULL,
+    id INTEGER PRIMARY KEY, path TEXT NOT NULL, key TEXT NOT NULL, value TEXT, type TEXT NOT NULL, line INTEGER NOT NULL,
     cut INTEGER NOT NULL, folded_key TEXT NOT NULL, folded_value TEXT
 );
 CREATE INDEX config_values_path ON config_values (path);
 CREATE INDEX config_values_folded_key ON config_values (folded_key);
 CREATE INDEX config_values_folded_value ON config_values (folded_value);
+CREATE VIRTUAL TABLE config_search USING fts5(
+    folded_key, folded_value, content='config_values', content_rowid='id',
+    tokenize='trigram case_sensitive 1'
+);
 ";
 
 /// A file modified this close to a refresh may change again within the same mtime tick, so
@@ -653,7 +660,8 @@ fn refresh_keeping(
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
                  DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports; \
                  DELETE FROM families; DELETE FROM flexible; DELETE FROM entry_points; DELETE FROM communities; \
-                 DELETE FROM valued; DELETE FROM config_files; DELETE FROM config_values;",
+                 DELETE FROM valued; DELETE FROM config_files; DELETE FROM config_values; \
+                 INSERT INTO config_search (config_search) VALUES ('delete-all');",
             )?;
             None
         }

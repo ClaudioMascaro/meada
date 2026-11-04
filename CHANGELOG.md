@@ -19,6 +19,11 @@ All notable changes to Meada are recorded here. The format follows
   parse are skipped, and `meada status` counts the config files read and skipped and the values
   redacted. Values stay out of `meada export`. The index schema changes, so existing indexes are
   rebuilt (#639).
+- `search` with the kind `value` serves substring matches from an FTS5 trigram table beside the
+  B-trees that already serve exact and prefix matches, instead of scanning every row; a query
+  under three characters still scans, with the same answer. The table holds about four times the
+  text of the key paths and values (21 MB for 5 MB on this repository). The index schema
+  changes, so existing indexes are rebuilt (#647).
 - Terraform and OpenTofu config values (ADR 0025): `*.tf`, `*.tofu`, `*.tfvars` and
   `*.auto.tfvars` files are read with `hcl-edit` and `hcl-rs`, and `*.tf.json`, `*.tofu.json`
   and `*.tfvars.json` through the JSON reader, so `search` with the kind `value` finds a team

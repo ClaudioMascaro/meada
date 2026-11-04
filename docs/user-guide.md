@@ -169,6 +169,13 @@ consulta, em minúsculas, casa o valor ou o caminho da chave: iguais primeiro, d
 começam com ela, depois os que a contêm. Um valor acima de 1 KiB é guardado cortado e aparece
 seguido de `(cut)`.
 
+Os iguais e os que começam com a consulta saem de B-trees sobre o caminho da chave e o valor em
+minúsculas; os que a contêm, de uma tabela FTS5 com o tokenizador de trigramas, quando a consulta
+tem três caracteres ou mais (uma consulta menor varre as linhas, com a mesma resposta). Esse
+índice custa espaço: guarda cerca de quatro vezes o texto dos caminhos de chave e dos valores
+(num repositório de 92 mil valores e 5 MB de texto, 21 MB de `.meada/index.db`), além do que o
+índice já tinha.
+
 #### `context`: entender um símbolo
 
 | Parâmetro | Tipo | Padrão | Papel |

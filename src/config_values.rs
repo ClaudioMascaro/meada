@@ -535,11 +535,17 @@ fn plain(key: &str) -> bool {
 }
 
 /// Replaces the rows of the file at `path` with `rows`, each with its key path and value
-/// lowercased beside it for the B-trees `hits` searches.
+/// lowercased beside it for the B-trees `hits` searches, and indexed by trigrams in
+/// `config_search` for its substring rank.
 pub(crate) fn store(tx: &Transaction, path: &str, rows: &[Row]) -> Result<()> {
     forget(tx, path)?;
-    let mut insert =
-        tx.prepare_cached("INSERT INTO config_values VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)")?;
+    let mut insert = tx.prepare_cached(
+        "INSERT INTO config_values (path, key, value, type, line, cut, folded_key, folded_value) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+    )?;
+    let mut index = tx.prepare_cached(
+        "INSERT INTO config_search (rowid, folded_key, folded_value) VALUES (?1, ?2, ?3)",
+    )?;
     for r in rows {
         let (key, value) = (
             r.key.to_lowercase(),
@@ -549,12 +555,19 @@ pub(crate) fn store(tx: &Transaction, path: &str, rows: &[Row]) -> Result<()> {
         insert.execute(params![
             path, r.key, r.value, r.kind, line, r.cut, key, value
         ])?;
+        index.execute(params![tx.last_insert_rowid(), key, value])?;
     }
     Ok(())
 }
 
 /// Drops the rows of the file at `path`.
 pub(crate) fn forget(tx: &Transaction, path: &str) -> Result<()> {
+    // An external-content FTS5 table is told the text it indexed, to drop it.
+    tx.execute(
+        "INSERT INTO config_search (config_search, rowid, folded_key, folded_value) \
+         SELECT 'delete', id, folded_key, folded_value FROM config_values WHERE path = ?1",
+        params![path],
+    )?;
     tx.execute("DELETE FROM config_values WHERE path = ?1", params![path])?;
     Ok(())
 }
@@ -563,8 +576,28 @@ pub(crate) fn forget(tx: &Transaction, path: &str) -> Result<()> {
 /// starts with it or holds it, as `search` hits: `<identity> <path>:<line> <key path> = <value>`,
 /// a string quoted as JSON, a cut one followed by `(cut)` and a secret one `redacted`, ordered
 /// by rank, then repository, path, line and key path. The B-trees on the lowercased key path
-/// and value serve exact and prefix (ADR 0025); a scan serves substring.
+/// and value serve exact and prefix, and the trigram table `config_search` serves substring
+/// (ADR 0025, #647); a query under three characters is answered by a scan, which is also what
+/// the trigram path must agree with, byte for byte.
 pub(crate) fn hits(identity: &str, db: &Connection, needle: &str) -> Result<Vec<Hit>> {
+    hits_by(identity, db, needle, true)
+}
+
+/// The characters in a trigram: a query of fewer cannot be matched in `config_search`.
+const TRIGRAM: usize = 3;
+
+/// The substring filter by scan, over the folded key path and value (`?1` the needle).
+const SCAN: &str = "instr(folded_key, ?1) > 0 OR instr(folded_value, ?1) > 0";
+
+/// The substring filter through `config_search` (`?1` the needle, `?2` it as an FTS5 phrase).
+/// The scan stays as a refilter: the table only narrows the rows looked at.
+fn trigram_filter() -> String {
+    format!("id IN (SELECT rowid FROM config_search WHERE config_search MATCH ?2) AND ({SCAN})")
+}
+
+/// `hits`, the substring rank answered by the trigram table when `indexed` and the query is
+/// long enough, else by a scan.
+fn hits_by(identity: &str, db: &Connection, needle: &str, indexed: bool) -> Result<Vec<Hit>> {
     const ROW: &str = "SELECT rowid, path, key, value, type, line, cut FROM config_values WHERE";
     // A key path or value that starts with `needle` sorts from it up to the least text above
     // all of them, as SQLite compares text by its UTF-8 bytes; with none, up to the end.
@@ -576,16 +609,18 @@ pub(crate) fn hits(identity: &str, db: &Connection, needle: &str) -> Result<Vec<
         ),
         None => ("folded_key >= ?1 OR folded_value >= ?1", vec![needle]),
     };
+    // A trigram needs three characters; a NUL cannot be quoted into the match expression.
+    let trigram = indexed && needle.chars().count() >= TRIGRAM && !needle.contains('\0');
+    let phrase = format!("\"{}\"", needle.replace('"', "\"\""));
+    let (substring, substring_args): (String, Vec<&str>) = if trigram {
+        (trigram_filter(), vec![needle, &phrase])
+    } else {
+        (SCAN.to_string(), vec![needle])
+    };
     let searches: [(u8, &str, &[&str]); 3] = [
         (0, "folded_key = ?1 OR folded_value = ?1", &[needle]),
         (1, prefix, &prefix_args),
-        // ponytail: substring scans every row; the FTS5 trigram table ADR 0025 records waits
-        // for a workspace that makes this slow.
-        (
-            2,
-            "instr(folded_key, ?1) > 0 OR instr(folded_value, ?1) > 0",
-            &[needle],
-        ),
+        (2, &substring, &substring_args),
     ];
     let mut found: BTreeMap<i64, Hit> = BTreeMap::new();
     for (rank, filter, args) in searches {
@@ -1012,5 +1047,111 @@ mod tests {
             "{outcome:?}"
         );
         assert!(rows.is_empty());
+    }
+
+    /// The trigram table and the scan answer every query shape alike over many values: exact,
+    /// prefix, substring (in a value, in a key path, with characters a pattern would read
+    /// specially, in several scripts) and under three characters; the first two do not use the
+    /// table, the substring ones do, and each finds something.
+    #[test]
+    fn the_trigram_index_answers_every_query_shape_as_the_scan_does() {
+        const WORDS: [&str; 9] = [
+            "orders",
+            "billing",
+            "Éclair",
+            "straße",
+            "say \"hi\"",
+            "100%_done",
+            "a*b",
+            "İstanbul",
+            "日本語のキュー",
+        ];
+        let mut teams = serde_json::Map::new();
+        for n in 0..1500 {
+            let value = format!("queue-{}-{}", n % 37, WORDS[n % WORDS.len()]);
+            let team = teams.entry(format!("team{}", n % 7)).or_insert(Value::Null);
+            if team.is_null() {
+                *team = Value::Object(Default::default());
+            }
+            team[format!("svc{n}")] = Value::String(value);
+        }
+        let text = serde_json::to_string(&Value::Object(teams)).unwrap();
+        let (outcome, rows) = read("big.json", text.as_bytes());
+        assert!(
+            matches!(outcome, Outcome::Read { values: 1500, .. }),
+            "{outcome:?}"
+        );
+        let mut db = Connection::open_in_memory().unwrap();
+        db.execute_batch(crate::index::SCHEMA).unwrap();
+        let tx = db.transaction().unwrap();
+        store(&tx, "big.json", &rows).unwrap();
+        tx.commit().unwrap();
+
+        let queries: [(&str, bool); 22] = [
+            ("queue-3-orders", true),
+            ("queue-3", true),
+            ("team3.svc10", true),
+            ("ders", true),
+            ("vc12", true),
+            ("ord", true),
+            ("éclair", true),
+            ("straße", true),
+            ("\"hi", true),
+            ("%_", true),
+            ("*b", true),
+            ("i\u{307}stan", true),
+            ("キュー", true),
+            ("zzzz", false),
+            ("", true),
+            ("q", true),
+            ("ab", false),
+            ("é", true),
+            ("日本", true),
+            ("0", true),
+            ("1", true),
+            ("[3]", false),
+        ];
+        for (query, found) in queries {
+            let query = query.to_lowercase();
+            let indexed = hits_by("acme/app", &db, &query, true).unwrap();
+            let scanned = hits_by("acme/app", &db, &query, false).unwrap();
+            assert_eq!(indexed, scanned, "{query:?}");
+            assert_eq!(!indexed.is_empty(), found, "{query:?}");
+        }
+        // A file stored again leaves nothing of its old rows in the table.
+        let kept = &rows[..10];
+        let tx = db.transaction().unwrap();
+        store(&tx, "big.json", kept).unwrap();
+        tx.commit().unwrap();
+        db.execute(
+            "INSERT INTO config_search (config_search, rank) VALUES ('integrity-check', 1)",
+            [],
+        )
+        .unwrap();
+        let indexed = hits_by("acme/app", &db, "queue", true).unwrap();
+        assert_eq!(indexed.len(), 10);
+        assert_eq!(indexed, hits_by("acme/app", &db, "queue", false).unwrap());
+        // The substring rank asks the trigram table (a scan would not name it).
+        let mut statement = db
+            .prepare(&format!(
+                "EXPLAIN QUERY PLAN SELECT rowid FROM config_values WHERE {}",
+                trigram_filter()
+            ))
+            .unwrap();
+        let plan: Vec<String> = (statement.query_map(["ord", "\"ord\""], |r| r.get(3)))
+            .unwrap()
+            .collect::<std::result::Result<_, _>>()
+            .unwrap();
+        assert!(plan.iter().any(|d| d.contains("config_search")), "{plan:?}");
+        // Emptying the table with the rows, as a new identity does, leaves it consistent.
+        db.execute_batch(
+            "DELETE FROM config_values; INSERT INTO config_search (config_search) VALUES ('delete-all');",
+        )
+        .unwrap();
+        db.execute(
+            "INSERT INTO config_search (config_search, rank) VALUES ('integrity-check', 1)",
+            [],
+        )
+        .unwrap();
     }
 }

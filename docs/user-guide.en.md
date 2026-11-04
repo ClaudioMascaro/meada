@@ -170,6 +170,13 @@ several documents, the document's index first (`[2].spec.replicas`). The query, 
 matches the value or the key path: equal ones first, then those that start with it, then those
 that hold it. A value over 1 KiB is stored cut and shows followed by `(cut)`.
 
+Equal values and those that start with the query come from B-trees on the lowercased key path and
+value; those that hold it come from an FTS5 table with the trigram tokenizer, when the query has
+three characters or more (a shorter query scans the rows, with the same answer). That index costs
+space: it holds about four times the text of the key paths and values (in a repository of 92
+thousand values and 5 MB of text, 21 MB of `.meada/index.db`), on top of what the index already
+held.
+
 #### `context`: understand a symbol
 
 | Parameter | Type | Default | Role |

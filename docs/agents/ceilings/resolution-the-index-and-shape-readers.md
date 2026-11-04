@@ -451,9 +451,11 @@
   an indented file stores about twice its size, but a minified file of tiny scalars, such as a
   long array of numbers, and long keys nested deep are unreadable). An unreadable file and a
   lockfile are counted in `meada status`, not named. Search kind `value` finds exact and prefix
-  matches through the B-trees on the lowercased key path and value, and substrings by scanning
-  every row of every repository (no marker on a `const`, a `ponytail:` comment in `hits`): the
-  FTS5 trigram table ADR 0025 describes waits for a workspace the scan makes slow. Redaction covers a Kubernetes `Secret` at a document's root or as an item of a
+  matches through the B-trees on the lowercased key path and value, and substrings through the
+  FTS5 trigram table `config_search` (#647); a query of under three characters (or holding a NUL)
+  scans every row of every repository, and the trigram table stores about four times the text of
+  the key paths and values (no marker on a `const`: the three-character floor is the
+  tokenizer's). Redaction covers a Kubernetes `Secret` at a document's root or as an item of a
   list's `items`; a `Secret` with no `apiVersion`, or nested anywhere else (a Helm value, a
   Crossplane composition's base), keeps its values (the other secret markers of ADR 0025 belong
   to the IaC formats, #640). The hidden CI paths are read at the repository root only, and only

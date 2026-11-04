@@ -172,6 +172,13 @@ documento primero (`[2].spec.replicas`). La consulta, en minúsculas, coincide c
 la ruta de la clave: iguales primero, luego los que empiezan con ella, luego los que la
 contienen. Un valor de más de 1 KiB se guarda cortado y aparece seguido de `(cut)`.
 
+Los iguales y los que empiezan con la consulta salen de B-trees sobre la ruta de la clave y el
+valor en minúsculas; los que la contienen, de una tabla FTS5 con el tokenizador de trigramas,
+cuando la consulta tiene tres caracteres o más (una consulta menor recorre las filas, con la misma
+respuesta). Ese índice cuesta espacio: guarda cerca de cuatro veces el texto de las rutas de clave
+y de los valores (en un repositorio de 92 mil valores y 5 MB de texto, 21 MB de
+`.meada/index.db`), además de lo que el índice ya tenía.
+
 #### `context`: entender un símbolo
 
 | Parámetro | Tipo | Predeterminado | Papel |
