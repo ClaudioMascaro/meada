@@ -52,6 +52,10 @@
   no object in the export, an edited, added and deleted manifest or kustomization equal to a
   cold index, a row rewritten by hand surviving a refresh no manifest changed in, and a Terraform
   root and a Kubernetes unit of one directory each keeping their rows when the other changes),
+  `compose` (#652, the `compose-nodes` fixture: a project with an override file, `search` kind
+  `iac`, `context` and `trace` against `compose-nodes.{search,context,trace}.txt`, and an edited
+  then deleted override equal to a cold index; the unit tests of `iac::compose` for variable
+  expansion, merge keys and the ceilings),
   `decorations` (the `decorations` fixture: Java, Kotlin, C#,
   Python and Rust calls that decorate a definition carry `CallSite::decorates`, ordinary calls do
   not, and `context` lists them under `annotations:`), `docs` (the repository map against the code:

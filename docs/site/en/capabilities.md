@@ -269,6 +269,10 @@ A directory with a `kustomization.yaml` that no other kustomization names as a b
 
 A reference stays in one namespace and one unit, and names an object as it was written, before the overlay's prefix and suffix, which the overlay then applies to both sides. Every reference is `exact`. `search` with kind `iac` and `context` answer for these nodes as for Terraform's, and `context` on a workload adds `images:`, what each container runs once the overlay's `images` applied (`web: registry.example.com/shop/api:1.4.0`). Patches, generators, `commonLabels`, Helm templates and a `kind: List` are not applied or read, and objects stay out of `meada export`.
 
+### Compose
+
+A Compose file (`compose.yaml`, `compose.yml`, `docker-compose.yaml` or `docker-compose.yml`) with its override file in the same directory is one evaluation unit, rooted at the directory. Each service is an IaC node `services.<name>` of type `service`. `depends_on`, `links` and shared networks (`networks:`; a service with none is on `default`) are references, with `via depends_on`, `via links` or `via networks.<name>`. `${VAR:-default}` resolves to its default and `context` marks it `(overridable)`; `${VAR}` stays in the text as an unresolved part, marked `(unresolved)`. `context` shows the service's `image:` and `build:`, recorded for the image contract; a build context is kept only as a path inside the repository (an absolute path, a URL, one that climbs out of the root or one with an unresolved part is not).
+
 ## Communities and processes
 
 A community groups symbols that call each other more than the rest. `meada export` computes these groups with Leiden, without randomness and using integer arithmetic. Names follow the directory containing most members (`src`, `src#2`), identically on every machine.

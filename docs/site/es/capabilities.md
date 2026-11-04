@@ -269,6 +269,10 @@ Una carpeta con `kustomization.yaml` que ningún otro kustomization nombra como 
 
 Una referencia queda en un namespace y una unidad, y nombra el objeto como se escribió, antes del prefijo y del sufijo del overlay, que el overlay aplica después a los dos lados. Toda referencia es `exact`. `search` con kind `iac` y `context` responden por estos nodos como por los de Terraform, y `context` en una carga de trabajo añade `images:`, lo que cada contenedor ejecuta tras las `images` del overlay (`web: registry.example.com/shop/api:1.4.0`). Los patches, los generadores, `commonLabels`, las plantillas Helm y `kind: List` no se aplican ni se leen, y los objetos quedan fuera de `meada export`.
 
+### Compose
+
+Un archivo Compose (`compose.yaml`, `compose.yml`, `docker-compose.yaml` o `docker-compose.yml`) con su archivo de override en la misma carpeta es una unidad de evaluación, con raíz en la carpeta. Cada servicio es un nodo IaC `services.<nombre>` de tipo `service`. `depends_on`, `links` y las redes compartidas (`networks:`; un servicio sin ninguna está en `default`) son referencias, con `via depends_on`, `via links` o `via networks.<nombre>`. `${VAR:-valor}` se resuelve a su valor por defecto y `context` lo marca `(overridable)`; `${VAR}` queda en el texto como parte sin resolver, marcada `(unresolved)`. `context` muestra `image:` y `build:` del servicio, guardados para el contrato de imagen; un contexto de build solo se guarda como ruta dentro del repositorio (una ruta absoluta, una URL, una que sale de la raíz o una con una parte sin resolver no).
+
 ## Comunidades y procesos
 
 Una comunidad agrupa símbolos que se llaman más entre sí que al resto. `meada export` calcula los grupos con Leiden, sin aleatoriedad y con aritmética entera. El nombre viene de la carpeta de la mayoría de sus miembros (`src`, `src#2`), igual en cada máquina.

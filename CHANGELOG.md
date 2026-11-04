@@ -58,6 +58,15 @@ All notable changes to Meada are recorded here. The format follows
   address shows the type, the physical name, the references both ways and the config values,
   and `trace` walks the references down and up. Nodes stay out of `meada export`; the index
   schema changes, so existing indexes are rebuilt (#649).
+- Compose services as IaC nodes: a Compose file (`compose.yaml`, `compose.yml`,
+  `docker-compose.yaml`, `docker-compose.yml`) with its override file in the same directory is one
+  evaluation unit, rooted at the directory, and each service is a node `services.<name>` of type
+  `service`. `depends_on`, `links` and shared networks are references (`via depends_on`, `via
+  links`, `via networks.<name>`). `${VAR:-default}` resolves to its default and is marked
+  overridable; `${VAR}` stays an unresolved part. A service records its image and its build
+  context (a path inside the repository, from its root) for the image contract, and `context`
+  shows both. `search` kind `iac`, `context` and `trace` answer for them. The index schema
+  changes, so existing indexes are rebuilt; release level minor (#652).
 - Kubernetes objects and Kustomize overlays as IaC nodes (ADR 0025): every YAML or JSON document
   with an `apiVersion`, a `kind` and a `metadata.name` is a node addressed
   `<Kind>[.<group>]/<namespace>/<name>` (no namespace for a cluster-scoped kind). Each directory

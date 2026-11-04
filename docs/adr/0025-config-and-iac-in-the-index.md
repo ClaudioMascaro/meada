@@ -254,6 +254,27 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   whole when a file that holds, or may hold, an object (a kustomization, or a YAML or JSON file
   that says `apiVersion`) is read again or leaves.
 
+### Compose nodes (#652)
+
+- **Unit.** A directory's Compose file (the first of `compose.yaml`, `compose.yml`,
+  `docker-compose.yaml`, `docker-compose.yml`) and the override file of the same family
+  (`compose.override.*`, `docker-compose.override.*`) are one evaluation unit, rooted at the
+  directory (`.` at the root). An override with no base of its family is no project. The merge
+  follows Compose for what is read: a scalar the override sets replaces the base's, the lists add.
+- **Nodes.** Each service is a node `services.<name>`, type `service`, no physical name, at the
+  base file's lines (the override's when it adds the service).
+- **References.** `depends_on` (a list or a mapping), `links` (without the alias) and every other
+  service on a network both list, each `exact`, with `via` `depends_on`, `links` or
+  `networks.<name>`. A service with no `networks:` is on the project's `default` network, as in
+  Compose, and shares it with the others. A name no service has is dropped.
+- **Variables.** `${VAR:-d}` and `${VAR-d}` resolve to `d` (itself expanded) and mark the text
+  overridable; `${VAR}`, `$VAR`, `${VAR:?e}` and `${VAR:+a}` stay in the text as `${VAR}`, the
+  unresolved part the image contract turns into a wildcard; `$$` is `$`.
+- **Image and build.** The node records the expanded `image` and the build context, each with its
+  overridable mark. A context is kept only as a path inside the repository from its root (`.` for
+  the root itself); an absolute path, a URL, a path that climbs out of the root or one with an
+  unresolved part is not recorded. No file is touched, so no symlink is followed.
+
 ### IaC node
 
 An IaC node is a resource-like block of any format, with an address, a type, a file and a span.

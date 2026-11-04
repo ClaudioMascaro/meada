@@ -245,7 +245,7 @@ symbol, its name as `<path>::<name>` (or its identity when another repository ha
 each followed by the shape the side carries and, for a route's consumers, its drift.
 
 **An IaC node.** Its head (the node and the lines of its block), its `type:`, `name:` and
-`root:` lines, then `overridable:` (the values a deployer can override that its name went
+`root:` lines (and `image:` and `build:` for a Compose service), then `overridable:` (the values a deployer can override that its name went
 through), `references:` (the nodes it references), `referenced by:` (those that reference it),
 `images:` (a Kubernetes workload's images once its overlay's `images` applied; absent for any
 other node) and `values:` (the config values of its block), each followed by its lines or
@@ -300,6 +300,8 @@ words:
 | iac type | `type: <iac-type>` | The IaC node's type. |
 | iac name | `name: <physical-name>` | The IaC node's physical name. |
 | iac root | `root: <iac-root>` | The IaC node's root module. |
+| iac image | `image: <text><iac-mark?>` | A Compose service's image, quoted as JSON. |
+| iac build | `build: <text><iac-mark?>` | A Compose service's build context, a path inside the repository, quoted as JSON. |
 | iac section | `<iac-section>:<none?>` | The lines that follow belong to the section, or ` none` when it has none. |
 | iac reference | `<repository> <place> <address><via?>` | A node the node references, or that references it, at its block. |
 | iac overridable | `<repository> <place> <variable> (<overridable-from>)` | A root module's variable the node's name went through, where its value comes from. |
@@ -325,6 +327,8 @@ words:
 | `<overridable-from>` | `default` | Its value is its default, at the variable's block. |
 | `<overridable-from>` | `tfvars` | Its value comes from a var file (`terraform.tfvars`, `*.auto.tfvars`), at the value's line. |
 | `<via>` | ` via <text>` | What the reference went through: a variable, local or module output (`var.queue_arn`, `local.topic`, `module.orders.queue_arn`), or for a Kubernetes object how it names the other (`selector app=api`, `env DATABASE_URL`, `envFrom`, `volume settings`, `serviceAccountName`, `backend shop.example.com/api`, `defaultBackend`). |
+| `<iac-mark>` | ` (overridable)` | A default (`${VAR:-default}`) gave the text. |
+| `<iac-mark>` | ` (unresolved)` | A variable with no default is still in the text, as `${VAR}`. |
 | `<iac-pass>` | `<address> (root <iac-root>)` | The node in its root module. |
 | `<iac-pass>` | `<repository>::<path>::<address> (root <iac-root>)` | The same, when another repository has it too. |
 | `<counts>` | `<text>` | `<n> <entry-kind>` for each entry kind with processes, joined by `, `. |

@@ -569,3 +569,17 @@
   (the `ponytail:` in `index::refresh_keeping`), reading every YAML or JSON file that says
   `apiVersion`. The Kustomize `images` transformer matches the name before the tag, as written
   (a `newTag` such as `1.20` read by YAML as a number loses its zero).
+- `iac/compose.rs` (#652, ADR 0025): a Compose unit reuses `NODES_MAX`, `REFERENCES_MAX`,
+  `ROOT_STORED_MAX` and `STORED_MAX` (services past `NODES_MAX` in name order, and references past
+  `REFERENCES_MAX` per service, are left out; shared-network references take the first services of
+  the network in name order) and adds `DEFAULT_DEPTH_MAX` (8 defaults inside each other; a deeper
+  one is left unresolved). Only the four Compose names and their `.override` files are read (no
+  `-f` list, `include:`, `extends:`, `COMPOSE_FILE`, profiles or `.env` file: a variable's value
+  never comes from the environment), only `image`, `build`, `depends_on`, `links` and `networks`
+  are read, a service's lines end at its last scalar, and a service with no
+  `networks:` is on `default`, so a project of thousands of such services reaches
+  `ROOT_STORED_MAX` through its shared-network references. A build context is judged by its text: a path inside the repository that is a symlink out of
+  it is recorded (no file is touched), so the image contract must check it before reading a
+  Dockerfile there. A service with a `network_mode` is on no `default` network. A YAML merge key
+  (`<<: *anchor`) is followed at any depth and through chains of anchors. A service in an override file but no base file has the
+  override's path. A changed Compose file evaluates again the root of its directory, with Terraform's.

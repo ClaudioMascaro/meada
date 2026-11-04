@@ -1,0 +1,13 @@
+example.com/acme/infra stack/compose.override.yaml:8 services.cache (service, root stack)
+example.com/acme/infra stack/compose.yaml:2 services.web (service, root stack)
+example.com/acme/infra stack/compose.yaml:9 services.api (service, root stack)
+example.com/acme/infra stack/compose.yaml:22 services.db (service, root stack)
+example.com/acme/infra tools/docker-compose.yml:2 services.escape (service, root tools)
+example.com/acme/infra tools/docker-compose.yml:4 services.remote (service, root tools)
+example.com/acme/infra tools/docker-compose.yml:6 services.unset (service, root tools)
+
+example.com/acme/infra stack/compose.yaml:2 services.web (service, root stack)
+
+example.com/acme/infra stack/compose.override.yaml:8 services.cache (service, root stack)
+
+no matches for `nothing-here`

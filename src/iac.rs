@@ -50,6 +50,7 @@ use crate::trace::Direction;
 use meada_core::export::Level;
 use meada_core::trace::{Chain, Row};
 
+mod compose;
 mod functions;
 
 /// The instances one `count` or `for_each` gives; past it the block is one node with no key.
@@ -103,9 +104,19 @@ const ROOT_STORED_MAX: usize = 4 * MAX_BYTES;
 // calling one exploding module would pass it.
 const STORED_MAX: usize = 16 * MAX_BYTES;
 
-/// Whether the file at `path` holds IaC nodes: a `.tf` or `.tofu` file (HCL).
+/// Whether the file at `path` holds IaC nodes: a `.tf` or `.tofu` file (HCL), or a Compose file
+/// or its override by name (#652).
 pub(crate) fn is_source(path: &str) -> bool {
-    path.ends_with(".tf") || path.ends_with(".tofu")
+    path.ends_with(".tf") || path.ends_with(".tofu") || compose::is_file(path)
+}
+
+/// A text a node records (a Compose service's image or build context) after its variables were
+/// expanded: `${VAR:-default}` is the default, with `overridable` set, and a variable with no
+/// default stays in the text as `${VAR}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Resolved {
+    pub text: String,
+    pub overridable: bool,
 }
 
 /// Whether the file at `path` is a var file Terraform loads by itself into its directory's root
@@ -154,6 +165,10 @@ pub(crate) struct Node {
     pub end_line: usize,
     /// The key path of its block, which its config values start with.
     pub block: String,
+    /// The image a Compose service runs.
+    pub image: Option<Resolved>,
+    /// The build context of a Compose service: a path inside the repository from its root.
+    pub build: Option<Resolved>,
 }
 
 /// A root module's variable a name went through: by its default, or by the value a var file
@@ -1017,6 +1032,8 @@ impl<'m> Eval<'m> {
                     line: block.line,
                     end_line: block.end_line,
                     block: block.key_path(),
+                    image: None,
+                    build: None,
                 });
                 let local = (block.source.as_deref())
                     .and_then(|s| local_source(dir, s))
@@ -1450,6 +1467,8 @@ fn label(dir: &str) -> &str {
 /// The Terraform files of one repository read into modules, one per directory.
 pub(crate) struct Repository {
     modules: BTreeMap<String, Module>,
+    /// The Compose files (#652), by path.
+    compose: Vec<(String, Vec<u8>)>,
 }
 
 impl Repository {
@@ -1458,11 +1477,16 @@ impl Repository {
         let mut modules: BTreeMap<String, Module> = BTreeMap::new();
         let mut sorted: Vec<&(String, Vec<u8>)> = files.iter().collect();
         sorted.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut compose = Vec::new();
         for (path, src) in sorted {
+            if compose::is_file(path) {
+                compose.push((path.clone(), src.clone()));
+                continue;
+            }
             let dir = config_values::parent(path).to_string();
             read(path, src, modules.entry(dir).or_default());
         }
-        Repository { modules }
+        Repository { modules, compose }
     }
 
     /// The directories each local module call of the module at `dir` names.
@@ -1471,11 +1495,11 @@ impl Repository {
             .filter_map(move |b| b.source.as_deref().and_then(|s| local_source(dir, s)))
     }
 
-    /// Each root module, by its label, with its evaluation unit: its directory and those of the
-    /// local modules it calls, however deep (up to `MODULE_DEPTH_MAX`), whether they hold files
-    /// or not. A directory another one calls as a local module is evaluated only through its
-    /// calls, so it is no root.
-    pub(crate) fn units(&self) -> Vec<(String, BTreeSet<String>)> {
+    /// The Terraform root modules by directory, each with its evaluation unit: its directory and
+    /// those of the local modules it calls, however deep (up to `MODULE_DEPTH_MAX`), whether they
+    /// hold files or not. A directory another one calls as a local module is evaluated only
+    /// through its calls, so it is no root.
+    fn terraform_units(&self) -> BTreeMap<&str, BTreeSet<String>> {
         let called: HashSet<String> = (self.modules.keys())
             .flat_map(|dir| self.calls(dir).filter(move |t| t != dir))
             .collect();
@@ -1491,24 +1515,57 @@ impl Repository {
                         .collect();
                     level = next;
                 }
-                (label(root).to_string(), unit)
+                (root.as_str(), unit)
             })
             .collect()
     }
 
-    /// The IaC nodes and references of the root modules whose label `pick` keeps, each evaluated
-    /// alone, in root and file order, with `left` bytes to store them all.
+    /// Each root, by its label, with its evaluation unit: a Terraform root module with its
+    /// called modules, or the directory of a Compose project (#652), which joins the Terraform
+    /// root of the same directory.
+    pub(crate) fn units(&self) -> Vec<(String, BTreeSet<String>)> {
+        let mut units: BTreeMap<String, BTreeSet<String>> = (self.terraform_units().into_iter())
+            .map(|(dir, unit)| (dir.to_string(), unit))
+            .collect();
+        for (path, _) in &self.compose {
+            let dir = config_values::parent(path).to_string();
+            units.entry(dir.clone()).or_default().insert(dir);
+        }
+        units
+            .into_iter()
+            .map(|(dir, unit)| (label(&dir).to_string(), unit))
+            .collect()
+    }
+
+    /// The IaC nodes and references of the roots whose label `pick` keeps, each evaluated alone,
+    /// in root and file order, with `left` bytes to store them all.
     pub(crate) fn evaluate(
         &self,
         pick: impl Fn(&str) -> bool,
         left: usize,
     ) -> (Vec<Node>, Vec<Reference>) {
         let mut eval = Eval::new(&self.modules, left);
+        let terraform = self.terraform_units();
+        let mut compose_dirs: Vec<&str> = (self.compose.iter())
+            .map(|(p, _)| config_values::parent(p))
+            .collect();
+        compose_dirs.dedup();
         for (root, _) in self.units() {
-            if pick(&root) {
-                let dir = if root == "." { "" } else { root.as_str() };
-                let (dir, _) = self.modules.get_key_value(dir).expect("a root is a module");
+            if !pick(&root) {
+                continue;
+            }
+            let dir = if root == "." { "" } else { root.as_str() };
+            if let Some((dir, _)) = terraform.get_key_value(dir) {
                 eval.root(dir);
+            }
+            if compose_dirs.contains(&dir) {
+                let files: Vec<(String, Vec<u8>)> = (self.compose.iter())
+                    .filter(|(p, _)| config_values::parent(p) == dir)
+                    .cloned()
+                    .collect();
+                let (nodes, references) = compose::evaluate(&files, &mut eval.left);
+                eval.nodes.extend(nodes);
+                eval.references.extend(references);
             }
         }
         (eval.nodes, eval.references)
@@ -1566,11 +1623,19 @@ pub(crate) fn refresh(
     insert(tx, &nodes, &references)
 }
 
-/// The condition that the file in `column` is a Terraform file. The Terraform and the Kubernetes
-/// nodes (#651) share the tables, and a Terraform root and a Kubernetes unit may share a label,
-/// so each side touches the rows of its own files only.
+/// The condition that the file in `column` is one this module reads: a Terraform file or, since
+/// #652, a Compose file. The Terraform and Compose nodes and the Kubernetes nodes (#651) share
+/// the tables, and a Terraform root and a Kubernetes unit may share a label, so each side touches
+/// the rows of its own files only.
 fn terraform_path(column: &str) -> String {
-    format!("({column} LIKE '%.tf' OR {column} LIKE '%.tofu')")
+    let mut any = vec![
+        format!("{column} LIKE '%.tf'"),
+        format!("{column} LIKE '%.tofu'"),
+    ];
+    for name in compose::NAMES {
+        any.push(format!("{column} = '{name}' OR {column} LIKE '%/{name}'"));
+    }
+    format!("({})", any.join(" OR "))
 }
 
 /// Deletes the stored nodes and references of the Terraform files (`terraform`) or of the
@@ -1604,10 +1669,11 @@ pub(crate) fn forget(tx: &Transaction, root: Option<&str>, terraform: bool) -> R
 /// Stores `nodes` and `references`.
 pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference]) -> Result<()> {
     let mut insert = tx
-        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)")?;
+        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)")?;
     for n in nodes {
         let (line, end) = (n.line as i64, n.end_line as i64);
         let overridable = serde_json::to_string(&n.overridable)?;
+        let (image, build) = (n.image.as_ref(), n.build.as_ref());
         insert.execute(params![
             n.address,
             n.root,
@@ -1618,7 +1684,11 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
             n.path,
             line,
             end,
-            n.block
+            n.block,
+            image.map(|i| &i.text),
+            image.map(|i| i.overridable),
+            build.map(|b| &b.text),
+            build.map(|b| b.overridable),
         ])?;
     }
     let mut insert = tx.prepare_cached("INSERT INTO iac_references VALUES (?1, ?2, ?3, ?4)")?;
@@ -1629,8 +1699,18 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
 }
 
 /// The columns of a node, in `row`'s order.
-const COLUMNS: &str =
-    "address, root, type, name, pattern, overridable, path, line, end_line, block";
+const COLUMNS: &str = "address, root, type, name, pattern, overridable, path, line, end_line, \
+                       block, image, image_overridable, build, build_overridable";
+
+/// The text at column `at` and its overridable flag at the next one, when there is a text.
+fn resolved(r: &rusqlite::Row, at: usize) -> rusqlite::Result<Option<Resolved>> {
+    let text: Option<String> = r.get(at)?;
+    let overridable: Option<bool> = r.get(at + 1)?;
+    Ok(text.map(|text| Resolved {
+        text,
+        overridable: overridable.unwrap_or(false),
+    }))
+}
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Node> {
     let overridable: String = r.get(5)?;
@@ -1645,6 +1725,8 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Node> {
         line: r.get::<_, i64>(7)? as usize,
         end_line: r.get::<_, i64>(8)? as usize,
         block: r.get(9)?,
+        image: resolved(r, 10)?,
+        build: resolved(r, 12)?,
     })
 }
 
@@ -1771,13 +1853,27 @@ fn references(
     let mut statement = db.prepare(&sql)?;
     let mut found: Vec<(Node, Option<String>)> = statement
         .query_map(params![node.root, node.address], |r| {
-            Ok((row(r)?, r.get(10)?))
+            Ok((row(r)?, r.get(14)?))
         })?
         .collect::<rusqlite::Result<_>>()?;
     found.sort_by(|(a, va), (b, vb)| {
         (&a.path, a.line, &a.address, va).cmp(&(&b.path, b.line, &b.address, vb))
     });
     Ok(found)
+}
+
+/// A recorded text as JSON, then ` (overridable)` when a default gave it and ` (unresolved)` when
+/// a variable with no default is still in it.
+fn resolved_shown(f: &Resolved) -> String {
+    let marks = [
+        (f.overridable, " (overridable)"),
+        (f.text.contains("${"), " (unresolved)"),
+    ];
+    let marks: String = marks.iter().filter(|m| m.0).map(|m| m.1).collect();
+    format!(
+        "{}{marks}",
+        serde_json::to_string(&f.text).unwrap_or_default()
+    )
 }
 
 /// `<identity> <path>:<line> <address>`, then ` via <name>` when the reference went through one.
@@ -1810,6 +1906,11 @@ pub(crate) fn context(repos: &[(&str, &Connection)], text: &str) -> Result<Optio
         format!("name: {name}"),
         format!("root: {}", n.root),
     ];
+    for (title, field) in [("image", &n.image), ("build", &n.build)] {
+        if let Some(f) = field {
+            lines.push(format!("{title}: {}", resolved_shown(f)));
+        }
+    }
     let overridable = (n.overridable.iter()).map(|o| {
         let from = if o.tfvars { "tfvars" } else { "default" };
         format!("{identity} {}:{} {} ({from})", o.path, o.line, o.variable)

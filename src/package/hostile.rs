@@ -122,6 +122,16 @@ fn tree(files: Vec<(String, String)>) -> usize {
     nodes.chain(references).sum()
 }
 
+/// The bytes of the addresses the IaC nodes and references of `text`, a lone `compose.yaml`,
+/// store.
+fn compose(text: String) -> usize {
+    let (nodes, references) = crate::iac::evaluate(&[("compose.yaml".into(), file(text))]);
+    let nodes = nodes.iter().map(|n| n.address.len());
+    let references = (references.iter())
+        .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
+    nodes.chain(references).sum()
+}
+
 /// The bytes of the addresses, references, images and unresolved entries `kube::evaluate` stores
 /// for the files `files` (path and text) of one repository.
 fn objects(files: Vec<(&str, String)>) -> usize {
@@ -836,6 +846,20 @@ fn probes() -> Vec<Probe> {
             nodes(fill(1, |i| {
                 format!("resource \"a\" \"r{i}\" {{ count = 1000 }}\n")
             }))
+        }),
+        ("compose: many services on one network", || {
+            let services = fill(1, |i| format!("  s{i}:\n    networks: [n]\n"));
+            compose(format!("services:\n{services}"))
+        }),
+        ("compose: a default naming a default", || {
+            let nest = "${A:-".repeat(5000) + "x" + &"}".repeat(5000);
+            compose(format!("services:\n  a:\n    image: {nest}\n"))
+        }),
+        ("compose: an alias per service", || {
+            let services = fill(1, |i| format!("  s{i}: *base\n"));
+            compose(format!(
+                "x: &base {{image: a, depends_on: [s0]}}\nservices:\n{services}"
+            ))
         }),
         // Kubernetes and Kustomize (#651): what one repository's evaluation stores
         ("kustomize: a chain of bases", || {

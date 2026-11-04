@@ -57,7 +57,8 @@ CREATE VIRTUAL TABLE config_search USING fts5(
 CREATE TABLE iac_nodes (
     address TEXT NOT NULL, root TEXT NOT NULL, type TEXT NOT NULL, name TEXT,
     pattern INTEGER NOT NULL, overridable TEXT NOT NULL, path TEXT NOT NULL,
-    line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL
+    line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
+    image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -3294,6 +3295,8 @@ Output {
             line: 29,
             end_line: 32,
             block: "[2]",
+            image: None,
+            build: None,
         },
         Node {
             address: "Deployment.apps/shop/dev-web",
@@ -3308,6 +3311,8 @@ Output {
             line: 3,
             end_line: 19,
             block: "[0]",
+            image: None,
+            build: None,
         },
         Node {
             address: "Service/shop/dev-web",
@@ -3322,6 +3327,8 @@ Output {
             line: 21,
             end_line: 27,
             block: "[1]",
+            image: None,
+            build: None,
         },
         Node {
             address: "ServiceAccount/shop/dev-runner",
@@ -3336,6 +3343,8 @@ Output {
             line: 34,
             end_line: 37,
             block: "[3]",
+            image: None,
+            build: None,
         },
     ],
     references: [

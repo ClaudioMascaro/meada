@@ -407,6 +407,23 @@ too, addressed `<Kind>[.<group>]/<namespace>/<name>` (`Deployment.apps/shop/api`
   overlay applied its `images`.
 - **Not read**: patches, generators, `commonLabels`, Helm templates and `kind: List`.
 
+### Compose
+
+A Compose file (`compose.yaml`, `compose.yml`, `docker-compose.yaml` or `docker-compose.yml`)
+with its override file (`compose.override.*`, `docker-compose.override.*`) in the same directory
+is read as one project, rooted at the directory. Each service is an IaC node `services.<name>`
+of type `service`.
+
+- **References**: `depends_on`, `links` and the services that share a network (`networks:`; a service with none is on `default`),
+  shown with `via depends_on`, `via links` or `via networks.<name>`. A name no service has is
+  dropped.
+- **Variables**: `${VAR:-default}` resolves to its default and `context` marks it
+  `(overridable)`; `${VAR}` stays in the text as an unresolved part, marked `(unresolved)`.
+- **Image and build**: `context` shows the service's `image:` and `build:`, kept for the image
+  contract. A build context is kept as a path inside the repository from its root; an absolute
+  path, a URL, one that climbs out of the root or one with an unresolved part is not.
+- **Queries**: as for Terraform nodes, `search` with `kind = "iac"`, `context` and `trace`.
+
 ## 4. `meada.toml`: reference
 
 Each repository may have a `meada.toml` at its root, versioned in git, that says who it talks to.

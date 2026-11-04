@@ -193,6 +193,16 @@ this file, and a change to these modules updates it.
   written. `store` rewrites `iac_images` and `iac_unresolved`, `images` feeds `iac::context`,
   `status` is the `Msg::KustomizeUnresolved` line, and `changed` tells `index::refresh` that a
   file read again or left holds, or held, objects.
+- `iac/compose.rs` (#652, ADR 0025): Compose services as IaC nodes. `is_file` names the Compose and
+  override files (`iac::is_source` includes them, so a changed one is an input of `refresh`);
+  `Repository::read` keeps them apart and `Repository::evaluate` hands a root's directory to
+  `compose::evaluate(files, left)`, one unit per directory, joining the Terraform root of the
+  same directory (the
+  first base name that exists plus the override of its family: `read` each with the event reader,
+  `merge` the override in), a node `services.<name>` of type `service` per service with its
+  `image` and `build` (`iac::Resolved`: text and overridable flag, from `expand` and `context`,
+  which keeps a build path only inside the repository) and its references from `depends_on`,
+  `links` and shared `networks`. `iac::context` prints `image:` and `build:` for them.
 - `shape.rs` (in `meada-core`, reached as `crate::shape`; spec #21, ADR 0009): `Shape {source, fields, open, scalars, declared, optional,
   imports, guessed}`, the one form of what a
   contract carries, whatever it is read from, so shape drift (spec #23) compares shapes without

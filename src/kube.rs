@@ -647,6 +647,8 @@ impl<'m> Eval<'m> {
                 line: o.line,
                 end_line: o.end_line,
                 block: o.block.clone(),
+                image: None,
+                build: None,
             });
         }
         let (objs, addresses) = (&objs[..kept], &addresses[..kept]);

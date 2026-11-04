@@ -1,0 +1,30 @@
+example.com/acme/infra stack/compose.yaml:2 services.web
+  example.com/acme/infra stack/compose.yaml:9 services.api via depends_on
+    example.com/acme/infra stack/compose.yaml:2 services.web via networks.front (cycle)
+    example.com/acme/infra stack/compose.yaml:22 services.db via depends_on
+      example.com/acme/infra stack/compose.yaml:9 services.api via networks.back (cycle)
+    example.com/acme/infra stack/compose.yaml:22 services.db via links (see above)
+    example.com/acme/infra stack/compose.yaml:22 services.db via networks.back (see above)
+  example.com/acme/infra stack/compose.yaml:9 services.api via networks.front (see above)
+chain: exact · 0 hops · 1 repos · 174 tokens
+
+example.com/acme/infra stack/compose.yaml:22 services.db
+  example.com/acme/infra stack/compose.yaml:9 services.api via networks.back
+    example.com/acme/infra stack/compose.yaml:2 services.web via networks.front
+      example.com/acme/infra stack/compose.yaml:9 services.api via depends_on (cycle)
+      example.com/acme/infra stack/compose.yaml:9 services.api via networks.front (cycle)
+    example.com/acme/infra stack/compose.yaml:22 services.db via depends_on (cycle)
+    example.com/acme/infra stack/compose.yaml:22 services.db via links (cycle)
+    example.com/acme/infra stack/compose.yaml:22 services.db via networks.back (cycle)
+chain: exact · 0 hops · 1 repos · 172 tokens
+
+example.com/acme/infra stack/compose.yaml:22 services.db
+  example.com/acme/infra stack/compose.override.yaml:8 services.cache via depends_on
+  example.com/acme/infra stack/compose.yaml:9 services.api via depends_on
+    example.com/acme/infra stack/compose.yaml:2 services.web via depends_on
+      example.com/acme/infra stack/compose.yaml:9 services.api via networks.front (cycle)
+    example.com/acme/infra stack/compose.yaml:2 services.web via networks.front (see above)
+    example.com/acme/infra stack/compose.yaml:22 services.db via networks.back (cycle)
+  example.com/acme/infra stack/compose.yaml:9 services.api via links (see above)
+  example.com/acme/infra stack/compose.yaml:9 services.api via networks.back (see above)
+chain: exact · 0 hops · 1 repos · 195 tokens

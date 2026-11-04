@@ -111,14 +111,15 @@ pub(crate) fn schema_version() -> i32 {
 /// three reaches the export. `iac_nodes` holds each IaC node (#649, `iac::Node`: its address, the
 /// label of its root module, its type, physical name as static evaluation resolves it (#650),
 /// whether that is a `pattern`, the `overridable` values it went through as JSON, file, first and
-/// last line, and the key path of its block) and `iac_references` each reference between two
-/// nodes of one root (`iac::Reference`). The Terraform ones are rewritten root by root
-/// (`iac::refresh`) for the roots whose evaluation unit holds a Terraform file or var file that
-/// changed, the Kubernetes ones (#651, `kube::Node` rows of YAML and JSON files, told apart by
-/// their path) whole when a Kubernetes file changed (`kube::refresh`). `iac_images` holds the
-/// images of a Kubernetes workload once its overlay changed them (`kube::Image`) and
-/// `iac_unresolved` the Kustomize entries not followed (`kube::Unresolved`), rewritten with
-/// them. None is exported.
+/// last line, the key path of its block and, for a Compose service (#652), its image and build
+/// context with a flag each for a default that gave it) and `iac_references` each reference
+/// between two nodes of one root (`iac::Reference`). The Terraform ones are rewritten root by
+/// root (`iac::refresh`) for the roots whose evaluation unit holds a Terraform file, var file or
+/// Compose file that changed, the Kubernetes ones (#651, `kube::Node` rows of YAML and JSON
+/// files, told apart by their path) whole when a Kubernetes file changed (`kube::refresh`).
+/// `iac_images` holds the images of a Kubernetes workload once its overlay changed them
+/// (`kube::Image`) and `iac_unresolved` the Kustomize entries not followed (`kube::Unresolved`),
+/// rewritten with them. None is exported.
 pub(crate) const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -179,7 +180,8 @@ CREATE VIRTUAL TABLE config_search USING fts5(
 CREATE TABLE iac_nodes (
     address TEXT NOT NULL, root TEXT NOT NULL, type TEXT NOT NULL, name TEXT,
     pattern INTEGER NOT NULL, overridable TEXT NOT NULL, path TEXT NOT NULL,
-    line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL
+    line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
+    image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);

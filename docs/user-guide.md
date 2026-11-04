@@ -405,6 +405,24 @@ endereço `<Kind>[.<grupo>]/<namespace>/<nome>` (`Deployment.apps/shop/api`,
   com o que cada contêiner roda depois que o overlay aplicou as `images`.
 - **Não lidos**: patches, geradores, `commonLabels`, templates Helm e `kind: List`.
 
+### Compose
+
+Um arquivo Compose (`compose.yaml`, `compose.yml`, `docker-compose.yaml` ou
+`docker-compose.yml`) com o arquivo de override (`compose.override.*`, `docker-compose.override.*`)
+na mesma pasta é lido como um projeto, enraizado na pasta. Cada serviço é um nó IaC
+`services.<nome>` do tipo `service`.
+
+- **Referências**: `depends_on`, `links` e os serviços que compartilham uma rede (`networks:`; um serviço sem nenhuma está em `default`),
+  mostradas com `via depends_on`, `via links` ou `via networks.<nome>`. Um nome que nenhum
+  serviço tem é descartado.
+- **Variáveis**: `${VAR:-padrão}` resolve para o padrão e o `context` o marca `(overridable)`;
+  `${VAR}` fica no texto como parte não resolvida, marcada `(unresolved)`.
+- **Imagem e build**: o `context` mostra `image:` e `build:` do serviço, guardados para o
+  contrato de imagem. Um contexto de build é guardado como caminho dentro do repositório, a
+  partir da raiz; caminho absoluto, URL, um que sobe para fora da raiz ou um com parte não
+  resolvida não são.
+- **Consultas**: como nos nós Terraform, `search` com `kind = "iac"`, `context` e `trace`.
+
 ## 4. `meada.toml`: referência
 
 Cada repositório pode ter um `meada.toml` na raiz, versionado no git, que diz com quem ele

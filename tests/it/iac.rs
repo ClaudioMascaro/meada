@@ -242,6 +242,60 @@ fn a_refresh_with_no_terraform_file_changed_keeps_the_nodes() {
     assert!(fresh.contains("(aws_sns_topic, "), "{fresh}");
 }
 
+/// Compose (#652): a project is a Compose file with its override, each service a node
+/// `services.<name>` with `depends_on`, `links` and shared networks as references, its image and
+/// build context recorded; `${VAR:-default}` is marked overridable, `${VAR}` stays unresolved, and
+/// a build context outside the repository, a URL or an unresolved path is not recorded.
+#[test]
+fn compose_services_are_nodes_with_references_image_and_build_context() {
+    let repo = fixture_repo("iac_compose", "compose-nodes", ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let search = answers(
+        &["service", "services.web", "services.cache", "nothing-here"],
+        |q| engine.search(q, Some("iac"), None).unwrap(),
+    );
+    assert_golden("compose-nodes.search.txt", &search);
+    let questions = [
+        "services.web",
+        "services.api",
+        "services.cache",
+        "services.escape",
+        "services.remote",
+        "services.unset",
+    ];
+    let context = answers(&questions, |q| engine.context(q, None).unwrap());
+    assert_golden("compose-nodes.context.txt", &context);
+    let down = |q: &str| engine.trace(Start::From(q), Direction::Down, None).unwrap();
+    let up = |q: &str| engine.trace(Start::From(q), Direction::Up, None).unwrap();
+    let trace = [
+        answers(&["services.web", "services.db"], down),
+        answers(&["services.db"], up),
+    ];
+    assert_golden("compose-nodes.trace.txt", &trace.join("\n"));
+}
+
+/// A change to the override file changes the nodes at the next query, as a cold index gives them.
+#[test]
+fn an_edited_override_file_changes_the_compose_nodes() {
+    let repo = fixture_repo("iac_compose_edit", "compose-nodes", ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.context("services.cache", None).unwrap();
+    assert!(before.contains("redis:7"), "{before}");
+    let over = repo.join("stack/compose.override.yaml");
+    let text = fs::read_to_string(&over).unwrap();
+    fs::write(&over, text.replace("redis:7", "valkey:8")).unwrap();
+    let warm = engine.context("services.cache", None).unwrap();
+    assert!(warm.contains("valkey:8"), "{warm}");
+    let cold = Engine::open(&repo)
+        .unwrap()
+        .context("services.cache", None)
+        .unwrap();
+    assert_eq!(warm, cold);
+    fs::remove_file(&over).unwrap();
+    let gone = engine.search("services.cache", Some("iac"), None).unwrap();
+    assert!(!gone.contains("services.cache ("), "{gone}");
+}
+
 /// The fixture `terraform-names`: a root `envs/prod` whose names come from locals, variables
 /// (defaults, `terraform.tfvars`, `regions.auto.tfvars`), functions, a `for_each` over a literal
 /// set and one over a variable, a local module's input and output, `terraform.workspace`, a data
@@ -329,4 +383,43 @@ fn a_changed_var_file_evaluates_its_unit_again_and_nothing_else() {
     assert!(warm.contains("\"shop-dev-billing-queue\""), "{warm}");
     fs::remove_dir_all(repo.join(".meada")).unwrap();
     assert_eq!(warm, ask(&Engine::open(&repo).unwrap()));
+}
+
+/// A Kubernetes manifest added to a repository that holds Compose nodes evaluates the Kubernetes
+/// objects again without touching the Compose nodes, and the other way round (they share tables).
+#[test]
+fn compose_and_kubernetes_nodes_keep_each_other_when_one_changes() {
+    let repo = fixture_repo("iac_compose_kube", "compose-nodes", ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let web = engine.context("services.web", None).unwrap();
+    fs::create_dir_all(repo.join("k8s")).unwrap();
+    let pod = "apiVersion: v1\nkind: Pod\nmetadata:\n  name: probe\nspec:\n  containers: []\n";
+    fs::write(repo.join("k8s/pod.yaml"), pod).unwrap();
+    assert!(
+        engine
+            .search("probe", Some("iac"), None)
+            .unwrap()
+            .contains("Pod")
+    );
+    assert_eq!(engine.context("services.web", None).unwrap(), web);
+    let over = repo.join("stack/compose.override.yaml");
+    fs::write(
+        &over,
+        fs::read_to_string(&over)
+            .unwrap()
+            .replace("redis:7", "redis:8"),
+    )
+    .unwrap();
+    assert!(
+        engine
+            .context("services.cache", None)
+            .unwrap()
+            .contains("redis:8")
+    );
+    assert!(
+        engine
+            .search("probe", Some("iac"), None)
+            .unwrap()
+            .contains("Pod")
+    );
 }
