@@ -127,7 +127,7 @@ fn looks_like_a_limit(name: &str) -> bool {
 }
 
 /// What is wrong with the limits of `files`: a const named like a limit without a `ponytail:`
-/// marker, and a marked limit name declared twice (Known ceilings lists limits by name, so one name
+/// marker, and a marked limit name declared twice (the ceilings list limits by name, so one name
 /// stands for one limit).
 fn limit_problems(files: &[(String, String)], allowed: &[(&str, &str)]) -> Vec<String> {
     let mut problems = Vec::new();
@@ -441,9 +441,9 @@ fn every_module_has_a_line_in_the_map_naming_its_area_file() {
                     let named_in = |text: &str| written.iter().any(|w| text.contains(w.as_str()));
                     match fs::read_to_string(&area) {
                         Ok(text) if !named_in(&text) && fs::read_dir(parts).is_ok() => {
-                            let parts = (agents_markdown().into_iter())
+                            let mut split = (agents_markdown().into_iter())
                                 .filter(|(p, _)| p.starts_with(&format!("{parts}/")));
-                            if !parts.into_iter().any(|(_, text)| named_in(&text)) {
+                            if !split.any(|(_, text)| named_in(&text)) {
                                 unnamed.push(format!(
                                     "{dir}/{stem}: map/{file} and its parts never name {written:?}"
                                 ));
@@ -452,7 +452,7 @@ fn every_module_has_a_line_in_the_map_naming_its_area_file() {
                         Err(_) => unnamed.push(format!(
                             "{dir}/{stem}: links map/{file}, which does not exist"
                         )),
-                        Ok(text) if !written.iter().any(|w| text.contains(w.as_str())) => unnamed
+                        Ok(text) if !named_in(&text) => unnamed
                             .push(format!("{dir}/{stem}: map/{file} never names {written:?}")),
                         Ok(_) => {}
                     }

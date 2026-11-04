@@ -94,10 +94,12 @@ amends these tables.
 
 ### Levels
 
-- A link is `exact` when both names are as written, `inferred` when either went through a
+- A link is `exact` when both names are as written and identified by their form (a plain name
+  under a typed key is `inferred`, above), `inferred` when either went through a
   resolution (an overridable value, a workload's environment, a base URL through a Service, a
   pattern), and `ambiguous` when several candidates fit: listed, never picked, an open item
-  `meada decide` can close (ADR 0006).
+  `meada decide` can close (ADR 0006). A declared `[[resource]]` side keeps the level ADR 0005
+  gives it.
 - A name built from an overridable value (ADR 0025) links `inferred`, its reason naming the
   values it went through.
 
@@ -195,8 +197,8 @@ amends these tables.
   that kind. A repository with no IaC reports no orphan.
 - Otherwise `context` and `search` mark the side itself ("no provisioner in the workspace"),
   with no status line.
-- `meada status` also counts the config and IaC files read, skipped and redacted, and the IaC
-  nodes.
+- `meada status` also counts the config and IaC files read and skipped, the values redacted
+  (ADR 0025) and the IaC nodes.
 
 ### Export
 
@@ -225,10 +227,9 @@ value of the open `contract` identity, its kind its prefix; a site that names an
 the `<repo remote>::<file>::<address>` form (ADR 0025), the shape a documented-only side's site
 (`<repo remote>::<document>::<label>`) already has; a side read from config has the
 repository-level site a declared resource side already has, and `at` is an added optional
-field. Provisioning
-links have an array of their own precisely so that `links` keeps its meaning, a consumer linked
-to a provider. The addition ships in a minor release, and the exports of repositories with no
-config and no IaC stay byte-identical.
+field. Provisioning links have an array of their own precisely so that `links` keeps its
+meaning, a consumer linked to a provider. The addition ships in a minor release, and the exports
+of repositories with no config and no IaC stay byte-identical.
 
 ### Server mode and named workspaces
 

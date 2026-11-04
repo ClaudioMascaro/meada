@@ -29,7 +29,7 @@ Environment variables matched by name are out. Their values are secrets that Mea
 and the same value often sits under different names in each repository.
 
 (Amended 2026-11-04; #642, ADR 0026.) Infrastructure joins these kinds: an IaC node that creates a
-queue, topic, stream, bucket, table, database, cache or secret is the provisioner side of its
+queue, topic, bus, stream, bucket, table, database, cache or secret is the provisioner side of its
 channel or resource contract, reached through a provisioning link; two new kinds, image (builder
 and runner) and alert (emitter and matcher), link build to deployment and alert rules to their
 routing; and Kubernetes Services, Ingresses and IaC-declared routes join HTTP. Environment

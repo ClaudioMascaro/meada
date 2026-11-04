@@ -534,7 +534,8 @@ or a shared resource.
 _Avoid_: interface, integration
 
 **Contract kind**:
-A category of contract with its own matching rules, such as HTTP route, channel or package.
+A category of contract with its own matching rules, such as HTTP route, channel, package, resource,
+image or alert.
 A kind owns the library forms it reads in each language (the web frameworks and clients of HTTP,
 the broker clients of channels), one module per language.
 _Avoid_: contract type, protocol
@@ -606,7 +607,7 @@ SDK form that writes or reads it (`GetObject` reads, ADR 0026).
 _Avoid_: producer, subscriber
 
 **Channel**:
-A queue or topic of a broker, identified by its broker kind and its name as evaluated:
+A queue, topic, bus or stream of a broker, identified by its broker kind and its name as evaluated:
 `channel::kafka::orders.created`. The same name under two broker kinds is two channels; broker
 clusters are not modelled, so one name of one kind is one channel across the workspace. Every
 consumer of a channel links to every producer of it, in the same repository too. A Redis stream
@@ -675,7 +676,9 @@ _Avoid_: alert route; router (HTTP vocabulary), source and sink (for emitter and
 **Link**:
 A connection Meada makes between a consumer and a provider through a contract. It carries a
 level and a reason. A **provisioning link** is a link of its own kind, between any other side of
-a contract and a provisioner of it (ADR 0026).
+a contract and a provisioner of it (ADR 0026). A config value that names a contract is a **use**
+side with no direction: it joins only provisioning links and orphans, never a consumer to a
+provider.
 _Avoid_: edge, bridge, connection
 
 **Level**:

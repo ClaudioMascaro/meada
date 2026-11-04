@@ -10,7 +10,7 @@
 //! section plus one line per part. No model and no network: the same text gives the same
 //! files, and the index has no second-level heading, so running this on it changes nothing.
 //! A part still past its budget has no second-level headings of its own to split by: give it
-//! some (promote its `### ` headings), then run this on the index again.
+//! some (promote its `### ` headings), then run this on that part.
 
 use std::fs;
 use std::path::Path;
@@ -67,10 +67,18 @@ fn deeper(text: &str) -> String {
 fn split(stem: &str, text: &str) -> Option<Split> {
     let mut preamble = String::new();
     let mut sections: Vec<(String, String)> = Vec::new();
-    let mut fenced = false;
+    // The marker of the open code fence: a fence closes only on its own marker.
+    let mut fence: Option<&str> = None;
     for line in text.lines() {
-        fenced ^= line.trim_start().starts_with("```") || line.trim_start().starts_with("~~~");
-        match heading(line).filter(|_| !fenced) {
+        let marker = ["```", "~~~"]
+            .into_iter()
+            .find(|m| line.trim_start().starts_with(m));
+        match (fence, marker) {
+            (None, Some(m)) => fence = Some(m),
+            (Some(open), Some(m)) if open == m => fence = None,
+            _ => {}
+        }
+        match heading(line).filter(|_| fence.is_none()) {
             Some(title) => sections.push((title.trim().to_string(), String::new())),
             None => {
                 let into = sections.last_mut().map_or(&mut preamble, |s| &mut s.1);
@@ -97,19 +105,12 @@ fn split(stem: &str, text: &str) -> Option<Split> {
         }
         let file = format!("{name}.md");
         let shown = title.replace('[', "\\[").replace(']', "\\]");
-        index.push_str(&format!("{}- [{shown}]({stem}/{file})\n", sep(&index)));
+        // One blank line between the preamble and the list, none between the list lines.
+        let sep = if parts.is_empty() { "\n" } else { "" };
+        index.push_str(&format!("{sep}- [{shown}]({stem}/{file})\n"));
         parts.push((file, format!("# {title}\n\n{}\n", deeper(body.trim()))));
     }
     Some(Split { index, parts })
-}
-
-/// The blank line the first list line follows the preamble with, none between the list lines.
-fn sep(index: &str) -> &'static str {
-    if index.ends_with("\n\n") || index.lines().last().is_some_and(|l| l.starts_with("- [")) {
-        ""
-    } else {
-        "\n"
-    }
 }
 
 fn main() -> ExitCode {
@@ -199,6 +200,18 @@ mod tests {
         for (_, part) in &split.parts {
             assert!(super::split("doc", part).is_none());
         }
+    }
+
+    #[test]
+    fn a_fence_closes_on_its_own_marker_and_a_listed_preamble_keeps_its_blank_line() {
+        let text = "# T\n\n- [old](x.md)\n\n## A\n\n~~~\n```\n## inside\n~~~\n\n## B\n\nb\n";
+        let split = split("doc", text).unwrap();
+        assert_eq!(split.parts.len(), 2);
+        assert!(split.parts[0].1.contains("## inside"));
+        assert_eq!(
+            split.index,
+            "# T\n\n- [old](x.md)\n\n- [A](doc/a.md)\n- [B](doc/b.md)\n"
+        );
     }
 
     #[test]
