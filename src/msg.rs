@@ -1452,10 +1452,11 @@ impl Msg<'_> {
     pub fn text(&self) -> String {
         use meada_core::msg::Msg as Core;
         let lang = meada_core::msg::lang();
+        // `Lang` is non_exhaustive: a language this catalog lacks reads English.
         let pick = |en: String, pt_br: String, es: String| match lang {
-            Lang::En => en,
             Lang::Pt => pt_br,
             Lang::Es => es,
+            _ => en,
         };
         match self {
             Msg::NotIndexed => pick(
