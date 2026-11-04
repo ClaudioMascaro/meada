@@ -55,7 +55,8 @@ CREATE VIRTUAL TABLE config_search USING fts5(
     tokenize='trigram case_sensitive 1'
 );
 CREATE TABLE iac_nodes (
-    address TEXT NOT NULL, root TEXT NOT NULL, type TEXT NOT NULL, name TEXT, path TEXT NOT NULL,
+    address TEXT NOT NULL, root TEXT NOT NULL, type TEXT NOT NULL, name TEXT,
+    pattern INTEGER NOT NULL, overridable TEXT NOT NULL, path TEXT NOT NULL,
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);

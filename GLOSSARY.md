@@ -87,6 +87,14 @@ wildcards fall on segment boundaries; it never links to another pattern. Not a b
 pattern.
 _Avoid_: glob, wildcard name, template
 
+**Overridable value**:
+A value a deployer can replace without editing the repository that a name went through: a
+Terraform root module's variable, by its default or by the value a `terraform.tfvars` or
+`*.auto.tfvars` file gives it (later a parameter default, a Compose or Serverless default, a Helm
+value). `context` lists those of an IaC node's name under `overridable:`; a name that went
+through one links `inferred`.
+_Avoid_: default (one kind of it), variable, input
+
 **Type table**:
 The data file embedded in Meada that says what each IaC type provisions or runs: its contract
 kind and broker or resource kind, where its physical name lives and, for a workload, where its

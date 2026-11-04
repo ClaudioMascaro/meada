@@ -11,3 +11,4 @@ boutique	values,kubernetes,kustomize,helm,image	https://github.com/GoogleCloudPl
 crossplane-aws	values,crossplane	https://github.com/upbound/platform-ref-aws	57fa3b0127c8ce263327f2d43b4e46d07fb90896	Apache-2.0
 sam-rust	values,sam,cloudformation	https://github.com/aws-samples/serverless-rust-demo	bd0164945a92ae1c05afc0b215f0eaa894e5ded9	MIT-0
 kube-prometheus	values,alert,kubernetes	https://github.com/prometheus-operator/kube-prometheus	b6c2f62b287524652592e6e2f7ea0d3054cb8ac6	Apache-2.0
+a7-names	values,terraform	probe:a7-names	-	Apache-2.0 (this repository)

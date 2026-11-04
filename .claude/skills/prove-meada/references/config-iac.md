@@ -17,6 +17,7 @@ lands it writes the check.
 |---|---|---|---|---|---|
 | Config values: `search` kind `value`, the default search's fallback, `meada status`'s config line, values kept out of the export | 1 to 17 | CLI (`meada status`, `meada export`), MCP stdio, MCP HTTP | `a7-probe` and every `infra.tsv` entry, plus `meada` | `prove.py values --http` | landed (#639) |
 | IaC nodes, Terraform: `search` kind `iac`, `context` and `trace` both ways over references, nodes kept out of the default search and the export | #649's criteria (of 18 to 31) | MCP stdio and HTTP, CLI (`meada status`, `meada export`) | `a7-iac`, `terraform-sqs` | `prove.py iac --http` | landed (#649) |
+| Static evaluation of Terraform names: evaluated names and patterns in `search` and `context`, the `overridable:` section, `count` and `for_each` over values that resolve | #650's criteria | MCP stdio and HTTP | `a7-names`, `a7-iac`, `terraform-sqs` | `prove.py iac --http` (its oracle `tf_names.py`) | landed (#650) |
 | IaC nodes of the other formats (Kubernetes, Kustomize, Compose, Crossplane, CloudFormation and SAM, Serverless) | 18 to 31 | MCP stdio and HTTP, CLI status | `boutique`, `crossplane-aws`, `sam-rust`, `kube-prometheus` | to write | pending |
 | Infrastructure contracts: provisioner sides and links, SDK and config use sides, subscriptions, patterns, orphans | 32 to 43, 57 to 60 | CLI export and status, MCP | `terraform-sqs`, `sam-rust`, `crossplane-aws` | to write | pending |
 | Workloads, image contract, environment entries | 44 to 49 | CLI export, MCP | `boutique`, `sam-rust` | to write | pending |
@@ -35,6 +36,7 @@ them (most hold no code, so their exports have no symbol).
 |---|---|---|---|---|
 | `a7-probe` | `scripts/a7-probe/` (this skill) | the working tree | Apache-2.0 | stories 6 to 13, case by case |
 | `a7-iac` | `scripts/a7-iac/` (this skill) | the working tree | Apache-2.0 | #649's Terraform shapes, case by case (its README lists them) |
+| `a7-names` | `scripts/a7-names/` (this skill) | the working tree | Apache-2.0 | #650's names: locals, variables, var files, a `for_each` over a literal set and over a variable, a local module, `terraform.workspace`, a data source, a registry module, a conditional `count`, a sensitive variable (its README lists them) |
 | `a7-noconfig` | `scripts/a7-noconfig/` (this skill) | the working tree | Apache-2.0 | a repository with no config: no config line, everything else as the base |
 | `terraform-sqs` | terraform-aws-modules/terraform-aws-sqs | `a68b4d515f9ccc729fb8bf84c6760c6b91302ce0` | Apache-2.0 | Terraform on AWS: SQS queues, a registry module family, `for_each`, examples as root modules |
 | `boutique` | GoogleCloudPlatform/microservices-demo | `c7cb6d5bfd6ea3aed768634ebbcb98cb7a523712` | Apache-2.0 | Kubernetes with Kustomize (`kustomize/`, `kubernetes-manifests/`), a Helm chart, Terraform, CI that builds the images, code in five languages |
@@ -82,7 +84,7 @@ run failed (BLOCKED).
 ```bash
 python3 -m venv --system-site-packages "$RUN/venv" && "$RUN/venv/bin/pip" install -q python-hcl2==8.1.4
 "$RUN/venv/bin/python" $S/prove.py iac --base-bin "$RUN/bin/meada-base" --head-bin "$RUN/bin/meada-head" \
-  --repos a7-iac,terraform-sqs --run "$RUN/iac" --http
+  --repos a7-iac,a7-names,terraform-sqs --run "$RUN/iac" --http
 ```
 
 Per entry it copies the entry and reads its `.tf` and `.tofu` files with `tf_oracle.py` (python-hcl2,
@@ -116,8 +118,19 @@ type, physical name, file, first and last line, root module) and the references,
 - Ties sort by path, line, address and root (search) and path, line, address and via (context,
   trace), as `docs/reference/output-grammar.md` and #649's ADR section give them.
 - A block's last line is found by matching braces outside strings, comments and heredocs.
-- A physical name is the literal `name` of a resource or data block; a module call has none (its
-  `name` is one of its inputs).
+- A physical name is the `name` of a resource or data block as `tf_names.py` evaluates it (#650);
+  a module call has none (its `name` is one of its inputs).
+- `tf_names.py` evaluates literals, templates, `var`, `local`, `each`, `count.index`, module
+  outputs, lists, conditionals, `&&`, `||`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `!` and the calls
+  `upper`, `lower`, `format` (`%s`, `%d`), `join`, `toset`, `length` and `coalesce`. Any other form is unchecked: a name it
+  cannot evaluate matches any name in `search` and its node is not sampled; a root with a `count`
+  or `for_each` it cannot evaluate is left out (its lines dropped from both answers). The report
+  counts both. A data source, a resource attribute, a registry module output,
+  `terraform.workspace`, a sensitive or undeclared variable, and a call outside ADR 0025's list
+  are `*`; a function over anything not known is `*` whole.
+- A root's variable is the last value of `terraform.tfvars`, `terraform.tfvars.json`, then the
+  `*.auto.tfvars` and `*.auto.tfvars.json` in name order, else its default, and is `overridable` (the value's line, or the variable block's first
+  line); a local module's variable is the call's argument, else its default, never overridable.
 
 A difference on one of these is a question for the maintainer, BROKEN until answered.
 

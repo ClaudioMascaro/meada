@@ -241,3 +241,92 @@ fn a_refresh_with_no_terraform_file_changed_keeps_the_nodes() {
         .unwrap();
     assert!(fresh.contains("(aws_sns_topic, "), "{fresh}");
 }
+
+/// The fixture `terraform-names`: a root `envs/prod` whose names come from locals, variables
+/// (defaults, `terraform.tfvars`, `regions.auto.tfvars`), functions, a `for_each` over a literal
+/// set and one over a variable, a local module's input and output, `terraform.workspace`, a data
+/// source and a registry module; and a root `envs/stage` calling the same module with its own
+/// var file.
+const NAMES: &str = "terraform-names";
+
+/// Static evaluation (#650): `search` shows each name as it will be created, and a name with an
+/// unresolved part as a pattern.
+#[test]
+fn search_shows_names_as_static_evaluation_resolves_them() {
+    let repo = fixture_repo("iac_names_search", NAMES, ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let queries = ["orders", "billing", "alerts", "-dlq", "replica"];
+    let search = |q: &str| engine.search(q, Some("iac"), None).unwrap();
+    assert_golden("terraform-names.search.txt", &answers(&queries, search));
+}
+
+/// `context` on a node shows its evaluated name, `(pattern)` when a part is unresolved, and the
+/// overridable values (a variable's default, a var file's value) the name went through.
+#[test]
+fn context_shows_an_evaluated_name_and_the_overridable_values_it_went_through() {
+    let repo = fixture_repo("iac_names_context", NAMES, ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let questions = [
+        "aws_sqs_queue.orders",
+        "aws_sns_topic.events",
+        "aws_sqs_queue.regional[\"us\"]",
+        "aws_sqs_queue.replica[\"us\"]",
+        "aws_sqs_queue.workspace",
+        "aws_sns_topic.account",
+        "module.billing.aws_sqs_queue.this (root envs/stage)",
+        "aws_sqs_queue.billing_dlq",
+        "aws_sqs_queue.audit_dlq",
+    ];
+    let context = |q: &str| engine.context(q, None).unwrap();
+    assert_golden("terraform-names.context.txt", &answers(&questions, context));
+}
+
+/// The evaluation unit is a root module with its local module calls (ADR 0025): a changed var
+/// file evaluates its root again and keeps every other root's rows as they are (a row rewritten
+/// by hand in `envs/prod` survives an edit to `envs/stage/terraform.tfvars`), and the answers then
+/// equal a cold index of the same files.
+#[test]
+fn a_changed_var_file_evaluates_its_unit_again_and_nothing_else() {
+    let repo = fixture_repo("iac_names_unit", NAMES, ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    engine.refresh().unwrap();
+    let db = rusqlite::Connection::open(repo.join(".meada/index.db")).unwrap();
+    db.execute(
+        "UPDATE iac_nodes SET type = 'kept' WHERE address = 'aws_sqs_queue.orders'",
+        [],
+    )
+    .unwrap();
+    let ask = |engine: &Engine| engine.search("billing", Some("iac"), None).unwrap();
+    assert!(ask(&engine).contains("\"shop-stage-billing-queue\""));
+    fs::write(
+        repo.join("envs/stage/terraform.tfvars"),
+        "environment = \"qa\"\n",
+    )
+    .unwrap();
+    let stage = ask(&engine);
+    assert!(stage.contains("\"shop-qa-billing-queue\""), "{stage}");
+    assert!(!stage.contains("shop-stage-"), "{stage}");
+    let kept = engine
+        .search("aws_sqs_queue.orders", Some("iac"), None)
+        .unwrap();
+    assert!(kept.contains("(kept, "), "{kept}");
+    // The var file of `envs/prod` evaluates `envs/prod` again.
+    fs::write(
+        repo.join("envs/prod/terraform.tfvars"),
+        "environment = \"live\"\n",
+    )
+    .unwrap();
+    let prod = engine
+        .search("aws_sqs_queue.orders", Some("iac"), None)
+        .unwrap();
+    assert!(
+        prod.contains("(aws_sqs_queue, name \"shop-live-orders\""),
+        "{prod}"
+    );
+    // A var file that leaves its root takes the root back to its defaults.
+    fs::remove_file(repo.join("envs/stage/terraform.tfvars")).unwrap();
+    let warm = ask(&engine);
+    assert!(warm.contains("\"shop-dev-billing-queue\""), "{warm}");
+    fs::remove_dir_all(repo.join(".meada")).unwrap();
+    assert_eq!(warm, ask(&Engine::open(&repo).unwrap()));
+}

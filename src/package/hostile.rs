@@ -103,10 +103,20 @@ fn stored(path: &str, text: String) -> usize {
         .sum()
 }
 
-/// The bytes of the addresses the IaC nodes and references of `text`, a lone `main.tf`, store.
+/// The bytes of the addresses and names the IaC nodes and references of `text`, a lone
+/// `main.tf`, store.
 fn nodes(text: String) -> usize {
-    let (nodes, references) = crate::iac::evaluate(&[("main.tf".into(), file(text))]);
-    let nodes = nodes.iter().map(|n| n.address.len());
+    tree(vec![("main.tf".into(), text)])
+}
+
+/// The bytes of the addresses and names the IaC nodes and references of the Terraform files
+/// `files` (path and text) store.
+fn tree(files: Vec<(String, String)>) -> usize {
+    let files: Vec<(String, Vec<u8>)> = (files.into_iter())
+        .map(|(path, text)| (path, file(text)))
+        .collect();
+    let (nodes, references) = crate::iac::evaluate(&files);
+    let nodes = (nodes.iter()).map(|n| n.address.len() + n.name.as_ref().map_or(0, String::len));
     let references = (references.iter())
         .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
     nodes.chain(references).sum()
@@ -734,6 +744,68 @@ fn probes() -> Vec<Probe> {
                 format!("module \"m{i}\" {{ source = \"./\" }}\n")
             }))
         }),
+        // Static evaluation (#650): what the names and instances one root evaluates store
+        (
+            "iac eval: a list doubled by locals under a for_each",
+            || {
+                let locals = count(40, |i| {
+                    format!("  l{} = concat(local.l{i}, local.l{i})\n", i + 1)
+                });
+                let users = fill(2, |i| {
+                    format!(
+                        "resource \"a\" \"r{i}\" {{\n  for_each = toset(local.l{})\n  name = \"${{each.key}}-${{local.s40}}\"\n}}\n",
+                        i % 41
+                    )
+                });
+                let strings = count(40, |i| {
+                    format!("  s{} = \"${{local.s{i}}}${{local.s{i}}}\"\n", i + 1)
+                });
+                nodes(format!(
+                    "locals {{\n  l0 = [\"a\", \"b\"]\n  s0 = \"ab\"\n{locals}{strings}}}\n{users}"
+                ))
+            },
+        ),
+        ("iac eval: a for in a for in a for over a wide list", || {
+            let items = count(1000, |i| format!("\"k{i}\", "));
+            let users = fill(2, |i| {
+                format!(
+                    "resource \"a\" \"r{i}\" {{ name = length([for a in local.l : [for b in local.l : [for c in local.l : 1]]]) }}\n"
+                )
+            });
+            nodes(format!("locals {{\n  l = [{items}]\n}}\n{users}"))
+        }),
+        ("iac eval: names through cyclic locals", || {
+            let n = 2000;
+            let locals = count(n, |i| {
+                format!("  a{i} = \"${{local.a{}}}-x\"\n", (i + 1) % n)
+            });
+            let users = fill(2, |i| {
+                format!("resource \"a\" \"r{i}\" {{ name = local.a{} }}\n", i % n)
+            });
+            nodes(format!("locals {{\n{locals}}}\n{users}"))
+        }),
+        (
+            "iac eval: modules nested past the ceiling, each passing a name down",
+            || {
+                let depth = 20;
+                let files = (0..depth)
+                .map(|level| {
+                    let calls = count(2, |c| {
+                        format!(
+                            "module \"m{c}\" {{\n  source = \"../l{}\"\n  name = \"${{var.name}}-{c}\"\n}}\n",
+                            level + 1
+                        )
+                    });
+                    let resources = fill(depth, |i| {
+                        format!("resource \"a\" \"r{i}\" {{ name = \"${{var.name}}-{i}\" }}\n")
+                    });
+                    let text = format!("variable \"name\" {{\n  default = \"q\"\n}}\n{calls}{resources}");
+                    (format!("l{level}/main.tf"), text)
+                })
+                .collect();
+                tree(files)
+            },
+        ),
         ("iac: wide counts", || {
             nodes(fill(1, |i| {
                 format!("resource \"a\" \"r{i}\" {{ count = 1000 }}\n")

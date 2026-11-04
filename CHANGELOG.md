@@ -58,6 +58,19 @@ All notable changes to Meada are recorded here. The format follows
   address shows the type, the physical name, the references both ways and the config values,
   and `trace` walks the references down and up. Nodes stay out of `meada export`; the index
   schema changes, so existing indexes are rebuilt (#649).
+- Static evaluation of Terraform names (ADR 0025): an IaC node's physical name (its `name` argument)
+  and each `count` and `for_each` are evaluated with `hcl-rs`'s evaluator and Meada's pure functions
+  (string, collection and conversion functions and `jsonencode`), from variable defaults, the root's
+  `terraform.tfvars`, `*.auto.tfvars` and their JSON forms, locals, local module inputs and outputs
+  per call, `each` and `count.index`, without running Terraform or reaching the network, so a
+  `for_each` over a variable gives one node per instance. Data sources, resource attributes,
+  registry modules, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_` and sensitive variables
+  are never evaluated: such a part of a name is a `*` and the name a pattern, shown as `pattern
+  "orders-*"` by `search` and `(pattern)` by `context`, and linked by nothing yet. `context` lists
+  under `overridable:` the root variables a name went through, by their default or a var file. A
+  changed Terraform file or var file evaluates again only the root modules whose unit holds it. A
+  value over 64 KiB, an expression that could make over 1 MiB and a root's evaluation past 64 MiB
+  stay unresolved. The index schema changes, so existing indexes are rebuilt (#650).
 - TypeScript consumers through `new URL(x)`: `new URL(x)` with one argument is `x` (unless the file
   declares a `URL` or imports one from a relative path), and `u.toString()`, `u.href`, `String(u)`
   and `` `${u}` `` pass the URL through, in a constant or built in place, so a `fetch` or a client

@@ -102,10 +102,12 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
     `trimprefix`, `trimsuffix`, `trimspace`, `chomp`, `replace` (a literal substring only; a
     `/.../` pattern leaves the call unresolved), `substr`;
   - collections and conversions: `concat`, `coalesce`, `element`, `keys`, `values`, `lookup`,
-    `merge`, `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber`.
-- Any other call (`file`, `templatefile`, `timestamp`, `uuid`, the hash, encoding and network
-  functions, a provider function) is unresolved and becomes a wildcard. Adding a function to the
-  list is a change to this ADR: it must be pure, total over its inputs and need no file.
+    `merge`, `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber`;
+  - encoders: `jsonencode` (#650, as Terraform writes it: compact, `<`, `>` and `&` escaped).
+- Any other call (`file`, `templatefile`, `timestamp`, `uuid`, the hash functions, the other
+  encoding functions, the network functions, a provider function) is unresolved and becomes a
+  wildcard. Adding a function to the list is a change to this ADR: it must be pure, total over its
+  inputs and need no file.
 
 ### HCL values (#640)
 
@@ -147,9 +149,8 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
 - **Instances.** Each call instantiates the called module's blocks under the call's address and
   a dot, recursively; a `count` of a literal number, or a `for_each` over an object of literal
   keys or `toset` of literal strings, gives one node per key (`[0]`, `["eu"]`, the keys sorted
-  as Terraform sorts them), and any other `count` or `for_each` one node with no key. Until the
-  static evaluation of #642's later tickets resolves variables and locals, nothing else is
-  expanded.
+  as Terraform sorts them), and any other `count` or `for_each` one node with no key. Static
+  evaluation (#650, below) widens "literal" to any value that resolves to one.
 - **References.** A traversal in any expression of a block (its arguments, nested blocks,
   `depends_on`) that names a resource, a data block or a module is a reference from the block's
   node: to the instance a literal key names, else to every instance. One through `var.<name>`
@@ -159,13 +160,56 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   references nothing goes to the module's node. References stay within their root and are all
   `exact`: names as written, followed without evaluating a value.
 - **Queries.** `search` kind `iac` matches the address, the type (`module` for a module call)
-  and the physical name, the literal of the block's `name` attribute. `context` and `trace` take
+  and the physical name, the block's `name` argument as static evaluation resolves it (#650; a
+  pattern is matched by its text, `*` and all). `context` and `trace` take
   an address, `<path>::<address>` or `<repository>::<path>::<address>`, followed by
   ` (root <root>)` when several roots hold it, and answer for a node only when no symbol (and, for
   `trace`, no route or call site) has the text, so every answer about code stays as it was.
 - **Storage.** The nodes and references are rewritten whole from the repository's Terraform files
   when one of them is read again or leaves the index, so a refresh that touches no Terraform file
-  keeps them.
+  keeps them. #650 narrows it to the evaluation units below.
+
+### Static evaluation of Terraform names (#650)
+
+- **What is evaluated.** A node's physical name (its `name` argument; a module call has none) and
+  the `count` and `for_each` of every block and module call, in the instance they belong to,
+  with `hcl-rs`'s evaluator and the functions above. Each name an expression reads is bound to
+  its value first: `var.<name>`, `local.<name>`, `module.<call>.<output>` (per instance of the
+  call, as an object, a list for a `count`, an object by key for a `for_each`), `each.key`,
+  `each.value` and `count.index`.
+- **Variables.** In a root module, a variable is the value its var files give it, or else its
+  default: `terraform.tfvars` first, then `terraform.tfvars.json`, then each `*.auto.tfvars`
+  and `*.auto.tfvars.json` of the root's directory in name order, a later file winning, as
+  Terraform loads them by itself (a JSON var file's strings are literals). Either is **overridable**: the
+  name records the variable and where its value is (the variable's block for a default, the
+  value's line for a var file), and `context` lists them. In a local module, a variable is the
+  call's argument, evaluated in the caller with the call instance's `each` (it carries what the
+  argument went through), or else its default, which no deployer sets. A variable with
+  `sensitive = true` is never evaluated, so its value never reaches a name.
+- **Never evaluated**: data sources, resource attributes (even an argument the configuration
+  sets), registry and remote modules, `terraform.workspace`, `path.*`, `-var`, any `-var-file`
+  other than the ones Terraform loads by itself, `TF_VAR_` and any function outside the list.
+- **Unresolved parts.** An expression that does not evaluate whole keeps what it can by its form:
+  a template keeps its literal text and each interpolation that resolves, every other part (an
+  interpolation that does not resolve, a directive) a `*`, consecutive `*` merged into one;
+  `var.<x>`, `local.<x>` or `module.<call>.<output>` alone is that name's value, a pattern
+  included; anything else (a function over an unresolved value, an operator, a conditional) is
+  `*` whole. The name is then a **pattern**: `search` shows it as `pattern "orders-*"` in place of
+  `name`, and `context` as `name: "orders-*" (pattern)`. A pattern links nothing yet (ADR 0026
+  fixes how it will).
+- **Expansion.** A `count` that resolves to a whole number, or a `for_each` that resolves to an
+  object or a list of strings (`toset` sorts and dedupes strings), gives one node per key, up to
+  `EXPANSION_MAX`; a `count` or `for_each` that reads a module output is evaluated before the
+  module has instances, so it does not resolve.
+- **Ceilings.** Besides the ones above, `EVAL_VALUE_MAX` (64 KiB of one value), `EVAL_COST_MAX`
+  (1 MiB that one expression could make, an upper bound computed from the sizes of the values it
+  reads, products for a `for`, `formatlist`, `join` and `replace`) and `EVAL_WORK_MAX` (64 MiB of
+  that cost per root module); past each, the value is unresolved. A `format` width past
+  `WIDTH_MAX` (256) leaves the call unresolved.
+- **Evaluation unit.** A root module with the directories of the local modules it calls, however
+  deep (up to `MODULE_DEPTH_MAX`). A refresh evaluates again the roots whose unit holds a
+  directory where a Terraform file or a var file was read again or left, and the roots not
+  stored yet, drops the rows of the roots that are no more, and keeps every other root's rows.
 
 ### IaC node
 

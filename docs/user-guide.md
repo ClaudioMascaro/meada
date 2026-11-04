@@ -178,12 +178,13 @@ tem três caracteres ou mais (uma consulta menor varre as linhas, com a mesma re
 índice já tinha.
 
 Com `kind = "iac"`, cada linha é um nó IaC: `<repositório> <caminho>:<linha> <endereço> (<tipo>,
-name "<nome físico>", root <módulo raiz>)`, sem o `name` quando o bloco não tem um atributo
-`name` literal. A busca sem `kind` não responde com nós IaC.
+name "<nome físico>", root <módulo raiz>)`, sem o `name` quando o bloco não tem atributo `name`,
+e com `pattern` no lugar quando uma parte do nome não se resolve (`pattern "orders-*"`). A busca
+sem `kind` não responde com nós IaC.
 
 ```text
 example.com/acme/infra envs/prod/main.tf:35 aws_sqs_queue.dlq[0] (aws_sqs_queue, name "dead-letters", root envs/prod)
-example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, root envs/prod)
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, name "orders", root envs/prod)
 ```
 
 #### `context`: entender um símbolo
@@ -196,7 +197,9 @@ example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this 
 Devolve a comunidade e os processos do símbolo, o trecho de código lido do disco, quem o chama
 (`callers:`), quem ele chama (`callees:`) e os contratos que ele toca (`contracts:`). Num recurso,
 lista quem escreve e quem lê; num canal, os produtores e os consumidores. Num nó IaC, o tipo, o
-nome físico, o módulo raiz, os nós que ele referencia (`references:`), os que o referenciam
+nome físico (seguido de `(pattern)` quando uma parte não se resolve), o módulo raiz, as
+variáveis da raiz por onde o nome passou (`overridable:`, cada uma com `(default)` ou
+`(tfvars)`), os nós que ele referencia (`references:`), os que o referenciam
 (`referenced by:`), cada um com o nome por onde passou (`via var.queue_arn`), e os valores de
 configuração do bloco (`values:`). Um endereço que mais de um módulo raiz tem lista os nós, cada
 um com o que passar: `<endereço> (root <módulo raiz>)`. Um símbolo do código com o mesmo nome
@@ -351,10 +354,25 @@ raiz).
 
 - **Endereços**: `<tipo>.<nome>`, `data.<tipo>.<nome>` e `module.<nome>`. Cada chamada de um
   módulo local instancia os blocos dele com o endereço da chamada na frente
-  (`module.orders.aws_sqs_queue.this`); um `count` ou um `for_each` sobre literais dá um nó por
-  instância, com `[chave]` no fim (`aws_sqs_queue.dlq[0]`,
+  (`module.orders.aws_sqs_queue.this`); um `count` ou um `for_each` sobre valores que se
+  resolvem em literais dá um nó por instância, com `[chave]` no fim (`aws_sqs_queue.dlq[0]`,
   `aws_cloudwatch_metric_alarm.depth["orders"]`).
-  Um `count` ou `for_each` que não é literal dá um nó só, sem chave.
+  Um `count` ou `for_each` que não se resolve (abaixo) dá um nó só, sem chave.
+- **Avaliação estática**: o nome físico (o argumento `name`) e cada `count` e `for_each` são
+  avaliados como o Terraform faria, sem rodá-lo nem acessar a rede: os defaults das variáveis, os
+  valores do `terraform.tfvars`, dos `*.auto.tfvars` e das suas formas JSON da raiz (nessa ordem, o
+  arquivo seguinte vencendo), os locals, as entradas e saídas de um módulo local por chamada,
+  `each`, `count.index`, templates e as funções puras `format`, `formatlist`, `join`, `split`,
+  `lower`, `upper`, `title`, `trim`, `trimprefix`, `trimsuffix`, `trimspace`, `chomp`, `replace`
+  (uma substring literal), `substr`, `concat`, `coalesce`, `element`, `keys`, `values`, `lookup`,
+  `merge`, `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber` e `jsonencode`. Data
+  sources, atributos de resources, módulos do registro, `terraform.workspace`, `-var`, `-var-file`,
+  `TF_VAR_`, variáveis sensíveis e qualquer outra função nunca são avaliados: essa parte do nome
+  vira um `*` e o nome um **padrão** (`"orders-${terraform.workspace}"` é `orders-*`), que por
+  enquanto não liga nada. Um nome que passou por uma variável do módulo raiz a lista em
+  `overridable:`, já que quem faz o deploy pode passar outro valor. Um arquivo Terraform ou de
+  variáveis alterado avalia de novo só os módulos raiz cuja unidade (a raiz e os módulos locais que
+  ela chama) o contém.
 - **Referências**: uma expressão que nomeia um resource, um bloco data ou um módulo é uma
   referência do nó dela, guardada como uma chamada. Uma que passa por `var.<nome>`, `local.<nome>`
   ou a saída de um módulo (`module.<nome>.<saída>`) é seguida até o que o argumento da chamada,

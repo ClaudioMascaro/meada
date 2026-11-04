@@ -13,7 +13,9 @@
   blocks, deep brackets, a long heredoc, a heredoc of interpolations, a long expression, many
   tfvars), the IaC nodes one root stores (`iac::evaluate`, #649: a chain of resources, locals
   naming each other twice, every resource naming a wide local, a module calling itself, wide
-  counts), and the walks
+  counts; #650's evaluator: a list doubled by locals under a `for_each`, a `for` in a `for` in a
+  `for` over a wide list, names through cyclic locals, modules nested past the ceiling each
+  passing a name down), and the walks
   `Maven::entries` and `Nuget::entries` over modules and projects that pass on to each other.
   Each row builds a file within `lang::MAX_BYTES` (many keys, deep nesting, wide fan-out), reads
   it on a thread of its own and answers the size of what came back; the test holds every row to
@@ -35,7 +37,13 @@
   `context` and `trace` both ways against `terraform-nodes.{search,context,trace}.txt`, the default
   search leaving nodes out, an edited, added and deleted `.tf` file equal to a cold index, and a
   row rewritten by hand surviving a refresh no Terraform file changed in, and no node in the
-  export), `decorations` (the `decorations` fixture: Java, Kotlin, C#,
+  export; #650's `terraform-names` fixture, a root `envs/prod` naming its nodes from locals,
+  variables, `terraform.tfvars`, `regions.auto.tfvars`, functions, a `for_each` over a literal
+  set and one over a variable, a local module's input and output, `terraform.workspace`, a data
+  source and a registry module, and a root `envs/stage` calling the same module: `search` and
+  `context` against `terraform-names.{search,context}.txt`, and a changed var file evaluating
+  its root again while a row rewritten by hand in the other root survives), `decorations` (the
+  `decorations` fixture: Java, Kotlin, C#,
   Python and Rust calls that decorate a definition carry `CallSite::decorates`, ordinary calls do
   not, and `context` lists them under `annotations:`), `docs` (the repository map against the code:
   `ponytail:` limits in `ceilings.md`, entry point kinds and process marks in their lists, a line

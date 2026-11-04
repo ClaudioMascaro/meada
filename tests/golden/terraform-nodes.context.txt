@@ -2,6 +2,7 @@ example.com/acme/infra envs/prod/main.tf:3-8 aws_sns_topic.orders
 type: aws_sns_topic
 name: "orders-events"
 root: envs/prod
+overridable: none
 references:
 example.com/acme/infra envs/prod/main.tf:1 data.aws_caller_identity.current
 referenced by:
@@ -19,8 +20,9 @@ example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this 
 
 example.com/acme/infra modules/queue/main.tf:9-11 module.orders.aws_sqs_queue.this
 type: aws_sqs_queue
-name: none
+name: "orders"
 root: envs/prod
+overridable: none
 references: none
 referenced by:
 example.com/acme/infra envs/prod/main.tf:22 module.worker via module.orders.queue_arn
@@ -33,6 +35,7 @@ example.com/acme/infra envs/prod/main.tf:35-38 aws_sqs_queue.dlq[1]
 type: aws_sqs_queue
 name: "dead-letters"
 root: envs/prod
+overridable: none
 references: none
 referenced by:
 example.com/acme/infra envs/prod/main.tf:40 aws_sqs_queue_redrive_allow_policy.dlq
@@ -44,6 +47,7 @@ example.com/acme/infra envs/prod/main.tf:44-48 module.audit
 type: module
 name: none
 root: envs/prod
+overridable: none
 references: none
 referenced by: none
 values:
@@ -55,6 +59,7 @@ example.com/acme/infra modules/worker/main.tf:5-8 module.worker.aws_lambda_event
 type: aws_lambda_event_source_mapping
 name: none
 root: envs/prod
+overridable: none
 references:
 example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this via var.queue_arn
 referenced by: none

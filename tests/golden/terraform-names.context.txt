@@ -1,0 +1,100 @@
+example.com/acme/infra envs/prod/main.tf:19-21 aws_sqs_queue.orders
+type: aws_sqs_queue
+name: "shop-prod-orders"
+root: envs/prod
+overridable:
+example.com/acme/infra envs/prod/main.tf:6 var.team (default)
+example.com/acme/infra envs/prod/terraform.tfvars:1 var.environment (tfvars)
+references: none
+referenced by: none
+values:
+example.com/acme/infra envs/prod/main.tf:20 resource.aws_sqs_queue.orders.name = "${local.prefix}-${local.service}"
+
+example.com/acme/infra envs/prod/main.tf:23-25 aws_sns_topic.events
+type: aws_sns_topic
+name: "ORDERS"
+root: envs/prod
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/acme/infra envs/prod/main.tf:24 resource.aws_sns_topic.events.name = upper(local.service)
+
+example.com/acme/infra envs/prod/main.tf:27-30 aws_sqs_queue.regional["us"]
+type: aws_sqs_queue
+name: "orders-us"
+root: envs/prod
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/acme/infra envs/prod/main.tf:28 resource.aws_sqs_queue.regional.for_each = toset(["eu", "us"])
+example.com/acme/infra envs/prod/main.tf:29 resource.aws_sqs_queue.regional.name = format("%s-%s", local.service, each.key)
+
+example.com/acme/infra envs/prod/main.tf:32-35 aws_sqs_queue.replica["us"]
+type: aws_sqs_queue
+name: "orders-replica-us"
+root: envs/prod
+overridable:
+example.com/acme/infra envs/prod/regions.auto.tfvars:1 var.regions (tfvars)
+references: none
+referenced by: none
+values:
+example.com/acme/infra envs/prod/main.tf:33 resource.aws_sqs_queue.replica.for_each = toset(var.regions)
+example.com/acme/infra envs/prod/main.tf:34 resource.aws_sqs_queue.replica.name = "${local.service}-replica-${each.key}"
+
+example.com/acme/infra envs/prod/main.tf:37-39 aws_sqs_queue.workspace
+type: aws_sqs_queue
+name: "orders-*" (pattern)
+root: envs/prod
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/acme/infra envs/prod/main.tf:38 resource.aws_sqs_queue.workspace.name = "${local.service}-${terraform.workspace}"
+
+example.com/acme/infra envs/prod/main.tf:43-45 aws_sns_topic.account
+type: aws_sns_topic
+name: "alerts-*" (pattern)
+root: envs/prod
+overridable: none
+references:
+example.com/acme/infra envs/prod/main.tf:41 data.aws_caller_identity.current
+referenced by: none
+values:
+example.com/acme/infra envs/prod/main.tf:44 resource.aws_sns_topic.account.name = "alerts-${data.aws_caller_identity.current.account_id}"
+
+example.com/acme/infra modules/queue/main.tf:9-11 module.billing.aws_sqs_queue.this
+type: aws_sqs_queue
+name: "shop-stage-billing-queue"
+root: envs/stage
+overridable:
+example.com/acme/infra envs/stage/terraform.tfvars:1 var.environment (tfvars)
+references: none
+referenced by: none
+values:
+example.com/acme/infra modules/queue/main.tf:10 resource.aws_sqs_queue.this.name = local.full
+
+example.com/acme/infra envs/prod/main.tf:52-54 aws_sqs_queue.billing_dlq
+type: aws_sqs_queue
+name: "shop-prod-billing-queue-dlq"
+root: envs/prod
+overridable:
+example.com/acme/infra envs/prod/main.tf:6 var.team (default)
+example.com/acme/infra envs/prod/terraform.tfvars:1 var.environment (tfvars)
+references:
+example.com/acme/infra envs/prod/main.tf:47 module.billing via module.billing.queue_name
+referenced by: none
+values:
+example.com/acme/infra envs/prod/main.tf:53 resource.aws_sqs_queue.billing_dlq.name = "${module.billing.queue_name}-dlq"
+
+example.com/acme/infra envs/prod/main.tf:61-63 aws_sqs_queue.audit_dlq
+type: aws_sqs_queue
+name: "*-dlq" (pattern)
+root: envs/prod
+overridable: none
+references:
+example.com/acme/infra envs/prod/main.tf:56 module.audit via module.audit.queue_name
+referenced by: none
+values:
+example.com/acme/infra envs/prod/main.tf:62 resource.aws_sqs_queue.audit_dlq.name = "${module.audit.queue_name}-dlq"

@@ -181,12 +181,13 @@ y de los valores (en un repositorio de 92 mil valores y 5 MB de texto, 21 MB de
 `.meada/index.db`), además de lo que el índice ya tenía.
 
 Con `kind = "iac"`, cada línea es un nodo IaC: `<repositorio> <ruta>:<línea> <dirección> (<tipo>,
-name "<nombre físico>", root <módulo raíz>)`, sin el `name` cuando el bloque no tiene un atributo
-`name` literal. La búsqueda sin `kind` no responde con nodos IaC.
+name "<nombre físico>", root <módulo raíz>)`, sin el `name` cuando el bloque no tiene atributo
+`name`, y con `pattern` en su lugar cuando una parte del nombre no se resuelve (`pattern
+"orders-*"`). La búsqueda sin `kind` no responde con nodos IaC.
 
 ```text
 example.com/acme/infra envs/prod/main.tf:35 aws_sqs_queue.dlq[0] (aws_sqs_queue, name "dead-letters", root envs/prod)
-example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, root envs/prod)
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, name "orders", root envs/prod)
 ```
 
 #### `context`: entender un símbolo
@@ -199,7 +200,9 @@ example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this 
 Devuelve la comunidad y los procesos del símbolo, el fragmento de código leído del disco, quién lo
 llama (`callers:`), a quién llama (`callees:`) y los contratos que toca (`contracts:`). En un
 recurso, lista quién escribe y quién lee; en un canal, los productores y los consumidores. En un
-nodo IaC, su tipo, su nombre físico, su módulo raíz, los nodos que referencia (`references:`) y
+nodo IaC, su tipo, su nombre físico (seguido de `(pattern)` cuando una parte no se resuelve), su
+módulo raíz, las variables de la raíz por las que pasó el nombre (`overridable:`, cada una con
+`(default)` o `(tfvars)`), los nodos que referencia (`references:`) y
 los que lo referencian (`referenced by:`), cada uno con el nombre por el que pasó (`via
 var.queue_arn`), y los valores de configuración de su bloque (`values:`). Una dirección que
 tienen varios módulos raíz lista los nodos, cada uno con lo que pasar: `<dirección> (root <módulo
@@ -357,10 +360,25 @@ ruta (`.` en la raíz).
 
 - **Direcciones**: `<tipo>.<nombre>`, `data.<tipo>.<nombre>` y `module.<nombre>`. Cada llamada de
   un módulo local instancia sus bloques con la dirección de la llamada delante
-  (`module.orders.aws_sqs_queue.this`); un `count` o un `for_each` sobre literales da un nodo por
-  instancia, con `[clave]` al final (`aws_sqs_queue.dlq[0]`,
-  `aws_cloudwatch_metric_alarm.depth["orders"]`). Un `count` o `for_each` que no es literal da un
-  solo nodo, sin clave.
+  (`module.orders.aws_sqs_queue.this`); un `count` o un `for_each` sobre valores que se
+  resuelven en literales da un nodo por instancia, con `[clave]` al final (`aws_sqs_queue.dlq[0]`,
+  `aws_cloudwatch_metric_alarm.depth["orders"]`). Un `count` o `for_each` que no se resuelve
+  (abajo) da un solo nodo, sin clave.
+- **Evaluación estática**: el nombre físico (el argumento `name`) y cada `count` y `for_each` se
+  evalúan como lo haría Terraform, sin ejecutarlo ni acceder a la red: los defaults de las
+  variables, los valores del `terraform.tfvars`, de los `*.auto.tfvars` y de sus formas JSON de la
+  raíz (en ese orden, ganando el archivo siguiente), los locals, las entradas y salidas de un módulo
+  local por llamada, `each`, `count.index`, plantillas y las funciones puras `format`, `formatlist`,
+  `join`, `split`, `lower`, `upper`, `title`, `trim`, `trimprefix`, `trimsuffix`, `trimspace`,
+  `chomp`, `replace` (una subcadena literal), `substr`, `concat`, `coalesce`, `element`, `keys`,
+  `values`, `lookup`, `merge`, `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber` y
+  `jsonencode`. Data sources, atributos de resources, módulos del registro, `terraform.workspace`,
+  `-var`, `-var-file`, `TF_VAR_`, variables sensibles y cualquier otra función nunca se evalúan: esa
+  parte del nombre es un `*` y el nombre un **patrón** (`"orders-${terraform.workspace}"` es
+  `orders-*`), que por ahora no enlaza nada. Un nombre que pasó por una variable del módulo raíz la
+  lista en `overridable:`, ya que quien despliega puede pasar otro valor. Un archivo Terraform o de
+  variables cambiado evalúa de nuevo solo los módulos raíz cuya unidad (la raíz y los módulos
+  locales que llama) lo contiene.
 - **Referencias**: una expresión que nombra un resource, un bloque data o un módulo es una
   referencia de su nodo, guardada como una llamada. Una que pasa por `var.<nombre>`,
   `local.<nombre>` o la salida de un módulo (`module.<nombre>.<salida>`) se sigue hasta lo que

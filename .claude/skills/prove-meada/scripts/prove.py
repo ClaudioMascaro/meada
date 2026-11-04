@@ -5,7 +5,7 @@
   prove.py rebless --base SHA --run DIR
   prove.py deploy --base SHA --run DIR
   prove.py values --base-bin B --head-bin H --repos a7-probe,meada --run DIR [--http]
-  prove.py iac --base-bin B --head-bin H --repos a7-iac,terraform-sqs --run DIR [--http]   (python-hcl2)
+  prove.py iac --base-bin B --head-bin H --repos a7-iac,a7-names,terraform-sqs --run DIR [--http]   (python-hcl2)
   prove.py clean DIR
 
 `run` indexes each corpus repository twice from cold with each binary (determinism and the
@@ -1158,6 +1158,14 @@ def cmd_iac(a):
             continue
         identity = json.loads((run / "head" / name / "export1.json").read_text())["repository"]
         roots = sorted({n["root"] for n in nodes})
+        # #650: a root with a `count` or `for_each` the oracle cannot evaluate is left out of the
+        # comparison (its lines dropped on both sides), a node whose name it cannot evaluate
+        # matches any name; both are counted, never hidden.
+        unsure = sorted({n["root"] for n in nodes if n.get("root_unchecked")})
+        names_unchecked = sum(1 for n in nodes if n.get("unchecked"))
+        report.append(f"Oracle (#650 names): {names_unchecked} names unchecked, roots left out: {unsure}")
+        drop = lambda text: "".join(l + "\n" for l in text.splitlines() if not any(l.endswith(f"root {r})") for r in unsure))
+        nodes = [n for n in nodes if n["root"] not in unsure]
         report.append(f"Oracle: {len(nodes)} nodes in {len(roots)} roots ({', '.join(roots[:8])}{', ...' if len(roots) > 8 else ''}), "
                       f"{len(references)} references; unreadable: {[f for f, _ in unreadable]}")
         same = body((run / "base" / name / "export1.json").read_bytes()) == body((run / "head" / name / "export1.json").read_bytes())
@@ -1168,6 +1176,7 @@ def cmd_iac(a):
         # The sample: nodes with references both ways first, then the rest, spread over the list.
         linked = {r[1] for r in references} & {r[2] for r in references}
         ordered = sorted(nodes, key=lambda n: (n["address"] not in linked, n["path"], n["line"], n["address"], n["root"]))
+        ordered = [n for n in ordered if not n.get("unchecked")]
         sample = spread([n for n in ordered if n["address"] in linked], a.sample // 2) + spread(ordered, a.sample - a.sample // 2)
         sample = list({(n["root"], n["address"]): n for n in sample}.values())
         counts = {}
@@ -1216,6 +1225,13 @@ def cmd_iac(a):
             if q["tool"] == "search" and args.get("kind") == "iac":
                 hits = tf.search_hits(identity, nodes, args["query"])
                 want = "".join(l + "\n" for l in hits) if hits else f"no matches for `{args['query']}`\n"
+                if unsure:
+                    got = drop(got) or f"no matches for `{args['query']}`\n"
+                if tf.UNCHECKED_NAME in want:
+                    any_name = r'(, (?:name|pattern) "(?:[^"\\]|\\.)*")?'
+                    pattern = "".join(re.escape(l).replace(re.escape(tf.UNCHECKED_NAME), any_name) + "\n" for l in hits)
+                    if re.fullmatch(pattern, got):
+                        got = want
                 if got != want:
                     problems.append("differs from the oracle:\n" + "\n".join(difflib.unified_diff(want.splitlines(), got.splitlines(), "oracle", "head", lineterm="", n=1)))
             elif label == "code answer":

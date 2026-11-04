@@ -108,10 +108,12 @@ pub(crate) fn schema_version() -> i32 {
 /// trigram index over both folded columns (#647, no text of its own: it reads `config_values` by
 /// `id`), which serves substring search for a query of three characters or more. None of the
 /// three reaches the export. `iac_nodes` holds each IaC node (#649, `iac::Node`: its address, the
-/// label of its root module, its type, physical name, file, first and last line, and the key path
-/// of its block) and `iac_references` each reference between two nodes of one root
-/// (`iac::Reference`), both rewritten whole from the Terraform files when one of them changed.
-/// Neither is exported.
+/// label of its root module, its type, physical name as static evaluation resolves it (#650),
+/// whether that is a `pattern`, the `overridable` values it went through as JSON, file, first and
+/// last line, and the key path of its block) and `iac_references` each reference between two
+/// nodes of one root (`iac::Reference`), both rewritten root by root (`iac::refresh`) for the
+/// roots whose evaluation unit holds a Terraform file or var file that changed. Neither is
+/// exported.
 pub(crate) const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -170,7 +172,8 @@ CREATE VIRTUAL TABLE config_search USING fts5(
     tokenize='trigram case_sensitive 1'
 );
 CREATE TABLE iac_nodes (
-    address TEXT NOT NULL, root TEXT NOT NULL, type TEXT NOT NULL, name TEXT, path TEXT NOT NULL,
+    address TEXT NOT NULL, root TEXT NOT NULL, type TEXT NOT NULL, name TEXT,
+    pattern INTEGER NOT NULL, overridable TEXT NOT NULL, path TEXT NOT NULL,
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
@@ -711,8 +714,8 @@ fn refresh_keeping(
     // so those are stored first) and is read again when they change.
     let configs = configs_found(&all, &hidden_ci(root));
     let sensitive = config_values::Sensitive::new(&tx, &configs);
-    // Whether a Terraform file changed, appeared or left: the IaC nodes are evaluated again.
-    let terraform = std::cell::Cell::new(false);
+    // The Terraform files and var files read again: the units holding them are evaluated again.
+    let terraform = std::cell::RefCell::new(BTreeSet::new());
     let gone = refresh_stamped(
         &tx,
         "config_files",
@@ -721,7 +724,11 @@ fn refresh_keeping(
         |path| sensitive.stale(path),
         |abs| read_up_to(abs, lang::MAX_BYTES),
         |path, src| {
-            terraform.set(terraform.get() || iac::is_source(path));
+            if iac::is_input(path) {
+                terraform
+                    .borrow_mut()
+                    .insert(config_values::parent(path).to_string());
+            }
             let (outcome, rows) = config_values::read_with(path, src, &sensitive.of(path)?);
             config_values::store(&tx, path, &rows)?;
             Ok(serde_json::to_string(&outcome)?)
@@ -730,19 +737,21 @@ fn refresh_keeping(
     for path in &gone {
         config_values::forget(&tx, path)?;
     }
-    // ponytail: one changed Terraform file evaluates every root module of the repository again,
-    // not only the units it belongs to; a repository of many roots would make that slow.
-    if terraform.get() || gone.iter().any(|p| iac::is_source(p)) {
+    let mut dirs = terraform.into_inner();
+    let left = gone.iter().filter(|p| iac::is_input(p));
+    dirs.extend(left.map(|p| config_values::parent(p).to_string()));
+    // ponytail: a changed Terraform file reads every Terraform file of the repository again to
+    // find the roots and their units, though only the units holding it are evaluated again.
+    if !dirs.is_empty() {
         let mut files = Vec::new();
-        for (path, abs) in configs.iter().filter(|(p, _)| iac::is_source(p)) {
+        for (path, abs) in configs.iter().filter(|(p, _)| iac::is_input(p)) {
             if let Ok(src) = read_up_to(abs, lang::MAX_BYTES)
                 && src.len() <= lang::MAX_BYTES
             {
                 files.push((path.clone(), src));
             }
         }
-        let (nodes, references) = iac::evaluate(&files);
-        iac::store(&tx, &nodes, &references)?;
+        iac::refresh(&tx, &iac::Repository::read(&files), &dirs)?;
     }
     // The packages decide which files keep the shapes of what they export (issue #175).
     let manifest_rows = manifest_rows(&tx)?;

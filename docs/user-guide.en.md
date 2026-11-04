@@ -179,12 +179,13 @@ thousand values and 5 MB of text, 21 MB of `.meada/index.db`), on top of what th
 held.
 
 With `kind = "iac"`, each line is an IaC node: `<repository> <path>:<line> <address> (<type>,
-name "<physical name>", root <root module>)`, without the `name` when the block has no literal
-`name` attribute. Search with no `kind` does not answer with IaC nodes.
+name "<physical name>", root <root module>)`, without the `name` when the block has no `name`
+attribute, and with `pattern` in its place when a part of the name is unresolved (`pattern
+"orders-*"`). Search with no `kind` does not answer with IaC nodes.
 
 ```text
 example.com/acme/infra envs/prod/main.tf:35 aws_sqs_queue.dlq[0] (aws_sqs_queue, name "dead-letters", root envs/prod)
-example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, root envs/prod)
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, name "orders", root envs/prod)
 ```
 
 #### `context`: understand a symbol
@@ -197,7 +198,9 @@ example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this 
 It returns the symbol's community and processes, the code excerpt read from disk, who calls it
 (`callers:`), who it calls (`callees:`) and the contracts it touches (`contracts:`). For a
 resource, it lists who writes and who reads; for a channel, the producers and consumers. For an
-IaC node, its type, its physical name, its root module, the nodes it references (`references:`)
+IaC node, its type, its physical name (followed by `(pattern)` when a part is unresolved), its
+root module, the root variables its name went through (`overridable:`, each with `(default)` or
+`(tfvars)`), the nodes it references (`references:`)
 and those that reference it (`referenced by:`), each with the name it went through (`via
 var.queue_arn`), and the config values of its block (`values:`). An address several root modules
 hold lists the nodes, each with what to pass: `<address> (root <root module>)`. A symbol of the
@@ -353,10 +356,24 @@ by its path (`.` at the root).
 
 - **Addresses**: `<type>.<name>`, `data.<type>.<name>` and `module.<name>`. Each call of a local
   module instantiates its blocks with the call's address in front
-  (`module.orders.aws_sqs_queue.this`); a `count` or a `for_each` over literals gives one node
-  per instance, with `[key]` at the end (`aws_sqs_queue.dlq[0]`,
-  `aws_cloudwatch_metric_alarm.depth["orders"]`). A `count` or `for_each` that is not literal
-  gives one node, with no key.
+  (`module.orders.aws_sqs_queue.this`); a `count` or a `for_each` over values that resolve to
+  literals gives one node per instance, with `[key]` at the end (`aws_sqs_queue.dlq[0]`,
+  `aws_cloudwatch_metric_alarm.depth["orders"]`). A `count` or `for_each` that does not resolve
+  (below) gives one node, with no key.
+- **Static evaluation**: the physical name (the `name` argument) and each `count` and `for_each` are
+  evaluated as Terraform would, without running it or reaching the network: variable defaults, the
+  values of the root's `terraform.tfvars`, `*.auto.tfvars` and their JSON forms (in that order, a
+  later file winning), locals, a local module's inputs and outputs per call, `each`, `count.index`,
+  templates and the pure functions `format`, `formatlist`, `join`, `split`, `lower`, `upper`,
+  `title`, `trim`, `trimprefix`, `trimsuffix`, `trimspace`, `chomp`, `replace` (a literal
+  substring), `substr`, `concat`, `coalesce`, `element`, `keys`, `values`, `lookup`, `merge`,
+  `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber` and `jsonencode`. Data sources,
+  resource attributes, registry modules, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_`,
+  sensitive variables and any other function are never evaluated: such a part of a name is a `*` and
+  the name a **pattern** (`"orders-${terraform.workspace}"` is `orders-*`), linked by nothing yet. A
+  name that went through a root module's variable lists it under `overridable:`, since a deployer
+  can set another value. A changed Terraform file or var file evaluates again only the root modules
+  whose unit (the root and the local modules it calls) holds it.
 - **References**: an expression that names a resource, a data block or a module is a reference
   of its node, stored like a call. One that goes through `var.<name>`, `local.<name>` or a
   module's output (`module.<name>.<output>`) is followed to what the call's argument, the local

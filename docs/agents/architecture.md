@@ -95,7 +95,7 @@ for the area a change touches.
 - `xml.rs`: the bounds the XML build readers of `jvm/` and `dotnet/` share. [seams](map/seams.md)
 - `document/`: OpenAPI and AsyncAPI provider documents, read into a `Summary` (spec #21), and `events.rs`, the one YAML and JSON event reader every YAML or JSON reader goes through (#646). [documents](map/documents.md)
 - `config_values.rs`, `config_values/hcl.rs`: config values (#639, #640, ADR 0025): every scalar of the YAML, JSON and Terraform files the walk visits and of the hidden CI paths, with its key path, `search` kind `value` and the `meada status` counts. [documents](map/documents.md)
-- `iac.rs`: IaC nodes (#649, ADR 0025): the Terraform resources, data blocks and module calls with their address and root module, the references between them, `search` kind `iac`, and `context` and `trace` on an address. [documents](map/documents.md)
+- `iac.rs`, `iac/`: IaC nodes (#649, ADR 0025): the Terraform resources, data blocks and module calls with their address and root module, the references between them, the static evaluation of their names (#650, `iac/functions.rs` the pure functions), `search` kind `iac`, and `context` and `trace` on an address. [documents](map/documents.md)
 - `literals.rs`, `zod.rs`, `declared.rs`: the shape of a route read from its handler's returned literals, zod schemas and declared types (spec #23); `lang/ts/types.rs` finds the schema a `z.infer` annotation names. [documents](map/documents.md)
 - `decisions.rs`: `meada.decisions.toml` and its replay at query time. [decisions](map/decisions.md)
 - `decide.rs`, `decider/`: `meada decide` and decider mode, the only network path. [decisions](map/decisions.md)

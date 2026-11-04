@@ -211,7 +211,8 @@ matches; it never lists IaC nodes. The answer is one line per match, or a `no ma
 | `<shown-value>` | `<text> (cut)` | A string past 1 KiB, quoted as JSON and cut. |
 | `<address>` | `<word>` | An IaC node's address: `aws_sqs_queue.orders`, `data.aws_iam_policy_document.p`, `module.orders.aws_sqs_queue.this`, `aws_sqs_queue.dlq[0]`. |
 | `<iac-type>` | `<word>` | The resource or data type of an IaC node, or `module` for a module call. |
-| `<iac-name>` | `, name <text>` | The node's physical name, the literal of its `name` attribute, quoted as JSON. |
+| `<iac-name>` | `, name <text>` | The node's physical name, its `name` argument as static evaluation resolves it, quoted as JSON. |
+| `<iac-name>` | `, pattern <text>` | The node's physical name when a part of it is unresolved (a data source, `terraform.workspace`, a resource's attribute), each such part a `*`, quoted as JSON. |
 | `<iac-root>` | `<word>` | The root module its evaluation starts from: its directory, `.` for the repository's root. |
 | `<shown-value>` | `<text>` | A string quoted as JSON (`"team-b"`), a number or a boolean as written, an HCL `expression` or `template` as written, a line break as `\n` (`var.env`, `"${var.env}-orders"`), or `redacted` for a value a format marks secret. |
 
@@ -244,9 +245,10 @@ symbol, its name as `<path>::<name>` (or its identity when another repository ha
 each followed by the shape the side carries and, for a route's consumers, its drift.
 
 **An IaC node.** Its head (the node and the lines of its block), its `type:`, `name:` and
-`root:` lines, then `references:` (the nodes it references), `referenced by:` (those that
-reference it) and `values:` (the config values of its block), each followed by its lines or
-printing `none`. An address several nodes have (one per root module that instantiates it) gives
+`root:` lines, then `overridable:` (the values a deployer can override that its name went
+through), `references:` (the nodes it references), `referenced by:` (those that reference it)
+and `values:` (the config values of its block), each followed by its lines or printing
+`none`. An address several nodes have (one per root module that instantiates it) gives
 a `fits` line and one line per node, with what to pass for it.
 
 **Nothing.** A `no symbol` or `no contract` line.
@@ -299,6 +301,7 @@ words:
 | iac root | `root: <iac-root>` | The IaC node's root module. |
 | iac section | `<iac-section>:<none?>` | The lines that follow belong to the section, or ` none` when it has none. |
 | iac reference | `<repository> <place> <address><via?>` | A node the node references, or that references it, at its block. |
+| iac overridable | `<repository> <place> <variable> (<overridable-from>)` | A root module's variable the node's name went through, where its value comes from. |
 | iac value | `<repository> <place> <key-path> = <shown-value>` | A config value of the node's block. |
 | fits iac | ``` `<query>` fits <n> IaC nodes; pass one of: ``` | The address fits several IaC nodes, listed after it. |
 | fit iac | `<repository> <place> <iac-pass>` | One of the IaC nodes the address fits, and what to pass for it. |
@@ -306,11 +309,16 @@ words:
 | Field | Form | Meaning |
 | --- | --- | --- |
 | `<last>` | `<number>` | The last line of the span. |
-| `<physical-name>` | `<text>` | The literal of the node's `name` attribute, quoted as JSON, or `none`. |
+| `<physical-name>` | `<text>` | The node's `name` argument as static evaluation resolves it, quoted as JSON, or `none`. |
+| `<physical-name>` | `<text> (pattern)` | The same name with an unresolved part, each such part a `*`. |
+| `<iac-section>` | `overridable` | The values a deployer can override that its name went through. |
 | `<iac-section>` | `references` | The nodes the node references. |
 | `<iac-section>` | `referenced by` | The nodes that reference it. |
 | `<iac-section>` | `values` | The config values of its block. |
 | `<none>` | ` none` | The section has no line. |
+| `<variable>` | `var.<word>` | A root module's variable. |
+| `<overridable-from>` | `default` | Its value is its default, at the variable's block. |
+| `<overridable-from>` | `tfvars` | Its value comes from a var file (`terraform.tfvars`, `*.auto.tfvars`), at the value's line. |
 | `<via>` | ` via <word>` | The variable, local or module output the reference went through (`var.queue_arn`, `local.topic`, `module.orders.queue_arn`). |
 | `<iac-pass>` | `<address> (root <iac-root>)` | The node in its root module. |
 | `<iac-pass>` | `<repository>::<path>::<address> (root <iac-root>)` | The same, when another repository has it too. |

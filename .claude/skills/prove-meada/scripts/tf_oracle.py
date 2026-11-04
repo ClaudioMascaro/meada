@@ -12,6 +12,8 @@ import subprocess
 
 import hcl2  # python-hcl2: see SKILL.md's Gotchas for the venv that holds it
 
+from tf_names import Names, Unchecked
+
 IDENT = r"[A-Za-z_][A-Za-z0-9_-]*"
 # A traversal: a root name, then attributes, indexes and splats; not after a `.`, a word
 # character or a quote, so `a.b` inside `x.a.b` or `"a.b"` is not a second one.
@@ -124,25 +126,6 @@ def lines_of(text, kind, labels):
     return start, None
 
 
-def instance_keys(body):
-    """The keys of a literal `count` or `for_each`; None for one node with no key."""
-    if "count" in body:
-        c = body["count"]
-        return list(range(c)) if isinstance(c, int) and 0 <= c <= 1000 else None
-    if "for_each" in body:
-        f = body["for_each"]
-        if isinstance(f, dict):
-            keys = [unquote(k) if k.startswith('"') else k for k in f if not k.startswith("__")]
-            return sorted(set(keys)) if all(isinstance(k, str) for k in keys) and len(keys) <= 1000 else None
-        m = re.fullmatch(r"\$\{toset\(\[(.*)\]\)\}", f, re.S) if isinstance(f, str) else None
-        if m:
-            items = [x.strip() for x in m.group(1).split(",") if x.strip()]
-            if all(re.fullmatch(r'"[^"\\]*"', x) for x in items) and len(items) <= 1000:
-                return sorted({x[1:-1] for x in items})
-        return None
-    return None
-
-
 def local_source(directory, source):
     if not isinstance(source, str) or not source.startswith(("./", "../")):
         return None
@@ -201,7 +184,13 @@ def read_repo(repo):
             unreadable.append((rel, str(e).splitlines()[0][:120] if str(e) else type(e).__name__))
             continue
         d = rel.rsplit("/", 1)[0] if "/" in rel else ""
-        m = modules.setdefault(d, {"blocks": [], "outputs": {}, "locals": {}})
+        m = module_of(modules, d)
+        for entry in doc.get("variable", []):
+            for name, body in entry.items():
+                name_ = unquote(name) or name
+                m["variables"][name_] = {"default": body.get("default"), "has_default": "default" in body,
+                                         "sensitive": body.get("sensitive") is True, "path": rel,
+                                         "line": lines_of(text, "variable", [name_])[0]}
         for kind in ("resource", "data"):
             for entry in doc.get(kind, []):
                 for ty, named in entry.items():
@@ -209,27 +198,71 @@ def read_repo(repo):
                         ty_, name_ = unquote(ty) or ty, unquote(name) or name
                         first, last = lines_of(text, kind, [ty_, name_])
                         m["blocks"].append({"kind": kind, "type": ty_, "name": name_, "path": rel, "line": first, "end": last,
-                                            "physical": unquote(body.get("name")), "keys": instance_keys(body),
+                                            "name_raw": body.get("name"), "count_raw": body.get("count"),
+                                            "for_each_raw": body.get("for_each"),
                                             "refs": refs_in(body), "source": None, "args": {}})
         for entry in doc.get("module", []):
             for name, body in entry.items():
                 name_ = unquote(name) or name
                 first, last = lines_of(text, "module", [name_])
                 m["blocks"].append({"kind": "module", "type": "module", "name": name_, "path": rel, "line": first, "end": last,
-                                    "physical": None,  # a module's `name` is an input, not what it creates
-                                    "keys": instance_keys(body), "refs": refs_in(body),
+                                    # a module's `name` is an input, not what it creates
+                                    "count_raw": body.get("count"), "for_each_raw": body.get("for_each"),
+                                    "args_raw": {k: v for k, v in body.items() if not k.startswith("__")},
+                                    "refs": refs_in(body),
                                     "source": unquote(body.get("source")),
                                     "args": {k: refs_in(v) for k, v in body.items() if not k.startswith("__")}})
         for entry in doc.get("output", []):
             for name, body in entry.items():
                 m["outputs"][unquote(name) or name] = refs_in(body.get("value"))
+                if "value" in body:
+                    m["outputs_raw"][unquote(name) or name] = body["value"]
         for entry in doc.get("locals", []):
             for k, v in entry.items():
                 if not k.startswith("__"):
                     m["locals"][k] = refs_in(v)
+                    m["locals_raw"][k] = v
+    # #650: the var files Terraform loads by itself, `terraform.tfvars` first, then each
+    # `*.auto.tfvars` in name order, a later value winning; a value that is no constant is left out.
+    def rank(r):
+        f = r.rsplit("/", 1)[-1]
+        return (r.rsplit("/", 1)[0] if "/" in r else "", 0 if f == "terraform.tfvars" else 1 if f == "terraform.tfvars.json" else 2, f)
+    as_hcl2 = lambda v: (json.dumps(v) if isinstance(v, str) else [as_hcl2(x) for x in v] if isinstance(v, list)
+                         else {k: as_hcl2(x) for k, x in v.items()} if isinstance(v, dict) else v)
+    for rel in sorted(var_files(repo), key=rank):
+        text = (repo / rel).read_text(errors="replace")
+        try:
+            doc = hcl2.loads(text) if not rel.endswith(".json") else as_hcl2(json.loads(text))
+        except Exception:
+            continue
+        m = module_of(modules, rel.rsplit("/", 1)[0] if "/" in rel else "")
+        for k, v in doc.items():
+            if k.startswith("__") or "${" in json.dumps(v):
+                continue
+            line = re.search(rf"^\s*{re.escape(k)}\s*=", text, re.M) if not rel.endswith(".json") else re.search(re.escape(json.dumps(k)), text)
+            m["tfvars"][k] = (v, rel, text.count("\n", 0, line.start()) + 1 if line else 1)
     for m in modules.values():
         m["blocks"].sort(key=lambda b: (b["path"], b["line"] or 0))
     return modules, unreadable
+
+
+def module_of(modules, d):
+    return modules.setdefault(d, {"blocks": [], "outputs": {}, "locals": {}, "outputs_raw": {},
+                                  "locals_raw": {}, "variables": {}, "tfvars": {}})
+
+
+def var_files(repo):
+    """The var files the walk visits: `terraform.tfvars` and `*.auto.tfvars`, as `tf_files`."""
+    listed = subprocess.run(["git", "ls-files", "-co", "--exclude-standard", "-z"], cwd=repo,
+                            check=True, capture_output=True, text=True).stdout.split("\0")
+    out = []
+    names = ("terraform.tfvars", "terraform.tfvars.json")
+    for rel in sorted(p for p in listed if p.rsplit("/", 1)[-1] in names or p.endswith((".auto.tfvars", ".auto.tfvars.json"))):
+        parts = rel.split("/")
+        if any(p.startswith(".") for p in parts) or any(repo.joinpath(*parts[:i + 1]).is_symlink() for i in range(len(parts))):
+            continue
+        out.append(rel)
+    return out
 
 
 def local_address(b):
@@ -248,22 +281,38 @@ def evaluate(repo):
         root = root_dir or "."
         instances = []  # {dir, parent: (instance, block), nodes: {(kind,type,name): [(key, address)]}, children: {name: [(key, instance)]}}
 
-        def instantiate(directory, prefix, parent, stack):
+        names, pending, unchecked = Names(modules, instances, root_dir), [], []
+
+        def instantiate(directory, prefix, parent, call, stack):
             me = len(instances)
-            instances.append({"dir": directory, "parent": parent, "nodes": {}, "children": {}})
+            instances.append({"dir": directory, "parent": parent, "call": call, "nodes": {}, "children": {}})
             for b in modules[directory]["blocks"]:
-                for key in (b["keys"] if b["keys"] is not None else [None]):
+                keys = names.keys(me, b)
+                if keys == "unchecked":
+                    unchecked.append(f"{b['path']}:{b['line']}")
+                for key, each in (keys if isinstance(keys, list) else [(None, None)]):
                     address = prefix + local_address(b) + ("" if key is None else shown_key(key))
-                    nodes.append({"address": address, "root": root, "type": b["type"], "name": b["physical"],
-                                  "path": b["path"], "line": b["line"], "end": b["end"]})
+                    node = {"address": address, "root": root, "type": b["type"], "name": None, "pattern": False,
+                            "through": (), "unchecked": False, "path": b["path"], "line": b["line"], "end": b["end"]}
+                    nodes.append(node)
+                    pending.append((node, me, b, each))
                     instances[me]["nodes"].setdefault((b["kind"], b["type"], b["name"]), []).append((key, address))
                     target = local_source(directory, b["source"]) if b["kind"] == "module" else None
                     if target in modules and target not in stack and len(stack) <= MODULE_DEPTH:
-                        child = instantiate(target, address + ".", (me, b), stack + [target])
+                        child = instantiate(target, address + ".", (me, b), each, stack + [target])
                         instances[me]["children"].setdefault(b["name"], []).append((key, child))
             return me
 
-        instantiate(root_dir, "", None, [root_dir])
+        instantiate(root_dir, "", None, None, [root_dir])
+        # Every instance made, module outputs are read: the names are evaluated again with them.
+        names.memo, names.outputs = {}, True
+        for node, me, b, each in pending:
+            found = names.physical(me, each, b)
+            if found == "unchecked":
+                node["unchecked"] = True
+            else:
+                node["name"], node["pattern"], node["through"] = found
+            node["root_unchecked"] = bool(unchecked)
 
         def pick(items, key):
             named = [t for k, t in items if key is not None and k == key]
@@ -306,6 +355,10 @@ def evaluate(repo):
     return nodes, sorted(references), unreadable
 
 
+# Where a hit line's name goes when the oracle could not evaluate it (`prove.py` matches any).
+UNCHECKED_NAME = "\x00"
+
+
 def node_line(identity, n):
     return f"{identity} {n['path']}:{n['line']} {n['address']}"
 
@@ -321,7 +374,10 @@ def search_hits(identity, nodes, query):
                  if r is not None]
         if not ranks:
             continue
-        name = "" if n["name"] is None else ", name " + json.dumps(n["name"], ensure_ascii=False)
+        word = "pattern" if n["pattern"] else "name"
+        name = "" if n["name"] is None else f", {word} " + json.dumps(n["name"], ensure_ascii=False)
+        if n["unchecked"]:
+            name = UNCHECKED_NAME
         key = f"{identity} {n['path']} {n['line']:010} {n['address']} {n['root']}"
         hits.append((min(ranks), key, f"{node_line(identity, n)} ({n['type']}{name}, root {n['root']})"))
     return [h[2] for h in sorted(hits)]
@@ -343,8 +399,13 @@ def neighbours(nodes, references, node, down):
 def context_lines(identity, nodes, references, node):
     """The lines `context` on `node` gives before its `values:` section."""
     name = "none" if node["name"] is None else json.dumps(node["name"], ensure_ascii=False)
+    name += " (pattern)" if node["pattern"] else ""
     lines = [f"{identity} {node['path']}:{node['line']}-{node['end']} {node['address']}",
              f"type: {node['type']}", f"name: {name}", f"root: {node['root']}"]
+    # #650: the root variables the name went through, in path and line order.
+    lines.append("overridable:" if node["through"] else "overridable: none")
+    lines += [f"{identity} {path}:{line} {var} ({'tfvars' if tfvars else 'default'})"
+              for path, line, var, tfvars in node["through"]]
     for title, down in (("references", True), ("referenced by", False)):
         got = neighbours(nodes, references, node, down)
         lines.append(f"{title}:" if got else f"{title}: none")
