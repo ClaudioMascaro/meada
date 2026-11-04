@@ -1,0 +1,6 @@
+proxy:
+  endpoints:
+    '/disputed':
+      target: https://stock.prod.example.com
+    '/stock':
+      target: https://stock.example.com/

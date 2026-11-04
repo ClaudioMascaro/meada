@@ -7,9 +7,10 @@
 //! whose `pluginId` cannot be read mounts nothing, so its routers stay at the root, and
 //! `meada status` says so (`Role::Unmounted`). On the consumer side a URL that starts with `discovery.getBaseUrl('<literal>')`,
 //! held by a constant or written in place, starts at `/api/<literal>`, and a hostless consumer of
-//! a route a plugin's mount serves names that mount in its reason (`name`).
+//! a route a plugin's mount serves names that mount in its reason (`name`). A URL through a
+//! proxy endpoint (`/api/proxy/<ep>`, #616) names the endpoint in its `via` (`proxied`).
 
-use super::super::{CLIENT_VIA, CallAt, fits};
+use super::super::{CLIENT_VIA, CallAt, PROXY_VIA, fits};
 use crate::contract::Found;
 use crate::lang::{Part, Value, literal, property};
 use crate::resolve::Code;
@@ -208,4 +209,28 @@ pub(in crate::http) fn name(consumers: &mut [Found], mounted: &[(String, String)
 /// How a consumer of the plugin `id`'s routes names its client, for the link's reason.
 pub(super) fn client(id: &str) -> String {
     format!("{CLIENT_VIA}Backstage plugin {id} at {}", mount(id))
+}
+
+/// How a consumer whose URL went through the proxy endpoint `endpoint` (#616) names where it
+/// goes: `via` (its target, `env:` or `host:`) with the endpoint, or, when the endpoint's target
+/// is not read (`usable` false), a client that says so.
+pub(super) fn proxied(via: Option<String>, endpoint: &str, usable: bool) -> Option<String> {
+    if !usable {
+        return Some(format!(
+            "{CLIENT_VIA}Backstage proxy endpoint {endpoint}{UNREAD}"
+        ));
+    }
+    via.map(|v| format!("{v}{PROXY_VIA}{endpoint}"))
+}
+
+/// What a proxy endpoint's client says when its target is neither `${VAR}` nor an `http(s)://`
+/// URL, or the path the target gets is not read (`Config::strips`).
+const UNREAD: &str = " (its target or the path it gets is not read: a target neither ${VAR} nor an http(s) URL, a pathRewrite that does more than strip the endpoint, ignorePath, prependPath, or app-config files that disagree)";
+
+/// The proxy endpoint whose target is not read, when `via` says it (`proxied`).
+pub(in crate::http) fn unread(via: &str) -> Option<&str> {
+    let endpoint = via.strip_prefix(CLIENT_VIA)?;
+    endpoint
+        .strip_prefix("Backstage proxy endpoint ")?
+        .strip_suffix(UNREAD)
 }

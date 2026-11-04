@@ -16,8 +16,10 @@ mod config;
 
 use std::collections::BTreeSet;
 
-pub(super) use backstage::name;
+pub(super) use backstage::{name, unread};
 pub(super) use clients::consumers;
+#[cfg(test)]
+pub(crate) use config::probe as app_config_probe;
 
 use super::{
     CallAt, HTTP_METHODS, METHODS, Mounts, contract, join, normalize_path, prefixes, provider,
@@ -105,7 +107,7 @@ fn is_express<'a>(code: &Code<'a>, (path, n): CallAt<'a>) -> bool {
         && o.direct
         && o.imported
             .as_ref()
-            .is_some_and(|(p, _)| *p == PROMISE_ROUTER)
+            .is_some_and(|(p, name)| *p == PROMISE_ROUTER && name == "default")
     {
         return true;
     }

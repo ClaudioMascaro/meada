@@ -140,6 +140,13 @@ pub enum Msg<'a> {
     BackstageUnmounted {
         site: &'a str,
     },
+    /// A Backstage proxy endpoint (#616) whose `target` is neither `${VAR}` nor an `http(s)://`
+    /// URL, or whose path to the target is not read (a `pathRewrite` that does more than strip
+    /// the endpoint, `ignorePath`, `prependPath`, files that disagree): its `calls` stay unlinked.
+    BackstageProxyTarget {
+        endpoint: &'a str,
+        calls: usize,
+    },
     DocumentUnreadable {
         path: &'a str,
         line: usize,
@@ -1784,6 +1791,11 @@ impl Msg<'_> {
                 format!("{site}: Backstage plugin whose pluginId is neither a string literal nor a const of its file bound to one: its routes stay at the root, not under /api/<pluginId>"),
                 format!("{site}: plugin do Backstage cujo pluginId não é literal de texto nem const do seu arquivo ligada a um: suas rotas ficam na raiz, não sob /api/<pluginId>"),
                 format!("{site}: plugin de Backstage cuyo pluginId no es literal de texto ni const de su archivo ligada a uno: sus rutas quedan en la raíz, no bajo /api/<pluginId>"),
+            ),
+            Msg::BackstageProxyTarget { endpoint, calls } => pick(
+                format!("Backstage proxy endpoint {endpoint}: its target or the path it gets is not read (a target neither ${{VAR}} nor an http(s) URL, a pathRewrite that does more than strip the endpoint, ignorePath, prependPath, or app-config files that disagree), so {calls} call(s) through it stay unlinked"),
+                format!("endpoint de proxy do Backstage {endpoint}: seu target ou o caminho que ele recebe não é lido (um target que não é ${{VAR}} nem uma URL http(s), um pathRewrite que faz mais que tirar o endpoint, ignorePath, prependPath, ou arquivos app-config que divergem), então {calls} chamada(s) por ele ficam sem ligação"),
+                format!("endpoint de proxy de Backstage {endpoint}: su target o la ruta que recibe no se lee (un target que no es ${{VAR}} ni una URL http(s), un pathRewrite que hace más que quitar el endpoint, ignorePath, prependPath, o archivos app-config que difieren), así que {calls} llamada(s) por él quedan sin enlace"),
             ),
             Msg::DocumentUnreadable { path, line, error } => pick(
                 format!("{path}:{line}: unreadable document ({error}), ignored"),

@@ -534,6 +534,16 @@ fn probes() -> Vec<Probe> {
                     .sum()
             },
         ),
+        // Backstage: `app-config.yaml`, its proxy table (#616)
+        ("app-config: many proxy endpoints and rewrite rules", || {
+            // A quarter of the file stays under `YAML_KEY_BUDGET`, so the endpoints are read.
+            let endpoints = fill(4, |i| {
+                format!(
+                    "    '/e{i}':\n      target: https://h{i}\n      pathRewrite:\n        '^/api/proxy/e{i}': ''\n        '^/r{i}': '/'\n"
+                )
+            });
+            crate::http::app_config_probe(file(format!("proxy:\n  endpoints:\n{endpoints}")))
+        }),
         // Spring: `application.properties`, `application.yml`
         ("spring: many properties", || {
             configured(

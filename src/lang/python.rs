@@ -1298,7 +1298,7 @@ fn imports(node: Node, src: &[u8], out: &mut Vec<Import>) {
 /// variable the field reads, `<env_prefix><FIELD>` or the `alias` / `validation_alias` (not
 /// prefixed), uppercased: the default is case-insensitive. The prefix is `env_prefix=` of `model_config =
 /// SettingsConfigDict(...)` or of an inner `class Config`.
-// shortcut: only a top-level base class in the same file, a literal prefix or alias; `AliasChoices`,
+// ponytail: only a top-level base class in the same file, a literal prefix or alias; `AliasChoices`,
 // v1 `Field(env=)`, a dict `model_config`, `case_sensitive` and inherited settings are not read.
 fn settings_consts(root: Node, src: &[u8]) -> Vec<Const> {
     let keyword = |call: Node, key: &str| -> Option<String> {
@@ -1351,7 +1351,11 @@ fn settings_consts(root: Node, src: &[u8]) -> Vec<Const> {
             }
         }
         // The legacy `class Config: env_prefix = "X"`.
-        for config in named(body).filter(|c| c.kind() == "class_definition") {
+        let is_config = |c: &Node| {
+            c.kind() == "class_definition"
+                && (c.child_by_field_name("name")).is_some_and(|n| text(n, src) == "Config")
+        };
+        for config in named(body).filter(is_config) {
             let inner = config.child_by_field_name("body");
             for stmt in inner.into_iter().flat_map(named) {
                 if let Some((left, right, _)) = assignment(stmt)
@@ -1692,6 +1696,23 @@ mod tests {
 
     fn facts(src: &str) -> Facts {
         Python.parse("a.py", src.as_bytes()).unwrap()
+    }
+
+    #[test]
+    fn only_an_inner_class_config_gives_a_settings_prefix() {
+        let src = "from pydantic_settings import BaseSettings\n\
+            class Legacy(BaseSettings):\n    url: str = ''\n    class Config:\n        env_prefix = 'old_'\n\
+            class Other(BaseSettings):\n    url: str = ''\n    class Meta:\n        env_prefix = 'no_'\n";
+        let consts = consts(src);
+        let env = |name: &str| match held(&consts, name) {
+            Value::Str(parts) => match parts.as_slice() {
+                [Part::Env(v)] => v.clone(),
+                _ => panic!("{name} is no env read"),
+            },
+            _ => panic!("{name} is no string"),
+        };
+        assert_eq!(env("Legacy.url"), "OLD_URL");
+        assert_eq!(env("Other.url"), "URL");
     }
 
     #[test]

@@ -192,7 +192,7 @@ budget of 64 KB (`tests/it/docs.rs` fails above it):
   clients, message brokers) live under the kind, one module per language
   (`http/<language>.rs`, `channel/<language>.rs`); a form may live in a submodule of that module
   (`http/rust/frameworks.rs`). A table or a form of a library in a pack is a finding, and the
-  kind owns it. Four exceptions are decided. The Rust pack folds `Method::GET` constants at
+  kind owns it. Six exceptions are decided. The Rust pack folds `Method::GET` constants at
   parse time (`METHOD_CRATES` and `VERBS`) and keeps them, `VERBS` being the one pack constant a
   kind reads; the Go pack folds `net/http`'s `MethodGet`-style constants the same way, gated on
   the file's `net/http` import (`METHODS` in `lang/go/values.rs`); and the Rust pack keeps
@@ -202,12 +202,17 @@ budget of 64 KB (`tests/it/docs.rs` fails above it):
   (`infer`, `output`, `TypeOf`) in `lang/ts/types.rs`, because it unwraps a handler's declared
   return type at parse time to reach the schema a type infers (`z.infer<typeof S>`, io-ts
   `t.TypeOf<typeof S>`), which no kind can do after the fact, and those are the words that walk
-  reads. The Go pack also reads the `env:"X"` and `envconfig:"X"` struct tags as environment reads (`tagged` in `lang/go/values.rs`, #618), because the read happens where the field is selected, which no kind can see after the fact. A pack may recognise the one call that reads the platform's environment, as a
-  form and not a table: Java's and Kotlin's `System.getenv` (`getenv` in `lang/java.rs` and
-  `lang/kotlin.rs`) and C#'s `GetEnvironmentVariable` (`ENVIRONMENT_READ` in `lang/csharp.rs`,
-  which leaves the kind to decide whether the `Environment` is the framework's); the TypeScript pack does the same for Backstage's `config.getString('a.b')` and
-  `getOptionalString` (`CONFIG_READS` in `lang/ts.rs`, #617): the call is a config read the kind
-  (`http/ts/config.rs`) looks up in `app-config*.yaml`. C# also keeps
+  reads. The Go pack reads the `env:"X"` and `envconfig:"X"` struct tags as environment reads
+  (`tagged` in `lang/go/values.rs`, #618), and the Python pack reads the fields of a
+  pydantic-settings `BaseSettings` class as environment reads (`settings_consts` in
+  `lang/python.rs`, #619), because the read happens where the field is selected, which no kind
+  can see after the fact. A pack may recognise the one call that reads the platform's
+  environment, as a form and not a table: Java's and Kotlin's `System.getenv` (`getenv` in
+  `lang/java.rs` and `lang/kotlin.rs`) and C#'s `GetEnvironmentVariable` (`ENVIRONMENT_READ` in
+  `lang/csharp.rs`, which leaves the kind to decide whether the `Environment` is the
+  framework's). The TypeScript pack also keeps Backstage's `config.getString('a.b')` and
+  `getOptionalString` as an `exception` table (`CONFIG_READS` in `lang/ts.rs`, #617): the call
+  is a config read the kind (`http/ts/config.rs`) looks up in `app-config*.yaml`. C# also keeps
   the trims of `System.String` (`TRIMS`) as runtime. The tables of known outside members
   (`LanguagePack::known_outside`) are runtime, apart from Swift's entry for Vapor's
   `RouteCollection`, an exception decided in ADR 0019. The test in `lang/mod.rs`

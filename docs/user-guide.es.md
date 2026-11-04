@@ -1067,8 +1067,21 @@ deja su router en la raíz, como antes, y `meada status` señala el plugin. Del 
 consumidor, una URL que empieza por `discovery.getBaseUrl('<id>')` (en una constante o escrito en
 la propia URL) empieza en `/api/<id>`, y el motivo del enlace nombra el plugin y ese montaje; una
 URL sin host de una ruta que sirve el montaje de un plugin del mismo repositorio también lo
-nombra. El plugin `proxy`
-no se lee.
+nombra.
+
+El plugin `proxy` de Backstage vale por la tabla `proxy.endpoints` de un `app-config*.yaml` del
+repositorio: una URL que empieza por `/api/proxy/<endpoint>` (también la que escribe
+`discovery.getBaseUrl('proxy')` más `/<endpoint>`) es una llamada al `target` de ese endpoint, y el
+resto de la URL sigue al destino. Un `target` que es exactamente `${VAR}` enlaza por el
+`base_url_env` del par, y el motivo nombra la variable y el endpoint; un `target` que es una URL
+`http://` o `https://` literal vale como el host (con su ruta). Cualquier otro `target` (texto
+alrededor de la variable, un valor por defecto) deja la llamada sin enlace, y `meada status` señala
+el endpoint y cuántas llamadas pasan por él. Un `pathRewrite` que solo quita el endpoint (una regla,
+`'^/api/proxy/<endpoint>': ''`, o `'^/api/proxy/<endpoint>/': '/'` para una URL con ruta) es lo que
+el proxy hace de todos modos, así que el resto de la URL va al destino; cualquier otro
+`pathRewrite` (otro reemplazo, varias reglas) se lee como un `target` ilegible: sin enlace, y
+`meada status` lo señala. `ignorePath`, `prependPath: false` y un endpoint al que los archivos
+`app-config*.yaml` dan valores distintos (no se sabe cuál carga el despliegue) se leen igual.
 
 **Entorno.** `process.env.X`, `process.env["X"]` e `import.meta.env.X`, solos o pasando por
 métodos de texto como `trim()`, `replace(...)` y `toLowerCase()`. La URL que empieza por una

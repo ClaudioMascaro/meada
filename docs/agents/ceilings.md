@@ -1676,7 +1676,7 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   place as the first call of the `fetch`, folds to `/api/<literal>`, and only when the receiver's
   last name holds `discovery` (`discovery`, `this.discovery`, `discoveryApi`; by name, not by
   type): another receiver, a base passed as a parameter and a non-literal id leave the base
-  unknown, and the `proxy` plugin (`getBaseUrl('proxy')`, `proxy.endpoints`) is not read. A
+  unknown. A
   hostless call names a plugin in its reason only for a route that plugin's mount serves in the
   consumer's own repository (`backstage::name`); in another repository it links as any hostless
   URL does. `http/python.rs`: a FastAPI
@@ -1795,12 +1795,30 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   libraries (`env-prefix`, `envPrefix`, envconfig's `Process("app")`) are not applied; nesting past
   64 levels is not read (#618).
 
+- Backstage proxy endpoints (#616, `http/ts/config.rs`): a `fetch` URL whose leading literal text
+  is `/api/proxy/<ep>` (also what `getBaseUrl('proxy')` folds to), `<ep>` an endpoint of
+  `proxy.endpoints` in the `app-config*.yaml` files (the lookup of the configuration reads
+  above), the longest matching endpoint, followed by `/`, `?`, `#` or the end of the URL. Only
+  the `target` form is read: the string shorthand (`'/ep': 'https://...'`) and a `|` in an
+  endpoint name are not. A target that is exactly `${VAR}` is the variable, one that is
+  a literal `http(s)://` URL is the host (a trailing `/` dropped, its path kept); any other
+  target (`${VAR}/v2`, `${VAR:-default}`, a URL with a placeholder) leaves the URL as written, with a
+  `client:` `via` the link's reason shows, and `meada status` names the endpoint and its calls.
+  A `pathRewrite` is followed only when it is the one rule that strips the endpoint
+  (`'^/api/proxy/<ep>': ''`, or `'^/api/proxy/<ep>/': '/'`, which strips only a path that starts
+  with `/`) and the endpoint is plain text in a regex (letters, digits, `/`, `-`, `_`); any other
+  (another replacement, several rules, a regex character in the endpoint) makes the target
+  unread, so the call stays unlinked and `meada status` names it, as do `ignorePath`,
+  `prependPath: false` and an endpoint key two `app-config*.yaml` files give different values. A
+  rule with a null replacement, and a `pathRewrite: {}` or `null`, are not in the flattened keys
+  and read as no rule (Backstage's default, the strip, is assumed). The other options (`allowedMethods`,
+  headers) are not read. Only a consumer in the repository holding the `app-config` is rewritten
+  (#616).
 - Backstage configuration reads (#617, `CONFIG_READS` in `lang/ts.rs`, read by `http/ts/config.rs`): `config.getString('a.b')`
   and `getOptionalString('a.b')` with a literal key are read from the `app-config*.yaml` files of
   the repository, `app-config.yaml` first and the first file holding the key winning, whatever
   their directory: profiles are not merged and a monorepo's apps share one lookup. A value that is
   not exactly `${VAR}` (a literal, `${VAR:-default}`, text around the placeholder), a key no file
-  holds, a receiver that is not a `Config`, and a read passed in from another file's wrapper
-  leave the base unresolved. The pack reads the call by its member name alone, so the receiver is
+  holds and a read passed in from another file's wrapper leave the base unresolved. The pack reads the call by its member name alone, so the receiver is
   not checked: a `getString` of another library with a key a config holds reads the same.
-- pydantic-settings reads (#619, `settings_consts` in `lang/python.rs`): a field of a `BaseSettings` subclass is read as `<env_prefix><FIELD>` uppercased or its literal `alias` / `validation_alias`, with `env_prefix` a literal of `model_config = SettingsConfigDict(...)` or an inner `class Config`. A base class defined in another file or inherited settings, `AliasChoices`, `case_sensitive` and `env_nested_delimiter` leave the base unresolved or read the unprefixed name.
+- pydantic-settings reads (#619, `settings_consts` in `lang/python.rs`): a field of a `BaseSettings` subclass is read as `<env_prefix><FIELD>` uppercased or its literal `alias` / `validation_alias`, with `env_prefix` a literal of `model_config = SettingsConfigDict(...)` or an inner `class Config`. A base class defined in another file, inherited settings, an instance a function returns (`@lru_cache def get_settings(): return Settings()`), `AliasChoices`, `case_sensitive` and `env_nested_delimiter` leave the base unresolved or read the unprefixed name.

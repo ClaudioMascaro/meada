@@ -18,7 +18,10 @@ this file, and a change to these modules updates it.
   it; `backstage::name` gives the same `via` to a hostless consumer of a route a plugin's mount
   serves, from the routes `ts::providers` reports as mounted; a plugin whose `pluginId` is
   neither a literal nor a `const` of the file bound to one is a `Role::Unmounted` row that
-  `Http::status` reports);
+  `Http::status` reports; `http/ts/config.rs` reads the `proxy.endpoints` of `app-config*.yaml`
+  (#616): a URL that starts with `/api/proxy/<ep>` is rewritten to the endpoint's `target`, the
+  consumer's `via` keeping the endpoint after `PROXY_VIA` for the reason, and an endpoint whose
+  target is not read gives the `client:` `via` that `backstage::unread` finds for `status`);
   `http/python.rs` and `http/python/clients.rs`, FastAPI, Flask and Django providers and the
   requests, httpx and aiohttp consumers, whose rows also list reqwest and ureq; `http/rust.rs`
   and `http/rust/axum.rs`, actix-web, Rocket and axum providers; `http/go.rs` and

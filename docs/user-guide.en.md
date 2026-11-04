@@ -1048,7 +1048,21 @@ leaves its router at the root, as before, and `meada status` names the plugin. O
 consumer side, a URL that starts with `discovery.getBaseUrl('<id>')` (held by a constant or
 written in the URL itself) starts at `/api/<id>`, and the link's reason names the plugin and that
 mount; a hostless URL of a route that the mount of a plugin of the same repository serves names it
-too. The `proxy` plugin is not read.
+too.
+
+Backstage's `proxy` plugin holds through the `proxy.endpoints` table of an `app-config*.yaml` of
+the repository: a URL that starts with `/api/proxy/<endpoint>` (also the one written by
+`discovery.getBaseUrl('proxy')` plus `/<endpoint>`) is a call to that endpoint's `target`, and the
+rest of the URL follows the target. A `target` that is exactly `${VAR}` links through the peer's
+`base_url_env`, and the reason names the variable and the endpoint; a `target` that is a literal
+`http://` or `https://` URL counts as the host (with its path). Any other `target` (text around
+the variable, a default value) leaves the call unlinked, and `meada status` names the endpoint and
+how many calls go through it. A `pathRewrite` that only strips the endpoint (one rule,
+`'^/api/proxy/<endpoint>': ''`, or `'^/api/proxy/<endpoint>/': '/'` for a URL with a path) is what
+the proxy does anyway, so the rest of the URL goes to the target; any other `pathRewrite` (another
+replacement, several rules) is read like a target that cannot be read: no link, and `meada status`
+says so. `ignorePath`, `prependPath: false` and an endpoint the `app-config*.yaml` files give
+different values (which one a deployment loads is not known) are read the same way.
 
 **Environment.** `process.env.X`, `process.env["X"]` and `import.meta.env.X`, alone or passing
 through text methods such as `trim()`, `replace(...)` and `toLowerCase()`. A URL that starts with
