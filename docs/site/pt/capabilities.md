@@ -223,6 +223,18 @@ Drift é um campo que um consumidor `fetch` lê da resposta, mas que a rota não
 | `search` com tipo `drift` | Lista o drift encontrado |
 | `meada status` | Conta leituras ausentes no repositório consumidor; o provedor não recebe essa contagem |
 
+## Valores de configuração
+
+Cada escalar de cada arquivo `*.yaml`, `*.yml` e `*.json` que o Meada lê, e dos arquivos YAML e JSON da configuração de CI na raiz (`.github/`, `.gitlab-ci.yml`, `.gitlab/`, `.circleci/`, `.buildkite/`, `.drone.yml`), é um valor de configuração: arquivo, caminho da chave (no estilo do jq, `alerts.loki[0].labels.support`, `metadata.labels["app.kubernetes.io/name"]`, `[2].spec.replicas` num arquivo de vários documentos), valor, tipo (texto, número ou booleano) e linha. Os outros caminhos ocultos ficam de fora, e não há nada para ligar.
+
+| Consulta | Resultado |
+| --- | --- |
+| `search` com kind `value` | Valores cujo valor ou caminho da chave é igual à consulta, começa com ela ou a contém, como `<repositório> <caminho>:<linha> <caminho da chave> = <valor>` |
+| `search` sem kind | Valores só quando nenhum símbolo e nenhum contrato casa |
+| `meada status` | Arquivos de configuração lidos e ignorados (lockfiles, arquivos que não são lidos) e os valores ocultados |
+
+Um valor acima de 1 KiB é guardado cortado, marcado `(cut)`. Os `data` e `stringData` de um `Secret` do Kubernetes ficam guardados como `redacted`, com caminho da chave, tipo e linha; nada mais é filtrado, então os arquivos que não devem entrar no índice vão no `.meadaignore`. Lockfiles (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `packages.lock.json`), templates Helm (que não são YAML até serem renderizados), arquivos acima de 1 MiB e arquivos de mais de 1.000 documentos ficam de fora. Valores nunca entram no `meada export` e não ligam nada.
+
 ## Comunidades e processos
 
 Uma comunidade reúne símbolos que se chamam mais entre si do que ao restante. `meada export` calcula esses grupos com Leiden, sem aleatoriedade e com aritmética inteira. O nome vem da pasta da maioria dos membros (`src`, `src#2`), igual em toda máquina.

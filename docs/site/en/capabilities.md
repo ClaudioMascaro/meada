@@ -223,6 +223,18 @@ Drift is a field a `fetch` consumer reads from a response but the route does not
 | `search` with kind `drift` | Lists detected drift |
 | `meada status` | Counts missing reads in the consumer repository; the provider receives no count |
 
+## Config values
+
+Every scalar of every `*.yaml`, `*.yml` and `*.json` file Meada reads, and of the YAML and JSON files under the CI configuration at the root (`.github/`, `.gitlab-ci.yml`, `.gitlab/`, `.circleci/`, `.buildkite/`, `.drone.yml`), is a config value: file, key path (jq style, `alerts.loki[0].labels.support`, `metadata.labels["app.kubernetes.io/name"]`, `[2].spec.replicas` in a file of several documents), value, type (string, number or boolean) and line. Other hidden paths stay out, and nothing needs turning on.
+
+| Query | Result |
+| --- | --- |
+| `search` with kind `value` | Values whose value or key path equals, starts with or holds the query, as `<repository> <path>:<line> <key path> = <value>` |
+| `search` with no kind | Values only when no symbol and no contract matches |
+| `meada status` | Config files read and skipped (lockfiles, files that do not parse) and the values redacted |
+
+A value over 1 KiB is stored cut, marked `(cut)`. The `data` and `stringData` of a Kubernetes `Secret` are stored as `redacted`, with key path, type and line; nothing else is filtered, so files that must stay out of the index go in `.meadaignore`. Lockfiles (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `packages.lock.json`), Helm templates (not YAML until rendered), files over 1 MiB and files of more than 1,000 documents are skipped. Values never enter `meada export` and link nothing.
+
 ## Communities and processes
 
 A community groups symbols that call each other more than the rest. `meada export` computes these groups with Leiden, without randomness and using integer arithmetic. Names follow the directory containing most members (`src`, `src#2`), identically on every machine.

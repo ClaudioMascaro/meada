@@ -648,6 +648,9 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
         unread("/rewritten", 1),
         unread("/slashed", 1),
         unread("/twice", 1),
+        "  config files: 2 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 17, \
+         redacted: 0"
+            .to_string(),
         "  wrong conclusion? report it: \
          https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml"
             .to_string(),

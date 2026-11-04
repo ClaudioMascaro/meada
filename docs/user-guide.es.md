@@ -151,9 +151,26 @@ Los valores de `kind`:
 | `community` | una comunidad por el nombre |
 | `process` | un proceso por la etiqueta del punto de entrada, con la identidad `process::` desde la que parte `trace` |
 | `duplicate` | símbolos con texto idéntico en dos o más lugares, por el nombre o por la ruta |
+| `value` | un valor de configuración de un archivo YAML o JSON, por el valor o por la ruta de la clave |
 | `ambiguous`, `unresolved` | los ítems abiertos, con el comando `meada decide` de cada uno |
 
 Cada resultado es una línea: repositorio, `ruta:línea` y nombre.
+
+Sin `kind`, la búsqueda responde con símbolos y contratos; solo cuando ninguno coincide responde
+con valores de configuración. Con `kind = "value"`, cada línea es `<repositorio> <ruta>:<línea>
+<ruta de la clave> = <valor>`, un texto entre comillas como en JSON:
+
+```text
+example.com/acme/app chart/values-prd.yaml:6 alerts.loki[0].labels.support = "team-b"
+example.com/acme/app deploy/app.yaml:26 [1].data.password = redacted
+```
+
+La ruta de la clave sigue el estilo de jq: claves unidas por puntos, un elemento de lista `[n]`
+desde 0, una clave que no es un identificador simple entre `["..."]`
+(`metadata.labels["app.kubernetes.io/name"]`) y, en un archivo de varios documentos, el índice del
+documento primero (`[2].spec.replicas`). La consulta, en minúsculas, coincide con el valor o con
+la ruta de la clave: iguales primero, luego los que empiezan con ella, luego los que la
+contienen. Un valor de más de 1 KiB se guarda cortado y aparece seguido de `(cut)`.
 
 #### `context`: entender un símbolo
 
@@ -251,7 +268,9 @@ graba es `meada.decisions.toml`, y solo cuando usted ejecuta `meada decide`.
 
 El recorrido cubre todos los archivos del repositorio, versionados o no, excepto:
 
-- **Ocultos**: los archivos y directorios cuyo nombre empieza con `.` no se leen.
+- **Ocultos**: los archivos y directorios cuyo nombre empieza con `.` no se leen, salvo la
+  configuración de CI en la raíz (`.github/`, `.gitlab-ci.yml`, `.gitlab/`, `.circleci/`,
+  `.buildkite/` y `.drone.yml`), cuyos archivos YAML y JSON se vuelven valores de configuración.
 - **Siempre ignorados**: los directorios `node_modules` y `Pods`, un `Checkouts` dentro de
   `Carthage`, los archivos `*.min.js` y `*.min.css` y la salida de build de .NET (`obj` o `bin`
   junto a un `.csproj`).
@@ -272,6 +291,25 @@ Migrations/
 
 Un archivo que una nueva regla excluye sale del índice en el próximo refresh, como un archivo
 borrado.
+
+### Valores de configuración
+
+Cada escalar (un texto, un número o un booleano; un nulo queda fuera) de cada archivo `*.yaml`,
+`*.yml` y `*.json` que el recorrido lee, y de los archivos YAML y JSON de la configuración de CI
+de arriba, es un **valor de configuración**: archivo, ruta de la clave, valor, tipo y línea. No
+hay clave para activarlo: la búsqueda con `kind = "value"` los encuentra, y la búsqueda sin
+`kind` responde con ellos cuando nada más coincide. No entran en `meada export`.
+
+- **Lockfiles** (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml` y
+  `packages.lock.json`) y los archivos que no se leen (una plantilla Helm, que no es YAML hasta
+  renderizarse; un archivo de más de 1 MiB; un archivo de más de 1.000 documentos) quedan fuera, y
+  `meada status` los cuenta:
+  `archivos de configuración: 5 leídos, 2 omitidos (lockfiles: 1, ilegibles: 1); valores: 46, ocultados: 3`.
+- **Secretos**: los valores de `data` y `stringData` de un `Secret` de Kubernetes (un documento
+  con `apiVersion` y `kind: Secret`, o un elemento así de una lista `items`) se guardan como
+  `redacted`, con su ruta de la clave, su tipo y su línea. Nada más se filtra: el índice guarda lo
+  que el checkout ya tiene. Pon en `.meadaignore` los archivos que no deben entrar en el índice
+  (`secrets/`, `*.env.json`).
 
 ## 4. `meada.toml`: referencia
 

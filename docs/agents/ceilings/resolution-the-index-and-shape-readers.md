@@ -347,9 +347,11 @@
 - `document/`: a document never fails indexing, so its readers have fixed limits; deeper or
   larger parts are unreadable or open. `mod.rs`: `DOCUMENT_BYTES_MAX` (16 MiB, above the largest public
   single-file descriptions, GitHub's REST API and Stripe's SDK spec at 10 to 15 MB): a larger
-  document is unreadable at its first line. `yaml.rs`: `MAX_NESTING` (128 nested collections, as
-  `serde_json` has for JSON) and the alias budget (`EXPANSION` times the source plus `SLACK`, no
-  marker). `schema.rs`: `MAX_DEPTH` (128 levels per shape), `WORK` (64 MiB per document) and
+  document is unreadable at its first line. `events.rs`, the YAML and JSON event reader:
+  `MAX_NESTING` (128 nested collections, as `serde_json` has for JSON, an alias's node counted at
+  the depth it lands) and the alias budget (`EXPANSION` times the source plus `SLACK`, no
+  marker), which also charges every document of a stream; the count of documents per file is
+  config values' (`config_values::DOCUMENTS_MAX`). `schema.rs`: `MAX_DEPTH` (128 levels per shape), `WORK` (64 MiB per document) and
   `BUDGET` (10,000 schemas per shape, no marker). `openapi.rs`: a path item reference behind
   another one that is external is dropped without a status line (no marker).
 - `entry.rs`: an export entry point is a function, or a method of an exported class (a
@@ -388,7 +390,7 @@
 - `jvm/spring.rs` (spec #26, #89): `PLACEHOLDER_DEPTH` (32) bounds how many keys deep a
   placeholder is resolved, a cycle included, and `PLACEHOLDER_BUDGET` (64 KiB) what one value
   may cost (each placeholder visited, each byte copied); past either the rest is an unknown
-  part. The YAML file goes through the provider documents' reader (`document/yaml.rs`), with its
+  part. The YAML file goes through the event reader (`document/events.rs`), with its
   budget and nesting limit; a `.properties` file is bounded by `lang::MAX_BYTES` like every pack
   config. A same-package `System` type in another file is not seen by the Java pack's
   `getenv`.
@@ -432,3 +434,19 @@
   what the modules of its repository it depends on pass on up to `MODULE_DEPTH` (32) modules
   deep (`package/maven.rs`); a module's parent pom adds nothing to what it passes on, and a
   Gradle dependency passes nothing on.
+- `config_values.rs` (#639, ADR 0025): `VALUE_MAX` (1 KiB: a value is stored cut at the last
+  character boundary within it, marked `(cut)` in the answers, and matched as stored);
+  `DOCUMENTS_MAX` (1,000 documents per file: a stream of more is unreadable, since a manifest
+  bundle holds tens and past a thousand it is generated output); `STORED_EXPANSION` (the bytes of the
+  key paths and values one file stores, 4 times its size plus `STORED_SLACK`, 4 KiB, the hostile
+  probes' bound:
+  an indented file stores about twice its size, but a minified file of tiny scalars, such as a
+  long array of numbers, and long keys nested deep are unreadable). An unreadable file and a
+  lockfile are counted in `meada status`, not named. Search kind `value` finds exact and prefix
+  matches through the B-trees on the lowercased key path and value, and substrings by scanning
+  every row of every repository (no marker on a `const`, a `ponytail:` comment in `hits`): the
+  FTS5 trigram table ADR 0025 describes waits for a workspace the scan makes slow. Redaction covers a Kubernetes `Secret` at a document's root or as an item of a
+  list's `items`; a `Secret` with no `apiVersion`, or nested anywhere else (a Helm value, a
+  Crossplane composition's base), keeps its values (the other secret markers of ADR 0025 belong
+  to the IaC formats, #640). The hidden CI paths are read at the repository root only, and only
+  their YAML and JSON files.

@@ -2512,6 +2512,42 @@ fn a_refresh_keeps_untouched_groups_and_follows_edits_across_files_like_a_cold_i
     }
 }
 
+/// A config file edited alone (#639) rewrites its values and nothing else: the Python job's
+/// file, rewritten under its old stamp, still gives its old consumer, so no group of code was
+/// extracted again, and the export does not move, while `search` finds the edited value and not
+/// the old one; a removed config file takes its values along.
+#[test]
+fn an_edited_config_file_alone_refreshes_its_values_and_nothing_else() {
+    let repo = catalog("fresh_config_alone");
+    fs::write(repo.join("settings.yaml"), "billing:\n  region: eu-west\n").unwrap();
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    let values = |q: &str| engine.search(q, Some("value"), None).unwrap();
+    assert!(
+        values("eu-west").contains("settings.yaml:2"),
+        "{}",
+        values("eu-west")
+    );
+    replace(&repo, "jobs/report.py", "billing", "bulling");
+    fs::write(
+        repo.join("settings.yaml"),
+        "billing:\n  region: us-east-2\n",
+    )
+    .unwrap();
+    age(&repo);
+
+    let refreshed = engine.export().unwrap();
+
+    assert_eq!(refreshed, before);
+    let edited = values("us-east-2");
+    let line = "settings.yaml:2 billing.region = \"us-east-2\"";
+    assert!(edited.contains(line), "{edited}");
+    assert_eq!(values("eu-west"), "no matches for `eu-west`\n");
+    fs::remove_file(repo.join("settings.yaml")).unwrap();
+    assert_eq!(values("us-east-2"), "no matches for `us-east-2`\n");
+}
+
 /// A refresh does not read a kept group's files again (#391): the Python job's file, rewritten
 /// under its old stamp with a host of the same length, still gives its old consumer after an
 /// edit of the TypeScript group, since its values are not parsed again.

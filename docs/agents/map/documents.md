@@ -7,7 +7,7 @@ this file, and a change to these modules updates it.
 - `document/` (spec #21): provider documents. `mod.rs`: `is_document(path)` (discovery by file
   name: `{openapi,asyncapi}.{yaml,yml,json}` and `*.{openapi,asyncapi}.{yaml,yml,json}`),
   `read(path, bytes) ->
-  Summary` (never fails: JSON by extension through `serde_json`, else YAML; what cannot be read
+  Summary` (never fails: JSON by extension, else YAML, both through `events::first`; what cannot be read
   becomes a `Problem`, with the line clamped to the file's last line; the content decides,
   since a listed document can have any name: a top-level `openapi` field goes to `openapi.rs`,
   an `asyncapi` one to `asyncapi.rs`, and with neither the name only picks which format it is
@@ -72,14 +72,52 @@ this file, and a change to these modules updates it.
   `Problem::UnknownServer` (the channel is ignored on it). A name holding `{` or `}` is a `Problem::Parameters` and
   ignored (AMQP bindings are not read). Sides with the same broker kind, name and role (several
   operations, several servers of one kind) are one, their payloads read together as one
-  `oneOf` shape. `yaml.rs`: `parse(text) -> Result<Value,
-  (line, reason)>` over `yaml-rust2`'s event parser, taken one event at a time with
-  `Parser::next_token` (never `YamlLoader`, nor `Parser::load`, which recurses per level of
-  nesting), the collections being read on an explicit stack, at most `MAX_NESTING` (128, as
-  `serde_json`) deep (deeper, the document is unreadable at that line): first document only, keys as written, plain scalars typed by the YAML 1.2 core schema,
-  quoted and block scalars strings, a non-scalar key an error, and every node built, aliases
-  included, charged to a budget of 4 times the source length plus 64 KiB (over it, the
-  document is unreadable). Readers only see `serde_json::Value`.
+  `oneOf` shape. `events.rs` (#646): the event reader every YAML and JSON reader goes through
+  (provider documents, Spring's `read_yaml` and with it Backstage's `app-config*.yaml`).
+  `first(syntax, bytes) -> Result<Value, (line, reason)>` reads the first document and nothing
+  past it; `read(syntax, bytes, each)` reads every document of a stream into a `Vec<Value>` and
+  hands `each` every scalar as a `Scalar {document, path: &[Step], value, line}` (`Step::{Key,
+  Index}`, 0-based document and index, 1-based line; a block scalar's line is its text's first,
+  a scalar an alias repeats has the alias's line, an aliased mapping's scalars come in key
+  order); `Syntax::of(path)` is JSON by the `.json` extension, YAML otherwise. YAML goes through
+  `yaml-rust2`'s event parser, taken one event at a time with `Parser::next_token` (never
+  `YamlLoader`, nor `Parser::load`, which recurses per level of nesting): keys as written, plain
+  scalars typed by the YAML 1.2 core schema, quoted and block scalars strings, a non-scalar key
+  an error, anchors per document. JSON is read by `serde_json` first (its line and reason are
+  the error, as before), then a lexer over the accepted text decodes each string and literal
+  with `serde_json`, so the tree is `serde_json`'s. Both build on one explicit stack, at most
+  `MAX_NESTING` (128, as `serde_json`) collections deep, an alias's node counted at the depth
+  it lands (deeper, the stream is unreadable at that line), and every node built and every
+  document, aliases included, is charged to a budget of 4 times the source length plus 64 KiB
+  (over it, the stream is unreadable). Readers only see `serde_json::Value`.
+- `config_values.rs` (#639, ADR 0025): config values. `is_config(path)` (`*.yaml`, `*.yml`,
+  `*.json`) picks them from the walk and from `index::hidden_ci`, the second walk of the hidden
+  root entries `HIDDEN_CI` (`.github`, `.gitlab-ci.yml`, `.gitlab`, `.circleci`, `.buildkite`,
+  `.drone.yml`, read whole, under the same ignore files; no other hidden path is walked, and the
+  packs never see these files); `index::configs_found` joins both. `read(path, bytes) ->
+  (Outcome, Vec<Row>)` never fails: a lockfile by name (`LOCKFILES`: `package-lock.json`,
+  `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `packages.lock.json`) is `Outcome::Lockfile`, a file
+  past `lang::MAX_BYTES`, one `events::read` cannot read, one of more than `DOCUMENTS_MAX`
+  documents and one whose rows pass the stored budget are `Outcome::Unreadable {line, reason}`
+  with no row; otherwise every scalar but a null is a `Row {key, value, kind, line, cut}`
+  (`kind` `string`, `number` or `boolean`, the value cut at `VALUE_MAX` on a character
+  boundary), and `Outcome::Read {values, redacted}`. `key_path(steps)` renders ADR
+  0025's grammar (dots, `[n]`, `["..."]` by `serde_json` escaping for a key that is not
+  `[A-Za-z_][A-Za-z0-9_]*`, `.` for a document that is the scalar); a stream of several
+  documents prefixes `[d]` once the read ends (`prefixed`). A value under `data` or `stringData` of a
+  document that is a Kubernetes `Secret` (an `apiVersion` and `kind: Secret`), or of such an item
+  of a list's `items`, keeps its key path, type and line with no value. `store` and `forget`
+  write the rows; `index::refresh` runs `refresh_stamped` on `config_files` beside the documents
+  and manifests, before the code, so an edited config file rewrites its rows and nothing else.
+  `store` keeps each key path and value lowercased beside it (`folded_key`, `folded_value`, each
+  with a B-tree); `hits(identity, db, needle)` takes exact matches from the B-trees (rank 0),
+  then prefixes from them (rank 1, the range from `needle` up to `successor(needle)`, the least
+  text above every text that starts with it), then
+  substrings from a scan (`instr`, rank 2), a row keeping its first rank, and renders `<repository> <path>:<line> <key path> = <value>` (a string as JSON,
+  `(cut)` after a cut one, `redacted` for a secret), tie-broken by repository, path, zero-padded
+  line and key path; `Engine::search` answers `kind = "value"` with them, and the default search
+  with them only when it found no symbol and no contract. `status(db)` is the `meada status`
+  line (`Msg::ConfigFiles`), absent with no config file.
 - `shape.rs` (in `meada-core`, reached as `crate::shape`; spec #21, ADR 0009): `Shape {source, fields, open, scalars, declared, optional,
   imports, guessed}`, the one form of what a
   contract carries, whatever it is read from, so shape drift (spec #23) compares shapes without

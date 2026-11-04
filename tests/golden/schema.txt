@@ -39,6 +39,17 @@ CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEX
 CREATE TABLE communities (name TEXT NOT NULL, member TEXT NOT NULL);
 CREATE INDEX communities_member ON communities (member);
 CREATE TABLE valued (path TEXT PRIMARY KEY);
+CREATE TABLE config_files (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    summary TEXT NOT NULL
+);
+CREATE TABLE config_values (
+    path TEXT NOT NULL, key TEXT NOT NULL, value TEXT, type TEXT NOT NULL, line INTEGER NOT NULL,
+    cut INTEGER NOT NULL, folded_key TEXT NOT NULL, folded_value TEXT
+);
+CREATE INDEX config_values_path ON config_values (path);
+CREATE INDEX config_values_folded_key ON config_values (folded_key);
+CREATE INDEX config_values_folded_value ON config_values (folded_value);
 
 sample.ts
 {
@@ -3224,3 +3235,22 @@ sample.tsconfig.json
   "out_dir": "./dist",
   "root_dir": "src"
 }
+
+sample.values.yaml
+{
+  "read": {
+    "values": 11,
+    "redacted": 1
+  }
+}
+Row { key: "[0].apiVersion", value: Some("v1"), kind: "string", line: 3, cut: false }
+Row { key: "[0].kind", value: Some("ConfigMap"), kind: "string", line: 4, cut: false }
+Row { key: "[0].metadata.name", value: Some("web"), kind: "string", line: 6, cut: false }
+Row { key: "[0].metadata.annotations[\"app.kubernetes.io/name\"]", value: Some("web"), kind: "string", line: 8, cut: false }
+Row { key: "[0].data.replicas", value: Some("3"), kind: "number", line: 10, cut: false }
+Row { key: "[0].data.debug", value: Some("false"), kind: "boolean", line: 11, cut: false }
+Row { key: "[0].data.hosts[0]", value: Some("a.example.com"), kind: "string", line: 13, cut: false }
+Row { key: "[0].data.hosts[1]", value: Some("b.example.com"), kind: "string", line: 13, cut: false }
+Row { key: "[1].apiVersion", value: Some("v1"), kind: "string", line: 15, cut: false }
+Row { key: "[1].kind", value: Some("Secret"), kind: "string", line: 16, cut: false }
+Row { key: "[1].stringData.password", value: None, kind: "string", line: 18, cut: false }

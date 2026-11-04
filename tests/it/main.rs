@@ -11,6 +11,7 @@ mod channels;
 mod channels_jobs;
 mod cli;
 mod community_queries;
+mod config_values;
 mod conformance;
 mod decide;
 mod decider;

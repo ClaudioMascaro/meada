@@ -117,6 +117,15 @@ pub enum Msg<'a> {
     UnlinkedResource(&'a str),
     /// The missing reads of the repository's consumers against the routes they call (spec #23).
     Drift(usize),
+    /// The config files of a repository (#639): read, skipped as lockfiles or as unreadable,
+    /// and the values they hold and redact.
+    ConfigFiles {
+        read: usize,
+        lockfiles: usize,
+        unreadable: usize,
+        values: usize,
+        redacted: usize,
+    },
     /// The line for the human at the end of a repository's status when it holds a drift or an
     /// `inferred` link: where a wrong conclusion goes.
     ReportHint,
@@ -1773,6 +1782,31 @@ impl Msg<'_> {
                 format!("drift de formato, leituras ausentes: {n}"),
                 format!("drift de formato, lecturas ausentes: {n}"),
             ),
+            Msg::ConfigFiles {
+                read,
+                lockfiles,
+                unreadable,
+                values,
+                redacted,
+            } => {
+                let skipped = lockfiles + unreadable;
+                pick(
+                    format!(
+                        "config files: {read} read, {skipped} skipped (lockfiles: {lockfiles}, \
+                         unreadable: {unreadable}); values: {values}, redacted: {redacted}"
+                    ),
+                    format!(
+                        "arquivos de configuração: {read} lidos, {skipped} ignorados \
+                         (lockfiles: {lockfiles}, ilegíveis: {unreadable}); valores: {values}, \
+                         ocultados: {redacted}"
+                    ),
+                    format!(
+                        "archivos de configuración: {read} leídos, {skipped} omitidos \
+                         (lockfiles: {lockfiles}, ilegibles: {unreadable}); valores: {values}, \
+                         ocultados: {redacted}"
+                    ),
+                )
+            }
             Msg::ReportHint => pick(
                 format!("wrong conclusion? report it: {REPORT_URL}"),
                 format!("conclusão errada? relate: {REPORT_URL}"),

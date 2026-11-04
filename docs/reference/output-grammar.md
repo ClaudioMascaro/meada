@@ -158,11 +158,12 @@ substrings), and an optional `kind`:
 | `community` | Communities, by name. |
 | `process` | Processes, by their entry point's label. |
 | `duplicate` | Groups of symbols with the same span text, by name or path. |
+| `value` | Config values of YAML and JSON files, by value or key path. |
 | `ambiguous` | Open items: calls with several candidate providers. |
 | `unresolved` | Open items: calls whose target Meada cannot read. |
 
-With no `kind`, `search` lists symbols and contracts. The answer is one line per match, or a
-`no matches` line:
+With no `kind`, `search` lists symbols and contracts, and config values only when neither
+matches. The answer is one line per match, or a `no matches` line:
 
 | Kind | Line | Meaning |
 | --- | --- | --- |
@@ -173,6 +174,7 @@ With no `kind`, `search` lists symbols and contracts. The answer is one line per
 | drift | `<repository> <place> <caller> <contract> missing <field-path> (<level>)` | One field path a consumer reads that the provider's shape lacks, with the level of that report. |
 | community | `<repository> <community> (members: <n>)` | A community and its size. |
 | process | `<repository> <label> process::<entry-identity> (<entry-kind>)` | A process: `process::<entry-identity>` is what `trace` starts from. |
+| value | `<repository> <place> <key-path> = <shown-value>` | A config value, at its file and line. |
 | copies | `<n> copies` | A group of duplicates; one symbol line per copy follows. |
 | open item | `` <repository> <place> (<item-kind>) candidates: <n>; run `meada decide --item <call-site>` `` | An open item and the command that closes it. |
 | no matches | `` no matches for `<query?>` `` | Nothing matched. |
@@ -203,6 +205,9 @@ With no `kind`, `search` lists symbols and contracts. The answer is one line per
 | `<entry-kind>` | `program` | A program start a language pack declares or a manifest names. |
 | `<item-kind>` | `ambiguous` | An ambiguous link: several providers fit. |
 | `<item-kind>` | `unresolved` | An unresolved consumer, such as a dynamic URL. |
+| `<key-path>` | `<text>` | Where the value sits in its file, jq style: `spec.containers[0].image`, `metadata.labels["app.kubernetes.io/name"]`, `[2].spec.replicas` in a file of several documents. |
+| `<shown-value>` | `<text> (cut)` | A string past 1 KiB, quoted as JSON and cut. |
+| `<shown-value>` | `<text>` | A string quoted as JSON (`"team-b"`), a number or a boolean as written, or `redacted` for a value a format marks secret. |
 
 ## `context`
 

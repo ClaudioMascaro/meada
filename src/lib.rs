@@ -10,6 +10,7 @@ mod catalog;
 mod channel;
 mod community;
 mod config;
+mod config_values;
 mod contract;
 pub mod decide;
 mod decider;

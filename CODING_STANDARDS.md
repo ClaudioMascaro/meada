@@ -161,7 +161,7 @@ budget of 64 KB (`tests/it/docs.rs` fails above it):
   `docs/agents/ceilings.md`), with its value and its reason; it is not repeated in the map.
 - A value the index now stores (a table, a column, a field of a stored summary) joins the list
   "Stored values" in `docs/agents/map/indexing/stored-values.md`, the detail of the invariant "The index holds
-  no source text and no values, apart from ..." in the map.
+  no source text and no values of code, apart from ..." in the map.
 - A kind's rule lives in its own files behind `ContractKind`. The engine, the items, the
   decisions, the trace, the entry points and the extraction loop of the index writer ask the seam
   (`contract::kind_of`, `shown`, `serves`, `place` and the other free functions) and import no

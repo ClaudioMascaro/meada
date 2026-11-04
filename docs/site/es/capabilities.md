@@ -223,6 +223,18 @@ Drift es un campo que un consumidor `fetch` lee de una respuesta pero que la rut
 | `search` con tipo `drift` | Lista el drift encontrado |
 | `meada status` | Cuenta lecturas ausentes en el repositorio consumidor; el proveedor no recibe esa cuenta |
 
+## Valores de configuración
+
+Cada escalar de cada archivo `*.yaml`, `*.yml` y `*.json` que Meada lee, y de los archivos YAML y JSON de la configuración de CI en la raíz (`.github/`, `.gitlab-ci.yml`, `.gitlab/`, `.circleci/`, `.buildkite/`, `.drone.yml`), es un valor de configuración: archivo, ruta de la clave (al estilo de jq, `alerts.loki[0].labels.support`, `metadata.labels["app.kubernetes.io/name"]`, `[2].spec.replicas` en un archivo de varios documentos), valor, tipo (texto, número o booleano) y línea. Las demás rutas ocultas quedan fuera, y no hay nada que activar.
+
+| Consulta | Resultado |
+| --- | --- |
+| `search` con kind `value` | Valores cuyo valor o ruta de la clave es igual a la consulta, empieza con ella o la contiene, como `<repositorio> <ruta>:<línea> <ruta de la clave> = <valor>` |
+| `search` sin kind | Valores solo cuando ningún símbolo y ningún contrato coincide |
+| `meada status` | Archivos de configuración leídos y omitidos (lockfiles, archivos que no se leen) y los valores ocultados |
+
+Un valor de más de 1 KiB se guarda cortado, marcado `(cut)`. Los `data` y `stringData` de un `Secret` de Kubernetes se guardan como `redacted`, con ruta de la clave, tipo y línea; nada más se filtra, así que los archivos que no deben entrar en el índice van en `.meadaignore`. Los lockfiles (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `packages.lock.json`), las plantillas Helm (que no son YAML hasta renderizarse), los archivos de más de 1 MiB y los archivos de más de 1.000 documentos quedan fuera. Los valores nunca entran en `meada export` y no enlazan nada.
+
 ## Comunidades y procesos
 
 Una comunidad agrupa símbolos que se llaman más entre sí que al resto. `meada export` calcula los grupos con Leiden, sin aleatoriedad y con aritmética entera. El nombre viene de la carpeta de la mayoría de sus miembros (`src`, `src#2`), igual en cada máquina.

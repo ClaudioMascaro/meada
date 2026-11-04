@@ -16,6 +16,7 @@ use serde::Serialize;
 use crate::Result;
 use crate::community::{self, Community};
 use crate::config::Serve;
+use crate::config_values;
 use crate::contract::{self, Found, Level, Link, Names, Role, Site};
 use crate::decisions::Stale;
 use crate::document::{self, Summary};
@@ -95,6 +96,14 @@ pub(crate) fn schema_version() -> i32 {
 /// which the index does not keep) the last contract extraction read (`resolve::Code::read`): a
 /// refresh reads them back from the values cache beside the index (ADR 0027), or parses them
 /// again, before it extracts, so one pass usually reads all it needs.
+/// `config_files` holds each config file (#639, ADR 0025: a YAML or JSON file the walk visits,
+/// or one under the hidden CI paths) stamped like `documents`, its `summary` being
+/// `config_values::Outcome` as JSON (read, with its count of values and of those redacted; a
+/// lockfile; or unreadable, with the line and the reason); `config_values` holds each of its
+/// scalars but nulls: the `key` path, the `value` (cut at `config_values::VALUE_MAX`, `cut` 1,
+/// or NULL when a format marks it secret), its `type` (`string`, `number`, `boolean`), its
+/// `line`, and the key path and value lowercased (`folded_key`, `folded_value`, each with a
+/// B-tree for exact and prefix search), rewritten with the file. Neither reaches the export.
 const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -137,6 +146,17 @@ CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEX
 CREATE TABLE communities (name TEXT NOT NULL, member TEXT NOT NULL);
 CREATE INDEX communities_member ON communities (member);
 CREATE TABLE valued (path TEXT PRIMARY KEY);
+CREATE TABLE config_files (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    summary TEXT NOT NULL
+);
+CREATE TABLE config_values (
+    path TEXT NOT NULL, key TEXT NOT NULL, value TEXT, type TEXT NOT NULL, line INTEGER NOT NULL,
+    cut INTEGER NOT NULL, folded_key TEXT NOT NULL, folded_value TEXT
+);
+CREATE INDEX config_values_path ON config_values (path);
+CREATE INDEX config_values_folded_key ON config_values (folded_key);
+CREATE INDEX config_values_folded_value ON config_values (folded_value);
 ";
 
 /// A file modified this close to a refresh may change again within the same mtime tick, so
@@ -191,6 +211,7 @@ fn provenance_fingerprint(db: &Connection) -> Result<String> {
         "SELECT path, hash FROM files ORDER BY path",
         "SELECT path, hash FROM documents ORDER BY path",
         "SELECT path, hash FROM manifests ORDER BY path",
+        "SELECT path, hash FROM config_files ORDER BY path",
     ] {
         hash.update(query.as_bytes());
         let mut statement = db.prepare(query)?;
@@ -632,7 +653,7 @@ fn refresh_keeping(
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
                  DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports; \
                  DELETE FROM families; DELETE FROM flexible; DELETE FROM entry_points; DELETE FROM communities; \
-                 DELETE FROM valued;",
+                 DELETE FROM valued; DELETE FROM config_files; DELETE FROM config_values;",
             )?;
             None
         }
@@ -659,6 +680,22 @@ fn refresh_keeping(
             false => Ok(serde_json::to_string(&package::read_manifest(path, src))?),
         },
     )?;
+    // Config values hold no code either: an edited config file changes its rows alone.
+    let gone = refresh_stamped(
+        &tx,
+        "config_files",
+        &configs_found(&all, &hidden_ci(root)),
+        now,
+        |abs| read_up_to(abs, lang::MAX_BYTES),
+        |path, src| {
+            let (outcome, rows) = config_values::read(path, src);
+            config_values::store(&tx, path, &rows)?;
+            Ok(serde_json::to_string(&outcome)?)
+        },
+    )?;
+    for path in &gone {
+        config_values::forget(&tx, path)?;
+    }
     // The packages decide which files keep the shapes of what they export (issue #175).
     let manifest_rows = manifest_rows(&tx)?;
     let Packs {
@@ -1459,6 +1496,11 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
             document::DOCUMENT_BYTES_MAX,
         ),
         ("manifests", manifests_found(&all), lang::MAX_BYTES),
+        (
+            "config_files",
+            configs_found(&all, &hidden_ci(root)),
+            lang::MAX_BYTES,
+        ),
     ];
     for (table, found, max) in tables {
         let read = |abs: &Path| read_up_to(abs, max);
@@ -1640,10 +1682,46 @@ fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
         .collect()
 }
 
-/// Brings `table` (`documents` or `manifests`, both stamped like `files`) up to date with
-/// `found`, the files on disk (path and absolute path), as `refresh` does `files`: stat, then
-/// `read` and hash, then `summarize` only what changed. A stored row not found, or whose file
-/// cannot be statted or read, leaves the table.
+/// The config files of a repository (path and absolute path): the YAML and JSON files `walk`
+/// found and those under the hidden CI paths (`hidden`, from `hidden_ci`), in path order.
+fn configs_found(
+    walked: &[(String, PathBuf)],
+    hidden: &[(String, PathBuf)],
+) -> Vec<(String, PathBuf)> {
+    let mut found: Vec<_> = (walked.iter().chain(hidden))
+        .filter(|(path, _)| config_values::is_config(path))
+        .cloned()
+        .collect();
+    found.sort();
+    found
+}
+
+/// Every file under the hidden entries of `root` that config values read although hidden
+/// (`config_values::HIDDEN_CI`: `.github/**`, `.gitlab-ci.yml` and the rest), but what
+/// `.gitignore`, `.ignore` and `.meadaignore` exclude, sorted. No other hidden path is walked.
+fn hidden_ci(root: &Path) -> Vec<(String, PathBuf)> {
+    let mut files: Vec<(String, PathBuf)> = WalkBuilder::new(root)
+        .require_git(false)
+        .parents(false)
+        .hidden(false)
+        .add_custom_ignore_filename(".meadaignore")
+        .filter_entry(|e| match e.depth() {
+            1 => (e.file_name().to_str()).is_some_and(config_values::is_hidden_ci),
+            _ => !is_build_output(e.path()) && !is_default_skip(e.path()),
+        })
+        .build()
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.file_type().is_some_and(|t| t.is_file()))
+        .filter_map(|entry| Some((relative(root, entry.path())?, entry.into_path())))
+        .collect();
+    files.sort();
+    files
+}
+
+/// Brings `table` (`documents`, `manifests` or `config_files`, stamped like `files`) up to date
+/// with `found`, the files on disk (path and absolute path), as `refresh` does `files`: stat,
+/// then `read` and hash, then `summarize` only what changed. A stored row not found, or whose
+/// file cannot be statted or read, leaves the table; their paths are returned.
 fn refresh_stamped(
     tx: &Transaction,
     table: &str,
@@ -1651,7 +1729,7 @@ fn refresh_stamped(
     now: SystemTime,
     read: impl Fn(&Path) -> std::io::Result<Vec<u8>>,
     summarize: impl Fn(&str, &[u8]) -> Result<String>,
-) -> Result<()> {
+) -> Result<Vec<String>> {
     let stored: HashMap<String, Stamp> = tx
         .prepare(&format!("SELECT path, hash, mtime, size FROM {table}"))?
         .query_map([], |r| {
@@ -1690,13 +1768,16 @@ fn refresh_stamped(
             params![path, hash, mtime, size, summary],
         )?;
     }
-    for path in stored.keys().filter(|p| !seen.contains(p.as_str())) {
+    let gone: Vec<String> = (stored.into_keys())
+        .filter(|p| !seen.contains(p.as_str()))
+        .collect();
+    for path in &gone {
         tx.execute(
             &format!("DELETE FROM {table} WHERE path = ?1"),
             params![path],
         )?;
     }
-    Ok(())
+    Ok(gone)
 }
 
 /// The size and mtime (nanoseconds) of the file at `abs`, and whether that mtime is old
@@ -2740,7 +2821,7 @@ mod tests {
     };
     use crate::config::Serve;
     use crate::msg::Fix;
-    use crate::{document, lang, package};
+    use crate::{config_values, document, lang, package};
 
     const REPO: &str = "example.com/acme/web";
     const MANIFEST: &str = "ops/meada.workspace.toml";
@@ -3312,7 +3393,8 @@ mod tests {
     }
 
     /// What an index stores: `SCHEMA`, then the facts each pack stores for its sample in
-    /// `tests/fixtures/schema/`, then the summary of each provider document and manifest sample.
+    /// `tests/fixtures/schema/`, then the summary of each provider document and manifest sample,
+    /// then the outcome and rows of the config values sample.
     /// Its golden is the schema version's source (`schema_version`), so a change fails until
     /// `MEADA_BLESS=1` rewrites the golden, which changes the version.
     #[test]
@@ -3359,6 +3441,11 @@ mod tests {
         let src = fs::read(tests.join("fixtures/schema/sample.tsconfig.json")).unwrap();
         let summary = serde_json::to_string_pretty(&package::read_tsconfig(&src)).unwrap();
         actual += &format!("\nsample.tsconfig.json\n{summary}\n");
+        let src = fs::read(tests.join("fixtures/schema/sample.values.yaml")).unwrap();
+        let (outcome, rows) = config_values::read("sample.values.yaml", &src);
+        let outcome = serde_json::to_string_pretty(&outcome).unwrap();
+        actual += &format!("\nsample.values.yaml\n{outcome}\n");
+        actual.extend(rows.iter().map(|row| format!("{row:?}\n")));
 
         let golden = tests.join("golden/schema.txt");
         if std::env::var_os("MEADA_BLESS").is_some_and(|v| v == "1") {

@@ -53,8 +53,9 @@ struct SearchArgs {
     /// with its consumers), `drift` (fields consumers read that a route lacks, by route or field
     /// path), `community` (by name), `process` (by its entry point's label, with the
     /// `process::` identity `trace` starts from), `duplicate` (symbols with identical text in
-    /// two or more places, by name or path), or `ambiguous` or `unresolved` (open items,
-    /// with the `meada decide` command for each).
+    /// two or more places, by name or path), `value` (a scalar of a YAML or JSON file, by value
+    /// or key path; with no kind, the answer when nothing else matches), or `ambiguous` or
+    /// `unresolved` (open items, with the `meada decide` command for each).
     kind: Option<String>,
     /// Token budget for the answer (default 2000).
     budget: Option<u32>,

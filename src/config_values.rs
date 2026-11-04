@@ -1,0 +1,631 @@
+//! Config values (ADR 0025, #639): every scalar of the YAML and JSON files the walk visits, and
+//! of the CI configuration under the hidden paths `HIDDEN_CI`, kept with its file, key path,
+//! value, type and line, which `search` finds with the kind `value`. Read through the event
+//! reader (`document::events`); the rows live in `config_values` beside the stamped
+//! `config_files`, which keeps each file's `Outcome` for `meada status`. Never exported.
+
+use std::collections::BTreeMap;
+use std::fmt::Write;
+
+use rusqlite::{Connection, Transaction, params};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use crate::Result;
+use crate::contract::Hit;
+use crate::document::events::{self, Step, Syntax};
+use crate::lang;
+use crate::msg::Msg;
+
+/// The lockfiles a YAML or JSON extension reaches, skipped by file name (ADR 0025).
+const LOCKFILES: [&str; 4] = [
+    "package-lock.json",
+    "npm-shrinkwrap.json",
+    "pnpm-lock.yaml",
+    "packages.lock.json",
+];
+
+/// The hidden entries of the repository root read although hidden (ADR 0025): the CI
+/// directories, read whole, and the CI files.
+pub(crate) const HIDDEN_CI: [&str; 6] = [
+    ".github",
+    ".gitlab-ci.yml",
+    ".gitlab",
+    ".circleci",
+    ".buildkite",
+    ".drone.yml",
+];
+
+/// The bytes of a value kept; a longer one is stored cut at a character boundary, marked.
+// ponytail: 1 KiB keeps a URL, an image name or an expression whole; past it a value is prose.
+pub(crate) const VALUE_MAX: usize = 1024;
+
+/// The documents one file may hold; a stream of more is unreadable.
+// ponytail: a manifest bundle holds tens of documents; past a thousand it is generated output.
+const DOCUMENTS_MAX: usize = 1000;
+
+/// The bytes the rows of one file may store (key paths and values), as a factor of its size,
+/// plus `STORED_SLACK`: a file of long keys nested deep, each repeated in the key path of every
+/// scalar below it, cannot store a tree many times its size. Past it the file is unreadable.
+// ponytail: an indented file stores about twice its size; 4 is the hostile probes' bound, and
+// keeps a minified file of tiny scalars (a long array of numbers) out.
+const STORED_EXPANSION: usize = 4;
+const STORED_SLACK: usize = 1 << 12;
+
+/// What reading one config file came to, stored as `config_files.summary`.
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum Outcome {
+    /// Read: how many values it holds, and how many of them are `redacted`.
+    Read { values: usize, redacted: usize },
+    /// A lockfile, skipped by name.
+    Lockfile,
+    /// Skipped: it does not parse, or passes a ceiling, at `line`.
+    Unreadable { line: usize, reason: String },
+}
+
+/// One config value as stored.
+#[derive(Debug, PartialEq)]
+pub(crate) struct Row {
+    pub key: String,
+    /// `None` when a format marks it secret: only its key path, type and line are kept.
+    pub value: Option<String>,
+    /// `string`, `number` or `boolean`.
+    pub kind: &'static str,
+    pub line: usize,
+    /// Whether `value` was cut at `VALUE_MAX`.
+    pub cut: bool,
+}
+
+/// Whether the file at `path` (relative, `/`-separated) holds config values: a `*.yaml`,
+/// `*.yml` or `*.json` file, lockfiles included (they are counted as skipped).
+pub(crate) fn is_config(path: &str) -> bool {
+    [".yaml", ".yml", ".json"].iter().any(|e| path.ends_with(e))
+}
+
+/// Whether a hidden entry the walk meets at the root, named `name`, is read anyway.
+pub(crate) fn is_hidden_ci(name: &str) -> bool {
+    HIDDEN_CI.contains(&name)
+}
+
+/// What a scalar row is before its document is known: its document, the steps that tell
+/// whether a Secret holds it, and the row.
+struct Pending {
+    document: usize,
+    secret: SecretPlace,
+    row: Row,
+}
+
+/// Where a scalar sits relative to the places a Kubernetes `Secret` keeps its values.
+#[derive(Clone, Copy, PartialEq)]
+enum SecretPlace {
+    No,
+    /// Under the root's `data` or `stringData`.
+    Root,
+    /// Under `items[n].data` or `items[n].stringData` of a list.
+    Item(usize),
+}
+
+impl SecretPlace {
+    fn of(path: &[Step]) -> SecretPlace {
+        let held =
+            |s: Option<&Step>| matches!(s, Some(Step::Key(k)) if k == "data" || k == "stringData");
+        match path {
+            [first, ..] if held(Some(first)) => SecretPlace::Root,
+            [Step::Key(items), Step::Index(n), rest @ ..]
+                if items == "items" && held(rest.first()) =>
+            {
+                SecretPlace::Item(*n)
+            }
+            _ => SecretPlace::No,
+        }
+    }
+}
+
+/// Whether `object` is a Kubernetes `Secret`: an object with an `apiVersion` and `kind: Secret`.
+fn is_secret(object: &Value) -> bool {
+    object.get("apiVersion").is_some()
+        && object.get("kind").and_then(Value::as_str) == Some("Secret")
+}
+
+/// The values of the file at `path` and what reading it came to. Every scalar but a null is a
+/// row; a value of a Kubernetes `Secret`'s `data` or `stringData` (at the root of a document,
+/// or an item of a `List`) keeps its key path, type and line only.
+pub(crate) fn read(path: &str, src: &[u8]) -> (Outcome, Vec<Row>) {
+    let unreadable = |line, reason: String| (Outcome::Unreadable { line, reason }, Vec::new());
+    let name = path.rsplit('/').next().unwrap_or(path);
+    if LOCKFILES.contains(&name) {
+        return (Outcome::Lockfile, Vec::new());
+    }
+    if src.len() > lang::MAX_BYTES {
+        return unreadable(1, format!("larger than {} bytes", lang::MAX_BYTES));
+    }
+    let mut pending = Vec::new();
+    let budget = (src.len())
+        .saturating_mul(STORED_EXPANSION)
+        .saturating_add(STORED_SLACK);
+    let mut left = budget;
+    let mut past: Option<(usize, String)> = None;
+    let read = events::read(Syntax::of(path), src, |scalar| {
+        if past.is_some() {
+            return;
+        }
+        if scalar.document >= DOCUMENTS_MAX {
+            past = Some((scalar.line, format!("more than {DOCUMENTS_MAX} documents")));
+            return;
+        }
+        let (kind, mut value) = match scalar.value {
+            Value::String(s) => ("string", s.clone()),
+            Value::Number(n) => ("number", n.to_string()),
+            Value::Bool(b) => ("boolean", b.to_string()),
+            _ => return,
+        };
+        let cut = value.len() > VALUE_MAX;
+        if cut {
+            value.truncate(value.floor_char_boundary(VALUE_MAX));
+        }
+        let key = key_path(scalar.path);
+        match left.checked_sub(key.len() + value.len()) {
+            Some(rest) => left = rest,
+            None => {
+                past = Some((scalar.line, format!("values past {budget} bytes")));
+                return;
+            }
+        }
+        let secret = SecretPlace::of(scalar.path);
+        let row = Row {
+            key,
+            value: Some(value),
+            kind,
+            line: scalar.line,
+            cut,
+        };
+        pending.push(Pending {
+            document: scalar.document,
+            secret,
+            row,
+        });
+    });
+    let documents = match read {
+        Ok(documents) => documents,
+        Err((line, reason)) => return unreadable(line, reason),
+    };
+    if let Some((line, reason)) = past {
+        return unreadable(line, reason);
+    }
+    if documents.len() > DOCUMENTS_MAX {
+        return unreadable(1, format!("more than {DOCUMENTS_MAX} documents"));
+    }
+    let several = documents.len() > 1;
+    let mut redacted = 0;
+    let rows: Vec<Row> = (pending.into_iter())
+        .map(
+            |Pending {
+                 document,
+                 secret,
+                 mut row,
+             }| {
+                let doc = &documents[document];
+                let hidden = match secret {
+                    SecretPlace::No => false,
+                    SecretPlace::Root => is_secret(doc),
+                    SecretPlace::Item(n) => doc["items"].get(n).is_some_and(is_secret),
+                };
+                if hidden {
+                    row.value = None;
+                    row.cut = false;
+                    redacted += 1;
+                }
+                if several {
+                    row.key = prefixed(document, &row.key);
+                }
+                row
+            },
+        )
+        .collect();
+    let values = rows.len();
+    (Outcome::Read { values, redacted }, rows)
+}
+
+/// The key path of the scalar at `path` (ADR 0025), jq style: keys joined by dots, a list item
+/// `[n]`, a key that is not a plain identifier `["..."]` with JSON escaping; `.` for a document
+/// that is the scalar itself. A file of several documents puts `[document]` first (`prefixed`).
+fn key_path(path: &[Step]) -> String {
+    let mut out = String::new();
+    for step in path {
+        match step {
+            Step::Index(n) => {
+                let _ = write!(out, "[{n}]");
+            }
+            Step::Key(key) if plain(key) => {
+                if !out.is_empty() {
+                    out.push('.');
+                }
+                out.push_str(key);
+            }
+            Step::Key(key) => {
+                let quoted = serde_json::to_string(key).unwrap_or_default();
+                let _ = write!(out, "[{quoted}]");
+            }
+        }
+    }
+    if out.is_empty() {
+        out.push('.');
+    }
+    out
+}
+
+/// `key`, a key path written without its document, with `[document]` first.
+fn prefixed(document: usize, key: &str) -> String {
+    match key {
+        "." => format!("[{document}]"),
+        _ if key.starts_with('[') => format!("[{document}]{key}"),
+        _ => format!("[{document}].{key}"),
+    }
+}
+
+/// An ASCII letter or `_`, then ASCII letters, digits or `_`: what jq reads as `.key`.
+fn plain(key: &str) -> bool {
+    let mut bytes = key.bytes();
+    bytes
+        .next()
+        .is_some_and(|b| b.is_ascii_alphabetic() || b == b'_')
+        && bytes.all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
+
+/// Replaces the rows of the file at `path` with `rows`, each with its key path and value
+/// lowercased beside it for the B-trees `hits` searches.
+pub(crate) fn store(tx: &Transaction, path: &str, rows: &[Row]) -> Result<()> {
+    forget(tx, path)?;
+    let mut insert =
+        tx.prepare_cached("INSERT INTO config_values VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)")?;
+    for r in rows {
+        let (key, value) = (
+            r.key.to_lowercase(),
+            r.value.as_deref().map(str::to_lowercase),
+        );
+        let line = r.line as i64;
+        insert.execute(params![
+            path, r.key, r.value, r.kind, line, r.cut, key, value
+        ])?;
+    }
+    Ok(())
+}
+
+/// Drops the rows of the file at `path`.
+pub(crate) fn forget(tx: &Transaction, path: &str) -> Result<()> {
+    tx.execute("DELETE FROM config_values WHERE path = ?1", params![path])?;
+    Ok(())
+}
+
+/// The values of `db` (repository `identity`) whose lowercased value or key path is `needle`,
+/// starts with it or holds it, as `search` hits: `<identity> <path>:<line> <key path> = <value>`,
+/// a string quoted as JSON, a cut one followed by `(cut)` and a secret one `redacted`, ordered
+/// by rank, then repository, path, line and key path. The B-trees on the lowercased key path
+/// and value serve exact and prefix (ADR 0025); a scan serves substring.
+pub(crate) fn hits(identity: &str, db: &Connection, needle: &str) -> Result<Vec<Hit>> {
+    const ROW: &str = "SELECT rowid, path, key, value, type, line, cut FROM config_values WHERE";
+    // A key path or value that starts with `needle` sorts from it up to the least text above
+    // all of them, as SQLite compares text by its UTF-8 bytes; with none, up to the end.
+    let past = successor(needle);
+    let (prefix, prefix_args): (&str, Vec<&str>) = match &past {
+        Some(past) => (
+            "folded_key >= ?1 AND folded_key < ?2 OR folded_value >= ?1 AND folded_value < ?2",
+            vec![needle, past],
+        ),
+        None => ("folded_key >= ?1 OR folded_value >= ?1", vec![needle]),
+    };
+    let searches: [(u8, &str, &[&str]); 3] = [
+        (0, "folded_key = ?1 OR folded_value = ?1", &[needle]),
+        (1, prefix, &prefix_args),
+        // ponytail: substring scans every row; the FTS5 trigram table ADR 0025 records waits
+        // for a workspace that makes this slow.
+        (
+            2,
+            "instr(folded_key, ?1) > 0 OR instr(folded_value, ?1) > 0",
+            &[needle],
+        ),
+    ];
+    let mut found: BTreeMap<i64, Hit> = BTreeMap::new();
+    for (rank, filter, args) in searches {
+        let mut statement = db.prepare(&format!("{ROW} {filter}"))?;
+        let mut rows = statement.query(rusqlite::params_from_iter(args))?;
+        while let Some(r) = rows.next()? {
+            let rowid: i64 = r.get(0)?;
+            if found.contains_key(&rowid) {
+                continue;
+            }
+            let (path, key, value): (String, String, Option<String>) =
+                (r.get(1)?, r.get(2)?, r.get(3)?);
+            let (kind, line, cut): (String, i64, bool) = (r.get(4)?, r.get(5)?, r.get(6)?);
+            let shown = match (&value, kind.as_str()) {
+                (None, _) => "redacted".to_string(),
+                (Some(v), "string") => serde_json::to_string(v)?,
+                (Some(v), _) => v.clone(),
+            };
+            let mark = if cut { " (cut)" } else { "" };
+            let text = format!("{identity} {path}:{line} {key} = {shown}{mark}");
+            found.insert(
+                rowid,
+                (rank, format!("{identity} {path} {line:010} {key}"), text),
+            );
+        }
+    }
+    Ok(found.into_values().collect())
+}
+
+/// The least text above every text that starts with `prefix`, in code point order (the byte
+/// order of UTF-8): `prefix` with its last character raised by one, after dropping each last
+/// `char::MAX`; `None` when nothing is above them (an empty `prefix`, or one of `char::MAX` only).
+fn successor(prefix: &str) -> Option<String> {
+    let mut chars: Vec<char> = prefix.chars().collect();
+    while let Some(last) = chars.pop() {
+        // Past the surrogates, which no `char` holds.
+        let next = match last {
+            '\u{D7FF}' => Some('\u{E000}'),
+            c => char::from_u32(c as u32 + 1),
+        };
+        if let Some(next) = next {
+            chars.push(next);
+            return Some(chars.into_iter().collect());
+        }
+    }
+    None
+}
+
+/// The `meada status` line of the config files of `db`: how many were read and skipped (as
+/// lockfiles, as unreadable) and how many values they hold and redact; `None` with no file.
+pub(crate) fn status(db: &Connection) -> Result<Option<String>> {
+    let mut statement = db.prepare("SELECT summary FROM config_files")?;
+    let summaries = statement.query_map([], |r| r.get::<_, String>(0))?;
+    let (mut read, mut lockfiles, mut unreadable, mut values, mut redacted) = (0, 0, 0, 0, 0);
+    for summary in summaries {
+        match serde_json::from_str(&summary?)? {
+            Outcome::Read {
+                values: v,
+                redacted: r,
+            } => {
+                read += 1;
+                values += v;
+                redacted += r;
+            }
+            Outcome::Lockfile => lockfiles += 1,
+            Outcome::Unreadable { .. } => unreadable += 1,
+        }
+    }
+    Ok((read + lockfiles + unreadable > 0).then(|| {
+        Msg::ConfigFiles {
+            read,
+            lockfiles,
+            unreadable,
+            values,
+            redacted,
+        }
+        .text()
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rows(path: &str, text: &str) -> Vec<(String, Option<String>, &'static str, usize)> {
+        let (outcome, rows) = read(path, text.as_bytes());
+        assert!(matches!(outcome, Outcome::Read { .. }), "{outcome:?}");
+        (rows.into_iter())
+            .map(|r| (r.key, r.value, r.kind, r.line))
+            .collect()
+    }
+
+    fn keys(path: &str, text: &str) -> Vec<String> {
+        rows(path, text).into_iter().map(|r| r.0).collect()
+    }
+
+    /// Every text that starts with the prefix sorts below its successor, even one where the
+    /// last character is followed by `char::MAX`.
+    #[test]
+    fn the_successor_of_a_prefix_is_the_least_text_above_all_that_start_with_it() {
+        let max = char::MAX;
+        assert_eq!(successor("ab").as_deref(), Some("ac"));
+        assert_eq!(successor(&format!("a{max}")).as_deref(), Some("b"));
+        assert_eq!(successor("\u{D7FF}").as_deref(), Some("\u{E000}"));
+        assert_eq!(successor(""), None);
+        assert_eq!(successor(&format!("{max}{max}")), None);
+        let past = successor("team").unwrap();
+        for text in [
+            "team",
+            "team-b",
+            &format!("team{max}"),
+            &format!("team{max}{max}x"),
+        ] {
+            assert!(text.as_bytes() < past.as_bytes(), "{text:?}");
+        }
+        assert!("teamz".as_bytes() < past.as_bytes() && "tean".as_bytes() >= past.as_bytes());
+    }
+
+    #[test]
+    fn a_key_path_joins_plain_keys_by_dots_and_indexes_lists_from_zero() {
+        let text = "spec:\n  containers:\n    - image: web\n      ports: [80, 443]\n";
+        assert_eq!(
+            keys("a.yaml", text),
+            [
+                "spec.containers[0].image",
+                "spec.containers[0].ports[0]",
+                "spec.containers[0].ports[1]"
+            ]
+        );
+        assert_eq!(keys("a.json", "[{\"a\": 1}, [true]]"), ["[0].a", "[1][0]"]);
+        assert_eq!(keys("a.yaml", "just text\n"), ["."]);
+    }
+
+    #[test]
+    fn a_key_that_is_no_plain_identifier_is_quoted_with_json_escaping() {
+        let text = concat!(
+            "metadata:\n  annotations:\n    app.kubernetes.io/name: web\n",
+            "env:\n  log-level: debug\n  _ok9: 1\n  9lives: 2\n  \"say \\\"hi\\\"\\n\": 3\n  \"\": 4\n  é: 5\n",
+        );
+        assert_eq!(
+            keys("a.yaml", text),
+            [
+                "metadata.annotations[\"app.kubernetes.io/name\"]",
+                "env[\"log-level\"]",
+                "env._ok9",
+                "env[\"9lives\"]",
+                "env[\"say \\\"hi\\\"\\n\"]",
+                "env[\"\"]",
+                "env[\"é\"]",
+            ]
+        );
+        assert_eq!(
+            keys("a.json", "{\"a b\": {\"c\": [1]}}"),
+            ["[\"a b\"].c[0]"]
+        );
+    }
+
+    #[test]
+    fn a_file_of_several_documents_starts_each_key_path_with_its_document() {
+        let text = "a: 1\n---\n- x\n---\nplain\n---\n\"k-1\": 2\n";
+        assert_eq!(
+            keys("a.yaml", text),
+            ["[0].a", "[1][0]", "[2]", "[3][\"k-1\"]"]
+        );
+    }
+
+    #[test]
+    fn each_row_holds_its_type_and_line_and_a_null_is_left_out() {
+        let text =
+            "name: web\nport: 8080\nratio: 0.5\non: true\nquoted: \"8080\"\nnone: null\nempty: ~\n";
+        let s = |v: &str| Some(v.to_string());
+        assert_eq!(
+            rows("a.yaml", text),
+            [
+                ("name".into(), s("web"), "string", 1),
+                ("port".into(), s("8080"), "number", 2),
+                ("ratio".into(), s("0.5"), "number", 3),
+                ("on".into(), s("true"), "boolean", 4),
+                ("quoted".into(), s("8080"), "string", 5),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_value_past_the_ceiling_is_stored_cut_at_a_character_boundary() {
+        let long = format!("{}é{}", "a".repeat(VALUE_MAX - 1), "b".repeat(10));
+        let (_, rows) = read("a.yaml", format!("long: {long}\nshort: x\n").as_bytes());
+        assert_eq!(
+            rows[0].value.as_deref(),
+            Some("a".repeat(VALUE_MAX - 1).as_str())
+        );
+        assert!(rows[0].cut);
+        assert!(!rows[1].cut);
+        let exact = "a".repeat(VALUE_MAX);
+        let (_, rows) = read("a.yaml", format!("v: {exact}\n").as_bytes());
+        assert_eq!(
+            (rows[0].value.as_deref(), rows[0].cut),
+            (Some(exact.as_str()), false)
+        );
+    }
+
+    #[test]
+    fn a_kubernetes_secret_keeps_its_data_and_string_data_redacted() {
+        let text = concat!(
+            "apiVersion: v1\nkind: ConfigMap\ndata:\n  plain: shown\n",
+            "---\napiVersion: v1\nkind: Secret\nmetadata:\n  name: db\n",
+            "data:\n  password: c2VjcmV0\nstringData:\n  port: 5432\n  user: admin\n",
+            "---\napiVersion: v1\nkind: List\nitems:\n",
+            "  - apiVersion: v1\n    kind: Secret\n    data:\n      token: dG9r\n",
+            "  - apiVersion: v1\n    kind: ConfigMap\n    data:\n      open: yes\n",
+            "---\nkind: Secret\ndata:\n  noversion: kept\n",
+        );
+        let (outcome, rows) = read("k8s.yaml", text.as_bytes());
+        assert_eq!(
+            outcome,
+            Outcome::Read {
+                values: 19,
+                redacted: 4
+            }
+        );
+        let hidden: Vec<_> = (rows.iter())
+            .filter(|r| r.value.is_none())
+            .map(|r| (r.key.as_str(), r.kind, r.line))
+            .collect();
+        assert_eq!(
+            hidden,
+            [
+                ("[1].data.password", "string", 11),
+                ("[1].stringData.port", "number", 13),
+                ("[1].stringData.user", "string", 14),
+                ("[2].items[0].data.token", "string", 22),
+            ]
+        );
+        let shown = |key: &str| {
+            rows.iter()
+                .find(|r| r.key == key)
+                .and_then(|r| r.value.clone())
+        };
+        assert_eq!(shown("[0].data.plain").as_deref(), Some("shown"));
+        assert_eq!(shown("[1].metadata.name").as_deref(), Some("db"));
+        assert_eq!(shown("[2].items[1].data.open").as_deref(), Some("yes"));
+        assert_eq!(shown("[3].data.noversion").as_deref(), Some("kept"));
+    }
+
+    #[test]
+    fn a_lockfile_a_file_that_does_not_parse_and_one_past_a_ceiling_are_skipped() {
+        for lockfile in [
+            "package-lock.json",
+            "web/pnpm-lock.yaml",
+            "src/App/packages.lock.json",
+            "npm-shrinkwrap.json",
+        ] {
+            assert_eq!(
+                read(lockfile, b"{}"),
+                (Outcome::Lockfile, vec![]),
+                "{lockfile}"
+            );
+        }
+        let (outcome, rows) = read(
+            "chart/templates/a.yaml",
+            b"a: 1\n{{- if .Values.on }}\nb: 2\n",
+        );
+        assert!(
+            matches!(outcome, Outcome::Unreadable { line: 2, .. }),
+            "{outcome:?}"
+        );
+        assert!(rows.is_empty());
+        let documents = "---\na: 1\n".repeat(DOCUMENTS_MAX + 1);
+        let (outcome, _) = read("many.yaml", documents.as_bytes());
+        assert!(
+            matches!(&outcome, Outcome::Unreadable { reason, .. } if reason.contains("documents")),
+            "{outcome:?}"
+        );
+        let (outcome, _) = read("many.yaml", "---\na: 1\n".repeat(DOCUMENTS_MAX).as_bytes());
+        assert_eq!(
+            outcome,
+            Outcome::Read {
+                values: DOCUMENTS_MAX,
+                redacted: 0
+            }
+        );
+        let large = format!("\"{}\"", "a".repeat(lang::MAX_BYTES));
+        assert!(matches!(
+            read("big.json", large.as_bytes()).0,
+            Outcome::Unreadable { line: 1, .. }
+        ));
+    }
+
+    /// Long keys nested deep, each repeated in the key path of every scalar below them, would
+    /// store many times the file: the file stops at its stored budget.
+    #[test]
+    fn a_file_whose_key_paths_store_past_the_budget_is_unreadable() {
+        let key = "k".repeat(4000);
+        let deep = format!("{{\"{key}\": ").repeat(20);
+        let leaves: Vec<String> = (0..2000).map(|n| format!("\"v{n}\": 1")).collect();
+        let text = format!("{deep}{{{}}}{}", leaves.join(", "), "}".repeat(20));
+        let (outcome, rows) = read("a.json", text.as_bytes());
+        assert!(
+            matches!(&outcome, Outcome::Unreadable { reason, .. } if reason.contains("past")),
+            "{outcome:?}"
+        );
+        assert!(rows.is_empty());
+    }
+}

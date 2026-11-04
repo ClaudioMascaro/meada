@@ -16,7 +16,9 @@ use crate::render::{
 };
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Manifest, Missing, Repository, Workspace};
-use crate::{Result, decisions, document, drift_view, index, items, render, repo, trace};
+use crate::{
+    Result, config_values, decisions, document, drift_view, index, items, render, repo, trace,
+};
 use meada_core::context::{self, shape_lines};
 use meada_core::search;
 
@@ -348,13 +350,17 @@ impl Engine {
         let repos = &self.workspace.repos;
         let entries = drift_view::entries(repos, &exports, &links);
         let drift = drift_view::counts(repos.len(), &entries);
-        let lines = (repos.iter().zip(&exports).zip(drift))
-            .map(|((repo, export), drift)| {
+        let configs: Vec<Option<String>> = (self.dbs.iter())
+            .map(config_values::status)
+            .collect::<Result<_>>()?;
+        let lines = (repos.iter().zip(&exports).zip(drift).zip(configs))
+            .map(|(((repo, export), drift), config)| {
                 let prefix = format!("{}::", repo.identity);
                 let mut lines: Vec<String> = (contract::KINDS.iter())
                     .flat_map(|kind| kind.status(repo, export, &links))
                     .collect();
                 lines.extend(document::report(repo, export));
+                lines.extend(config);
                 lines.extend(export.dropped.iter().map(|(path, limit)| match *limit {
                     Dropped::Bytes(limit) => Msg::FileTooBroad { path, limit }.text(),
                     Dropped::Usings(limit) => Msg::FileTooManyUsings { path, limit }.text(),
@@ -481,7 +487,9 @@ impl Engine {
     /// the processes, matched by their entry point's label (`search_communities`,
     /// `search_processes`); `drift` lists the fields consumers read that a route lacks (see
     /// `search_drift`); `duplicate` lists the symbols whose span text is the same in two or more
-    /// places of the workspace, in groups (`search_duplicates`); `ambiguous` and `unresolved` list the open items whose enclosing
+    /// places of the workspace, in groups (`search_duplicates`); `value` lists the config values
+    /// whose value or key path matches (`config_values::hits`), which with no `kind` answer only
+    /// when no symbol and no contract does; `ambiguous` and `unresolved` list the open items whose enclosing
     /// symbol or call expression matches, each with the `meada decide` command that resolves
     /// it. The answer is cut at `budget` tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
@@ -510,6 +518,11 @@ impl Engine {
         }
         if kind == Some("duplicate") {
             return self.search_duplicates(query, budget);
+        }
+        if kind == Some("value") {
+            self.refresh()?;
+            let hits = self.value_hits(&query.to_lowercase())?;
+            return Ok(search::answer(query, hits, budget));
         }
         // Whether symbols match, and the prefix of the contracts that do.
         let (symbols, contracts) = match (kind, selected) {
@@ -603,7 +616,21 @@ impl Engine {
                 hits.push((r, format!("{contract} {site}"), line));
             }
         }
+        // With no kind, config values answer only when no symbol and no contract does (ADR 0025).
+        if kind.is_none() && hits.is_empty() {
+            hits = self.value_hits(&needle)?;
+        }
         Ok(search::answer(query, hits, budget))
+    }
+
+    /// The config values (#639) of every repository whose value or key path matches `needle`,
+    /// lowercased, as `config_values::hits` gives them.
+    fn value_hits(&self, needle: &str) -> Result<Vec<Hit>> {
+        let mut hits = Vec::new();
+        for (repo, db) in self.workspace.repos.iter().zip(&self.dbs) {
+            hits.extend(config_values::hits(&repo.identity, db, needle)?);
+        }
+        Ok(hits)
     }
 
     /// The documents read (spec #21) whose path or `info.title` matches `query`, one line each,
@@ -1583,11 +1610,12 @@ fn status_lines(
 /// The `kind` words of `search` the engine answers itself: the first two come before the kinds'
 /// filter words, the rest after the kinds' own renderers (`document` sits between the two).
 const WORDS_BEFORE: [&str; 2] = ["symbol", "contract"];
-const WORDS_AFTER: [&str; 6] = [
+const WORDS_AFTER: [&str; 7] = [
     "drift",
     "community",
     "process",
     "duplicate",
+    "value",
     "ambiguous",
     "unresolved",
 ];

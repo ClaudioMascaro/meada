@@ -88,7 +88,13 @@ from ...", with the whole list. A value the index now stores joins it.
   its parameter types, with the least and the most count, `resolve::Flexible`), the `entry_points` table (spec #31:
   each entry point's identity, kind, label and start symbol, rewritten with the contracts),
   each community's name and member identities (`communities`, spec #31), and the paths of the
-  files whose values the last contract extraction read (`valued`, #391). `Call::args`,
+  files whose values the last contract extraction read (`valued`, #391), and, ADR 0004 amended
+  by ADR 0025, the config values (#639): `config_files`, each YAML or JSON file the walk visits
+  or the hidden CI paths hold, stamped, with what reading it came to (`config_values::Outcome`:
+  read with its counts of values and redacted ones, a lockfile, or unreadable with the line and
+  the reason), and `config_values`, each of its scalars but nulls with its key path, its value cut
+  at `config_values::VALUE_MAX` (`cut`) or NULL when a Kubernetes `Secret` holds it, its type,
+  its line, and the key path and value lowercased for search (`folded_key`, `folded_value`). They never reach the export. `Call::args`,
   `Call::kwargs`, `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::return_values`, `Param::default`,
   `Field::default`, `Const::value` and `Const::ty` (and `Facts::rebound`, `mutable`, `mentions`,
   `annotated` and `bound`) serialize only inside `lang::with_values` (`skip_serializing_if =

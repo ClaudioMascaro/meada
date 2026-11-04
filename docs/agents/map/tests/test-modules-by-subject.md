@@ -5,12 +5,22 @@
   `requirements.txt`, `Cargo.toml`, `go.mod`, `pom.xml`, Gradle builds, `gradle.properties` and
   version catalogs (also `Maven::inherit` over many builds), `.csproj` and
   `Directory.Build.props` (also `Nuget::inherit`), `msbuild::read` and `props`, Spring's
-  `application.properties` and `.yml` (also placeholders) and `appsettings.json`, and the walks
+  `application.properties` and `.yml` (also placeholders), `appsettings.json`, the YAML and JSON
+  event reader (`document::events::read`: many documents, deep and wide, aliases fanning out and
+  nesting one level deeper each, JSON deep and wide and past `serde_json`'s limit), the config
+  values a file stores (`config_values::read`: long keys nested deep, many scalars, secrets in
+  many documents), and the walks
   `Maven::entries` and `Nuget::entries` over modules and projects that pass on to each other.
   Each row builds a file within `lang::MAX_BYTES` (many keys, deep nesting, wide fan-out), reads
   it on a thread of its own and answers the size of what came back; the test holds every row to
   30 s and four times `MAX_BYTES`, and names the rows that missed. A new reader adds its row.
-- Test modules of `tests/it/` by subject: `decorations` (the `decorations` fixture: Java, Kotlin, C#,
+- Test modules of `tests/it/` by subject: `config_values` (#639, the `config-values` fixture:
+  Helm values with #638's alert labels, a multi-document Kubernetes file with a `Secret`, a
+  workflow under `.github/`, a lockfile, a Helm template that does not parse, a hidden `.vscode/`
+  and a `.meadaignore`d directory; `search` kind `value` against
+  `config-values.search.txt`, `meada status` against `config-values.status.txt`, the default
+  search's fallback, and no value in the export nor a secret in the index file; `freshness` edits
+  a config file alone, and `oidc` scopes the values by the grant), `decorations` (the `decorations` fixture: Java, Kotlin, C#,
   Python and Rust calls that decorate a definition carry `CallSite::decorates`, ordinary calls do
   not, and `context` lists them under `annotations:`), `docs` (the repository map against the code:
   `ponytail:` limits in `ceilings.md`, entry point kinds and process marks in their lists, a line

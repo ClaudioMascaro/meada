@@ -93,7 +93,8 @@ for the area a change touches.
 - `jvm/`: what the JVM ecosystems and kinds share: the Maven and Gradle readers, Spring configuration, file readers. [languages](map/languages.md), [seams](map/seams.md)
 - `dotnet/`: what the .NET pack and ecosystems share (spec #28): the MSBuild project reader and what builds on it. [seams](map/seams.md)
 - `xml.rs`: the bounds the XML build readers of `jvm/` and `dotnet/` share. [seams](map/seams.md)
-- `document/`: OpenAPI and AsyncAPI provider documents, read into a `Summary` (spec #21). [documents](map/documents.md)
+- `document/`: OpenAPI and AsyncAPI provider documents, read into a `Summary` (spec #21), and `events.rs`, the one YAML and JSON event reader every YAML or JSON reader goes through (#646). [documents](map/documents.md)
+- `config_values.rs`: config values (#639, ADR 0025): every scalar of the YAML and JSON files the walk visits and of the hidden CI paths, with its key path, `search` kind `value` and the `meada status` counts. [documents](map/documents.md)
 - `literals.rs`, `zod.rs`, `declared.rs`: the shape of a route read from its handler's returned literals, zod schemas and declared types (spec #23); `lang/ts/types.rs` finds the schema a `z.infer` annotation names. [documents](map/documents.md)
 - `decisions.rs`: `meada.decisions.toml` and its replay at query time. [decisions](map/decisions.md)
 - `decide.rs`, `decider/`: `meada decide` and decider mode, the only network path. [decisions](map/decisions.md)
@@ -448,11 +449,12 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   unreadable one, is rebuilt beside it and renamed over it, and `status` says so. One whose stored facts do not
   parse is rebuilt by the first refresh that reads them (when a file changed), which `status`
   cannot tell.
-- The index holds no source text and no values, apart from the BLAKE3 of each symbol's span
+- The index holds no source text and no values of code, apart from the BLAKE3 of each symbol's span
   (`symbols.hash`, `Def::hash`) and the facts listed under "Stored values" in
   [map/indexing/stored-values.md](map/indexing/stored-values.md): argument counts and labels, names a file
   declares or imports, summaries of manifests, build files and provider documents, the field
-  paths of shapes, entry points and communities. A value the index now stores joins that list. A
+  paths of shapes, entry points and communities, and the config values of YAML and JSON files
+  (ADR 0004 amended, ADR 0025). A value the index now stores joins that list. A
   contract kind that reads a value from a new place relies on the loop of misses (`Code::read`,
   `valued`) that `refresh` runs until none is left. The values cache beside the index
   (`values.db`, ADR 0027) gives back what a pack parsed of a file, values included, by the file's

@@ -13,6 +13,8 @@ use std::time::{Duration, Instant};
 use super::maven::Maven;
 use super::nuget::Nuget;
 use super::{Ecosystem, Export, Manifest, Providers, read_manifest};
+use crate::config_values;
+use crate::document::events::{self, Syntax};
 use crate::dotnet::{appsettings, msbuild};
 use crate::jvm::spring;
 use crate::lang::csharp::CSharp;
@@ -82,6 +84,23 @@ fn project_size(project: Option<msbuild::Project>) -> usize {
     let references = (project.packages.iter().chain(&project.projects))
         .map(|r| r.include.len() + r.version.as_ref().map_or(0, String::len));
     usings.chain(references).sum()
+}
+
+/// How many documents and scalars the event reader gives for `text` read as `syntax`, every
+/// document and every scalar with its position; a stream it cannot read gives the scalars handed
+/// out before it stopped.
+fn stream(syntax: Syntax, text: String) -> usize {
+    let mut handed = 0;
+    let documents = events::read(syntax, &file(text), |_| handed += 1);
+    handed + documents.map_or(0, |d| d.len())
+}
+
+/// The bytes of the key paths and values config values store for `text` at `path`.
+fn stored(path: &str, text: String) -> usize {
+    let (_, rows) = config_values::read(path, &file(text));
+    (rows.iter())
+        .map(|r| r.key.len() + r.value.as_ref().map_or(0, String::len))
+        .sum()
 }
 
 /// An SDK-style project file with `body` in it.
@@ -595,6 +614,54 @@ fn probes() -> Vec<Probe> {
                 )
             });
             configured("application.yml", first + &levels)
+        }),
+        // YAML and JSON: the event reader (`document::events`), every document and scalar
+        ("events: many documents", || {
+            stream(
+                Syntax::Yaml,
+                fill(1, |i| format!("--- {{k{i}: [a, &a{i} b, *a{i}]}}\n")),
+            )
+        }),
+        ("events: deep and wide", || {
+            // At the nesting limit, every scalar is handed out at the full depth.
+            let wide = fill(1, |_| "1, ".into());
+            stream(Syntax::Yaml, format!("{}[{wide}1]\n", "- ".repeat(127)))
+        }),
+        ("events: aliases fanning out", || {
+            let anchor = format!("a: &a [{}]\n", vec!["x"; 1000].join(", "));
+            stream(Syntax::Yaml, anchor + &fill(1, |i| format!("b{i}: *a\n")))
+        }),
+        ("events: aliases one level deeper each", || {
+            // Each anchor holds the one before: the nesting limit stops it, not the stack.
+            let first = "a0: &a0 [x]\n".to_string();
+            stream(
+                Syntax::Yaml,
+                first + &fill(1, |i| format!("a{}: &a{0} [*a{i}]\n", i + 1)),
+            )
+        }),
+        ("events: deep and wide json", || {
+            let wide = fill(1, |_| "1,".into());
+            let nest = |c: &str| c.repeat(100);
+            stream(Syntax::Json, format!("{}{wide}1{}", nest("["), nest("]")))
+        }),
+        ("events: json nested past serde_json's limit", || {
+            let nest = |c: &str| c.repeat(NESTING);
+            stream(Syntax::Json, format!("{}1{}", nest("["), nest("]")))
+        }),
+        // Config values (#639): the rows a YAML or JSON file stores
+        ("config values: long keys nested deep", || {
+            let key = "k".repeat(1000);
+            let deep = format!("{{\"{key}\": ").repeat(100);
+            let leaves = fill(2, |i| format!("\"v{i}\": 1, "));
+            let text = format!("{deep}{{{leaves}\"z\": 1}}{}", "}".repeat(100));
+            stored("a.json", text)
+        }),
+        ("config values: many scalars", || {
+            stored("a.yaml", fill(1, |i| format!("- {}\n", i % 10)))
+        }),
+        ("config values: secrets in many documents", || {
+            let secret = "---\napiVersion: v1\nkind: Secret\ndata: {a: b, c: d}\n";
+            stored("a.yaml", count(999, |_| secret.to_string()))
         }),
         // .NET: `appsettings.json`
         ("appsettings: many keys", || {

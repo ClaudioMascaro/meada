@@ -150,9 +150,25 @@ The values of `kind`:
 | `community` | a community by name |
 | `process` | a process by the label of its entry point, with the `process::` identity `trace` starts from |
 | `duplicate` | symbols with identical text in two or more places, by name or path |
+| `value` | a config value of a YAML or JSON file, by value or key path |
 | `ambiguous`, `unresolved` | the open items, with the `meada decide` command for each |
 
 Each result is one line: repository, `path:line` and name.
+
+With no `kind`, search answers with symbols and contracts; only when neither matches does it
+answer with config values. With `kind = "value"`, each line is `<repository> <path>:<line> <key
+path> = <value>`, a string quoted as in JSON:
+
+```text
+example.com/acme/app chart/values-prd.yaml:6 alerts.loki[0].labels.support = "team-b"
+example.com/acme/app deploy/app.yaml:26 [1].data.password = redacted
+```
+
+The key path is jq style: keys joined by dots, a list item `[n]` from 0, a key that is not a
+plain identifier in `["..."]` (`metadata.labels["app.kubernetes.io/name"]`) and, in a file of
+several documents, the document's index first (`[2].spec.replicas`). The query, lowercased,
+matches the value or the key path: equal ones first, then those that start with it, then those
+that hold it. A value over 1 KiB is stored cut and shows followed by `(cut)`.
 
 #### `context`: understand a symbol
 
@@ -249,7 +265,9 @@ only inside `.meada/`, which Meada keeps out of git; the only other file it writ
 
 The scan covers every file in the repository, tracked or not, except:
 
-- **Hidden**: files and directories whose name starts with `.` are not read.
+- **Hidden**: files and directories whose name starts with `.` are not read, except the CI
+  configuration at the root (`.github/`, `.gitlab-ci.yml`, `.gitlab/`, `.circleci/`,
+  `.buildkite/` and `.drone.yml`), whose YAML and JSON files become config values.
 - **Always ignored**: `node_modules` and `Pods` directories, a `Checkouts` inside `Carthage`,
   `*.min.js` and `*.min.css` files and the .NET build output (`obj` or `bin` next to a `.csproj`).
 - **`.gitignore` and `.ignore`**, respected with or without git, at the root and in
@@ -268,6 +286,25 @@ Migrations/
 ```
 
 A file that a new rule excludes leaves the index on the next refresh, like a deleted file.
+
+### Config values
+
+Each scalar (a string, a number or a boolean; a null is left out) of each `*.yaml`, `*.yml` and
+`*.json` file the scan reads, and of the YAML and JSON files of the CI configuration above, is a
+**config value**: file, key path, value, type and line. There is no key to turn it on: search
+with `kind = "value"` finds them, and search with no `kind` answers with them when nothing else
+matches. They stay out of `meada export`.
+
+- **Lockfiles** (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml` and
+  `packages.lock.json`) and files that are not read (a Helm template, which is no YAML until
+  rendered; a file over 1 MiB; a file of more than 1,000 documents) are left out, and `meada
+  status` counts them:
+  `config files: 5 read, 2 skipped (lockfiles: 1, unreadable: 1); values: 46, redacted: 3`.
+- **Secrets**: the values of `data` and `stringData` of a Kubernetes `Secret` (a document with
+  `apiVersion` and `kind: Secret`, or such an item of a list's `items`) are stored as `redacted`,
+  with their key path, type and line. Nothing else is filtered: the index holds what the checkout
+  already does. List in `.meadaignore` the files that must stay out of the index (`secrets/`,
+  `*.env.json`).
 
 ## 4. `meada.toml`: reference
 

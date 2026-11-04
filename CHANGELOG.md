@@ -6,6 +6,20 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Config values (ADR 0025): every scalar of every `*.yaml`, `*.yml` and `*.json` file the walk
+  visits, and of the YAML and JSON files under the CI configuration at the root (`.github/`,
+  `.gitlab-ci.yml`, `.gitlab/`, `.circleci/`, `.buildkite/`, `.drone.yml`), is indexed with its
+  file, key path (jq style, the document index first in a file of several documents), value,
+  type and line. `search` finds them with the new kind `value` (exact, then prefix, then
+  substring, over values and key paths), and the default search answers with them only when no
+  symbol and no contract matches. A value over 1 KiB is stored cut, marked `(cut)`; a Kubernetes
+  `Secret`'s `data` and `stringData` are stored as `redacted`. Lockfiles and files that do not
+  parse are skipped, and `meada status` counts the config files read and skipped and the values
+  redacted. Values stay out of `meada export`. The index schema changes, so existing indexes are
+  rebuilt (#639).
+
 ### Changed
 
 - A refresh reads the values of the files it did not change from a values cache beside the index
@@ -15,6 +29,8 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A YAML document whose anchors and aliases expand past the nesting limit (128 levels) is
+  reported unreadable and skipped, where it could abort meada (#646).
 - Authorization: an `added_by` a team operator wrote while no GitHub grant provider was
   configured no longer decides eligibility once `[oidc.github]` is enabled. Under the provider the
   console stamps each `added_by` it writes with `added_by_time` (its own clock, never the
