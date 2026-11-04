@@ -243,8 +243,8 @@ pub fn touched_owners(current: &[Json], new: &[Json]) -> Vec<String> {
 }
 
 /// A document's entries as `[[repository]]` tables, `None` when they are not TOML tables. An
-/// entry's `owner`, `added_by` and `added_by_time` follow its `path`, before its block tables: a key after a block's header
-/// would belong to the block.
+/// entry's `owner`, `added_by` and `added_by_time` follow its `path`, before its block tables: a
+/// key after a block's header would belong to the block.
 pub fn entries_text(repositories: &[Json]) -> Option<String> {
     if repositories.is_empty() {
         let entries = toml::Value::try_from(repositories).ok()?;

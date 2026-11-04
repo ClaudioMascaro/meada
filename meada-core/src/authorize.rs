@@ -208,8 +208,8 @@ pub fn authorize_entries(
 /// `added_by_time` from the save, never from the text (#454): the current entry's when its
 /// `added_by` is unchanged, else, under the GitHub grant provider alone, `now`
 /// (`YYYY-MM-DDTHH:MM:SSZ`) when it has one, and none otherwise: an `added_by` written without
-/// the provider never carries a time, so the role check never takes it for the provider's. Run with `current` the entries the grant reads, it is the change `authorize_entries`
-/// authorizes; with the whole current version, once that refused nothing, the version stored.
+/// the provider never carries a time, so the role check never takes it for the provider's. Run
+/// with `current` the entries the grant reads, it is the change `authorize_entries` authorizes; with the whole current version, once that refused nothing, the version stored.
 pub fn compose_entries(
     grant: &Grant,
     login: Option<&str>,

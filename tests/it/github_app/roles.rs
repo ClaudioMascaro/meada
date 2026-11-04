@@ -465,14 +465,22 @@ fn a_set_is_never_replaced_by_a_lower_fence_or_a_failed_listing() {
     );
     below(6);
 
-    // A 403 with quota left and the permission message is no throttle: the repository gets a
-    // warning and no rows, both installations stay unmarked and the run goes on.
+    // A 403 with quota left and the permission message is no throttle: each installation is
+    // asked in turn (another App may hold the permission), the repository gets a warning and no
+    // rows, both installations stay unmarked and the run goes on.
     case.api.with(|s| {
         s.listing_status = None;
         s.listing_forbidden = Some("chain/web".into());
     });
+    let before = case.listings().len();
     let (_, stderr, code) = case.roles(MANIFEST, Some(9));
     assert_eq!(code, Some(0), "{stderr}");
+    let mut asked: Vec<u64> = (case.listings()[before..].iter())
+        .filter(|(_, path)| path.contains("/chain/web/"))
+        .map(|(id, _)| *id)
+        .collect();
+    asked.sort();
+    assert_eq!(asked, [11, 21]);
     assert!(
         stderr.contains(&format!("{WEB}: GitHub answers 403 (permission")),
         "{stderr}"
@@ -486,6 +494,12 @@ fn a_set_is_never_replaced_by_a_lower_fence_or_a_failed_listing() {
         .query(&mut valkey)
         .unwrap();
     assert!(!marked);
+
+    // The same 403 with a body past `DENIAL_MAX` is read as a throttle.
+    case.api.with(|s| s.forbidden_padding = 5000);
+    let (_, stderr, code) = case.roles(MANIFEST, Some(10));
+    assert_eq!(code, Some(1), "{stderr}");
+    assert!(stderr.contains("throttled"), "{stderr}");
 }
 
 /// An addition whose `added_by` GitHub lists with no role, or only with one outside `roles`,

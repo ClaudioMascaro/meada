@@ -55,16 +55,17 @@ async function signIn() {
   await page.locator('input:not([type=password])').first().fill('admin');
   await page.locator('input[type=password]').first().fill(password);
   await page.locator('button[type=submit]').first().click();
+  // The page is often idle before the login answer arrives: wait for the sign-in form to go.
+  await page.locator('input[type=password]').first().waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
   await page.waitForLoadState('networkidle');
 }
-// A full page load drops the local-accounts sign-in, so a route that lands on the sign-in page signs in
-// again; one still on it afterwards is a failure of that route.
+// A full page load drops the local-accounts sign-in (the session lives in the page), so a route that
+// lands on the sign-in page signs in again and the app then shows the route it was loaded on: no
+// reload, which would drop the session again. Load time and CLS are then that page's, sign-in
+// included. A route still on the sign-in page afterwards is a failure of that route.
 async function open(route) {
   await page.goto(url + route, { waitUntil: 'networkidle' });
-  if (password && await page.locator('input[type=password]').count()) {
-    await signIn();
-    await page.goto(url + route, { waitUntil: 'networkidle' }); // a fresh load, so CLS and load time are the route's
-  }
+  if (password && await page.locator('input[type=password]').count()) await signIn();
   return !(password && await page.locator('input[type=password]').count());
 }
 // The admin password is derived from the run's signing key, as console.py's admin_password does.
@@ -74,7 +75,9 @@ if (fs.existsSync(key)) {
   await page.goto(url + '/', { waitUntil: 'networkidle' });
   await signIn();
   await page.screenshot({ path: path.join(shots, 'signed-in.png') });
-  lines.push('signed in as admin through the page');
+  const refused = await page.locator('input[type=password]').count();
+  failures += refused ? 1 : 0;
+  lines.push(refused ? 'sign-in as admin through the page refused  FAIL' : 'signed in as admin through the page');
 }
 for (const route of ['/config', '/session', '/manifest', '/playground', '/graph']) {
   const before = errors.length;
@@ -101,13 +104,17 @@ const rec = JSON.parse(fs.readFileSync(path.join(run, 'head', name, 'record.json
 const identity = JSON.parse(fs.readFileSync(path.join(run, 'head', name, 'export1.json'), 'utf8')).repository;
 const i = rec.queries.findIndex(q => q.tool === 'context');
 const q = rec.queries[i];
-if (!await open('/playground')) { failures++; lines.push('/playground: still on the sign-in page  FAIL'); }
-const form = page.locator('form').first();
-await form.locator('input[required]').nth(0).fill(identity);
-await form.locator('select').first().selectOption(q.tool);
-await form.locator('input[required]').nth(1).fill(q.arguments.symbol);
-await form.locator('button[type=submit]').click();
-const answer = await page.locator('pre[role=region]').textContent({ timeout: 30000 }).catch(() => null);
+let answer = null;
+if (await open('/playground')) {
+  const form = page.locator('form').first();
+  await form.locator('input[required]').nth(0).fill(identity);
+  await form.locator('select').first().selectOption(q.tool);
+  await form.locator('input[required]').nth(1).fill(q.arguments.symbol);
+  await form.locator('button[type=submit]').click();
+  answer = await page.locator('pre[role=region]').textContent({ timeout: 30000 }).catch(() => null);
+} else {
+  lines.push('/playground: still on the sign-in page, no query sent');
+}
 await page.screenshot({ path: path.join(shots, 'playground-answer.png'), fullPage: true });
 const same = answer === rec.answers[i];
 failures += same ? 0 : 1;

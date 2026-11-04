@@ -69,7 +69,8 @@ left aside until it resets.
   accessible by integration` is a missing permission, not a throttle. The App lacks a permission
   on that repository, and waiting does not fix it, yet the mark kept the installation out of the
   role check and the credential helper's rotation for up to an hour. `meada github-app roles`
-  records the repository as `forbidden` in the permissions set, with a warning and no rows, and
+  passes such a 403 to the next installation unmarked (another App may hold the permission) and,
+  when every installation covering the owner answers it, records the repository as `forbidden` in the permissions set, with a warning and no rows, and
   marks nothing. A 403 or 429 with `retry-after` or `x-ratelimit-remaining: 0`, and any other 403
   body, stays a throttle, as does any 403 on a mint, an installations listing or the catalog.)
 - **Only the job runs the module.** `meada mcp --listen` reads the blocks with the manifest and

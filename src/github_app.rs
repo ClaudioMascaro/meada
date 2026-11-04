@@ -61,10 +61,10 @@ const THROTTLE_FIRST: u64 = 60;
 // ponytail: one REST request, connection to last byte.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 // ponytail: the most bytes of one REST answer read; past it the request fails.
+const ANSWER_MAX: u64 = 4 << 20;
 // ponytail: a 403's body is read up to this many bytes to tell a permission denial from a
 // throttle; one that fills it counts as a throttle.
 const DENIAL_MAX: u64 = 4 << 10;
-const ANSWER_MAX: u64 = 4 << 20;
 // ponytail: the most pages of installations listed per App, `PER_PAGE` each.
 const PAGES_MAX: u32 = 100;
 const PER_PAGE: usize = 100;
@@ -302,10 +302,11 @@ fn number(headers: &HeaderMap, name: &str) -> Option<u64> {
     headers.get(name)?.to_str().ok()?.trim().parse().ok()
 }
 
-/// Whether a 403 is a permission failure and no throttle: no `retry-after`, a
-/// `x-ratelimit-remaining` above 0, and GitHub's permission message in the body.
+/// Whether a 403 is a permission failure and no throttle: no `retry-after` (in any form, an
+/// HTTP date included), a `x-ratelimit-remaining` above 0, and GitHub's permission message in
+/// the body.
 fn is_permission_denial(headers: &HeaderMap, body: &[u8]) -> bool {
-    number(headers, "retry-after").is_none()
+    !headers.contains_key("retry-after")
         && number(headers, "x-ratelimit-remaining").is_some_and(|left| left > 0)
         && String::from_utf8_lossy(body).contains("Resource not accessible by integration")
 }
@@ -1173,8 +1174,8 @@ fn eligible_sets(
 }
 
 /// What `roles` reads of the workspace: the pulled version's id with `source = "store"` and each
-/// entry's identity, `added_by` and `added_by_time`, whole: the exclusions are this command's to write. With
-/// `[workspaces]` also the named workspaces the pull read (#342) and the digest of their file.
+/// entry's identity, `added_by` and `added_by_time`, whole: the exclusions are this command's to
+/// write. With `[workspaces]` also the named workspaces the pull read (#342) and the digest of their file.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 fn checked_entries(manifest: &Path, read: &crate::workspace::Manifest) -> crate::Result<Checked> {
     #[cfg(feature = "generation-pointer")]
@@ -1697,11 +1698,12 @@ impl Shown {
 }
 
 /// The collaborators of `identity` (`owner/repo` on `host`) and their roles, through the
-/// installations covering the owner in `Run::rotation`'s order: a permission 403 is
-/// `Shown::Forbidden`, a 403 or 429 marks the
-/// installation throttled and passes to the next. `Shown::Uncovered` or `Shown::NotFound`, with a
-/// stderr line, when no installation covers the owner or GitHub answers 404. Every other failure, every installation
-/// throttled included, is the line that fails the run.
+/// installations covering the owner in `Run::rotation`'s order: a permission 403 passes to the
+/// next unmarked (another App may hold the permission), a 403 or 429 marks the installation
+/// throttled and passes to the next. `Shown::Forbidden` when every installation answers a
+/// permission 403; `Shown::Uncovered` or `Shown::NotFound`, with a stderr line, when no
+/// installation covers the owner or GitHub answers 404. Every other failure, every installation
+/// throttled (or some throttled and the rest forbidden) included, is the line that fails the run.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 async fn listed(
     run: &mut Run<'_>,
@@ -1723,7 +1725,7 @@ async fn listed(
     if throttled {
         return Err(failed(&Msg::RolesThrottled(None).text()));
     }
-    let mut last = None;
+    let (mut last, mut forbidden) = (None, false);
     for at in open {
         let Some((token, _)) = run.token(at).await.map_err(|e| failed(&e))? else {
             continue;
@@ -1740,10 +1742,7 @@ async fn listed(
                 run.notes.push(Msg::RolesNotFound(identity).text());
                 return Ok(Shown::NotFound);
             }
-            Err(Failure::Forbidden(_)) => {
-                run.notes.push(Msg::RolesForbidden(identity).text());
-                return Ok(Shown::Forbidden);
-            }
+            Err(Failure::Forbidden(_)) => forbidden = true,
             Err(Failure::Throttled(status, wait)) => {
                 let key = run.installation_key(host, at.id, "throttled");
                 let secs = run.mark(&key, wait).await.map_err(|e| failed(&e))?;
@@ -1756,6 +1755,10 @@ async fn listed(
                 return Err(failed(&why));
             }
         }
+    }
+    if forbidden && last.is_none() {
+        run.notes.push(Msg::RolesForbidden(identity).text());
+        return Ok(Shown::Forbidden);
     }
     Err(failed(&Msg::RolesThrottled(last).text()))
 }
@@ -2040,15 +2043,16 @@ mod tests {
         }
     }
 
+    fn headers(pairs: &[(&'static str, &str)]) -> HeaderMap {
+        let mut map = HeaderMap::new();
+        for (k, v) in pairs {
+            map.insert(*k, v.parse().unwrap());
+        }
+        map
+    }
+
     #[test]
     fn a_throttled_answer_waits_as_its_headers_say() {
-        let headers = |pairs: &[(&'static str, &str)]| {
-            let mut map = HeaderMap::new();
-            for (k, v) in pairs {
-                map.insert(*k, v.parse().unwrap());
-            }
-            map
-        };
         assert_eq!(wait(&headers(&[("retry-after", "30")]), 0), Some(30));
         let reset = [
             ("x-ratelimit-remaining", "0"),
@@ -2065,13 +2069,6 @@ mod tests {
 
     #[test]
     fn a_403_is_a_permission_failure_only_with_quota_left_and_the_permission_message() {
-        let headers = |pairs: &[(&'static str, &str)]| {
-            let mut map = HeaderMap::new();
-            for (k, v) in pairs {
-                map.insert(*k, v.parse().unwrap());
-            }
-            map
-        };
         let body = br#"{"message":"Resource not accessible by integration"}"#;
         // Permission 403.
         assert!(is_permission_denial(

@@ -79,20 +79,20 @@ All notable changes to Meada are recorded here. The format follows
 - Authorization: an `added_by` a team operator wrote while no GitHub grant provider was
   configured no longer decides eligibility once `[oidc.github]` is enabled. Under the provider the
   console stamps each `added_by` it writes with `added_by_time` (its own clock, never the
-  submitted text; part of the version id), and without it writes none; Postgres migration 10 keeps the time the provider's first permissions set
-  started (`<schema>.permission_state`), and `meada github-app roles` reports an addition on the
+  submitted text; part of the version id), and without it writes none; Postgres migration 10
+  keeps the time the provider's first permissions set started (`<schema>.permission_state`), and `meada github-app roles` reports an addition on the
   host whose `added_by` has no time, or one no later than that set's second, `unattributed` and
   excludes it whatever its roles. Entries saved before this version carry no time, so under the
   provider their additions are excluded until the global operator writes a reviewed
   `added_by_time` or a team operator adds them again; `composeEntries` takes the time as its
   fourth argument (#454).
-
 - A query no longer reopens each peer's index: the engine refreshes and reads the connection it
   holds, so a peer is never refreshed in one file and read from another (#443).
 - GitHub App: a 403 `Resource not accessible by integration` with quota left (no `retry-after`,
   `x-ratelimit-remaining` above 0) is a permission failure, not a throttle: `github-app roles`
-  records the repository as `forbidden` (no rows, a warning) and the installation stays eligible
-  for the role check and keeps minting. A 403 or 429 with `retry-after` or an empty quota still
+  passes it to the next installation unmarked, records the repository as `forbidden` (no rows, a
+  warning) when every installation answers so, and the installations stay eligible for the role
+  check and keep minting. A 403 or 429 with `retry-after` or an empty quota still
   throttles, as does any 403 outside the role check's collaborators listing (ADR 0013 amended,
   #452).
 - prove-meada scripts: the console page checks sign in again when a route lands on the sign-in page
