@@ -76,6 +76,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- prove-meada scripts: the console page checks sign in again when a route lands on the sign-in page
+  and fail the route that stays there, the Helm overlays `values-identity.yaml` and
+  `values-workspaces.yaml` render in their stack (as `scripts/helm-check` does) instead of failing
+  alone, and `console.py start --bin` resolves a relative path against the caller's directory.
 - Go: a method named like a resty verb (`Get`, `Post`, `Put`, `Patch`, `Delete`, `Head`,
   `Options`) called on a struct field that holds a repository, a Kubernetes client or a cache
   client (`s.repo.Get(ctx, id)`) is no longer an HTTP consumer with an unresolved URL, so
