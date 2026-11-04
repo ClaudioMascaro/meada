@@ -34,6 +34,13 @@ All notable changes to Meada are recorded here. The format follows
   the same name. The `default` of a `variable` with `sensitive = true` and every value a
   `.tfvars` file gives a variable of that name are stored as `redacted`. A file that does
   not parse is skipped and counted by `meada status` (#640).
+- A Go struct field that keeps a base URL (`c.base`) carries the environment read every
+  composite literal of the repository that sets it gives it, directly or through a constructor's
+  parameter whose callers in the repository all pass that read, so a method that reads the field,
+  directly or through a request wrapper, links through `base_url_env` like the same read written
+  inline. Two different reads, a literal by position or of an alias, no literal, a write through
+  a selector (`c.base = x`), a constructor with no caller and a literal string leave the field
+  unknown, as before (#687).
 - A TypeScript class field that is `readonly`, `private` or `#x` and written once, by its
   initializer or by one plain `this.f = v` in the constructor body, is a constant of the class:
   `this.f` in a method folds to it, so `` fetch(`${this.baseUrl}/orders`) `` gets the base URL

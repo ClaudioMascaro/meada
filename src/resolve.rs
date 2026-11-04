@@ -4708,6 +4708,13 @@ pub(crate) const EVAL_DEPTH: usize = 256;
 // thousands of wrappers from overflowing the stack.
 const WRAPPER_DEPTH: usize = 64;
 
+/// How many struct fields deep `Code::field_read` folds a field through the values of others
+/// (`&T{base: o.base}`); deeper, the field is unknown. The values folded on the way share one
+/// `EVAL_DEPTH`.
+// ponytail: real clients copy a base through a field or two; the limit keeps a crafted chain of
+// fields, each set from the next, from overflowing the stack.
+pub(crate) const FIELD_DEPTH: usize = 16;
+
 /// Folding one value: the constants being folded (one met again folds to nothing), how deep it
 /// is, whether calls are folded too, an outside name kept (`Expand::Chain`), what the kind
 /// reads off the annotations of a field or a parameter (`Code::expand_with`), and how many of
@@ -4720,6 +4727,8 @@ struct Fold<'a, 'i> {
     chain: bool,
     inject: Option<&'i Inject<'a, 'i>>,
     foreign: usize,
+    /// How many struct fields deep the value is folded (`Code::field_read`).
+    field_depth: usize,
 }
 
 /// What a contract kind injects where the source gives no value (`Code::expand_with`), given
@@ -4841,6 +4850,9 @@ pub struct Code<'a> {
     /// The marker constants of the literals that set each field (`field_values`), by field name
     /// (`*` for a literal by position), built the first time a field is read.
     literals: OnceCell<HashMap<&'a str, BTreeSet<(&'a str, &'a str)>>>,
+    /// The environment read each struct field holds (`Code::field_read`), `Unknown` while it is
+    /// folded, so a field many reads reach is folded once and a field met again folds to nothing.
+    field_reads: RefCell<HashMap<Field<'a>, Value>>,
     /// The last segment of every callee of the repository (`save` of `repo.save`, `C` of
     /// `(opaque).C`), built the first time a parameter is injected (`Code::may_be_called`).
     callees: OnceCell<HashSet<&'a str>>,
@@ -5005,6 +5017,7 @@ impl<'a> Code<'a> {
             folded: RefCell::new(HashMap::new()),
             by_name: full.keys().map(|&path| (path, OnceCell::new())).collect(),
             literals: OnceCell::new(),
+            field_reads: RefCell::new(HashMap::new()),
             callees: OnceCell::new(),
             pack,
         }
@@ -5710,6 +5723,99 @@ impl<'a> Code<'a> {
         self.field_written(field) || self.resolver.written_in.contains(&(class, field))
     }
 
+    /// The environment read the struct field `field` holds: the one every composite literal of
+    /// the repository that sets it gives it (a literal sets the fields it names,
+    /// https://go.dev/ref/spec#Composite_literals), folded where the literal is written, and a
+    /// parameter of the function around it through every exact caller of that function. Unknown
+    /// when a literal may set it to a value the source does not tell (`Code::field_values`),
+    /// when no literal sets it, when two give different values or one gives anything but one
+    /// environment read (`Env` or `EnvOr`), when a function whose parameter it takes has no
+    /// exact caller, past `FIELD_DEPTH`, and while it is folded (a field met again). The caller
+    /// checks that no file writes it through a selector (`Code::field_written`).
+    fn field_read(&self, field: Field<'a>, depth: usize, nested: usize) -> Value {
+        let (at, ty, _) = field;
+        let struct_field = (self.resolver.defs.get(at).and_then(|d| d.get(ty)))
+            .is_some_and(|d| d.kind == Kind::Class);
+        if depth >= FIELD_DEPTH || !struct_field {
+            return Value::Unknown;
+        }
+        if let Some(known) = self.field_reads.borrow().get(&field) {
+            return known.clone();
+        }
+        (self.field_reads.borrow_mut()).insert(field, Value::Unknown);
+        let mut reads = Vec::new();
+        let all = self.field_values(field).is_some_and(|values| {
+            !values.is_empty()
+                && (values.into_iter()).all(|(path, scope, value)| {
+                    let frames = &mut Vec::new();
+                    self.literal_reads(path, scope, value, frames, (depth, nested), &mut reads)
+                })
+        });
+        let read = match (all, &reads[..]) {
+            (true, [first, rest @ ..]) if rest.iter().all(|r| r == first) => {
+                Value::Str(vec![first.clone()])
+            }
+            _ => Value::Unknown,
+        };
+        (self.field_reads.borrow_mut()).insert(field, read.clone());
+        read
+    }
+
+    /// Pushes onto `reads` what `value`, written in `scope` of `path`, folds to under `frames`:
+    /// once, or once per exact caller of the function whose parameter it leaves unbound, climbed
+    /// as `Code::expand` climbs a wrapper. Its own `wants`: the function climbed is no wrapper of
+    /// the walk that reads the field. `false` as soon as one is no single environment read, or a
+    /// function to climb has no exact caller (a name match may reach another function), is met
+    /// again, is `WRAPPER_DEPTH` calls up or its caller's file has spent its `EVAL_BUDGET`.
+    fn literal_reads(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        value: &'a Value,
+        frames: &mut Vec<Frame<'a>>,
+        (depth, nested): (usize, usize),
+        reads: &mut Vec<Part>,
+    ) -> bool {
+        let mut wants = None;
+        // The fold goes on as deep as the one that reads the field: `EVAL_DEPTH` bounds both.
+        let fold = &mut Fold {
+            field_depth: depth + 1,
+            nested,
+            ..Fold::default()
+        };
+        let folded = self.eval(path, scope, value, frames, 0, fold, &mut wants);
+        if let Value::Str(mut parts) = folded
+            && let [Part::Env(_) | Part::EnvOr(..)] = &parts[..]
+        {
+            reads.extend(parts.pop());
+            return true;
+        }
+        let Some(function) = wants else {
+            return false;
+        };
+        if frames.iter().any(|f| f.def == function) || frames.len() >= WRAPPER_DEPTH {
+            return false;
+        }
+        let callers: Vec<Caller> = (self.resolver.callers.get(&function).into_iter().flatten())
+            .copied()
+            .collect();
+        !callers.is_empty()
+            && callers.into_iter().all(|caller| {
+                // Each climb is charged to the caller's file, as `Code::walk` charges its own.
+                if !self.charge(caller.path, 1) {
+                    return false;
+                }
+                frames.push(Frame {
+                    def: function,
+                    path: caller.path,
+                    index: caller.index,
+                });
+                let read = self.literal_reads(path, scope, value, frames, (depth, nested), reads);
+                frames.pop();
+                read
+            })
+    }
+
     /// The argument the call at `index` of `path` passes for parameter `n` of `function`: by
     /// position, or by the parameter's name among its keyword arguments. A method called on
     /// an instance (`x.m(a)`) is passed no argument for its receiver parameter.
@@ -5833,8 +5939,18 @@ impl<'a> Code<'a> {
                     });
                 }
                 if let Some(mut kept) = kept {
-                    for (origin, routes) in std::mem::take(&mut trail.out) {
-                        kept.entry(origin).or_default().extend(routes);
+                    // The smaller set goes into the larger: in a lattice of functions the routes
+                    // double at each level, and re-inserting them all at every level cost more
+                    // than the walk the budget charges.
+                    if kept.len() < trail.out.len() {
+                        std::mem::swap(&mut kept, &mut trail.out);
+                    }
+                    for (origin, mut routes) in std::mem::take(&mut trail.out) {
+                        let into = kept.entry(origin).or_default();
+                        if into.len() < routes.len() {
+                            std::mem::swap(into, &mut routes);
+                        }
+                        into.extend(routes);
                     }
                     trail.out = kept;
                 }
@@ -6918,14 +7034,14 @@ impl<'a> Code<'a> {
                 fold.held.pop();
                 folded
             }
-            // A field no file assigns holds what an annotation on it injects.
-            Binding::Local(at, class, field) => match fold.inject {
-                Some(inject) if !self.field_written_in(class, field) => {
-                    let marks = |on: &Marked| matches!(on, Marked::Field { class: c, name, .. } if c == class && name == field);
-                    self.injected(at, marks, inject).unwrap_or(Value::Unknown)
-                }
-                _ => Value::Unknown,
-            },
+            // A field no file assigns holds what an annotation on it injects, else the
+            // environment read every composite literal that sets it gives it.
+            Binding::Local(at, class, field) if !self.field_written_in(class, field) => {
+                let marks = |on: &Marked| matches!(on, Marked::Field { class: c, name, .. } if c == class && name == field);
+                let injected = fold.inject.and_then(|i| self.injected(at, marks, i));
+                let field = (at, class, field);
+                injected.unwrap_or_else(|| self.field_read(field, fold.field_depth, fold.nested))
+            }
             Binding::External(..) | Binding::Unknown if fold.chain => {
                 match self.outside(path, scope, name, false) {
                     Some(o) if !o.candidates.is_empty() => Value::External(o.candidates),

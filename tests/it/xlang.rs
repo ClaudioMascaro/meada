@@ -293,6 +293,8 @@ fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
         ("tagNested", "TAG_API_URL"),
         ("tagEnvconfig", "TAG_ENVCONFIG_URL"),
         ("tagOptions", "TAG_CAARLO_URL"),
+        ("Client.OrdersDirect", "FIELD_URL"),
+        ("Client.Orders", "FIELD_URL"),
     ];
     for (function, variable) in read {
         let expected = format!("env:{variable}");
@@ -326,6 +328,14 @@ fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
         "lengthShadowed",
         "lookedUpToAVariable",
         "tagUntagged",
+        "twoLiterals.get",
+        "twoCallers.get",
+        "byPosition.get",
+        "untold.get",
+        "unset.get",
+        "assigned.get",
+        "uncalled.get",
+        "literal.get",
     ];
     for function in unread {
         assert_eq!(vias.get(function), Some(&None), "{function}");

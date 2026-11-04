@@ -66,7 +66,12 @@ environment reads; the architecture map keeps the lead of the first:
   writes the same constant for a `readonly`, `private` or `#x` field written once
   (`lang/ts.rs` `sealed_field`, #688), which `this.f` (a `Ref`) reads. The values
   an injector gives are transient like the arguments they stand for, so the index stays free of
-  them. `jvm/spring.rs` is the JVM packs' injector (Spring's `@Value`, `spring::inject`, which is
+  them. A field no injection fills (and no file writes through a selector) is what
+  `Code::field_read` folds (#687): the one environment read every Go composite literal that sets
+  it gives (`Code::field_values`), a constructor's parameter climbed through its exact callers
+  with its own `wants`, so the constructor is never a wrapper of the walk that reads the field;
+  a memo per field (`Code::field_reads`, `Unknown` while it is folded) and `FIELD_DEPTH` bound it.
+  `jvm/spring.rs` is the JVM packs' injector (Spring's `@Value`, `spring::inject`, which is
   given the annotation with what it marks, and nothing for `Injected::Param`), and
   `http/csharp/clients.rs` C#'s (an `HttpClient` constructor parameter, `Injected::Param` only); `spring::resolved` is the one
   rule for an annotation's text Spring resolves (`@Value`, a Feign `url` or `path`, a listener's
