@@ -49,7 +49,8 @@ _Avoid_: snippet, line range
 
 **Config value**:
 One scalar of a YAML, JSON or IaC file, kept in the index with its file, key path, value, type
-(string, number or boolean) and line (ADR 0025). A value past its ceiling is stored cut, with a
+(string, number or boolean; an HCL expression or template is stored as written, under the type
+`expression` or `template`) and line (ADR 0025). A value past its ceiling is stored cut, with a
 mark; one a format marks secret is stored as `redacted`. `search` finds it with kind `value`; it
 never enters the export.
 _Avoid_: setting, config entry, property

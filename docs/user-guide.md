@@ -300,9 +300,21 @@ mais casa. Eles não entram no `meada export`.
   renderizado; um arquivo acima de 1 MiB; um arquivo de mais de 1.000 documentos) ficam de fora,
   contados pelo `meada status`:
   `arquivos de configuração: 5 lidos, 2 ignorados (lockfiles: 1, ilegíveis: 1); valores: 46, ocultados: 3`.
+- **Terraform e OpenTofu**: os arquivos `*.tf`, `*.tofu`, `*.tfvars`, `*.auto.tfvars`,
+  `*.tf.json`, `*.tofu.json` e `*.tfvars.json` também são valores de configuração. O caminho da
+  chave passa pelo tipo e pelos rótulos do bloco e pelo nome do atributo
+  (`resource.aws_sqs_queue.orders.name`), e um bloco repetido com o mesmo tipo e os mesmos rótulos
+  é `[n]` (`ingress[0].from_port`). Um literal mantém o tipo; uma expressão (`var.environment`)
+  ou um template (`"${var.environment}-orders"`, um heredoc com interpolação) é guardado como foi
+  escrito, com o tipo `expression` ou `template`. Um arquivo `.tofu` esconde o arquivo `.tf` de
+  mesmo nome na sua pasta (e o `.tofu.json`, o `.tf.json`), e o arquivo escondido não é lido. Um
+  arquivo que não é lido, ou que aninha colchetes além de 64 níveis, é ignorado e contado como os
+  outros; `.terraform/` é oculto e fica de fora.
 - **Segredos**: os valores de `data` e `stringData` de um `Secret` do Kubernetes (um documento
-  com `apiVersion` e `kind: Secret`, ou um item assim de uma lista `items`) ficam guardados como
-  `redacted`, com o caminho da chave, o tipo e a linha. Fora disso nada é filtrado: o índice
+  com `apiVersion` e `kind: Secret`, ou um item assim de uma lista `items`), o `default` de uma
+  `variable` do Terraform com `sensitive = true` e todo valor que um arquivo `.tfvars` dá a uma
+  variável desse nome (todo valor, quando um arquivo Terraform na pasta dele ou acima não é lido)
+  ficam guardados como `redacted`, com o caminho da chave, o tipo e a linha. Fora disso nada é filtrado: o índice
   guarda o que o checkout já tem. Ponha no `.meadaignore` os arquivos que não devem entrar no
   índice (`secrets/`, `*.env.json`).
 

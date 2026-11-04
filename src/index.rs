@@ -666,6 +666,7 @@ fn refresh_keeping(
         "documents",
         &documents_found(root, &all, serve),
         now,
+        |_| Ok(false),
         |abs| read_up_to(abs, document::DOCUMENT_BYTES_MAX),
         |path, src| Ok(serde_json::to_string(&document::read(path, src))?),
     )?;
@@ -674,6 +675,7 @@ fn refresh_keeping(
         "manifests",
         &manifests_found(&all),
         now,
+        |_| Ok(false),
         |abs| read_up_to(abs, lang::MAX_BYTES),
         |path, src| match package::is_tsconfig(path) {
             true => Ok(serde_json::to_string(&package::read_tsconfig(src))?),
@@ -681,14 +683,19 @@ fn refresh_keeping(
         },
     )?;
     // Config values hold no code either: an edited config file changes its rows alone.
+    // A `.tfvars` file is redacted for the sensitive variables of other files (they sort last,
+    // so those are stored first) and is read again when they change.
+    let configs = configs_found(&all, &hidden_ci(root));
+    let sensitive = config_values::Sensitive::new(&tx, &configs);
     let gone = refresh_stamped(
         &tx,
         "config_files",
-        &configs_found(&all, &hidden_ci(root)),
+        &configs,
         now,
+        |path| sensitive.stale(path),
         |abs| read_up_to(abs, lang::MAX_BYTES),
         |path, src| {
-            let (outcome, rows) = config_values::read(path, src);
+            let (outcome, rows) = config_values::read_with(path, src, &sensitive.of(path)?);
             config_values::store(&tx, path, &rows)?;
             Ok(serde_json::to_string(&outcome)?)
         },
@@ -1692,8 +1699,12 @@ fn configs_found(
         .filter(|(path, _)| config_values::is_config(path))
         .cloned()
         .collect();
-    found.sort();
-    found
+    // The `.tfvars` files last, for the sensitive variables of the others, and no `.tf` file
+    // a `.tofu` one shadows.
+    found.sort_by(|(a, _), (b, _)| {
+        (config_values::is_tfvars(a), a).cmp(&(config_values::is_tfvars(b), b))
+    });
+    config_values::unshadowed(found)
 }
 
 /// Every file under the hidden entries of `root` that config values read although hidden
@@ -1720,13 +1731,15 @@ fn hidden_ci(root: &Path) -> Vec<(String, PathBuf)> {
 
 /// Brings `table` (`documents`, `manifests` or `config_files`, stamped like `files`) up to date
 /// with `found`, the files on disk (path and absolute path), as `refresh` does `files`: stat,
-/// then `read` and hash, then `summarize` only what changed. A stored row not found, or whose
+/// then `read` and hash, then `summarize` only what changed, or what `forced` says depends on
+/// another file that did. A stored row not found, or whose
 /// file cannot be statted or read, leaves the table; their paths are returned.
 fn refresh_stamped(
     tx: &Transaction,
     table: &str,
     found: &[(String, PathBuf)],
     now: SystemTime,
+    forced: impl Fn(&str) -> Result<bool>,
     read: impl Fn(&Path) -> std::io::Result<Vec<u8>>,
     summarize: impl Fn(&str, &[u8]) -> Result<String>,
 ) -> Result<Vec<String>> {
@@ -1746,7 +1759,9 @@ fn refresh_stamped(
         };
         seen.insert(path.as_str());
         let known = stored.get(path);
-        if known.is_some_and(|k| k.mtime.is_some() && k.mtime == mtime && k.size == size) {
+        let forced = forced(path)?;
+        if !forced && known.is_some_and(|k| k.mtime.is_some() && k.mtime == mtime && k.size == size)
+        {
             continue;
         }
         let mtime = mtime.filter(|_| trusted);
@@ -1755,7 +1770,7 @@ fn refresh_stamped(
             continue;
         };
         let hash = blake3::hash(&src).to_hex().to_string();
-        if known.is_some_and(|k| k.hash == hash) {
+        if !forced && known.is_some_and(|k| k.hash == hash) {
             tx.execute(
                 &format!("UPDATE {table} SET mtime = ?2, size = ?3 WHERE path = ?1"),
                 params![path, mtime, size],
@@ -3364,6 +3379,7 @@ mod tests {
             "manifests",
             &found,
             std::time::SystemTime::now(),
+            |_| Ok(false),
             |abs| fs::read(abs),
             |_, _| Ok("{}".into()),
         )

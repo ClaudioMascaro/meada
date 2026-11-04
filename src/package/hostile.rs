@@ -663,6 +663,41 @@ fn probes() -> Vec<Probe> {
             let secret = "---\napiVersion: v1\nkind: Secret\ndata: {a: b, c: d}\n";
             stored("a.yaml", count(999, |_| secret.to_string()))
         }),
+        ("hcl: long labels nested deep", || {
+            let label = "k".repeat(4000);
+            let open = format!("b \"{label}\" {{\n").repeat(50);
+            let leaves = fill(2, |i| format!("v{i} = 1\n"));
+            stored("a.tf", format!("{open}{leaves}{}", "}\n".repeat(50)))
+        }),
+        ("hcl: many attributes", || {
+            stored("a.tf", fill(1, |i| format!("a{i} = {}\n", i % 10)))
+        }),
+        ("hcl: many blocks of one type", || {
+            stored("a.tf", fill(1, |i| format!("b {{ a = {} }}\n", i % 10)))
+        }),
+        ("hcl: deep brackets", || {
+            stored("a.tf", format!("x = {}", "[".repeat(NESTING)))
+        }),
+        ("hcl: long heredoc", || {
+            let line = format!("{}\n", "a".repeat(79));
+            stored(
+                "a.tf",
+                format!("x = <<EOT\n{}EOT\n", fill(1, |_| line.clone())),
+            )
+        }),
+        ("hcl: heredoc of interpolations", || {
+            let body = fill(1, |i| format!("${{var.a{i}}}\n"));
+            stored("a.tf", format!("x = <<EOT\n{body}EOT\n"))
+        }),
+        ("hcl: long expression", || {
+            stored(
+                "a.tf",
+                format!("x = f({}0)\n", fill(1, |i| format!("a{i}, "))),
+            )
+        }),
+        ("hcl: many tfvars", || {
+            stored("a.tfvars", fill(1, |i| format!("v{i} = \"x\"\n")))
+        }),
         // .NET: `appsettings.json`
         ("appsettings: many keys", || {
             let keys = fill(1, |i| format!("\"Key{i}\": {{\"A\": \"v{i}\"}}, // c\n"));

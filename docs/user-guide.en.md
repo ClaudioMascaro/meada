@@ -300,8 +300,21 @@ matches. They stay out of `meada export`.
   rendered; a file over 1 MiB; a file of more than 1,000 documents) are left out, and `meada
   status` counts them:
   `config files: 5 read, 2 skipped (lockfiles: 1, unreadable: 1); values: 46, redacted: 3`.
+- **Terraform and OpenTofu**: `*.tf`, `*.tofu`, `*.tfvars`, `*.auto.tfvars`, `*.tf.json`,
+  `*.tofu.json` and `*.tfvars.json` files are config values too. The key path runs over the
+  block's type and labels and the attribute's name (`resource.aws_sqs_queue.orders.name`), and a
+  block repeated under the same type and labels is `[n]` (`ingress[0].from_port`). A literal
+  keeps its type; an expression (`var.environment`) or a template (`"${var.environment}-orders"`,
+  a heredoc with an interpolation) is stored as written, with the type `expression` or
+  `template`. A `.tofu` file shadows the `.tf` file of the same name in its directory (and
+  `.tofu.json` the `.tf.json`), and the shadowed file is not read. A file that does not parse,
+  or nests brackets past 64 levels, is skipped and counted like the others; `.terraform/` is
+  hidden and stays out.
 - **Secrets**: the values of `data` and `stringData` of a Kubernetes `Secret` (a document with
-  `apiVersion` and `kind: Secret`, or such an item of a list's `items`) are stored as `redacted`,
+  `apiVersion` and `kind: Secret`, or such an item of a list's `items`), the `default` of a
+  Terraform `variable` with `sensitive = true` and every value a `.tfvars` file gives a variable
+  of that name (every value, when a Terraform file in its directory or above does not parse) are
+  stored as `redacted`,
   with their key path, type and line. Nothing else is filtered: the index holds what the checkout
   already does. List in `.meadaignore` the files that must stay out of the index (`secrets/`,
   `*.env.json`).

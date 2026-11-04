@@ -109,6 +109,26 @@ this file, and a change to these modules updates it.
   of a list's `items`, keeps its key path, type and line with no value. `store` and `forget`
   write the rows; `index::refresh` runs `refresh_stamped` on `config_files` beside the documents
   and manifests, before the code, so an edited config file rewrites its rows and nothing else.
+  Terraform and OpenTofu (#640): `is_config` also picks `*.tf`, `*.tofu` and `*.tfvars`
+  (`*.auto.tfvars` included); `unshadowed` drops a `.tf` file beside a `.tofu` one of its name
+  (and `.tf.json` beside `.tofu.json`) from `configs_found`, which also sorts the `.tfvars` and
+  `.tfvars.json` files last. `config_values/hcl.rs` reads `.tf`, `.tofu` and `.tfvars` with
+  `hcl-edit` (`parse_body`, spans for the line and the text as written; `hcl-rs` evaluates the
+  string a heredoc of literals holds): attributes and blocks walk to rows whose key path is the
+  block type, labels and attribute (a block repeated under the same names in one body `[n]`),
+  a list or an object of literal keys element by element, anything else one row typed
+  `expression` or `template` with its source text (shown on one line by `one_line`); a file nested past `NESTING_MAX` brackets
+  (counted by `nested_past` before the parser runs) is unreadable. `.tf.json`, `.tofu.json`
+  and `.tfvars.json` go through the event reader (their key paths are the same), their strings
+  with an interpolation typed by `json_kind` and stored as the quoted JSON string. Sensitive:
+  a top-level `variable` with `sensitive = true` hides its `default` (`SecretPlace::Variable`
+  in JSON, `Hide::Attribute` in HCL); `Sensitive` collects, once per refresh from the rows
+  already stored (`variable.<name>.sensitive` = true, of the files found), the sensitive
+  variable names of the repository and the directories holding an unreadable Terraform file,
+  and `read_with` redacts the values a `.tfvars` file gives those names (`Sensitive::of`; all
+  of them, `ANY_VARIABLE`, at or below such a directory). `Outcome::Read::sensitive`
+  keeps that set for a `.tfvars` file and `Sensitive::stale` makes `refresh_stamped` read the
+  file again, though unchanged, when it differs (its `forced` argument).
   `store` keeps each key path and value lowercased beside it (`folded_key`, `folded_value`, each
   with a B-tree); `hits(identity, db, needle)` takes exact matches from the B-trees (rank 0),
   then prefixes from them (rank 1, the range from `needle` up to `successor(needle)`, the least

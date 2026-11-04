@@ -48,6 +48,10 @@ clap = { version = "4.6.7", features = ["derive"] }
 # A bundle's download as a stream (`meada snapshot pull`), only behind `snapshot`. rmcp already
 # brings it into the default build, so it is no canary of the module.
 futures = { version = "0.3.34", optional = true, default-features = false, features = ["std"] }
+# Terraform and OpenTofu files (ADR 0025): `hcl-edit` parses with a span for every node, `hcl-rs`
+# evaluates a template that holds literals only (a heredoc), so the value is the string HCL reads.
+hcl-edit = "0.10.0"
+hcl-rs = "0.20.0"
 # The listener under rmcp's streamable HTTP server, which is a service with none (server mode).
 http-body-util = "0.1.3"
 hyper = { version = "1.9.0", features = ["server", "http1"] }

@@ -227,13 +227,15 @@ Drift is a field a `fetch` consumer reads from a response but the route does not
 
 Every scalar of every `*.yaml`, `*.yml` and `*.json` file Meada reads, and of the YAML and JSON files under the CI configuration at the root (`.github/`, `.gitlab-ci.yml`, `.gitlab/`, `.circleci/`, `.buildkite/`, `.drone.yml`), is a config value: file, key path (jq style, `alerts.loki[0].labels.support`, `metadata.labels["app.kubernetes.io/name"]`, `[2].spec.replicas` in a file of several documents), value, type (string, number or boolean) and line. Other hidden paths stay out, and nothing needs turning on.
 
+Terraform and OpenTofu files are config values too (`*.tf`, `*.tofu`, `*.tf.json`, `*.tofu.json`, `*.tfvars`, `*.auto.tfvars`, `*.tfvars.json`). The key path runs over the block's type and labels and the attribute's name (`resource.aws_sqs_queue.orders.name`, `resource.opsgenie_team_routing_rule.critical.criteria.conditions[1].expected_value`), a block repeated under the same type and labels indexed `[n]` (`ingress[0]`). A literal keeps its type; an expression (`var.environment`, `format(..)`) or a template (`"${var.environment}-orders"`, a heredoc with an interpolation) is stored as written, under the type `expression` or `template`, until static evaluation resolves it. A `.tofu` file shadows the `.tf` file of the same name in its directory (`.tofu.json` the `.tf.json`), as OpenTofu does, and the shadowed file is not read.
+
 | Query | Result |
 | --- | --- |
 | `search` with kind `value` | Values whose value or key path equals, starts with or holds the query, as `<repository> <path>:<line> <key path> = <value>` |
 | `search` with no kind | Values only when no symbol and no contract matches |
 | `meada status` | Config files read and skipped (lockfiles, files that do not parse) and the values redacted |
 
-A value over 1 KiB is stored cut, marked `(cut)`. The `data` and `stringData` of a Kubernetes `Secret` are stored as `redacted`, with key path, type and line; nothing else is filtered, so files that must stay out of the index go in `.meadaignore`. Lockfiles (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `packages.lock.json`), Helm templates (not YAML until rendered), files over 1 MiB and files of more than 1,000 documents are skipped. Values never enter `meada export` and link nothing.
+A value over 1 KiB is stored cut, marked `(cut)`. The `data` and `stringData` of a Kubernetes `Secret` are stored as `redacted`, with key path, type and line, as are the `default` of a Terraform `variable` with `sensitive = true` and every value a `.tfvars` file gives a variable of that name (all of them, when a Terraform file at or above it does not parse); nothing else is filtered, so files that must stay out of the index go in `.meadaignore`. Lockfiles (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `packages.lock.json`), Helm templates (not YAML until rendered), files over 1 MiB and files of more than 1,000 documents are skipped. Values never enter `meada export` and link nothing.
 
 ## Communities and processes
 

@@ -305,9 +305,21 @@ hay clave para activarlo: la búsqueda con `kind = "value"` los encuentra, y la 
   renderizarse; un archivo de más de 1 MiB; un archivo de más de 1.000 documentos) quedan fuera, y
   `meada status` los cuenta:
   `archivos de configuración: 5 leídos, 2 omitidos (lockfiles: 1, ilegibles: 1); valores: 46, ocultados: 3`.
+- **Terraform y OpenTofu**: los archivos `*.tf`, `*.tofu`, `*.tfvars`, `*.auto.tfvars`,
+  `*.tf.json`, `*.tofu.json` y `*.tfvars.json` también son valores de configuración. La ruta de
+  la clave pasa por el tipo y las etiquetas del bloque y por el nombre del atributo
+  (`resource.aws_sqs_queue.orders.name`), y un bloque repetido con el mismo tipo y las mismas
+  etiquetas es `[n]` (`ingress[0].from_port`). Un literal conserva su tipo; una expresión
+  (`var.environment`) o una plantilla (`"${var.environment}-orders"`, un heredoc con
+  interpolación) se guarda tal como está escrita, con el tipo `expression` o `template`. Un
+  archivo `.tofu` oculta el archivo `.tf` del mismo nombre en su carpeta (y el `.tofu.json`, el
+  `.tf.json`), y el archivo oculto no se lee. Un archivo que no se lee, o que anida corchetes más
+  allá de 64 niveles, se omite y se cuenta como los demás; `.terraform/` es oculto y queda fuera.
 - **Secretos**: los valores de `data` y `stringData` de un `Secret` de Kubernetes (un documento
-  con `apiVersion` y `kind: Secret`, o un elemento así de una lista `items`) se guardan como
-  `redacted`, con su ruta de la clave, su tipo y su línea. Nada más se filtra: el índice guarda lo
+  con `apiVersion` y `kind: Secret`, o un elemento así de una lista `items`), el `default` de una
+  `variable` de Terraform con `sensitive = true` y todo valor que un archivo `.tfvars` da a una
+  variable de ese nombre (todo valor, cuando un archivo Terraform en su carpeta o por encima no se
+  lee) se guardan como `redacted`, con su ruta de la clave, su tipo y su línea. Nada más se filtra: el índice guarda lo
   que el checkout ya tiene. Pon en `.meadaignore` los archivos que no deben entrar en el índice
   (`secrets/`, `*.env.json`).
 

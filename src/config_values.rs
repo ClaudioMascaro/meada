@@ -4,10 +4,12 @@
 //! reader (`document::events`); the rows live in `config_values` beside the stamped
 //! `config_files`, which keeps each file's `Outcome` for `meada status`. Never exported.
 
-use std::collections::BTreeMap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt::Write;
+use std::path::PathBuf;
 
-use rusqlite::{Connection, Transaction, params};
+use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -16,6 +18,8 @@ use crate::contract::Hit;
 use crate::document::events::{self, Step, Syntax};
 use crate::lang;
 use crate::msg::Msg;
+
+mod hcl;
 
 /// The lockfiles a YAML or JSON extension reaches, skipped by file name (ADR 0025).
 const LOCKFILES: [&str; 4] = [
@@ -56,8 +60,15 @@ const STORED_SLACK: usize = 1 << 12;
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum Outcome {
-    /// Read: how many values it holds, and how many of them are `redacted`.
-    Read { values: usize, redacted: usize },
+    /// Read: how many values it holds, and how many of them are `redacted`. A `.tfvars` file also
+    /// keeps the sensitive variables it was read against (`Sensitive`), since a variable
+    /// another file marks `sensitive` redacts the values this one gives it.
+    Read {
+        values: usize,
+        redacted: usize,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        sensitive: Vec<String>,
+    },
     /// A lockfile, skipped by name.
     Lockfile,
     /// Skipped: it does not parse, or passes a ceiling, at `line`.
@@ -78,9 +89,159 @@ pub(crate) struct Row {
 }
 
 /// Whether the file at `path` (relative, `/`-separated) holds config values: a `*.yaml`,
-/// `*.yml` or `*.json` file, lockfiles included (they are counted as skipped).
+/// `*.yml` or `*.json` file, or a Terraform or OpenTofu one (`*.tf`, `*.tofu`, `*.tfvars`),
+/// lockfiles included (they are counted as skipped).
 pub(crate) fn is_config(path: &str) -> bool {
-    [".yaml", ".yml", ".json"].iter().any(|e| path.ends_with(e))
+    [".yaml", ".yml", ".json", ".tf", ".tofu", ".tfvars"]
+        .iter()
+        .any(|e| path.ends_with(e))
+}
+
+/// Whether the file at `path` gives values to variables: `*.tfvars`, `*.auto.tfvars` or
+/// `*.tfvars.json`.
+pub(crate) fn is_tfvars(path: &str) -> bool {
+    path.ends_with(".tfvars") || path.ends_with(".tfvars.json")
+}
+
+/// `found` without the Terraform files a OpenTofu one shadows: a `.tofu` file hides the `.tf`
+/// file of the same name in its directory, and a `.tofu.json` the `.tf.json` (ADR 0025).
+pub(crate) fn unshadowed(found: Vec<(String, PathBuf)>) -> Vec<(String, PathBuf)> {
+    let paths: HashSet<String> = found.iter().map(|(p, _)| p.clone()).collect();
+    let shadowed = |path: &str| {
+        [(".tf", ".tofu"), (".tf.json", ".tofu.json")]
+            .iter()
+            .any(|(tf, tofu)| {
+                (path.strip_suffix(tf)).is_some_and(|stem| paths.contains(&format!("{stem}{tofu}")))
+            })
+    };
+    found.into_iter().filter(|(p, _)| !shadowed(p)).collect()
+}
+
+/// The parent directory of `path`, `""` for the root.
+fn parent(path: &str) -> &str {
+    path.rsplit_once('/').map_or("", |(dir, _)| dir)
+}
+
+/// What a `.tfvars` file's values are redacted for in place of a variable's name: every value it
+/// gives. Part of `Sensitive::of` when a Terraform file that may declare variables is unreadable.
+pub(crate) const ANY_VARIABLE: &str = "*";
+
+/// The sensitive variables a `.tfvars` file is read against: the names declared `sensitive = true`
+/// by any Terraform file found (a var-file can be given to a module in any directory, and
+/// redacting too much is the safe direction), and `ANY_VARIABLE` when a Terraform file in its
+/// directory or above it is unreadable, since the variables it declares are unknown. Computed
+/// once per refresh from the rows of the files found, after every file but the `.tfvars` ones is
+/// refreshed.
+pub(crate) struct Sensitive<'a> {
+    db: &'a Connection,
+    found: HashSet<&'a str>,
+    /// The names, and the directories holding an unreadable Terraform file.
+    loaded: RefCell<Option<(BTreeSet<String>, Vec<String>)>>,
+}
+
+impl<'a> Sensitive<'a> {
+    pub(crate) fn new(db: &'a Connection, found: &'a [(String, PathBuf)]) -> Self {
+        Sensitive {
+            db,
+            found: found.iter().map(|(p, _)| p.as_str()).collect(),
+            loaded: RefCell::new(None),
+        }
+    }
+
+    /// The sensitive variables the file at `path` is read against; none unless it is a
+    /// `.tfvars` file.
+    pub(crate) fn of(&self, path: &str) -> Result<BTreeSet<String>> {
+        if !is_tfvars(path) {
+            return Ok(BTreeSet::new());
+        }
+        let mut loaded = self.loaded.borrow_mut();
+        if loaded.is_none() {
+            *loaded = Some(self.load()?);
+        }
+        let (names, unreadable) = loaded.as_ref().expect("loaded above");
+        let mut names = names.clone();
+        let dir = parent(path);
+        let below = |d: &String| {
+            d.is_empty()
+                || dir == d
+                || dir
+                    .strip_prefix(d.as_str())
+                    .is_some_and(|r| r.starts_with('/'))
+        };
+        if unreadable.iter().any(below) {
+            names.insert(ANY_VARIABLE.to_string());
+        }
+        Ok(names)
+    }
+
+    /// Whether the stored rows of the `.tfvars` file at `path` were read against other
+    /// sensitive variables than those now: they are read again though the file did not change.
+    pub(crate) fn stale(&self, path: &str) -> Result<bool> {
+        if !is_tfvars(path) {
+            return Ok(false);
+        }
+        let summary: Option<String> = self
+            .db
+            .query_row(
+                "SELECT summary FROM config_files WHERE path = ?1",
+                params![path],
+                |r| r.get(0),
+            )
+            .optional()?;
+        let Some(Outcome::Read { sensitive, .. }) =
+            summary.and_then(|s| serde_json::from_str(&s).ok())
+        else {
+            return Ok(false);
+        };
+        Ok(self.of(path)?.into_iter().collect::<Vec<_>>() != sensitive)
+    }
+
+    fn load(&self) -> Result<(BTreeSet<String>, Vec<String>)> {
+        let mut statement = self.db.prepare(
+            "SELECT path, key FROM config_values \
+             WHERE type = 'boolean' AND value = 'true' AND key LIKE 'variable%.sensitive'",
+        )?;
+        let mut names = BTreeSet::new();
+        for row in
+            statement.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+        {
+            let (path, key) = row?;
+            if let (true, Some(name)) = (self.found.contains(path.as_str()), variable(&key)) {
+                names.insert(name);
+            }
+        }
+        let mut statement = self.db.prepare("SELECT path, summary FROM config_files")?;
+        let mut unreadable = Vec::new();
+        for row in
+            statement.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+        {
+            let (path, summary) = row?;
+            let terraform = [".tf", ".tofu", ".tf.json", ".tofu.json"]
+                .iter()
+                .any(|e| path.ends_with(e));
+            if terraform
+                && self.found.contains(path.as_str())
+                && matches!(
+                    serde_json::from_str(&summary),
+                    Ok(Outcome::Unreadable { .. })
+                )
+            {
+                unreadable.push(parent(&path).to_string());
+            }
+        }
+        Ok((names, unreadable))
+    }
+}
+
+/// The name of the variable whose `sensitive` attribute the key path `key` is
+/// (`variable.db_password.sensitive`, `variable["db-password"].sensitive`).
+fn variable(key: &str) -> Option<String> {
+    let rest = key.strip_prefix("variable")?.strip_suffix(".sensitive")?;
+    if let Some(name) = rest.strip_prefix('.') {
+        return plain(name).then(|| name.to_string());
+    }
+    let quoted = rest.strip_prefix('[')?.strip_suffix(']')?;
+    serde_json::from_str(quoted).ok()
 }
 
 /// Whether a hidden entry the walk meets at the root, named `name`, is read anyway.
@@ -96,21 +257,35 @@ struct Pending {
     row: Row,
 }
 
-/// Where a scalar sits relative to the places a Kubernetes `Secret` keeps its values.
-#[derive(Clone, Copy, PartialEq)]
+/// Where a scalar sits relative to the places a format keeps secret values.
+#[derive(Clone, PartialEq)]
 enum SecretPlace {
     No,
-    /// Under the root's `data` or `stringData`.
+    /// Under the root's `data` or `stringData` of a Kubernetes `Secret`.
     Root,
     /// Under `items[n].data` or `items[n].stringData` of a list.
     Item(usize),
+    /// Under `variable.<name>.default` of a Terraform JSON file: secret when the variable says
+    /// `"sensitive": true`.
+    Variable(String),
+    /// Under the top-level key `<name>` of a `.tfvars.json` file: secret when the variable is
+    /// sensitive.
+    Tfvars(String),
 }
 
 impl SecretPlace {
-    fn of(path: &[Step]) -> SecretPlace {
+    fn of(path: &[Step], file: &str) -> SecretPlace {
         let held =
             |s: Option<&Step>| matches!(s, Some(Step::Key(k)) if k == "data" || k == "stringData");
         match path {
+            [Step::Key(name), ..] if file.ends_with(".tfvars.json") => {
+                SecretPlace::Tfvars(name.clone())
+            }
+            [Step::Key(v), Step::Key(name), Step::Key(d), ..]
+                if v == "variable" && d == "default" && terraform_json(file) =>
+            {
+                SecretPlace::Variable(name.clone())
+            }
             [first, ..] if held(Some(first)) => SecretPlace::Root,
             [Step::Key(items), Step::Index(n), rest @ ..]
                 if items == "items" && held(rest.first()) =>
@@ -119,6 +294,53 @@ impl SecretPlace {
             }
             _ => SecretPlace::No,
         }
+    }
+}
+
+/// Whether `file` is a Terraform or OpenTofu JSON file (`*.tf.json`, `*.tofu.json`).
+fn terraform_json(file: &str) -> bool {
+    file.ends_with(".tf.json") || file.ends_with(".tofu.json")
+}
+
+/// The type of a string of a Terraform JSON file, where every string is a template: `string`
+/// when it holds no interpolation or directive (a doubled `$` or `%` escapes one), `expression`
+/// when it is one interpolation and nothing else, else `template`.
+fn json_kind(s: &str) -> &'static str {
+    let bare = s.replace("$${", "").replace("%%{", "");
+    if !bare.contains("${") && !bare.contains("%{") {
+        return "string";
+    }
+    let single = bare.strip_prefix("${").is_some_and(|rest| {
+        let mut depth = 1usize;
+        for (at, c) in rest.char_indices() {
+            match c {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return at + 1 == rest.len();
+                    }
+                }
+                _ => {}
+            }
+        }
+        false
+    });
+    if single { "expression" } else { "template" }
+}
+
+/// The value and type of the string `s` at `path` of the file `file`: a Terraform JSON string
+/// is a template (`json_kind`), stored as the quoted JSON string when it is not a plain one, and
+/// with its escapes (`$${`) undone when it is; a variable's `default` is a literal.
+fn json_string(file: &str, path: &[Step], s: &str) -> (&'static str, String) {
+    let literal =
+        matches!(path, [Step::Key(v), _, Step::Key(d), ..] if v == "variable" && d == "default");
+    if !terraform_json(file) || literal {
+        return ("string", s.to_string());
+    }
+    match json_kind(s) {
+        "string" => ("string", s.replace("$${", "${").replace("%%{", "%{")),
+        kind => (kind, serde_json::to_string(s).unwrap_or_default()),
     }
 }
 
@@ -131,7 +353,18 @@ fn is_secret(object: &Value) -> bool {
 /// The values of the file at `path` and what reading it came to. Every scalar but a null is a
 /// row; a value of a Kubernetes `Secret`'s `data` or `stringData` (at the root of a document,
 /// or an item of a `List`) keeps its key path, type and line only.
+#[cfg(test)]
 pub(crate) fn read(path: &str, src: &[u8]) -> (Outcome, Vec<Row>) {
+    read_with(path, src, &BTreeSet::new())
+}
+
+/// `read` for the file at `path` against `sensitive`, the Terraform variables marked sensitive
+/// that a `.tfvars` file's values are redacted for (`Sensitive::of`).
+pub(crate) fn read_with(
+    path: &str,
+    src: &[u8],
+    sensitive: &BTreeSet<String>,
+) -> (Outcome, Vec<Row>) {
     let unreadable = |line, reason: String| (Outcome::Unreadable { line, reason }, Vec::new());
     let name = path.rsplit('/').next().unwrap_or(path);
     if LOCKFILES.contains(&name) {
@@ -139,6 +372,20 @@ pub(crate) fn read(path: &str, src: &[u8]) -> (Outcome, Vec<Row>) {
     }
     if src.len() > lang::MAX_BYTES {
         return unreadable(1, format!("larger than {} bytes", lang::MAX_BYTES));
+    }
+    if hcl::is_hcl(path) {
+        return match hcl::read(path, src, sensitive) {
+            Ok(rows) => {
+                let redacted = rows.iter().filter(|r| r.value.is_none()).count();
+                let outcome = Outcome::Read {
+                    values: rows.len(),
+                    redacted,
+                    sensitive: sensitive.iter().cloned().collect(),
+                };
+                (outcome, rows)
+            }
+            Err((line, reason)) => unreadable(line, reason),
+        };
     }
     let mut pending = Vec::new();
     let budget = (src.len())
@@ -155,7 +402,7 @@ pub(crate) fn read(path: &str, src: &[u8]) -> (Outcome, Vec<Row>) {
             return;
         }
         let (kind, mut value) = match scalar.value {
-            Value::String(s) => ("string", s.clone()),
+            Value::String(s) => json_string(path, scalar.path, s),
             Value::Number(n) => ("number", n.to_string()),
             Value::Bool(b) => ("boolean", b.to_string()),
             _ => return,
@@ -172,7 +419,7 @@ pub(crate) fn read(path: &str, src: &[u8]) -> (Outcome, Vec<Row>) {
                 return;
             }
         }
-        let secret = SecretPlace::of(scalar.path);
+        let secret = SecretPlace::of(scalar.path, path);
         let row = Row {
             key,
             value: Some(value),
@@ -210,6 +457,12 @@ pub(crate) fn read(path: &str, src: &[u8]) -> (Outcome, Vec<Row>) {
                     SecretPlace::No => false,
                     SecretPlace::Root => is_secret(doc),
                     SecretPlace::Item(n) => doc["items"].get(n).is_some_and(is_secret),
+                    SecretPlace::Variable(name) => {
+                        doc["variable"][name.as_str()]["sensitive"] == Value::Bool(true)
+                    }
+                    SecretPlace::Tfvars(name) => {
+                        sensitive.contains(&name) || sensitive.contains(ANY_VARIABLE)
+                    }
                 };
                 if hidden {
                     row.value = None;
@@ -224,7 +477,15 @@ pub(crate) fn read(path: &str, src: &[u8]) -> (Outcome, Vec<Row>) {
         )
         .collect();
     let values = rows.len();
-    (Outcome::Read { values, redacted }, rows)
+    let sensitive = sensitive.iter().cloned().collect();
+    (
+        Outcome::Read {
+            values,
+            redacted,
+            sensitive,
+        },
+        rows,
+    )
 }
 
 /// The key path of the scalar at `path` (ADR 0025), jq style: keys joined by dots, a list item
@@ -341,6 +602,7 @@ pub(crate) fn hits(identity: &str, db: &Connection, needle: &str) -> Result<Vec<
             let shown = match (&value, kind.as_str()) {
                 (None, _) => "redacted".to_string(),
                 (Some(v), "string") => serde_json::to_string(v)?,
+                (Some(v), "expression" | "template") => one_line(v),
                 (Some(v), _) => v.clone(),
             };
             let mark = if cut { " (cut)" } else { "" };
@@ -352,6 +614,24 @@ pub(crate) fn hits(identity: &str, db: &Connection, needle: &str) -> Result<Vec<
         }
     }
     Ok(found.into_values().collect())
+}
+
+/// `text` on one line, as an answer has one line per match: a line break (and any other control
+/// character, or a Unicode line separator) is written as an escape, so a multi-line expression
+/// cannot pass for matches of its own.
+fn one_line(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            c if c != '\t' && (c.is_control() || matches!(c, '\u{2028}' | '\u{2029}')) => {
+                let _ = write!(out, "\\u{{{:x}}}", c as u32);
+            }
+            c => out.push(c),
+        }
+    }
+    out
 }
 
 /// The least text above every text that starts with `prefix`, in code point order (the byte
@@ -384,6 +664,7 @@ pub(crate) fn status(db: &Connection) -> Result<Option<String>> {
             Outcome::Read {
                 values: v,
                 redacted: r,
+                ..
             } => {
                 read += 1;
                 values += v;
@@ -441,6 +722,108 @@ mod tests {
             assert!(text.as_bytes() < past.as_bytes(), "{text:?}");
         }
         assert!("teamz".as_bytes() < past.as_bytes() && "tean".as_bytes() >= past.as_bytes());
+    }
+
+    #[test]
+    fn a_tofu_file_shadows_the_terraform_file_of_its_name_in_its_directory() {
+        let at = |paths: &[&str]| -> Vec<(String, PathBuf)> {
+            (paths.iter())
+                .map(|p| (p.to_string(), PathBuf::from(p)))
+                .collect()
+        };
+        let kept = unshadowed(at(&[
+            "a/main.tf",
+            "a/main.tofu",
+            "a/other.tf",
+            "b/main.tf",
+            "a/x.tf.json",
+            "a/x.tofu.json",
+            "a/y.tf.json",
+            "a/main.tf.json",
+            "a/main.tofu.json",
+            "a/main.tfvars",
+        ]));
+        let kept: Vec<&str> = kept.iter().map(|(p, _)| p.as_str()).collect();
+        assert_eq!(
+            kept,
+            [
+                "a/main.tofu",
+                "a/other.tf",
+                "b/main.tf",
+                "a/x.tofu.json",
+                "a/y.tf.json",
+                "a/main.tofu.json",
+                "a/main.tfvars"
+            ]
+        );
+    }
+
+    #[test]
+    fn the_variable_a_sensitive_row_names_is_read_from_its_key_path() {
+        assert_eq!(
+            variable("variable.db_password.sensitive").as_deref(),
+            Some("db_password")
+        );
+        assert_eq!(
+            variable("variable[\"db-password\"].sensitive").as_deref(),
+            Some("db-password")
+        );
+        assert_eq!(
+            variable("variable[\"a\\\"b\"].sensitive").as_deref(),
+            Some("a\"b")
+        );
+        assert_eq!(variable("output.x.sensitive"), None);
+        assert_eq!(variable("variable.x.y.sensitive"), None);
+        assert_eq!(variable("variable.x.default"), None);
+    }
+
+    #[test]
+    fn a_terraform_json_string_is_a_template_unless_it_is_plain_or_a_variable_default() {
+        for (text, kind) in [
+            ("plain", "string"),
+            ("a$${b}", "string"),
+            ("${var.a}", "expression"),
+            ("${ {a = 1}.a }", "expression"),
+            ("${a}b}", "template"),
+            ("${a} }", "template"),
+            ("x-${a}", "template"),
+            ("${a}${b}", "template"),
+            ("%{if a}b%{endif}", "template"),
+        ] {
+            assert_eq!(json_kind(text), kind, "{text}");
+        }
+        let key = |names: &[&str]| -> Vec<Step> {
+            names.iter().map(|n| Step::Key(n.to_string())).collect()
+        };
+        let default = key(&["variable", "x", "default"]);
+        let other = key(&["resource", "a", "name"]);
+        let file = "main.tf.json";
+        assert_eq!(
+            json_string(file, &default, "${a}"),
+            ("string", "${a}".into())
+        );
+        assert_eq!(
+            json_string(file, &other, "${a}b"),
+            ("template", "\"${a}b\"".into())
+        );
+        assert_eq!(
+            json_string(file, &other, "a$${b}"),
+            ("string", "a${b}".into())
+        );
+        assert_eq!(
+            json_string("a.json", &other, "${a}"),
+            ("string", "${a}".into())
+        );
+    }
+
+    #[test]
+    fn an_expression_is_shown_on_one_line_whatever_it_holds() {
+        assert_eq!(one_line("f({\n  a = 1\r\n})"), "f({\\n  a = 1\\r\\n})");
+        assert_eq!(
+            one_line("a\u{2028}b\u{0}c\u{85}d\te"),
+            "a\\u{2028}b\\u{0}c\\u{85}d\te"
+        );
+        assert_eq!(one_line("var.env"), "var.env");
     }
 
     #[test]
@@ -542,7 +925,8 @@ mod tests {
             outcome,
             Outcome::Read {
                 values: 19,
-                redacted: 4
+                redacted: 4,
+                sensitive: vec![]
             }
         );
         let hidden: Vec<_> = (rows.iter())
@@ -603,7 +987,8 @@ mod tests {
             outcome,
             Outcome::Read {
                 values: DOCUMENTS_MAX,
-                redacted: 0
+                redacted: 0,
+                sensitive: vec![]
             }
         );
         let large = format!("\"{}\"", "a".repeat(lang::MAX_BYTES));

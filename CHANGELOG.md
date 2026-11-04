@@ -19,6 +19,16 @@ All notable changes to Meada are recorded here. The format follows
   parse are skipped, and `meada status` counts the config files read and skipped and the values
   redacted. Values stay out of `meada export`. The index schema changes, so existing indexes are
   rebuilt (#639).
+- Terraform and OpenTofu config values (ADR 0025): `*.tf`, `*.tofu`, `*.tfvars` and
+  `*.auto.tfvars` files are read with `hcl-edit` and `hcl-rs`, and `*.tf.json`, `*.tofu.json`
+  and `*.tfvars.json` through the JSON reader, so `search` with the kind `value` finds a team
+  name in an OpsGenie routing rule or a queue name in Terraform. The key path runs over the
+  block's type and labels and the attribute's name (`resource.aws_sqs_queue.orders.name`), a
+  repeated block `[n]`; a literal keeps its type, and an expression or a template is stored as
+  written under the type `expression` or `template`. A `.tofu` file shadows the `.tf` file of
+  the same name. The `default` of a `variable` with `sensitive = true` and every value a
+  `.tfvars` file gives a variable of that name are stored as `redacted`. A file that does
+  not parse is skipped and counted by `meada status` (#640).
 
 ### Changed
 

@@ -107,6 +107,36 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   functions, a provider function) is unresolved and becomes a wildcard. Adding a function to the
   list is a change to this ADR: it must be pure, total over its inputs and need no file.
 
+### HCL values (#640)
+
+- **Key path.** The grammar above over the block's type and labels and the attribute's name
+  (`resource.aws_sqs_queue.orders.name`). A block repeated under the same type and labels in
+  one body is indexed `[n]` from 0 (`ingress[0].from_port`), as the JSON syntax writes it; a
+  block that is alone has no index. A list or an object with literal keys is read element by
+  element; an object with a key that is no literal is one `expression`.
+- **Type.** A literal keeps `string`, `number` or `boolean` (a null is left out); a heredoc of
+  literals is the string HCL reads from it. Anything else is stored as written (the source
+  text, cut at the value ceiling) under a type of its own until static evaluation resolves it:
+  `expression` (a reference, a call, an operator, a conditional, a `for`), `template` (a string
+  or heredoc with an interpolation or a directive). In `.tf.json` and `.tofu.json` every string
+  is a template: one with an interpolation is stored as the JSON string, quoted, typed
+  `expression` when it is a single interpolation and nothing else and `template` otherwise;
+  a plain one has its `$${` and `%%{` escapes undone, and a variable's `default` is a literal
+  string, as Terraform reads it.
+- **Sensitive.** The `default` of a top-level `variable` with the literal `sensitive = true`
+  (`"sensitive": true` in JSON) is `redacted`, whatever it holds. A `.tfvars`, `*.auto.tfvars`
+  or `*.tfvars.json` file has `redacted` every value it gives a variable whose name any
+  Terraform file of the repository marks sensitive: a var-file can go to a module in any
+  directory, before evaluation says which, and redacting too much is the safe direction. When
+  a Terraform file in the var-file's directory or above is unreadable, the variables it
+  declares are unknown and every value of the var-file is redacted. The stored summary of a
+  `.tfvars` file names what it was read against, and it is read again when that changes.
+- **Shadowing.** A `.tofu` file hides the `.tf` file of the same base name in the same
+  directory, and a `.tofu.json` the `.tf.json`; the hidden file is not read and not counted.
+- **Ceiling.** Brackets (`{`, `[`, `(`) nest at most 64 deep in one file, counted even inside
+  a string; past it the file is unreadable, which `meada status` counts. The value length and
+  the stored budget are the ones above.
+
 ### IaC node
 
 An IaC node is a resource-like block of any format, with an address, a type, a file and a span.

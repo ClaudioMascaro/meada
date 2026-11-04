@@ -9,7 +9,9 @@
   event reader (`document::events::read`: many documents, deep and wide, aliases fanning out and
   nesting one level deeper each, JSON deep and wide and past `serde_json`'s limit), the config
   values a file stores (`config_values::read`: long keys nested deep, many scalars, secrets in
-  many documents), and the walks
+  many documents, and eight rows of Terraform: long labels nested deep, many attributes, many
+  blocks, deep brackets, a long heredoc, a heredoc of interpolations, a long expression, many
+  tfvars), and the walks
   `Maven::entries` and `Nuget::entries` over modules and projects that pass on to each other.
   Each row builds a file within `lang::MAX_BYTES` (many keys, deep nesting, wide fan-out), reads
   it on a thread of its own and answers the size of what came back; the test holds every row to
@@ -17,7 +19,11 @@
 - Test modules of `tests/it/` by subject: `config_values` (#639, the `config-values` fixture:
   Helm values with #638's alert labels, a multi-document Kubernetes file with a `Secret`, a
   workflow under `.github/`, a lockfile, a Helm template that does not parse, a hidden `.vscode/`
-  and a `.meadaignore`d directory; `search` kind `value` against
+  and a `.meadaignore`d directory, and #640's `terraform-values`: a `.tf` file with OpsGenie
+  routing rules and an SQS queue, a `.tf.json` file, a `.tofu` file shadowing a `.tf` one, a
+  `broken.tf`, a sensitive variable given values by `terraform.tfvars` and `envs/prd.tfvars`, and
+  a hidden `.terraform/`, against `terraform-values.search.txt` and `terraform-values.status.txt`,
+  and a `.tf` edit that makes a `.tfvars` value redacted or shown; `search` kind `value` against
   `config-values.search.txt`, `meada status` against `config-values.status.txt`, the default
   search's fallback, and no value in the export nor a secret in the index file; `freshness` edits
   a config file alone, and `oidc` scopes the values by the grant), `decorations` (the `decorations` fixture: Java, Kotlin, C#,

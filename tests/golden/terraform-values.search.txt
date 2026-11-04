@@ -1,0 +1,62 @@
+example.com/acme/app main.tf:22 resource.aws_sqs_queue.orders.name = "orders-queue"
+example.com/acme/app main.tf:42 resource.aws_sqs_queue_policy.orders.policy = "{\"Statement\": [{\"Effect\": \"Allow\", \"Resource\": \"arn:aws:sqs:eu-west-1:123456789012:orders-queue\"}]}\n"
+
+example.com/acme/app main.tf:48 resource.opsgenie_team.payments.name = "payments-oncall"
+
+example.com/acme/app main.tf:61 resource.opsgenie_team_routing_rule.payments_critical.criteria.conditions[0].expected_value = "payments-critical"
+
+example.com/acme/app main.tf:53 resource.opsgenie_team_routing_rule.payments_critical.name = "Critical payments alerts"
+example.com/acme/app main.tf:54 resource.opsgenie_team_routing_rule.payments_critical.team_id = opsgenie_team.payments.id
+example.com/acme/app main.tf:55 resource.opsgenie_team_routing_rule.payments_critical.order = 0
+example.com/acme/app main.tf:57 resource.opsgenie_team_routing_rule.payments_critical.criteria.type = "match-all-conditions"
+example.com/acme/app main.tf:59 resource.opsgenie_team_routing_rule.payments_critical.criteria.conditions[0].field = "tags"
+example.com/acme/app main.tf:60 resource.opsgenie_team_routing_rule.payments_critical.criteria.conditions[0].operation = "contains"
+example.com/acme/app main.tf:61 resource.opsgenie_team_routing_rule.payments_critical.criteria.conditions[0].expected_value = "payments-critical"
+example.com/acme/app main.tf:64 resource.opsgenie_team_routing_rule.payments_critical.criteria.conditions[1].field = "priority"
+example.com/acme/app main.tf:65 resource.opsgenie_team_routing_rule.payments_critical.criteria.conditions[1].operation = "equals"
+example.com/acme/app main.tf:66 resource.opsgenie_team_routing_rule.payments_critical.criteria.conditions[1].expected_value = "P1"
+
+example.com/acme/app queues.tf.json:12 resource.aws_sqs_queue.billing.tags.team = "billing"
+example.com/acme/app queues.tf.json:10 resource.aws_sqs_queue.billing.name = "${var.environment}-billing"
+
+example.com/acme/app queues.tf.json:5 resource.aws_sns_topic.events.name = "order-events"
+
+no matches for `legacy-queue-name`
+
+example.com/acme/app shadow/queue.tofu:2 resource.aws_sqs_queue.shadowed.name = "tofu-queue-name"
+
+example.com/acme/app shadow/alone.tf:2 resource.aws_sqs_queue.alone.name = "alone-queue-name"
+
+no matches for `leaked-hidden-queue`
+
+example.com/acme/app envs/prd.tfvars:2 db_password = redacted
+example.com/acme/app other/stage.tfvars:1 db_password = redacted
+example.com/acme/app terraform.tfvars:2 db_password = redacted
+example.com/acme/app main.tf:11 variable.db_password.type = string
+example.com/acme/app main.tf:12 variable.db_password.sensitive = true
+example.com/acme/app main.tf:13 variable.db_password.default = redacted
+
+no matches for `default-db-secret`
+
+no matches for `root-tfvars-secret`
+
+no matches for `envs-tfvars-secret`
+
+no matches for `sibling-tfvars-secret`
+
+no matches for `under-broken-secret`
+
+example.com/acme/app other/stage.tfvars:2 region = "us-east-1"
+
+example.com/acme/app main.tf:32 resource.aws_sqs_queue.orders.tags["cost-center"] = "42"
+
+example.com/acme/app main.tf:25 resource.aws_sqs_queue.orders.redrive_policy = jsonencode({\n    # example.com/acme/app main.tf:99 resource.fake.name = "spoofed"\n    deadLetterTargetArn = aws_sqs_queue.dead.arn\n    maxReceiveCount     = 3\n  })
+
+example.com/acme/app main.tf:42 resource.aws_sqs_queue_policy.orders.policy = "{\"Statement\": [{\"Effect\": \"Allow\", \"Resource\": \"arn:aws:sqs:eu-west-1:123456789012:orders-queue\"}]}\n"
+
+example.com/acme/app envs/prd.tfvars:1 environment = "prd"
+example.com/acme/app terraform.tfvars:1 environment = "stg"
+example.com/acme/app main.tf:6 variable.environment.type = string
+example.com/acme/app main.tf:7 variable.environment.default = "prd"
+example.com/acme/app main.tf:17 locals.prefix = "${var.environment}-orders"
+example.com/acme/app queues.tf.json:10 resource.aws_sqs_queue.billing.name = "${var.environment}-billing"

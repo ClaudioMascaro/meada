@@ -450,3 +450,23 @@
   Crossplane composition's base), keeps its values (the other secret markers of ADR 0025 belong
   to the IaC formats, #640). The hidden CI paths are read at the repository root only, and only
   their YAML and JSON files.
+  Terraform and OpenTofu (#640, `config_values/hcl.rs`): `NESTING_MAX` (64 brackets open inside
+  each other in one file, counted by a scan that includes the ones inside strings, so a file
+  with many unbalanced brackets in strings can be unreadable; past it the file is unreadable and
+  counted). The parser's own limits (`hcl-edit` 0.10's `MAX_OPERATOR_DEPTH`, 128 chained
+  operators, and `MAX_NESTING_DEPTH`, 64 levels of nested expressions, templates and blocks) make
+  a file past them unreadable, counted by `meada status`; `PARSER_OPERATOR_DEPTH` and `PARSER_NESTING_DEPTH`
+  in `hcl.rs`' tests mirror them, and a test feeds a file at and past each. An `expression` or
+  `template` is shown on one line, its line breaks written `\n` (`config_values::one_line`).
+  The value length and stored budget are the YAML ones. A `.tfvars` value is
+  redacted by variable name across the repository (a sensitive name redacts it in every
+  var-file, whichever module it goes to), and wholly when a Terraform file at or above its
+  directory is unreadable (`config_values::ANY_VARIABLE`); a variable marked sensitive by an
+  expression keeps its values, and `sensitive` is read as the literal `true` of a top-level
+  `variable` (JSON: the object form of `variable`, not the array form). A `//` comment
+  property of a Terraform JSON file is a value, and a block written as an array of one is
+  indexed `[0]` there. A number is stored as
+  written. A block repeated in one body is indexed from its second occurrence on, so adding a
+  second block renames the key path of the first. A `.tf` file a `.tofu` one shadows is neither
+  read nor counted. The old value of a variable made sensitive later stays in SQLite's free
+  pages until they are reused (`secure_delete` is off).
