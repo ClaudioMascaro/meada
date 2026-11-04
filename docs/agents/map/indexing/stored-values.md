@@ -90,8 +90,11 @@ from ...", with the whole list. A value the index now stores joins it.
   each community's name and member identities (`communities`, spec #31), and the paths of the
   files whose values the last contract extraction read (`valued`, #391). `Call::args`,
   `Call::kwargs`, `Call::uses`, `Call::arg_types`, `Def::returns`, `Def::return_values`, `Param::default`,
-  `Field::default`, `Const::value` and `Const::ty` are `serde(skip)`, so unchanged files come
-  back from SQLite without them. An `interface` or `type` declaration is a `Const` too, so its
+  `Field::default`, `Const::value` and `Const::ty` (and `Facts::rebound`, `mutable`, `mentions`,
+  `annotated` and `bound`) serialize only inside `lang::with_values` (`skip_serializing_if =
+  "lean"`), so the index stores and unchanged files come back from SQLite without them; the
+  values cache (`index/values.rs`, ADR 0027) stores them, whole, per `valued` file, beside the
+  index. An `interface` or `type` declaration is a `Const` too, so its
   name is stored (its members are not). `Code` records every file it needs but lacks as a miss, and
   every file of `full` it looks into (`Code::read`); `refresh` re-parses the files the last
   extraction read (`valued`) before its first pass, then the missed ones, and extracts again the

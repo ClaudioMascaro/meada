@@ -29,7 +29,7 @@ mod grant;
 mod http;
 mod index;
 #[doc(hidden)]
-pub use index::{with_busy_timeout, with_reversed_walk};
+pub use index::{value_parses, with_busy_timeout, with_reversed_walk};
 mod items;
 mod jvm;
 mod lang;

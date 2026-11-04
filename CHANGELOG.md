@@ -6,6 +6,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- A refresh reads the values of the files it did not change from a values cache beside the index
+  (`values.db`, ADR 0027) instead of parsing them again: on this repository, a one-line edit of a
+  Rust file refreshes in 1.4 s instead of 3.4 s. The refreshed index still equals a cold one, and
+  deleting the cache costs only time (#611).
+
 ### Fixed
 
 - Authorization: an `added_by` a team operator wrote while no GitHub grant provider was

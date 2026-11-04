@@ -37,6 +37,10 @@ fresh, and how things in it are named.
   met: the ceiling bounds the inflation, and the text lives in a stamped table refreshed with the
   files it comes from, so it is as fresh as any row. Code stays a location only: no source text of
   a symbol, a call or any other code is stored.
+- (Amended 2026-11-04; #611, ADR 0027.) A values cache, `values.db`, sits beside the index in
+  the same directory: per file the values its pack parsed (literals, names and expressions as
+  read, no source of a symbol or a call), keyed by the file's bytes and Meada's build. No query
+  reads it; a refresh reads it instead of parsing an unchanged file again for its values.
 
 ### Freshness
 

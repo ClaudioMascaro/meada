@@ -736,6 +736,58 @@ fn rust_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() 
     );
 }
 
+/// A refresh after a one-line edit reads the values of every unchanged file from the values
+/// cache (ADR 0027), parsing only the edited one, and leaves the index a cold one; deleting the
+/// cache costs only the parses.
+#[test]
+fn a_refresh_over_the_values_cache_parses_only_the_edited_file_and_equals_a_cold_export() {
+    let edit = |repo: &Path| {
+        replace(
+            repo,
+            "crates/worker/src/clients.rs",
+            "verbs/head",
+            "verbs/heads",
+        )
+    };
+    let again = |repo: &Path| {
+        edit(repo);
+        replace(
+            repo,
+            "crates/worker/src/urls.rs",
+            "/fmt/inline",
+            "/fmt/inlined",
+        );
+    };
+    let repo = fixture_repo("fresh_values", "conformance-rust", ORIGIN);
+    age(&repo);
+    let started = meada::value_parses();
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    let cold = meada::value_parses() - started;
+    let cache = repo.join(".meada/values.db");
+    assert!(cold > 1 && cache.exists(), "{cold} parsed for values");
+
+    edit(&repo);
+    let started = meada::value_parses();
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+    assert_eq!(meada::value_parses() - started, 1);
+    assert_ne!(refreshed, before);
+    let expected = cold_export("fresh_values_cold", "conformance-rust", ORIGIN, edit);
+    assert_eq!(refreshed, expected);
+
+    fs::remove_file(&cache).unwrap();
+    replace(
+        &repo,
+        "crates/worker/src/urls.rs",
+        "/fmt/inline",
+        "/fmt/inlined",
+    );
+    let started = meada::value_parses();
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+    assert_eq!(meada::value_parses() - started, cold);
+    let expected = cold_export("fresh_values_again", "conformance-rust", ORIGIN, again);
+    assert_eq!(refreshed, expected);
+}
+
 /// Renames a function of a multi-file package that the package's other files call, adds a file
 /// to the package that defines a name another file calls, adds one the build constraints leave
 /// out, deletes a file of another package, and replaces `go.mod`'s `replace` target.

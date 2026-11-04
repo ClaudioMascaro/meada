@@ -42,7 +42,10 @@
   `Found::shape`s of a side reached several ways merged, as JSON in `contracts.shape`, which `export` loads into `Provider::shape` and
   `Consumer::shape`). The extraction reads values the index does not keep, so it parses again
   the files whose values the last extraction read (the `valued` table, `Code::read`) before its
-  first pass, then each file a kind misses (`Code::misses`) until none does; a pack that missed
+  first pass, each through the values cache (`index/values.rs`, `values.db` beside the index, ADR
+  0027): an entry keyed by the file's bytes, setting, pack and Meada's build gives back what the
+  parse would, so of an unchanged file nothing is parsed, and each extraction writes what it
+  parsed and drops the entries of the files no longer in `valued`; then each file a kind misses (`Code::misses`) until none does; a pack that missed
   nothing in a pass is done and is not extracted again (#391). A group of packs that resolve
   together (`lang::resolver_of`) none of whose files was changed, deleted or stamped by a join is
   kept when `meta.configs` (which folds Meada's version in), the member files and the stored

@@ -16,6 +16,13 @@ What Meada builds for one repository: its symbols, calls and contracts, with no 
 code. Of config and IaC files it keeps the scalars, as config values (ADR 0025).
 _Avoid_: database, cache
 
+**Values cache**:
+The file beside a repository's index (`values.db`) that holds, per file a contract extraction
+reads the values of, what its language pack parsed, values included, keyed by the file's bytes,
+setting and pack and by Meada's build (ADR 0027). A refresh reads it instead of parsing an unchanged file again. No
+query reads it, and deleting it costs only time.
+_Avoid_: index (it is not one), values table
+
 **Partial export**:
 What `search`, `context` and `trace` read of the indexes: every contract row, and of the symbols
 and calls only those of the answer. `meada export` reads the whole index instead; both answer

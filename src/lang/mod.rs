@@ -362,6 +362,44 @@ pub fn hash_spans(facts: &mut Facts, src: &[u8]) {
     }
 }
 
+thread_local! {
+    static VALUES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether a value of `Facts` the index does not keep (see `Call::args`) is left out of a
+/// serialization: always, but inside `with_values`.
+fn lean<T>(_: &T) -> bool {
+    !VALUES.get()
+}
+
+/// Runs `f` with `Facts` serializing their values too, for the values cache (ADR 0027): what
+/// `LanguagePack::parse_with` gives, whole. What `LanguagePack::join` sets stays out.
+pub fn with_values<T>(f: impl FnOnce() -> T) -> T {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            VALUES.set(self.0);
+        }
+    }
+    let _restore = Restore(VALUES.replace(true));
+    f()
+}
+
+/// `Part::Read::scope` as a plain string: each read deserialized holds its own copy.
+mod as_str {
+    use std::sync::Arc;
+
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(scope: &Arc<str>, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(scope)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Arc<str>, D::Error> {
+        Ok(Arc::from(String::deserialize(d)?))
+    }
+}
+
 pub fn pack(index: usize) -> &'static dyn LanguagePack {
     PACKS[index]
 }
@@ -399,13 +437,13 @@ pub struct Facts {
     /// The scope and value of each `let` whose name is bound again in its scope or assigned
     /// again (Rust): no constant, since the name holds no one value, but a value that flows
     /// somewhere unread. Not kept in the index (see `Call::args`).
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub rebound: Vec<(String, Value)>,
     /// The qualified name and value of each `let mut` of a plain name that nothing else binds
     /// or assigns (Rust). It is no constant, since a method may change what it holds (a
     /// `String` is pushed to), but an object it holds is still the one its call made: the flow
     /// of a client reads it (`Code::mutable`). Not kept in the index (see `Call::args`).
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub mutable: HashMap<String, Value>,
     /// Every other name a binding makes, qualified like `Const::name` by the definition whose
     /// body or parameters hold it (a function that is no definition lends its names to the
@@ -453,7 +491,7 @@ pub struct Facts {
     /// names it defines and the route attributes it carries (Rust): `None` where the pack does
     /// not tell, or the file writes more than the pack reads. A name no file mentions is
     /// registered by no code. Not kept in the index (see `Call::args`).
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub mentions: Option<BTreeSet<String>>,
     /// The `exports` names only the package itself sees (Rust's items that are not `pub`):
     /// they resolve for the package's own files but are not in the exports table.
@@ -502,7 +540,7 @@ pub struct Facts {
     /// The annotations written on fields and parameters (Java's `@Value("${key}") String base`),
     /// which no definition carries: contract kinds read what they inject (`Code::expand_with`).
     /// Not kept in the index (see `Call::args`).
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub annotated: Vec<Annotated>,
     /// The value each Kotlin, Java, C# or Swift local, or the parameter of a tracked lambda, was
     /// given, where no constant records it: the call a `val` (a Swift `let`) holds, the receiver
@@ -510,7 +548,7 @@ pub struct Facts {
     /// creation or call a field or a local is initialized with, and a member written through a
     /// name (`c.BaseAddress = v`, named `c.BaseAddress`). Not kept in
     /// the index (see `Call::args`).
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub bound: Vec<Bound>,
     /// What the file gives every file of its project, in the pack's spelling, which
     /// `LanguagePack::join` applies to each: C#'s `global using` directives (`A.B`, `static
@@ -590,6 +628,7 @@ pub fn extra(setting: &str) -> &str {
 }
 
 /// The value a name bound in `scope` holds, written in `within` (`Facts::bound`).
+#[derive(Serialize, Deserialize)]
 pub struct Bound {
     pub scope: String,
     pub within: String,
@@ -608,13 +647,14 @@ pub struct Through {
 
 /// An annotation written on a field or a parameter: the binding it marks and the annotation as
 /// a call (`callee` its name, `args` and `kwargs` its arguments, `scope` the class around it).
+#[derive(Serialize, Deserialize)]
 pub struct Annotated {
     pub on: Marked,
     pub annotation: Call,
 }
 
 /// What an annotation marks (`Annotated`).
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Marked {
     /// The field `name` of the class `class` (`Def::name`), `static` or not: the kind decides
     /// what each takes.
@@ -837,17 +877,17 @@ pub struct Def {
     pub decorators: Vec<String>,
     /// What a function returns, one value per `return`. Not kept in the index (see
     /// `Call::args`).
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub return_values: Vec<Value>,
     /// The string a function returns when that is all its body does (an arrow function's
     /// expression body, or one lone `return`): a call to it folds to this string, its parameters
     /// replaced by the call's arguments (`Code::eval`). Not kept in the index (see `Call::args`).
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub lone_string: Option<Value>,
     /// A function's declared return type, inside the `Promise` and `NextResponse` it is wrapped
     /// in (`Promise<z.infer<typeof S>>` gives that schema), when it lists any fields. Not kept in
     /// the index (see `Call::args`).
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub returns: Option<Ty>,
     /// The names of a function's or type's type parameters in order (`get<T>`). Kept in the
     /// index: Swift's join reads them from every file of its pack, kept or parsed.
@@ -909,7 +949,7 @@ pub struct Param {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     /// The default value, as written. Not kept in the index (see `Call::args`).
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub default: Option<Value>,
     /// The names an object pattern binds, in order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -975,7 +1015,7 @@ pub struct Field {
     /// The property of the argument it reads.
     pub key: String,
     /// The default value, as written. Not kept in the index.
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub default: Option<Value>,
 }
 
@@ -984,17 +1024,17 @@ pub struct Field {
 pub struct Const {
     pub name: String,
     /// Not kept in the index (see `Call::args`).
-    #[serde(skip, default = "unknown")]
+    #[serde(default = "unknown", skip_serializing_if = "lean")]
     pub value: Value,
     /// The type the constant is declared to have, by an annotation or a cast (spec #23), when
     /// it lists fields: the value as written may lack what the type has, an index signature.
     /// Not kept in the index, like `value`.
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub ty: Option<Ty>,
     /// The scope `value` is written in when it is not the constant's own (`scope_of(name)`):
     /// a Java `final` field one constructor assigns holds a value written in that constructor.
     /// Not kept in the index, like `value`.
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub scope: Option<String>,
 }
 
@@ -1045,10 +1085,10 @@ pub struct Call {
     /// The arguments, as far as the call's own syntax tells: what contract kinds read URLs
     /// and options from. Not kept in the index: they hold string literals, so the index
     /// parses a file again when a contract needs them.
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub args: Vec<Value>,
     /// The keyword arguments, as written, after the positional ones. Not kept in the index.
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub kwargs: Vec<(String, Value)>,
     /// The qualified name of the definition a decorator call applies to: `@app.get("/")`
     /// written on `def index()` decorates `index`.
@@ -1081,17 +1121,17 @@ pub struct Call {
     /// The value a method is called on (`Router::new()` in `Router::new().route(..)`), when
     /// the pack gives it; a pack whose `fluent` is true has it followed. Not kept in the
     /// index, like `args`.
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub receiver: Option<Value>,
     /// The type each argument is cast to (`body as Reply`), by position, when it lists fields
     /// (spec #23). Not kept in the index, like `args`.
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub arg_types: Vec<Option<Ty>>,
     /// Shape facts (spec #23), an optional part of a pack's output: what the function making
     /// the call does with its result, one chain of steps per use, such as `res.json()` then
     /// `.items`, `[0]` and `.id`. A pack that leaves it empty gives its consumers no shape.
     /// Not kept in the index, like `args`.
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "lean")]
     pub uses: Vec<Vec<Step>>,
 }
 
@@ -1105,7 +1145,7 @@ impl Call {
 /// One step of what code does with a value (spec #23): the value read through a chain of
 /// member and element accesses and method calls, then maybe returned. A chain ends where the
 /// pack cannot follow the value (passed to a function, stored, rebound).
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Step {
     /// `.name`, `?.name` or `["name"]`.
     Field(String),
@@ -1141,7 +1181,7 @@ pub(crate) const MAX_BYTES: usize = 1 << 20;
 
 /// A type as written (spec #23), as far as drift reads it: the fields it lists. A form that
 /// lists none is `Unknown`.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Ty {
     /// `{ a: A; b?: B }`, or an interface body. `open` when it has an index signature.
     Object { members: Vec<Member>, open: bool },
@@ -1175,7 +1215,7 @@ impl Ty {
 }
 
 /// A property of an object type.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Member {
     pub name: String,
     pub optional: bool,
@@ -1185,7 +1225,7 @@ pub struct Member {
 /// An expression as written. The pack does not follow names: the shared side folds
 /// `Ref`s into the constants and arguments they name (`resolve`), and after that only
 /// parameters whose arguments are not known remain as `Ref`s.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum Value {
     /// A string: literals, template literals and `+` concatenation, folded into parts.
     Str(Vec<Part>),
@@ -1234,7 +1274,7 @@ pub enum Value {
 /// `z.object(..)`, the call before `.optional()` in `z.string().optional()`), left out when
 /// the callee is no member. `range` is the range of that call among the file's calls, which
 /// the shared side resolves to follow the value it returns.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Invocation {
     pub callee: String,
     pub receiver: Option<Box<Value>>,
@@ -1283,7 +1323,7 @@ pub fn literal(parts: &[Part]) -> Option<String> {
         .collect()
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub enum Part {
     Text(String),
     /// A name inside a string, folded like `Value::Ref`.
@@ -1304,6 +1344,7 @@ pub enum Part {
     /// knows the library decides what it is (`Env`, `EnvOr` or `Hole`). Only the C# pack writes
     /// it.
     Read {
+        #[serde(with = "as_str")]
         scope: std::sync::Arc<str>,
         callee: String,
         key: String,

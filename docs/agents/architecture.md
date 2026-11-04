@@ -79,7 +79,7 @@ for the area a change touches.
 - `workspace.rs`: the workspace (`Workspace::discover`: repositories, peers, sibling clones) and server mode's workspace manifest (`Manifest`). [indexing](map/indexing.md)
 - `config.rs`: `meada.toml` (`[[peer]]`, `[serve]`, `[[resource]]`) and the shared TOML reader. [indexing](map/indexing.md)
 - `repo.rs`: repository root and identity, read through `git`. [indexing](map/indexing.md)
-- `index.rs`: the SQLite index: schema, the freshness pipeline (`refresh`) and `export`. [indexing](map/indexing.md)
+- `index.rs`: the SQLite index: schema, the freshness pipeline (`refresh`) and `export`; `index/values.rs`, the values cache beside it (ADR 0027). [indexing](map/indexing.md)
 - `lang/`: the language adapter and the TS/JS, Python, Rust, Go, Java, Kotlin, C# and Swift packs. [indexing](map/indexing.md)
 - `resolve.rs`: the shared resolution: calls to definitions (`Resolver`), values and receivers (`Code`). [indexing](map/indexing.md)
 - `community.rs`: the deterministic Leiden behind communities (spec #31). [indexing](map/indexing.md)
@@ -365,7 +365,7 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   charges its per-file limit to a `shape::Budget`, and an extraction holds one reader of each
   source (`Literals` holds its `Types`, which hold their `Zod`), so each limit is spent once per
   file. What a pack reads from code
-  for it is a shape fact: an optional part of the pack's output, `serde(skip)` like
+  for it is a shape fact: an optional part of the pack's output, kept out of the index like
   `Call::args` and read through `Code` (`Code::uses`), so a pack without it is unchanged. The
   TS/JS pack's are in `lang/ts/uses.rs` (`Call::uses`, the `Step`s the enclosing function
   applies to a call's result). The kind turns them into a `Found::shape`, stored as
@@ -454,7 +454,9 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   declares or imports, summaries of manifests, build files and provider documents, the field
   paths of shapes, entry points and communities. A value the index now stores joins that list. A
   contract kind that reads a value from a new place relies on the loop of misses (`Code::read`,
-  `valued`) that `refresh` runs until none is left.
+  `valued`) that `refresh` runs until none is left. The values cache beside the index
+  (`values.db`, ADR 0027) gives back what a pack parsed of a file, values included, by the file's
+  bytes, setting, pack and Meada's build: no query reads it, and a hit is what a parse gives.
 - Links are never stored. They derive from the stored provider and consumer contracts, then the
   decisions replay, when a query runs, so a change on either side, or to a decisions file, needs
   no relinking. `Level` order: `exact` < `declared` < `inferred` < `decided` < `ambiguous`.

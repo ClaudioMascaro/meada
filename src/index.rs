@@ -28,6 +28,8 @@ use crate::shape::{Shape, Want};
 pub(crate) use meada_core::export as written;
 pub(crate) use meada_core::export::{Binding, CallSite, File, Process, Publish, Span, Symbol};
 
+mod values;
+
 /// The stored format's version, derived from its golden (`tests/golden/schema.txt`, kept by the
 /// unit test `the_stored_format_matches_its_golden`): re-blessing it after a change to `SCHEMA`,
 /// to the facts a pack stores or to a document's or a manifest's stored `summary` changes the
@@ -91,7 +93,8 @@ pub(crate) fn schema_version() -> i32 {
 /// (`route`, `export`, `channel` or `program`), the `label` that names its process and the `site` the process starts
 /// from; rewritten with the contracts. `valued` lists the files whose values (`Facts` as parsed,
 /// which the index does not keep) the last contract extraction read (`resolve::Code::read`): a
-/// refresh parses them again before it extracts, so one pass usually reads all it needs.
+/// refresh reads them back from the values cache beside the index (ADR 0027), or parses them
+/// again, before it extracts, so one pass usually reads all it needs.
 const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -585,7 +588,8 @@ pub struct Indexed<'a> {
 /// file's exports, re-export chains, name inference, config changes and inline route
 /// handlers renamed by a mount elsewhere alike. Contracts are extracted again for the whole of
 /// such a group, since constants and client wrappers reach across its files, over the values of
-/// the files the last extraction read (`valued`), parsed again up front. Deleted files leave
+/// the files the last extraction read (`valued`), read up front from the values cache, which
+/// gives back what a parse of an unchanged file would, or parsed again. Deleted files leave
 /// the index. The result equals a refresh of an empty index over the same files. Stored facts
 /// that do not parse (a change whose golden was not re-blessed) rebuild the index.
 ///
@@ -907,18 +911,31 @@ fn refresh_keeping(
     };
 
     // Contracts, from every file of the groups not kept. Values are not kept in the index, so
-    // the files whose values a kind reads are parsed again: up front those the last extraction
-    // read (`valued`), then those a kind misses, until no kind misses one. A kind only looks
+    // the files whose values a kind reads are read from the values cache or parsed again: up
+    // front those the last extraction read (`valued`), then those a kind misses, until no kind
+    // misses one. A kind only looks
     // files up, so a file parsed for nothing changes no contract.
     // ponytail: a group holding a changed file is extracted whole, since a kind reads the whole
     // pack at once (mounts across files, budgets spent in walk order); narrowing it per file
     // needs each kind to say what its contracts read (#391).
+    let cache = values::Values::beside(db);
     let reparse = |path: &str| -> Result<Facts> {
         let src = fs::read(root.join(path))?;
         let pack = packs[path];
         let setting = parsed_under.get(path).cloned();
         let setting = setting.unwrap_or_else(|| settings[&pack](path));
-        let mut facts = lang::pack(pack).parse_with(path, &src, &setting)?;
+        let key = values::key(pack, &setting, &src);
+        // ponytail: a changed file is parsed here a second time, its first parse being under a
+        // setting `settle` may still change; only the changed files of a refresh pay it.
+        let mut facts = match cache.get(path, &key) {
+            Some(facts) => facts,
+            None => {
+                VALUE_PARSES.set(VALUE_PARSES.get() + 1);
+                let facts = lang::pack(pack).parse_with(path, &src, &setting)?;
+                cache.put(path, key, &facts);
+                facts
+            }
+        };
         if let Some(join) = joins.get(&pack) {
             join(path, &mut facts);
         }
@@ -994,6 +1011,7 @@ fn refresh_keeping(
             tx.execute("INSERT INTO valued VALUES (?1)", params![path])?;
         }
     }
+    cache.keep(&read);
     // The values are not needed past the extraction.
     drop(reparsed);
     let unknown = kept_files.iter().map(|p| p.to_string()).collect();
@@ -1695,6 +1713,15 @@ fn stat(abs: &Path, now: SystemTime) -> Result<(i64, Option<i64>, bool)> {
 
 thread_local! {
     static REVERSED_WALK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The files this thread's refreshes parsed for their values, past the values cache.
+    static VALUE_PARSES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// How many files this thread's refreshes have parsed for their values (`valued`), past the
+/// values cache (ADR 0027). Test-only: no command, option or setting reads it.
+#[doc(hidden)]
+pub fn value_parses() -> usize {
+    VALUE_PARSES.get()
 }
 
 /// Runs `f` with this thread's indexing in reverse order (determinism test, spec #31): the
