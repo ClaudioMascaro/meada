@@ -76,6 +76,8 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A query no longer reopens each peer's index: the engine refreshes and reads the connection it
+  holds, so a peer is never refreshed in one file and read from another (#443).
 - GitHub App: a 403 `Resource not accessible by integration` with quota left (no `retry-after`,
   `x-ratelimit-remaining` above 0) is a permission failure, not a throttle: `github-app roles`
   records the repository as `forbidden` (no rows, a warning) and the installation stays eligible

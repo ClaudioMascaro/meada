@@ -183,9 +183,10 @@ impl Engine {
         if self.read_only {
             return Ok(());
         }
-        for peer in &self.workspace.repos[1..] {
-            let db = index::open(&peer.index, &peer.root, &peer.identity, &peer.config.serve)?;
-            index::refresh(&db, &peer.root, &peer.identity, &peer.config.serve)?;
+        // The peers' connections stay open for the session (#443): `exports` reads the same
+        // handles, so a peer is never refreshed in one file and read from another.
+        for (peer, db) in self.workspace.repos[1..].iter().zip(&self.dbs[1..]) {
+            index::refresh(db, &peer.root, &peer.identity, &peer.config.serve)?;
         }
         let here = &self.workspace.repos[0];
         index::refresh(&self.dbs[0], &self.root, &self.identity, &here.config.serve)
@@ -947,10 +948,7 @@ impl Engine {
         let text = span_text(&repo.root, &exports[n], symbol_found);
         if text.is_none() && retry {
             // The file changed without its mtime or size showing it: hash it again.
-            index::forget(
-                &index::open(&repo.index, &repo.root, &repo.identity, &repo.config.serve)?,
-                &symbol_found.span.path,
-            )?;
+            index::forget(&self.dbs[n], &symbol_found.span.path)?;
             self.refresh()?;
             return self.context_fresh(symbol, budget, false);
         }

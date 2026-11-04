@@ -7,6 +7,12 @@ a ticket accepted, each with its value and its reason. Detail behind the
 
 ## Known ceilings
 
+- `engine.rs` (`Engine::refresh`, #443): the peers' connections are opened once, with the engine, and
+  every query refreshes and reads through them. A peer whose index schema changes while the
+  process runs (another Meada version rebuilding it) is not rebuilt mid-session: the engine keeps
+  the file it opened, and the rebuilt one is read from the next process start. Reopening a peer per
+  query is what #443 removed (it split the refresh from the read); a mid-session reopen would
+  have to swap the handle `exports` reads, and the ticket left it out.
 - `http.rs` (`is_test_file`, `drop_test_providers`, #620): a route is a test's by where its
   handler is defined, so a test registering a handler of the repository's own code
   (`mux.HandleFunc("GET /orders", realHandler)` in a `_test.go`) leaves it a provider; and only the
