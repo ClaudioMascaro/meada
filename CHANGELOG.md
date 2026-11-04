@@ -8,6 +8,8 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A YAML document whose anchors and aliases expand past the nesting limit (128 levels) is
+  reported unreadable and skipped, where it could abort meada (#646).
 - Authorization: an `added_by` a team operator wrote while no GitHub grant provider was
   configured no longer decides eligibility once `[oidc.github]` is enabled. Under the provider the
   console stamps each `added_by` it writes with `added_by_time` (its own clock, never the
