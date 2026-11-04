@@ -935,8 +935,8 @@ pub enum Closure {
     Unknown,
     /// Written as this name, which `LanguagePack::join` reads among the repository's aliases of
     /// a function type (Swift's `typealias Handler = (Int) -> Void`): `Takes` when one is so
-    /// named, `Refuses` for a type the repository declares or a standard value type, else `Unknown`. The
-    /// resolver reads one left as `Takes`.
+    /// named, `Refuses` for a type the repository declares or a standard value type, else
+    /// `Unknown`. The resolver reads one left as `Takes`.
     Named(String),
 }
 

@@ -899,7 +899,8 @@ fn assignment(node: Node, src: &[u8], up: &Parents) -> Option<Assigned> {
     }
     let (name, method, exported) = match names.as_slice() {
         ["module", "exports"] => ("default".to_string(), false, true),
-        // The symbol is `exports.y`, not `y`: Node binds no local `y`, so a bare `y()` must not reach it.
+        // The symbol is `exports.y`, not `y`: Node binds no local `y`, so a bare `y()` must not
+        // reach it.
         ["exports", y] | ["module", "exports", y] => (format!("exports.{y}"), false, true),
         ["exports" | "module", ..] => return None,
         [.., "prototype"] => return None,

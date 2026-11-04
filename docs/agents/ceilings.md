@@ -23,6 +23,16 @@ a ticket accepted, each with its value and its reason. Detail behind the
   source set), so `Foo()` of an `internal` class of another module can still resolve. A class
   with a `private` primary and public secondary constructors keeps the secondaries as
   candidates.
+  A call `C(..)` from outside that Kotlin answers with the companion's `operator fun invoke`
+  (turbine's `TurbineAssertionError`, whose primary is `private`) resolves to nothing, not to
+  `Companion.invoke`: the resolver reads no `invoke` operator.
+- Rust globs: a name two `use m::*;` globs give is `ambiguous` between them (#439). Meada does not
+  evaluate `cfg`, so `#[cfg(a)] use x::*; #[cfg(not(a))] use y::*;` reads as two globs and the
+  call stays `ambiguous` though only one compiles.
+- `lang/ts.rs` (#457): a call to `send` inside `exports.send = function () {}` resolves to
+  `exports.send` itself, not to a top-level `function send`: the resolver's scope walk reads the
+  symbol `exports.send` as `send` in the scope `exports`, as it does `use()` inside
+  `app.use = function use() {}`.
 - `names.rs`, `http/csharp.rs`, `channel/java.rs` (#466): two cases are not pinned.
   (1) #358: a Rabbit `convertAndSend("orders", o)` whose `o` is a parameter of a type the
   repository does not declare (`void f(Order o)`) reads as the named producer `amqp orders
@@ -227,9 +237,9 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   seen from another file (its extensions included), an outside alias of a function type
   (`Ext.Handler`: a parameter written as an outside name is `Closure::Unknown`, so a call that
   fits an overload only through its trailing closure is `inferred` or `ambiguous`, never `exact`,
-  #456; a name the repository declares as a type or a standard value type, `VALUE_TYPES`, refuses it, and
-  a `typealias` of a type of the repository is read as an outside name),
-  and the protocols a conformed protocol inherits when the conformance is
+  #456; a name the repository declares as a type or a standard value type, `VALUE_TYPES`,
+  refuses it, and a `typealias` of a type of the repository is read as an outside name), and the
+  protocols a conformed protocol inherits when the conformance is
   written on an extension. As in Java, an outside base the pack does not list among its known outside members (`NSObject`, `View`) keeps a type's own
   overloads from `exact`, and a listed one (`Codable`, a raw value type) the names it declares.
 - `http/swift/client.rs`: `CLIENT_DEPTH` (8) bounds the locals, properties and constants followed
@@ -1777,14 +1787,6 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   what the modules of its repository it depends on pass on up to `MODULE_DEPTH` (32) modules
   deep (`package/maven.rs`); a module's parent pom adds nothing to what it passes on, and a
   Gradle dependency passes nothing on.
-
-- Rust globs: a name two `use m::*;` globs give is `ambiguous` between them (#439). Meada does not
-  evaluate `cfg`, so `#[cfg(a)] use x::*; #[cfg(not(a))] use y::*;` reads as two globs and the
-  call stays `ambiguous` though only one compiles.
-
-- A call to `send` inside `exports.send = function () {}` resolves to `exports.send` itself, not to
-  a top-level `function send`: the resolver's scope walk reads the symbol `exports.send` as `send`
-  in the scope `exports`, as it does `use()` inside `app.use = function use() {}` (#457).
 
 - A Go struct field tagged `env:"X"` or `envconfig:"X"` reads `X` only when its struct is declared
   in the same file as the read, and a selector matches it by its field path (`cfg.API.URL` is
