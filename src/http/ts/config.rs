@@ -10,7 +10,8 @@
 //! that starts with `/api/proxy/<ep>` (the proxy plugin's mount, also what `getBaseUrl('proxy')`
 //! folds to) is a call to that target: a `${VAR}` target is the variable `VAR`, an `http(s)://`
 //! target is that host (with its path), and the rest of the URL follows it. Any other target
-//! (a template around the variable, a default, no `http`) leaves the URL as written and the call
+//! (a template around the variable, a default, no `http`), and an endpoint with a `pathRewrite`
+//! (the path after it would not be the target's), leave the URL as written and the call
 //! unlinked, and `meada status` says so.
 // ponytail: every `app-config*.yaml` of the repository serves every file of it, whatever the
 // directory, and profiles are not merged: the first file holding the key wins. Scope the lookup
@@ -118,7 +119,15 @@ impl<'i> Config<'i> {
                     if !name.starts_with('/') || name.contains('|') {
                         return None;
                     }
-                    Some((name.to_string(), target(value)))
+                    // The proxy rewrites the path after the endpoint, which Meada does not follow.
+                    let rewrites = format!("proxy.endpoints.{name}.pathRewrite");
+                    let rewritten = self.keys().keys().any(|k| k.starts_with(&rewrites));
+                    let target = if rewritten {
+                        Target::Unread
+                    } else {
+                        target(value)
+                    };
+                    Some((name.to_string(), target))
                 })
                 .collect();
             out.sort_by_key(|(name, _)| std::cmp::Reverse(name.len()));

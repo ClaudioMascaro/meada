@@ -486,10 +486,11 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
         .collect();
     consumers.sort();
     let inventory = Some("env:INVENTORY_URL through proxy endpoint /inventory");
-    let unread = Some(
-        "client:Backstage proxy endpoint /legacy (its target is neither ${VAR} nor an http(s) URL)",
-    );
-    let expected = [
+    let said =
+        " (its target is not read: neither ${VAR} nor an http(s) URL, or it has a pathRewrite)";
+    let legacy = format!("client:Backstage proxy endpoint /legacy{said}");
+    let rewritten = format!("client:Backstage proxy endpoint /rewritten{said}");
+    let mut expected = [
         // `/inventoryx` is no `/inventory`.
         (
             "otherEndpoint",
@@ -507,14 +508,24 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
         (
             "viaUnreadAgain",
             "http::GET::/api/proxy/legacy/clusters",
-            unread,
+            Some(legacy.as_str()),
         ),
         (
             "viaUnreadTarget",
             "http::GET::/api/proxy/legacy/clusters",
-            unread,
+            Some(legacy.as_str()),
         ),
+        // A `pathRewrite` changes the path the target sees, which Meada does not follow.
+        (
+            "viaRewrite",
+            "http::GET::/api/proxy/rewritten/clusters",
+            Some(rewritten.as_str()),
+        ),
+        // A part Meada cannot read in the endpoint, or right after it, names no endpoint.
+        ("holeAfterEndpoint", "http::GET::/api/proxy/{}", None),
+        ("holeInEndpoint", "http::GET::/api/proxy/{}/clusters", None),
     ];
+    expected.sort();
     assert_eq!(consumers, expected.map(|(f, c, v)| (f.to_string(), c, v)));
 
     // The two calls of the issue and the template link to the peer; the unread target links
@@ -567,7 +578,8 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
     assert_eq!(
         said,
         [
-            "  Backstage proxy endpoint /legacy: its target is neither ${VAR} nor an http(s) URL, so 2 call(s) through it stay unlinked"
+            "  Backstage proxy endpoint /legacy: its target is not read (neither ${VAR} nor an http(s) URL, or it has a pathRewrite), so 2 call(s) through it stay unlinked",
+            "  Backstage proxy endpoint /rewritten: its target is not read (neither ${VAR} nor an http(s) URL, or it has a pathRewrite), so 1 call(s) through it stay unlinked"
         ],
         "{status}"
     );

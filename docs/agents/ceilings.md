@@ -1804,8 +1804,8 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   a literal `http(s)://` URL is the host (a trailing `/` dropped, its path kept); any other
   target (`${VAR}/v2`, `${VAR:-default}`, a URL with a placeholder) leaves the URL as written, with a
   `client:` `via` the link's reason shows, and `meada status` names the endpoint and its calls.
-  The proxy's per-endpoint options (`pathRewrite`, `allowedMethods`) are not read, so the path
-  after the endpoint is taken unchanged; only a consumer in the repository holding the
+  An endpoint with a `pathRewrite` key is treated like an unread target (the path after it would
+  not be the target's); the other options (`allowedMethods`, headers) are not read. Only a consumer in the repository holding the
   `app-config` is rewritten (#616).
 - Backstage configuration reads (#617, `CONFIG_READS` in `lang/ts.rs`, read by `http/ts/config.rs`): `config.getString('a.b')`
   and `getOptionalString('a.b')` with a literal key are read from the `app-config*.yaml` files of

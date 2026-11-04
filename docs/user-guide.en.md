@@ -1056,7 +1056,7 @@ the repository: a URL that starts with `/api/proxy/<endpoint>` (also the one wri
 rest of the URL follows the target. A `target` that is exactly `${VAR}` links through the peer's
 `base_url_env`, and the reason names the variable and the endpoint; a `target` that is a literal
 `http://` or `https://` URL counts as the host (with its path). Any other `target` (text around
-the variable, a default value) leaves the call unlinked, and `meada status` names the endpoint and
+the variable, a default value), or an endpoint with a `pathRewrite`, leaves the call unlinked, and `meada status` names the endpoint and
 how many calls go through it.
 
 **Environment.** `process.env.X`, `process.env["X"]` and `import.meta.env.X`, alone or passing

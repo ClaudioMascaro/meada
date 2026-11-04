@@ -4,5 +4,9 @@ proxy:
       target: ${INVENTORY_URL}
     '/stock':
       target: https://stock.example.com/
+    '/rewritten':
+      target: https://stock.example.com
+      pathRewrite:
+        '^/api/proxy/rewritten': '/v1'
     '/legacy':
       target: ${LEGACY_URL}/v2

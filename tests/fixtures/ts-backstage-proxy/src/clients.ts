@@ -29,3 +29,15 @@ export async function viaUnreadAgain(discovery: DiscoveryApi) {
 export async function otherEndpoint() {
   return fetch('/api/proxy/inventoryx/clusters');
 }
+
+export async function viaRewrite() {
+  return fetch('/api/proxy/rewritten/clusters');
+}
+
+export async function holeInEndpoint(endpoint: string) {
+  return fetch(`/api/proxy/${endpoint}/clusters`);
+}
+
+export async function holeAfterEndpoint(id: string) {
+  return fetch(`/api/proxy/inventory${id}`);
+}
