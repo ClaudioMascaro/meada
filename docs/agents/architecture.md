@@ -450,7 +450,7 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   cannot tell.
 - The index holds no source text and no values, apart from the BLAKE3 of each symbol's span
   (`symbols.hash`, `Def::hash`) and the facts listed under "Stored values" in
-  [map/indexing.md](map/indexing.md#stored-values): argument counts and labels, names a file
+  [map/indexing/stored-values.md](map/indexing/stored-values.md): argument counts and labels, names a file
   declares or imports, summaries of manifests, build files and provider documents, the field
   paths of shapes, entry points and communities. A value the index now stores joins that list. A
   contract kind that reads a value from a new place relies on the loop of misses (`Code::read`,
@@ -492,12 +492,46 @@ the rendered configuration.
   (`chain-{web,gateway,catalog,worker}.export.json`), the conformance export and the
   `*.processes.json` goldens carry them (spec #31), so a change to the process walk re-blesses
   those alone.
-- Test files by subject, the fixtures each uses and the loopback decider stub: [map/tests.md](map/tests.md).
+- Test files by subject, the fixtures each uses and the loopback decider stub: [map/tests.md](map/tests.md),
+  split into parts (below).
 - A new behavior gets a fixture repo plus a golden; reuse a fixture before adding one. Fixture
   `meada.toml` files declare the peers and `serve.hosts`.
 
+## Split area files
+
+Every Markdown file under `docs/agents` stays within its byte budget (`MAP_BUDGET` for this map,
+`AREA_BUDGET` for the rest, both 64 KiB; `tests/it/docs.rs` checks it). A file past it is split by
+its `## ` headings with `cargo run --example split_agents -- <file>` in the same change, never
+trimmed by dropping entries: the file keeps its introduction and one line per part, and each part
+is a file of its own in a directory named after it. Three are split so far:
+
+- [map/tests.md](map/tests.md): [harness](map/tests/test-crates-harness-and-fixtures.md),
+  [test modules by subject](map/tests/test-modules-by-subject.md),
+  [package, channel and gateway fixtures](map/tests/package-channel-and-gateway-fixtures.md),
+  [workspace editor and shared validation](map/tests/workspace-editor-and-shared-validation-310.md),
+  [Java declarative clients](map/tests/java-declarative-clients-90.md),
+  [Java conformance](map/tests/java-conformance-84.md) and the named workspaces parts
+  ([creation to query](map/tests/named-workspaces-creation-to-query-342.md),
+  [versions and overlap](map/tests/named-workspaces-versions-and-overlap-343.md),
+  [context configuration](map/tests/named-workspaces-context-configuration-344.md),
+  [acceptance](map/tests/named-workspaces-acceptance-347.md)).
+- [map/indexing.md](map/indexing.md): [modules in brief](map/indexing/modules-in-brief.md),
+  [stored values](map/indexing/stored-values.md),
+  [discovery, the index, adapter](map/indexing/detail-discovery-index-adapter.md),
+  [message forms, Python and Rust](map/indexing/detail-message-forms-python-rust.md),
+  [Go, resolution and JVM builds](map/indexing/detail-go-resolution-jvm-builds.md),
+  [Java receivers and supertypes](map/indexing/java-receivers-and-supertypes-85.md) and
+  [Java source facts](map/indexing/java-source-facts-84.md).
+- [ceilings.md](ceilings.md): the limits of the code, by area
+  ([resolution and the index](ceilings/resolution-the-index-and-shape-readers.md),
+  [language packs](ceilings/language-packs.md),
+  [HTTP: JVM, Go, Rust, TS](ceilings/http-clients-jvm-go-rust-ts.md),
+  [HTTP: C# and Swift](ceilings/http-clients-csharp-swift.md),
+  [channel clients](ceilings/channel-clients.md),
+  [server, accounts, workspaces and deploy](ceilings/server-accounts-workspaces-and-deploy.md)).
+
 ## Known ceilings
 
-The limits of the code, each with its value and its reason, are in [ceilings.md](ceilings.md):
-read it when a limit is touched. A limit marked `ponytail:` is named there
-(`tests/it/docs.rs` checks it).
+The limits of the code, each with its value and its reason, are in [ceilings.md](ceilings.md) and
+the parts it lists: read the part of the area when a limit is touched. A limit marked `ponytail:` is
+named in one of them (`tests/it/docs.rs` checks it).

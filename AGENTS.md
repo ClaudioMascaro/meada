@@ -46,7 +46,9 @@ write tools; one index per repository; determinism) live in
 - Domain terms are defined in `GLOSSARY.md`. Use them in code, docs and issues.
 - Repository map in `docs/agents/architecture.md`: read it before exploring or changing code, then
   the area file in `docs/agents/map/` that the map names for the area being changed. The
-  limits of the code are in `docs/agents/ceilings.md`: read it when a limit is touched.
+  limits of the code are in `docs/agents/ceilings.md`: read it when a limit is touched. A
+  `docs/agents` file past its size budget (`tests/it/docs.rs` names it) is split in the same PR
+  with `cargo run --example split_agents -- <file>`, never trimmed by dropping entries.
 - Coding standards in `CODING_STANDARDS.md`: read them before writing or reviewing resolution, a
   contract kind or a language pack.
 

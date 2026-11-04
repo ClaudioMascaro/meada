@@ -1,0 +1,351 @@
+# Test modules by subject
+
+- `src/package/hostile.rs` (unit, `cfg(test)`): the table `probes` of the readers of manifests and
+  configurations, a row each for `package.json`, `tsconfig.json`, `pyproject.toml`,
+  `requirements.txt`, `Cargo.toml`, `go.mod`, `pom.xml`, Gradle builds, `gradle.properties` and
+  version catalogs (also `Maven::inherit` over many builds), `.csproj` and
+  `Directory.Build.props` (also `Nuget::inherit`), `msbuild::read` and `props`, Spring's
+  `application.properties` and `.yml` (also placeholders) and `appsettings.json`, and the walks
+  `Maven::entries` and `Nuget::entries` over modules and projects that pass on to each other.
+  Each row builds a file within `lang::MAX_BYTES` (many keys, deep nesting, wide fan-out), reads
+  it on a thread of its own and answers the size of what came back; the test holds every row to
+  30 s and four times `MAX_BYTES`, and names the rows that missed. A new reader adds its row.
+- Test modules of `tests/it/` by subject: `decorations` (the `decorations` fixture: Java, Kotlin, C#,
+  Python and Rust calls that decorate a definition carry `CallSite::decorates`, ordinary calls do
+  not, and `context` lists them under `annotations:`), `docs` (the repository map against the code:
+  `ponytail:` limits in `ceilings.md`, entry point kinds and process marks in their lists, a line
+  per module naming its area file, the 64 KiB budget of every `docs/agents` Markdown file with the
+  splitter's command in its failure, and every relative link of those files resolving; the splitter,
+  `examples/split_agents.rs`, tests itself under `cargo test`),
+  `benchmark` (public fixture index/reindex times and sizes, fixed default-answer and MCP
+  tool-list token costs, JSON/Markdown reports, future conformance/cross-language coverage
+  guard; ignored development harness, timings never gate),
+  `conformance` (pack; for Python also its HTTP providers and consumers
+  and its message channels, over `conformance-python` (`messages/`), `python-mounts` and
+  `python-django`; for Rust, `conformance-rust`: a Cargo workspace whose members are `api`
+  (`src/main.rs` with `mod.rs`, `<name>.rs` and `#[path]` modules, inline modules holding a
+  `mod x;` and a `#[path]` one, `self::`, `super::` past a module's own name and `crate::`, a
+  `let` named like the module a path names, `src/bin/tool.rs`, `src/bin/sync/main.rs`, a
+  `[[bin]]` at `tools/admin.rs`, an inherent `impl` in another file than its struct, a trait's
+  `impl` and a default body, two traits giving `label` and two `impl From<_>` blocks
+  (`ambiguous`), a `#[cfg(test)] mod tests` that sees the file's `Store` only through a
+  `use`, a `println!` whose call is not indexed, a closure, and `orphan.rs`, which no `mod`
+  reaches; every `use` form (`crate::`, `self::`, a group, a rename, a crate name, a glob,
+  `use super::*` taking a private item), a `use` that binds in an inline module or a function
+  alone, a `pub use` chain (`ring/c.rs` to `d.rs` to `e.rs`), a re-export cycle
+  (`ring/x.rs`, `ring/y.rs`), mutual aliases, a glob beaten by an explicit import or a local item, a parameter hiding a
+  `used` name, a top-level `use` unseen in an inline module, a module and an item of one name
+  (`launch`); the `exports` table read back over `rusqlite`: a binary crate has no row), `crates/billing` (`[lib] path`, a `pub use`,
+  a call to another member) and `crates/ledger-core` (a library reached by its name with an
+  underscore from a crate that lists it as a dependency, a `pub(crate)` item that stays inside
+  it, a `pub` module holding `pub` and private items and a `pub use` of a private module's
+  item, a private module and an item of one name, `mod meter; pub use meter::meter;`), and `crates/scratch`, which the workspace's `exclude` names and is a crate all the same (a call to a crate it does not list stays external);
+  `freshness` moves a `mod`, declares the orphan, adds a module, drops the `[[bin]]`, edits a
+  `pub use`, moves an item between files and renames a package, and
+  exports it with the walk reversed), `xlang` (a TypeScript and a Python repository linked both ways, over HTTP
+  and over a Kafka topic: exports, `context`, `trace`; and a TypeScript and a Rust repository, `xlang-rust-web` and `xlang-rust-api`, linked both ways over HTTP through `base_url_env` and a declared host: exports, `trace` down, up and from uncommitted changes, `freshness` editing, adding and deleting `.rs` files; and a TypeScript and a Java one, `xlang-java-web` and `xlang-java-api`, the Java bases from Spring `@Value` fields and a constructor parameter (a placeholder, a literal URL, a placeholder with a default a peer serves and one no peer serves) and `System.getenv`, and a Kafka topic produced in TypeScript and consumed by a `@KafkaListener` whose topic the configuration names: exports, `trace` down (also from the producer, `xlang-java.trace-channel-down.txt`), up and from uncommitted changes, `freshness` editing, adding and deleting `.java` and configuration files, and a configuration edited alone), `index` (export, schema rebuild, writes only in `.meada/`), `indexed_commit` (#512: `format`, `commit` and `dirty` of a clean, edited, untracked-file and ignored-path checkout, outside git and before the first commit, and a workspace export naming the recorded commit after the mirror moves, neither field once the sidecar is gone), `self_index` (a copy of this repository's tracked files, indexed in about 6 s in debug: no call from `src/` reaches `tests/fixtures/`, and `Resolver.call` has an `exact` caller), `hostile` (per pack, repositories of pathological files sized past the limits of Known ceilings: deep nesting, long chains, wide files and manifests, values traced through chains and lattices of constants, wrappers, parameters and return values; each indexed on a thread with a small stack within a time budget, so a recursion with no limit aborts the run and a loop with none fails it; `--nocapture` names each case as it starts; and one test over the table `chained`, a row for each pack of `PACKS`, which indexes a chain of 80 locals each holding a call on the one before, from a receiver typed outside the repository and from a type of it, side by side within the budget: a pack that reads a result twice per link misses it, as Java's and C#'s did before `result_of` read exact targets alone), `query` (search/context), `grammar` (the output grammar of `docs/reference/output-grammar.md`, whose tables it reads as the grammar, against every rendered-answer golden: each line of a `search`, `context` or `trace` golden matches a line kind of its tool, a symbol's span text is verbatim for the head's range and a line under a `context` section is of a kind the section lists; every documented line kind is shown by a golden or named in `UNSHOWN`; the document's levels, entry kinds, open item kinds and `search` kinds are the code's), `partial` (#396: every `search` kind, `context` and `trace` both ways over the fixture workspaces and every fixture alone, a sample of each repository's symbols (by identity and by short name), call sites and contracts and every process, and a trace from an uncommitted edit inside a symbol, reading the rows of the answer and every row, `engine::with_every_row`, give the same bytes), `workspace` (peers, status, config errors, an `owner` key in a `meada.toml` as an unknown key), `manifest` (server mode's workspace manifest: `index`, `status` and `export --repo` with `--workspace`, the refused entries, manifest errors, entry blocks configuring mirrors with no `meada.toml` and ignored under one, decisions replayed, reads that write nothing and see the index until `meada index` refreshes it, nothing written into a mirror, refreshed equals cold, `[workspace]`'s unknown key and source, `source = "file"` as before, `source = "store"` naming `generation-pointer` without it and its sections or `[[repository]]` with it; `[postgres]` naming the `postgres` feature without it, and with it each key error (an unknown key, `url_env` with `url_file`, a `schema` with an uppercase letter, a leading digit or 64 characters, `pool_size = 0`, a zero timeout) naming the file, the line and the key in `index`, `status` and `postgres migrate`; an `owner` in a static manifest's entry naming the file, the line, the key and `source = "store"`, and each `owner` rule it breaks; with `oidc`, `type = "azure"`, `type = 1`, `[oidc.entra]` with no `type` and under `generic` and `okta`, `overage = "directory"` and `"always"`, an unknown key in `[oidc.entra]` and `[oidc.github]` each naming the file, the line and the key, never the value; `[oidc.github]` (#331) without `[postgres]` naming both, in a build without `postgres` naming the feature, without `login_claim` or `max_age_seconds`, with an empty `login_claim`, `max_age_seconds = 59`, an uppercase `host`, repeated or no `roles` and an unknown key, each naming the file, the line and the key or the section, the table alone accepted without `identities_claim` or `groups_claim`, and `github-app roles` without a `[[github_app]]` block for its host (none, or one for another host) naming it; without `directory`, `[directory]` naming the feature, and with `directory` and `oidc`, `[directory]` without `[postgres]`, without `[oidc]` and without both, with both token keys, with an unknown key, with `user_attribute = "email"` and without `user_claim`, each naming the file, the line and the sections or the key, never a value; with `snapshot`, a bad `[snapshot] node_name` naming the file, the line and the key), `gateway`
+  (gateway prefixes), `urls` (constants, wrappers, Express, inferred links, routes of every method), `trace`, `processes`
+  (entry points and `trace` from `process::...` over the chain: the processes each export
+  carries (`chain-<repo>.processes.json`), a route process crossing into a peer, a channel handler's process, a cycle, an
+  export process, an ambiguous call, a missing peer, a budget cut), `community_queries`
+  (`search` kinds `community` and `process`, and the community and processes lines of `context`
+  over the chain: processes in three repositories, `community: none`, a decided link that counts
+  and an ambiguous call that does not, the processes line cut under the budget), `duplicates`
+  (`search` kind `duplicate` over `duplicates-a` and its peer `duplicates-b`: three exact copies in
+  one group, the whitespace near copy left out, groups by span length, a match by path, and the
+  export's `hash`), `decisions`
+  (replay, parse errors), `stale` (stale and waiting decisions in `status` and `export`), `decide`
+  (the binary in human mode over scripted stdin), `decider` (decider mode against the stub),
+  `freshness` (cold vs refreshed, also an edited zod schema dropping a field, edited calls moving
+  every repository's communities and processes, and the chain's export byte-identical under
+  `meada::with_reversed_walk`), `items` (open items and their `search` goldens, fixtures
+  `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US, es_ES and de_DE `LANG`;
+  with `oidc`, the identity provider's errors: an unknown `type`, `[oidc.entra]` under `okta` and
+  an `overage` other than `ignore` and `directory`; with `oidc` and `directory`,
+  `overage = "directory"` without `groups_claim` and without `[directory]` (#336); without `directory`, `[directory]` naming the feature; with
+  `directory` and `oidc`, `[directory]` without `[postgres]` and `[oidc]`, with both token keys
+  and with `user_attribute = "email"`; without `postgres`, `[postgres]` naming the feature and no `meada postgres`; with it, a
+  `[postgres]` key error, the URL refusals (an unset variable, a query, a Unix socket) and,
+  against the local Postgres, both version refusals; with
+  `refresh-lock`, the operations' refusals: a malformed id, no `[refresh_lock]`, a generation
+  not retained, the current generation dropped, a full kept set, a lock held by a named or an
+  unknown holder; without it, no `snapshot pointer`
+  or `snapshot fence`; `[workspace]`'s errors and, with `generation-pointer`, `source = "store"`
+  without its sections or beside `[[repository]]`, `index` without a pulled version naming
+  `meada workspace pull`, `mcp --listen` naming `--generations`, and `meada workspace`'s
+  refusals of a malformed id and of a manifest without `[generations]` (`pull` included); with
+  `refresh-lock`, `workspace apply`'s malformed id and missing `[refresh_lock]`, and against the
+  services `apply` of a version not stored, `pull` with no current version, below the current
+  file's fence and already current; with `snapshot`, the `[snapshot] node_name` error in both
+  languages; `owner`'s and `added_by`'s errors and the static manifest's `owner` and `added_by` errors in both languages; an `added_by` stored, shown after the owner, pulled and refused when malformed, #330),
+  `mcp`
+  (the binary over stdio), `server` (`meada mcp --listen` as a child process over the chain's
+  mirrors, through rmcp's streamable HTTP client and plain HTTP requests: the stdio tools and
+  `trace` byte for byte, the 404 listing, the `uncommitted` refusal, the behind line before and
+  after `meada index`, two stateless servers answering alternate calls, the refused start, and
+  `Origin` refused with 403 before the 404 listing), `snapshot` (the first of the five cloud
+  module modules, ADR 0012, each built with its feature; a test that needs Valkey or an
+  S3-compatible server, `MEADA_TEST_VALKEY_URL` or `MEADA_TEST_S3_ENDPOINT`, prints why and
+  skips without it, or fails with `MEADA_TEST_SERVICES_REQUIRED=1`; here `snapshot publish`
+  and `snapshot pull`: a republish or a second machine uploads nothing, the refused publish, no
+  secret in an authentication failure, no redirect followed, `[snapshot]` errors, a pull that
+  keeps the previous generation, corrupted and hostile generations (bundles, tar entries, ids,
+  identities, index schemas, a pointer and a document past their bounds) changing nothing, a
+  pulled mirror that runs nothing its bundle configured, a nested repository refused;
+  `snapshot/tls.rs` runs binary publish/pull through a TLS front of the local store with a
+  private CA, refusing absent, wrong, empty, invalid and oversized CA files without exposing
+  fixture secrets),
+  `serving` (`mcp --listen --generations`, `status --generations` and `export --generations`:
+  the chain goldens from a pulled generation, a swap between two calls, the probe and the start
+  depending only on the node, the fixed 503, an index naming files outside its mirror, the same goldens, header and `_meta` from a node whose companion writes heartbeats),
+  `generations` (the heartbeat of each `pull --every` round: its fields equal the node pointer file, the held directories, the readiness and the version, its TTL of three periods and the node set scored by the expiry, a swap writing the new generation and fence, a failed round and an unreachable Valkey (one warning, no password, nothing else changed), expiry and the next heartbeat removing the stale name, no heartbeat from a single `pull` or without `[generations]`, the host name by default; the generation pointer and pins: a pin answered on every node until it is no
+  longer retained, the 404 of a pin not held, `Origin` refused before a pin, every id and fence
+  from Valkey checked, a retained list longer than `keep` plus `KEPT_MAX`, a retained
+  generation that fails to pull, the probe reading Valkey,
+  `[generations]` errors, `snapshot pointer set` rolling two nodes back to G1's goldens until
+  the next publish, a generation not retained and malformed ids refused, a generation kept by
+  `pointer retain` held and pinned on two nodes past `keep` until `pointer drop`; the workspace
+  versions: `workspace import` of the chain's manifest with owned and ownerless entries storing the owners in the document, `workspace show` printing each owner right after `path` and `import` reading that output back to the same id, a stored document with a malformed owner listed as malformed and refused by `show` and `pull` with the pulled directory unchanged, an `owner` error refused before any connection in both languages; `workspace import` of the chain's manifest storing `workspaces/<id>.json` with every
+  field and its metadata, the same entries again uploading nothing and answering the first
+  author and message, two entries swapped giving another id, an invalid file refused with its
+  file, line and key before any connection, its other sections named as not imported; `workspace
+  list` newest first, the current one marked once `{<key_prefix>}:workspace` names it, a
+  malformed pointer refused, a corrupted and a forged document listed as malformed; `workspace
+  show` of entries with blocks read back by `import` to the same id, and with no current
+  version naming `meada workspace apply`; `workspace pull` refused with no current version,
+  writing the document and the current file, current on a second run, swapping after the
+  pointer moves and keeping only the current version and the one it replaced, refusing a
+  pointer whose fence is not above the current file's; a malformed pointer id or fence, a
+  document of another id, one whose id does not derive from its entries, an oversized one and
+  one with invalid entries each refused, the directory unchanged; `index` over a pulled version
+  opening no connection to its `[snapshot]` and `[valkey]` ports, the export goldens after it (the pulled version holds owners and `added_by` logins);
+  with the chain stored, applied and pulled, `index` and `export` giving the export goldens,
+  `status` the file's report, `publish` recording the version in the document's `workspace`
+  field with the ids of a file's publish, the stored document unchanged by a file's publish and
+  after another version and after one that only changes owners or only `added_by` (the document still naming the first version), no field from a file's new generation, a node pulling and serving it
+  and refusing a field that is no version id; and without a pulled version `index`, `status`,
+  `export` and `snapshot publish` naming `meada workspace pull` and `mcp --listen` naming
+  `--generations`, while the `--generations` commands serve),
+  `refresh_lock`
+  (`snapshot lock`: the child terminated past the TTL, killed past the grace, stopped when the
+  lock changes hands, a SIGTERM reaching it, a stale fence refused, a lost fence stopping a node
+  with the recovery named in both languages, `[refresh_lock]` errors; the operations: each
+  refused while a lock holds, naming the holder, the holder's fields, TTL, renewal and release,
+  no lock or holder left by an operation, `retain` and `drop` changing only the retained list
+  and the kept set (already retained, appended with its fence and counted by `fence recover`,
+  not stored, past `KEPT_MAX`, current, not retained), a stuck fleet moving again after `fence
+  recover`, the
+  highest recorded fence and the `--at-least` floor, never lowered, live, expired and malformed
+  heartbeats written by hand; `workspace apply` moving `{<key_prefix>}:workspace` with a fence
+  above the previous one and rolling back with a new one, refused for a version not stored,
+  while a job holds the lock and with the fence lowered, `fence recover` counting the workspace
+  pointer, and a malformed id refused before any connection; `apply` of versions that set, change and clear owners and touch an ownerless entry, and of versions that set, change and clear `added_by`), `postgres` (the data layer, ADR 0016, feature `postgres`; a test that needs Postgres, `MEADA_TEST_POSTGRES_URL`, prints why and skips without it, or fails with `MEADA_TEST_SERVICES_REQUIRED=1`, each in a schema `meada_t<pid>_<case>` of its own: each URL refusal (another scheme, a Unix socket path, a query, `sslmode=disable`, a zero port, an unset variable, an unreadable file, a refused URL in a file) naming `postgres.url_env` or `postgres.url_file` and neither the URL, its password nor its host in `migrate`'s stderr or `status`'s line; `migrate` without `[postgres]` naming the manifest, and `meada index` with it opening no connection; `migrate` on an empty schema printing the binary's version, a second run printing it again with the schema unchanged (its columns and the version row's `xmin`) and no table outside it, a schema the operator created beforehand migrated; a run waiting on the advisory lock the test holds, past a one-second `statement_timeout_seconds`, writing nothing until it is released, and two runs started together both succeeding; with `MEADA_POSTGRES_VERSION_MAX`, an absent schema making `status` print the unreachable form naming `meada postgres migrate`, a higher version the form naming both, and a capped `migrate` refusing to lower it, naming both, the schema unchanged; `status`'s `postgres:` line, unreachable against a closed port and reachable against the local Postgres, with the exit code it has without `[postgres]`, indexed or not, and a loopback `ca_file` asking for TLS), `oidc` (`[oidc]`
+  against an issuer and a JWKS served on loopback: a token admits what its claim lists and leaks
+  nowhere, a rotated key, an oversized JWKS refusing the start, a pinned path admitted as its
+  identity; the identity provider's `type` (no key, `generic`, `okta`, `keycloak`, and `entra`
+  with and without `[oidc.entra] overage = "ignore"`) answering every case, the metadata (of a pin
+  too), the 401s, 403s and 404 lists, the groups' grant, a token in overage with no groups and a
+  key added after the start, with the same status, headers and body and the same stderr, which
+  holds no token part, group or claim value, as the manifest without the key, and an oversized
+  JWKS refusing the start alike; in `oidc/overage.rs` (with `ui,directory`; the debug knob
+  `MEADA_OVERAGE_TTL_MS` shortens the answers' lifetime to three seconds, and a loopback relay
+  the test closes stands for Postgres stopped), Entra overage through the directory on nodes,
+  the directory fed through the console's SCIM endpoint: a token with `_claim_names` and no
+  `groups` reading the identities `[oidc.groups]` maps its directory groups to, with the claims
+  grant beside them and nothing under `overage = "ignore"`, an inactive, an unknown and a
+  groupless user reading nothing, a token with `groups` or a `_claim_names` that is no object or
+  maps to a non-string never looked up (no line with Postgres closed), an answer, of no groups
+  too, kept for the TTL and no longer, a cached subject keeping its groups with Postgres stopped
+  until expiry and an uncached one having none, each failed lookup one stderr line, readiness
+  unchanged and a schema version newer than the node knows named, group values failing the owner
+  name rule skipped with a line naming `directory_groups`, `userName` matched ignoring case and
+  `externalId` exactly, and no token, object id, group or URL on stderr), `github_app` (`github-app credential` and `throttled` against a GitHub API served
+  on loopback that verifies each App's JWT against the fixture keys of
+  `tests/fixtures/github-app/`: a minted token cached and reused, two Apps taken in turn, a
+  throttled installation skipped until its retry time, a mint answered 429 passing to the next
+  installation, a token minted again after its cache runs out or `erase`, an uncovered host or
+  owner, a new block and new installations after the refresh, `[[github_app]]` errors, no
+  request from `mcp --listen`, and no key, JWT or token on stderr; and in
+  `tests/it/github_app/roles.rs`, the role check `meada github-app roles` (#331) against the
+  fake's collaborators listing, each connection on a thread of its own so one listing can be
+  held, the local Valkey and the local Postgres in a schema of each test's own, observed through
+  the command's line, its fence refusal and the readers, never the tables: every page of a
+  250-collaborator repository, each request with `affiliation=all` and `per_page=100`, a login
+  checked ignoring case, a 404 and an uncovered owner each a warning and no rows, the exclusions
+  file holding the version id alone, a second run a new set id; against `postgres::Stalled`
+  (no service) a Postgres that stops answering fails the run in `bound(1)` with the file gone; with `source = "file"` no
+  exclusions file, `MEADA_REFRESH_FENCE` required under `[refresh_lock]`, a lower fence refused
+  naming the higher (also in `pt_BR`), a 403 without `retry-after` passing to the next
+  installation, a 429 with it leaving every one throttled and the run failing naming the
+  identity and the status, every one marked failing before any request, a 503 failing alike, the
+  set staying each time; an addition whose adder GitHub lists with no role, or a role outside
+  `roles`, excluded with its reason and no login, in the file, absent from `show --pulled`, not
+  indexed, absent from `status` (a peer naming it misses it) and `export`, an entry without
+  `added_by` never excluded, and both included once GitHub lists an accepted role, a custom one
+  of `roles` included; every reader (`index`, `status`, `export`, `snapshot publish`, `show
+  --pulled`) refusing at the first pull with no file, after a new pull with the old file, and on
+  each malformed line naming the file and the line, `index` with a good file recording no
+  connection on the store's, Valkey's and Postgres's loopback listeners, `--pulled` with a version
+  a usage error and without `[oidc.github]` the version whole (no service needed); a failed
+  check, a commit whose file cannot be written and a check killed mid-listing each leaving no
+  file a reader admits, the next success writing it, and a low fence held mid-listing while a high
+  one completes refused at its commit, the high check's file kept; a schema never migrated and
+  one a newer Meada migrated refused; a `Link` to another origin, with a user, to another
+  repository or to a page listed already failing the run with no request to the other origin;
+  and the job's refresh under `meada snapshot lock` against the local store: an excluded
+  addition absent from the published generation, a refresh stopping at the role check
+  publishing nothing, `show` and `import` carrying `added_by` to the same id, an adopted entry
+  published once its index can be written (the failed index keeping the current generation,
+  #316), an attribution-only change publishing the same generation, and `deploy/compose/managed-refresh.sh`
+  itself under the lock with its fetch stubbed: a failed check exiting 1 before the pulled list or
+  the fetch, a check with one excluded entry handing the fetch the eligible ones and publishing,
+  exit 0), `ui` (`meada ui` as a child
+  process over a `[ui] dir` it writes, with a `meada-ui.json` naming this build's version, in
+  plain HTTP over raw sockets so no path is normalised: the `config`, `session` and `manifest`
+  documents, the JSON 404, the `manifest` errors of a file broken after the start; the
+  `--listen` forms and both flags required; the `Host` 403 before the `Origin` 403, a write
+  without `Origin` refused; static files with their content type, cache rule and security
+  headers, `..`, `%2e%2e`, an empty segment, a symbolic link out of the directory and an unknown
+  extension refused, no listing, an unknown path answering `index.html`; no cookie or
+  `Access-Control-*` header on any answer; every start refusal listed at once; a
+  `password_file`'s content in no answer, with `valkey`; and an answer in flight, blocked on a
+  FIFO, received after SIGTERM, then exit 0; in `ui/playground.rs`, the playground and the
+  exports over the chain: started before `meada index --workspace`, both a 503 naming it while
+  `config` and `manifest` answer, then with no restart `search`, `context` and `trace` equal to
+  the chain goldens with `generation` null and every export equal to its golden, `index_dir`
+  byte-identical after them; with `snapshot` (skipped without the store), the same before and
+  after an init `meada snapshot pull` into the console's `local_dir` (naming `meada snapshot
+  pull`, then the goldens with the current id, by default and named), a second pull's
+  generation answering the next query, the retained one when named, an unheld generation a 404
+  naming both held ids, `local_dir` byte-identical; in both, `trace` with `changes:
+  uncommitted` refused with the node's text, an unknown repository and an unheld generation a
+  404, a body over `QUERY_MAX` a 413, malformed JSON, an unknown tool, arguments not the tool's
+  or an unknown key a fixed 400, a query without the console's `Origin` or with a foreign one
+  a 403; in `ui/reads.rs`, local repository freshness and commit provenance, unknown commits
+  for absent, oversized or stale sidecars; explicit missing modules; four blocked readers
+  timing out without releasing worker permits early, bounded overload and independent basic
+  routes; non-regular credentials refused before open; with `generation-pointer`,
+  two pull companions and the console's own companion, the live fleet, generation/workspace
+  documents, retention and kept marks, modification time, schemas from held copies, malformed
+  names/ids/fences excluded from diagnostics and both stuck recoveries; with `github-app`,
+  the cached installation/token-expiry/throttle view against the module's loopback API without
+  any additional API request or private key read; with `oidc`, in `ui/oidc.rs`, against the `oidc`
+  module's loopback issuer, which logs every request: no token, an expired one, the nodes'
+  audience, another issuer and `HS256` get 401 with `WWW-Authenticate`, a missing scope 403, a
+  valid token the viewer's `session`; static files and `config` (the issuer, `client_id`, the
+  scopes) without a token, the issuer's origin in every answer's `connect-src`; the start
+  refused without `[ui] client_id`, metadata or JWKS; `admission` with the metadata, the key
+  ids, the last read, the groups table bounded by the grant and, after the JWKS fails, the
+  failed refresh; `admission/check` per check for a valid, an expired, a wrong-audience, a
+  forged and an unknown-`kid` token, the identities bounded by both grants, no request to the
+  issuer and no pasted token in its log, a 413 past the cap and a fixed 400; a viewer's grant
+  bounding the manifest's entries and its error text, whole for `*`; the playground and the
+  exports under a grant, the goldens for `*`, a `WEB`-only trace and export with no peer
+  outside the grant, the repositories outside it the 404 of one not served, a 401 without a
+  token; `admission`'s `type`, `generic` with no key and `entra` when set, every read route,
+  `session` and `admission/check` answering the same tokens alike under both, a token in overage
+  with no groups; in `ui/oidc/overage.rs` (with `directory,refresh-lock`), a token in overage
+  granted through directory groups, made `operator` through `operator_groups` and `team_operator`
+  through a group owning an entry it reads, its `session` listing the groups, and none of it under
+  `overage = "ignore"`; a token with `groups` or an odd `_claim_names` never looked up; an
+  inactive or deleted user refused with 403 `deprovisioned` before its cached answer is used, on
+  `session` and a write, and a viewer once reprovisioned in no group and the answer expired; the
+  token check of a pasted overage token listing the identities its directory groups grant,
+  none under `ignore`, with no request on the issuer; the admission routes
+  absent without `[oidc]`; manifest peers and error text bounded even for an unlisted peer;
+  operator groups and strict boolean claims, all five configuration errors, whole operator
+  views despite restricted grants, and header-only refused writes proving bodies stay unread;
+  in `ui/oidc/writes.rs` (with `ui,oidc,refresh-lock`), real pointer retain/set/drop, exact
+  decimal fence recovery, save/CLI validation agreement, admitted author, workspace apply and
+  catalog refusals, per-route caps, held-lock refusals and one escaped audit line per attempt,
+  including unauthenticated refusals and tokens pasted into ids/floors; save422 exactly matches
+  CLI diagnostics while its fixed audit outcome excludes JWT fixtures pasted into entries;
+  malformed heartbeat
+  MAX fences ignored by CLI and HTTP recovery, and workspace-pointer fences in fleet diagnostics;
+  in `ui/oidc/team.rs` (with `ui,oidc,refresh-lock`, #324), the team operator: the `session`
+  role and fields (`team_operator` with `groups`, `grant` and `teams`; a viewer for groups that
+  own nothing or only entries outside the grant, with `operations = false`, with a file
+  workspace, with no pointer, a pointer to a missing document and a malformed pointer; the
+  global operator stays one), a team operator's views bounded by its grant with every role
+  seeing `owner`, a save that edits, removes and adds entries (composed with the entries
+  outside the grant kept in place, its subject as author) and its apply and rollback, two teams
+  in one save, each refusal reason as a 403 `entries_refused` with nothing written and the lock
+  free, an apply naming what the grant reads and counting the rest in `hidden`, an apply checked
+  against the version current then, a team that removes its last entry turning viewer, a save
+  and an apply that lose the role between admission and the refresh lock (#477: the debug-only
+  `MEADA_PAUSE_BEFORE_LOCK` knob of `ui/write.rs` holds the request while the global operator
+  moves the pointer; the 403 has the admission refusal's text and its stderr line names the
+  teams, `as ["team-billing"]`, which an admitted viewer's never does), the
+  generation operations refused by role before the body is read, and the `as <owners>` stderr
+  line;
+  serialized workspace versions refused before storage even when their uploads fit the cap;
+  managed workspace views and nested peers bounded by grants, the
+  token check using current workspace identities; no token, claim value or identity on stderr), `resources` (resource `search`, `context`, `trace` start and `status`
+  over the chain), `channels` (the `channels-api`, `channels-worker`, `channels-billing`
+  fixture: kafkajs forms, fan-out, same-repository links, an unrelated `send`; amqplib queues,
+  publishes through a binding of another repository, the empty exchange, queues named like the
+  exchange and like an unbound key that no publish reaches, and a Kafka topic that shares a
+  queue's name; the `channels-queues-api` and `channels-queues-worker` fixtures: SQS by queue
+  name and NATS wildcards at `inferred`, also in `context` on a subject and on a pattern),
+  `channel_queries` (`search`, `context` and `trace` on channels over the first fixture),
+  `channels_jobs` (the `channels-jobs-api` and `channels-jobs-worker` fixtures: BullMQ queues,
+  a `new Queue(name)` wrapper, and Redis streams in both client styles),
+  `drift` (shape drift over `drift_chain`: the web export with every consumer shape and
+  link drift, and `trace` up from `GET /api/orders` with `drift: missing` on the drifting
+  consumers' lines only; an edited client wrapper changing its callers' drift like a cold
+  chain is in `freshness`; the overlay's gateway Express routes and catalog Next.js routes
+  return object literals, so the gateway and catalog exports carry shapes with source
+  `literals`, `trace` up from those routes shows drift and not-checked reads, and `context`
+  names the source, and a Next.js route answering through a helper and an Express one that may
+  redirect are open at the root, while error answers in other forms (`sendStatus`, a literal
+  status before `end`, `next(err)`, `new Response(null, { status: 404 })`) are left out, so
+  the web's `price` and `reviews` show drift; the limits of `literals.rs` are unit tests there;
+  a decisions file (`chain-drift-web`) links the unresolved `src/open.ts::rate` to a route with
+  a shape (drift on a `decided` link) beside the ambiguous `ping` (none), golden
+  `chain-drift.trace-decided.txt`; `trace` down from `src/stock.ts::price` ends its link line
+  with the drift (`chain-drift.trace-down.txt`); the catalog's
+  zod routes (`app/api/comments`) give shapes with source `zod`, `trace` up from them (golden
+  `chain-drift.trace-zod.txt`) shows the drift of the web reads, and a document wins over a zod
+  schema, which wins over literals; the reading rules and limits of `zod.rs` are unit tests
+  there; the catalog's `app/api/batches` route and the web's `src/batches.ts` consumers
+  (golden `chain-drift.trace-batches.txt`) destructure, iterate and map over the response,
+  with the hidden names and the values handed to a function that are not followed; the
+  catalog's `app/api/profiles` route and the web's `src/declared.ts` consumers (golden
+  `chain-drift.trace-declared.txt`) read declared types (the removed `nickname` read through
+  an interface cast, `exact`, and with plain member access, `inferred`), with the optional fields, the package
+  type and the freshness of an edited shared type in `freshness`, the limits being unit tests in
+  `declared.rs` and `lang/ts/types.rs`; the catalog's shared package and the routes and
+  consumers importing it (golden `chain-drift.trace-shared.txt`) cross repositories through
+  package imports, with an edited package and a package that gets its name back in
+  `freshness`, the views, the levels and the limits (`PACKAGE_HOPS`, `GRAFT_BUDGET`) being unit
+  tests in `shape.rs`, and the surface, `kept` and `export *` collisions in `package.rs`; the rules
+  and the pattern depth limit are unit tests in `lang/ts/uses.rs`; `context` on the documented,
+  zod, literals and drift-free routes (goldens `chain-drift.context-route-*.txt`), `search` with
+  the kind `drift` (`chain-drift.search-drift.txt`) and `status` (`chain-drift.status.txt`, and
+  `cli.status-drift.*` in `cli` for pt-BR, English and Spanish) show it),
+  `documents` (provider documents over `documented_chain`: export, `trace` to "documented
+  only", `search` (routes and kind `document`), `status`, listed documents, `context` on the
+  merged route with its documented fields, `context` on a route (documented only and merged);
+  inline repositories written by the test (`repo`, `client`, `openapi` helpers): each document
+  giving its own gateway forms under `[serve] prefix` and `strip`, a `[serve]` table with only
+  `documents` and an unlisted gitignored document left out, a listed path through a symbolic
+  link left unread; over
+  the `documents-shapes` fixture, a repository with no code whose OpenAPI 3.0 JSON document
+  has local `$ref`s into `components`, `allOf`, `oneOf`, an array response,
+  `additionalProperties: true`, a cycle and an external `$ref`, plus a later
+  `v2.openapi.json` listing one route again: the export with every shape and `status` with
+  the external reference; freshness of an edited document and of a dropped `[serve]` is in
+  `freshness`), `asyncapi` (AsyncAPI documents over `asyncapi-events`, a repository with a
+  `[serve]` table whose `asyncapi.yaml` (2.6, `kafka-secure`), `billing.asyncapi.yaml` (3.0,
+  `amqp`), `sensors.asyncapi.yml` (`mqtt`), `routing.asyncapi.yaml` (a server without
+  `protocol`, a channel naming a server the document lacks), `serverless.asyncapi.yaml` (no root
+  `servers`) and `legacy.asyncapi.json` (1.2) sit beside two
+  code sides that merge with a documented one, and `asyncapi-services`, which names it as a
+  peer and holds the code on the other side of each documented one: both exports with the
+  channel contracts, shapes and links, the merge of a documented and a code side, `status`
+  (protocol, parameterized channel, version), `trace` down to a documented consumer and up
+  from a handler to a documented producer, `context` on documented channels with their payload
+  fields, and `search` of channels and of documents). Table tests for discovery, format detection, routes, response selection, the
+  schema-to-shape reader (`schema.rs`) and the YAML reader are unit tests in `src/document/`,
+  with the hostile inputs each limit stops (server variables naming each other, 200,000 nested
+  block sequences, a 10,000-long reference chain, one wide schema read for many routes).

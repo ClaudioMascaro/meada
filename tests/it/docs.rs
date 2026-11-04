@@ -1,7 +1,8 @@
-//! The repository map keeps up with the code: every limit marked `ponytail:` is named under
-//! "Known ceilings" in `docs/agents/ceilings.md` (CODING_STANDARDS.md, hostile input), every
+//! The repository map keeps up with the code: every limit marked `ponytail:` is named in
+//! `docs/agents/ceilings.md` or a part of `docs/agents/ceilings/` (CODING_STANDARDS.md, hostile input), every
 //! entry point kind and process step mark is in the list the map gives of them, every module has
-//! its line in `docs/agents/architecture.md`, and that map stays within its size budget.
+//! its line in `docs/agents/architecture.md`, and every Markdown file under `docs/agents` stays
+//! within its size budget (the map and the files split by `examples/split_agents.rs`).
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -77,15 +78,11 @@ fn sources(dir: &Path, out: &mut Vec<(String, String)>) {
 
 #[test]
 fn every_marked_limit_is_a_known_ceiling() {
-    let map = fs::read_to_string("docs/agents/ceilings.md").unwrap();
-    let start = map
-        .find("\n## Known ceilings")
-        .expect("a Known ceilings section");
-    let section = &map[start + 1..];
-    let ceilings = match section[1..].find("\n## ") {
-        Some(end) => &section[..end + 1],
-        None => section,
-    };
+    // The list is the index and the area files of `docs/agents/ceilings/` (split by budget, #644).
+    let ceilings: String = (agents_markdown().into_iter())
+        .filter(|(path, _)| path.starts_with("docs/agents/ceilings"))
+        .map(|(_, text)| text)
+        .collect();
     let files = limit_sources();
     let found: Vec<(&String, String)> = (files.iter())
         .flat_map(|(path, text)| marked(text).into_iter().map(move |n| (path, n)))
@@ -98,7 +95,7 @@ fn every_marked_limit_is_a_known_ceiling() {
         .collect();
     assert!(
         missing.is_empty(),
-        "limits marked `ponytail:` but not named in Known ceilings: {missing:?}"
+        "limits marked `ponytail:` but not named in the known ceilings: {missing:?}"
     );
 }
 
@@ -160,7 +157,7 @@ fn every_limit_is_marked_once() {
     let problems = limit_problems(&files, NOT_CEILINGS);
     assert!(
         problems.is_empty(),
-        "mark a limit `ponytail:` and list it under Known ceilings, rename it, share it, or \
+        "mark a limit `ponytail:` and list it in the known ceilings (`docs/agents/ceilings/`), rename it, share it, or \
          add it to NOT_CEILINGS with its reason: {problems:#?}"
     );
     let unmarked: BTreeSet<String> = (files.iter())
@@ -255,17 +252,122 @@ fn every_process_mark_is_listed_in_the_queries_map() {
     );
 }
 
-/// The most the architecture map may hold, in bytes: an index an agent reads whole. Detail goes
-/// to the area file in `docs/agents/map/`, a limit to `docs/agents/ceilings.md` (#572).
+// ponytail: the repository map is an index an agent reads whole: 64 KiB, in bytes. Detail goes to
+// the area file in `docs/agents/map/`, a limit to `docs/agents/ceilings.md` (#572).
 const MAP_BUDGET: u64 = 64 * 1024;
 
+// ponytail: every other Markdown file under `docs/agents` (an area file, the ceilings list, a part
+// the splitter wrote) holds at most 64 KiB, in bytes, so an agent reads one in a single call. A
+// file past it is split by `examples/split_agents.rs`, never trimmed (#644).
+const AREA_BUDGET: u64 = 64 * 1024;
+
+/// Every Markdown file under `docs/agents`, as (path, text), in path order.
+fn agents_markdown() -> Vec<(String, String)> {
+    fn walk(dir: &Path, out: &mut Vec<(String, String)>) {
+        let mut entries: Vec<_> = fs::read_dir(dir)
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .collect();
+        entries.sort();
+        for path in entries {
+            if path.is_dir() {
+                walk(&path, out);
+            } else if path.extension().is_some_and(|e| e == "md") {
+                let text = fs::read_to_string(&path).unwrap();
+                out.push((path.display().to_string(), text));
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(Path::new("docs/agents"), &mut out);
+    out
+}
+
+/// The files of `sizes` (path, bytes) past their budget, each as the failure message names it.
+fn over_budget(sizes: &[(String, u64)]) -> Vec<String> {
+    (sizes.iter())
+        .map(|(path, size)| {
+            let budget = if path == "docs/agents/architecture.md" {
+                MAP_BUDGET
+            } else {
+                AREA_BUDGET
+            };
+            (path, size, budget)
+        })
+        .filter(|(_, size, budget)| *size > budget)
+        .map(|(path, size, budget)| {
+            format!(
+                "{path} is {size} bytes, over its budget of {budget} bytes: split it by area with \
+                 `cargo run --example split_agents -- {path}` in this change (a part still over \
+                 its budget needs `## ` headings of its own first), never trim it by dropping entries"
+            )
+        })
+        .collect()
+}
+
 #[test]
-fn the_architecture_map_stays_within_its_budget() {
-    let size = fs::metadata("docs/agents/architecture.md").unwrap().len();
+fn every_agents_markdown_file_stays_within_its_budget() {
+    let files = agents_markdown();
+    // The scan sees the map, the index of the ceilings and the parts the splitter wrote.
+    for seen in [
+        "architecture.md",
+        "ceilings.md",
+        "ceilings/language-packs.md",
+    ] {
+        assert!(files.iter().any(|(p, _)| p.ends_with(seen)), "{seen}");
+    }
+    // The scan above covers `src/` only: the two budgets of this file are named by hand.
+    let ceilings: String = (files.iter())
+        .filter(|(path, _)| path.starts_with("docs/agents/ceilings"))
+        .map(|(_, text)| text.as_str())
+        .collect();
+    for name in ["MAP_BUDGET", "AREA_BUDGET"] {
+        assert!(
+            ceilings.contains(&format!("`{name}`")),
+            "{name} not in the ceilings"
+        );
+    }
+    let sizes: Vec<(String, u64)> = (files.iter())
+        .map(|(path, text)| (path.clone(), text.len() as u64))
+        .collect();
+    let over = over_budget(&sizes);
+    assert!(over.is_empty(), "{over:#?}");
+}
+
+#[test]
+fn a_file_past_its_budget_fails_with_the_path_the_size_the_budget_and_the_splitter() {
+    let map = ("docs/agents/architecture.md".to_string(), MAP_BUDGET + 1);
+    let area = ("docs/agents/map/tests.md".to_string(), AREA_BUDGET + 7);
+    let fits = ("docs/agents/map/core.md".to_string(), AREA_BUDGET);
+    let over = over_budget(&[map, area, fits]);
+    assert_eq!(over.len(), 2, "{over:#?}");
+    assert!(over[0].contains("docs/agents/architecture.md is 65537 bytes"));
+    assert!(over[0].contains("budget of 65536 bytes"));
+    assert!(over[1].contains("docs/agents/map/tests.md is 65543 bytes"));
+    assert!(over[1].contains("cargo run --example split_agents -- docs/agents/map/tests.md"));
+}
+
+#[test]
+fn every_relative_link_of_the_agents_docs_resolves() {
+    let mut broken = Vec::new();
+    for (path, text) in agents_markdown() {
+        let mut rest = text.as_str();
+        while let Some(at) = rest.find("](") {
+            rest = &rest[at + 2..];
+            let target = rest.split(')').next().unwrap();
+            let file = target.split('#').next().unwrap();
+            if file.is_empty() || file.contains(':') || target.contains(char::is_whitespace) {
+                continue;
+            }
+            let dir = Path::new(&path).parent().unwrap();
+            if !dir.join(file).exists() {
+                broken.push(format!("{path}: {target}"));
+            }
+        }
+    }
     assert!(
-        size <= MAP_BUDGET,
-        "docs/agents/architecture.md is {size} bytes, over its budget of {MAP_BUDGET} bytes: \
-         move detail to the area file in docs/agents/map/, a limit to docs/agents/ceilings.md"
+        broken.is_empty(),
+        "links that resolve to no file: {broken:#?}"
     );
 }
 
@@ -333,7 +435,20 @@ fn every_module_has_a_line_in_the_map_naming_its_area_file() {
                     .map(|f| f.trim_matches('`').to_string())
                     .collect();
                 for file in files {
-                    match fs::read_to_string(format!("docs/agents/map/{file}")) {
+                    // A split area file keeps its detail in the parts of its directory (#644).
+                    let area = format!("docs/agents/map/{file}");
+                    let parts = area.trim_end_matches(".md");
+                    let named_in = |text: &str| written.iter().any(|w| text.contains(w.as_str()));
+                    match fs::read_to_string(&area) {
+                        Ok(text) if !named_in(&text) && fs::read_dir(parts).is_ok() => {
+                            let parts = (agents_markdown().into_iter())
+                                .filter(|(p, _)| p.starts_with(&format!("{parts}/")));
+                            if !parts.into_iter().any(|(_, text)| named_in(&text)) {
+                                unnamed.push(format!(
+                                    "{dir}/{stem}: map/{file} and its parts never name {written:?}"
+                                ));
+                            }
+                        }
                         Err(_) => unnamed.push(format!(
                             "{dir}/{stem}: links map/{file}, which does not exist"
                         )),

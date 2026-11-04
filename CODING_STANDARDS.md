@@ -100,8 +100,8 @@ indexing carries on.
   substitution runs once over the original text.
 - A path read from a file or a config stays inside the repository root: relative, without `..`,
   and through no symlink.
-- Each limit is a named constant with a `ponytail:` marker, listed under "Known ceilings" in
-  `docs/agents/ceilings.md` (`tests/it/docs.rs` checks the name is there, that a `const` named
+- Each limit is a named constant with a `ponytail:` marker, listed in
+  `docs/agents/ceilings.md` or a part of `docs/agents/ceilings/` (`tests/it/docs.rs` checks the name is there, that a `const` named
   `MAX_*`, `*_MAX`, `*_LIMIT` or `*_CAP` carries the marker, and that no two share a name), and a
   unit test feeds it an input past the limit.
 - A manifest or configuration reader reads a file of `lang::MAX_BYTES` built to explode (many
@@ -157,10 +157,10 @@ budget of 64 KB (`tests/it/docs.rs` fails above it):
 - The detail behind a line (behavior, routes, store functions, per-language and per-library
   entries, the steps of a seam too long for the map) goes to the area file in `docs/agents/map/`,
   a new one when none fits. A paragraph that only repeats an ADR or a site page links to it.
-- A limit goes to `docs/agents/ceilings.md`, under "Known ceilings", with its value and its
-  reason; it is not repeated in the map.
+- A limit goes to the part of `docs/agents/ceilings/` for its area (listed in
+  `docs/agents/ceilings.md`), with its value and its reason; it is not repeated in the map.
 - A value the index now stores (a table, a column, a field of a stored summary) joins the list
-  "Stored values" in `docs/agents/map/indexing.md`, the detail of the invariant "The index holds
+  "Stored values" in `docs/agents/map/indexing/stored-values.md`, the detail of the invariant "The index holds
   no source text and no values, apart from ..." in the map.
 - A kind's rule lives in its own files behind `ContractKind`. The engine, the items, the
   decisions, the trace, the entry points and the extraction loop of the index writer ask the seam
