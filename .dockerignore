@@ -10,6 +10,7 @@
 !src/**
 !examples/
 !examples/golden_diff.rs
+!examples/split_agents.rs
 !meada-core/
 !meada-core/Cargo.toml
 !meada-core/src/
