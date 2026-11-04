@@ -1,0 +1,6 @@
+# The proxy plugin routes `/api/proxy/<endpoint>` to the target `app-config.yaml` gives it.
+# `inventory` declares the variable `/inventory` takes its target from; `stock` is reached by
+# the host of `/stock`'s target.
+[[peer]]
+repo = "example.com/backstage/inventory"
+base_url_env = ["INVENTORY_URL"]

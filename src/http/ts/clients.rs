@@ -1,20 +1,30 @@
 //! TypeScript and JavaScript consumers (spec #23): `fetch(url, init)`, only in a pack whose
 //! globals bind `fetch` (also a call to a parameter defaulting to `fetch`). A client wrapper is
-//! read at each of its call sites through `Code::expand`, and the shape the consumer reads
+//! read at each of its call sites through `Code::expand`; a URL whose base is Backstage's
+//! `getBaseUrl('<id>')` starts at `/api/<id>` (`backstage`), one through `/api/proxy/<ep>` goes to
+//! the target of the endpoint `app-config*.yaml` gives (`config`), and the shape the consumer reads
 //! of the response is the field paths `response_reads` reads over the frames climbed. Seams of
 //! the root reused: its `fetch(args)` reader (`locate`, `method`, `fragments`) and `consumer`.
 
 use super::super::{consumer, fetch};
+use super::backstage;
+use super::config::Config;
 use crate::contract::Found;
 use crate::declared::{self, Declared, Types};
+use crate::index::Indexed;
 use crate::lang::{Step, Ty};
 use crate::literals::Literals;
 use crate::resolve::{Code, Expand, Expanded, Frame, Target};
 use crate::shape::{self, Import, Shape, Source, under};
 
 /// `fetch` consumers with the shape each reads of its response (spec #23).
-pub(in crate::http) fn consumers(code: &Code, literals: &mut Literals) -> Vec<Found> {
+pub(in crate::http) fn consumers(
+    code: &Code,
+    indexed: &Indexed,
+    literals: &mut Literals,
+) -> Vec<Found> {
     let mut found = Vec::new();
+    let config = Config::new(indexed.configs);
     // `fetch` is a consumer only where the language binds it everywhere.
     let global = code.binds_everywhere("fetch");
     for (&path, facts) in code.files() {
@@ -25,7 +35,25 @@ pub(in crate::http) fn consumers(code: &Code, literals: &mut Literals) -> Vec<Fo
             if !is_fetch || code.args(path, n).is_none_or(<[_]>::is_empty) {
                 continue;
             }
-            let expanded = code.expand(Expand::Call(path, n), &|args, _| fetch(args));
+            // A URL from Backstage's `discovery.getBaseUrl('<id>')` starts at the plugin's mount.
+            let plugin = backstage::base(code, path, n);
+            let expanded = code.expand(Expand::Call(path, n), &|args, _| {
+                let decided = config.decided(args);
+                let folded =
+                    (plugin.as_deref()).and_then(|id| Some((id, backstage::based(&decided, id)?)));
+                let args = folded.as_ref().map_or(&decided, |(_, args)| args);
+                // A URL through a proxy endpoint goes to the endpoint's target.
+                let proxied = config.proxied(args);
+                let target = proxied.as_ref().and_then(|p| p.args.as_ref());
+                let mut read = fetch(target.unwrap_or(args))?;
+                if let (None, Some((id, _))) = (&read.via, folded) {
+                    read.via = Some(backstage::client(id));
+                }
+                if let Some(p) = proxied {
+                    read.via = backstage::proxied(read.via, &p.endpoint, p.args.is_some());
+                }
+                Some(read)
+            });
             for Expanded {
                 site: (site, at),
                 frames,

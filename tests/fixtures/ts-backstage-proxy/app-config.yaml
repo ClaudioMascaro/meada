@@ -1,0 +1,30 @@
+proxy:
+  endpoints:
+    '/inventory':
+      target: ${INVENTORY_URL}
+    '/stock':
+      target: https://stock.example.com/
+    '/rewritten':
+      target: https://stock.example.com
+      pathRewrite:
+        '^/api/proxy/rewritten': '/v1'
+    '/stripped':
+      target: https://stock.example.com
+      pathRewrite:
+        '^/api/proxy/stripped': ''
+    '/slashed':
+      target: https://stock.example.com
+      pathRewrite:
+        '^/api/proxy/slashed/': '/'
+    '/twice':
+      target: https://stock.example.com
+      pathRewrite:
+        '^/api/proxy/twice': ''
+        '^/old': '/new'
+    '/legacy':
+      target: ${LEGACY_URL}/v2
+    '/ignored':
+      target: https://stock.example.com
+      ignorePath: true
+    '/disputed':
+      target: https://stock.example.com

@@ -8,6 +8,38 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Backstage backends: the router a backend plugin gives its `httpRouter`
+  (`coreServices.httpRouter`) is served under `/api/<pluginId>` when `createBackendPlugin` writes
+  its `pluginId` as a literal or as a `const` of the file bound to one, so two plugins with the
+  same relative path no longer collide, and a URL
+  that starts with `discovery.getBaseUrl('<id>')` (held by a constant or written in place) starts
+  at `/api/<id>`, its link's reason naming the plugin's mount (as does a hostless call of a route
+  the plugin serves in its own repository). A plugin whose `pluginId` cannot be read stays at the
+  root, and `meada status` names it. TypeScript and JavaScript functions now give their `return`
+  values and an arrow's expression body to the value flow, so a router a factory returns
+  (`httpRouter.use(await createRouter())`) is followed (#615).
+- Backstage proxy: a TypeScript or JavaScript `fetch` whose URL starts with `/api/proxy/<endpoint>`
+  (also `discovery.getBaseUrl('proxy')` plus `/<endpoint>`) is a call to the `target` of that
+  endpoint in `proxy.endpoints` of an `app-config*.yaml`: a `${VAR}` target links through the
+  peer's `base_url_env` and a literal `http(s)://` target by host, the link's reason naming the
+  endpoint, and any other target leaves the call unlinked, which `meada status` says. A
+  `pathRewrite` that only strips the endpoint is followed; any other one, `ignorePath`,
+  `prependPath: false` and an endpoint the `app-config*.yaml` files disagree on leave the call
+  unlinked too (#616).
+- Go: a struct field tagged `env:"X"` (cleanenv, caarlos0/env) or `envconfig:"X"`
+  (kelseyhightower/envconfig) is the environment read `X` where the field is read
+  (`cfg.API.URL`), so `base_url_env` links such a call as `inferred` instead of `ambiguous`
+  (#618).
+
+- A Python pydantic-settings field is an environment read: a field `f` of a `BaseSettings`
+  subclass of the same file is the variable `<env_prefix><F>` (upper case), or its `alias` /
+  `validation_alias`, so the peer's `base_url_env` links `f"{settings.f}/orders"` as an
+  environment read does instead of leaving it `ambiguous`; other classes are unchanged (#619).
+- A TypeScript or JavaScript base URL read through Backstage's `config.getString('a.b')` or
+  `getOptionalString('a.b')` is the variable `VAR` when an `app-config*.yaml` of the repository
+  holds `a.b: ${VAR}`, so the peer's `base_url_env` links the call as an environment read does
+  instead of leaving it `ambiguous`; a literal value or a key no file holds leaves the base
+  unresolved (#617).
 - A PyPI version specifier is checked against the provider's version as PEP 440 says, as npm's
   range is: `range mismatch` when the specifiers (`==`, `!=`, `<`, `<=`, `>`, `>=`, `~=`, `==X.*`
   and `===`, joined by commas) reject the local version, nothing added when they accept it, and
@@ -52,6 +84,24 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Go: a method named like a resty verb (`Get`, `Post`, `Put`, `Patch`, `Delete`, `Head`,
+  `Options`) called on a struct field that holds a repository, a Kubernetes client or a cache
+  client (`s.repo.Get(ctx, id)`) is no longer an HTTP consumer with an unresolved URL, so
+  `meada decide` lists no open item for it; a field holding a resty request or client keeps its
+  consumers (#621).
+- A route whose handler sits in a test file (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`,
+  `*_test.py`, a `tests` or `__tests__` directory, `src/test`) is no provider: a test's router
+  or fake upstream no longer shows in `search` and the export, and no longer makes the client
+  repository a candidate for the route it consumes, so those calls link to the only real server
+  instead of turning `ambiguous`. The test code stays indexed; `test_routes = true` in
+  `meada.toml` keeps the routes as providers (#620).
+- A comment inside a Go parameter list or argument list (`func NewRouter( //nolint:funlen`,
+  `NewRouter( // engine`) is no longer read as a parameter or an argument: it took position 0, so
+  a router handed to such a function reached none of its routes. The shared child walk of the
+  packs now skips comments, which also fixes the same shift in the TypeScript pack (#613).
+
+- Express routes registered on an `express-promise-router` router (the Backstage backend default)
+  are provided: its default import counts as a router factory under any local name (#614).
 - A refresh resolves a Swift file as a cold index does: the type parameters of a type or
   function (`Page<Item>`) are kept in the index, so an `Item()` in an extension of `Page` in
   another file is no construction of a type named `Item` after an edit to an unrelated Swift file
@@ -95,6 +145,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- An Express app or router a TypeScript or JavaScript function returns now takes the prefixes of
+  the mounts it is given to: `app.use('/v1', makeRouter())` serves `makeRouter`'s routes under
+  `/v1/...`, where they were served at the root, and the links of consumers of those paths change
+  with them (#615).
 - A refresh keeps the rows of each group of language packs that resolve together (TypeScript and
   JavaScript, Rust, Python, ...) when no file of the group changed and the config files,
   manifests, file list and exports did not move: its contracts are not extracted again, its calls

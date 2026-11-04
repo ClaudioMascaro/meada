@@ -1,0 +1,8 @@
+# A Python service reads its base URLs through pydantic-settings. `api` declares the variable
+# `APP_API_URL`; `other` serves the same route.
+[[peer]]
+repo = "example.com/pysettings/api"
+base_url_env = ["APP_API_URL", "ORDERS_URL", "APP_REQUIRED", "BOTH_URL"]
+
+[[peer]]
+repo = "example.com/pysettings/other"

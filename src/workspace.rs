@@ -328,6 +328,7 @@ fn config_of(entry: EntryFile) -> Config {
         peers: peers.collect(),
         serve: entry.serve,
         resources: entry.resources,
+        test_routes: false,
     }
 }
 

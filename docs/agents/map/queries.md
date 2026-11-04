@@ -122,7 +122,8 @@ this file, and a change to these modules updates it.
   its `response` shape lines (which name the document); its consumers are calls, left to
   `trace` and to the `contracts:` of their symbols. Only `ContractKind::sides` makes a start
   point to `context` in `trace`, so a route stays a `trace` start. `status` also prints,
-  under each repository, the lines `Engine::status_report` gathers (resource lines,
+  under each repository, the lines `Engine::status_report` gathers (resource lines and
+  each Backstage plugin left at the root, `Export::unmounted`, through `ContractKind::status`,
   then document lines from `document::report`; same indexed-only rule as
   decisions). `search` shows a route only a document lists at `<document path> (documented
   only)` (`Export::document_of`). `search` kind `document` (`search_documents`, an early branch

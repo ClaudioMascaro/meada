@@ -52,6 +52,7 @@ mod serving;
 mod snapshot;
 mod stale;
 mod swiftpkg;
+mod test_routes;
 mod test_services;
 mod trace;
 mod ui;

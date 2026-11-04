@@ -23,6 +23,10 @@ pub struct Config {
     pub serve: Serve,
     #[serde(default, rename = "resource")]
     pub resources: Vec<Resource>,
+    /// Keeps the routes whose handler sits in a test file as providers (`http::is_test_file`):
+    /// by default a test's router or fake upstream is no provider of the repository.
+    #[serde(default)]
+    pub test_routes: bool,
 }
 
 #[derive(Deserialize, Clone)]

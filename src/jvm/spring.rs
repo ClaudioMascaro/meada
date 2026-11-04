@@ -180,7 +180,7 @@ fn read_properties(src: &str) -> Properties {
 /// a list, a null and anything the reader cannot read are left out (and the whole file,
 /// when its joined keys pass `YAML_KEY_BUDGET`), and so is a document
 /// that activates on a profile.
-fn read_yaml(src: &str) -> Properties {
+pub fn read_yaml(src: &str) -> Properties {
     let Ok(root) = crate::document::yaml::parse(src) else {
         return Properties::new();
     };

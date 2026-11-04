@@ -102,7 +102,8 @@ from ...", with the whole list. A value the index now stores joins it.
   `shape`: the exported name in `method`, the view (`shape::Want`) in `via`, and field paths, open
   parts, scalar leaves, declared and optional paths and the imports they leave to fill, issue
   #175; what crosses repositories is this shape of an exported name,
-  never its source text), the names of the Cargo features a Rust crate enables by default
+  never its source text), the Backstage plugins whose `pluginId` cannot be read (`contracts`
+  rows of role `unmounted`, no contract, at the `createBackendPlugin` call, issue #615), the names of the Cargo features a Rust crate enables by default
   (`files.setting`, a comma-separated list per file, from `[features] default`), the Rust item
   macros a file invokes (#398: the lines after it in `files.setting`, each a macro's name and the
   `cfg` predicates its arm writes, as tokens; `Facts::macro_rules`, the outer attributes each
@@ -630,7 +631,10 @@ from ...", with the whole list. A value the index now stores joins it.
   object parameter reading its names (`Param::fields`) off the literal object the caller passes.
   A call to a function that only returns a string (`Def::lone_string`, filled by the TS/JS pack for an
   expression body or one lone `return`) folds to it with the call's arguments (`Code::built`, #536):
-  `exact` calls alone, every part known or the call stays as written.
+  `exact` calls alone, every part known or the call stays as written. The TS/JS pack lists each
+  `return` of a function (and an arrow's expression body) in `Def::return_values` (#615), so the
+  value flow follows a router or client a factory returns; a `return` of a function that is no
+  definition (one returned in place) is nobody's.
   `Code::expand` returns, for each site, the wrapper calls it
   climbed (`Expanded::frames`, `Frame {def, path, index}`, innermost first), and `Code::uses(path, index)` reads
   `Call::uses` like `args` (a file without full facts is a miss). An argument binds a parameter as its `Param::binds` says: by position or by

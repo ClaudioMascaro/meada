@@ -94,7 +94,8 @@ environment reads; the architecture map keeps the lead of the first:
   bound once and never assigned): text, or names that are constants of the same file holding
   plain values; a call, a name bound to a read, a loop variable, a package `var` or a name from
   another file leaves `v` no constant, so the base is absent. `http/go/clients.rs` `one_read`
-  makes every read of a URL a hole when it holds two. `http.rs` `locate` and `link` map the
+  makes every read of a URL a hole when it holds two. `values::tagged` reads struct fields tagged `env:"X"`/`envconfig:"X"` as
+  `Str([Env(X)])` where the field is selected (`Std::field_env`). `http.rs` `locate` and `link` map the
   head `Env` as for every language. The `xlang-go-*` fixtures are the cross-language chain: a
   repository of another language joins by one more `common::xlang_go` entry.
 

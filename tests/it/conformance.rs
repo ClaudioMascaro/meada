@@ -9165,6 +9165,44 @@ fn a_chi_subrouter_passed_on_past_the_limit_is_not_read() {
     assert!(!export.contains("http::GET::/long/end"));
 }
 
+/// A line comment inside a Go parameter list or argument list (`func NewRouter( //nolint:funlen`)
+/// is no parameter and no argument (#613): the router handed to `NewRouter` still reaches its
+/// routes. The fixture writes a comment in the call and in the signature (each shifts a
+/// position, so together they cancel); each file is also read without its comments, alone and
+/// together, and all four give the same three HTTP providers.
+#[test]
+fn a_go_comment_in_a_parameter_or_argument_list_shifts_no_position() {
+    let expected = [
+        "http::GET::/clusters",
+        "http::GET::/clusters/{}",
+        "http::GET::/healthcheck",
+    ];
+    for (case, bare) in [
+        ("both", &[][..]),
+        ("call", &["cmd/main.go"][..]),
+        ("signature", &["http/router.go"][..]),
+        ("neither", &["cmd/main.go", "http/router.go"][..]),
+    ] {
+        let repo = fixture_repo(&format!("go_comments_{case}"), "go-comments", Some(ORIGIN));
+        for file in bare {
+            let source = std::fs::read_to_string(repo.join(file)).unwrap();
+            let stripped: String = (source.lines())
+                .map(|line| line.split("//").next().unwrap().trim_end())
+                .map(|line| format!("{line}\n"))
+                .collect();
+            std::fs::write(repo.join(file), stripped).unwrap();
+        }
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        let json: Value = serde_json::from_str(&export).unwrap();
+        let mut routes: Vec<&str> = (json["providers"].as_array().unwrap().iter())
+            .map(|p| p["contract"].as_str().unwrap())
+            .filter(|c| c.starts_with("http::"))
+            .collect();
+        routes.sort();
+        assert_eq!(routes, expected, "comments kept: {case}");
+    }
+}
+
 /// The routers of the Go fixture (spec #25): `net/http` patterns, and gin, echo, chi and
 /// gorilla/mux groups, with every prefix a router is registered under (chi's `Route`, `Group`
 /// and `Mount`, gorilla's `PathPrefix(..).Subrouter()`), a group passed to or returned from a
@@ -11010,6 +11048,56 @@ fn python_environment_reads_name_the_base_url_variable() {
         python_clients("python_http_environment", "environment.py"),
         expected
     );
+}
+
+#[test]
+fn express_promise_router_routers_export_their_routes_like_express_routers() {
+    let repo = fixture_repo("express_promise_router", "ts-basic", Some(ORIGIN));
+    let routes = |import: &str, make: &str| -> Vec<String> {
+        let src = format!(
+            "{import}\nexport function createRouter() {{\n  const router = {make};\n  router.post(\n    '/requests',\n    (req, res) => res.json({{}}),\n  );\n  router.get('/requests/:id', (req, res) => res.json({{}}));\n  return router;\n}}\n"
+        );
+        std::fs::write(repo.join("src/router.ts"), src).unwrap();
+        let export = Engine::open(&repo).unwrap().export().unwrap();
+        let json: Value = serde_json::from_str(&export).unwrap();
+        let mut found: Vec<String> = (json["providers"].as_array().unwrap().iter())
+            .map(|p| p["contract"].as_str().unwrap().to_string())
+            .collect();
+        found.sort();
+        found
+    };
+    let expected = ["http::GET::/requests/{}", "http::POST::/requests"];
+    assert_eq!(
+        routes("import express from 'express';", "express.Router()"),
+        expected
+    );
+    assert_eq!(
+        routes("import Router from 'express-promise-router';", "Router()"),
+        expected
+    );
+    assert_eq!(
+        routes(
+            "import PromiseRouter from 'express-promise-router';",
+            "PromiseRouter()"
+        ),
+        expected
+    );
+    assert_eq!(
+        routes(
+            "import { default as PromiseRouter } from 'express-promise-router';",
+            "PromiseRouter()"
+        ),
+        expected
+    );
+    // A named export of the package, or a `Router` another package makes, is no Express router.
+    assert!(
+        routes(
+            "import { Other as Router } from 'express-promise-router';",
+            "Router()"
+        )
+        .is_empty()
+    );
+    assert!(routes("import Router from 'koa-router';", "Router()").is_empty());
 }
 
 #[test]

@@ -60,6 +60,10 @@ pub enum Role {
     /// (`shape::Want`). Stored, never exported; at query time it fills the parts of the shapes
     /// that import the name.
     Shape,
+    /// Neither side: a Backstage backend plugin whose `pluginId` Meada cannot read (#615), at its
+    /// `createBackendPlugin` call, no `contract`: its routers stay at the root. Stored, never
+    /// exported; `meada status` reports it.
+    Unmounted,
 }
 
 impl Role {
@@ -72,6 +76,7 @@ impl Role {
             Role::Publish => "publish",
             Role::Import => "import",
             Role::Shape => "shape",
+            Role::Unmounted => "unmounted",
         }
     }
 }

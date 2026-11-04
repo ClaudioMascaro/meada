@@ -349,6 +349,12 @@ impl LanguagePack for Python {
         let hidden;
         (facts.receivers, facts.consts, hidden) = locals.finish();
         facts.locals.extend(hidden);
+        // A settings field is the variable it reads, not the default it is written with.
+        let settings = settings_consts(tree.root_node(), src);
+        facts
+            .consts
+            .retain(|c| !settings.iter().any(|s| s.name == c.name));
+        facts.consts.extend(settings);
         Ok(facts)
     }
 
@@ -1287,6 +1293,103 @@ fn imports(node: Node, src: &[u8], out: &mut Vec<Import>) {
     }
 }
 
+/// The environment reads of pydantic-settings: for each field of a `BaseSettings` subclass, a
+/// constant `Settings.field` (reached through `s = Settings()` like any member) holding the
+/// variable the field reads, `<env_prefix><FIELD>` or the `alias` / `validation_alias` (not
+/// prefixed), uppercased: the default is case-insensitive. The prefix is `env_prefix=` of `model_config =
+/// SettingsConfigDict(...)` or of an inner `class Config`.
+// ponytail: only a top-level base class in the same file, a literal prefix or alias; `AliasChoices`,
+// v1 `Field(env=)`, a dict `model_config`, `case_sensitive` and inherited settings are not read.
+fn settings_consts(root: Node, src: &[u8]) -> Vec<Const> {
+    let keyword = |call: Node, key: &str| -> Option<String> {
+        let list = call.child_by_field_name("arguments")?;
+        named(list)
+            .filter(|a| a.kind() == "keyword_argument")
+            .find(|a| (a.child_by_field_name("name")).is_some_and(|n| text(n, src) == key))
+            .and_then(|a| string(a.child_by_field_name("value")?, src))
+    };
+    let mut consts = Vec::new();
+    for class in named(root).filter(|n| n.kind() == "class_definition") {
+        let bases = class.child_by_field_name("superclasses");
+        let is_settings = bases.is_some_and(|b| {
+            named(b).any(|b| {
+                matches!(
+                    callee(b, src).as_str(),
+                    "BaseSettings" | "pydantic_settings.BaseSettings" | "pydantic.BaseSettings"
+                )
+            })
+        });
+        let (Some(name), Some(body), true) = (
+            class.child_by_field_name("name"),
+            class.child_by_field_name("body"),
+            is_settings,
+        ) else {
+            continue;
+        };
+        let mut prefix = String::new();
+        let mut fields = Vec::new();
+        for stmt in named(body).filter(|s| s.kind() == "expression_statement") {
+            let Some((left, right, assign)) = assignment(stmt) else {
+                continue;
+            };
+            let key = text(left, src);
+            let call = right.filter(|r| r.kind() == "call");
+            if key == "model_config" {
+                prefix = call
+                    .and_then(|c| keyword(c, "env_prefix"))
+                    .unwrap_or(prefix);
+            } else if left.kind() == "identifier"
+                && !key.starts_with('_')
+                && (assign.child_by_field_name("type"))
+                    .is_some_and(|t| !text(t, src).contains("ClassVar"))
+            {
+                // No annotation or a ClassVar is no field; a field needs no default.
+                let alias = call
+                    .and_then(|c| keyword(c, "validation_alias").or_else(|| keyword(c, "alias")))
+                    .map(|a| a.to_uppercase());
+                fields.push((key.to_string(), alias));
+            }
+        }
+        // The legacy `class Config: env_prefix = "X"`.
+        let is_config = |c: &Node| {
+            c.kind() == "class_definition"
+                && (c.child_by_field_name("name")).is_some_and(|n| text(n, src) == "Config")
+        };
+        for config in named(body).filter(is_config) {
+            let inner = config.child_by_field_name("body");
+            for stmt in inner.into_iter().flat_map(named) {
+                if let Some((left, right, _)) = assignment(stmt)
+                    && text(left, src) == "env_prefix"
+                    && let Some(p) = right.and_then(|r| string(r, src))
+                {
+                    prefix = p;
+                }
+            }
+        }
+        let class = text(name, src);
+        for (field, alias) in fields {
+            let var = alias.unwrap_or_else(|| format!("{prefix}{field}").to_uppercase());
+            consts.push(Const {
+                name: format!("{class}.{field}"),
+                value: Value::Str(vec![Part::Env(var)]),
+                ty: None,
+                scope: None,
+            });
+        }
+    }
+    consts
+}
+
+/// The left, the right and the node of the assignment an expression statement is.
+fn assignment(stmt: Node) -> Option<(Node, Option<Node>, Node)> {
+    let a = named(stmt).next().filter(|a| a.kind() == "assignment")?;
+    Some((
+        a.child_by_field_name("left")?,
+        a.child_by_field_name("right"),
+        a,
+    ))
+}
+
 /// The strings of a list or tuple literal of string literals; `None` for anything else.
 fn string_list(node: Node, src: &[u8]) -> Option<Vec<String>> {
     if !matches!(node.kind(), "list" | "tuple") {
@@ -1593,6 +1696,23 @@ mod tests {
 
     fn facts(src: &str) -> Facts {
         Python.parse("a.py", src.as_bytes()).unwrap()
+    }
+
+    #[test]
+    fn only_an_inner_class_config_gives_a_settings_prefix() {
+        let src = "from pydantic_settings import BaseSettings\n\
+            class Legacy(BaseSettings):\n    url: str = ''\n    class Config:\n        env_prefix = 'old_'\n\
+            class Other(BaseSettings):\n    url: str = ''\n    class Meta:\n        env_prefix = 'no_'\n";
+        let consts = consts(src);
+        let env = |name: &str| match held(&consts, name) {
+            Value::Str(parts) => match parts.as_slice() {
+                [Part::Env(v)] => v.clone(),
+                _ => panic!("{name} is no env read"),
+            },
+            _ => panic!("{name} is no string"),
+        };
+        assert_eq!(env("Legacy.url"), "OLD_URL");
+        assert_eq!(env("Other.url"), "URL");
     }
 
     #[test]
