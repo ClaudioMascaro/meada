@@ -2566,3 +2566,27 @@ fn a_refresh_does_not_parse_a_kept_group_again() {
     assert!(refreshed.contains("billing.example.com"), "{refreshed}");
     assert!(!refreshed.contains("bulling"), "{refreshed}");
 }
+
+/// An edit that changes what a file exports keeps no group, though the other groups' exports
+/// are read from their stored rows (#610): the Python job's file, rewritten under its old stamp,
+/// is parsed again and gives its new host.
+#[test]
+fn an_edit_of_what_a_file_exports_keeps_no_group() {
+    let repo = catalog("fresh_kept_exports");
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    engine.export().unwrap();
+    replace(&repo, "jobs/report.py", "billing", "bulling");
+    age(&repo);
+    let export = "export async function titles()";
+    replace(
+        &repo,
+        "web/comments.ts",
+        export,
+        &format!("export const n = 1;\n{export}"),
+    );
+
+    let refreshed = engine.export().unwrap();
+
+    assert!(refreshed.contains("bulling.example.com"), "{refreshed}");
+}

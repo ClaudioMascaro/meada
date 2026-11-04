@@ -209,10 +209,10 @@ environment reads; the architecture map keeps the lead of the first:
   and leave the export), `Layout::modules` (by default the pack's `modules`; it answers with a shared
   list, `Rc<[String]>`, so a lookup costs the same whatever the namespace holds), `Layout::published`
   and `Layout::programs` (both below), and `Layout::reaches` (default: none, every file), the
-  files a name match may reach from a caller (`Resolver::reaching`, called by `refresh`):
+  files a name match may reach from a caller (`Resolver::with_layout`, called by `refresh`):
   Rust's are its crate's and those of the repository's libraries it depends on. A language whose
   files share one scope (a Go package: the files of one directory that declare one package; Java and Kotlin packages, which share the Java layout, as C# namespaces do) says which through `Layout::shared`, groups of files that
-  `Resolver::with_shared` takes: a name a file and its imports leave unbound is looked up
+  `Resolver::with_layout` takes: a name a file and its imports leave unbound is looked up
   among the top-level definitions and constants of the others in its group, private ones
   included (`Resolver::sibling`, at the end of `lexical_as`), and an import that names any
   file of a group (`Modules` gives the first candidate, which stands for them all) exports what

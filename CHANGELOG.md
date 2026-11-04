@@ -36,6 +36,10 @@ All notable changes to Meada are recorded here. The format follows
   (`values.db`, ADR 0027) instead of parsing them again: on this repository, a one-line edit of a
   Rust file refreshes in 1.4 s instead of 3.4 s. The refreshed index still equals a cold one, and
   deleting the cache costs only time (#611).
+- A refresh builds no resolver for a group it keeps, resolves each call of a changed group once,
+  writes communities again only when the call graph moved, and the actix-web reader skips the
+  lookups whose answer it does not use: on this repository a one-line edit of a Rust file
+  refreshes in 1.0 s instead of 1.5 s, with the same index (#610).
 
 ### Fixed
 

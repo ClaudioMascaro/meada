@@ -24,6 +24,7 @@ pub struct Target<'a> {
     pub name: &'a str,
 }
 
+#[derive(Clone)]
 pub enum Resolution<'a> {
     /// Scope and import resolution found one definition.
     Exact(Target<'a>),
@@ -416,6 +417,13 @@ pub struct Resolver<'a> {
     /// reach another function: it is not kept, so a wrapper or a parameter is never climbed
     /// through it.
     callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
+    /// What each call resolved to when the resolver was built, by file and position
+    /// (`resolved_at`).
+    built: HashMap<&'a str, Vec<Resolution<'a>>>,
+    /// Whether `built` holds what `call` answers now: it was resolved under the `reaches` the
+    /// resolver has. Else only its `exact` calls are, since no name match gives one and only
+    /// name matches read `reaches` (`candidates`); `publishing` changes no call.
+    built_final: bool,
     /// The calls made on a receiver that reach each extension method (`Resolver::extension_call`),
     /// sorted: a name match the value flow takes, as the language binds it.
     extension_callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
@@ -705,11 +713,43 @@ impl<'a> Resolver<'a> {
     }
 
     /// `new`, with the groups of files that share one top-level scope (`Layout::shared`).
+    #[cfg(test)]
     pub fn with_shared(
         files: &'a BTreeMap<&'a str, &'a Facts>,
         modules: Modules,
         shared: Vec<Vec<String>>,
         language: &dyn LanguagePack,
+    ) -> Self {
+        Self::built(files, modules, shared, language, None)
+    }
+
+    /// The resolver of the files of a pack, under what its `layout` makes of them: the shared
+    /// scopes, the files it publishes (`publishing`) and the files each reaches.
+    pub fn with_layout(
+        files: &'a BTreeMap<&'a str, &'a Facts>,
+        layout: crate::lang::Layout,
+        language: &dyn LanguagePack,
+    ) -> Self {
+        let resolver = Self::built(
+            files,
+            layout.modules,
+            layout.shared,
+            language,
+            layout.reaches,
+        );
+        resolver.publishing(layout.published)
+    }
+
+    /// The resolver of `files`, its name matches limited to the definitions each file reaches
+    /// (`Layout::reaches`; `None` reaches every file) from the first call it resolves, unless
+    /// its extension callers need the calls resolved without that limit. `callers` holds exact
+    /// calls alone, which the limit leaves as they are.
+    fn built(
+        files: &'a BTreeMap<&'a str, &'a Facts>,
+        modules: Modules,
+        shared: Vec<Vec<String>>,
+        language: &dyn LanguagePack,
+        reaches: Option<Reaches>,
     ) -> Self {
         let defs: HashMap<&str, HashMap<&str, &Def>> = files
             .iter()
@@ -1010,6 +1050,8 @@ impl<'a> Resolver<'a> {
             known: crate::lang::known_outside(language),
             globals: language.globals(),
             callers: HashMap::new(),
+            built: HashMap::new(),
+            built_final: false,
             extension_callers: HashMap::new(),
             by_name,
             modules,
@@ -1161,11 +1203,22 @@ impl<'a> Resolver<'a> {
             .for_each(|b| b.sort_by_key(|b| b.of_trait));
         (resolver.impls, resolver.blocks, resolver.outside) = (impls, blocks, outside);
         (resolver.unread, resolver.extensions) = (unread, extensions);
+        // The extension callers are name matches made without `reaches`: a pack with extension
+        // methods is limited to it once they are found.
+        let mut reaches = reaches;
+        if !resolver.extension_methods {
+            resolver.reaches = reaches.take();
+            resolver.built_final = true;
+        }
         let mut callers: HashMap<Target, Vec<Caller>> = HashMap::new();
         let mut extension_callers: HashMap<Target, Vec<Caller>> = HashMap::new();
+        let mut built = HashMap::new();
         for (path, facts) in files {
+            let built: &mut Vec<Resolution> = built.entry(*path).or_default();
             for (index, call) in facts.calls.iter().enumerate() {
-                match resolver.call(path, call) {
+                let resolution = resolver.call(path, call);
+                built.push(resolution.clone());
+                match resolution {
                     Resolution::Exact(target) => {
                         callers
                             .entry(target)
@@ -1180,6 +1233,10 @@ impl<'a> Resolver<'a> {
             }
         }
         (resolver.callers, resolver.extension_callers) = (callers, extension_callers);
+        resolver.built = built;
+        if reaches.is_some() {
+            resolver.reaches = reaches;
+        }
         resolver
     }
 
@@ -1216,15 +1273,18 @@ impl<'a> Resolver<'a> {
         self
     }
 
-    /// Limits name matches to the definitions each file reaches (`Layout::reaches`); `None`
-    /// reaches every file. `callers` holds exact calls alone, which this leaves as they are.
-    pub fn reaching(mut self, reaches: Option<Reaches>) -> Self {
-        self.reaches = reaches;
-        self
-    }
-
     pub fn call(&self, path: &'a str, call: &'a Call) -> Resolution<'a> {
         self.resolved(path, call, true, &mut Work::default())
+    }
+
+    /// `call` of the call at `index` of `path`, read from what the resolver resolved when it
+    /// was built where that still holds (`built_final`).
+    pub fn resolved_at(&self, path: &'a str, index: usize) -> Resolution<'a> {
+        match self.built.get(path).and_then(|b| b.get(index)) {
+            Some(known) if self.built_final => known.clone(),
+            Some(exact @ Resolution::Exact(_)) => exact.clone(),
+            _ => self.call(path, &self.files[path].calls[index]),
+        }
     }
 
     /// `call`, resolved. Where the pack only guesses at constructor syntax
@@ -7090,6 +7150,68 @@ mod tests {
         assert!(origin(3).unwrap().ends_with("Dial.M.M.M"));
         assert!(origin(RECEIVER_DEPTH - 1).is_some());
         assert_eq!(origin(RECEIVER_DEPTH), None);
+    }
+
+    /// What the resolver built over the Rust conformance workspace answers each call when it is
+    /// built (`resolved_at`, from the build pass run under the workspace's `reaches`) equals what
+    /// `call` answers afterwards: resolving the build pass without `reaches` while keeping its
+    /// answers turns it red.
+    #[test]
+    fn the_build_pass_answers_every_call_as_call_does() {
+        use crate::lang::rust::Rust;
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/conformance-rust");
+        let (mut sources, mut configs) = (Vec::new(), Vec::new());
+        let mut dirs = vec![root.clone()];
+        while let Some(dir) = dirs.pop() {
+            for entry in std::fs::read_dir(dir).unwrap() {
+                let path = entry.unwrap().path();
+                let rel = path
+                    .strip_prefix(&root)
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string();
+                match path.extension().and_then(|e| e.to_str()) {
+                    _ if path.is_dir() => dirs.push(path),
+                    Some("rs") => sources.push((rel, std::fs::read(&path).unwrap())),
+                    _ if rel.ends_with("Cargo.toml") => {
+                        configs.push((rel, std::fs::read(&path).unwrap()))
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let parsed: Vec<(String, Facts)> = (sources.iter())
+            .map(|(rel, src)| (rel.clone(), Rust.parse(rel, src).unwrap()))
+            .collect();
+        let configs: Vec<(&str, &[u8])> = (configs.iter())
+            .map(|(p, c)| (p.as_str(), c.as_slice()))
+            .collect();
+        let mut files: BTreeMap<&str, &Facts> =
+            (parsed.iter()).map(|(p, f)| (p.as_str(), f)).collect();
+        let layout = Rust.layout(&configs, &files).unwrap();
+        if let Some(members) = &layout.members {
+            files.retain(|path, _| members.contains(*path));
+        }
+        let resolver = Resolver::with_layout(&files, layout, &Rust);
+        let answer = |r: Resolution| match r {
+            Resolution::Exact(t) => format!("exact {}::{}", t.path, t.name),
+            Resolution::Inferred(t) => format!("inferred {}::{}", t.path, t.name),
+            Resolution::Narrowed(t) => format!("narrowed {}::{}", t.path, t.name),
+            Resolution::Ambiguous(ts) => (ts.iter())
+                .map(|t| format!("{}::{}", t.path, t.name))
+                .fold("ambiguous".to_string(), |all, t| all + " " + &t),
+            Resolution::Unresolved => "unresolved".to_string(),
+        };
+        let mut calls = 0;
+        for (&path, facts) in &files {
+            for (index, call) in facts.calls.iter().enumerate() {
+                let built = answer(resolver.resolved_at(path, index));
+                assert_eq!(built, answer(resolver.call(path, call)), "{path} #{index}");
+                calls += 1;
+            }
+        }
+        assert!(calls > 100, "{calls} calls");
     }
 
     /// A Python file of `n` classes, each but the first deriving from the one before and

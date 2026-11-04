@@ -888,12 +888,14 @@ fn refresh_keeping(
         layouts.insert(pack, layout);
     }
     let all: BTreeMap<&str, &Facts> = groups.values().flatten().map(|(p, f)| (*p, *f)).collect();
+    let mut graph_moved = false;
     // A file its pack leaves out keeps its facts, for when a change brings it in, but no rows:
     // an empty `resolved` both marks it and makes the rows be written again then.
     for path in parsed.keys().filter(|p| !all.contains_key(*p)) {
         if stored.get(*path).is_some_and(|s| s.resolved.is_empty()) {
             continue;
         }
+        graph_moved = true;
         forget_calls(&tx, path)?;
         tx.execute("DELETE FROM symbols WHERE path = ?1", params![path])?;
         tx.execute(
@@ -902,47 +904,71 @@ fn refresh_keeping(
         )?;
     }
     let mut roots: Vec<(String, String)> = Vec::new();
-    let mut resolvers: BTreeMap<usize, Resolver> = BTreeMap::new();
-    for (&pack, files) in &groups {
-        let layout = layouts.remove(&pack).expect("a layout per pack");
-        roots.extend(layout.programs);
-        let resolver =
-            Resolver::with_shared(files, layout.modules, layout.shared, lang::pack(pack));
-        let resolver = resolver.publishing(layout.published);
-        resolvers.insert(pack, resolver.reaching(layout.reaches));
+    for layout in layouts.values_mut() {
+        roots.append(&mut layout.programs);
     }
+    let group_of = |path: &str| {
+        let pack = packs.get(path).copied().or_else(|| lang::pack_for(path));
+        pack.map(lang::resolver_of)
+    };
+    // The groups that may keep their rows; their resolvers are built only if none is kept.
+    let candidates = match keep && known_configs.as_deref() == Some(&digest) {
+        true => candidate_groups(
+            &stored,
+            &groups,
+            group_of,
+            (changed_paths.iter().map(String::as_str))
+                .chain(deleted.iter().map(|p| p.as_str()))
+                .chain(restamped.iter().map(String::as_str)),
+        ),
+        false => BTreeSet::new(),
+    };
+    let mut resolvers: BTreeMap<usize, Resolver> = BTreeMap::new();
+    for &pack in groups.keys().filter(|g| !candidates.contains(g)) {
+        resolvers.insert(pack, resolver(pack, &groups, &mut layouts));
+    }
+    // A group nothing of which changed exports what it did (`Resolver::exported` reads its own
+    // files and its pack's configs alone): its stored rows stand for its resolver's.
+    let stored_exports = match candidates.is_empty() {
+        true => Vec::new(),
+        false => stored_exports(&tx)?,
+    };
+    let exports_of = |pack: usize, resolvers: &BTreeMap<usize, Resolver>| match resolvers.get(&pack)
+    {
+        Some(resolver) => resolver.exported(),
+        None => (stored_exports.iter())
+            .filter(|e| group_of(&e.path) == Some(pack))
+            .cloned()
+            .collect(),
+    };
+    let mut exported: Vec<Exported> = (groups.keys())
+        .flat_map(|&pack| exports_of(pack, &resolvers))
+        .collect();
+    // A group of packs that resolve together keeps its rows when nothing it reads moved: none
+    // of its files changed, and every group exports what it did.
+    let kept_groups = match !candidates.is_empty() && stored_exports == exported {
+        true => candidates,
+        false => {
+            for &pack in &candidates {
+                resolvers.insert(pack, resolver(pack, &groups, &mut layouts));
+            }
+            exported = resolvers.values().flat_map(Resolver::exported).collect();
+            BTreeSet::new()
+        }
+    };
+    // The files of the kept groups: their rows stay as they are.
+    let kept_files: HashSet<&str> = (kept_groups.iter())
+        .flat_map(|g| groups[g].keys().copied())
+        .collect();
     let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
     let files: Vec<&str> = all.keys().copied().collect();
-    tx.execute("DELETE FROM flexible", [])?;
+    forget_rows_outside(&tx, "flexible", &kept_files)?;
     for f in resolvers.values().flat_map(Resolver::flexible) {
         tx.execute(
             "INSERT INTO flexible VALUES (?1, ?2, ?3, ?4)",
             params![f.path, f.name, f.least as i64, f.most.map(|m| m as i64)],
         )?;
     }
-    let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
-    let kept_groups = match keep && known_configs.as_deref() == Some(&digest) {
-        true => unchanged_groups(
-            &tx,
-            &stored,
-            &groups,
-            &exported,
-            |path| {
-                let pack = packs.get(path).copied().or_else(|| lang::pack_for(path));
-                pack.map(lang::resolver_of)
-            },
-            changed_paths
-                .iter()
-                .map(String::as_str)
-                .chain(deleted.iter().map(|p| p.as_str()))
-                .chain(restamped.iter().map(String::as_str)),
-        )?,
-        false => BTreeSet::new(),
-    };
-    // The files of the kept groups: their rows stay as they are.
-    let kept_files: HashSet<&str> = (kept_groups.iter())
-        .flat_map(|g| groups[g].keys().copied())
-        .collect();
     let pack_configs: Vec<(&str, &[u8])> = (configs.values().flatten())
         .map(|(path, src)| (*path, src.as_slice()))
         .collect();
@@ -1066,6 +1092,9 @@ fn refresh_keeping(
     // change, under names its own contracts give, which did not either.
     // ponytail: a group holding a changed file resolves whole; a reverse-import graph can narrow
     // it if resolution shows up in profiles.
+    // Whether the graph communities are read from moved: a deleted file, one its pack leaves
+    // out, or another version or config, else a file whose symbols or call edges differ.
+    graph_moved = graph_moved || !deleted.is_empty() || known_configs.as_deref() != Some(&digest);
     // The symbols and the targets of every call, for the entry points; a kept file's, as stored.
     let (mut symbols, mut called) = stored_reach(&tx, &kept_files)?;
     let mut order: Vec<(&&str, &&Facts)> = (all.iter())
@@ -1092,6 +1121,7 @@ fn refresh_keeping(
         if before == Some(resolved.as_str()) {
             continue;
         }
+        graph_moved = graph_moved || stored_graph(&tx, path)? != graph(&rows);
         forget_calls(&tx, path)?;
         tx.execute("DELETE FROM symbols WHERE path = ?1", params![path])?;
         for (id, start, end, hash) in &rows.symbols {
@@ -1223,13 +1253,13 @@ fn refresh_keeping(
         )?;
     }
     tx.execute("DELETE FROM exports", [])?;
-    for e in resolvers.values().flat_map(Resolver::exported) {
+    for e in &exported {
         tx.execute(
             "INSERT INTO exports VALUES (?1, ?2, ?3, ?4)",
             params![e.path, e.name, e.file, e.target],
         )?;
     }
-    tx.execute("DELETE FROM families", [])?;
+    forget_rows_outside(&tx, "families", &kept_files)?;
     for a in resolvers.values().flat_map(Resolver::ancestries) {
         let ancestors = a
             .ancestors
@@ -1241,7 +1271,6 @@ fn refresh_keeping(
             params![a.path, a.class, ancestors],
         )?;
     }
-    let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
     // The programs the packs declare per file, and the console scripts of the manifests.
     let scripts = package::programs(&manifests, &files);
     let programs: Vec<entry::Program> = (all.iter())
@@ -1277,7 +1306,10 @@ fn refresh_keeping(
             params![e.identity, e.kind.name(), e.label, e.site],
         )?;
     }
-    write_communities(&tx)?;
+    // Communities are read off the symbols and their `exact` and `inferred` calls alone.
+    if graph_moved {
+        write_communities(&tx)?;
+    }
     tx.execute("DELETE FROM meta", [])?;
     tx.execute(
         "INSERT INTO meta VALUES (?1, ?2)",
@@ -1390,23 +1422,40 @@ fn configs_digest(mut digest: blake3::Hasher, manifest_rows: &[(String, String)]
     digest.finalize().to_hex().to_string()
 }
 
-/// The groups (`lang::resolver_of`) whose rows a refresh keeps: none when the files of the
-/// groups or what they export moved since the last refresh (each group's extraction reads
-/// them), else every group no `touched` path (changed, deleted, or stamped by a join) is of.
-fn unchanged_groups<'p>(
-    db: &Connection,
+/// The groups of packs that resolve together that may keep their rows: the files of every group
+/// are those the index holds rows of, and none of the group's files was changed, deleted or
+/// stamped by a join (`touched`). They keep them when every group also exports what it did.
+fn candidate_groups<'p>(
     stored: &HashMap<String, Stored>,
     groups: &BTreeMap<usize, BTreeMap<&str, &Facts>>,
-    exported: &[Exported],
     group_of: impl Fn(&str) -> Option<usize>,
     touched: impl Iterator<Item = &'p str>,
-) -> Result<BTreeSet<usize>> {
+) -> BTreeSet<usize> {
     let before = (stored.iter()).filter(|(_, s)| !s.resolved.is_empty());
     let before: BTreeSet<&str> = before.map(|(path, _)| path.as_str()).collect();
     let now: BTreeSet<&str> = groups.values().flat_map(|f| f.keys().copied()).collect();
     if before != now {
-        return Ok(BTreeSet::new());
+        return BTreeSet::new();
     }
+    let touched: BTreeSet<usize> = touched.filter_map(group_of).collect();
+    (groups.keys().copied())
+        .filter(|g| !touched.contains(g))
+        .collect()
+}
+
+/// The resolver of the group of `pack`, over its files and what its pack made of them, which
+/// it takes from `layouts`.
+fn resolver<'a>(
+    pack: usize,
+    groups: &'a BTreeMap<usize, BTreeMap<&'a str, &'a Facts>>,
+    layouts: &mut BTreeMap<usize, lang::Layout>,
+) -> Resolver<'a> {
+    let layout = layouts.remove(&pack).expect("a layout per pack");
+    Resolver::with_layout(&groups[&pack], layout, lang::pack(pack))
+}
+
+/// The `exports` rows, in the order they were written.
+fn stored_exports(db: &Connection) -> Result<Vec<Exported>> {
     let mut statement =
         db.prepare("SELECT path, name, file, target FROM exports ORDER BY rowid")?;
     let rows = statement.query_map([], |r| {
@@ -1417,16 +1466,25 @@ fn unchanged_groups<'p>(
             target: r.get(3)?,
         })
     })?;
-    let stored_exports = rows.collect::<rusqlite::Result<Vec<_>>>()?;
-    if stored_exports != exported {
-        return Ok(BTreeSet::new());
+    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+/// Deletes the rows of `table` (`flexible`, `families`) of every file but the kept ones.
+fn forget_rows_outside(tx: &Transaction, table: &str, kept: &HashSet<&str>) -> Result<()> {
+    if kept.is_empty() {
+        tx.execute(&format!("DELETE FROM {table}"), [])?;
+        return Ok(());
     }
-    let touched: BTreeSet<usize> = touched.filter_map(group_of).collect();
-    Ok(groups
-        .keys()
-        .copied()
-        .filter(|g| !touched.contains(g))
-        .collect())
+    let paths: Vec<String> = (tx.prepare(&format!("SELECT DISTINCT path FROM {table}"))?)
+        .query_map([], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    for path in paths.iter().filter(|p| !kept.contains(p.as_str())) {
+        tx.execute(
+            &format!("DELETE FROM {table} WHERE path = ?1"),
+            params![path],
+        )?;
+    }
+    Ok(())
 }
 
 /// The symbols of the files `kept`, and what their calls reach but the caller itself (a self-call
@@ -1555,6 +1613,38 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
         return Ok(false);
     }
     Ok(configs_digest(digest, &manifest_rows(db)?) == configs)
+}
+
+/// What communities read of a file's rows (`write_communities`): its symbols, and the caller and
+/// target of each of its `exact` and `inferred` calls, sorted.
+type Graph = (Vec<String>, Vec<(String, String)>);
+
+/// The graph a file's stored rows give.
+fn stored_graph(tx: &Transaction, path: &str) -> Result<Graph> {
+    let mut symbols: Vec<String> = (tx.prepare_cached("SELECT id FROM symbols WHERE path = ?1")?)
+        .query_map(params![path], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    let mut calls: Vec<(String, String)> = (tx.prepare_cached(
+        "SELECT caller, target FROM calls WHERE path = ?1 AND level IN ('exact', 'inferred') \
+         AND target IS NOT NULL",
+    )?)
+    .query_map(params![path], |r| Ok((r.get(0)?, r.get(1)?)))?
+    .collect::<rusqlite::Result<_>>()?;
+    symbols.sort();
+    calls.sort();
+    Ok((symbols, calls))
+}
+
+/// The graph a file's rows give, as `stored_graph` reads them once written.
+fn graph(rows: &Rows) -> Graph {
+    let mut symbols: Vec<String> = rows.symbols.iter().map(|(id, ..)| id.clone()).collect();
+    let mut calls: Vec<(String, String)> = (rows.calls.iter())
+        .filter(|c| matches!(c.level, Some(Level::Exact | Level::Inferred)))
+        .filter_map(|c| Some((c.caller.clone(), c.target.clone()?)))
+        .collect();
+    symbols.sort();
+    calls.sort();
+    (symbols, calls)
 }
 
 /// Rewrites the `communities` rows from the stored calls at `exact` or `inferred` between two
@@ -2031,8 +2121,9 @@ fn resolve_file<'a>(
         .calls
         .iter()
         .zip(call_ids(identity, path, facts, names))
-        .map(|(call, (caller, call_id))| {
-            let resolution = resolver.call(path, call);
+        .enumerate()
+        .map(|(index, (call, (caller, call_id)))| {
+            let resolution = resolver.resolved_at(path, index);
             let narrowed = matches!(resolution, Resolution::Narrowed(_));
             let (target, level, candidates) = match resolution {
                 Resolution::Exact(t) => (Some(id(&t)), Some(Level::Exact), Vec::new()),
