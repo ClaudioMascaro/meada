@@ -10,6 +10,15 @@
       "upstreamTree": "d6a0d9bf3cdc78cbfcbd6466ac5fd3deffb52877",
       "tree": "d6a0d9bf3cdc78cbfcbd6466ac5fd3deffb52877"
     },
+    "audit-prove-it": {
+      "upstream": {
+        "repo": "ray-amjad/skills",
+        "commit": "0f7e404357e8f5676b5e4a6fcac3560395be8795"
+      },
+      "path": "skills/audit-prove-it",
+      "upstreamTree": "99d1fe97d3ca3340d03fdd21648877541415b8a1",
+      "tree": "99d1fe97d3ca3340d03fdd21648877541415b8a1"
+    },
     "chief-of-staff": {
       "path": "skills/in-progress/chief-of-staff",
       "upstreamTree": "58e0a4122260ba45c150d8201dad2d6de4153d18",
@@ -29,6 +38,15 @@
       "path": "skills/engineering/codebase-design",
       "upstreamTree": "4cbe1c131e1ea54109cb1e4e5f3c505810db6606",
       "tree": "4cbe1c131e1ea54109cb1e4e5f3c505810db6606"
+    },
+    "create-prove-it": {
+      "upstream": {
+        "repo": "ray-amjad/skills",
+        "commit": "0f7e404357e8f5676b5e4a6fcac3560395be8795"
+      },
+      "path": "skills/create-prove-it",
+      "upstreamTree": "18f1d9f03f3736c2a8652f7485b918664baae727",
+      "tree": "18f1d9f03f3736c2a8652f7485b918664baae727"
     },
     "diagnosing-bugs": {
       "path": "skills/engineering/diagnosing-bugs",
@@ -84,6 +102,15 @@
       "path": "skills/in-progress/loop-me",
       "upstreamTree": "a0dfdc3562686d920900973b50289b36e2f7eafe",
       "tree": "a0dfdc3562686d920900973b50289b36e2f7eafe"
+    },
+    "maintain-prove-it": {
+      "upstream": {
+        "repo": "ray-amjad/skills",
+        "commit": "0f7e404357e8f5676b5e4a6fcac3560395be8795"
+      },
+      "path": "skills/maintain-prove-it",
+      "upstreamTree": "be43531a1ee4054f9e3c37714851fbba1c0d5de4",
+      "tree": "be43531a1ee4054f9e3c37714851fbba1c0d5de4"
     },
     "migrate-to-shoehorn": {
       "path": "skills/misc/migrate-to-shoehorn",
@@ -148,7 +175,7 @@
     "to-spec": {
       "path": "skills/engineering/to-spec",
       "upstreamTree": "136b9651747cfccbfbb7c50a6b0dfb757e7547d2",
-      "tree": "136b9651747cfccbfbb7c50a6b0dfb757e7547d2"
+      "tree": "d9a8c093d4b5a58c89cd4afbc11ea86ebcb42acf"
     },
     "to-tickets": {
       "path": "skills/engineering/to-tickets",

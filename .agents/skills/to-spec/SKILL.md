@@ -14,6 +14,14 @@ The issue tracker and triage label vocabulary should have been provided to you. 
 
 2. Sketch out the seams at which you're going to test the feature. Existing seams should be preferred to new ones. Use the highest seam possible. If new seams are needed, propose them at the highest point you can. The fewer seams across the codebase, the better - the ideal number is one.
 
+Then sketch the end-to-end seams, where the running app proves the feature. Read the repository's prove skill (a `prove-*` skill carrying the `prove-it:` marker, made by `/create-prove-it`) and use the surface and flow names of its Scope map:
+
+- **Flows**: every surface and flow the spec adds or touches, each sorted new or existing.
+- **Answer keys**: what each flow's proof compares with. A new flow that copies an existing one: parity with it. A new flow that copies nothing: this spec, so write down the result that proves it. An existing flow: the app before the change. Name the areas that must stay as they are "not changed".
+- **Prove skill work**: which tickets extend the prove skill through `/create-prove-it` wherever it cannot reach a flow yet (a surface section, Scope map rows, answer keys, fixtures), each followed by `/audit-prove-it` to try to fool the extension, and when `/maintain-prove-it` folds what their receipts learned back into it.
+
+With no prove skill in the repository, propose `/create-prove-it` as the first ticket.
+
 Check with the user that these seams match their expectations.
 
 3. Write the spec using the template below, then publish it to the project issue tracker. Apply the `ready-for-agent` triage label - no need for additional triage.
@@ -63,6 +71,7 @@ A list of testing decisions that were made. Include:
 - A description of what makes a good test (only test external behavior, not implementation details)
 - Which modules will be tested
 - Prior art for the tests (i.e. similar types of tests in the codebase)
+- The end-to-end seams from step 2: a table with one row per flow (surface, new or existing, answer key), the areas "not changed", and the prove skill work
 
 ## Out of Scope
 
