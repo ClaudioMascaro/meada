@@ -126,6 +126,12 @@ pub enum Msg<'a> {
         values: usize,
         redacted: usize,
     },
+    /// The Kustomize entries of a repository that were not followed (#651): in all, and the
+    /// remote ones among them.
+    KustomizeUnresolved {
+        count: usize,
+        remote: usize,
+    },
     /// The line for the human at the end of a repository's status when it holds a drift or an
     /// `inferred` link: where a wrong conclusion goes.
     ReportHint,
@@ -1807,6 +1813,11 @@ impl Msg<'_> {
                     ),
                 )
             }
+            Msg::KustomizeUnresolved { count, remote } => pick(
+                format!("kustomize entries not followed: {count} (remote, never fetched: {remote})"),
+                format!("entradas do kustomize não seguidas: {count} (remotas, nunca baixadas: {remote})"),
+                format!("entradas de kustomize no seguidas: {count} (remotas, nunca descargadas: {remote})"),
+            ),
             Msg::ReportHint => pick(
                 format!("wrong conclusion? report it: {REPORT_URL}"),
                 format!("conclusão errada? relate: {REPORT_URL}"),

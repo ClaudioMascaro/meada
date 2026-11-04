@@ -151,7 +151,7 @@ The values of `kind`:
 | `process` | a process by the label of its entry point, with the `process::` identity `trace` starts from |
 | `duplicate` | symbols with identical text in two or more places, by name or path |
 | `value` | a config value of a YAML or JSON file, by value or key path |
-| `iac` | an IaC node (a Terraform resource, data block or module call), by address, type or physical name |
+| `iac` | an IaC node (a Terraform resource, data block or module call, or a Kubernetes object), by address, type or physical name |
 | `ambiguous`, `unresolved` | the open items, with the `meada decide` command for each |
 
 Each result is one line: repository, `path:line` and name.
@@ -382,6 +382,30 @@ by its path (`.` at the root).
 - **Queries**: `search` with `kind = "iac"` finds the nodes, `context` explains one and `trace`
   follows its references both ways. Nodes stay out of search with no `kind` and out of `meada
   export`.
+
+### Kubernetes objects and Kustomize overlays
+
+Every YAML or JSON document with an `apiVersion`, a `kind` and a `metadata.name` is an IaC node
+too, addressed `<Kind>[.<group>]/<namespace>/<name>` (`Deployment.apps/shop/api`,
+`Service/shop/api`), with no namespace for a cluster-scoped kind
+(`ClusterRole.rbac.authorization.k8s.io/reader`) or for an object that sets none.
+
+- **Overlays**: a directory with a `kustomization.yaml` that no other kustomization names as a
+  base is an overlay and an evaluation unit. Its `resources`, `bases` and `components` inside
+  the repository are instantiated under it, each node labelled by the overlay (`root
+  overlays/dev`), with the `namePrefix`, `nameSuffix`, `namespace` and `images` of each
+  kustomization on the way applied. A `..` that stays inside the repository is followed
+  (`../../base`); a remote base, one above the root, absolute, missing, through a symlink, in a
+  cycle or nested past 16 levels is not followed, and `meada status` counts it (`kustomize
+  entries not followed: N`). Manifests no kustomization lists are plain: a directory's
+  manifests are one unit.
+- **References**: a Service to the workloads whose pod labels hold its selector (`via selector
+  app=api`), a workload to the ConfigMaps and Secrets of its `env`, `envFrom` and volumes (`via
+  env DATABASE_URL`) and to its `serviceAccountName`, an Ingress to the Services of its rules
+  (`via backend shop.example.com/api`), all in one namespace and one unit, by the name as
+  written. `context` on a workload adds `images:` with what each container runs once the
+  overlay applied its `images`.
+- **Not read**: patches, generators, `commonLabels`, Helm templates and `kind: List`.
 
 ## 4. `meada.toml`: reference
 

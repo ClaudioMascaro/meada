@@ -149,7 +149,7 @@ Os valores de `kind`:
 | `process` | um processo pelo rótulo do ponto de entrada, com a identidade `process::` de onde o `trace` parte |
 | `duplicate` | símbolos com texto idêntico em dois ou mais lugares, pelo nome ou pelo caminho |
 | `value` | um valor de configuração de um arquivo YAML ou JSON, pelo valor ou pelo caminho da chave |
-| `iac` | um nó IaC (um resource, um bloco data ou uma chamada de módulo do Terraform), pelo endereço, pelo tipo ou pelo nome físico |
+| `iac` | um nó IaC (um resource, um bloco data ou uma chamada de módulo do Terraform, ou um objeto Kubernetes), pelo endereço, pelo tipo ou pelo nome físico |
 | `ambiguous`, `unresolved` | os itens abertos, com o comando `meada decide` de cada um |
 
 Cada resultado é uma linha: repositório, `caminho:linha` e nome.
@@ -380,6 +380,30 @@ raiz).
   registro fica como o nó da chamada, sem nada dentro.
 - **Consultas**: `search` com `kind = "iac"` acha os nós, `context` explica um e `trace` segue as
   referências dele nos dois sentidos. Os nós ficam fora da busca sem `kind` e do `meada export`.
+
+### Objetos Kubernetes e overlays do Kustomize
+
+Todo documento YAML ou JSON com `apiVersion`, `kind` e `metadata.name` também é um nó IaC, com
+endereço `<Kind>[.<grupo>]/<namespace>/<nome>` (`Deployment.apps/shop/api`,
+`Service/shop/api`), sem namespace para um kind de escopo de cluster
+(`ClusterRole.rbac.authorization.k8s.io/reader`) ou para um objeto que não define nenhum.
+
+- **Overlays**: uma pasta com `kustomization.yaml` que nenhum outro kustomization nomeia como
+  base é um overlay e uma unidade de avaliação. Os `resources`, `bases` e `components` dela
+  dentro do repositório são instanciados sob ela, cada nó rotulado pelo overlay (`root
+  overlays/dev`), com o `namePrefix`, o `nameSuffix`, o `namespace` e as `images` de cada
+  kustomization no caminho aplicados. Um `..` que fica dentro do repositório é seguido
+  (`../../base`); uma base remota, acima da raiz, absoluta, ausente, por um symlink, em ciclo
+  ou aninhada além de 16 níveis não é seguida, e o `meada status` a conta (`entradas do
+  kustomize não seguidas: N`). Manifestos que nenhum kustomization lista são simples: os
+  manifestos de uma pasta são uma unidade.
+- **Referências**: um Service para as cargas de trabalho cujos labels do pod contêm o selector
+  dele (`via selector app=api`), uma carga de trabalho para os ConfigMaps e Secrets de `env`,
+  `envFrom` e volumes (`via env DATABASE_URL`) e para o `serviceAccountName` dela, um Ingress
+  para os Services das regras (`via backend shop.example.com/api`), tudo num namespace e numa
+  unidade, pelo nome como foi escrito. `context` numa carga de trabalho acrescenta `images:`
+  com o que cada contêiner roda depois que o overlay aplicou as `images`.
+- **Não lidos**: patches, geradores, `commonLabels`, templates Helm e `kind: List`.
 
 ## 4. `meada.toml`: referência
 

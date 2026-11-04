@@ -22,6 +22,7 @@ use crate::decisions::Stale;
 use crate::document::{self, Summary};
 use crate::entry::{self, EntryKind, EntryPoint};
 use crate::iac;
+use crate::kube;
 use crate::lang::{self, Facts};
 use crate::msg::{Fix, Msg};
 use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package};
@@ -111,9 +112,13 @@ pub(crate) fn schema_version() -> i32 {
 /// label of its root module, its type, physical name as static evaluation resolves it (#650),
 /// whether that is a `pattern`, the `overridable` values it went through as JSON, file, first and
 /// last line, and the key path of its block) and `iac_references` each reference between two
-/// nodes of one root (`iac::Reference`), both rewritten root by root (`iac::refresh`) for the
-/// roots whose evaluation unit holds a Terraform file or var file that changed. Neither is
-/// exported.
+/// nodes of one root (`iac::Reference`). The Terraform ones are rewritten root by root
+/// (`iac::refresh`) for the roots whose evaluation unit holds a Terraform file or var file that
+/// changed, the Kubernetes ones (#651, `kube::Node` rows of YAML and JSON files, told apart by
+/// their path) whole when a Kubernetes file changed (`kube::refresh`). `iac_images` holds the
+/// images of a Kubernetes workload once its overlay changed them (`kube::Image`) and
+/// `iac_unresolved` the Kustomize entries not followed (`kube::Unresolved`), rewritten with
+/// them. None is exported.
 pub(crate) const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -177,11 +182,19 @@ CREATE TABLE iac_nodes (
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
+CREATE INDEX iac_nodes_path ON iac_nodes (path);
 CREATE TABLE iac_references (
     root TEXT NOT NULL, source TEXT NOT NULL, target TEXT NOT NULL, via TEXT
 );
 CREATE INDEX iac_references_source ON iac_references (root, source);
 CREATE INDEX iac_references_target ON iac_references (root, target);
+CREATE TABLE iac_images (
+    root TEXT NOT NULL, address TEXT NOT NULL, container TEXT NOT NULL, image TEXT NOT NULL
+);
+CREATE INDEX iac_images_address ON iac_images (root, address);
+CREATE TABLE iac_unresolved (
+    root TEXT NOT NULL, path TEXT NOT NULL, entry TEXT NOT NULL, reason TEXT NOT NULL
+);
 ";
 
 /// A file modified this close to a refresh may change again within the same mtime tick, so
@@ -680,7 +693,8 @@ fn refresh_keeping(
                  DELETE FROM families; DELETE FROM flexible; DELETE FROM entry_points; DELETE FROM communities; \
                  DELETE FROM valued; DELETE FROM config_files; DELETE FROM config_values; \
                  INSERT INTO config_search (config_search) VALUES ('delete-all'); \
-                 DELETE FROM iac_nodes; DELETE FROM iac_references;",
+                 DELETE FROM iac_nodes; DELETE FROM iac_references; DELETE FROM iac_images; \
+                 DELETE FROM iac_unresolved;",
             )?;
             None
         }
@@ -716,6 +730,8 @@ fn refresh_keeping(
     let sensitive = config_values::Sensitive::new(&tx, &configs);
     // The Terraform files and var files read again: the units holding them are evaluated again.
     let terraform = std::cell::RefCell::new(BTreeSet::new());
+    // Whether a Kubernetes file changed, appeared or left: its objects are evaluated again.
+    let kubernetes = std::cell::Cell::new(false);
     let gone = refresh_stamped(
         &tx,
         "config_files",
@@ -729,12 +745,17 @@ fn refresh_keeping(
                     .borrow_mut()
                     .insert(config_values::parent(path).to_string());
             }
+            if kube::changed(&tx, path, Some(src))? {
+                kubernetes.set(true);
+            }
             let (outcome, rows) = config_values::read_with(path, src, &sensitive.of(path)?);
             config_values::store(&tx, path, &rows)?;
             Ok(serde_json::to_string(&outcome)?)
         },
     )?;
+    let mut kube_left = false;
     for path in &gone {
+        kube_left = kube_left || kube::changed(&tx, path, None)?;
         config_values::forget(&tx, path)?;
     }
     let mut dirs = terraform.into_inner();
@@ -752,6 +773,27 @@ fn refresh_keeping(
             }
         }
         iac::refresh(&tx, &iac::Repository::read(&files), &dirs)?;
+    }
+    // ponytail: one changed Kubernetes file evaluates every overlay and directory of manifests of
+    // the repository again, not only the units it belongs to; a repository of many overlays
+    // would make that slow.
+    if kubernetes.get() || kube_left {
+        let mut files = Vec::new();
+        for (path, abs) in configs.iter().filter(|(p, _)| kube::is_source(p)) {
+            let Ok(src) = read_up_to(abs, lang::MAX_BYTES) else {
+                continue;
+            };
+            // A file that cannot hold an object (or is past the size ceiling, which config
+            // values count) still exists for a kustomization naming it.
+            let big = src.len() > lang::MAX_BYTES;
+            let src = if big || !kube::wanted(path, &src) {
+                Vec::new()
+            } else {
+                src
+            };
+            files.push((path.clone(), src));
+        }
+        kube::refresh(&tx, &kube::evaluate(&files))?;
     }
     // The packages decide which files keep the shapes of what they export (issue #175).
     let manifest_rows = manifest_rows(&tx)?;
@@ -2976,6 +3018,7 @@ mod tests {
         with_busy_timeout,
     };
     use crate::config::Serve;
+    use crate::kube;
     use crate::msg::Fix;
     use crate::{config_values, document, lang, package};
 
@@ -3551,7 +3594,8 @@ mod tests {
 
     /// What an index stores: `SCHEMA`, then the facts each pack stores for its sample in
     /// `tests/fixtures/schema/`, then the summary of each provider document and manifest sample,
-    /// then the outcome and rows of the config values sample.
+    /// then the outcome and rows of the config values sample, then the IaC nodes of the
+    /// kustomization sample.
     /// Its golden is the schema version's source (`schema_version`), so a change fails until
     /// `MEADA_BLESS=1` rewrites the golden, which changes the version.
     #[test]
@@ -3603,6 +3647,22 @@ mod tests {
         let outcome = serde_json::to_string_pretty(&outcome).unwrap();
         actual += &format!("\nsample.values.yaml\n{outcome}\n");
         actual.extend(rows.iter().map(|row| format!("{row:?}\n")));
+
+        // The IaC nodes, references, images and unresolved entries of a kustomization (#651).
+        let files: Vec<(String, Vec<u8>)> = [
+            ("sample.kustomization.yaml", "overlay/kustomization.yaml"),
+            ("sample.kubernetes.yaml", "overlay/sample.kubernetes.yaml"),
+        ]
+        .iter()
+        .map(|(name, path)| {
+            (
+                path.to_string(),
+                fs::read(tests.join("fixtures/schema").join(name)).unwrap(),
+            )
+        })
+        .collect();
+        actual += "\nsample.kustomization.yaml\n";
+        actual += &format!("{:#?}\n", kube::evaluate(&files));
 
         let golden = tests.join("golden/schema.txt");
         if std::env::var_os("MEADA_BLESS").is_some_and(|v| v == "1") {

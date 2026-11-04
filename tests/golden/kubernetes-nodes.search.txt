@@ -1,0 +1,20 @@
+example.com/acme/deploy base/deployment.yaml:1 Deployment.apps/shop-dev/dev-api (Deployment, name "dev-api", root overlays/dev)
+example.com/acme/deploy base/deployment.yaml:1 Deployment.apps/shop/api-v2 (Deployment, name "api-v2", root overlays/prod)
+
+example.com/acme/deploy base/deployment.yaml:1 Deployment.apps/shop-dev/dev-api (Deployment, name "dev-api", root overlays/dev)
+example.com/acme/deploy base/service.yaml:1 Service/shop-dev/dev-api (Service, name "dev-api", root overlays/dev)
+example.com/acme/deploy base/config.yaml:1 ConfigMap/shop-dev/dev-api-settings (ConfigMap, name "dev-api-settings", root overlays/dev)
+
+example.com/acme/deploy base/config.yaml:1 ConfigMap/shop/api-settings-v2 (ConfigMap, name "api-settings-v2", root overlays/prod)
+example.com/acme/deploy base/config.yaml:1 ConfigMap/shop-dev/dev-api-settings (ConfigMap, name "dev-api-settings", root overlays/dev)
+
+example.com/acme/deploy base/service.yaml:1 Service/shop/api-v2 (Service, name "api-v2", root overlays/prod)
+
+example.com/acme/deploy raw/stack.yaml:1 Namespace/tools (Namespace, name "tools", root raw)
+
+example.com/acme/deploy raw/stack.yaml:1 Namespace/tools (Namespace, name "tools", root raw)
+example.com/acme/deploy raw/job.json:2 Job.batch/tools/migrate (Job, name "migrate", root raw)
+example.com/acme/deploy raw/stack.yaml:6 Pod/tools/runner (Pod, name "runner", root raw)
+example.com/acme/deploy raw/stack.yaml:18 Service/tools/runner (Service, name "runner", root raw)
+
+no matches for `Release`

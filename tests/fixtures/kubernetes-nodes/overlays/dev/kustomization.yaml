@@ -1,0 +1,7 @@
+resources:
+  - ../../base
+namespace: shop-dev
+namePrefix: dev-
+images:
+  - name: ghcr.io/acme/api
+    newTag: dev

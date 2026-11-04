@@ -122,6 +122,32 @@ fn tree(files: Vec<(String, String)>) -> usize {
     nodes.chain(references).sum()
 }
 
+/// The bytes of the addresses, references, images and unresolved entries `kube::evaluate` stores
+/// for the files `files` (path and text) of one repository.
+fn objects(files: Vec<(&str, String)>) -> usize {
+    let files: Vec<(String, Vec<u8>)> = (files.into_iter())
+        .map(|(path, text)| (path.to_string(), file(text)))
+        .collect();
+    let out = crate::kube::evaluate(&files);
+    let nodes = out.nodes.iter().map(|n| n.address.len());
+    let references = (out.references.iter())
+        .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
+    let images = out.images.iter().map(|i| i.address.len() + i.image.len());
+    let unresolved = out.unresolved.iter().map(|u| u.entry.len());
+    nodes
+        .chain(references)
+        .chain(images)
+        .chain(unresolved)
+        .sum()
+}
+
+/// A kustomization file naming `entries`.
+fn kustomization(entries: impl Iterator<Item = String>) -> String {
+    entries
+        .map(|e| format!("  - {e}\n"))
+        .fold("resources:\n".into(), |a, e| a + &e)
+}
+
 /// An SDK-style project file with `body` in it.
 fn project(body: &str) -> String {
     format!("<Project Sdk=\"Microsoft.NET.Sdk\">{body}</Project>")
@@ -810,6 +836,81 @@ fn probes() -> Vec<Probe> {
             nodes(fill(1, |i| {
                 format!("resource \"a\" \"r{i}\" {{ count = 1000 }}\n")
             }))
+        }),
+        // Kubernetes and Kustomize (#651): what one repository's evaluation stores
+        ("kustomize: a chain of bases", || {
+            let mut files: Vec<(String, String)> = Vec::new();
+            for i in 0..4000 {
+                let (dir, next) = (format!("d{i}"), format!("../d{}", i + 1));
+                files.push((
+                    format!("{dir}/kustomization.yaml"),
+                    kustomization([next].into_iter()),
+                ));
+            }
+            let files = files.iter().map(|(p, t)| (p.as_str(), t.clone())).collect();
+            objects(files)
+        }),
+        ("kustomize: bases naming each other", || {
+            let mut files: Vec<(String, String)> = Vec::new();
+            for i in 0..4000 {
+                let next = (1..=3).map(|k| format!("../d{}", (i + k) % 4000));
+                files.push((format!("d{i}/kustomization.yaml"), kustomization(next)));
+            }
+            files.push((
+                "root/kustomization.yaml".into(),
+                kustomization(["../d0".to_string()].into_iter()),
+            ));
+            let files = files.iter().map(|(p, t)| (p.as_str(), t.clone())).collect();
+            objects(files)
+        }),
+        ("kustomize: a base named many times", || {
+            let base = count(900, |i| {
+                format!("---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: c{i}\n")
+            });
+            let names = fill(2, |_| "  - ../base\n".to_string());
+            objects(vec![
+                (
+                    "base/kustomization.yaml",
+                    "resources:\n  - all.yaml\n".into(),
+                ),
+                ("base/all.yaml", base),
+                ("o/kustomization.yaml", format!("resources:\n{names}")),
+            ])
+        }),
+        ("kustomize: many overlays over one base", || {
+            let base = count(900, |i| {
+                format!("---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: c{i}\n")
+            });
+            let mut files = vec![
+                (
+                    "base/kustomization.yaml",
+                    "resources:\n  - all.yaml\n".to_string(),
+                ),
+                ("base/all.yaml", base),
+            ];
+            let overlays: Vec<(String, String)> = (0..300)
+                .map(|i| {
+                    (
+                        format!("o{i}/kustomization.yaml"),
+                        "resources:\n  - ../base\n".to_string(),
+                    )
+                })
+                .collect();
+            files.extend(overlays.iter().map(|(p, t)| (p.as_str(), t.clone())));
+            objects(files)
+        }),
+        ("kubernetes: services selecting many workloads", || {
+            let pair = |i: usize| {
+                format!(
+                    "---\napiVersion: v1\nkind: Service\nmetadata:\n  name: s{i}\nspec:\n  selector:\n    app: a\n\
+                     ---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: d{i}\nspec:\n  template:\n    \
+                     metadata:\n      labels:\n        app: a\n    spec:\n      containers: []\n"
+                )
+            };
+            let files: Vec<(String, String)> = (0..9)
+                .map(|n| (format!("f{n}.yaml"), count(450, |i| pair(n * 450 + i))))
+                .collect();
+            objects(files.iter().map(|(p, t)| (p.as_str(), t.clone())).collect())
         }),
         // .NET: `appsettings.json`
         ("appsettings: many keys", || {

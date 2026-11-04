@@ -17,7 +17,8 @@ use crate::render::{
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Manifest, Missing, Repository, Workspace};
 use crate::{
-    Result, config_values, decisions, document, drift_view, iac, index, items, render, repo, trace,
+    Result, config_values, decisions, document, drift_view, iac, index, items, kube, render, repo,
+    trace,
 };
 use meada_core::context::{self, shape_lines};
 use meada_core::search;
@@ -353,30 +354,38 @@ impl Engine {
         let configs: Vec<Option<String>> = (self.dbs.iter())
             .map(config_values::status)
             .collect::<Result<_>>()?;
-        let lines = (repos.iter().zip(&exports).zip(drift).zip(configs))
-            .map(|(((repo, export), drift), config)| {
-                let prefix = format!("{}::", repo.identity);
-                let mut lines: Vec<String> = (contract::KINDS.iter())
-                    .flat_map(|kind| kind.status(repo, export, &links))
-                    .collect();
-                lines.extend(document::report(repo, export));
-                lines.extend(config);
-                lines.extend(export.dropped.iter().map(|(path, limit)| match *limit {
-                    Dropped::Bytes(limit) => Msg::FileTooBroad { path, limit }.text(),
-                    Dropped::Usings(limit) => Msg::FileTooManyUsings { path, limit }.text(),
-                    Dropped::Misparsed => Msg::FileMisparsed { path }.text(),
-                }));
-                if drift > 0 {
-                    lines.push(Msg::Drift(drift).text());
-                }
-                let inferred = (links.iter())
-                    .any(|l| l.level == Level::Inferred && l.consumer.starts_with(&prefix));
-                if drift > 0 || inferred {
-                    lines.push(Msg::ReportHint.text());
-                }
-                lines
-            })
-            .collect();
+        let kubes: Vec<Option<String>> =
+            (self.dbs.iter()).map(kube::status).collect::<Result<_>>()?;
+        let lines = (repos
+            .iter()
+            .zip(&exports)
+            .zip(drift)
+            .zip(configs)
+            .zip(kubes))
+        .map(|((((repo, export), drift), config), kube)| {
+            let prefix = format!("{}::", repo.identity);
+            let mut lines: Vec<String> = (contract::KINDS.iter())
+                .flat_map(|kind| kind.status(repo, export, &links))
+                .collect();
+            lines.extend(document::report(repo, export));
+            lines.extend(config);
+            lines.extend(kube);
+            lines.extend(export.dropped.iter().map(|(path, limit)| match *limit {
+                Dropped::Bytes(limit) => Msg::FileTooBroad { path, limit }.text(),
+                Dropped::Usings(limit) => Msg::FileTooManyUsings { path, limit }.text(),
+                Dropped::Misparsed => Msg::FileMisparsed { path }.text(),
+            }));
+            if drift > 0 {
+                lines.push(Msg::Drift(drift).text());
+            }
+            let inferred = (links.iter())
+                .any(|l| l.level == Level::Inferred && l.consumer.starts_with(&prefix));
+            if drift > 0 || inferred {
+                lines.push(Msg::ReportHint.text());
+            }
+            lines
+        })
+        .collect();
         Ok((evaluations, lines))
     }
 

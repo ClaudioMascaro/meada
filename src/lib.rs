@@ -34,6 +34,7 @@ mod index;
 pub use index::{value_parses, with_busy_timeout, with_reversed_walk};
 mod items;
 mod jvm;
+mod kube;
 mod lang;
 mod literals;
 pub mod mcp;

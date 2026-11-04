@@ -42,8 +42,17 @@
   set and one over a variable, a local module's input and output, `terraform.workspace`, a data
   source and a registry module, and a root `envs/stage` calling the same module: `search` and
   `context` against `terraform-names.{search,context}.txt`, and a changed var file evaluating
-  its root again while a row rewritten by hand in the other root survives), `decorations` (the
-  `decorations` fixture: Java, Kotlin, C#,
+  its root again while a row rewritten by hand in the other root survives), `kubernetes` (#651,
+  the `kubernetes-nodes` fixture: a base with a Deployment, a Service, a ConfigMap and a Secret
+  in one file of two documents, an Ingress and a ServiceAccount, overlays `dev` (namespace,
+  prefix, image tag) and `prod` (namespace, suffix, renamed image, a remote base), plain
+  manifests in `raw/` (three documents in a file, a JSON Job) and a Helm template: `search` kind
+  `iac`, `context` and `trace` against `kubernetes-nodes.{search,context,trace}.txt`, `meada
+  status` counting the entries not followed (a symlinked base and one above the root included),
+  no object in the export, an edited, added and deleted manifest or kustomization equal to a
+  cold index, a row rewritten by hand surviving a refresh no manifest changed in, and a Terraform
+  root and a Kubernetes unit of one directory each keeping their rows when the other changes),
+  `decorations` (the `decorations` fixture: Java, Kotlin, C#,
   Python and Rust calls that decorate a definition carry `CallSite::decorates`, ordinary calls do
   not, and `context` lists them under `annotations:`), `docs` (the repository map against the code:
   `ponytail:` limits in `ceilings.md`, entry point kinds and process marks in their lists, a line

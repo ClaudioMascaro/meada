@@ -325,8 +325,18 @@ fn local_source(dir: &str, source: &str) -> Option<String> {
     if !(source.starts_with("./") || source.starts_with("../")) {
         return None;
     }
+    joined(dir, source)
+}
+
+/// `rel` joined to the directory `dir` and normalized (`.` and empty steps dropped, `..` popped);
+/// `None` for a path that climbs out of the repository or is absolute. The result has no
+/// leading or trailing `/`, and is empty for the root.
+pub(crate) fn joined(dir: &str, rel: &str) -> Option<String> {
+    if rel.starts_with('/') {
+        return None;
+    }
     let mut parts: Vec<&str> = dir.split('/').filter(|p| !p.is_empty()).collect();
-    for part in source.split('/') {
+    for part in rel.split('/') {
         match part {
             "" | "." => {}
             ".." => {
@@ -1520,7 +1530,10 @@ pub(crate) fn refresh(
     repository: &Repository,
     dirs: &BTreeSet<String>,
 ) -> Result<()> {
-    let mut statement = tx.prepare("SELECT DISTINCT root FROM iac_nodes")?;
+    let mut statement = tx.prepare(&format!(
+        "SELECT DISTINCT root FROM iac_nodes WHERE {}",
+        terraform_path("path")
+    ))?;
     let stored: BTreeSet<String> = statement
         .query_map([], |r| r.get(0))?
         .collect::<rusqlite::Result<_>>()?;
@@ -1531,26 +1544,68 @@ pub(crate) fn refresh(
         .collect();
     for root in &stored {
         if again.contains(root.as_str()) || !units.iter().any(|(r, _)| r == root) {
-            tx.execute("DELETE FROM iac_nodes WHERE root = ?1", [root])?;
-            tx.execute("DELETE FROM iac_references WHERE root = ?1", [root])?;
+            forget(tx, Some(root), true)?;
         }
     }
     let bytes = |sql: &str| -> Result<usize> {
         let n: Option<i64> = tx.query_row(sql, [], |r| r.get(0)).optional()?.flatten();
         Ok(n.unwrap_or(0) as usize)
     };
-    let kept = bytes(
+    let kept = bytes(&format!(
         "SELECT sum(length(CAST(address AS BLOB)) + coalesce(length(CAST(name AS BLOB)), 0)) \
-         FROM iac_nodes",
-    )? + bytes(
+         FROM iac_nodes WHERE {}",
+        terraform_path("path")
+    ))? + bytes(&format!(
         "SELECT sum(length(CAST(source AS BLOB)) + length(CAST(target AS BLOB)) \
-         + coalesce(length(CAST(via AS BLOB)), 0)) FROM iac_references",
-    )?;
+         + coalesce(length(CAST(via AS BLOB)), 0)) FROM iac_references r WHERE EXISTS \
+         (SELECT 1 FROM iac_nodes n WHERE n.root = r.root AND n.address = r.source AND {})",
+        terraform_path("n.path")
+    ))?;
     let (nodes, references) =
         repository.evaluate(|root| again.contains(root), STORED_MAX.saturating_sub(kept));
+    insert(tx, &nodes, &references)
+}
+
+/// The condition that the file in `column` is a Terraform file. The Terraform and the Kubernetes
+/// nodes (#651) share the tables, and a Terraform root and a Kubernetes unit may share a label,
+/// so each side touches the rows of its own files only.
+fn terraform_path(column: &str) -> String {
+    format!("({column} LIKE '%.tf' OR {column} LIKE '%.tofu')")
+}
+
+/// Deletes the stored nodes and references of the Terraform files (`terraform`) or of the
+/// others, of the root `root` or of every root.
+pub(crate) fn forget(tx: &Transaction, root: Option<&str>, terraform: bool) -> Result<()> {
+    let own = match terraform {
+        true => terraform_path("path"),
+        false => format!("NOT {}", terraform_path("path")),
+    };
+    let mut args: Vec<&dyn rusqlite::ToSql> = Vec::new();
+    let mut scope = String::new();
+    if let Some(root) = &root {
+        scope = " AND root = ?1".into();
+        args.push(root);
+    }
+    // The references go first: they are found through the nodes that source them.
+    tx.execute(
+        &format!(
+            "DELETE FROM iac_references WHERE (root, source) IN \
+             (SELECT root, address FROM iac_nodes WHERE {own}{scope})"
+        ),
+        args.as_slice(),
+    )?;
+    tx.execute(
+        &format!("DELETE FROM iac_nodes WHERE {own}{scope}"),
+        args.as_slice(),
+    )?;
+    Ok(())
+}
+
+/// Stores `nodes` and `references`.
+pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference]) -> Result<()> {
     let mut insert = tx
         .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)")?;
-    for n in &nodes {
+    for n in nodes {
         let (line, end) = (n.line as i64, n.end_line as i64);
         let overridable = serde_json::to_string(&n.overridable)?;
         insert.execute(params![
@@ -1567,7 +1622,7 @@ pub(crate) fn refresh(
         ])?;
     }
     let mut insert = tx.prepare_cached("INSERT INTO iac_references VALUES (?1, ?2, ?3, ?4)")?;
-    for r in &references {
+    for r in references {
         insert.execute(params![r.root, r.source, r.target, r.via])?;
     }
     Ok(())
@@ -1767,6 +1822,10 @@ pub(crate) fn context(repos: &[(&str, &Connection)], text: &str) -> Result<Optio
         let reached_nodes = references(db, n, direction)?;
         let items = (reached_nodes.iter()).map(|(m, via)| reached(identity, m, via));
         lines.extend(section(title, items.collect()));
+    }
+    let images = crate::kube::images(db, &n.root, &n.address)?;
+    if !images.is_empty() {
+        lines.extend(section("images", images));
     }
     let values = config_values::under(identity, db, &n.path, &n.block)?;
     lines.extend(section("values", values));

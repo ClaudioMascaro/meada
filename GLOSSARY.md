@@ -80,6 +80,14 @@ Kustomize tree per overlay, a CloudFormation or SAM template, a Compose project 
 service file. A change to one of its files re-evaluates all of it.
 _Avoid_: stack, project, workspace
 
+**Overlay**:
+A directory with a Kustomize `kustomization.yaml` that no other kustomization names as a base: the
+root of its evaluation unit, which instantiates its `resources`, `bases` and `components` under it
+with `namePrefix`, `nameSuffix`, `namespace` and `images` applied. Its path labels each node it
+yields, as a root module's does a Terraform node. A manifest no kustomization lists belongs to the
+plain unit of its directory.
+_Avoid_: environment, stage, kustomization (the file)
+
 **Pattern**:
 A name with a part static evaluation could not resolve, kept with a wildcard in its place. It
 links `inferred` to a literal name when its literal part has at least three characters and its

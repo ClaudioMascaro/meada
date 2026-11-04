@@ -175,6 +175,24 @@ this file, and a change to these modules updates it.
   the files, `Repository::units` gives each root with the directories of its unit, and `refresh`
   (called by `index::refresh_keeping` with the directories a Terraform file or var file changed in)
   evaluates again the roots whose unit holds one, and the roots not stored yet.
+- `kube.rs` (#651, ADR 0025): Kubernetes objects and Kustomize trees, into the same nodes
+  (`iac::Node`, `iac::Reference`). `evaluate(files) -> Output {nodes, references, images,
+  unresolved}` is pure over the YAML and JSON files `index::refresh` hands it (`wanted`: a
+  kustomization or a file that says `apiVersion`; any other gives empty bytes, a file that
+  exists and holds nothing). `read` parses a file with `events::read`, one `Obj` per document
+  with a `metadata.name` (`object`: address `<Kind>[.<group>]/<namespace>/<name>`, no namespace
+  for `CLUSTER_SCOPED`, `block` `[n]` in a file of several documents, its span the lines of
+  its scalars) and its `Facts` (pod labels, a Service's selector, ConfigMap and Secret mounts,
+  the service account, an Ingress's backends, the images), and a kustomization file into a
+  `Kustomization`. A kustomization directory no other names (`Eval::entry` resolves each entry
+  of `resources`, `bases`, `components` to a file, a directory or `Unresolved`: `remote`,
+  `outside`, `missing`, `cycle`, `depth`) is an overlay: `Eval::objects` instantiates it base
+  first and applies `namePrefix`, `nameSuffix`, `namespace` and `images` (`retag`) on the way
+  out; a manifest no kustomization lists or patches with is a plain unit of its directory.
+  `Eval::unit` sorts, drops repeated addresses and resolves the references by the name as
+  written. `store` rewrites `iac_images` and `iac_unresolved`, `images` feeds `iac::context`,
+  `status` is the `Msg::KustomizeUnresolved` line, and `changed` tells `index::refresh` that a
+  file read again or left holds, or held, objects.
 - `shape.rs` (in `meada-core`, reached as `crate::shape`; spec #21, ADR 0009): `Shape {source, fields, open, scalars, declared, optional,
   imports, guessed}`, the one form of what a
   contract carries, whatever it is read from, so shape drift (spec #23) compares shapes without

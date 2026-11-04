@@ -48,7 +48,7 @@ pub(crate) const VALUE_MAX: usize = 1024;
 
 /// The documents one file may hold; a stream of more is unreadable.
 // ponytail: a manifest bundle holds tens of documents; past a thousand it is generated output.
-const DOCUMENTS_MAX: usize = 1000;
+pub(crate) const DOCUMENTS_MAX: usize = 1000;
 
 /// The bytes the rows of one file may store (key paths and values), as a factor of its size,
 /// plus `STORED_SLACK`: a file of long keys nested deep, each repeated in the key path of every
@@ -669,7 +669,7 @@ fn shown(
 
 /// The values of the file at `path` of `db` (repository `identity`) whose key path is `block` or
 /// lies under it (`block.` or `block[`), as `hits` shows them, by line and key path: the config
-/// values of an IaC node.
+/// values of an IaC node. An empty `block` (an object that is the whole of its file) is every row.
 pub(crate) fn under(
     identity: &str,
     db: &Connection,
@@ -678,7 +678,7 @@ pub(crate) fn under(
 ) -> Result<Vec<String>> {
     let mut statement = db.prepare(
         "SELECT key, value, type, line, cut FROM config_values WHERE path = ?1 \
-         AND (key = ?2 OR substr(key, 1, length(?2) + 1) IN (?2 || '.', ?2 || '[')) \
+         AND (?2 = '' OR key = ?2 OR substr(key, 1, length(?2) + 1) IN (?2 || '.', ?2 || '[')) \
          ORDER BY line, key",
     )?;
     let mut rows = statement.query(params![path, block])?;

@@ -58,6 +58,19 @@ All notable changes to Meada are recorded here. The format follows
   address shows the type, the physical name, the references both ways and the config values,
   and `trace` walks the references down and up. Nodes stay out of `meada export`; the index
   schema changes, so existing indexes are rebuilt (#649).
+- Kubernetes objects and Kustomize overlays as IaC nodes (ADR 0025): every YAML or JSON document
+  with an `apiVersion`, a `kind` and a `metadata.name` is a node addressed
+  `<Kind>[.<group>]/<namespace>/<name>` (no namespace for a cluster-scoped kind). Each directory
+  with a `kustomization.yaml` that no other names as a base is an overlay and an evaluation unit:
+  its `resources`, `bases` and `components` inside the repository are instantiated under it, each
+  node labelled by the overlay, with `namePrefix`, `nameSuffix`, `namespace` and `images` applied.
+  A base stays inside the repository (a `..` that stays inside is followed; a remote base, one
+  above the root, through a symlink, in a cycle or past 16 levels is not), and `meada status`
+  counts the entries not followed. References: a Service to the workloads its selector matches, a
+  workload to the ConfigMaps and Secrets of its `env`, `envFrom` and volumes and to its service
+  account, an Ingress to its backend Services, in one namespace and one unit. `search` with the
+  kind `iac`, `context` (with the images of a workload) and `trace` answer for them as for
+  Terraform's nodes. The index schema changes, so existing indexes are rebuilt (#651).
 - Static evaluation of Terraform names (ADR 0025): an IaC node's physical name (its `name` argument)
   and each `count` and `for_each` are evaluated with `hcl-rs`'s evaluator and Meada's pure functions
   (string, collection and conversion functions and `jsonencode`), from variable defaults, the root's

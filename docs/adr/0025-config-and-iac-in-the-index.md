@@ -211,6 +211,49 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   directory where a Terraform file or a var file was read again or left, and the roots not
   stored yet, drops the rows of the roots that are no more, and keeps every other root's rows.
 
+### Kubernetes objects and Kustomize trees (#651)
+
+- **Objects.** Every YAML or JSON document with an `apiVersion`, a `kind` and a string
+  `metadata.name` is a node, addressed `<Kind>[.<group>]/<namespace>/<name>` (the core group
+  writes no group). A cluster-scoped kind (a fixed list) has no namespace in its address and no
+  Kustomize `namespace` sets one; an object with no `metadata.namespace` that no overlay gives
+  one stays without it, `<Kind>[.<group>]/<name>`, and is not given the cluster's `default`. A
+  Kustomize file (`kustomization.yaml`, `kustomization.yml`, or any object of the group
+  `kustomize.config.k8s.io`) is no object, and neither is a document whose name holds `{{` (a
+  Helm template, which is not rendered). The node's `block` is its document's key path prefix
+  (`[2]`, none in a file of one document), so `context` shows the values of its document; its
+  span is the lines of its first and last scalar.
+- **Overlays.** A directory with a kustomization that no other kustomization names as a base
+  (`resources`, `bases`, `components`) is an overlay, labelled by its path, and the root of its
+  evaluation unit. Its entries that name a file or a kustomization directory of the repository
+  are instantiated under it, each base first, and each kustomization on the way then applies
+  its `namePrefix`, `nameSuffix` (not to `Namespace`, `CustomResourceDefinition` and
+  `APIService`), `namespace` and `images` (the first rule that names the image; `newName`,
+  `newTag`, `digest`) to everything below it, so the overlay's values come last. A base used by
+  two overlays is one node in each, under that overlay's names. A manifest no kustomization
+  lists or patches with is plain, and the plain manifests of a directory are one unit labelled
+  by the directory. Patches, generators and `commonLabels` are not applied (the ceilings list
+  them).
+- **Paths.** Entries follow the "Paths" rule below as #649 amended it: a `..` that stays
+  inside the repository is followed, since overlays name their base as `../../base`. The files
+  come from the walk, which follows no symlink, so a base through a symlink is not found. An
+  entry that is remote (a URL, `git@`, `github.com/`, `?ref=`), above the root, absolute, not
+  there, in a cycle or nested past `OVERLAY_DEPTH_MAX` is not followed, never fetched, and is
+  stored as unresolved with its reason; `meada status` counts them.
+- **References.** A Service to the pod template owners (any object whose `spec.template` or
+  `spec.jobTemplate.spec.template` holds containers, or a Pod) whose pod labels hold its
+  selector, a pod template to the ConfigMaps and Secrets named in `env`, `envFrom` and volumes
+  (including projected ones) and to its `serviceAccountName`, and an Ingress to the Services of
+  its rules and default backend, each in the same namespace and the same unit, by the name as
+  written before any prefix or suffix (Kustomize renames the references with the object), all
+  `exact`, with the `via` naming how the source names the target.
+- **Images.** The images of a workload's containers once the overlay's `images` applied are
+  stored with its node and shown by `context`; the image contract of ADR 0026 reads them.
+- **Storage.** The nodes and references of Kubernetes join the Terraform ones in `iac_nodes`
+  and `iac_references`; `iac_images` and `iac_unresolved` hold the rest. All are rewritten
+  whole when a file that holds, or may hold, an object (a kustomization, or a YAML or JSON file
+  that says `apiVersion`) is read again or leaves.
+
 ### IaC node
 
 An IaC node is a resource-like block of any format, with an address, a type, a file and a span.

@@ -60,11 +60,19 @@ CREATE TABLE iac_nodes (
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
+CREATE INDEX iac_nodes_path ON iac_nodes (path);
 CREATE TABLE iac_references (
     root TEXT NOT NULL, source TEXT NOT NULL, target TEXT NOT NULL, via TEXT
 );
 CREATE INDEX iac_references_source ON iac_references (root, source);
 CREATE INDEX iac_references_target ON iac_references (root, target);
+CREATE TABLE iac_images (
+    root TEXT NOT NULL, address TEXT NOT NULL, container TEXT NOT NULL, image TEXT NOT NULL
+);
+CREATE INDEX iac_images_address ON iac_images (root, address);
+CREATE TABLE iac_unresolved (
+    root TEXT NOT NULL, path TEXT NOT NULL, entry TEXT NOT NULL, reason TEXT NOT NULL
+);
 
 sample.ts
 {
@@ -3269,3 +3277,107 @@ Row { key: "[0].data.hosts[1]", value: Some("b.example.com"), kind: "string", li
 Row { key: "[1].apiVersion", value: Some("v1"), kind: "string", line: 15, cut: false }
 Row { key: "[1].kind", value: Some("Secret"), kind: "string", line: 16, cut: false }
 Row { key: "[1].stringData.password", value: None, kind: "string", line: 18, cut: false }
+
+sample.kustomization.yaml
+Output {
+    nodes: [
+        Node {
+            address: "ConfigMap/shop/dev-settings",
+            root: "overlay",
+            ty: "ConfigMap",
+            name: Some(
+                "dev-settings",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "overlay/sample.kubernetes.yaml",
+            line: 29,
+            end_line: 32,
+            block: "[2]",
+        },
+        Node {
+            address: "Deployment.apps/shop/dev-web",
+            root: "overlay",
+            ty: "Deployment",
+            name: Some(
+                "dev-web",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "overlay/sample.kubernetes.yaml",
+            line: 3,
+            end_line: 19,
+            block: "[0]",
+        },
+        Node {
+            address: "Service/shop/dev-web",
+            root: "overlay",
+            ty: "Service",
+            name: Some(
+                "dev-web",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "overlay/sample.kubernetes.yaml",
+            line: 21,
+            end_line: 27,
+            block: "[1]",
+        },
+        Node {
+            address: "ServiceAccount/shop/dev-runner",
+            root: "overlay",
+            ty: "ServiceAccount",
+            name: Some(
+                "dev-runner",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "overlay/sample.kubernetes.yaml",
+            line: 34,
+            end_line: 37,
+            block: "[3]",
+        },
+    ],
+    references: [
+        Reference {
+            root: "overlay",
+            source: "Deployment.apps/shop/dev-web",
+            target: "ConfigMap/shop/dev-settings",
+            via: Some(
+                "envFrom",
+            ),
+        },
+        Reference {
+            root: "overlay",
+            source: "Deployment.apps/shop/dev-web",
+            target: "ServiceAccount/shop/dev-runner",
+            via: Some(
+                "serviceAccountName",
+            ),
+        },
+        Reference {
+            root: "overlay",
+            source: "Service/shop/dev-web",
+            target: "Deployment.apps/shop/dev-web",
+            via: Some(
+                "selector app=web",
+            ),
+        },
+    ],
+    images: [
+        Image {
+            root: "overlay",
+            address: "Deployment.apps/shop/dev-web",
+            container: "main",
+            image: "ghcr.io/acme/web:dev",
+        },
+    ],
+    unresolved: [
+        Unresolved {
+            root: "overlay",
+            path: "overlay/kustomization.yaml",
+            entry: "https://example.com/acme/base//kube?ref=v1",
+            reason: "remote",
+        },
+    ],
+}

@@ -540,3 +540,32 @@
   `format` or `join`, which keep no literal part. A literal
   `*` in a name reads as a wildcard. A child module's variable default its call leaves is not
   overridable. Names through a cycle of locals are partly resolved, the member met again a `*`.
+- `kube.rs` (#651, ADR 0025): `OVERLAY_DEPTH_MAX` (16 kustomizations as bases inside each other;
+  past it the entry is unresolved, as a base already on the stack is, `cycle`); `WALK_MAX`
+  (50,000 kustomization entries one overlay walks, which bounds bases reaching one another
+  along many paths; past it the rest of the overlay is left out); `OBJECTS_MAX` (10,000 objects
+  per overlay or directory, bases included, the rest left out); `OBJECT_REFERENCES_MAX` (64
+  references per object, the first in address order; a Service stops scanning candidates at 64
+  matches); `UNIT_STORED_MAX` (4 MiB of addresses, references, images and unresolved entries per
+  unit) and `KUBE_STORED_MAX` (16 MiB for the repository), past which the rest is left out.
+  A file of more than `config_values::DOCUMENTS_MAX` documents gives no object. Only a
+  `kustomization.yaml` or `kustomization.yml` is a kustomization (not `Kustomization`); only
+  `resources`, `bases` and `components` are followed, and patches (`patches`,
+  `patchesStrategicMerge`, `patchesJson6902`, the files they name are no objects), generators,
+  `commonLabels`, `labels`, `replacements`, `helmCharts` and the object a `kind: List` holds
+  are not applied or read. A name is matched as the object was written, so a reference to an
+  object a generator or a patch renames resolves to nothing. A cluster-scoped kind is known by
+  the list `CLUSTER_SCOPED`; a custom resource outside it takes a Kustomize `namespace`. An
+  object with no namespace is `<Kind>[.<group>]/<name>`, which reads as a cluster-scoped one.
+  A document is no object when its name holds `{{` (a Helm template). A manifest no
+  kustomization lists is in a unit of its directory, labelled by it, and shares the label of a
+  kustomization of that directory; two objects of one address in a unit keep the first. A
+  kustomization another names as a base is no overlay of its own (an overlay built on another
+  yields its nodes under itself alone), and kustomizations that only name each other in a cycle
+  are no root, so what they list is plain. An entry cut by `WALK_MAX` or a stored budget is left
+  out with no unresolved row, and a non-object file a kustomization lists, created or deleted
+  alone, leaves the unresolved count as it was until a manifest changes. A
+  Kubernetes file changed anywhere evaluates every root and overlay of the repository again
+  (the `ponytail:` in `index::refresh_keeping`), reading every YAML or JSON file that says
+  `apiVersion`. The Kustomize `images` transformer matches the name before the tag, as written
+  (a `newTag` such as `1.20` read by YAML as a number loses its zero).

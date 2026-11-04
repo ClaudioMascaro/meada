@@ -35,6 +35,7 @@ mod indexed_commit;
 mod items;
 mod jvmpkg;
 mod kotlinpkg;
+mod kubernetes;
 mod manifest;
 mod mcp;
 mod nugetpkg;
