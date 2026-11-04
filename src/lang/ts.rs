@@ -58,6 +58,12 @@ impl LanguagePack for TsJs {
         let parents = Parents::new(tree.root_node(), src);
         let mut facts = Facts::default();
         let mut uses = uses::Uses::new(src, &parents);
+        // The instance fields only their declaration or constructor may assign, or only their
+        // class reach (`sealed_field`), by class and name, with their initializer; and every
+        // member write, by name (`None`: any member of `this`) and scope (`member_writes`).
+        let typescript = path.ends_with(".ts") || path.ends_with(".tsx");
+        let mut sealed: Vec<(String, String, Option<Value>)> = Vec::new();
+        let mut writes: BTreeMap<(Option<String>, String), Vec<Option<Value>>> = BTreeMap::new();
         // Each function definition by its node: the `return`s written in its body.
         let mut functions: HashMap<usize, usize> = HashMap::new();
         // Explicit stack instead of recursion: generated code can nest deeper than the call
@@ -159,6 +165,23 @@ impl LanguagePack for TsJs {
                         });
                     }
                 }
+                "public_field_definition" if typescript => {
+                    if let Some(name) = sealed_field(node, src) {
+                        let initial = node.child_by_field_name("value");
+                        let initial = initial.map(|v| value(v, src, &scope, &parents));
+                        sealed.push((scope.clone(), name, initial));
+                    }
+                }
+                "assignment_expression"
+                | "augmented_assignment_expression"
+                | "update_expression"
+                    if typescript =>
+                {
+                    for (name, plain) in member_writes(node, src, &scope, &parents) {
+                        let at = writes.entry((name, scope.clone())).or_default();
+                        at.push(plain);
+                    }
+                }
                 "import_statement" => imports(node, src, &mut facts.imports),
                 "export_statement" => exports(node, src, &mut facts.exports),
                 // A `return` of a function that is no definition (one returned in place, or
@@ -252,6 +275,44 @@ impl LanguagePack for TsJs {
                     },
                 }
             }));
+        }
+        // A sealed field written once, by its initializer or by the plain `this.f = v` of its
+        // class's constructor body, holds that value: a constant of the class, written in the
+        // constructor, as Java's `final` and C#'s `readonly` fields are (`Const::scope`), which
+        // `this.f` reads. Any other write of a member so named inside the class, or a computed
+        // one of `this`, leaves it none.
+        // ponytail: a write through an alias of `this` (`const self = this; self.f = v`) or
+        // `Object.assign(this, ..)` is not seen, nor a subclass that redeclares a non-private
+        // `readonly` field; see `docs/agents/ceilings/language-packs.md`.
+        for (class, name, initial) in sealed {
+            let inside = |scope: &str| {
+                (scope.strip_prefix(class.as_str()))
+                    .is_some_and(|r| r.is_empty() || r.starts_with('.'))
+            };
+            // The writes of `name` (or of any member) in scopes from `class` up to `class/`, which
+            // holds every `class.*` scope; `inside` drops the others the range holds (`class-x`).
+            let mut given = [Some(name.clone()), None].into_iter().flat_map(|name| {
+                let (from, to) = (class.clone(), format!("{class}/"));
+                (writes.range((name.clone(), from)..(name, to)))
+                    .filter(|((_, scope), _)| inside(scope))
+                    .flat_map(|((_, scope), values)| values.iter().map(move |v| (scope, v)))
+            });
+            let ctor = qualify(&class, "constructor");
+            let held = match (initial, given.next(), given.next()) {
+                (Some(value), None, _) => Some((value, None)),
+                (None, Some((scope, Some(value))), None) if *scope == ctor => {
+                    Some((value.clone(), Some(ctor)))
+                }
+                _ => None,
+            };
+            if let Some((value, scope)) = held {
+                facts.consts.push(Const {
+                    name: qualify(&class, &name),
+                    value,
+                    ty: None,
+                    scope,
+                });
+            }
         }
         Ok(facts)
     }
@@ -1214,6 +1275,7 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
         "true" | "false" => Value::Scalar(None),
         "identifier" if text(node, src) == "undefined" => Value::Undefined,
         "identifier" => Value::Ref(text(node, src).to_string()),
+        "member_expression" if let Some(name) = this_member(node, src, up) => Value::Ref(name),
         kind if FUNCTIONS.contains(&kind) && written_in_place(node, up) => {
             function(scope, &inline(node))
         }
@@ -1347,6 +1409,9 @@ fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Pa
         "identifier" if text(node, src) != "undefined" => {
             Some(vec![Part::Ref(text(node, src).to_string())])
         }
+        "member_expression" if let Some(name) = this_member(node, src, up) => {
+            Some(vec![Part::Ref(name)])
+        }
         "parenthesized_expression"
         | "non_null_expression"
         | "as_expression"
@@ -1474,6 +1539,133 @@ fn config_read(call: Node, function: Node, src: &[u8]) -> Option<Part> {
         key: unquote(key, src),
         then: Vec::new(),
     })
+}
+
+/// How many nodes `this_member` climbs to the class member around a `this`; past it the `this`
+/// is read as no instance's.
+// ponytail: real code nests a `this` a few dozen nodes inside its method; the climb must stay
+// cheap whatever the file. See `docs/agents/ceilings/language-packs.md`.
+const THIS_CLIMB: usize = 256;
+
+/// `this.f` or `this.#f` as the name the resolver reads (`LanguagePack::receiver`), when the
+/// `this` is an instance of the class around it: written in an instance method or field
+/// initializer of a class body, through arrow functions only. A `function`, a method of an
+/// object literal, a `static` member and a static block bind another `this`.
+fn this_member(node: Node, src: &[u8], up: &Parents) -> Option<String> {
+    let object = node.child_by_field_name("object")?;
+    let property = node.child_by_field_name("property")?;
+    let named = matches!(
+        property.kind(),
+        "property_identifier" | "private_property_identifier"
+    );
+    if object.kind() != "this" || !named {
+        return None;
+    }
+    let mut at = node;
+    for _ in 0..THIS_CLIMB {
+        let parent = up.of(at)?;
+        match parent.kind() {
+            "class_body" => {
+                let shared = (at.children(&mut at.walk())).any(|c| c.kind() == "static");
+                let instance = !shared && at.kind() != "class_static_block";
+                return instance.then(|| format!("this.{}", text(property, src)));
+            }
+            "method_definition" if up.of(parent).is_none_or(|b| b.kind() != "class_body") => {
+                return None;
+            }
+            kind if kind != "arrow_function" && FUNCTIONS.contains(&kind) => return None,
+            "function_declaration" | "generator_function_declaration" => return None,
+            _ => at = parent,
+        }
+    }
+    None
+}
+
+/// The name of the instance field `node` (a `public_field_definition`) declares, when only its
+/// declaration or a constructor of its class may assign it (`readonly`) or only its class may
+/// reach it (`private`, `#x`): TypeScript's handbook
+/// (https://www.typescriptlang.org/docs/handbook/2/classes.html#readonly) and ECMAScript's
+/// private names (https://tc39.es/ecma262/#sec-private-names). A `static` or `abstract` field
+/// is no instance's.
+fn sealed_field(node: Node, src: &[u8]) -> Option<String> {
+    let name = node.child_by_field_name("name")?;
+    let mut sealed = name.kind() == "private_property_identifier";
+    for child in node.children(&mut node.walk()) {
+        match child.kind() {
+            "readonly" => sealed = true,
+            "accessibility_modifier" if text(child, src) == "private" => sealed = true,
+            "static" | "abstract" => return None,
+            _ => {}
+        }
+    }
+    let plain = matches!(
+        name.kind(),
+        "property_identifier" | "private_property_identifier"
+    );
+    (sealed && plain).then(|| text(name, src).to_string())
+}
+
+/// The members the write `node` (`=`, `op=`, `++`) assigns: each one's name, `None` for a
+/// computed member of `this` (it may be any), with the value of a plain `this.f = v` written
+/// as a statement of a constructor's body, the one write a sealed field may have. A pattern
+/// (`[this.a] = ..`) writes every member it holds.
+fn member_writes(
+    node: Node,
+    src: &[u8],
+    scope: &str,
+    up: &Parents,
+) -> Vec<(Option<String>, Option<Value>)> {
+    let target = match node.kind() {
+        "update_expression" => node.child_by_field_name("argument"),
+        _ => node.child_by_field_name("left"),
+    };
+    let mut pending: Vec<Node> = target.into_iter().collect();
+    let mut out = Vec::new();
+    while let Some(t) = pending.pop() {
+        let object = t.child_by_field_name("object");
+        let on_this = object.is_some_and(|o| o.kind() == "this");
+        let name = match t.kind() {
+            "member_expression" => t.child_by_field_name("property").map(|p| text(p, src)),
+            "subscript_expression" => match t.child_by_field_name("index") {
+                Some(index) if index.kind() == "string" => {
+                    out.push((Some(unquote(index, src)), None));
+                    continue;
+                }
+                _ if on_this => None,
+                _ => continue,
+            },
+            _ => {
+                pending.extend(named(t));
+                continue;
+            }
+        };
+        let plain = (node.kind() == "assignment_expression"
+            && Some(t) == target
+            && on_this
+            && in_constructor_body(node, src, up))
+        .then(|| node.child_by_field_name("right"))
+        .flatten()
+        .filter(|v| !FUNCTIONS.contains(&v.kind()) && v.kind() != "class")
+        .map(|v| value(v, src, scope, up));
+        out.push((name.map(str::to_string), plain));
+    }
+    out
+}
+
+/// Whether the expression `node` is a statement of the body of a class's `constructor`.
+fn in_constructor_body(node: Node, src: &[u8], up: &Parents) -> bool {
+    let statement = up.of(node).filter(|s| s.kind() == "expression_statement");
+    let block = statement
+        .and_then(|s| up.of(s))
+        .filter(|b| b.kind() == "statement_block");
+    let method = block.and_then(|b| up.of(b)).filter(|m| {
+        m.kind() == "method_definition"
+            && m.child_by_field_name("name")
+                .is_some_and(|n| text(n, src) == "constructor")
+    });
+    method
+        .and_then(|m| up.of(m))
+        .is_some_and(|c| c.kind() == "class_body")
 }
 
 /// The environment read that makes up all of `parts`, if that is what they are.
@@ -1723,6 +1915,146 @@ mod tests {
         assert!(matches!(args[0].args.as_slice(), [Value::Ref(name)] if name == "url"));
         assert_eq!(args[0].arg_types, [None]);
         assert!(matches!(args[1].args.as_slice(), [Value::Str(_)]));
+    }
+
+    /// What the first argument of the one `fetch` in `path` folds to, `src` alone in the
+    /// repository.
+    fn fetched_parts(path: &'static str, src: &str) -> Vec<Part> {
+        use crate::resolve::{Code, Resolver};
+        let facts = TsJs.parse(path, src.as_bytes()).unwrap();
+        let files = BTreeMap::from([(path, &facts)]);
+        let modules = TsJs.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &TsJs);
+        let code = Code::new(&resolver, &files, &TsJs);
+        let [call] = &facts
+            .calls
+            .iter()
+            .filter(|c| c.callee == "fetch")
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("one fetch in {src}");
+        };
+        match code.value(path, &call.scope, &call.args[0]) {
+            Value::Str(parts) => parts,
+            _ => panic!("no string in {src}"),
+        }
+    }
+
+    /// A field TypeScript lets only its declaration or its constructor assign (`readonly`), or
+    /// only its class reach (`private`, ECMAScript's `#x`), written once holds that value: a
+    /// constant of the class, written in the constructor, which `this.f` in a method reads.
+    #[test]
+    fn a_readonly_or_private_field_written_once_is_a_constant_of_its_class() {
+        let env = || vec![Part::Env("API".into()), Part::Text("/o".into())];
+        // `F` is the field's name.
+        let class = |members: &str, field: &str| {
+            let method = "list() { return fetch(`${this.F}/o`); }";
+            format!("class C {{\n{members}\n{method}\n}}\n").replace('F', field)
+        };
+        let assigned = "constructor() { this.F = process.env.API; }";
+        for (members, field) in [
+            (format!("private readonly F: string;\n{assigned}"), "base"),
+            (format!("readonly F: string;\n{assigned}"), "base"),
+            (format!("private F: string;\n{assigned}"), "base"),
+            (format!("F: string;\n{assigned}"), "#base"),
+            ("private readonly F = process.env.API;".to_string(), "base"),
+            ("F = process.env.API;".to_string(), "#base"),
+        ] {
+            let src = class(&members, field);
+            assert_eq!(fetched_parts("a.ts", &src), env(), "{src}");
+        }
+        // Through a concatenation, and a Backstage read the HTTP kind decides.
+        let src = "class C {\nprivate readonly base: string;\n\
+                   constructor(config: Config) { this.base = config.getString('a.b'); }\n\
+                   list() { return fetch(this.base + '/o'); }\n}\n";
+        let parts = fetched_parts("a.ts", src);
+        assert!(
+            matches!(&parts[..], [Part::Read { key, .. }, Part::Text(t)] if key == "a.b" && t == "/o"),
+            "{parts:?}"
+        );
+
+        let hole = || vec![Part::Hole, Part::Text("/o".into())];
+        for members in [
+            // Public and mutable.
+            "base = process.env.API;",
+            "public base: string;\nconstructor() { this.base = process.env.API; }",
+            // Written twice: by the initializer and the constructor, twice in the constructor,
+            // or under a condition (written, or not).
+            "private readonly base = process.env.API;\nconstructor() { this.base = process.env.API; }",
+            "private base: string;\nconstructor() { this.base = process.env.API; this.base = process.env.API; }",
+            "private base: string;\nconstructor(x: boolean) { if (x) { this.base = process.env.API; } }",
+            "private base = process.env.API;\nreset() { this.base += '/v2'; }",
+            "private base = process.env.API;\nreset(o: C) { o.base = 'x'; }",
+            "private base = process.env.API;\nreset() { [this.base] = ['x']; }",
+            "private base = process.env.API;\nreset() { this['base'] = 'x'; }",
+            // Written outside the constructor, or in a nested function of it.
+            "private base: string;\ninit() { this.base = process.env.API; }",
+            "private base: string;\nconstructor() { const f = () => { this.base = process.env.API; }; f(); }",
+            // A parameter property, or a constructor's parameter: its callers give the value.
+            "constructor(private readonly base: string) {}",
+            "private readonly base: string;\nconstructor(base: string) { this.base = base; }",
+            // Static: no instance holds it.
+            "static readonly base = process.env.API;",
+        ] {
+            let src = class(members, "base");
+            assert_eq!(fetched_parts("a.ts", &src), hole(), "{src}");
+        }
+        // Only an instance method's `this` is the instance, also through an arrow function: a
+        // `function`, a method of an object literal, a `static` method and a nested class bind
+        // another `this`.
+        let sealed = "private readonly base = process.env.API;";
+        let with = |method: &str| format!("class C {{\n{sealed}\n{method}\n}}\n");
+        let arrow = with("list() { return [1].map(() => fetch(`${this.base}/o`)); }");
+        assert_eq!(fetched_parts("a.ts", &arrow), env(), "{arrow}");
+        for method in [
+            "list() { return [1].map(function () { return fetch(`${this.base}/o`); }); }",
+            "list() { return run({ go() { return fetch(`${this.base}/o`); } }); }",
+            "static list() { return fetch(`${this.base}/o`); }",
+            "list() { class D { go() { return fetch(`${this.base}/o`); } } }",
+        ] {
+            let src = with(method);
+            assert_eq!(fetched_parts("a.ts", &src), hole(), "{src}");
+        }
+        // A JavaScript file declares no `readonly` or `private`, and its `#x` is left as today.
+        let js = class("F = process.env.API;", "#base");
+        assert_eq!(fetched_parts("a.js", &js), hole(), "{js}");
+    }
+
+    /// A `this` nested past `THIS_CLIMB` nodes inside its method is no instance's.
+    #[test]
+    fn a_this_nested_past_the_climb_reads_nothing() {
+        let nested = |n: usize| {
+            let arrows = "() => ".repeat(n);
+            format!(
+                "class C {{\nprivate readonly base = process.env.API;\n\
+                 list() {{ return {arrows}fetch(`${{this.base}}/o`); }}\n}}\n"
+            )
+        };
+        let env = vec![Part::Env("API".into()), Part::Text("/o".into())];
+        assert_eq!(fetched_parts("a.ts", &nested(THIS_CLIMB / 4)), env);
+        let hole = vec![Part::Hole, Part::Text("/o".into())];
+        assert_eq!(fetched_parts("a.ts", &nested(THIS_CLIMB * 2)), hole);
+    }
+
+    #[test]
+    fn sealed_fields_of_many_classes_are_read_in_linear_time() {
+        let source: String = (0..8192)
+            .map(|n| {
+                format!(
+                    "class C{n} {{ private readonly base: string; \
+                     constructor() {{ this.base = process.env.API; }} }}\n"
+                )
+            })
+            .collect();
+        let start = std::time::Instant::now();
+        let facts = TsJs.parse("a.ts", source.as_bytes()).unwrap();
+        let took = start.elapsed();
+        assert_eq!(
+            facts.consts.iter().filter(|c| c.scope.is_some()).count(),
+            8192
+        );
+        // 1.4 s measured in a local debug build; the bound is over twenty times that.
+        assert!(took.as_secs() < 40, "{took:?}");
     }
 
     /// The text of the literal parts of a folded value, `<env>` for an environment read, `?`

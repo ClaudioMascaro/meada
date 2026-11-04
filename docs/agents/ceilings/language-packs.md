@@ -277,6 +277,23 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   parameters and locals to the definition around it; at the top level that is the whole file.
   A call to the hidden name elsewhere in that scope loses its exact link or its value, never
   gains a wrong one (no marker).
+- `lang/ts.rs` (`sealed_field`, `member_writes`, `this_member`, #688): an instance field of a
+  `.ts` or `.tsx` class that is `readonly`, `private` or `#x` (not `static` or `abstract`) holds
+  a value only when it has exactly one write, its initializer or a plain `this.f = v` that is a
+  statement of its class's `constructor` body; that value, written in the constructor, is what
+  `this.f` (also inside a template or a `+`) reads in a method. A public or `protected` mutable
+  field, a second write of a member of that name anywhere inside the class (`x.f = ..`, `op=`,
+  `++`, `this['f']`, a pattern, a computed `this[k]`), a write under a condition, in a nested
+  function or outside the constructor, a parameter property, a constructor parameter
+  (`this.f = param`: no fold through the callers of `new`) and a JavaScript file stay unknown.
+  `this` is the instance only in an instance method or field initializer, through arrow
+  functions: in a `function`, a method of an object literal, a `static` member or a static block
+  it reads nothing. `THIS_CLIMB` (256, `ponytail:`): a `this` nested deeper than that many nodes
+  inside its member reads nothing. Not seen (`ponytail:`): a write through an alias of `this`
+  (`const self = this; self.f = v`), `Object.assign(this, ..)`, a write from outside the class
+  that casts the type away (`(c as any).f = v`), and a subclass that redeclares a non-private
+  `readonly` field (its own initializer then overrides the value the base class's methods read):
+  the resolver keeps no list of a class's subclasses.
 - `lang/python.rs`: `VALUE_DEPTH` (64): a list, tuple, dict literal, parenthesized expression or
   `await` nested deeper in a value is `Value::Unknown`, so a hostile file cannot overflow the
   stack. `FOLD_DEPTH` (256): a `+` or `or` chain, a chain of string methods or `getenv`

@@ -991,7 +991,8 @@ fn a_declarative_client_method_is_an_open_item_at_its_definition() {
 /// A Backstage service reads a base URL through `config.getString('a.b')` and the key holds
 /// `${VAR}` in `app-config*.yaml` (#617): the read is the variable, which the peer's
 /// `base_url_env` maps, so two providers of the route no longer leave the link `ambiguous`. A
-/// literal value and a key no file holds leave the host unresolved.
+/// literal value and a key no file holds leave the host unresolved. A `readonly`, `private` or
+/// `#x` field the constructor writes once with the read holds it in every method (#688).
 #[test]
 fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
     let case = "xlang_backstage";
@@ -1028,6 +1029,17 @@ fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
         ("missingKey", None),
         // Another pack's config file (`application.yaml`) is no Backstage config.
         ("notAppConfig", None),
+        // A field only the constructor writes, once (#688), and the fields that stay unread: a
+        // public mutable one, one written twice, under a condition or outside the constructor,
+        // one its callers give, and one of a JavaScript file.
+        ("OrdersClient.list", Some("env:API_URL")),
+        ("PublicClient.list", None),
+        ("TwiceClient.list", None),
+        ("ConditionalClient.list", None),
+        ("LateClient.list", None),
+        ("ParameterClient.list", None),
+        ("AssignedClient.list", None),
+        ("LegacyClient.list", None),
     ];
     for (function, via) in expected {
         assert_eq!(vias.get(function), Some(&via), "{function}");
@@ -1037,7 +1049,10 @@ fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
         .as_array()
         .unwrap()
         .iter()
-        .filter(|l| l["consumer"].as_str().unwrap().contains("viaGetString"))
+        .filter(|l| {
+            let consumer = l["consumer"].as_str().unwrap();
+            consumer.contains("viaGetString") || consumer.contains("OrdersClient")
+        })
         .map(|l| {
             (
                 l["provider"].as_str().unwrap(),
@@ -1046,14 +1061,12 @@ fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
             )
         })
         .collect();
-    assert_eq!(
-        links,
-        [(
-            "example.com/backstage/api::src/server.ts::GET /orders",
-            "inferred",
-            "base URL from API_URL, a base_url_env of peer example.com/backstage/api"
-        )]
+    let link = (
+        "example.com/backstage/api::src/server.ts::GET /orders",
+        "inferred",
+        "base URL from API_URL, a base_url_env of peer example.com/backstage/api",
     );
+    assert_eq!(links, [link, link]);
 }
 
 /// A Python service reads a base URL from a pydantic-settings field (#619): the read is

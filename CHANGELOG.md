@@ -34,6 +34,12 @@ All notable changes to Meada are recorded here. The format follows
   the same name. The `default` of a `variable` with `sensitive = true` and every value a
   `.tfvars` file gives a variable of that name are stored as `redacted`. A file that does
   not parse is skipped and counted by `meada status` (#640).
+- A TypeScript class field that is `readonly`, `private` or `#x` and written once, by its
+  initializer or by one plain `this.f = v` in the constructor body, is a constant of the class:
+  `this.f` in a method folds to it, so `` fetch(`${this.baseUrl}/orders`) `` gets the base URL
+  the constructor reads, a Backstage `config.getString` through `app-config*.yaml` included, and
+  links through `base_url_env`. A public mutable field, a second or conditional write, a write
+  outside the constructor, a constructor parameter and a JavaScript file stay unknown (#688).
 - IaC nodes (ADR 0025): every Terraform and OpenTofu `resource`, `data` block and `module` call
   of a `*.tf` or `*.tofu` file is a node with an address (`<type>.<name>`, `data.<type>.<name>`,
   `module.<name>`), a type, a file, its lines and the root module that roots its evaluation (a

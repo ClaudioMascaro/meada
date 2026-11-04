@@ -62,7 +62,9 @@ environment reads; the architecture map keeps the lead of the first:
   constructor calls, all count); a function some exact call reaches climbs to its callers as
   before, so the injected value never stands in for what a caller passes. A
   constructor's parameter a `final` field holds (`Const::scope`, the constructor the value is
-  written in) is no wrapper's parameter: it is injected or unknown, never climbed. The values
+  written in) is no wrapper's parameter: it is injected or unknown, never climbed. The TS pack
+  writes the same constant for a `readonly`, `private` or `#x` field written once
+  (`lang/ts.rs` `sealed_field`, #688), which `this.f` (a `Ref`) reads. The values
   an injector gives are transient like the arguments they stand for, so the index stays free of
   them. `jvm/spring.rs` is the JVM packs' injector (Spring's `@Value`, `spring::inject`, which is
   given the annotation with what it marks, and nothing for `Injected::Param`), and

@@ -17,7 +17,7 @@ g9	OrdersInline	via	env:API_URL	control	example.com/acme/api inferred base URL f
 g9	ordersInline	via	env:API_URL	control	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	env:API_URL	control: TS config.getString inline
 g9	Client.OrdersDirect	via	env:API_URL	pending	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	Go field, direct use
 g9	Client.Orders	via	env:API_URL	pending	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	Go field, through the send() wrapper
-g9	OrdersClient.list	via	env:API_URL	pending	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	TS field set in the constructor
+g9	OrdersClient.list	via	env:API_URL	landed	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	TS field set in the constructor
 g10a	ordersConfig	via	env:API_URL	control	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	env:API_URL	control: config value inline (g10a)
 g10b	ordersConfig	via	env:API_URL	pending	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	config value via $include file#key (g10b)
 g10c	ordersConfig	via	env:API_URL	pending	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	config block via $include file (g10c)

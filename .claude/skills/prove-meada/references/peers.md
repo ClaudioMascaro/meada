@@ -64,7 +64,7 @@ through `/create-prove-it`, and adds its paths to SKILL.md's Scope row.
 | TS URL builders, one argument | 7 (`g8`) | #685 | landed |
 | TS `new URL(ref, base)` join | none yet | to come | no case |
 | Go struct field | 2 (`g9`) | to come | pending |
-| TS readonly field | 1 (`g9`) | to come | pending |
+| TS readonly field | 1 (`g9`) | #688 | landed |
 | Backstage `$include` and `$env` | 2 (`g10b`, `g10c`) | to come | pending |
 | Backstage proxy shapes | 3 (`g10e` to `g10g`) | to come | pending |
 
