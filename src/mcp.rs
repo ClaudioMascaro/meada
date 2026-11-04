@@ -54,8 +54,9 @@ struct SearchArgs {
     /// path), `community` (by name), `process` (by its entry point's label, with the
     /// `process::` identity `trace` starts from), `duplicate` (symbols with identical text in
     /// two or more places, by name or path), `value` (a scalar of a YAML or JSON file, by value
-    /// or key path; with no kind, the answer when nothing else matches), or `ambiguous` or
-    /// `unresolved` (open items, with the `meada decide` command for each).
+    /// or key path; with no kind, the answer when nothing else matches), `iac` (a Terraform
+    /// resource, data block or module call, by address, type or physical name), or `ambiguous`
+    /// or `unresolved` (open items, with the `meada decide` command for each).
     kind: Option<String>,
     /// Token budget for the answer (default 2000).
     budget: Option<u32>,
@@ -63,7 +64,7 @@ struct SearchArgs {
 
 #[derive(Deserialize, JsonSchema)]
 struct ContextArgs {
-    /// Symbol name, `<path>::<name>` or full identity; a resource, `resource::<kind>::<id>`; or a channel, `channel::<broker>::<name>`.
+    /// Symbol name, `<path>::<name>` or full identity; a resource, `resource::<kind>::<id>`; a channel, `channel::<broker>::<name>`; or an IaC node's address.
     symbol: String,
     /// Token budget for the answer (default 2000).
     budget: Option<u32>,
@@ -71,8 +72,8 @@ struct ContextArgs {
 
 #[derive(Deserialize, JsonSchema)]
 struct TraceArgs {
-    /// Start: a symbol, a route (`GET /users/{}` or its contract), a call site, or a process
-    /// (`process::<entry point identity>`, down only).
+    /// Start: a symbol, a route (`GET /users/{}` or its contract), a call site, an IaC node's
+    /// address, or a process (`process::<entry point identity>`, down only).
     from: Option<String>,
     /// `uncommitted`: start from the symbols the working-tree diff touches instead.
     changes: Option<String>,

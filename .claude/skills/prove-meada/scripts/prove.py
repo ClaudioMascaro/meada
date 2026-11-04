@@ -5,6 +5,7 @@
   prove.py rebless --base SHA --run DIR
   prove.py deploy --base SHA --run DIR
   prove.py values --base-bin B --head-bin H --repos a7-probe,meada --run DIR [--http]
+  prove.py iac --base-bin B --head-bin H --repos a7-iac,terraform-sqs --run DIR [--http]   (python-hcl2)
   prove.py clean DIR
 
 `run` indexes each corpus repository twice from cold with each binary (determinism and the
@@ -1118,6 +1119,153 @@ def cmd_values(a):
     sys.exit(2 if blocked else 1 if differences else 0)
 
 
+def cmd_iac(a):
+    """A7 IaC nodes (#649): the oracle's nodes and references against `search` kind `iac`,
+    `context` and `trace` both ways over stdio (and HTTP with `--http`); the base answers the
+    default search, `meada status` and the export, which the change leaves alone."""
+    sys.dont_write_bytecode = True  # no __pycache__ left in the skill's folder
+    import tf_oracle as tf  # needs python-hcl2: see SKILL.md's Gotchas
+    os.environ["LANG"] = "C.UTF-8"
+    run = Path(a.run).resolve()
+    run.mkdir(parents=True, exist_ok=True)
+    report, differences, blocked = [], 0, False
+    footer = re.compile(r"chain: (exact|none) \u00b7 0 hops \u00b7 1 repos \u00b7 \d+ tokens\Z")
+    for name in a.repos.split(","):
+        src = run / "work" / "src" / name
+        if not src.exists():
+            fetch(name, src)
+        nodes, references, unreadable = tf.evaluate(src)
+        recs = {}
+        for side, bin in (("head", a.head_bin), ("base", a.base_bin)):
+            repo, out = run / "work" / side / name, run / side / name
+            shutil.rmtree(repo, ignore_errors=True)
+            shutil.copytree(src, repo, symlinks=True)
+            out.mkdir(parents=True, exist_ok=True)
+            bin = Path(bin).resolve()
+            rec = {"version": subprocess.check_output([bin, "--version"], text=True).strip()}
+            rec["index"] = timed([bin, "index"], repo, out / "index.out", out / "index.err")
+            rec["export"] = timed([bin, "export"], repo, out / "export1.json", out / "export.err")
+            st = subprocess.run([bin, "status"], cwd=repo, capture_output=True, text=True)
+            rec["status"] = st.stdout + st.stderr
+            if rec["index"]["exit"] or rec["export"]["exit"]:
+                rec["failed"] = f"index or export exited non-zero, see {out}"
+            recs[side] = rec
+        h, b = recs["head"], recs["base"]
+        report.append(f"## {name}\n\n{b['version']} (base) vs {h['version']} (head)\n")
+        if h.get("failed") or b.get("failed"):
+            blocked = True
+            report.append(f"BLOCKED: base {b.get('failed')}; head {h.get('failed')}\n")
+            continue
+        identity = json.loads((run / "head" / name / "export1.json").read_text())["repository"]
+        roots = sorted({n["root"] for n in nodes})
+        report.append(f"Oracle: {len(nodes)} nodes in {len(roots)} roots ({', '.join(roots[:8])}{', ...' if len(roots) > 8 else ''}), "
+                      f"{len(references)} references; unreadable: {[f for f, _ in unreadable]}")
+        same = body((run / "base" / name / "export1.json").read_bytes()) == body((run / "head" / name / "export1.json").read_bytes())
+        differences += not same
+        report.append(f"meada export: {'byte-equal to base (no IaC node in it)' if same else 'DIFFERS from base'}")
+        differences += h["status"] != b["status"]
+        report.append(f"meada status: {'equal to base' if h['status'] == b['status'] else 'DIFFERS from base'}")
+        # The sample: nodes with references both ways first, then the rest, spread over the list.
+        linked = {r[1] for r in references} & {r[2] for r in references}
+        ordered = sorted(nodes, key=lambda n: (n["address"] not in linked, n["path"], n["line"], n["address"], n["root"]))
+        sample = spread([n for n in ordered if n["address"] in linked], a.sample // 2) + spread(ordered, a.sample - a.sample // 2)
+        sample = list({(n["root"], n["address"]): n for n in sample}.values())
+        counts = {}
+        for n in nodes:
+            counts[n["address"]] = counts.get(n["address"], 0) + 1
+        queries = []
+        search = lambda label, q, **kw: queries.append({"tool": "search", "label": label, "arguments": {"query": q, **kw}})
+        for n in sample:
+            search("address", n["address"], kind="iac", budget=200000)
+            search("prefix", n["address"][:5], kind="iac", budget=200000)
+            if n["name"]:
+                search("physical name", n["name"], kind="iac", budget=200000)
+            passed = f"{n['address']} (root {n['root']})"
+            queries.append({"tool": "context", "label": "context", "node": n, "arguments": {"symbol": passed, "budget": 200000}})
+            for d in ("down", "up"):
+                queries.append({"tool": "trace", "label": f"trace {d}", "node": n, "arguments": {"from": passed, "direction": d, "budget": 200000}})
+        for t in sorted({n["type"] for n in nodes})[:3]:
+            search("type", t, kind="iac", budget=200000)
+        shared = sorted(k for k, c in counts.items() if c > 1)[:2]
+        for addr in shared:
+            queries.append({"tool": "context", "label": "several", "arguments": {"symbol": addr, "budget": 200000}})
+        search("nothing", "zz_prove_no_node", kind="iac", budget=200000)
+        for n in sample[:3]:
+            search("default search", n["address"], budget=200000)
+        search("unknown kind", "x", kind="iacs")
+        # The code keeps its answers: a symbol named like a node (`a7-iac`'s `zz_code.py`) answers
+        # `context` and `trace` as on the base (the prover's finding on 09f2aae, 2026-11-04).
+        symbols = json.loads((run / "head" / name / "export1.json").read_text()).get("symbols", [])
+        for sym in sorted({x["id"].rsplit("::", 1)[-1] for x in symbols}, key=lambda n: ("." not in n, n))[:3]:
+            queries.append({"tool": "context", "label": "code answer", "arguments": {"symbol": sym, "budget": 200000}})
+            queries.append({"tool": "trace", "label": "code answer", "arguments": {"from": sym, "direction": "up", "budget": 200000}})
+        wire = [{k: v for k, v in q.items() if k != "node"} for q in queries]
+        try:
+            h["tools"], h["answers"], secs = mcp_answers(Path(a.head_bin).resolve(), run / "work" / "head" / name, wire, run / "head" / name / "mcp.err")
+            _, b["answers"], _ = mcp_answers(Path(a.base_bin).resolve(), run / "work" / "base" / name, wire, run / "base" / name / "mcp.err")
+        except Exception as e:
+            blocked = True
+            report.append(f"BLOCKED: mcp stdio {e!r}")
+            continue
+        h["queries"] = wire
+        (run / "head" / name / "iac.json").write_text(json.dumps({"queries": wire, "answers": h["answers"], "seconds": secs}, indent=1, ensure_ascii=False))
+        lines, fails = [], 0
+        for i, q in enumerate(queries):
+            got, args, label = h["answers"][i], q["arguments"], q["label"]
+            problems = []
+            if q["tool"] == "search" and args.get("kind") == "iac":
+                hits = tf.search_hits(identity, nodes, args["query"])
+                want = "".join(l + "\n" for l in hits) if hits else f"no matches for `{args['query']}`\n"
+                if got != want:
+                    problems.append("differs from the oracle:\n" + "\n".join(difflib.unified_diff(want.splitlines(), got.splitlines(), "oracle", "head", lineterm="", n=1)))
+            elif label == "code answer":
+                if got != b["answers"][i]:
+                    problems.append("differs from base: a symbol's answer must not change")
+            elif q["tool"] == "context" and label == "several":
+                if not got.startswith(f"`{args['symbol']}` fits {counts[args['symbol']]} IaC nodes; pass one of:\n"):
+                    problems.append(f"not a list of {counts[args['symbol']]} nodes: {got[:200]}")
+            elif q["tool"] == "context":
+                want = tf.context_lines(identity, nodes, references, q["node"])
+                got_lines = got.splitlines()
+                head_part = got_lines[:len(want)]
+                if head_part != want:
+                    problems.append("differs from the oracle:\n" + "\n".join(difflib.unified_diff(want, head_part, "oracle", "head", lineterm="", n=1)))
+                rest = got_lines[len(want):]
+                values_ok = rest == ["values: none"] or (rest[:1] == ["values:"] and all(l.startswith(f"{identity} {q['node']['path']}:") for l in rest[1:]))
+                if not values_ok:
+                    problems.append(f"values section not of the node's file: {rest[:3]}")
+            elif q["tool"] == "trace":
+                want = tf.trace_lines(identity, nodes, references, q["node"], args["direction"] == "down")
+                got_lines = got.splitlines()
+                if got_lines[:-1] != want:
+                    problems.append("differs from the oracle:\n" + "\n".join(difflib.unified_diff(want, got_lines[:-1], "oracle", "head", lineterm="", n=1)))
+                m = footer.match(got_lines[-1] if got_lines else "")
+                if not m or (m.group(1) == "none") != (len(want) == 1):
+                    problems.append(f"footer: {got_lines[-1:] }")
+            elif "kind" not in args:
+                if got != b["answers"][i]:
+                    problems.append("differs from base: the default search must leave IaC nodes out")
+            else:
+                listed = got.rsplit(", not `", 1)[0]
+                if not (got.startswith(("TOOL ERROR", "ERROR")) and "`iac`" in listed):
+                    problems.append(f"not refused or `iac` not listed: {got[:200]}")
+            fails += bool(problems)
+            lines.append(f"  [{'FAIL' if problems else 'PASS'}] {label} {json.dumps(args, ensure_ascii=False)[:150]} ({secs[i]} s)"
+                         + "".join("\n      " + p.replace("\n", "\n      ") for p in problems))
+        differences += fails
+        report.append(f"IaC queries over stdio: {len(queries) - fails}/{len(queries)} equal to the oracle (or base); slowest {max(secs)} s\n" + "\n".join(lines))
+        if a.http:
+            line, failed = http_parity(Path(a.head_bin).resolve(), name, run / "work" / "head" / name, run, h)
+            differences += failed
+            report.append("MCP HTTP vs stdio (head):\n" + line)
+        report.append("")
+    verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}")
+    (run / "iac.md").write_text(f"# prove.py iac\n\n{verdict}\n\n" + "\n".join(report) + "\n")
+    print(verdict)
+    print(f"full report: {run}/iac.md")
+    sys.exit(2 if blocked else 1 if differences else 0)
+
+
 def cmd_clean(a):
     run = Path(a.run).resolve()
     for pid in run.glob("http/*/server.pid"):
@@ -1156,11 +1304,18 @@ def main():
     v.add_argument("--run", required=True)
     v.add_argument("--sample", type=int, default=8, help="files sampled for value queries per entry")
     v.add_argument("--http", action="store_true")
+    i = sub.add_parser("iac")
+    i.add_argument("--base-bin", required=True)
+    i.add_argument("--head-bin", required=True)
+    i.add_argument("--repos", required=True, help="comma-separated infra.tsv names")
+    i.add_argument("--run", required=True)
+    i.add_argument("--sample", type=int, default=8, help="nodes sampled for context and trace per entry")
+    i.add_argument("--http", action="store_true")
     c = sub.add_parser("clean")
     c.add_argument("run")
     sub.add_parser("selftest")
     a = p.parse_args()
-    {"run": cmd_run, "rebless": cmd_rebless, "deploy": cmd_deploy, "clean": cmd_clean, "values": cmd_values, "selftest": cmd_selftest}[a.cmd](a)
+    {"run": cmd_run, "rebless": cmd_rebless, "deploy": cmd_deploy, "clean": cmd_clean, "values": cmd_values, "iac": cmd_iac, "selftest": cmd_selftest}[a.cmd](a)
 
 
 if __name__ == "__main__":

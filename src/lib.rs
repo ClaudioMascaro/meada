@@ -28,6 +28,7 @@ pub mod github_app;
 #[cfg(feature = "oidc")]
 mod grant;
 mod http;
+mod iac;
 mod index;
 #[doc(hidden)]
 pub use index::{value_parses, with_busy_timeout, with_reversed_walk};

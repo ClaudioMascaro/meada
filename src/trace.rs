@@ -246,9 +246,7 @@ impl<'a> Graph<'a> {
         calls.sort_by_key(|(_, c)| &c.id);
         match calls[..] {
             [call] => Lookup::Call(call),
-            [] => Lookup::Answer(vec![format!(
-                "no symbol, route or call site matches `{from}`"
-            )]),
+            [] => Lookup::Answer(vec![no_start(from)]),
             _ => {
                 let mut lines = vec![format!(
                     "`{from}` fits {} call sites; pass one of:",
@@ -314,6 +312,11 @@ impl<'a> Graph<'a> {
     fn ends(&self, id: &str) -> bool {
         self.is_repo(id) || self.documented.contains_key(id)
     }
+}
+
+/// The answer's line when `from` names no symbol, route or call site.
+pub(crate) fn no_start(from: &str) -> String {
+    format!("no symbol, route or call site matches `{from}`")
 }
 
 /// The nodes `start` names, as `Graph::find` and `Graph::changed` find them, read into

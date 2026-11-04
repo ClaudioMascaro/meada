@@ -17,7 +17,7 @@ use crate::render::{
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Manifest, Missing, Repository, Workspace};
 use crate::{
-    Result, config_values, decisions, document, drift_view, index, items, render, repo, trace,
+    Result, config_values, decisions, document, drift_view, iac, index, items, render, repo, trace,
 };
 use meada_core::context::{self, shape_lines};
 use meada_core::search;
@@ -471,9 +471,21 @@ impl Engine {
             Start::From(_) => None,
         };
         let starts = trace::starts(&mut partial, start, changes.as_deref(), direction)?;
+        let none = starts.is_empty();
         trace::read(&mut partial, &links, starts, direction, true)?;
         let exports = partial.exports;
         let graph = trace::Graph::new(&self.workspace, &exports, &links);
+        // An IaC node (#649) by its address, when nothing of the code has that name: its
+        // references, walked within its root module. Decided on the whole answer, before any
+        // budget cuts it.
+        if let Start::From(from) = start
+            && none
+            && graph.answer(start, None, direction, Some(usize::MAX / 8))
+                == format!("{}\n", trace::no_start(from))
+            && let Some(iac) = iac::trace(&self.indexes(), from, direction, budget)?
+        {
+            return Ok(iac);
+        }
         Ok(graph.answer(start, changes.as_deref(), direction, budget))
     }
 
@@ -489,9 +501,11 @@ impl Engine {
     /// `search_drift`); `duplicate` lists the symbols whose span text is the same in two or more
     /// places of the workspace, in groups (`search_duplicates`); `value` lists the config values
     /// whose value or key path matches (`config_values::hits`), which with no `kind` answer only
-    /// when no symbol and no contract does; `ambiguous` and `unresolved` list the open items whose enclosing
-    /// symbol or call expression matches, each with the `meada decide` command that resolves
-    /// it. The answer is cut at `budget` tokens.
+    /// when no symbol and no contract does; `iac` lists the IaC nodes whose address, type or
+    /// physical name matches (`iac::hits`), never part of the answer with no `kind`; `ambiguous`
+    /// and `unresolved` list the open items whose enclosing symbol or call expression matches,
+    /// each with the `meada decide` command that resolves it. The answer is cut at `budget`
+    /// tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
         if let Some(item_kind) = kind.and_then(ItemKind::parse) {
             return self.search_items(query, item_kind, budget);
@@ -522,6 +536,14 @@ impl Engine {
         if kind == Some("value") {
             self.refresh()?;
             let hits = self.value_hits(&query.to_lowercase())?;
+            return Ok(search::answer(query, hits, budget));
+        }
+        if kind == Some("iac") {
+            self.refresh()?;
+            let mut hits = Vec::new();
+            for (identity, db) in self.indexes() {
+                hits.extend(iac::hits(identity, db, &query.to_lowercase())?);
+            }
             return Ok(search::answer(query, hits, budget));
         }
         // Whether symbols match, and the prefix of the contracts that do.
@@ -623,12 +645,20 @@ impl Engine {
         Ok(search::answer(query, hits, budget))
     }
 
+    /// Each repository's identity and index, in workspace order.
+    fn indexes(&self) -> Vec<(&str, &Connection)> {
+        (self.workspace.repos.iter())
+            .map(|r| r.identity.as_str())
+            .zip(&self.dbs)
+            .collect()
+    }
+
     /// The config values (#639) of every repository whose value or key path matches `needle`,
     /// lowercased, as `config_values::hits` gives them.
     fn value_hits(&self, needle: &str) -> Result<Vec<Hit>> {
         let mut hits = Vec::new();
-        for (repo, db) in self.workspace.repos.iter().zip(&self.dbs) {
-            hits.extend(config_values::hits(&repo.identity, db, needle)?);
+        for (identity, db) in self.indexes() {
+            hits.extend(config_values::hits(identity, db, needle)?);
         }
         Ok(hits)
     }
@@ -951,6 +981,10 @@ impl Engine {
             .collect();
         let [(n, symbol_found)] = found[..] else {
             if found.is_empty() {
+                // An IaC node (#649) by its address, when no symbol has that name.
+                if let Some(lines) = iac::context(&self.indexes(), symbol)? {
+                    return Ok(render::budgeted(&lines, budget));
+                }
                 return Ok(format!("no symbol matches `{symbol}`\n"));
             }
             let short = |s: &Symbol| format!("{}::{}", s.span.path, label(&s.id));
@@ -1610,12 +1644,13 @@ fn status_lines(
 /// The `kind` words of `search` the engine answers itself: the first two come before the kinds'
 /// filter words, the rest after the kinds' own renderers (`document` sits between the two).
 const WORDS_BEFORE: [&str; 2] = ["symbol", "contract"];
-const WORDS_AFTER: [&str; 7] = [
+const WORDS_AFTER: [&str; 8] = [
     "drift",
     "community",
     "process",
     "duplicate",
     "value",
+    "iac",
     "ambiguous",
     "unresolved",
 ];

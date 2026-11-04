@@ -152,6 +152,7 @@ Los valores de `kind`:
 | `process` | un proceso por la etiqueta del punto de entrada, con la identidad `process::` desde la que parte `trace` |
 | `duplicate` | símbolos con texto idéntico en dos o más lugares, por el nombre o por la ruta |
 | `value` | un valor de configuración de un archivo YAML o JSON, por el valor o por la ruta de la clave |
+| `iac` | un nodo IaC (un resource, un bloque data o una llamada de módulo de Terraform), por la dirección, el tipo o el nombre físico |
 | `ambiguous`, `unresolved` | los ítems abiertos, con el comando `meada decide` de cada uno |
 
 Cada resultado es una línea: repositorio, `ruta:línea` y nombre.
@@ -179,16 +180,31 @@ respuesta). Ese índice cuesta espacio: guarda cerca de cuatro veces el texto de
 y de los valores (en un repositorio de 92 mil valores y 5 MB de texto, 21 MB de
 `.meada/index.db`), además de lo que el índice ya tenía.
 
+Con `kind = "iac"`, cada línea es un nodo IaC: `<repositorio> <ruta>:<línea> <dirección> (<tipo>,
+name "<nombre físico>", root <módulo raíz>)`, sin el `name` cuando el bloque no tiene un atributo
+`name` literal. La búsqueda sin `kind` no responde con nodos IaC.
+
+```text
+example.com/acme/infra envs/prod/main.tf:35 aws_sqs_queue.dlq[0] (aws_sqs_queue, name "dead-letters", root envs/prod)
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, root envs/prod)
+```
+
 #### `context`: entender un símbolo
 
 | Parámetro | Tipo | Predeterminado | Papel |
 | --- | --- | --- | --- |
-| `symbol` | texto, obligatorio | | Un nombre, `<ruta>::<nombre>` o la identidad completa; un recurso (`resource::postgres::orders`) o un canal (`channel::kafka::orders.created`) |
+| `symbol` | texto, obligatorio | | Un nombre, `<ruta>::<nombre>` o la identidad completa; un recurso (`resource::postgres::orders`), un canal (`channel::kafka::orders.created`) o la dirección de un nodo IaC (`aws_sqs_queue.orders`, `<ruta>::<dirección>`) |
 | `budget` | entero | 2000 | Presupuesto de tokens de la respuesta |
 
 Devuelve la comunidad y los procesos del símbolo, el fragmento de código leído del disco, quién lo
 llama (`callers:`), a quién llama (`callees:`) y los contratos que toca (`contracts:`). En un
-recurso, lista quién escribe y quién lee; en un canal, los productores y los consumidores.
+recurso, lista quién escribe y quién lee; en un canal, los productores y los consumidores. En un
+nodo IaC, su tipo, su nombre físico, su módulo raíz, los nodos que referencia (`references:`) y
+los que lo referencian (`referenced by:`), cada uno con el nombre por el que pasó (`via
+var.queue_arn`), y los valores de configuración de su bloque (`values:`). Una dirección que
+tienen varios módulos raíz lista los nodos, cada uno con lo que pasar: `<dirección> (root <módulo
+raíz>)`. Un símbolo del código con el mismo nombre va antes del nodo; `<ruta>::<dirección>` llega
+al nodo.
 
 ```text
 example.com/acme/web src/status.ts:2-4 health
@@ -209,14 +225,15 @@ example.com/acme/web src/status.ts:3 consumes http::GET::/api/health →[exact: 
 
 | Parámetro | Tipo | Predeterminado | Papel |
 | --- | --- | --- | --- |
-| `from` | texto | | El inicio: un símbolo, una ruta (`GET /users/{}` o el contrato), un call site o un proceso (`process::<identidad>`, solo río abajo) |
+| `from` | texto | | El inicio: un símbolo, una ruta (`GET /users/{}` o el contrato), un call site, la dirección de un nodo IaC o un proceso (`process::<identidad>`, solo río abajo) |
 | `changes` | texto | | `uncommitted`: parte de los símbolos que toca el diff del árbol de trabajo |
 | `direction` | `down` o `up` | `down` | `down` es lo que el inicio alcanza, `up` es lo que lo alcanza |
 | `budget` | entero | 2000 | Presupuesto de tokens de la respuesta |
 
 Pase `from` o `changes: uncommitted`, nunca los dos. El segundo sirve para medir el impacto de lo
 que acaba de editarse, y solo funciona en el Meada local (el modo servidor no tiene árbol de
-trabajo).
+trabajo). Desde un nodo IaC, `down` sigue sus referencias y `up` las que llegan a él, dentro de su
+módulo raíz, entrando en los módulos locales por sus entradas y salidas.
 
 ```text
 example.com/acme/web src/orders.ts:5 listOrders
@@ -329,6 +346,29 @@ hay clave para activarlo: la búsqueda con `kind = "value"` los encuentra, y la 
   lee) se guardan como `redacted`, con su ruta de la clave, su tipo y su línea. Nada más se filtra: el índice guarda lo
   que el checkout ya tiene. Pon en `.meadaignore` los archivos que no deben entrar en el índice
   (`secrets/`, `*.env.json`).
+
+### Nodos IaC
+
+Cada `resource`, bloque `data` y llamada `module` de los archivos `*.tf` y `*.tofu` es un **nodo
+IaC**, con dirección, tipo, archivo, líneas y el módulo raíz que empieza su evaluación. Una
+carpeta de archivos Terraform es un módulo; una carpeta que ninguna otra llama como módulo local
+(un `source` `./` o `../` que queda dentro del repositorio) es un módulo raíz, etiquetado por su
+ruta (`.` en la raíz).
+
+- **Direcciones**: `<tipo>.<nombre>`, `data.<tipo>.<nombre>` y `module.<nombre>`. Cada llamada de
+  un módulo local instancia sus bloques con la dirección de la llamada delante
+  (`module.orders.aws_sqs_queue.this`); un `count` o un `for_each` sobre literales da un nodo por
+  instancia, con `[clave]` al final (`aws_sqs_queue.dlq[0]`,
+  `aws_cloudwatch_metric_alarm.depth["orders"]`). Un `count` o `for_each` que no es literal da un
+  solo nodo, sin clave.
+- **Referencias**: una expresión que nombra un resource, un bloque data o un módulo es una
+  referencia de su nodo, guardada como una llamada. Una que pasa por `var.<nombre>`,
+  `local.<nombre>` o la salida de un módulo (`module.<nombre>.<salida>`) se sigue hasta lo que
+  nombra el argumento de la llamada, el local o la salida, y muestra por dónde pasó (`via
+  var.queue_arn`). Un módulo del registro queda como el nodo de la llamada, sin nada dentro.
+- **Consultas**: `search` con `kind = "iac"` encuentra los nodos, `context` explica uno y `trace`
+  sigue sus referencias en los dos sentidos. Los nodos quedan fuera de la búsqueda sin `kind` y de
+  `meada export`.
 
 ## 4. `meada.toml`: referencia
 

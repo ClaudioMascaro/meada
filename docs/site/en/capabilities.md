@@ -239,6 +239,19 @@ Terraform and OpenTofu files are config values too (`*.tf`, `*.tofu`, `*.tf.json
 
 A value over 1 KiB is stored cut, marked `(cut)`. The `data` and `stringData` of a Kubernetes `Secret` are stored as `redacted`, with key path, type and line, as are the `default` of a Terraform `variable` with `sensitive = true` and every value a `.tfvars` file gives a variable of that name (all of them, when a Terraform file at or above it does not parse); nothing else is filtered, so files that must stay out of the index go in `.meadaignore`. Lockfiles (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `packages.lock.json`), Helm templates (not YAML until rendered), files over 1 MiB and files of more than 1,000 documents are skipped. Values never enter `meada export` and link nothing.
 
+## IaC nodes
+
+Every `resource`, `data` block and `module` call of the `*.tf` and `*.tofu` files is an IaC node, with an address (`<type>.<name>`, `data.<type>.<name>`, `module.<name>`), a type, a file, its lines and the root module its evaluation starts from: a directory no other one calls as a local module, labelled by its path (`.` at the root). Each call of a local module (a `./` or `../` `source` that stays inside the repository) instantiates its blocks with the call's address in front (`module.orders.aws_sqs_queue.this`), and a `count` or a `for_each` over literals gives one node per instance, with `[key]` at the end (`aws_sqs_queue.dlq[0]`). An expression that names a resource, a data block or a module is a reference, stored like a call; one that goes through `var.<name>`, `local.<name>` or a module's output is followed to what it names, and keeps the name it went through.
+
+| Query | Result |
+| --- | --- |
+| `search` with kind `iac` | Nodes whose address, type or physical name (the literal `name` attribute) equals, starts with or holds the query, as `<repository> <path>:<line> <address> (<type>, name "<name>", root <root module>)` |
+| `search` with no kind | No IaC node: only the config values that hold its name, when nothing else matches |
+| `context` on an address | Type, physical name, root module, the references both ways (`references:`, `referenced by:`, each with its `via`) and the block's config values |
+| `trace` from an address | The references, `down` (what the node reaches) or `up` (what reaches it), within the root module and through the local modules |
+
+Every reference is `exact`: a name as written, followed without evaluating values. A `count` or `for_each` that is not literal gives one node with no key; a registry or remote module is only the call's node; `.tf.json` and `.tofu.json` files give no nodes yet. Nodes never enter `meada export`.
+
 ## Communities and processes
 
 A community groups symbols that call each other more than the rest. `meada export` computes these groups with Leiden, without randomness and using integer arithmetic. Names follow the directory containing most members (`src`, `src#2`), identically on every machine.

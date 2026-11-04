@@ -159,11 +159,12 @@ substrings), and an optional `kind`:
 | `process` | Processes, by their entry point's label. |
 | `duplicate` | Groups of symbols with the same span text, by name or path. |
 | `value` | Config values of YAML, JSON and Terraform files, by value or key path. |
+| `iac` | IaC nodes (Terraform resources, data blocks and module calls), by address, type or physical name. |
 | `ambiguous` | Open items: calls with several candidate providers. |
 | `unresolved` | Open items: calls whose target Meada cannot read. |
 
 With no `kind`, `search` lists symbols and contracts, and config values only when neither
-matches. The answer is one line per match, or a `no matches` line:
+matches; it never lists IaC nodes. The answer is one line per match, or a `no matches` line:
 
 | Kind | Line | Meaning |
 | --- | --- | --- |
@@ -175,6 +176,7 @@ matches. The answer is one line per match, or a `no matches` line:
 | community | `<repository> <community> (members: <n>)` | A community and its size. |
 | process | `<repository> <label> process::<entry-identity> (<entry-kind>)` | A process: `process::<entry-identity>` is what `trace` starts from. |
 | value | `<repository> <place> <key-path> = <shown-value>` | A config value, at its file and line. |
+| iac node | `<repository> <place> <address> (<iac-type><iac-name?>, root <iac-root>)` | An IaC node, at its block's first line, with its type, its physical name and its root module. |
 | copies | `<n> copies` | A group of duplicates; one symbol line per copy follows. |
 | open item | `` <repository> <place> (<item-kind>) candidates: <n>; run `meada decide --item <call-site>` `` | An open item and the command that closes it. |
 | no matches | `` no matches for `<query?>` `` | Nothing matched. |
@@ -207,6 +209,10 @@ matches. The answer is one line per match, or a `no matches` line:
 | `<item-kind>` | `unresolved` | An unresolved consumer, such as a dynamic URL. |
 | `<key-path>` | `<text>` | Where the value sits in its file, jq style: `spec.containers[0].image`, `metadata.labels["app.kubernetes.io/name"]`, `[2].spec.replicas` in a file of several documents. |
 | `<shown-value>` | `<text> (cut)` | A string past 1 KiB, quoted as JSON and cut. |
+| `<address>` | `<word>` | An IaC node's address: `aws_sqs_queue.orders`, `data.aws_iam_policy_document.p`, `module.orders.aws_sqs_queue.this`, `aws_sqs_queue.dlq[0]`. |
+| `<iac-type>` | `<word>` | The resource or data type of an IaC node, or `module` for a module call. |
+| `<iac-name>` | `, name <text>` | The node's physical name, the literal of its `name` attribute, quoted as JSON. |
+| `<iac-root>` | `<word>` | The root module its evaluation starts from: its directory, `.` for the repository's root. |
 | `<shown-value>` | `<text>` | A string quoted as JSON (`"team-b"`), a number or a boolean as written, an HCL `expression` or `template` as written, a line break as `\n` (`var.env`, `"${var.env}-orders"`), or `redacted` for a value a format marks secret. |
 
 ## `context`
@@ -236,6 +242,12 @@ symbol, its name as `<path>::<name>` (or its identity when another repository ha
 
 **A contract.** Its identifier, then one line per side across the workspace, providers first,
 each followed by the shape the side carries and, for a route's consumers, its drift.
+
+**An IaC node.** Its head (the node and the lines of its block), its `type:`, `name:` and
+`root:` lines, then `references:` (the nodes it references), `referenced by:` (those that
+reference it) and `values:` (the config values of its block), each followed by its lines or
+printing `none`. An address several nodes have (one per root module that instantiates it) gives
+a `fits` line and one line per node, with what to pass for it.
 
 **Nothing.** A `no symbol` or `no contract` line.
 
@@ -282,10 +294,26 @@ words:
 | drift | `    drift: missing <missing>` | Under a consumer: the field paths it reads that the provider lacks, each with its level. |
 | not checked | `    not checked: <unchecked>` | Under a consumer: the field paths it reads under an open part of the shape. |
 | no contract | `` no <contract-kind> matches `<query>` `` | No side of the contract is in the workspace. |
+| iac type | `type: <iac-type>` | The IaC node's type. |
+| iac name | `name: <physical-name>` | The IaC node's physical name. |
+| iac root | `root: <iac-root>` | The IaC node's root module. |
+| iac section | `<iac-section>:<none?>` | The lines that follow belong to the section, or ` none` when it has none. |
+| iac reference | `<repository> <place> <address><via?>` | A node the node references, or that references it, at its block. |
+| iac value | `<repository> <place> <key-path> = <shown-value>` | A config value of the node's block. |
+| fits iac | ``` `<query>` fits <n> IaC nodes; pass one of: ``` | The address fits several IaC nodes, listed after it. |
+| fit iac | `<repository> <place> <iac-pass>` | One of the IaC nodes the address fits, and what to pass for it. |
 
 | Field | Form | Meaning |
 | --- | --- | --- |
 | `<last>` | `<number>` | The last line of the span. |
+| `<physical-name>` | `<text>` | The literal of the node's `name` attribute, quoted as JSON, or `none`. |
+| `<iac-section>` | `references` | The nodes the node references. |
+| `<iac-section>` | `referenced by` | The nodes that reference it. |
+| `<iac-section>` | `values` | The config values of its block. |
+| `<none>` | ` none` | The section has no line. |
+| `<via>` | ` via <word>` | The variable, local or module output the reference went through (`var.queue_arn`, `local.topic`, `module.orders.queue_arn`). |
+| `<iac-pass>` | `<address> (root <iac-root>)` | The node in its root module. |
+| `<iac-pass>` | `<repository>::<path>::<address> (root <iac-root>)` | The same, when another repository has it too. |
 | `<counts>` | `<text>` | `<n> <entry-kind>` for each entry kind with processes, joined by `, `. |
 | `<repositories>` | `repository` | One repository holds the entry points. |
 | `<repositories>` | `repositories` | Several repositories do. |
@@ -379,6 +407,9 @@ carries its level with no reason.
 | fits call sites | ``` `<query>` fits <n> call sites; pass one of: ``` | The name fits several call sites, listed after it. |
 | fit call site | `<repository> <place> <call-site>` | One of the call sites the name fits. |
 | no start | `` no symbol, route or call site matches `<query>` `` | Nothing to start from. |
+| iac reference | `<indent><repository> <place> <address><via?><repeat?>` | From an IaC node: a node it references (`down`) or that references it (`up`), at its block, within its root module. |
+| fits iac | ``` `<query>` fits <n> IaC nodes; pass one of: ``` | The address fits several IaC nodes, listed after it. |
+| fit iac | `<repository> <place> <iac-pass>` | One of the IaC nodes the address fits, and what to pass for it. |
 
 | Field | Form | Meaning |
 | --- | --- | --- |

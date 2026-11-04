@@ -21,6 +21,7 @@ use crate::contract::{self, Found, Level, Link, Names, Role, Site};
 use crate::decisions::Stale;
 use crate::document::{self, Summary};
 use crate::entry::{self, EntryKind, EntryPoint};
+use crate::iac;
 use crate::lang::{self, Facts};
 use crate::msg::{Fix, Msg};
 use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package};
@@ -106,7 +107,11 @@ pub(crate) fn schema_version() -> i32 {
 /// B-tree for exact and prefix search), rewritten with the file. `config_search` is an FTS5
 /// trigram index over both folded columns (#647, no text of its own: it reads `config_values` by
 /// `id`), which serves substring search for a query of three characters or more. None of the
-/// three reaches the export.
+/// three reaches the export. `iac_nodes` holds each IaC node (#649, `iac::Node`: its address, the
+/// label of its root module, its type, physical name, file, first and last line, and the key path
+/// of its block) and `iac_references` each reference between two nodes of one root
+/// (`iac::Reference`), both rewritten whole from the Terraform files when one of them changed.
+/// Neither is exported.
 pub(crate) const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -164,6 +169,16 @@ CREATE VIRTUAL TABLE config_search USING fts5(
     folded_key, folded_value, content='config_values', content_rowid='id',
     tokenize='trigram case_sensitive 1'
 );
+CREATE TABLE iac_nodes (
+    address TEXT NOT NULL, root TEXT NOT NULL, type TEXT NOT NULL, name TEXT, path TEXT NOT NULL,
+    line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL
+);
+CREATE INDEX iac_nodes_address ON iac_nodes (address);
+CREATE TABLE iac_references (
+    root TEXT NOT NULL, source TEXT NOT NULL, target TEXT NOT NULL, via TEXT
+);
+CREATE INDEX iac_references_source ON iac_references (root, source);
+CREATE INDEX iac_references_target ON iac_references (root, target);
 ";
 
 /// A file modified this close to a refresh may change again within the same mtime tick, so
@@ -661,7 +676,8 @@ fn refresh_keeping(
                  DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports; \
                  DELETE FROM families; DELETE FROM flexible; DELETE FROM entry_points; DELETE FROM communities; \
                  DELETE FROM valued; DELETE FROM config_files; DELETE FROM config_values; \
-                 INSERT INTO config_search (config_search) VALUES ('delete-all');",
+                 INSERT INTO config_search (config_search) VALUES ('delete-all'); \
+                 DELETE FROM iac_nodes; DELETE FROM iac_references;",
             )?;
             None
         }
@@ -695,6 +711,8 @@ fn refresh_keeping(
     // so those are stored first) and is read again when they change.
     let configs = configs_found(&all, &hidden_ci(root));
     let sensitive = config_values::Sensitive::new(&tx, &configs);
+    // Whether a Terraform file changed, appeared or left: the IaC nodes are evaluated again.
+    let terraform = std::cell::Cell::new(false);
     let gone = refresh_stamped(
         &tx,
         "config_files",
@@ -703,6 +721,7 @@ fn refresh_keeping(
         |path| sensitive.stale(path),
         |abs| read_up_to(abs, lang::MAX_BYTES),
         |path, src| {
+            terraform.set(terraform.get() || iac::is_source(path));
             let (outcome, rows) = config_values::read_with(path, src, &sensitive.of(path)?);
             config_values::store(&tx, path, &rows)?;
             Ok(serde_json::to_string(&outcome)?)
@@ -710,6 +729,20 @@ fn refresh_keeping(
     )?;
     for path in &gone {
         config_values::forget(&tx, path)?;
+    }
+    // ponytail: one changed Terraform file evaluates every root module of the repository again,
+    // not only the units it belongs to; a repository of many roots would make that slow.
+    if terraform.get() || gone.iter().any(|p| iac::is_source(p)) {
+        let mut files = Vec::new();
+        for (path, abs) in configs.iter().filter(|(p, _)| iac::is_source(p)) {
+            if let Ok(src) = read_up_to(abs, lang::MAX_BYTES)
+                && src.len() <= lang::MAX_BYTES
+            {
+                files.push((path.clone(), src));
+            }
+        }
+        let (nodes, references) = iac::evaluate(&files);
+        iac::store(&tx, &nodes, &references)?;
     }
     // The packages decide which files keep the shapes of what they export (issue #175).
     let manifest_rows = manifest_rows(&tx)?;

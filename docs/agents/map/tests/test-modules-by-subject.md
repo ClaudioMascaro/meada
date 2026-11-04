@@ -11,7 +11,9 @@
   values a file stores (`config_values::read`: long keys nested deep, many scalars, secrets in
   many documents, and eight rows of Terraform: long labels nested deep, many attributes, many
   blocks, deep brackets, a long heredoc, a heredoc of interpolations, a long expression, many
-  tfvars), and the walks
+  tfvars), the IaC nodes one root stores (`iac::evaluate`, #649: a chain of resources, locals
+  naming each other twice, every resource naming a wide local, a module calling itself, wide
+  counts), and the walks
   `Maven::entries` and `Nuget::entries` over modules and projects that pass on to each other.
   Each row builds a file within `lang::MAX_BYTES` (many keys, deep nesting, wide fan-out), reads
   it on a thread of its own and answers the size of what came back; the test holds every row to
@@ -26,7 +28,14 @@
   and a `.tf` edit that makes a `.tfvars` value redacted or shown; `search` kind `value` against
   `config-values.search.txt`, `meada status` against `config-values.status.txt`, the default
   search's fallback, and no value in the export nor a secret in the index file; `freshness` edits
-  a config file alone, and `oidc` scopes the values by the grant), `decorations` (the `decorations` fixture: Java, Kotlin, C#,
+  a config file alone, and `oidc` scopes the values by the grant), `iac` (#649, the
+  `terraform-nodes` fixture: a root `envs/prod` with resources, a data block, a `count`, a
+  `for_each` and a registry module, calling `modules/queue` twice and `modules/worker` with an
+  output of the first, and a root `envs/stage` calling `modules/queue` once: `search` kind `iac`,
+  `context` and `trace` both ways against `terraform-nodes.{search,context,trace}.txt`, the default
+  search leaving nodes out, an edited, added and deleted `.tf` file equal to a cold index, and a
+  row rewritten by hand surviving a refresh no Terraform file changed in, and no node in the
+  export), `decorations` (the `decorations` fixture: Java, Kotlin, C#,
   Python and Rust calls that decorate a definition carry `CallSite::decorates`, ordinary calls do
   not, and `context` lists them under `annotations:`), `docs` (the repository map against the code:
   `ponytail:` limits in `ceilings.md`, entry point kinds and process marks in their lists, a line

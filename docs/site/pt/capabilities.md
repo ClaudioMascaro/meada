@@ -239,6 +239,19 @@ Os arquivos Terraform e OpenTofu também são valores de configuração (`*.tf`,
 
 Um valor acima de 1 KiB é guardado cortado, marcado `(cut)`. Os `data` e `stringData` de um `Secret` do Kubernetes ficam guardados como `redacted`, com caminho da chave, tipo e linha, assim como o `default` de uma `variable` do Terraform com `sensitive = true` e todo valor que um arquivo `.tfvars` dá a uma variável desse nome (todos, quando um arquivo Terraform na mesma pasta ou acima dela não é lido); nada mais é filtrado, então os arquivos que não devem entrar no índice vão no `.meadaignore`. Lockfiles (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `packages.lock.json`), templates Helm (que não são YAML até serem renderizados), arquivos acima de 1 MiB e arquivos de mais de 1.000 documentos ficam de fora. Valores nunca entram no `meada export` e não ligam nada.
 
+## Nós IaC
+
+Cada `resource`, bloco `data` e chamada `module` dos arquivos `*.tf` e `*.tofu` é um nó IaC, com endereço (`<tipo>.<nome>`, `data.<tipo>.<nome>`, `module.<nome>`), tipo, arquivo, linhas e o módulo raiz que começa a sua avaliação: uma pasta que nenhuma outra chama como módulo local, rotulada pelo caminho (`.` na raiz). Cada chamada de um módulo local (um `source` `./` ou `../` que fica dentro do repositório) instancia os blocos dele com o endereço da chamada na frente (`module.orders.aws_sqs_queue.this`), e um `count` ou um `for_each` sobre literais dá um nó por instância, com `[chave]` no fim (`aws_sqs_queue.dlq[0]`). Uma expressão que nomeia um resource, um bloco data ou um módulo é uma referência, guardada como uma chamada; uma que passa por `var.<nome>`, `local.<nome>` ou a saída de um módulo é seguida até o que ela nomeia, e guarda o nome por onde passou.
+
+| Consulta | Resultado |
+| --- | --- |
+| `search` com kind `iac` | Nós cujo endereço, tipo ou nome físico (o atributo `name` literal) é igual à consulta, começa com ela ou a contém, como `<repositório> <caminho>:<linha> <endereço> (<tipo>, name "<nome>", root <módulo raiz>)` |
+| `search` sem kind | Nenhum nó IaC: só os valores de configuração que guardam o nome, quando nada mais casa |
+| `context` num endereço | Tipo, nome físico, módulo raiz, as referências nos dois sentidos (`references:`, `referenced by:`, cada uma com o seu `via`) e os valores de configuração do bloco |
+| `trace` de um endereço | As referências, `down` (o que o nó alcança) ou `up` (o que o alcança), dentro do módulo raiz e pelos módulos locais |
+
+Tudo o que é referência é `exact`: um nome escrito, seguido sem avaliar valores. Um `count` ou um `for_each` que não é literal dá um nó só, sem chave; um módulo do registro ou remoto é só o nó da chamada; arquivos `.tf.json` e `.tofu.json` ainda não dão nós. Os nós nunca entram no `meada export`.
+
 ## Comunidades e processos
 
 Uma comunidade reúne símbolos que se chamam mais entre si do que ao restante. `meada export` calcula esses grupos com Leiden, sem aleatoriedade e com aritmética inteira. O nome vem da pasta da maioria dos membros (`src`, `src#2`), igual em toda máquina.

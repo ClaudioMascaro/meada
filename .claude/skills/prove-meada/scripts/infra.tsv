@@ -5,6 +5,7 @@
 # maintainer's OK.
 a7-probe	values	probe:a7-probe	-	Apache-2.0 (this repository)
 a7-noconfig	values	probe:a7-noconfig	-	Apache-2.0 (this repository)
+a7-iac	values,terraform	probe:a7-iac	-	Apache-2.0 (this repository)
 terraform-sqs	values,terraform	https://github.com/terraform-aws-modules/terraform-aws-sqs	a68b4d515f9ccc729fb8bf84c6760c6b91302ce0	Apache-2.0
 boutique	values,kubernetes,kustomize,helm,image	https://github.com/GoogleCloudPlatform/microservices-demo	c7cb6d5bfd6ea3aed768634ebbcb98cb7a523712	Apache-2.0
 crossplane-aws	values,crossplane	https://github.com/upbound/platform-ref-aws	57fa3b0127c8ce263327f2d43b4e46d07fb90896	Apache-2.0

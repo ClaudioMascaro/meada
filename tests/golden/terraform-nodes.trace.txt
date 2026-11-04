@@ -1,0 +1,29 @@
+example.com/acme/infra envs/prod/main.tf:10 module.orders
+  example.com/acme/infra envs/prod/main.tf:3 aws_sns_topic.orders
+    example.com/acme/infra envs/prod/main.tf:1 data.aws_caller_identity.current
+chain: exact · 0 hops · 1 repos · 63 tokens
+
+example.com/acme/infra modules/worker/main.tf:5 module.worker.aws_lambda_event_source_mapping.this
+  example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this via var.queue_arn
+chain: exact · 0 hops · 1 repos · 62 tokens
+
+example.com/acme/infra envs/prod/main.tf:27 aws_cloudwatch_metric_alarm.depth["orders"]
+  example.com/acme/infra modules/queue/main.tf:9 module.payments.aws_sqs_queue.this via module.payments.queue_name
+chain: exact · 0 hops · 1 repos · 63 tokens
+
+example.com/acme/infra envs/prod/main.tf:3 aws_sns_topic.orders
+  example.com/acme/infra envs/prod/main.tf:10 module.orders
+  example.com/acme/infra envs/prod/main.tf:16 module.payments
+  example.com/acme/infra modules/queue/main.tf:13 module.orders.aws_sns_topic_subscription.this via var.topic_arn
+  example.com/acme/infra modules/queue/main.tf:13 module.payments.aws_sns_topic_subscription.this via var.topic_arn
+chain: exact · 0 hops · 1 repos · 116 tokens
+
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this
+  example.com/acme/infra envs/prod/main.tf:22 module.worker via module.orders.queue_arn
+  example.com/acme/infra modules/queue/main.tf:13 module.orders.aws_sns_topic_subscription.this
+  example.com/acme/infra modules/worker/main.tf:5 module.worker.aws_lambda_event_source_mapping.this via var.queue_arn
+chain: exact · 0 hops · 1 repos · 108 tokens
+
+`module.orders.aws_sqs_queue.this` fits 2 IaC nodes; pass one of:
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (root envs/prod)
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (root envs/stage)

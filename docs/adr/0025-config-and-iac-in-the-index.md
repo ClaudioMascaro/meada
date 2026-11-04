@@ -137,6 +137,36 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   a string; past it the file is unreadable, which `meada status` counts. The value length and
   the stored budget are the ones above.
 
+### Terraform nodes and references (#649)
+
+- **Roots.** A directory of `.tf` and `.tofu` files is a module. A `module` block whose literal
+  `source` starts with `./` or `../` and, joined to its directory and normalized, stays inside
+  the repository calls the module of that directory. A directory no other directory calls is a
+  root module, labelled by its path (`.` at the repository root); every node records it, and a
+  node of a module two roots instantiate is one node per root.
+- **Instances.** Each call instantiates the called module's blocks under the call's address and
+  a dot, recursively; a `count` of a literal number, or a `for_each` over an object of literal
+  keys or `toset` of literal strings, gives one node per key (`[0]`, `["eu"]`, the keys sorted
+  as Terraform sorts them), and any other `count` or `for_each` one node with no key. Until the
+  static evaluation of #642's later tickets resolves variables and locals, nothing else is
+  expanded.
+- **References.** A traversal in any expression of a block (its arguments, nested blocks,
+  `depends_on`) that names a resource, a data block or a module is a reference from the block's
+  node: to the instance a literal key names, else to every instance. One through `var.<name>`
+  goes to what the caller's argument of that name references, one through `local.<name>` to what
+  the local references, and one through `module.<name>.<output>` to what the output references
+  inside the instance; each keeps that first name as its `via`, and one to a module output that
+  references nothing goes to the module's node. References stay within their root and are all
+  `exact`: names as written, followed without evaluating a value.
+- **Queries.** `search` kind `iac` matches the address, the type (`module` for a module call)
+  and the physical name, the literal of the block's `name` attribute. `context` and `trace` take
+  an address, `<path>::<address>` or `<repository>::<path>::<address>`, followed by
+  ` (root <root>)` when several roots hold it, and answer for a node only when no symbol (and, for
+  `trace`, no route or call site) has the text, so every answer about code stays as it was.
+- **Storage.** The nodes and references are rewritten whole from the repository's Terraform files
+  when one of them is read again or leaves the index, so a refresh that touches no Terraform file
+  keeps them.
+
 ### IaC node
 
 An IaC node is a resource-like block of any format, with an address, a type, a file and a span.
@@ -206,8 +236,11 @@ re-evaluates the whole unit. Links across repositories resolve at link time, as 
   intrinsics, the evaluator) adds its row to the hostile probes and reads a file of the per-file
   size ceiling built to explode in bounded time and size.
 - **Paths.** A path read from IaC (a local module source, a Kustomize base, a SAM `CodeUri`, a
-  Compose build context) stays inside the repository root: relative, without `..`, and through
-  no symlink. Any other path is not followed.
+  Compose build context) stays inside the repository root: relative, never above the root once
+  joined to its directory and normalized, and through no symlink. Any other path is not followed.
+  A `..` that stays inside the root is followed (#649): `../../modules/queue` from `envs/prod` is
+  how Terraform repositories lay out their modules, and the root is what keeps a read inside
+  the repository.
 
 ### Type table
 

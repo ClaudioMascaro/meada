@@ -149,6 +149,7 @@ Os valores de `kind`:
 | `process` | um processo pelo rótulo do ponto de entrada, com a identidade `process::` de onde o `trace` parte |
 | `duplicate` | símbolos com texto idêntico em dois ou mais lugares, pelo nome ou pelo caminho |
 | `value` | um valor de configuração de um arquivo YAML ou JSON, pelo valor ou pelo caminho da chave |
+| `iac` | um nó IaC (um resource, um bloco data ou uma chamada de módulo do Terraform), pelo endereço, pelo tipo ou pelo nome físico |
 | `ambiguous`, `unresolved` | os itens abertos, com o comando `meada decide` de cada um |
 
 Cada resultado é uma linha: repositório, `caminho:linha` e nome.
@@ -176,16 +177,30 @@ tem três caracteres ou mais (uma consulta menor varre as linhas, com a mesma re
 (num repositório de 92 mil valores e 5 MB de texto, 21 MB de `.meada/index.db`), além do que o
 índice já tinha.
 
+Com `kind = "iac"`, cada linha é um nó IaC: `<repositório> <caminho>:<linha> <endereço> (<tipo>,
+name "<nome físico>", root <módulo raiz>)`, sem o `name` quando o bloco não tem um atributo
+`name` literal. A busca sem `kind` não responde com nós IaC.
+
+```text
+example.com/acme/infra envs/prod/main.tf:35 aws_sqs_queue.dlq[0] (aws_sqs_queue, name "dead-letters", root envs/prod)
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, root envs/prod)
+```
+
 #### `context`: entender um símbolo
 
 | Parâmetro | Tipo | Padrão | Papel |
 | --- | --- | --- | --- |
-| `symbol` | texto, obrigatório | | Um nome, `<caminho>::<nome>` ou a identidade completa; um recurso (`resource::postgres::orders`) ou um canal (`channel::kafka::orders.created`) |
+| `symbol` | texto, obrigatório | | Um nome, `<caminho>::<nome>` ou a identidade completa; um recurso (`resource::postgres::orders`), um canal (`channel::kafka::orders.created`) ou o endereço de um nó IaC (`aws_sqs_queue.orders`, `<caminho>::<endereço>`) |
 | `budget` | inteiro | 2000 | Orçamento de tokens da resposta |
 
 Devolve a comunidade e os processos do símbolo, o trecho de código lido do disco, quem o chama
 (`callers:`), quem ele chama (`callees:`) e os contratos que ele toca (`contracts:`). Num recurso,
-lista quem escreve e quem lê; num canal, os produtores e os consumidores.
+lista quem escreve e quem lê; num canal, os produtores e os consumidores. Num nó IaC, o tipo, o
+nome físico, o módulo raiz, os nós que ele referencia (`references:`), os que o referenciam
+(`referenced by:`), cada um com o nome por onde passou (`via var.queue_arn`), e os valores de
+configuração do bloco (`values:`). Um endereço que mais de um módulo raiz tem lista os nós, cada
+um com o que passar: `<endereço> (root <módulo raiz>)`. Um símbolo do código com o mesmo nome
+vem antes do nó; `<caminho>::<endereço>` chega no nó.
 
 ```text
 example.com/acme/web src/status.ts:2-4 health
@@ -206,14 +221,15 @@ example.com/acme/web src/status.ts:3 consumes http::GET::/api/health →[exact: 
 
 | Parâmetro | Tipo | Padrão | Papel |
 | --- | --- | --- | --- |
-| `from` | texto | | O início: um símbolo, uma rota (`GET /users/{}` ou o contrato), um ponto de chamada ou um processo (`process::<identidade>`, só rio abaixo) |
+| `from` | texto | | O início: um símbolo, uma rota (`GET /users/{}` ou o contrato), um ponto de chamada, o endereço de um nó IaC ou um processo (`process::<identidade>`, só rio abaixo) |
 | `changes` | texto | | `uncommitted`: parte dos símbolos que o diff da árvore de trabalho toca |
 | `direction` | `down` ou `up` | `down` | `down` é o que o início alcança, `up` é o que o alcança |
 | `budget` | inteiro | 2000 | Orçamento de tokens da resposta |
 
 Passe `from` ou `changes: uncommitted`, nunca os dois. O segundo serve para medir o impacto do
 que acabou de ser editado, e só funciona no Meada local (o modo servidor não tem árvore de
-trabalho).
+trabalho). De um nó IaC, `down` segue as referências dele e `up` as que chegam nele, dentro do
+seu módulo raiz, entrando nos módulos locais pelas entradas e saídas deles.
 
 ```text
 example.com/acme/web src/orders.ts:5 listOrders
@@ -324,6 +340,28 @@ mais casa. Eles não entram no `meada export`.
   ficam guardados como `redacted`, com o caminho da chave, o tipo e a linha. Fora disso nada é filtrado: o índice
   guarda o que o checkout já tem. Ponha no `.meadaignore` os arquivos que não devem entrar no
   índice (`secrets/`, `*.env.json`).
+
+### Nós IaC
+
+Cada `resource`, bloco `data` e chamada `module` dos arquivos `*.tf` e `*.tofu` é um **nó IaC**,
+com endereço, tipo, arquivo, linhas e o módulo raiz que começa a sua avaliação. Uma pasta de
+arquivos Terraform é um módulo; uma pasta que nenhuma outra chama como módulo local (um `source`
+`./` ou `../` que fica dentro do repositório) é um módulo raiz, rotulado pelo caminho (`.` na
+raiz).
+
+- **Endereços**: `<tipo>.<nome>`, `data.<tipo>.<nome>` e `module.<nome>`. Cada chamada de um
+  módulo local instancia os blocos dele com o endereço da chamada na frente
+  (`module.orders.aws_sqs_queue.this`); um `count` ou um `for_each` sobre literais dá um nó por
+  instância, com `[chave]` no fim (`aws_sqs_queue.dlq[0]`,
+  `aws_cloudwatch_metric_alarm.depth["orders"]`).
+  Um `count` ou `for_each` que não é literal dá um nó só, sem chave.
+- **Referências**: uma expressão que nomeia um resource, um bloco data ou um módulo é uma
+  referência do nó dela, guardada como uma chamada. Uma que passa por `var.<nome>`, `local.<nome>`
+  ou a saída de um módulo (`module.<nome>.<saída>`) é seguida até o que o argumento da chamada,
+  o local ou a saída nomeia, e mostra por onde passou (`via var.queue_arn`). Um módulo do
+  registro fica como o nó da chamada, sem nada dentro.
+- **Consultas**: `search` com `kind = "iac"` acha os nós, `context` explica um e `trace` segue as
+  referências dele nos dois sentidos. Os nós ficam fora da busca sem `kind` e do `meada export`.
 
 ## 4. `meada.toml`: referência
 

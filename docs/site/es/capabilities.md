@@ -239,6 +239,19 @@ Los archivos Terraform y OpenTofu también son valores de configuración (`*.tf`
 
 Un valor de más de 1 KiB se guarda cortado, marcado `(cut)`. Los `data` y `stringData` de un `Secret` de Kubernetes se guardan como `redacted`, con ruta de la clave, tipo y línea, igual que el `default` de una `variable` de Terraform con `sensitive = true` y todo valor que un archivo `.tfvars` da a una variable de ese nombre (todos, cuando un archivo Terraform en la misma carpeta o por encima no se lee); nada más se filtra, así que los archivos que no deben entrar en el índice van en `.meadaignore`. Los lockfiles (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `packages.lock.json`), las plantillas Helm (que no son YAML hasta renderizarse), los archivos de más de 1 MiB y los archivos de más de 1.000 documentos quedan fuera. Los valores nunca entran en `meada export` y no enlazan nada.
 
+## Nodos IaC
+
+Cada `resource`, bloque `data` y llamada `module` de los archivos `*.tf` y `*.tofu` es un nodo IaC, con dirección (`<tipo>.<nombre>`, `data.<tipo>.<nombre>`, `module.<nombre>`), tipo, archivo, líneas y el módulo raíz que empieza su evaluación: una carpeta que ninguna otra llama como módulo local, etiquetada por su ruta (`.` en la raíz). Cada llamada de un módulo local (un `source` `./` o `../` que queda dentro del repositorio) instancia sus bloques con la dirección de la llamada delante (`module.orders.aws_sqs_queue.this`), y un `count` o un `for_each` sobre literales da un nodo por instancia, con `[clave]` al final (`aws_sqs_queue.dlq[0]`). Una expresión que nombra un resource, un bloque data o un módulo es una referencia, guardada como una llamada; una que pasa por `var.<nombre>`, `local.<nombre>` o la salida de un módulo se sigue hasta lo que nombra, y guarda el nombre por el que pasó.
+
+| Consulta | Resultado |
+| --- | --- |
+| `search` con kind `iac` | Nodos cuya dirección, tipo o nombre físico (el atributo `name` literal) es igual a la consulta, empieza con ella o la contiene, como `<repositorio> <ruta>:<línea> <dirección> (<tipo>, name "<nombre>", root <módulo raíz>)` |
+| `search` sin kind | Ningún nodo IaC: solo los valores de configuración que guardan su nombre, cuando nada más coincide |
+| `context` en una dirección | Tipo, nombre físico, módulo raíz, las referencias en los dos sentidos (`references:`, `referenced by:`, cada una con su `via`) y los valores de configuración del bloque |
+| `trace` desde una dirección | Las referencias, `down` (lo que el nodo alcanza) o `up` (lo que lo alcanza), dentro del módulo raíz y por los módulos locales |
+
+Toda referencia es `exact`: un nombre tal como está escrito, seguido sin evaluar valores. Un `count` o un `for_each` que no es literal da un solo nodo, sin clave; un módulo del registro o remoto es solo el nodo de la llamada; los archivos `.tf.json` y `.tofu.json` todavía no dan nodos. Los nodos nunca entran en `meada export`.
+
 ## Comunidades y procesos
 
 Una comunidad agrupa símbolos que se llaman más entre sí que al resto. `meada export` calcula los grupos con Leiden, sin aleatoriedad y con aritmética entera. El nombre viene de la carpeta de la mayoría de sus miembros (`src`, `src#2`), igual en cada máquina.

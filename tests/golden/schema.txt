@@ -54,6 +54,16 @@ CREATE VIRTUAL TABLE config_search USING fts5(
     folded_key, folded_value, content='config_values', content_rowid='id',
     tokenize='trigram case_sensitive 1'
 );
+CREATE TABLE iac_nodes (
+    address TEXT NOT NULL, root TEXT NOT NULL, type TEXT NOT NULL, name TEXT, path TEXT NOT NULL,
+    line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL
+);
+CREATE INDEX iac_nodes_address ON iac_nodes (address);
+CREATE TABLE iac_references (
+    root TEXT NOT NULL, source TEXT NOT NULL, target TEXT NOT NULL, via TEXT
+);
+CREATE INDEX iac_references_source ON iac_references (root, source);
+CREATE INDEX iac_references_target ON iac_references (root, target);
 
 sample.ts
 {

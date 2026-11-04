@@ -151,6 +151,7 @@ The values of `kind`:
 | `process` | a process by the label of its entry point, with the `process::` identity `trace` starts from |
 | `duplicate` | symbols with identical text in two or more places, by name or path |
 | `value` | a config value of a YAML or JSON file, by value or key path |
+| `iac` | an IaC node (a Terraform resource, data block or module call), by address, type or physical name |
 | `ambiguous`, `unresolved` | the open items, with the `meada decide` command for each |
 
 Each result is one line: repository, `path:line` and name.
@@ -177,16 +178,30 @@ space: it holds about four times the text of the key paths and values (in a repo
 thousand values and 5 MB of text, 21 MB of `.meada/index.db`), on top of what the index already
 held.
 
+With `kind = "iac"`, each line is an IaC node: `<repository> <path>:<line> <address> (<type>,
+name "<physical name>", root <root module>)`, without the `name` when the block has no literal
+`name` attribute. Search with no `kind` does not answer with IaC nodes.
+
+```text
+example.com/acme/infra envs/prod/main.tf:35 aws_sqs_queue.dlq[0] (aws_sqs_queue, name "dead-letters", root envs/prod)
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, root envs/prod)
+```
+
 #### `context`: understand a symbol
 
 | Parameter | Type | Default | Role |
 | --- | --- | --- | --- |
-| `symbol` | text, required | | A name, `<path>::<name>` or the full identity; a resource (`resource::postgres::orders`) or a channel (`channel::kafka::orders.created`) |
+| `symbol` | text, required | | A name, `<path>::<name>` or the full identity; a resource (`resource::postgres::orders`), a channel (`channel::kafka::orders.created`) or an IaC node's address (`aws_sqs_queue.orders`, `<path>::<address>`) |
 | `budget` | integer | 2000 | Token budget of the answer |
 
 It returns the symbol's community and processes, the code excerpt read from disk, who calls it
 (`callers:`), who it calls (`callees:`) and the contracts it touches (`contracts:`). For a
-resource, it lists who writes and who reads; for a channel, the producers and consumers.
+resource, it lists who writes and who reads; for a channel, the producers and consumers. For an
+IaC node, its type, its physical name, its root module, the nodes it references (`references:`)
+and those that reference it (`referenced by:`), each with the name it went through (`via
+var.queue_arn`), and the config values of its block (`values:`). An address several root modules
+hold lists the nodes, each with what to pass: `<address> (root <root module>)`. A symbol of the
+code with the same name comes before the node; `<path>::<address>` reaches the node.
 
 ```text
 example.com/acme/web src/status.ts:2-4 health
@@ -207,13 +222,15 @@ example.com/acme/web src/status.ts:3 consumes http::GET::/api/health →[exact: 
 
 | Parameter | Type | Default | Role |
 | --- | --- | --- | --- |
-| `from` | text | | The start: a symbol, a route (`GET /users/{}` or the contract), a call site or a process (`process::<identity>`, downstream only) |
+| `from` | text | | The start: a symbol, a route (`GET /users/{}` or the contract), a call site, an IaC node's address or a process (`process::<identity>`, downstream only) |
 | `changes` | text | | `uncommitted`: starts from the symbols the working-tree diff touches |
 | `direction` | `down` or `up` | `down` | `down` is what the start reaches, `up` is what reaches it |
 | `budget` | integer | 2000 | Token budget of the answer |
 
 Pass `from` or `changes: uncommitted`, never both. The second serves to measure the impact of
-what was just edited, and works only in local Meada (server mode has no working tree).
+what was just edited, and works only in local Meada (server mode has no working tree). From an
+IaC node, `down` follows its references and `up` those that reach it, within its root module,
+into the local modules through their inputs and outputs.
 
 ```text
 example.com/acme/web src/orders.ts:5 listOrders
@@ -325,6 +342,29 @@ matches. They stay out of `meada export`.
   with their key path, type and line. Nothing else is filtered: the index holds what the checkout
   already does. List in `.meadaignore` the files that must stay out of the index (`secrets/`,
   `*.env.json`).
+
+### IaC nodes
+
+Each `resource`, `data` block and `module` call of the `*.tf` and `*.tofu` files is an **IaC
+node**, with an address, a type, a file, its lines and the root module its evaluation starts
+from. A directory of Terraform files is a module; a directory no other one calls as a local
+module (a `./` or `../` `source` that stays inside the repository) is a root module, labelled
+by its path (`.` at the root).
+
+- **Addresses**: `<type>.<name>`, `data.<type>.<name>` and `module.<name>`. Each call of a local
+  module instantiates its blocks with the call's address in front
+  (`module.orders.aws_sqs_queue.this`); a `count` or a `for_each` over literals gives one node
+  per instance, with `[key]` at the end (`aws_sqs_queue.dlq[0]`,
+  `aws_cloudwatch_metric_alarm.depth["orders"]`). A `count` or `for_each` that is not literal
+  gives one node, with no key.
+- **References**: an expression that names a resource, a data block or a module is a reference
+  of its node, stored like a call. One that goes through `var.<name>`, `local.<name>` or a
+  module's output (`module.<name>.<output>`) is followed to what the call's argument, the local
+  or the output names, and shows what it went through (`via var.queue_arn`). A registry module
+  stays as the call's node, with nothing inside.
+- **Queries**: `search` with `kind = "iac"` finds the nodes, `context` explains one and `trace`
+  follows its references both ways. Nodes stay out of search with no `kind` and out of `meada
+  export`.
 
 ## 4. `meada.toml`: reference
 

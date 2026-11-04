@@ -103,6 +103,15 @@ fn stored(path: &str, text: String) -> usize {
         .sum()
 }
 
+/// The bytes of the addresses the IaC nodes and references of `text`, a lone `main.tf`, store.
+fn nodes(text: String) -> usize {
+    let (nodes, references) = crate::iac::evaluate(&[("main.tf".into(), file(text))]);
+    let nodes = nodes.iter().map(|n| n.address.len());
+    let references = (references.iter())
+        .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
+    nodes.chain(references).sum()
+}
+
 /// An SDK-style project file with `body` in it.
 fn project(body: &str) -> String {
     format!("<Project Sdk=\"Microsoft.NET.Sdk\">{body}</Project>")
@@ -697,6 +706,38 @@ fn probes() -> Vec<Probe> {
         }),
         ("hcl: many tfvars", || {
             stored("a.tfvars", fill(1, |i| format!("v{i} = \"x\"\n")))
+        }),
+        // IaC nodes (#649): what the evaluation of one root module stores
+        ("iac: a chain of resources", || {
+            nodes(fill(1, |i| {
+                format!("resource \"a\" \"r{}\" {{ x = a.r{i}.id }}\n", i + 1)
+            }))
+        }),
+        ("iac: locals naming each other twice", || {
+            let locals = fill(2, |i| format!("  l{} = [local.l{i}, local.l{i}]\n", i + 1));
+            let users = fill(2, |i| {
+                format!("resource \"b\" \"u{i}\" {{ x = local.l{i} }}\n")
+            });
+            nodes(format!(
+                "resource \"a\" \"t\" {{}}\nlocals {{\n  l0 = a.t.id\n{locals}}}\n{users}"
+            ))
+        }),
+        ("iac: every resource naming a wide local", || {
+            let all = count(5000, |i| format!("a.r{i}, "));
+            let users = fill(2, |i| {
+                format!("resource \"a\" \"r{i}\" {{ x = local.all }}\n")
+            });
+            nodes(format!("locals {{\n  all = [{all}]\n}}\n{users}"))
+        }),
+        ("iac: a module calling itself", || {
+            nodes(fill(1, |i| {
+                format!("module \"m{i}\" {{ source = \"./\" }}\n")
+            }))
+        }),
+        ("iac: wide counts", || {
+            nodes(fill(1, |i| {
+                format!("resource \"a\" \"r{i}\" {{ count = 1000 }}\n")
+            }))
         }),
         // .NET: `appsettings.json`
         ("appsettings: many keys", || {

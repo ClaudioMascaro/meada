@@ -34,6 +34,17 @@ All notable changes to Meada are recorded here. The format follows
   the same name. The `default` of a `variable` with `sensitive = true` and every value a
   `.tfvars` file gives a variable of that name are stored as `redacted`. A file that does
   not parse is skipped and counted by `meada status` (#640).
+- IaC nodes (ADR 0025): every Terraform and OpenTofu `resource`, `data` block and `module` call
+  of a `*.tf` or `*.tofu` file is a node with an address (`<type>.<name>`, `data.<type>.<name>`,
+  `module.<name>`), a type, a file, its lines and the root module that roots its evaluation (a
+  directory no other one calls as a local module). A local module's blocks are instantiated once
+  per call under the call's address (`module.orders.aws_sqs_queue.this`), and a literal `count`
+  or `for_each` gives one node per `[key]`. The references between nodes are stored like calls,
+  followed through `var`, `local` and module outputs. `search` finds the nodes with the new kind
+  `iac` (by address, type or physical name; the default search leaves them out), `context` on an
+  address shows the type, the physical name, the references both ways and the config values,
+  and `trace` walks the references down and up. Nodes stay out of `meada export`; the index
+  schema changes, so existing indexes are rebuilt (#649).
 - TypeScript consumers through `new URL(x)`: `new URL(x)` with one argument is `x` (unless the file
   declares a `URL` or imports one from a relative path), and `u.toString()`, `u.href`, `String(u)`
   and `` `${u}` `` pass the URL through, in a constant or built in place, so a `fetch` or a client

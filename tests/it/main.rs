@@ -29,6 +29,7 @@ mod github_app;
 mod gopkg;
 mod grammar;
 mod hostile;
+mod iac;
 mod index;
 mod indexed_commit;
 mod items;

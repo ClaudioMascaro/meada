@@ -100,7 +100,7 @@ pub(super) fn read(path: &str, src: &[u8], sensitive: &BTreeSet<String>) -> Resu
 
 /// The byte offset where brackets nest past `NESTING_MAX`, counting every `{`, `[` and `(`
 /// even inside a string: a count that is only ever too high.
-fn nested_past(text: &str) -> Option<usize> {
+pub(crate) fn nested_past(text: &str) -> Option<usize> {
     let mut depth = 0usize;
     for (at, b) in text.bytes().enumerate() {
         match b {

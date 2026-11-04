@@ -42,6 +42,7 @@ Follow each changed file to the surfaces and flows it reaches. Internal code cou
 | `src/accounts*`, `src/postgres.rs`, `src/audit.rs` | yes: sign-in | console | console with `--accounts` |
 | `deploy/`, `Dockerfile`, `scripts/{compose-check,helm-check,container-smoke,ui-tarball}`, `.github/workflows/{compose,helm,container}.yml` | yes: every deployment | deploy | [references/deploy.md](references/deploy.md) |
 | `src/config_values.rs`, `src/index.rs` (`hidden_ci`, `config_files`), `src/document/` (the event reader), `src/msg.rs` (`ConfigFiles`) | yes: A7 config values | CLI (`meada status`), MCP stdio and HTTP | A7 config values: `prove.py values --http` over `infra.tsv` and `meada` ([references/config-iac.md](references/config-iac.md)) |
+| `src/iac.rs`, `src/index.rs` (`iac_nodes`, `iac_references`, the rebuild after `config_files`), `src/engine.rs` (`search` kind `iac`, `context` and `trace` on an address) | yes: A7 IaC nodes (Terraform) | MCP stdio and HTTP, CLI (`meada status`, `meada export`) | A7 IaC nodes: `prove.py iac --http` over `a7-iac` and `terraform-sqs`, plus `prove.py run` on one corpus entry for the code answers ([references/config-iac.md](references/config-iac.md)) |
 | A7 IaC, infrastructure contracts, workloads, HTTP through IaC, alerts, `via` (spec #642; no path yet: each A7 ticket names its own here) | yes: A7 | CLI, MCP stdio and HTTP, console graph | the A7 flow table in [references/config-iac.md](references/config-iac.md): each A7 ticket adds its paths here and its flow there |
 | `src/lang/ts.rs`, `src/lang/ts/`, `src/lang/go.rs`, `src/lang/go/`, `src/http.rs`, `src/http/ts.rs`, `src/http/ts/` (`config.rs`: the Backstage config reader), `src/http/go.rs`, `src/http/go/`, `src/resolve.rs`, `src/lang/mod.rs` and `src/index.rs` (the config inputs: `config_files`, `configs_found`, `configs_digest`) | yes: A8 base URLs (spec #683) | CLI (`meada export`) | A8 peer workspaces: `a8-peers.sh check` ([references/peers.md](references/peers.md)), beside the corpus entries the rows above name |
 | `tests/golden/` | answer keys | none, but every changed golden is audited | `prove.py rebless` |
@@ -92,6 +93,7 @@ Ladder, best first: 1 an old system that does the same job, 2 a snapshot, 3 an i
 | Index time, peak RSS, export size | existing | head at most x1.25, x1.25 and x1.5 of the base (time only when the base takes 2 s or more) | budget | `prove.py run` | the maintainer, 2026-11-02 |
 | Compose and Helm renders | existing | the renders at the base | 1 | `prove.py deploy` | the deploy files before the change |
 | A7 config values (`search` kind `value`, the status config line) | new | spec #642's user stories 1 to 17, through `prove.py values`'s own reading of the files | 4 | `prove.py values` | the maintainer; the oracle reads the files, never Meada |
+| A7 IaC nodes, Terraform (`search` kind `iac`, `context` and `trace` on an address) | new | ticket #649's criteria and Terraform's address rules, through `tf_oracle.py`'s own reading of the files (python-hcl2) | 4 | `prove.py iac` | the maintainer; the oracle reads the files, never Meada |
 | Every other answer of an A7 entry, and a repository with no config | existing | the base binary on the same copy | 1 | `prove.py values` (status, export, default search), `prove.py run` | the code before the change |
 | A8 base URL cases (`a8-cases.tsv`, `landed`) | new | spec #683's expected lines (#684's table) | 4 | `a8-peers.sh check` | the maintainer |
 | The 5 A8 controls and every other field of the peer workspaces' exports | existing | the base binary on the same generated workspaces | 1 | `a8-peers.sh check` | the code before the change |
@@ -182,7 +184,7 @@ One section per surface. `/create-prove-it` adds a section when the app gains a 
 
 ### A7: config values and IaC (spec #642)
 
-**Drive**: `prove.py values --http` over the A7 entries, beside `prove.py run --http` on the corpus entries Scope names: the command, the pinned repositories, the story-by-story map and what could fool it are in [references/config-iac.md](references/config-iac.md).
+**Drive**: `prove.py values --http` over the A7 entries (and `prove.py iac --http` for the IaC nodes), beside `prove.py run --http` on the corpus entries Scope names: the command, the pinned repositories, the story-by-story map and what could fool it are in [references/config-iac.md](references/config-iac.md).
 
 **Copies**: nothing for the new flows: their answer key is #642's user stories, through an oracle that reads every config file itself (PyYAML and `json`). HTTP copies stdio. What an A7 change leaves alone answers to the base binary.
 
@@ -297,6 +299,7 @@ Send the findings back to the agent that made the change: the failing steps, the
 - Read a script's verdict from its first output line or its report, never from `$?` after a pipe (zsh's `pipestatus` and `| tail` hide it).
 - After editing a script, run `python3 $S/prove.py selftest` (the comparison logic on two small exports).
 - `prove.py` imports PyYAML (`python3 -c "import yaml"`): the A7 oracle's reader. Without it, `values` cannot run: BLOCKED, never skipped.
+- `prove.py iac` imports python-hcl2, which the system Python lacks: `python3 -m venv --system-site-packages "$RUN/venv" && "$RUN/venv/bin/pip" install -q python-hcl2==8.1.4`, then run `"$RUN/venv/bin/python" $S/prove.py iac ...`. Without it, `iac` cannot run: BLOCKED, never skipped.
 - `examples/golden_diff` panics without `origin/main` (#592); `prove.py rebless --base` takes the base explicitly and needs no build.
 - `meada decide` has no scripted check: its replay is `tests/it/decisions.rs`'s. Put it under Not covered when Scope reaches `src/decide.rs` or `src/decider/`.
 - The cloud modules beyond accounts (snapshot, generations, OIDC, directory, GitHub App, named workspaces) need Valkey, S3 or an identity provider: Not covered here, with the unlock `deploy/compose` or CI's `cloud` job.

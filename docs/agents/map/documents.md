@@ -139,7 +139,32 @@ this file, and a change to these modules updates it.
   `(cut)` after a cut one, `redacted` for a secret), tie-broken by repository, path, zero-padded
   line and key path; `Engine::search` answers `kind = "value"` with them, and the default search
   with them only when it found no symbol and no contract. `status(db)` is the `meada status`
-  line (`Msg::ConfigFiles`), absent with no config file.
+  line (`Msg::ConfigFiles`), absent with no config file. `under(identity, db, path, block)`
+  gives the rows of one file under a key path (`block`, `block.` or `block[`), as `hits` shows
+  them: the `values:` of `context` on an IaC node.
+- `iac.rs` (#649, ADR 0025): IaC nodes. `evaluate(files) -> (Vec<Node>, Vec<Reference>)` is
+  pure over the `.tf` and `.tofu` files (`is_source`) of one repository: `read` parses each with
+  `hcl-edit` (skipping one `config_values::nested_past` or the parser refuses) into its
+  directory's `Module` (the `resource`, `data` and `module` blocks with their span, literal
+  `name`, instance `keys` of a literal `count` or `for_each`, the `Ref`s their expressions make,
+  found by the `Refs` visitor, a module's literal `source` and the `Ref`s of each argument; the
+  `output` and `locals` values). A directory no other one calls through a local `source`
+  (`local_source`: `./` or `../`, normalized, never above the root; the files come from the walk,
+  so a symlinked directory holds none) is a root; `Eval::root` instantiates it and, per module
+  call, the called directory under `<call address>.` (`Eval::instantiate`, a stack against
+  cycles), then resolves each block's `Ref`s in its instance (`Eval::resolve`, memoized per
+  instance and `Ref`: a block by kind, type and name, a literal key picking its instance; a
+  module output into the child instance; `var.<name>` into the caller's argument; `local.<name>`
+  into the locals), each reference keeping `Ref::via`. `store` rewrites `iac_nodes` and
+  `iac_references` whole; `index::refresh` calls both after `config_files` when a Terraform file
+  was read again or left (a `Cell` the `summarize` closure sets). `hits` renders `search` kind
+  `iac` (`<repository> <path>:<line> <address> (<type>, name "<name>", root <root>)`, rank over
+  address, type and name); `named` reads an address, `<path>::<address>` or
+  `<repository>::<path>::<address>`, each with an optional ` (root <root>)`; `context` and
+  `trace` answer for `Engine::context` and `Engine::trace` once no symbol (`context`) or no
+  symbol, route or call site (`trace`, its `trace::no_start` answer) has the text, and return
+  `None` when it names no node (`trace` walks depth first on its own stack, rows
+  through `meada_core::trace::Chain`, every reference `exact`).
 - `shape.rs` (in `meada-core`, reached as `crate::shape`; spec #21, ADR 0009): `Shape {source, fields, open, scalars, declared, optional,
   imports, guessed}`, the one form of what a
   contract carries, whatever it is read from, so shape drift (spec #23) compares shapes without

@@ -1,0 +1,63 @@
+example.com/acme/infra envs/prod/main.tf:3-8 aws_sns_topic.orders
+type: aws_sns_topic
+name: "orders-events"
+root: envs/prod
+references:
+example.com/acme/infra envs/prod/main.tf:1 data.aws_caller_identity.current
+referenced by:
+example.com/acme/infra envs/prod/main.tf:10 module.orders
+example.com/acme/infra envs/prod/main.tf:16 module.payments
+example.com/acme/infra modules/queue/main.tf:13 module.orders.aws_sns_topic_subscription.this via var.topic_arn
+example.com/acme/infra modules/queue/main.tf:13 module.payments.aws_sns_topic_subscription.this via var.topic_arn
+values:
+example.com/acme/infra envs/prod/main.tf:4 resource.aws_sns_topic.orders.name = "orders-events"
+example.com/acme/infra envs/prod/main.tf:6 resource.aws_sns_topic.orders.tags.account = data.aws_caller_identity.current.account_id
+
+`module.orders.aws_sqs_queue.this` fits 2 IaC nodes; pass one of:
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (root envs/prod)
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (root envs/stage)
+
+example.com/acme/infra modules/queue/main.tf:9-11 module.orders.aws_sqs_queue.this
+type: aws_sqs_queue
+name: none
+root: envs/prod
+references: none
+referenced by:
+example.com/acme/infra envs/prod/main.tf:22 module.worker via module.orders.queue_arn
+example.com/acme/infra modules/queue/main.tf:13 module.orders.aws_sns_topic_subscription.this
+example.com/acme/infra modules/worker/main.tf:5 module.worker.aws_lambda_event_source_mapping.this via var.queue_arn
+values:
+example.com/acme/infra modules/queue/main.tf:10 resource.aws_sqs_queue.this.name = var.name
+
+example.com/acme/infra envs/prod/main.tf:35-38 aws_sqs_queue.dlq[1]
+type: aws_sqs_queue
+name: "dead-letters"
+root: envs/prod
+references: none
+referenced by:
+example.com/acme/infra envs/prod/main.tf:40 aws_sqs_queue_redrive_allow_policy.dlq
+values:
+example.com/acme/infra envs/prod/main.tf:36 resource.aws_sqs_queue.dlq.count = 2
+example.com/acme/infra envs/prod/main.tf:37 resource.aws_sqs_queue.dlq.name = "dead-letters"
+
+example.com/acme/infra envs/prod/main.tf:44-48 module.audit
+type: module
+name: none
+root: envs/prod
+references: none
+referenced by: none
+values:
+example.com/acme/infra envs/prod/main.tf:45 module.audit.source = "terraform-aws-modules/sqs/aws"
+example.com/acme/infra envs/prod/main.tf:46 module.audit.version = "4.0.0"
+example.com/acme/infra envs/prod/main.tf:47 module.audit.name = "audit"
+
+example.com/acme/infra modules/worker/main.tf:5-8 module.worker.aws_lambda_event_source_mapping.this
+type: aws_lambda_event_source_mapping
+name: none
+root: envs/prod
+references:
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this via var.queue_arn
+referenced by: none
+values:
+example.com/acme/infra modules/worker/main.tf:6 resource.aws_lambda_event_source_mapping.this.event_source_arn = var.queue_arn
+example.com/acme/infra modules/worker/main.tf:7 resource.aws_lambda_event_source_mapping.this.function_name = "orders-worker"

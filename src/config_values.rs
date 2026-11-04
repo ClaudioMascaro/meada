@@ -21,6 +21,8 @@ use crate::msg::Msg;
 
 mod hcl;
 
+pub(crate) use hcl::nested_past;
+
 /// The lockfiles a YAML or JSON extension reaches, skipped by file name (ADR 0025).
 const LOCKFILES: [&str; 4] = [
     "package-lock.json",
@@ -118,7 +120,7 @@ pub(crate) fn unshadowed(found: Vec<(String, PathBuf)>) -> Vec<(String, PathBuf)
 }
 
 /// The parent directory of `path`, `""` for the root.
-fn parent(path: &str) -> &str {
+pub(crate) fn parent(path: &str) -> &str {
     path.rsplit_once('/').map_or("", |(dir, _)| dir)
 }
 
@@ -491,7 +493,7 @@ pub(crate) fn read_with(
 /// The key path of the scalar at `path` (ADR 0025), jq style: keys joined by dots, a list item
 /// `[n]`, a key that is not a plain identifier `["..."]` with JSON escaping; `.` for a document
 /// that is the scalar itself. A file of several documents puts `[document]` first (`prefixed`).
-fn key_path(path: &[Step]) -> String {
+pub(crate) fn key_path(path: &[Step]) -> String {
     let mut out = String::new();
     for step in path {
         match step {
@@ -634,14 +636,7 @@ fn hits_by(identity: &str, db: &Connection, needle: &str, indexed: bool) -> Resu
             let (path, key, value): (String, String, Option<String>) =
                 (r.get(1)?, r.get(2)?, r.get(3)?);
             let (kind, line, cut): (String, i64, bool) = (r.get(4)?, r.get(5)?, r.get(6)?);
-            let shown = match (&value, kind.as_str()) {
-                (None, _) => "redacted".to_string(),
-                (Some(v), "string") => serde_json::to_string(v)?,
-                (Some(v), "expression" | "template") => one_line(v),
-                (Some(v), _) => v.clone(),
-            };
-            let mark = if cut { " (cut)" } else { "" };
-            let text = format!("{identity} {path}:{line} {key} = {shown}{mark}");
+            let text = shown(identity, &path, line, &key, value.as_deref(), &kind, cut)?;
             found.insert(
                 rowid,
                 (rank, format!("{identity} {path} {line:010} {key}"), text),
@@ -649,6 +644,60 @@ fn hits_by(identity: &str, db: &Connection, needle: &str, indexed: bool) -> Resu
         }
     }
     Ok(found.into_values().collect())
+}
+
+/// `<identity> <path>:<line> <key path> = <value>`: a string quoted as JSON, an expression or a
+/// template on one line, a cut value followed by `(cut)` and a secret one `redacted`.
+fn shown(
+    identity: &str,
+    path: &str,
+    line: i64,
+    key: &str,
+    value: Option<&str>,
+    kind: &str,
+    cut: bool,
+) -> Result<String> {
+    let shown = match (value, kind) {
+        (None, _) => "redacted".to_string(),
+        (Some(v), "string") => serde_json::to_string(v)?,
+        (Some(v), "expression" | "template") => one_line(v),
+        (Some(v), _) => v.to_string(),
+    };
+    let mark = if cut { " (cut)" } else { "" };
+    Ok(format!("{identity} {path}:{line} {key} = {shown}{mark}"))
+}
+
+/// The values of the file at `path` of `db` (repository `identity`) whose key path is `block` or
+/// lies under it (`block.` or `block[`), as `hits` shows them, by line and key path: the config
+/// values of an IaC node.
+pub(crate) fn under(
+    identity: &str,
+    db: &Connection,
+    path: &str,
+    block: &str,
+) -> Result<Vec<String>> {
+    let mut statement = db.prepare(
+        "SELECT key, value, type, line, cut FROM config_values WHERE path = ?1 \
+         AND (key = ?2 OR substr(key, 1, length(?2) + 1) IN (?2 || '.', ?2 || '[')) \
+         ORDER BY line, key",
+    )?;
+    let mut rows = statement.query(params![path, block])?;
+    let mut lines = Vec::new();
+    while let Some(r) = rows.next()? {
+        let (key, value, kind): (String, Option<String>, String) =
+            (r.get(0)?, r.get(1)?, r.get(2)?);
+        let (line, cut): (i64, bool) = (r.get(3)?, r.get(4)?);
+        lines.push(shown(
+            identity,
+            path,
+            line,
+            &key,
+            value.as_deref(),
+            &kind,
+            cut,
+        )?);
+    }
+    Ok(lines)
 }
 
 /// `text` on one line, as an answer has one line per match: a line break (and any other control
