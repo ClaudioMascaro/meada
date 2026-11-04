@@ -17,6 +17,7 @@ use crate::workspace::Repository;
 mod csharp;
 mod go;
 mod java;
+mod join;
 mod kotlin;
 mod python;
 mod rust;

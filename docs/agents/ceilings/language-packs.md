@@ -268,8 +268,10 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   A mutation inside a function the URL is passed to is not seen, so a wrapper called with the
   URL folds to the string it was built from. A parameter, a `catch` binding or a variable named
   `URL` (but not a destructured `require` of a package) also stops the fold. `new URL(x, base)`
-  is not read, and a `toString` or `href` that a repository class defines on a name is read as a
-  pass-through of that name, not followed to the method.
+  of the global is a `Value::New` named `GLOBAL_URL` (#686, joined by the HTTP kind, below), so
+  `.href`, `toString()` and `String(u)` on a two-argument `new URL` are not read. A `toString` or
+  `href` that a repository class defines on a name is read as a pass-through of that name, not
+  followed to the method.
 - `lang/ts.rs` (`Facts::locals`): a local binding hides the name in its whole enclosing
   definition, whatever block holds it, the definition's own definitions, constants and
   parameters of that name included, and a function that is no definition (a method or arrow of an

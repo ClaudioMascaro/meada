@@ -18,7 +18,7 @@ repro's (#684):
 |---|---|---|
 | `api`, `other` | peers | Go `net/http`, both serve `GET /orders`: only `base_url_env` can pick `api` |
 | `inventory` | peer | Go gin, serves `GET /clusters`, behind the Backstage proxy |
-| `g8` | consumer | TS URL builders: a template string, `new URL(..)` with `searchParams` and `toString()`, `new URL(env)`, `.href`, `String(u)`, `${u}`, a path write |
+| `g8` | consumer | TS URL builders: a template string, `new URL(..)` with `searchParams` and `toString()`, `new URL(env)`, `.href`, `String(u)`, `${u}`, a path write; the `new URL(ref, base)` join (literal base, environment base, a parameter) |
 | `g9` | consumer | Go cleanenv tag read inline and in a struct field (direct and through a `send()` wrapper); TS `config.getString` inline and in a readonly field set in the constructor |
 | `g10a` to `g10c` | consumers | Backstage `config.getString`: the value inline, through `$include` with a `#` key path, through `$include` of a whole block |
 | `g10d` to `g10g` | consumers | Backstage `discovery.getBaseUrl('proxy')`: `proxy.endpoints` inline, the legacy shape inline, each through `$include` |
@@ -62,7 +62,7 @@ through `/create-prove-it`, and adds its paths to SKILL.md's Scope row.
 |---|---|---|---|
 | Controls: template string, cleanenv tag inline, `config.getString` inline, `proxy.endpoints` inline | 5 | existing | control |
 | TS URL builders, one argument | 7 (`g8`) | #685 | landed |
-| TS `new URL(ref, base)` join | none yet | to come | no case |
+| TS `new URL(ref, base)` join | 19 rows, 15 functions (`g8`) | #686 | landed (4 controls) |
 | Go struct field | 2 (`g9`) | to come | pending |
 | TS readonly field | 1 (`g9`) | #688 | landed |
 | Backstage `$include` and `$env` | 2 (`g10b`, `g10c`) | to come | pending |

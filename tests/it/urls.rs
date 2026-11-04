@@ -347,6 +347,44 @@ fn a_url_a_function_only_builds_folds_at_the_call_and_through_a_constant() {
             "http::GET::/api/vets",
         ]
     );
+    // `new URL(reference, base)` is the join of the two (RFC 3986 section 5.2). Over a literal base
+    // an absolute reference is itself, `//host/x` takes its host, `/x` replaces the path and `x`
+    // joins the base's directory, in the argument, through a constant and a client wrapper. Over
+    // an environment read or a hole an absolute path keeps the lead; the rest is unresolved.
+    let consumers: std::collections::BTreeMap<String, Option<&str>> =
+        (json["consumers"].as_array().unwrap())
+            .iter()
+            .filter(|c| c["site"].as_str().unwrap().contains("src/join.ts"))
+            .map(|c| {
+                let site = c["site"].as_str().unwrap().split("::").collect::<Vec<_>>();
+                (site[2..].join("::"), c["contract"].as_str())
+            })
+            .collect();
+    let vets = Some("http::GET::/api/vets");
+    let owners = Some("http::GET::/api/owners");
+    let expected = [
+        ("absolute::fetch#0", vets),
+        ("absolutePath::fetch#0", vets),
+        ("envAbsolutePath::fetch#0", vets),
+        ("envNetworkPath::fetch#0", None),
+        ("envReference::fetch#0", None),
+        ("envRelative::fetch#0", None),
+        ("fragmentOnly::fetch#0", None),
+        ("holeAbsolutePath::fetch#0", vets),
+        ("holeBareAbsolutePath::fetch#0", owners),
+        ("holeBareRelative::fetch#0", None),
+        ("networkPath::fetch#0", owners),
+        ("queryOnly::fetch#0", None),
+        ("relativeUnderSlash::fetch#0", owners),
+        ("relativeWithoutSlash::fetch#0", vets),
+        ("throughConstant::fetch#0", owners),
+        ("wrapped::from#0", vets),
+        ("wrapped::get#0", owners),
+    ];
+    let expected: std::collections::BTreeMap<_, _> =
+        expected.map(|(k, v)| (k.to_string(), v)).into();
+    assert_eq!(consumers, expected);
+    assert_eq!(linked("src/join.ts").len(), 11);
     // A base read from the environment, a body of two statements, a name match and a name a
     // parameter, a `catch` binding or a local hides fold nothing; neither does a `new URL`
     // written through its path or host, nor a `URL` the file declares or imports from the

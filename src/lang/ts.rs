@@ -745,6 +745,9 @@ fn declares_url(node: Node, src: &[u8]) -> bool {
     }
 }
 
+/// The callee of a `new URL(reference, base)` of the runtime global, as a `Value::New` names it.
+pub const GLOBAL_URL: &str = "globalThis.URL";
+
 /// Whether `node` is `new URL(..)` of the runtime global: no declaration of the file hides it.
 fn is_url_new(node: Node, src: &[u8], up: &Parents) -> bool {
     node.kind() == "new_expression"
@@ -1305,8 +1308,18 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
             None if kind == "new_expression" => callee_node(node).map_or(Value::Unknown, |f| {
                 let args = node.child_by_field_name("arguments");
                 let args = args.filter(|a| a.kind() == "arguments");
-                let args = args.map(|a| named(a).map(deeper));
-                Value::New(callee(f, src), args.into_iter().flatten().collect())
+                let args: Vec<Value> = args
+                    .map(|a| named(a).map(deeper))
+                    .into_iter()
+                    .flatten()
+                    .collect();
+                // `new URL(reference, base)` of the runtime global: the name no declaration of
+                // the file can hide, for the HTTP kind to join (`http::join`).
+                let name = match args.len() == 2 && is_url_new(node, src, up) {
+                    true => GLOBAL_URL.to_string(),
+                    false => callee(f, src),
+                };
+                Value::New(name, args)
             }),
             None if kind == "member_expression" => {
                 let object = node.child_by_field_name("object");
@@ -2125,7 +2138,7 @@ mod tests {
             .map(|c| &c.args[0])
             .collect();
         assert!(matches!(args[0], Value::Call(i) if i.callee == "n.toString"));
-        assert!(matches!(args[1], Value::New(c, a) if c == "URL" && a.len() == 2));
+        assert!(matches!(args[1], Value::New(c, a) if c == GLOBAL_URL && a.len() == 2));
         assert!(matches!(args[2], Value::New(c, _) if c == "URL"));
         assert!(matches!(args[3], Value::Unknown));
         assert!(matches!(args[4], Value::Call(_)));

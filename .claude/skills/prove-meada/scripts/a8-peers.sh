@@ -113,6 +113,55 @@ export async function ordersInTemplate(base: string) {
   const url = new URL(`${base}/orders`);
   return fetch(`${url}`);
 }
+// new URL(reference, base) is the join of the two: an absolute reference is itself, //host/x takes
+// its host, /x replaces the base's path, x joins the base's directory (a trailing / keeps it)
+export async function ordersJoinAbsolute() {
+  return fetch(new URL('https://api.example.com/orders', 'https://other.example.com/x'));
+}
+export async function ordersJoinNetwork() {
+  return fetch(new URL('//api.example.com/orders', 'https://other.example.com/x'));
+}
+export async function ordersJoinPath() {
+  return fetch(new URL('/orders', 'https://api.example.com/old/path'));
+}
+export async function ordersJoinSlash() {
+  return fetch(new URL('orders', 'https://api.example.com/api/'));
+}
+export async function ordersJoinNoSlash() {
+  return fetch(new URL('orders', 'https://api.example.com/api'));
+}
+// over a base read from the environment an absolute path keeps the lead; the rest stays unknown
+export async function ordersJoinEnv() {
+  return fetch(new URL('/orders', process.env.API_URL));
+}
+export async function ordersJoinEnvRelative() {
+  return fetch(new URL('orders', process.env.API_URL));
+}
+export async function ordersJoinEnvRef() {
+  return fetch(new URL(`${process.env.PREFIX}/orders`, 'https://api.example.com'));
+}
+export async function ordersJoinQuery() {
+  return fetch(new URL('?page=1', 'https://api.example.com/orders'));
+}
+export async function ordersJoinHole() {
+  return fetch(new URL('/orders', config.host));
+}
+export async function ordersJoinFragment() {
+  return fetch(new URL('#top', 'https://api.example.com/orders'));
+}
+// a parameter on either side waits for the call sites
+function joinGet(path: string) {
+  return fetch(new URL(path, 'https://api.example.com'));
+}
+function joinFrom(base: string) {
+  return fetch(new URL('/orders', base));
+}
+export async function ordersJoinParam() {
+  return joinGet('/orders');
+}
+export async function ordersJoinParamBase() {
+  return joinFrom('https://api.example.com');
+}
 // a write to the path leaves the URL unknown
 export async function ordersWritten(base: string) {
   const moved = new URL(`${base}/orders`);

@@ -391,6 +391,22 @@
   but a call (`self.http = http`, marked in `lang/python.rs`) is not read; a parameter given a
   client takes the base of every caller that passes one, and several different bases make it a
   hole.
+- `http/ts/clients.rs` (`joined`, #686): a first argument `new URL(reference, base)` of the global
+  `URL` (`Value::New` of `GLOBAL_URL`, so a file's own `URL` is left alone) is replaced by the
+  join of the two before the `fetch` is read, in the argument, through a constant and in a client
+  wrapper's call sites. The join is `http/join.rs`'s RFC 3986 resolver, which the WHATWG URL
+  Standard's constructor agrees with for the references it reads: a literal base with its scheme
+  and authority visible, and a reference that is absolute, `//host/x`, `/x` or relative (the
+  base's directory ends at its last `/`, so `orders` over `https://h/api` is `/orders`). Over a
+  base that is an environment read or a hole as its whole origin (`${API_URL}`, or followed by a
+  path) only an absolute-path reference is read, `opaque_lead`: `/orders` keeps the lead
+  (`http::GET::/orders`, `via env:API_URL`). Unknown, so unresolved: a relative reference or a
+  `//host/x` over an opaque base, a reference that starts with a read or a hole, a query or a
+  fragment alone (they keep a path the join does not place, even over a literal base), a base
+  with its authority half opaque (`https://${H}` is read; `${H}:8080` is not), a `..` that would
+  remove a segment holding a part that is not text, and a base or reference that is itself a
+  `new URL`. A parameter on either side is resolved at the call sites, where the pieces are
+  joined again. `.href`, `toString()` and `String(u)` of a two-argument `new URL` are not read.
 - Backstage proxy endpoints (#616, `http/ts/config.rs`): a `fetch` URL whose leading literal text
   is `/api/proxy/<ep>` (also what `getBaseUrl('proxy')` folds to), `<ep>` an endpoint of
   `proxy.endpoints` in the `app-config*.yaml` files (the lookup of the configuration reads

@@ -57,6 +57,15 @@ All notable changes to Meada are recorded here. The format follows
   wrapper called with one links to its route and a base URL read from the environment shows its
   `via`. A change through `u.searchParams`, `u.search` or `u.hash` keeps the path; a write to any
   other member of a `new URL` constant leaves it unresolved (#685).
+- TypeScript consumers through `new URL(reference, base)`: the two arguments read as the join the
+  WHATWG URL Standard defines (RFC 3986 section 5.2 for these references), so an absolute
+  reference is itself, `//host/x` takes its host, `/orders` replaces the base's path and `orders`
+  joins the base's directory (`https://h/api/` keeps `api`, `https://h/api` does not). Over a base
+  read from the environment (or a hole) an absolute path keeps the base as its lead, so `/orders`
+  is `http::GET::/orders` with `via env:API_URL`; a relative reference, one that starts with a
+  read, and a query or a fragment alone stay unresolved, and a parameter on either side is
+  resolved at the call sites. Swift's `URL(string:relativeTo:)` goes through the same resolver,
+  with its answers unchanged (#686).
 
 ### Changed
 

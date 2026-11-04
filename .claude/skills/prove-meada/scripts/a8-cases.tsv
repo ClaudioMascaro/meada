@@ -12,6 +12,25 @@ g8	ordersUrlEnv	via	env:API_URL	landed	example.com/acme/api inferred base URL fr
 g8	ordersHref	contract	http::GET::/orders	landed	-	null	new URL(...).href
 g8	ordersString	contract	http::GET::/orders	landed	-	null	new URL + String(u)
 g8	ordersInTemplate	contract	http::GET::/orders	landed	-	null	new URL + ${u} in a template string
+g8	ordersJoinAbsolute	contract	http::GET::/orders	landed	-	null	new URL(absolute, base): the reference is itself
+g8	ordersJoinAbsolute	via	host:api.example.com	landed	-	null	new URL(absolute, base): host from the reference
+g8	ordersJoinNetwork	contract	http::GET::/orders	landed	-	null	new URL(//host/x, base)
+g8	ordersJoinNetwork	via	host:api.example.com	landed	-	null	new URL(//host/x, base): host from the reference
+g8	ordersJoinPath	contract	http::GET::/orders	landed	-	null	new URL(/x, base): replaces the base path
+g8	ordersJoinPath	via	host:api.example.com	landed	-	null	new URL(/x, base): the base host
+g8	ordersJoinSlash	contract	http::GET::/api/orders	landed	-	null	new URL(x, base/api/): joins the directory
+g8	ordersJoinNoSlash	contract	http::GET::/orders	landed	-	null	new URL(x, base/api): drops the last segment
+g8	ordersJoinEnv	contract	http::GET::/orders	landed	-	null	new URL(/x, env): keeps the opaque lead
+g8	ordersJoinEnv	via	env:API_URL	landed	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	new URL(/x, env): via
+g8	ordersJoinEnvRelative	contract	null	control	-	null	control: new URL(x, env) stays unresolved
+g8	ordersJoinEnvRef	contract	null	control	-	null	control: a reference that starts with a read stays unresolved
+g8	ordersJoinQuery	contract	null	control	-	null	control: a query-only reference stays unresolved
+g8	ordersJoinParam	contract	http::GET::/orders	landed	-	null	new URL(param, base): resolved at the call site
+g8	joinGet	contract	no consumer	landed	-	null	new URL(param, base): the wrapper itself stops being a consumer
+g8	ordersJoinHole	contract	http::GET::/orders	landed	-	null	new URL(/x, hole): keeps the opaque lead
+g8	ordersJoinFragment	contract	null	control	-	null	control: a fragment-only reference stays unresolved
+g8	ordersJoinParamBase	contract	http::GET::/orders	landed	-	null	new URL(/x, param): resolved at the call site
+g8	joinFrom	contract	no consumer	landed	-	null	new URL(/x, param): the wrapper itself stops being a consumer
 g8	ordersWritten	contract	null	control	-	null	control: a write to the path leaves the URL unknown
 g9	OrdersInline	via	env:API_URL	control	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	env:API_URL	control: Go tag read inline
 g9	ordersInline	via	env:API_URL	control	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	env:API_URL	control: TS config.getString inline

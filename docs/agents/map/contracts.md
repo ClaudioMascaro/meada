@@ -10,7 +10,8 @@ this file, and a change to these modules updates it.
   (`channel/message.rs`: the message types and broker helpers; `channel/{ts,python,rust,go,java,csharp}.rs`:
   the message libraries of each language): the
   `ContractKind` trait and the HTTP kind (`http.rs`: the contract and path rules, the mount
-  machinery and the shared consumer readers; one submodule per language: `http/ts.rs` and
+  machinery and the shared consumer readers, and `http/join.rs`, the RFC 3986 join of Swift's
+  `URL(string:relativeTo:)` and TS's `new URL(reference, base)`; one submodule per language: `http/ts.rs` and
   `http/ts/clients.rs`, Express and Next.js route-file providers and `fetch` consumers, with
   `http/ts/backstage.rs` mounting each Backstage backend plugin's router at `/api/<pluginId>` (a
   mount node per `createBackendPlugin` call in Express's `Mounts`) and folding a

@@ -104,7 +104,8 @@
   `CLIENT_DEPTH` (8) names; a repository type of the same name hides the library's. The call is
   read whole by `Expand::Chain` as in `http/kotlin/client.rs`, so a wrapper at any depth (the
   URL, the method or the request a parameter) is a consumer, with cycle detection. The URL is
-  `URL(string:)`, `URL(string:relativeTo:)` (RFC 3986 resolution: the scheme before any `/?#`,
+  `URL(string:)`, `URL(string:relativeTo:)` (RFC 3986 resolution by `http/join.rs`, the resolver
+  TypeScript's `new URL(reference, base)` shares (#686): the scheme before any `/?#`,
   network paths, dot segments, the base's query dropped), `appendingPathComponent` (before the
   query), a literal, an interpolation, a `+` or a `let` constant (`static let` too, from other files and
   imported modules); a hole the evaluation cannot fold stays a parameter marker, a reference or a

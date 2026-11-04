@@ -193,8 +193,9 @@ budget of 64 KB (`tests/it/docs.rs` fails above it):
   (`http/<language>.rs`, `channel/<language>.rs`); a form may live in a submodule of that module
   (`http/rust/frameworks.rs`). A table or a form of a library in a pack is a finding, and the
   kind owns it. Six exceptions are decided. The Rust pack folds `Method::GET` constants at
-  parse time (`METHOD_CRATES` and `VERBS`) and keeps them, `VERBS` being the one pack constant a
-  kind reads; the Go pack folds `net/http`'s `MethodGet`-style constants the same way, gated on
+  parse time (`METHOD_CRATES` and `VERBS`) and keeps them, `VERBS` being the one pack constant table
+  a kind reads, besides the TypeScript pack's `GLOBAL_URL`, the callee it gives a two-argument
+  `new URL` of the runtime global, which the file's own declarations decide; the Go pack folds `net/http`'s `MethodGet`-style constants the same way, gated on
   the file's `net/http` import (`METHODS` in `lang/go/values.rs`); and the Rust pack keeps
   `ROUTE_ATTRIBUTES`, because which attributes it emits as calls that decorate a function
   (`Call::decorates`) is a syntax decision a kind cannot take after the fact without a hook from
