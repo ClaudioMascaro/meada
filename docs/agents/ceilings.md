@@ -1804,9 +1804,14 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   a literal `http(s)://` URL is the host (a trailing `/` dropped, its path kept); any other
   target (`${VAR}/v2`, `${VAR:-default}`, a URL with a placeholder) leaves the URL as written, with a
   `client:` `via` the link's reason shows, and `meada status` names the endpoint and its calls.
-  An endpoint with a `pathRewrite` key is treated like an unread target (the path after it would
-  not be the target's); the other options (`allowedMethods`, headers) are not read. Only a consumer in the repository holding the
-  `app-config` is rewritten (#616).
+  A `pathRewrite` is followed only when it is the one rule that strips the endpoint
+  (`'^/api/proxy/<ep>': ''`, or `'^/api/proxy/<ep>/': '/'`, which strips only a path that starts
+  with `/`) and the endpoint is plain text in a regex (letters, digits, `/`, `-`, `_`); any other
+  (another replacement, several rules, a regex character in the endpoint) makes the target
+  unread, so the call stays unlinked and `meada status` names it. A rule with a null replacement
+  is not in the flattened keys and reads as no rule. The other options (`allowedMethods`,
+  headers) are not read. Only a consumer in the repository holding the `app-config` is rewritten
+  (#616).
 - Backstage configuration reads (#617, `CONFIG_READS` in `lang/ts.rs`, read by `http/ts/config.rs`): `config.getString('a.b')`
   and `getOptionalString('a.b')` with a literal key are read from the `app-config*.yaml` files of
   the repository, `app-config.yaml` first and the first file holding the key winning, whatever

@@ -225,8 +225,7 @@ pub(super) fn proxied(via: Option<String>, endpoint: &str, usable: bool) -> Opti
 
 /// What a proxy endpoint's client says when its target is neither `${VAR}` nor an `http(s)://`
 /// URL, or the endpoint rewrites the path.
-const UNREAD: &str =
-    " (its target is not read: neither ${VAR} nor an http(s) URL, or it has a pathRewrite)";
+const UNREAD: &str = " (its target is not read: neither ${VAR} nor an http(s) URL, or its pathRewrite does more than strip the endpoint)";
 
 /// The proxy endpoint whose target is not read, when `via` says it (`proxied`).
 pub(in crate::http) fn unread(via: &str) -> Option<&str> {

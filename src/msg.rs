@@ -1792,9 +1792,9 @@ impl Msg<'_> {
                 format!("{site}: plugin de Backstage cuyo pluginId no es literal de texto ni const de su archivo ligada a uno: sus rutas quedan en la raíz, no bajo /api/<pluginId>"),
             ),
             Msg::BackstageProxyTarget { endpoint, calls } => pick(
-                format!("Backstage proxy endpoint {endpoint}: its target is not read (neither ${{VAR}} nor an http(s) URL, or it has a pathRewrite), so {calls} call(s) through it stay unlinked"),
-                format!("endpoint de proxy do Backstage {endpoint}: seu target não é lido (nem ${{VAR}} nem uma URL http(s), ou tem pathRewrite), então {calls} chamada(s) por ele ficam sem ligação"),
-                format!("endpoint de proxy de Backstage {endpoint}: su target no se lee (ni ${{VAR}} ni una URL http(s), o tiene pathRewrite), así que {calls} llamada(s) por él quedan sin enlace"),
+                format!("Backstage proxy endpoint {endpoint}: its target is not read (neither ${{VAR}} nor an http(s) URL, or its pathRewrite does more than strip the endpoint), so {calls} call(s) through it stay unlinked"),
+                format!("endpoint de proxy do Backstage {endpoint}: seu target não é lido (nem ${{VAR}} nem uma URL http(s), ou o pathRewrite faz mais que tirar o endpoint), então {calls} chamada(s) por ele ficam sem ligação"),
+                format!("endpoint de proxy de Backstage {endpoint}: su target no se lee (ni ${{VAR}} ni una URL http(s), o su pathRewrite hace más que quitar el endpoint), así que {calls} llamada(s) por él quedan sin enlace"),
             ),
             Msg::DocumentUnreadable { path, line, error } => pick(
                 format!("{path}:{line}: unreadable document ({error}), ignored"),

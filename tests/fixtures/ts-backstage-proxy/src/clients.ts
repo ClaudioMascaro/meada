@@ -41,3 +41,19 @@ export async function holeInEndpoint(endpoint: string) {
 export async function holeAfterEndpoint(id: string) {
   return fetch(`/api/proxy/inventory${id}`);
 }
+
+export async function viaStripped() {
+  return fetch('/api/proxy/stripped/clusters');
+}
+
+export async function viaSlashed() {
+  return fetch('/api/proxy/slashed/clusters');
+}
+
+export async function viaSlashedBare() {
+  return fetch('/api/proxy/slashed?name=a');
+}
+
+export async function viaTwoRules() {
+  return fetch('/api/proxy/twice/clusters');
+}

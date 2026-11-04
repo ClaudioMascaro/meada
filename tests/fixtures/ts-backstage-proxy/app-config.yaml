@@ -8,5 +8,18 @@ proxy:
       target: https://stock.example.com
       pathRewrite:
         '^/api/proxy/rewritten': '/v1'
+    '/stripped':
+      target: https://stock.example.com
+      pathRewrite:
+        '^/api/proxy/stripped': ''
+    '/slashed':
+      target: https://stock.example.com
+      pathRewrite:
+        '^/api/proxy/slashed/': '/'
+    '/twice':
+      target: https://stock.example.com
+      pathRewrite:
+        '^/api/proxy/twice': ''
+        '^/old': '/new'
     '/legacy':
       target: ${LEGACY_URL}/v2

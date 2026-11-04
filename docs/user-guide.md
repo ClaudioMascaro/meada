@@ -1057,8 +1057,12 @@ repositório: uma URL que começa por `/api/proxy/<endpoint>` (também a que
 endpoint, e o resto da URL segue o alvo. Um `target` que é exatamente `${VAR}` liga pelo
 `base_url_env` do par, e o motivo nomeia a variável e o endpoint; um `target` que é uma URL
 `http://` ou `https://` literal vale como o host (com o seu caminho). Qualquer outro `target` (um
-texto em volta da variável, um valor padrão), ou um endpoint com `pathRewrite`, deixa a chamada sem ligação, e o `meada status` aponta
-o endpoint e quantas chamadas passam por ele.
+texto em volta da variável, um valor padrão) deixa a chamada sem ligação, e o `meada status` aponta
+o endpoint e quantas chamadas passam por ele. Um `pathRewrite` que só tira o endpoint (uma regra,
+`'^/api/proxy/<endpoint>': ''`, ou `'^/api/proxy/<endpoint>/': '/'` para uma URL com caminho) é o
+que o proxy faz de qualquer jeito, então o resto da URL segue para o alvo; qualquer outro
+`pathRewrite` (outra substituição, várias regras) é lido como um `target` ilegível: sem ligação, e
+o `meada status` aponta.
 
 **Ambiente.** `process.env.X`, `process.env["X"]` e `import.meta.env.X`, sozinhos ou passando por
 métodos de texto como `trim()`, `replace(...)` e `toLowerCase()`. A URL que começa por uma leitura

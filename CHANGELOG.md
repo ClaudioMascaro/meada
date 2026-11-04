@@ -22,7 +22,9 @@ All notable changes to Meada are recorded here. The format follows
   (also `discovery.getBaseUrl('proxy')` plus `/<endpoint>`) is a call to the `target` of that
   endpoint in `proxy.endpoints` of an `app-config*.yaml`: a `${VAR}` target links through the
   peer's `base_url_env` and a literal `http(s)://` target by host, the link's reason naming the
-  endpoint, and any other target leaves the call unlinked, which `meada status` says (#616).
+  endpoint, and any other target leaves the call unlinked, which `meada status` says. A
+  `pathRewrite` that only strips the endpoint is followed; any other one leaves the call unlinked
+  too (#616).
 - Go: a struct field tagged `env:"X"` (cleanenv, caarlos0/env) or `envconfig:"X"`
   (kelseyhightower/envconfig) is the environment read `X` where the field is read
   (`cfg.API.URL`), so `base_url_env` links such a call as `inferred` instead of `ambiguous`

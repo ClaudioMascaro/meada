@@ -486,10 +486,19 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
         .collect();
     consumers.sort();
     let inventory = Some("env:INVENTORY_URL through proxy endpoint /inventory");
-    let said =
-        " (its target is not read: neither ${VAR} nor an http(s) URL, or it has a pathRewrite)";
+    let said = " (its target is not read: neither ${VAR} nor an http(s) URL, or its pathRewrite does more than strip the endpoint)";
     let legacy = format!("client:Backstage proxy endpoint /legacy{said}");
-    let rewritten = format!("client:Backstage proxy endpoint /rewritten{said}");
+    let (rewritten, slashed, twice) = (
+        format!("client:Backstage proxy endpoint /rewritten{said}"),
+        format!("client:Backstage proxy endpoint /slashed{said}"),
+        format!("client:Backstage proxy endpoint /twice{said}"),
+    );
+    let stock = |endpoint: &str| {
+        Some(format!(
+            "host:stock.example.com through proxy endpoint {endpoint}"
+        ))
+    };
+    let (stripped_via, slashed_via) = (stock("/stripped"), stock("/slashed"));
     let mut expected = [
         // `/inventoryx` is no `/inventory`.
         (
@@ -515,11 +524,29 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
             "http::GET::/api/proxy/legacy/clusters",
             Some(legacy.as_str()),
         ),
-        // A `pathRewrite` changes the path the target sees, which Meada does not follow.
+        // A `pathRewrite` that only strips the endpoint is what the proxy does anyway: the call
+        // goes to the stripped path. Any other rewrite changes the path the target sees, which
+        // Meada does not evaluate; `/slashed` strips `<ep>/`, so a path without it is no strip.
+        (
+            "viaStripped",
+            "http::GET::/clusters",
+            stripped_via.as_deref(),
+        ),
+        ("viaSlashed", "http::GET::/clusters", slashed_via.as_deref()),
+        (
+            "viaSlashedBare",
+            "http::GET::/api/proxy/slashed",
+            Some(slashed.as_str()),
+        ),
         (
             "viaRewrite",
             "http::GET::/api/proxy/rewritten/clusters",
             Some(rewritten.as_str()),
+        ),
+        (
+            "viaTwoRules",
+            "http::GET::/api/proxy/twice/clusters",
+            Some(twice.as_str()),
         ),
         // A part Meada cannot read in the endpoint, or right after it, names no endpoint.
         ("holeAfterEndpoint", "http::GET::/api/proxy/{}", None),
@@ -570,6 +597,20 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
                     "host stock.example.com through the proxy endpoint /stock is served by {peer}"
                 ),
             ),
+            served(
+                "viaSlashed",
+                "exact",
+                &format!(
+                    "host stock.example.com through the proxy endpoint /slashed is served by {peer}"
+                ),
+            ),
+            served(
+                "viaStripped",
+                "exact",
+                &format!(
+                    "host stock.example.com through the proxy endpoint /stripped is served by {peer}"
+                ),
+            ),
             served("viaTemplate", "inferred", &through),
         ]
     );
@@ -578,8 +619,10 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
     assert_eq!(
         said,
         [
-            "  Backstage proxy endpoint /legacy: its target is not read (neither ${VAR} nor an http(s) URL, or it has a pathRewrite), so 2 call(s) through it stay unlinked",
-            "  Backstage proxy endpoint /rewritten: its target is not read (neither ${VAR} nor an http(s) URL, or it has a pathRewrite), so 1 call(s) through it stay unlinked"
+            "  Backstage proxy endpoint /legacy: its target is not read (neither ${VAR} nor an http(s) URL, or its pathRewrite does more than strip the endpoint), so 2 call(s) through it stay unlinked",
+            "  Backstage proxy endpoint /rewritten: its target is not read (neither ${VAR} nor an http(s) URL, or its pathRewrite does more than strip the endpoint), so 1 call(s) through it stay unlinked",
+            "  Backstage proxy endpoint /slashed: its target is not read (neither ${VAR} nor an http(s) URL, or its pathRewrite does more than strip the endpoint), so 1 call(s) through it stay unlinked",
+            "  Backstage proxy endpoint /twice: its target is not read (neither ${VAR} nor an http(s) URL, or its pathRewrite does more than strip the endpoint), so 1 call(s) through it stay unlinked"
         ],
         "{status}"
     );

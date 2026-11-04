@@ -1056,8 +1056,12 @@ the repository: a URL that starts with `/api/proxy/<endpoint>` (also the one wri
 rest of the URL follows the target. A `target` that is exactly `${VAR}` links through the peer's
 `base_url_env`, and the reason names the variable and the endpoint; a `target` that is a literal
 `http://` or `https://` URL counts as the host (with its path). Any other `target` (text around
-the variable, a default value), or an endpoint with a `pathRewrite`, leaves the call unlinked, and `meada status` names the endpoint and
-how many calls go through it.
+the variable, a default value) leaves the call unlinked, and `meada status` names the endpoint and
+how many calls go through it. A `pathRewrite` that only strips the endpoint (one rule,
+`'^/api/proxy/<endpoint>': ''`, or `'^/api/proxy/<endpoint>/': '/'` for a URL with a path) is what
+the proxy does anyway, so the rest of the URL goes to the target; any other `pathRewrite` (another
+replacement, several rules) is read like a target that cannot be read: no link, and `meada status`
+says so.
 
 **Environment.** `process.env.X`, `process.env["X"]` and `import.meta.env.X`, alone or passing
 through text methods such as `trim()`, `replace(...)` and `toLowerCase()`. A URL that starts with

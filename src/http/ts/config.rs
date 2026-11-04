@@ -9,10 +9,12 @@
 //! The same files hold Backstage's proxy table (#616): `proxy.endpoints['/<ep>'].target`. A URL
 //! that starts with `/api/proxy/<ep>` (the proxy plugin's mount, also what `getBaseUrl('proxy')`
 //! folds to) is a call to that target: a `${VAR}` target is the variable `VAR`, an `http(s)://`
-//! target is that host (with its path), and the rest of the URL follows it. Any other target
-//! (a template around the variable, a default, no `http`), and an endpoint with a `pathRewrite`
-//! (the path after it would not be the target's), leave the URL as written and the call
-//! unlinked, and `meada status` says so.
+//! target is that host (with its path), and the rest of the URL follows it. A `pathRewrite` that
+//! only strips the endpoint (`'^/api/proxy/<ep>': ''`, or `'^/api/proxy/<ep>/': '/'` for a URL
+//! with a path) is what the proxy does anyway. Any other target (a template around the variable,
+//! a default, no `http`) and any other `pathRewrite` (another replacement, several rules, a
+//! pattern with regex characters) leave the URL as written and the call unlinked, and
+//! `meada status` says so.
 // ponytail: every `app-config*.yaml` of the repository serves every file of it, whatever the
 // directory, and profiles are not merged: the first file holding the key wins. Scope the lookup
 // by directory if a monorepo's apps keep different values under one key.
@@ -27,8 +29,12 @@ use crate::lang::{Part, Value};
 pub(super) struct Config<'i> {
     files: &'i [(&'i str, &'i [u8])],
     keys: OnceCell<Properties>,
-    endpoints: OnceCell<Vec<(String, Target)>>,
+    endpoints: OnceCell<Vec<Endpoint>>,
 }
+
+/// A proxy endpoint: its name, its target, and whether its `pathRewrite` strips only `<ep>/`
+/// (so a URL with nothing after `<ep>` or a `?` is not stripped, and its target is unread).
+type Endpoint = (String, Target, bool);
 
 /// What a proxy endpoint's `target` is.
 enum Target {
@@ -107,32 +113,55 @@ impl<'i> Config<'i> {
     // ponytail: only the `target` form is read: the string shorthand (`'/ep': 'https://...'`) is
     // indistinguishable from a dotted endpoint name in the flattened keys; read it from the
     // parsed document if configs in the wild use it.
-    fn endpoints(&self) -> &[(String, Target)] {
+    fn endpoints(&self) -> &[Endpoint] {
         self.endpoints.get_or_init(|| {
             let mut out: Vec<_> = (self.keys().iter())
                 .filter_map(|(key, value)| {
                     let name = key
                         .strip_prefix("proxy.endpoints.")?
                         .strip_suffix(".target")?;
+                    let raw = name;
                     let name = name.trim_end_matches('/');
                     // `|` is the separator of a consumer's twin readings (`keep_applicable`).
                     if !name.starts_with('/') || name.contains('|') {
                         return None;
                     }
-                    // The proxy rewrites the path after the endpoint, which Meada does not follow.
-                    let rewrites = format!("proxy.endpoints.{name}.pathRewrite");
-                    let rewritten = self.keys().keys().any(|k| k.starts_with(&rewrites));
-                    let target = if rewritten {
-                        Target::Unread
-                    } else {
-                        target(value)
-                    };
-                    Some((name.to_string(), target))
+                    let (strip, slash) = self.strips(raw, name);
+                    let target = if strip { target(value) } else { Target::Unread };
+                    Some((name.to_string(), target, slash))
                 })
                 .collect();
-            out.sort_by_key(|(name, _)| std::cmp::Reverse(name.len()));
+            out.sort_by_key(|(name, ..)| std::cmp::Reverse(name.len()));
             out
         })
+    }
+
+    /// Whether the `pathRewrite` of the endpoint `raw` (as written in the file; `name` without a
+    /// trailing `/`) leaves the path after it as the target gets it, and whether it does so only
+    /// for a path that starts with `/`: none, or the one rule that strips the endpoint.
+    // ponytail: a rule with a null replacement is not in the flattened keys, so an endpoint whose
+    // only rule is null reads as having none; read the parsed document if that shows up.
+    fn strips(&self, raw: &str, name: &str) -> (bool, bool) {
+        let at = format!("proxy.endpoints.{raw}.pathRewrite");
+        let rules: Vec<_> = (self.keys().range(at.clone()..))
+            .take_while(|(k, _)| k.starts_with(&at))
+            .collect();
+        // The pattern is a regex: the endpoint has to be plain text in it.
+        let plain = name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "/-_".contains(c));
+        match rules[..] {
+            [] => (true, false),
+            [(key, replacement)] if plain => {
+                let pattern = key.strip_prefix(&at).and_then(|k| k.strip_prefix('.'));
+                match (pattern, replacement.as_str()) {
+                    (Some(p), "") if p == format!("^{PROXY}{name}") => (true, false),
+                    (Some(p), "/") if p == format!("^{PROXY}{name}/") => (true, true),
+                    _ => (false, false),
+                }
+            }
+            _ => (false, false),
+        }
     }
 
     /// `args` when their URL starts with `/api/proxy/<ep>` for an endpoint of the table: the
@@ -153,16 +182,16 @@ impl<'i> Config<'i> {
             })
             .collect();
         let rest = text.strip_prefix(PROXY)?;
-        let (endpoint, target) = self.endpoints().iter().find(|(name, _)| {
+        let (endpoint, target, slash) = self.endpoints().iter().find(|(name, ..)| {
             rest.strip_prefix(name.as_str()).is_some_and(|after| {
                 (after.is_empty() && lead == parts.len()) || after.starts_with(['/', '?', '#'])
             })
         })?;
         let after = &rest[endpoint.len()..];
         let head = match target {
-            Target::Env(var) => Part::Env(var.clone()),
-            Target::Url(url) => Part::Text(url.clone()),
-            Target::Unread => {
+            Target::Env(var) if !slash || after.starts_with('/') => Part::Env(var.clone()),
+            Target::Url(url) if !slash || after.starts_with('/') => Part::Text(url.clone()),
+            _ => {
                 return Some(Proxied {
                     endpoint: endpoint.clone(),
                     args: None,
