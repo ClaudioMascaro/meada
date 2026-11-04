@@ -105,8 +105,12 @@ as páginas, e grava no Postgres, numa transação, um conjunto de permissões q
 anterior: cada colaborador listado com o seu `role_name`. Sob `[refresh_lock]` o conjunto leva o
 `MEADA_REFRESH_FENCE` do job, e um conjunto de fence maior já gravado recusa a execução. Um 403
 ou 429 passa para a próxima instalação; com todas limitadas, num 5xx, num timeout ou num
-cabeçalho `Link` que sai da listagem do repositório, nada é gravado e a saída é 1. Um 404, ou um
-owner que nenhuma instalação cobre, dá um aviso e nenhuma linha.
+cabeçalho `Link` que sai da listagem do repositório, nada é gravado e a saída é 1. Um 403 com
+cota restante (`x-ratelimit-remaining` acima de 0, sem `retry-after`) e corpo `Resource not
+accessible by integration` é falta de permissão, não limitação: passa para a próxima instalação
+sem marcá-la, e quando todas o respondem o repositório é registrado como `forbidden`, não recebe
+linhas, dá um aviso e as instalações continuam no rodízio.
+Um 404, ou um owner que nenhuma instalação cobre, dá um aviso e nenhuma linha.
 
 Com `source = "store"`, toda adição cujo `added_by` não tem um papel de `roles` fica de fora:
 o comando escreve `<index_dir>/workspace/excluded` (o id da versão, depois as identidades

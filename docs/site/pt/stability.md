@@ -105,6 +105,7 @@ O manifesto de workspace do [modo servidor](server.md), lido pelo build padrão:
 | `[[repository]]` | `path` | texto, obrigatório | Onde está o mirror. |
 | `[[repository]]` | `owner` | texto, opcional | Grupo (do OIDC ou de uma conta local) responsável; metadado da entrada. |
 | `[[repository]]` | `added_by` | texto, opcional | Login do GitHub que acrescentou a entrada; metadado. |
+| `[[repository]]` | `added_by_time` | texto, opcional | Quando o console gravou o `added_by`, `YYYY-MM-DDTHH:MM:SSZ` (UTC); metadado. |
 | `[repository.serve]` | `hosts`, `prefix`, `strip`, `documents` | | Como em `[serve]` de `meada.toml`. |
 | `[[repository.resource]]` | `kind`, `id`, `role`, `via` | | Como em `[[resource]]` de `meada.toml`. |
 | `[[repository.peer]]` | `repo`, `base_url_env` | | Como em `[[peer]]`, sem `path`. |

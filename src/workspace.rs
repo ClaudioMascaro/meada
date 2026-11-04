@@ -565,14 +565,19 @@ impl Manifest {
             let owner = Msg::WorkspaceOwnerStatic.text();
             return Err(config::error_at(file, &src, "repository.owner", &owner));
         }
-        if parsed.repositories.iter().any(|e| e.added_by.is_some()) {
+        let attributed = (parsed.repositories.iter()).find_map(|e| match e {
+            EntryFile {
+                added_by: Some(_), ..
+            } => Some("repository.added_by"),
+            EntryFile {
+                added_by_time: Some(_),
+                ..
+            } => Some("repository.added_by_time"),
+            _ => None,
+        });
+        if let Some(key) = attributed {
             let added_by = Msg::WorkspaceAddedByStatic.text();
-            return Err(config::error_at(
-                file,
-                &src,
-                "repository.added_by",
-                &added_by,
-            ));
+            return Err(config::error_at(file, &src, key, &added_by));
         }
         let index_dir = base.join(index_dir);
         #[cfg(feature = "snapshot")]
@@ -636,6 +641,7 @@ impl Manifest {
                     path: path.display().to_string(),
                     owner: None,
                     added_by: None,
+                    added_by_time: None,
                     serve: Default::default(),
                     resources: Vec::new(),
                     peers: Vec::new(),

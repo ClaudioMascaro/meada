@@ -96,6 +96,7 @@ pub enum Msg<'a> {
     AddedByNotString,
     AddedByTooLong,
     AddedByChars,
+    AddedByTimeShape,
     /// A key a named workspace's entry may not hold (ADR 0021): the platform's, not the context's.
     NamedReserved(&'a str),
     /// A named workspace's text past its bound, in bytes.
@@ -236,6 +237,11 @@ impl Msg<'_> {
                 "contém um caractere além de letras ASCII minúsculas, dígitos, `-` e `_`".into(),
                 "contiene un carácter distinto de letras ASCII minúsculas, dígitos, `-` y `_`"
                     .into(),
+            ),
+            Msg::AddedByTimeShape => pick(
+                "must be one string, a UTC time as `YYYY-MM-DDTHH:MM:SSZ`".into(),
+                "deve ser uma única string, um horário UTC como `YYYY-MM-DDTHH:MM:SSZ`".into(),
+                "debe ser una única string, una hora UTC como `YYYY-MM-DDTHH:MM:SSZ`".into(),
             ),
             Msg::NamedReserved(key) => pick(
                 format!("`{key}` is reserved: a named workspace's entry does not set it"),

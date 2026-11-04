@@ -105,6 +105,7 @@ The workspace manifest of [server mode](server.md), read by the default build:
 | `[[repository]]` | `path` | string, required | Where the mirror is. |
 | `[[repository]]` | `owner` | string, optional | The group (from the identity provider or a local account) that answers for the repository; entry metadata. |
 | `[[repository]]` | `added_by` | string, optional | The GitHub login that added the entry; metadata. |
+| `[[repository]]` | `added_by_time` | string, optional | When the console wrote `added_by`, `YYYY-MM-DDTHH:MM:SSZ` (UTC); metadata. |
 | `[repository.serve]` | `hosts`, `prefix`, `strip`, `documents` | | As `[serve]` in `meada.toml`. |
 | `[[repository.resource]]` | `kind`, `id`, `role`, `via` | | As `[[resource]]` in `meada.toml`. |
 | `[[repository.peer]]` | `repo`, `base_url_env` | | As `[[peer]]`, without `path`. |

@@ -204,20 +204,25 @@ pub fn authorize_entries(
 /// GitHub grant provider (`github_host`), each of those additions is attributed: on its host,
 /// `added_by` is `login` whatever the submitted text held, absent without a valid login; off it,
 /// absent.
-/// Edited entries keep their submitted form. Run with `current` the entries the grant reads, it
-/// is the change `authorize_entries` authorizes; with the whole current version, once that
-/// refused nothing, the version stored.
+/// Edited entries keep their submitted form, but every entry this save writes gets its
+/// `added_by_time` from the save, never from the text (#454): the current entry's when its
+/// `added_by` is unchanged, else, under the GitHub grant provider alone, `now`
+/// (`YYYY-MM-DDTHH:MM:SSZ`) when it has one, and none otherwise: an `added_by` written without
+/// the provider never carries a time, so the role check never takes it for the provider's. Run
+/// with `current` the entries the grant reads, it is the change `authorize_entries` authorizes; with the whole current version, once that refused nothing, the version stored.
 pub fn compose_entries(
     grant: &Grant,
     login: Option<&str>,
     github_host: Option<&str>,
+    now: &str,
     current: &[Json],
     submitted: &[Json],
 ) -> Vec<Json> {
+    let now = github_host.map(|_| now);
     let by_repo: BTreeMap<&str, &Json> = submitted.iter().map(|e| (repo(e), e)).collect();
     let present: BTreeSet<&str> = current.iter().map(repo).collect();
     let kept = current.iter().filter_map(|e| match grant.reads(repo(e)) {
-        true => by_repo.get(repo(e)).copied().cloned(),
+        true => (by_repo.get(repo(e))).map(|new| stamped((*new).clone(), Some(e), now)),
         false => Some(e.clone()),
     });
     let login = login.filter(|l| crate::manifest::added_by_problem(l).is_none());
@@ -226,17 +231,36 @@ pub fn compose_entries(
         .map(|e| match github_host {
             Some(host) => attributed(e, login.filter(|_| on_host(repo(e), host))),
             None => e.clone(),
-        });
+        })
+        .map(|e| stamped(e, None, now));
     kept.chain(added).collect()
 }
 
 /// `entry` with `added_by` set to `login`, or without it when there is none.
 fn attributed(entry: &Json, login: Option<&str>) -> Json {
-    let mut entry = entry.clone();
+    set(entry.clone(), "added_by", login)
+}
+
+/// `entry` with the `added_by_time` the console writes for it, `before` being the entry it
+/// replaces: `before`'s when the `added_by` is the same, else `now` when it has one.
+fn stamped(entry: Json, before: Option<&Json>, now: Option<&str>) -> Json {
+    let time = match added_by(&entry) {
+        None => None,
+        Some(login) if before.and_then(added_by) == Some(login) => {
+            before.and_then(|b| b["added_by_time"].as_str())
+        }
+        Some(_) => now,
+    };
+    let time = time.map(str::to_string);
+    set(entry, "added_by_time", time.as_deref())
+}
+
+/// `entry` with `key` set to `value`, or without it when there is none.
+fn set(mut entry: Json, key: &str, value: Option<&str>) -> Json {
     if let Json::Object(fields) = &mut entry {
-        match login {
-            Some(login) => fields.insert("added_by".into(), login.into()),
-            None => fields.remove("added_by"),
+        match value {
+            Some(value) => fields.insert(key.into(), value.into()),
+            None => fields.remove(key),
         };
     }
     entry

@@ -105,12 +105,15 @@ pub fn authorize_entries(
 }
 
 /// The entries a team operator's save stores (`compose_entries`), its additions attributed, as
-/// JSON; the arguments as `authorizeEntries` takes them.
+/// JSON; `now` the time an `added_by` it writes under the GitHub grant provider gets
+/// (`YYYY-MM-DDTHH:MM:SSZ`), the other
+/// arguments as `authorizeEntries` takes them.
 #[wasm_bindgen(js_name = composeEntries)]
 pub fn compose_entries(
     grant: &str,
     login: Option<String>,
     github_host: Option<String>,
+    now: &str,
     current: &str,
     submitted: &str,
 ) -> Result<String, String> {
@@ -118,6 +121,7 @@ pub fn compose_entries(
         &from_json(grant)?,
         login.as_deref(),
         github_host.as_deref(),
+        now,
         &from_json::<Vec<_>>(current)?,
         &from_json::<Vec<_>>(submitted)?,
     );

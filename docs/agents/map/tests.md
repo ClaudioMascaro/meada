@@ -1137,7 +1137,11 @@ one; after `meada workspace pull` and `meada github-app roles` exclude an additi
 and `workspace/versions/<id>` of that version marking it `excluded: true` for the global operator
 and for a viewer the GitHub grant lets read it, another version holding the same entry and every
 other entry unmarked, and a team operator that does not read it never seeing it. No stderr line
-carries a token, a login or the forged value. `tests/it/ui/oidc/team.rs` checks that without
+carries a token, a login or the forged value. #454: a team operator's `added_by` saved while the
+console has no provider, then `[oidc.github]` enabled, is excluded `unattributed` by the role check
+though its login holds an accepted role, and an addition the provider attributes past the first
+set's second is checked by its roles as before; `tests/it/postgres.rs` moves a schema at 9 with a
+set to 10, the set kept and its start the first set's time. `tests/it/ui/oidc/team.rs` checks that without
 `[oidc.github]` no workspace body carries `excluded`. `tests/it/ui/oidc/audit.rs` also leaves out a record whose stored login fails the login
 pattern. `ui/tests/models.test.ts`,
 `ui/tests/operations.test.ts` and `ui/tests/operations.test.tsx` hold the session view's login

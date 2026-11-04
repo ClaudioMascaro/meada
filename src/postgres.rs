@@ -129,9 +129,9 @@ const MIGRATIONS: &[&str] = &[
      );",
     // 5: the permissions set (#331), one kept: `meada github-app roles` replaces it in one
     // transaction, its repositories what GitHub showed of each identity on the host (`listed`,
-    // `not_found`, `uncovered`, `not_a_repository`), its rows every collaborator GitHub listed,
-    // and its exclusions the additions left out (`no_role`, `role_not_accepted`); times from
-    // Postgres's clock.
+    // `not_found`, `forbidden`, `uncovered`, `not_a_repository`), its rows every collaborator
+    // GitHub listed, and its exclusions the additions left out (`no_role`, `role_not_accepted`);
+    // times from Postgres's clock.
     "CREATE TABLE {schema}.permission_sets (
        id text PRIMARY KEY DEFAULT replace(gen_random_uuid()::text, '-', ''),
        fence bigint NOT NULL,
@@ -245,6 +245,16 @@ const MIGRATIONS: &[&str] = &[
        created timestamptz NOT NULL DEFAULT now(),
        created_by text
      );",
+    // 10: when the GitHub grant provider's first permissions set started (#454), one row the
+    // role check writes once and never moves: an `added_by` written by then is `unattributed`.
+    // A schema that holds a set already starts from that set's start: the latest run's, since a
+    // run deletes the sets before it, so later than the true first and stricter, never looser.
+    "CREATE TABLE {schema}.permission_state (
+       singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
+       first_started timestamptz NOT NULL
+     );
+     INSERT INTO {schema}.permission_state (first_started)
+       SELECT min(started) FROM {schema}.permission_sets HAVING count(*) > 0;",
 ];
 
 /// The `[postgres]` section as written.

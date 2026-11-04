@@ -138,3 +138,32 @@ fn context_on_a_queue_lists_the_bindings_that_reach_it() {
     let lookalike = engine.context("channel::amqp::events", None).unwrap();
     assert_golden("channels.context-queue-lookalike.txt", &lookalike);
 }
+
+/// A query reuses the connection opened for each peer (#443): it neither reopens the peer's
+/// index nor rebuilds a file removed under it, so the refresh and the answer read the same file.
+#[test]
+fn a_query_reuses_the_connection_held_for_each_peer() {
+    let api = workspace("channel_held_peers");
+    let engine = Engine::open(&api).unwrap();
+    let before = engine
+        .context("channel::kafka::orders.created", None)
+        .unwrap();
+    let peers: Vec<PathBuf> = std::fs::read_dir(api.parent().unwrap())
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| *p != api)
+        .map(|p| p.join(".meada/index.db"))
+        .filter(|p| p.exists())
+        .collect();
+    assert_eq!(peers.len(), 2, "worker and billing");
+    for index in &peers {
+        std::fs::remove_file(index).unwrap();
+    }
+
+    let after = engine
+        .context("channel::kafka::orders.created", None)
+        .unwrap();
+
+    assert_eq!(after, before);
+    assert!(peers.iter().all(|p| !p.exists()), "a query reopened a peer");
+}

@@ -19,6 +19,10 @@ use crate::ui::Reply;
 /// A repository of the GitHub grant provider's host no team's claims grant reads.
 const FRESH: &str = "e.test/team/fresh";
 
+/// The `added_by_time` line of an entry the global operator attributes by hand (#454): a time
+/// after any permissions set a test writes.
+const AFTER_LINE: &str = "added_by_time = \"2999-01-01T00:00:00Z\"\n";
+
 /// The team fixture with `[oidc.github]` on `HOST` (role `write`) over a schema of its own, a
 /// console reading it, and `ops/roles.toml`: the console's manifest with an `index_dir` of its
 /// own and the App block, the role check's.
@@ -29,7 +33,11 @@ struct Case {
 }
 
 fn case(name: &'static str) -> Option<Case> {
-    let team = team(name, true)?;
+    enable(name, team(name, true)?)
+}
+
+/// `[oidc.github]` enabled over `team`'s fleet: `case`'s console and role check.
+fn enable(name: &'static str, team: Team) -> Option<Case> {
     let github = Github::new(name)?;
     let dir = &team.fleet.dir;
     let file = dir.join("ops/console.toml");
@@ -128,6 +136,20 @@ fn with(text: &str, repo: &str, extra: &str) -> String {
     )
 }
 
+/// `entry` with its `added_by_time` (#454) checked as a time the console wrote and taken out.
+fn untimed(mut entry: Value) -> Value {
+    let time = entry["added_by_time"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    assert!(
+        time.len() == 20 && time.starts_with("20") && time.ends_with('Z'),
+        "{entry}"
+    );
+    entry.as_object_mut().unwrap().remove("added_by_time");
+    entry
+}
+
 /// A 403 `entries_refused`: its refused entries and hidden count.
 fn refusals(reply: &Reply) -> (Value, Value) {
     assert_eq!(reply.status, 403, "{}", reply.body);
@@ -186,7 +208,7 @@ fn a_team_operator_s_addition_on_the_host_is_attributed_from_its_login() {
     }
 
     let saved = case.saved(&ana, &with(&base, FRESH, forged));
-    let fresh = case.entry(&root, &saved, FRESH);
+    let fresh = untimed(case.entry(&root, &saved, FRESH));
     assert_eq!(
         fresh,
         json!({"repo": FRESH, "path": "../v", "owner": "team-billing", "added_by": "ana-souza"})
@@ -224,6 +246,73 @@ fn a_team_operator_s_addition_on_the_host_is_attributed_from_its_login() {
     let stderr = case.console.stderr();
     case.github.clean(&stderr, &[ana, anon, root]);
     assert!(!stderr.contains("mallory"), "{stderr}");
+}
+
+/// #454: while no GitHub grant provider is configured, a team operator sets an `added_by` on its
+/// team's entry and adds another entry with one (both kept as submitted, with no
+/// `added_by_time`), and the version is applied. Once `[oidc.github]` is enabled, the role check
+/// reports both `unattributed` and excludes them although their `added_by` holds an accepted
+/// role. An addition the provider attributes after that first permissions set is checked by its
+/// roles as before: eligible, no exclusion of its own.
+#[test]
+fn an_added_by_written_before_the_provider_s_first_set_is_unattributed() {
+    let Some(team) = team("ui_additions_before", true) else {
+        return;
+    };
+    let root = team.token("root", &[], true);
+    let ana = team.token("ana", &["team-billing"], false);
+    let mallory = "added_by = \"mallory\"\nadded_by_time = \"2999-01-01T00:00:00Z\"\n";
+    let forged = seen().replacen(
+        "owner = \"team-billing\"\n",
+        &format!("owner = \"team-billing\"\n{mallory}"),
+        1,
+    );
+    let forged = with(&forged, INVOICES, mallory);
+    let body = json!({"entries": forged, "message": "m"});
+    let reply = post(&team.console, "workspace/versions", &ana, body);
+    assert_eq!(reply.status, 200, "{}", reply.body);
+    let before = reply.json()["result"].as_str().unwrap().to_string();
+    let reply = post(
+        &team.console,
+        "workspace/apply",
+        &root,
+        json!({"version": before}),
+    );
+    assert_eq!(reply.status, 200, "{}", reply.body);
+
+    let Some(case) = enable("ui_additions_before", team) else {
+        return;
+    };
+    let root = case.token("root", &[], None, true);
+    for identity in [BILLING, INVOICES] {
+        let entry = case.entry(&root, &before, identity);
+        assert_eq!(entry["added_by"], "mallory", "{entry}");
+        assert!(entry.get("added_by_time").is_none(), "{entry}");
+    }
+    case.github.list("team/billing", &[("mallory", "write")]);
+    case.github.list("team/invoices", &[("mallory", "write")]);
+    case.job(&["workspace", "pull", "--workspace", "ops/roles.toml"]);
+    let (line, stderr) = case.job(&["github-app", "roles", "--workspace", "ops/roles.toml"]);
+    assert!(line.ends_with(", 2 exclusions\n"), "{line}");
+    let unattributed = |identity: &str| format!("{identity}: excluded: unattributed");
+    for identity in [BILLING, INVOICES] {
+        assert!(stderr.contains(&unattributed(identity)), "{stderr}");
+    }
+    case.github.clean(&stderr, &[]);
+
+    // Past the second the first set started in, an addition the provider attributes.
+    std::thread::sleep(Duration::from_millis(1100));
+    let ana = case.token("ana", &["team-billing"], Some("Ana-Souza"), false);
+    let after = case.saved(&ana, &with(&forged, FRESH, ""));
+    assert_eq!(case.entry(&root, &after, FRESH)["added_by"], "ana-souza");
+    assert_eq!(case.apply(&root, &after).status, 200);
+    case.github.list("team/fresh", &[("ana-souza", "write")]);
+    case.job(&["workspace", "pull", "--workspace", "ops/roles.toml"]);
+    let (line, stderr) = case.job(&["github-app", "roles", "--workspace", "ops/roles.toml"]);
+    assert!(line.ends_with(", 2 exclusions\n"), "{line}");
+    assert!(stderr.contains(&unattributed(BILLING)), "{stderr}");
+    assert!(!stderr.contains(FRESH), "{stderr}");
+    case.github.clean(&stderr, &[]);
 }
 
 /// The global operator's saves keep `added_by` as written, setting, replacing and clearing it,
@@ -292,7 +381,11 @@ fn an_excluded_addition_is_marked_in_the_views_of_the_version_checked() {
     let root = case.token("root", &[], None, true);
     let bia = case.token("bia", &[], Some("bia_acme"), false);
     let ana = case.token("ana", &["team-billing"], Some("Ana-Souza"), false);
-    let whole = with(&entries(&ENTRIES), FRESH, "added_by = \"ana-souza\"\n");
+    let whole = with(
+        &entries(&ENTRIES),
+        FRESH,
+        &format!("added_by = \"ana-souza\"\n{AFTER_LINE}"),
+    );
     let checked = case.saved(&root, &whole);
     assert_eq!(case.apply(&root, &checked).status, 200);
     let other = case.saved(&root, &whole.replace("../e.test/team/ledger", "../moved"));
@@ -341,7 +434,7 @@ fn an_excluded_addition_is_marked_in_the_views_of_the_version_checked() {
     assert_eq!(
         seen,
         json!([{"repo": FRESH, "path": "../v", "owner": "team-billing",
-                "added_by": "ana-souza", "excluded": true}])
+                "added_by": "ana-souza", "added_by_time": "2999-01-01T00:00:00Z", "excluded": true}])
     );
     let body = get(
         &case.console,
@@ -475,7 +568,8 @@ fn a_local_team_operator_s_addition_is_attributed_from_its_verified_login() {
     let version = get(&console, &format!("workspace/versions/{saved}"), &root);
     let fresh = (version["repositories"].as_array().unwrap().iter())
         .find(|e| e["repo"] == FRESH)
-        .cloned();
+        .cloned()
+        .map(untimed);
     assert_eq!(
         fresh,
         Some(
@@ -550,7 +644,8 @@ fn a_local_team_operator_s_addition_is_attributed_from_its_verified_login() {
         assert!(start.elapsed() < Duration::from_secs(20));
         std::thread::sleep(Duration::from_millis(50));
     }
-    let seen_by_bia = get(&console, "workspace", &bia)["version"]["repositories"].clone();
+    let seen_by_bia = get(&console, "workspace", &bia)["version"]["repositories"][0].clone();
+    let seen_by_bia = json!([untimed(seen_by_bia)]);
     assert_eq!(
         seen_by_bia,
         json!([{"repo": FRESH, "path": "../v", "owner": "team-billing",

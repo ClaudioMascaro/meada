@@ -180,6 +180,33 @@ fn an_added_by_is_one_lowercase_login_and_each_error_names_its_line_and_key() {
     assert_eq!(validate(FILE, OWNED).unwrap()[0].added_by, None);
 }
 
+/// The time an `added_by` was written (#454) is one UTC string to the second, as a version's.
+#[test]
+fn an_added_by_time_is_one_utc_time_to_the_second() {
+    let error = "must be one string, a UTC time as `YYYY-MM-DDTHH:MM:SSZ`";
+    for value in [
+        "1",
+        "2026-11-04T12:00:00Z",
+        "\"2026-11-04 12:00:00Z\"",
+        "\"2026-11-04T12:00:00.5Z\"",
+        "\"2026-11-04T12:00:00+00:00\"",
+    ] {
+        let src = format!("{OWNED}added_by = \"ana\"\nadded_by_time = {value}\n");
+        assert_eq!(
+            problems(&src),
+            [format!("{FILE}:5: `repository.added_by_time`: {error}")],
+            "{value}"
+        );
+    }
+    let src = format!("{OWNED}added_by = \"ana\"\nadded_by_time = \"2026-11-04T12:00:00Z\"\n");
+    let entries = validate(FILE, &src).unwrap();
+    assert_eq!(
+        entries[0].added_by_time.as_deref(),
+        Some("2026-11-04T12:00:00Z")
+    );
+    assert_eq!(validate(FILE, OWNED).unwrap()[0].added_by_time, None);
+}
+
 #[test]
 fn a_named_peer_takes_an_environment_name_of_at_most_128_bytes() {
     let text = |name: &str| {

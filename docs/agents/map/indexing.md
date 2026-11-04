@@ -23,7 +23,8 @@ this file, and a change to these modules updates it.
   (`Msg::WorkspaceStoreBeside`); `Manifest::store` records it, with no entries from `read`. An
   `owner` in the bootstrap manifest's own `[[repository]]` entries (`source = "file"`) is an
   error naming the file, the line, `repository.owner` and `source = "store"`
-  (`Msg::WorkspaceOwnerStatic`), and an `added_by` likewise (`Msg::WorkspaceAddedByStatic`);
+  (`Msg::WorkspaceOwnerStatic`), and an `added_by` or an `added_by_time` likewise
+  (`Msg::WorkspaceAddedByStatic`);
   `meada workspace import` reads the same entries with them allowed.
   `Manifest::read_listed`, which `index`, `status`, `export` without `--generations` and
   `snapshot publish` call, reads the entries of the version `meada workspace pull` left under

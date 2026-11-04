@@ -65,6 +65,14 @@ left aside until it resets.
   installation (a mint) or their App (a listing) the same way, from `retry-after`, else from
   `x-ratelimit-reset` when `x-ratelimit-remaining` is 0, else for 1 minute. A `get` whose mint is
   throttled takes the next installation, and fails when every mint was.
+  (Amended 2026-11-04; #452: a 403 with quota left, no `retry-after` and the body `Resource not
+  accessible by integration` is a missing permission, not a throttle. The App lacks a permission
+  on that repository, and waiting does not fix it, yet the mark kept the installation out of the
+  role check and the credential helper's rotation for up to an hour. `meada github-app roles`
+  passes such a 403 to the next installation unmarked (another App may hold the permission) and,
+  when every installation covering the owner answers it, records the repository as `forbidden` in the permissions set, with a warning and no rows, and
+  marks nothing. A 403 or 429 with `retry-after` or `x-ratelimit-remaining: 0`, and any other 403
+  body, stays a throttle, as does any 403 on a mint, an installations listing or the catalog.)
 - **Only the job runs the module.** `meada mcp --listen` reads the blocks with the manifest and
   never calls GitHub. (Amended 2026-10-22; #319: ADR 0016 adds the module's second REST use,
   `meada github-app roles`, which the job runs at every refresh: it lists each repository's

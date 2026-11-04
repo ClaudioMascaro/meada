@@ -587,8 +587,12 @@ def renders(root, out):
         shutil.copy(f, out / f"mounted-{f.name}")
     if shutil.which("helm"):
         chart = root / "deploy/helm/meada"
+        # The overlays render in the stack their headers name, as scripts/helm-check does.
+        stacks = {"values-identity": ["values-console", "values-identity"],
+                  "values-workspaces": ["values-console", "values-identity", "values-workspaces"]}
         for values in sorted(chart.glob("values*.yaml")):
-            r = subprocess.run(["helm", "template", "check", str(chart), "-f", str(values)], capture_output=True, text=True)
+            files = [f for n in stacks.get(values.stem, [values.stem]) for f in ("-f", str(chart / f"{n}.yaml"))]
+            r = subprocess.run(["helm", "template", "check", str(chart), *files], capture_output=True, text=True)
             text = r.stdout if r.returncode == 0 else f"render failed ({r.returncode}): {r.stderr}"
             (out / f"helm-{values.stem}.yaml").write_text(text.replace(str(root), "<root>"))
     else:

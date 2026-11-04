@@ -55,6 +55,8 @@ def admin_password(d):
 
 def cmd_start(a):
     run = Path(a.run).resolve()
+    if os.sep in a.bin:  # a path is the caller's, not the run's directory's; a bare name stays a PATH lookup
+        a.bin = str(Path(a.bin).resolve())
     d = run / "console"
     if (d / "ui.pid").exists():
         sys.exit(f"a console of this run may still be up: console.py stop --run {run}")

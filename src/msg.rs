@@ -732,6 +732,8 @@ pub enum Msg<'a> {
     RolesUncovered(&'a str),
     #[cfg(feature = "github-app")]
     RolesNotFound(&'a str),
+    #[cfg(feature = "github-app")]
+    RolesForbidden(&'a str),
     /// A collaborator listed without a valid login or role, never echoing either.
     #[cfg(feature = "github-app")]
     RolesSkipped(&'a str),
@@ -757,6 +759,10 @@ pub enum Msg<'a> {
         identity: &'a str,
         listed: bool,
     },
+    /// An addition whose `added_by` has no time or was written by the first permissions set
+    /// (#454).
+    #[cfg(feature = "github-app")]
+    RolesUnattributed(&'a str),
     /// The role check's line on success.
     #[cfg(feature = "github-app")]
     RolesSet {
@@ -3382,6 +3388,18 @@ impl Msg<'_> {
                 ),
             ),
             #[cfg(feature = "github-app")]
+            Msg::RolesForbidden(identity) => pick(
+                format!(
+                    "{identity}: GitHub answers 403 (permission, not a rate limit) for its collaborators; it gets no rows"
+                ),
+                format!(
+                    "{identity}: o GitHub responde 403 (permissão, não limite de taxa) para os colaboradores; não recebe linhas"
+                ),
+                format!(
+                    "{identity}: GitHub responde 403 (permiso, no límite de tasa) para los colaboradores; no recibe filas"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
             Msg::RolesNotFound(identity) => pick(
                 format!("{identity}: GitHub answers 404 for its collaborators; it gets no rows"),
                 format!(
@@ -3463,6 +3481,21 @@ impl Msg<'_> {
                 ),
                 format!(
                     "{identity}: excluido: su added_by no tiene ningún rol en [oidc.github] roles"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesUnattributed(identity) => pick(
+                format!(
+                    "{identity}: excluded: unattributed, its added_by was written before the \
+                     GitHub grant provider's first permissions set"
+                ),
+                format!(
+                    "{identity}: excluído: sem atribuição, o seu added_by foi escrito antes do \
+                     primeiro conjunto de permissões do provedor de concessões do GitHub"
+                ),
+                format!(
+                    "{identity}: excluido: sin atribución, su added_by se escribió antes del \
+                     primer conjunto de permisos del proveedor de concesiones de GitHub"
                 ),
             ),
             #[cfg(feature = "github-app")]

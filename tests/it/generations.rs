@@ -848,7 +848,7 @@ fn import_stores_a_version_once_and_answers_its_id() {
         .collect();
     let blocks = serde_json::json!({});
     let hashed: Vec<meada_core::ids::VersionEntry> = (entries.iter())
-        .map(|(repo, path)| (*repo, path.as_str(), &blocks, None, None))
+        .map(|(repo, path)| (*repo, path.as_str(), &blocks, None, None, None))
         .collect();
     assert_eq!(id, meada_core::ids::workspace_version_id(&hashed));
     let s3 = bucket(&fleet.endpoint, &fleet.bucket);
@@ -1060,7 +1060,7 @@ fn an_owner_is_stored_shown_and_pulled_and_a_malformed_one_is_refused() {
             (other["repositories"].as_array().unwrap().iter())
                 .map(|e| {
                     let (repo, path) = (e["repo"].as_str().unwrap(), e["path"].as_str().unwrap());
-                    (repo, path, &blocks, e["owner"].as_str(), None)
+                    (repo, path, &blocks, e["owner"].as_str(), None, None)
                 })
                 .collect();
         let id = meada_core::ids::workspace_version_id(&hashed);
@@ -1153,7 +1153,7 @@ fn an_added_by_is_stored_shown_and_pulled_and_a_malformed_one_is_refused() {
                 .map(|e| {
                     let (repo, path) = (e["repo"].as_str().unwrap(), e["path"].as_str().unwrap());
                     let (owner, added_by) = (e["owner"].as_str(), e["added_by"].as_str());
-                    (repo, path, &blocks, owner, added_by)
+                    (repo, path, &blocks, owner, added_by, None)
                 })
                 .collect();
         let id = meada_core::ids::workspace_version_id(&hashed);
@@ -2000,10 +2000,11 @@ fn write_pulled(dir: &Path) {
         Some("team-worker"),
     ];
     let logins = [Some("ana-souza"), Some("bia_acme"), None, Some("caio")];
-    let hashed: Vec<meada_core::ids::VersionEntry> =
-        (entries.iter().zip(owners.into_iter().zip(logins)))
-            .map(|((repo, path), (owner, login))| (*repo, path.as_str(), &blocks, owner, login))
-            .collect();
+    let hashed: Vec<meada_core::ids::VersionEntry> = (entries
+        .iter()
+        .zip(owners.into_iter().zip(logins)))
+    .map(|((repo, path), (owner, login))| (*repo, path.as_str(), &blocks, owner, login, None))
+    .collect();
     let id = meada_core::ids::workspace_version_id(&hashed);
     let repositories: Vec<serde_json::Value> = (entries.iter().zip(owners.into_iter().zip(logins)))
         .map(|((repo, path), (owner, login))| {

@@ -4,7 +4,7 @@ pub mod stub;
 
 /// The Postgres schema version the binary migrates to: the number of `MIGRATIONS` in
 /// `src/postgres.rs`, which the `schema_version_matches_the_migrations` test checks without services.
-pub const SCHEMA_VERSION: u32 = 9;
+pub const SCHEMA_VERSION: u32 = 10;
 
 use std::fs;
 use std::path::{Path, PathBuf};

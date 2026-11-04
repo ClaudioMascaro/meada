@@ -62,6 +62,9 @@ const THROTTLE_FIRST: u64 = 60;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 // ponytail: the most bytes of one REST answer read; past it the request fails.
 const ANSWER_MAX: u64 = 4 << 20;
+// ponytail: a 403's body is read up to this many bytes to tell a permission denial from a
+// throttle; one that fills it counts as a throttle.
+const DENIAL_MAX: u64 = 4 << 10;
 // ponytail: the most pages of installations listed per App, `PER_PAGE` each.
 const PAGES_MAX: u32 = 100;
 const PER_PAGE: usize = 100;
@@ -276,15 +279,42 @@ enum Failure {
         #[cfg_attr(not(all(feature = "postgres", feature = "oidc")), expect(dead_code))] u16,
         Option<u64>,
     ),
+    /// A 403 that is no rate limit: the quota shows left and the body is GitHub's permission
+    /// message (the App lacks a permission on the resource, #452).
+    Forbidden(String),
     /// 404.
     Missing(String),
     Other(String),
 }
 
+impl Failure {
+    /// Outside a repository's collaborators listing a 403 stays a throttle (ADR 0013).
+    fn throttled(self) -> Self {
+        match self {
+            Failure::Forbidden(_) => Failure::Throttled(403, None),
+            other => other,
+        }
+    }
+}
+
+/// The unsigned integer in header `name`, if it holds one.
+fn number(headers: &HeaderMap, name: &str) -> Option<u64> {
+    headers.get(name)?.to_str().ok()?.trim().parse().ok()
+}
+
+/// Whether a 403 is a permission failure and no throttle: no `retry-after` (in any form, an
+/// HTTP date included), a `x-ratelimit-remaining` above 0, and GitHub's permission message in
+/// the body.
+fn is_permission_denial(headers: &HeaderMap, body: &[u8]) -> bool {
+    !headers.contains_key("retry-after")
+        && number(headers, "x-ratelimit-remaining").is_some_and(|left| left > 0)
+        && String::from_utf8_lossy(body).contains("Resource not accessible by integration")
+}
+
 /// The seconds a 403 or 429 says to wait: `retry-after`, else until `x-ratelimit-reset` when
 /// `x-ratelimit-remaining` is 0, else nothing.
 fn wait(headers: &HeaderMap, now: u64) -> Option<u64> {
-    let number = |name: &str| headers.get(name)?.to_str().ok()?.trim().parse::<u64>().ok();
+    let number = |name: &str| number(headers, name);
     if let Some(after) = number("retry-after") {
         return Some(after);
     }
@@ -295,7 +325,8 @@ fn wait(headers: &HeaderMap, now: u64) -> Option<u64> {
 }
 
 /// `GET url` (or `POST`, with no body) with the bearer `jwt` (the App's JWT, or an installation
-/// token): at most `ANSWER_MAX` bytes of a success answer, and its `Link` header. No error
+/// token): at most `ANSWER_MAX` bytes of a success answer, and its `Link` header; a 403's body up
+/// to `DENIAL_MAX`, to tell a permission denial (`Failure::Forbidden`) from a throttle. No error
 /// carries the bearer.
 fn call(
     agent: &ureq::Agent,
@@ -316,6 +347,15 @@ fn call(
     let other = |e: ureq::Error| Failure::Other(scrub(&format!("{url}: {e}"), Some(jwt)));
     let mut response = sent.map_err(other)?;
     let status = response.status().as_u16();
+    if status == 403 {
+        // A body that cannot be read (or fills the limit) is no permission message: a throttle.
+        let body = response.body_mut().with_config().limit(DENIAL_MAX);
+        let body = body.read_to_vec().unwrap_or_default();
+        if is_permission_denial(response.headers(), &body) {
+            let why = Msg::GithubAppStatus { url, status }.text();
+            return Err(Failure::Forbidden(why));
+        }
+    }
     if matches!(status, 403 | 429) {
         return Err(Failure::Throttled(status, wait(response.headers(), now())));
     }
@@ -544,7 +584,7 @@ impl<'a> Run<'a> {
         throttled: &str,
     ) -> Result<(), String> {
         let jwt = self.jwt(app)?;
-        let found = match list(&self.agent, app, &jwt) {
+        let found = match list(&self.agent, app, &jwt).map_err(Failure::throttled) {
             Ok(found) => found,
             Err(Failure::Throttled(_, wait)) => {
                 let secs = self.mark(throttled, wait).await?;
@@ -553,7 +593,9 @@ impl<'a> Run<'a> {
                     .push(Msg::GithubAppMarked { what: &what, secs }.text());
                 return Ok(());
             }
-            Err(Failure::Other(why) | Failure::Missing(why)) => return Err(why),
+            Err(Failure::Other(why) | Failure::Missing(why) | Failure::Forbidden(why)) => {
+                return Err(why);
+            }
         };
         let mut replace = cmd("EVAL");
         replace.arg(REPLACE).arg(1).arg(held).arg(INSTALLATIONS_TTL);
@@ -672,17 +714,20 @@ impl<'a> Run<'a> {
         throttled: &str,
     ) -> Result<Option<(String, u64)>, String> {
         let jwt = self.jwt(at.app)?;
-        let (token, expires) = match mint(&self.agent, at.app, at.id, &jwt) {
-            Ok(minted) => minted,
-            Err(Failure::Throttled(_, wait)) => {
-                let secs = self.mark(throttled, wait).await?;
-                let what = format!("installation {}", at.id);
-                self.notes
-                    .push(Msg::GithubAppMarked { what: &what, secs }.text());
-                return Ok(None);
-            }
-            Err(Failure::Other(why) | Failure::Missing(why)) => return Err(why),
-        };
+        let (token, expires) =
+            match mint(&self.agent, at.app, at.id, &jwt).map_err(Failure::throttled) {
+                Ok(minted) => minted,
+                Err(Failure::Throttled(_, wait)) => {
+                    let secs = self.mark(throttled, wait).await?;
+                    let what = format!("installation {}", at.id);
+                    self.notes
+                        .push(Msg::GithubAppMarked { what: &what, secs }.text());
+                    return Ok(None);
+                }
+                Err(Failure::Other(why) | Failure::Missing(why) | Failure::Forbidden(why)) => {
+                    return Err(why);
+                }
+            };
         let ttl = expires.saturating_sub(now()).saturating_sub(TOKEN_MARGIN);
         if ttl > 0 {
             let value = format!("{expires} {token}");
@@ -975,9 +1020,10 @@ impl<'a> Listing<'a> {
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 type Row = (String, String);
 
-/// An entry of the workspace as the role check reads it: its identity and its `added_by`.
+/// An entry of the workspace as the role check reads it: its identity, its `added_by` and when
+/// that was written (#454).
 #[cfg(all(feature = "postgres", feature = "oidc"))]
-type Entry = (String, Option<String>);
+type Entry = (String, Option<String>, Option<String>);
 
 /// A collaborator as `role_name`'s row: the login, lowercase, and the role as GitHub spells it;
 /// `None` for one whose login is not a GitHub login (1 to 39 ASCII letters, digits, `-` and `_`,
@@ -1128,8 +1174,8 @@ fn eligible_sets(
 }
 
 /// What `roles` reads of the workspace: the pulled version's id with `source = "store"` and each
-/// entry's identity and `added_by`, whole: the exclusions are this command's to write. With
-/// `[workspaces]` also the named workspaces the pull read (#342) and the digest of their file.
+/// entry's identity, `added_by` and `added_by_time`, whole: the exclusions are this command's to
+/// write. With `[workspaces]` also the named workspaces the pull read (#342) and the digest of their file.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 fn checked_entries(manifest: &Path, read: &crate::workspace::Manifest) -> crate::Result<Checked> {
     #[cfg(feature = "generation-pointer")]
@@ -1153,7 +1199,7 @@ fn checked_entries(manifest: &Path, read: &crate::workspace::Manifest) -> crate:
             (pulled, _) => pulled,
         };
         let (id, entries, _) = pulled.ok_or_else(not_pulled)?;
-        let entries = entries.into_iter().map(|e| (e.repo, e.added_by));
+        let entries = (entries.into_iter()).map(|e| (e.repo, e.added_by, e.added_by_time));
         #[cfg(feature = "workspaces")]
         let (contexts, digest) = named.unzip();
         return Ok(Checked {
@@ -1169,7 +1215,7 @@ fn checked_entries(manifest: &Path, read: &crate::workspace::Manifest) -> crate:
     Ok(Checked {
         version: None,
         entries: (read.entries.iter())
-            .map(|l| (l.repo.clone(), None))
+            .map(|l| (l.repo.clone(), None, None))
             .collect(),
         #[cfg(feature = "workspaces")]
         contexts: Vec::new(),
@@ -1342,7 +1388,13 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         Ok(())
     };
     let q = postgres.quoted();
-    let first = format!("SELECT (SELECT max(fence) FROM {q}.permission_sets), now()::text");
+    // The time of the GitHub grant provider's first permissions set (#454), to the second: this
+    // run's start when none was written yet.
+    let first = format!(
+        "SELECT (SELECT max(fence) FROM {q}.permission_sets), now()::text, \
+         to_char(coalesce((SELECT first_started FROM {q}.permission_state), now()) \
+         AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')"
+    );
     let reached = async {
         let opened = crate::postgres::connected(postgres).await?;
         let scrub = opened.scrubber();
@@ -1372,6 +1424,7 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     };
     held_fence(row.get(0))?;
     let started: String = row.get(1);
+    let first_set: String = row.get(2);
     remove_excluded()?;
 
     // Every identity on the host, listed; rows keyed by identity and login, the first kept.
@@ -1384,7 +1437,7 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     #[cfg(feature = "workspaces")]
     if let Some(catalog) = catalog {
         let named: Vec<String> = contexts.iter().flat_map(|c| c.identities()).collect();
-        let selected = (entries.iter().map(|(i, _)| i.as_str()))
+        let selected = (entries.iter().map(|(i, _, _)| i.as_str()))
             .chain(named.iter().map(String::as_str))
             .collect();
         let listed = catalog::candidates(&mut run, apps, &github.host, catalog, &selected).await;
@@ -1396,7 +1449,7 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         contexts.iter().flat_map(|c| c.identities()).collect();
     #[cfg(not(feature = "workspaces"))]
     let named: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-    let own: Vec<&str> = entries.iter().map(|(i, _)| i.as_str()).collect();
+    let own: Vec<&str> = entries.iter().map(|(i, _, _)| i.as_str()).collect();
     let targets = targets_of(&github.host, &own, &named, &candidates);
     // Per identity on the host, what GitHub showed of it: the App and repository coverage.
     let mut coverage: Vec<(&str, &str, Source)> = Vec::new();
@@ -1432,13 +1485,20 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     let role_of = |identity: &str, login: &String| rows.get(&(identity.to_string(), login.clone()));
 
     // The additions whose `added_by` holds no accepted role on their repository, with
-    // `source = "store"` only (a file's entries have no `added_by`).
+    // `source = "store"` only (a file's entries have no `added_by`). An `added_by` without a
+    // time, or written by the end of the second the first permissions set started in, was not
+    // the GitHub grant provider's attribution (#454): `unattributed`, whatever its roles.
     let repositories = coverage.iter().filter(|(_, c, _)| *c == "listed").count();
     let mut excluded: BTreeMap<&str, (&str, &str)> = BTreeMap::new();
-    for (identity, added_by) in &entries {
+    for (identity, added_by, time) in &entries {
         let Some(login) = added_by.as_ref().filter(|_| identity.starts_with(&prefix)) else {
             continue;
         };
+        if time.as_ref().is_none_or(|time| *time <= first_set) {
+            notes.push(Msg::RolesUnattributed(identity).text());
+            excluded.insert(identity, (login, "unattributed"));
+            continue;
+        }
         let role = role_of(identity, login);
         if role.is_some_and(|role| github.roles.contains(role)) {
             continue;
@@ -1475,11 +1535,12 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         Some(dir) => Some(crate::snapshot::versions::lock_excluded(dir)?),
         None => None,
     };
-    // Nine statements of its own, after the listing (which has no Postgres in it): begin, the
-    // lock, the fence, the set, its rows, its coverage, its exclusions, the older sets and commit.
+    // Ten statements of its own, after the listing (which has no Postgres in it): begin, the
+    // lock, the fence, the first set's time, the set, its rows, its coverage, its exclusions, the
+    // older sets and commit.
     // Past the bound the file stays removed, so no reader admits an exclusion of this run or the
     // one before it.
-    let writing = postgres.bound(9);
+    let writing = postgres.bound(10);
     let written = async {
         let tx = client.transaction().await.map_err(&scrub)?;
         let lock = format!("LOCK TABLE {q}.permission_sets IN EXCLUSIVE MODE");
@@ -1491,6 +1552,12 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         if let Some(dir) = &dir {
             crate::snapshot::versions::remove_excluded(dir)?;
         }
+        // The first set's time is written once and never moved (#454).
+        let state = format!(
+            "INSERT INTO {q}.permission_state (first_started) VALUES ($1::text::timestamptz) \
+             ON CONFLICT DO NOTHING"
+        );
+        tx.execute(&state, &[&started]).await.map_err(&scrub)?;
         let insert = format!(
             "INSERT INTO {q}.permission_sets (fence, version, started, repositories) \
          VALUES ($1, $2, $3::text::timestamptz, $4) RETURNING id"
@@ -1611,6 +1678,8 @@ enum Shown {
     Listed(Vec<Row>),
     /// A 404.
     NotFound,
+    /// A 403 that is a missing permission, not a throttle (#452).
+    Forbidden,
     /// No installation covers the owner.
     Uncovered,
 }
@@ -1622,16 +1691,19 @@ impl Shown {
         match self {
             Shown::Listed(_) => "listed",
             Shown::NotFound => "not_found",
+            Shown::Forbidden => "forbidden",
             Shown::Uncovered => "uncovered",
         }
     }
 }
 
 /// The collaborators of `identity` (`owner/repo` on `host`) and their roles, through the
-/// installations covering the owner in `Run::rotation`'s order: a 403 or 429 marks the
-/// installation throttled and passes to the next. `Shown::Uncovered` or `Shown::NotFound`, with a
-/// stderr line, when no installation covers the owner or GitHub answers 404. Every other failure, every installation
-/// throttled included, is the line that fails the run.
+/// installations covering the owner in `Run::rotation`'s order: a permission 403 passes to the
+/// next unmarked (another App may hold the permission), a 403 or 429 marks the installation
+/// throttled and passes to the next. `Shown::Forbidden` when every installation answers a
+/// permission 403; `Shown::Uncovered` or `Shown::NotFound`, with a stderr line, when no
+/// installation covers the owner or GitHub answers 404. Every other failure, every installation
+/// throttled (or some throttled and the rest forbidden) included, is the line that fails the run.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 async fn listed(
     run: &mut Run<'_>,
@@ -1653,7 +1725,7 @@ async fn listed(
     if throttled {
         return Err(failed(&Msg::RolesThrottled(None).text()));
     }
-    let mut last = None;
+    let (mut last, mut forbidden) = (None, false);
     for at in open {
         let Some((token, _)) = run.token(at).await.map_err(|e| failed(&e))? else {
             continue;
@@ -1670,6 +1742,7 @@ async fn listed(
                 run.notes.push(Msg::RolesNotFound(identity).text());
                 return Ok(Shown::NotFound);
             }
+            Err(Failure::Forbidden(_)) => forbidden = true,
             Err(Failure::Throttled(status, wait)) => {
                 let key = run.installation_key(host, at.id, "throttled");
                 let secs = run.mark(&key, wait).await.map_err(|e| failed(&e))?;
@@ -1678,8 +1751,14 @@ async fn listed(
                     .push(Msg::GithubAppMarked { what: &what, secs }.text());
                 last = Some(status);
             }
-            Err(Failure::Other(why) | Failure::Missing(why)) => return Err(failed(&why)),
+            Err(Failure::Other(why) | Failure::Missing(why)) => {
+                return Err(failed(&why));
+            }
         }
+    }
+    if forbidden && last.is_none() {
+        run.notes.push(Msg::RolesForbidden(identity).text());
+        return Ok(Shown::Forbidden);
     }
     Err(failed(&Msg::RolesThrottled(last).text()))
 }
@@ -1964,15 +2043,16 @@ mod tests {
         }
     }
 
+    fn headers(pairs: &[(&'static str, &str)]) -> HeaderMap {
+        let mut map = HeaderMap::new();
+        for (k, v) in pairs {
+            map.insert(*k, v.parse().unwrap());
+        }
+        map
+    }
+
     #[test]
     fn a_throttled_answer_waits_as_its_headers_say() {
-        let headers = |pairs: &[(&'static str, &str)]| {
-            let mut map = HeaderMap::new();
-            for (k, v) in pairs {
-                map.insert(*k, v.parse().unwrap());
-            }
-            map
-        };
         assert_eq!(wait(&headers(&[("retry-after", "30")]), 0), Some(30));
         let reset = [
             ("x-ratelimit-remaining", "0"),
@@ -1985,6 +2065,30 @@ mod tests {
         ];
         assert_eq!(wait(&headers(&left), 1000), None);
         assert_eq!(wait(&headers(&[]), 1000), None);
+    }
+
+    #[test]
+    fn a_403_is_a_permission_failure_only_with_quota_left_and_the_permission_message() {
+        let body = br#"{"message":"Resource not accessible by integration"}"#;
+        // Permission 403.
+        assert!(is_permission_denial(
+            &headers(&[("x-ratelimit-remaining", "4999")]),
+            body
+        ));
+        // Rate-limited 403: quota spent, or `retry-after`, or another message.
+        assert!(!is_permission_denial(
+            &headers(&[("x-ratelimit-remaining", "0")]),
+            body
+        ));
+        let after = [("x-ratelimit-remaining", "4999"), ("retry-after", "30")];
+        assert!(!is_permission_denial(&headers(&after), body));
+        let secondary = br#"{"message":"You have exceeded a secondary rate limit"}"#;
+        assert!(!is_permission_denial(
+            &headers(&[("x-ratelimit-remaining", "4999")]),
+            secondary
+        ));
+        // No rate-limit header: stays a throttle (429 never reaches `permission`).
+        assert!(!is_permission_denial(&headers(&[]), body));
     }
 
     #[test]

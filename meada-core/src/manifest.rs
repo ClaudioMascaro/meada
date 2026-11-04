@@ -239,6 +239,27 @@ fn added_by<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error>
     }
 }
 
+/// Whether `text` is a time as a version records it: `YYYY-MM-DDTHH:MM:SSZ`.
+pub fn is_time(text: &str) -> bool {
+    let shape = "dddd-dd-ddTdd:dd:ddZ";
+    text.len() == shape.len()
+        && (text.bytes().zip(shape.bytes())).all(|(b, s)| {
+            if s == b'd' {
+                b.is_ascii_digit()
+            } else {
+                b == s
+            }
+        })
+}
+
+/// One string that `is_time` accepts; a TOML date-time is not one.
+fn added_by_time<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    match toml::Value::deserialize(d)? {
+        toml::Value::String(time) if is_time(&time) => Ok(Some(time)),
+        _ => Err(D::Error::custom(Msg::AddedByTimeShape.text())),
+    }
+}
+
 /// A `[[repository]]`: `serve` and `resource` take the shapes of `meada.toml`'s, `peer` that
 /// of its `[[peer]]` without `path` (the manifest locates every repository).
 #[derive(Deserialize)]
@@ -255,6 +276,11 @@ pub struct EntryFile {
     /// the role check excludes an addition whose adder holds no accepted role (#331).
     #[serde(default, deserialize_with = "added_by")]
     pub added_by: Option<String>,
+    /// When the console wrote `added_by` (#454), `YYYY-MM-DDTHH:MM:SSZ`: `compose_entries` stamps
+    /// it, and the role check treats an `added_by` without one, or written before the GitHub
+    /// grant provider's first permissions set, as `unattributed`.
+    #[serde(default, deserialize_with = "added_by_time")]
+    pub added_by_time: Option<String>,
     #[serde(default, deserialize_with = "declared")]
     pub serve: Serve,
     #[serde(default, rename = "resource")]
@@ -281,6 +307,7 @@ impl EntryFile {
             blocks,
             self.owner.as_deref(),
             self.added_by.as_deref(),
+            self.added_by_time.as_deref(),
         )
     }
 
@@ -325,7 +352,7 @@ pub fn entry_problems<'a>(repos: impl IntoIterator<Item = &'a str>) -> Vec<Optio
 }
 
 /// A named workspace's `[[repository]]` (ADR 0021): the blocks of an entry and nothing the platform
-/// owns, so no `path`, `owner` or `added_by`.
+/// owns, so no `path`, `owner`, `added_by` or `added_by_time`.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct NamedEntry {
@@ -347,10 +374,11 @@ struct NamedEntries {
 }
 
 /// The keys a named workspace's entry may not set (ADR 0021), as dotted keys of the text.
-const NAMED_RESERVED: [&str; 4] = [
+const NAMED_RESERVED: [&str; 5] = [
     "repository.path",
     "repository.owner",
     "repository.added_by",
+    "repository.added_by_time",
     "repository.serve.documents",
 ];
 
@@ -422,6 +450,7 @@ pub fn validate_named(
             path: String::new(),
             owner: None,
             added_by: None,
+            added_by_time: None,
             serve: e.serve,
             resources: e.resources,
             peers: e.peers,

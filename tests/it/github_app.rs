@@ -70,6 +70,10 @@ pub(crate) struct State {
     pub(crate) covered_body: Option<String>,
     /// Installations whose listings answer this status (403 or 429), with this `retry-after`.
     listing_throttled: HashMap<u64, (u16, Option<u64>)>,
+    /// The `<owner>/<repo>` whose collaborators answer a permission 403 (quota left), when set.
+    pub(crate) listing_forbidden: Option<String>,
+    /// The bytes of padding after that permission 403's message (past `DENIAL_MAX`, a throttle).
+    pub(crate) forbidden_padding: usize,
     /// The status every listing answers, when set (a 5xx).
     pub(crate) listing_status: Option<u16>,
     /// The status `GET /app/installations` answers, when set (a 5xx).
@@ -311,6 +315,15 @@ fn collaborators(
     if let Some(&(status, after)) = state.listing_throttled.get(&id) {
         let after = after.map_or(String::new(), |a| format!("Retry-After: {a}\r\n"));
         return (status, after, String::new());
+    }
+    if state.listing_forbidden.as_deref() == Some(repo) {
+        let padding = " ".repeat(state.forbidden_padding);
+        let body = json!({"message": "Resource not accessible by integration", "pad": padding});
+        return (
+            403,
+            "X-RateLimit-Remaining: 4999\r\n".into(),
+            body.to_string(),
+        );
     }
     if let Some(status) = state.listing_status {
         return (status, String::new(), String::new());

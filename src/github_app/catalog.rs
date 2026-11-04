@@ -133,7 +133,7 @@ pub(super) async fn candidates(
         let Some((token, _)) = run.token(at).await.map_err(|e| failed(&e))? else {
             return Err(failed(&Msg::RolesCatalogThrottled(None).text()));
         };
-        match repositories(&run.agent, at.app, &token) {
+        match repositories(&run.agent, at.app, &token).map_err(Failure::throttled) {
             Ok(listed) => {
                 let allowed = listed.into_iter().filter(|(o, r)| config.allows(o, r));
                 found.extend(allowed.map(|(owner, repo)| format!("{host}/{owner}/{repo}")));
@@ -145,7 +145,9 @@ pub(super) async fn candidates(
                     .push(Msg::GithubAppMarked { what: &what, secs }.text());
                 return Err(failed(&Msg::RolesCatalogThrottled(Some(status)).text()));
             }
-            Err(Failure::Other(why) | Failure::Missing(why)) => return Err(failed(&why)),
+            Err(Failure::Other(why) | Failure::Missing(why) | Failure::Forbidden(why)) => {
+                return Err(failed(&why));
+            }
         }
     }
     let extra = extra(host, &found, selected);

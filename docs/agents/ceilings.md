@@ -7,6 +7,12 @@ a ticket accepted, each with its value and its reason. Detail behind the
 
 ## Known ceilings
 
+- `engine.rs` (`Engine::refresh`, #443): the peers' connections are opened once, with the engine, and
+  every query refreshes and reads through them. A peer whose index schema changes while the
+  process runs (another Meada version rebuilding it) is not rebuilt mid-session: the engine keeps
+  the file it opened, and the rebuilt one is read from the next process start. Reopening a peer per
+  query is what #443 removed (it split the refresh from the read); a mid-session reopen would
+  have to swap the handle `exports` reads, and the ticket left it out.
 - `http.rs` (`is_test_file`, `drop_test_providers`, #620): a route is a test's by where its
   handler is defined, so a test registering a handler of the repository's own code
   (`mux.HandleFunc("GET /orders", realHandler)` in a `_test.go`) leaves it a provider; and only the
@@ -382,11 +388,25 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
 - `meada-core/src/manifest.rs`: a GitHub login (an entry's `added_by`, and a token's `login_claim`
   value, which `grant/permissions.rs` reads through `added_by_problem`) holds at most `ADDED_BY_MAX`
   (39) characters; a longer one is an error in an entry and no GitHub grant in a token.
+- `github_app.rs` (#454): an `added_by_time` is compared with the first permissions set's start
+  to the second, and a time in that same second counts as before it, so an addition the provider
+  attributed within the second the first role check started is `unattributed` too. An addition
+  the console attributes after `[oidc.github]` is enabled but before the first role check runs is
+  older than the first set and `unattributed`. The stamp is the console host's clock and the first
+  set's start Postgres's: a console clock ahead of Postgres by k seconds lets an addition the
+  provider attributed in the k seconds before the first set pass as later (and a console behind
+  it, one just after as earlier); both are the provider's own attributions, since a save without
+  the provider writes no time. Entries saved before `added_by_time` existed carry none and are
+  `unattributed` under the provider. The global operator's text is stored as written, so an
+  `added_by_time` it writes is trusted as is.
 - `audit.rs`: the audit grows without bound, one `<schema>.audit` row per write and refusal, until
   the operator prunes it in SQL; Meada never deletes a record, and a page of `GET /api/v1/audit`
   answers at most 100.
 - `github_app.rs`: each REST request takes at most `REQUEST_TIMEOUT` (10 seconds) and reads at
-  most `ANSWER_MAX` (4 MiB); an App's installations are listed over at most `PAGES_MAX` pages of
+  most `ANSWER_MAX` (4 MiB), a 403's body at most `DENIAL_MAX` (4 KiB, one that fills it counts as a
+  throttle, #452), and a 403 with no `x-ratelimit-remaining` at all (a GitHub Enterprise Server
+  with rate limiting off) stays a throttle whatever its body; a 403 is a permission denial only
+  when a `retry-after` header is absent in every form; an App's installations are listed over at most `PAGES_MAX` pages of
   `PER_PAGE` (100 each; 10,000 installations), the rest unseen; the role check lists one repository's
   collaborators over at most `COLLABORATOR_PAGES_MAX` pages of 100 (100,000 collaborators), past
   which the run fails, writing nothing; with `[catalog]` (#341) it lists one installation's
