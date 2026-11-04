@@ -41,8 +41,8 @@ const QUALIFICATION_BYTES: usize = 4 * 1024 * 1024;
 // ponytail: real aliases chain once or twice; this keeps a crafted chain cheap.
 const ALIAS_DEPTH: usize = 16;
 
-/// The standard library's value and collection types that are no function type: a parameter written as one
-/// refuses a trailing closure, as a type of the repository does (`join`).
+/// The standard library's value and collection types that are no function type: a parameter
+/// written as one refuses a trailing closure, as a type of the repository does (`join`).
 const VALUE_TYPES: &[&str] = &[
     "Array",
     "Bool",
