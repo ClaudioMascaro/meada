@@ -6,6 +6,27 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-04
+
+A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md):
+package reading (PEP 440 specifiers, uv sources, Go `replace` by a held module, `fetch` URLs a
+function builds), resolution in the Rust, TypeScript and Gradle packs, the console's versions
+page for a named workspace, the proposal server in the Compose and Helm recipes, SCRAM channel
+binding to Postgres, CLI messages in Spanish, a generated first password for the console's
+default `admin` account instead of a published one (#579), a refresh that keeps the language
+groups no changed file touches (#391), Backstage and HTTP contract reading (tier d1, #613 to #621), and the fixes of tiers b6 to c5. The stored
+manifest summary changes, so existing indexes are rebuilt once on first use. `meada-core` 1.2.0 replaces `msg::pt()` with
+`msg::lang()` (`msg::lang() == msg::Lang::Pt`), types `effective::Diagnostic::code` as
+`DiagnosticCode` (the JSON is unchanged) and makes `named::message_problem("")` return `Some`; a
+crate that declares `meada-core = "1.1"` meets all three on `cargo update`, and `=1.1.0` stays on
+the old API. The tree, the `meada-core` pin, the Dockerfile, the compose defaults and the Helm
+chart declare `1.2.0`, and the `v1.2.0` tag follows this entry's merge on main. Publication
+(crates, the staged npm package, the GitHub draft release) belongs to the maintainer.
+Release notes are available in
+[pt-BR](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.2.0.md),
+[English](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.2.0.en.md) and
+[Spanish](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.2.0.es.md).
+
 ### Added
 
 - Backstage backends: the router a backend plugin gives its `httpRouter`
@@ -81,6 +102,32 @@ All notable changes to Meada are recorded here. The format follows
   current before, through the editor's confirmation at the base the page read. A stale base and
   a refused entry show the server's message and the page reads the versions again. In pt-BR and
   English.
+- Gradle coordinate holes from `gradle.properties` and version catalogs (#467): a dependency
+  written `implementation(libs.models)` or with a `${name}` or `$name` the script leaves open
+  now links to the package providing its coordinate. `gradle.properties` of the repository root,
+  the settings file's directory and the module (the module's wins, and a name the script assigns
+  is never filled) feeds the same hole filler as the script's own declarations, and
+  `gradle/libs.versions.toml`, or a `*.versions.toml` a settings `from(files("..."))` names by a
+  relative path, maps `libs.<alias>` (dashes and underscores as dots) to `group:artifact` and
+  its version through `[libraries]` and `[versions]`; an alias the catalog lacks declares
+  nothing. Both files are bounded (`lang::MAX_BYTES`, 8192 entries) and have rows in the
+  manifest probes. `buildSrc`, convention plugins, included builds and build-time BOMs stay
+  unread. The stored manifest summary gains Gradle's `template` and catalog placeholders, so
+  existing indexes rebuild once (ADR 0004); the `conformance-java` export gained two links.
+- Rust item macros in associated-item position and by `crate::` (#505, after #398): an
+  invocation of a qualifying item macro among the items of an `impl` or a trait gives its
+  body's methods, associated consts and types to that block, under the same rules (first arm
+  only, the attributes on the invocation, the same `cfg` handling), and `crate::m! { .. }`
+  qualifies as `m!` does; `other::m!`, `self::m!` and `super::m!` stay unread. `meada decide
+  --decider` now parses a file under the setting the index stored for it, so a function from an
+  item macro body is function-like and its span is sent.
+- TypeScript and JavaScript: a `tsconfig.json` (or `jsconfig.json`) with `extends` naming a
+  relative path inside the repository takes the `paths` and `baseUrl` of the chain, the nearest
+  config that declares each option winning (#465), so the alias imports under a monorepo's
+  `packages/*` whose configs only extend the root's resolve. A package, a path outside the
+  repository, a chain of more than 8 configs after the nearest and a cycle are not followed (the
+  nearest config alone serves). Project `references` and a base not named `tsconfig.json` or
+  `jsconfig.json` are still not read.
 
 ### Fixed
 
@@ -142,6 +189,9 @@ All notable changes to Meada are recorded here. The format follows
   repositories manifest whose `repo` and `path` keys are written as quoted keys (`"repo" = ...`);
   the shared awk program skipped them. Its test now takes the expected pairs of every case from the
   `toml` crate instead of hand-written lists (#568).
+- Rust: a `crate::a::*` glob written inside `a` or below it sees what `use super::*` sees,
+  the ancestor's private `use` included, so `Def::new()` through it is `exact` instead of
+  unresolved (#438). A glob of a sibling module still takes public names only.
 
 ### Changed
 
@@ -189,33 +239,6 @@ Release notes are available in
 [Spanish](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.1.0.es.md).
 
 ### Added
-
-- Gradle coordinate holes from `gradle.properties` and version catalogs (#467): a dependency
-  written `implementation(libs.models)` or with a `${name}` or `$name` the script leaves open
-  now links to the package providing its coordinate. `gradle.properties` of the repository root,
-  the settings file's directory and the module (the module's wins, and a name the script assigns
-  is never filled) feeds the same hole filler as the script's own declarations, and
-  `gradle/libs.versions.toml`, or a `*.versions.toml` a settings `from(files("..."))` names by a
-  relative path, maps `libs.<alias>` (dashes and underscores as dots) to `group:artifact` and
-  its version through `[libraries]` and `[versions]`; an alias the catalog lacks declares
-  nothing. Both files are bounded (`lang::MAX_BYTES`, 8192 entries) and have rows in the
-  manifest probes. `buildSrc`, convention plugins, included builds and build-time BOMs stay
-  unread. The stored manifest summary gains Gradle's `template` and catalog placeholders, so
-  existing indexes rebuild once (ADR 0004); the `conformance-java` export gained two links.
-- Rust item macros in associated-item position and by `crate::` (#505, after #398): an
-  invocation of a qualifying item macro among the items of an `impl` or a trait gives its
-  body's methods, associated consts and types to that block, under the same rules (first arm
-  only, the attributes on the invocation, the same `cfg` handling), and `crate::m! { .. }`
-  qualifies as `m!` does; `other::m!`, `self::m!` and `super::m!` stay unread. `meada decide
-  --decider` now parses a file under the setting the index stored for it, so a function from an
-  item macro body is function-like and its span is sent.
-- TypeScript and JavaScript: a `tsconfig.json` (or `jsconfig.json`) with `extends` naming a
-  relative path inside the repository takes the `paths` and `baseUrl` of the chain, the nearest
-  config that declares each option winning (#465), so the alias imports under a monorepo's
-  `packages/*` whose configs only extend the root's resolve. A package, a path outside the
-  repository, a chain of more than 8 configs after the nearest and a cycle are not followed (the
-  nearest config alone serves). Project `references` and a base not named `tsconfig.json` or
-  `jsconfig.json` are still not read.
 
 - The export format and the indexed commit (#512, ADR 0004 "Canonical export"): every export
   starts with `format` (`meada_core::export::FORMAT`, 1), which rises only when a reader of the
@@ -426,10 +449,6 @@ Release notes are available in
   drops from about 1.4 s to about 0.1 s. No golden changed.
 
 ### Fixed
-
-- Rust: a `crate::a::*` glob written inside `a` or below it sees what `use super::*` sees,
-  the ancestor's private `use` included, so `Def::new()` through it is `exact` instead of
-  unresolved (#438). A glob of a sibling module still takes public names only.
 
 - Swift: a call whose labels differ from a known outside member's resolves as if that base
   were absent (#463): `x.hash(seed: 1)` on a type that conforms to `Hashable` and declares
@@ -1276,7 +1295,8 @@ and `trace` from the two longest processes. The spec adds about 0.3 MB and 0.03 
 The rise of the single-file reindex since 2026-10-14 predates it (specs #22 and #23), and at
 692 files it is close to its target.
 
-[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.2.0
 [1.1.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.1.0
 [1.0.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.0.0
 [0.1.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v0.1.0

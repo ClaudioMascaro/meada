@@ -16,8 +16,9 @@ docker compose up -d
 docker compose ps
 ```
 
-It needs Docker Compose v2.24 or newer (`!reset`) and images at 1.1.0 or newer, the first to carry
-`[accounts]` (ADR 0024); 1.0.0 does not. To run this checkout ahead of a release, build its two
+It needs Docker Compose v2.24 or newer (`!reset`) and images at 1.2.0 or newer: 1.1.0 is the first to
+carry `[accounts]` (ADR 0024), and 1.2.0 the first to generate the `admin` first password read
+below. To run this checkout ahead of a release, build its two
 images and point `MEADA_VERSION` at the tag:
 
 ```sh

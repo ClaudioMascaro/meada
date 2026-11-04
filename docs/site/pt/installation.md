@@ -23,7 +23,7 @@ Escolha uma das cinco formas.
 Para indexar com o contêiner o repositório em que você está (Linux e macOS):
 
 ```sh
-docker run --rm --network none --user "$(id -u):$(id -g)" -v "${PWD%/*}:${PWD%/*}" -w "$PWD" ghcr.io/claudiomascaro/meada:1.1.0 index
+docker run --rm --network none --user "$(id -u):$(id -g)" -v "${PWD%/*}:${PWD%/*}" -w "$PWD" ghcr.io/claudiomascaro/meada:1.2.0 index
 ```
 
 Trocar `index` por `status` mostra o resultado; o servidor MCP é a mesma linha com `-i` e `mcp`,
