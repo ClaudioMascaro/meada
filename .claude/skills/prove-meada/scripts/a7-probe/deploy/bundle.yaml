@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zzprove-orders
+  labels:
+    app.kubernetes.io/name: zzprove-orders
+    "quote\"and\\slash": odd-key-zzprove
+    "ünïcode-key": wert-zzprove
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: orders
+          image: ghcr.io/zz-prove/orders:1.4.2
+          env:
+            - name: QUEUE_URL
+              value: https://sqs.eu-west-1.amazonaws.com/123456789012/zzprove-orders
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: zzprove-credentials
+data:
+  password: c2VjcmV0LXp6cHJvdmUtZGF0YQ==
+stringData:
+  token: secret-zzprove-stringdata
+  nested:
+    deeper: secret-zzprove-deeper
+---
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: zzprove-in-a-list
+    stringData:
+      apiKey: secret-zzprove-list-item
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: zzprove-config
+    data:
+      open: plain-zzprove-configmap
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zzprove-orders
+spec:
+  selector:
+    app.kubernetes.io/name: zzprove-orders
+  ports:
+    - port: 8080
