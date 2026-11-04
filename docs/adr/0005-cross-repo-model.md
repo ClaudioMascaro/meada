@@ -28,6 +28,20 @@ Through v1, Meada links these kinds of contract:
 Environment variables matched by name are out. Their values are secrets that Meada never reads,
 and the same value often sits under different names in each repository.
 
+(Amended 2026-11-04; #642, ADR 0026.) Infrastructure joins these kinds: an IaC node that creates a
+queue, topic, bus, stream, bucket, table, database, cache or secret is the provisioner side of its
+channel or resource contract, reached through a provisioning link; two new kinds, image (builder
+and runner) and alert (emitter and matcher), link build to deployment and alert rules to their
+routing; and Kubernetes Services, Ingresses and IaC-declared routes join HTTP. Environment
+variables are still not matched by name across repositories: an environment read in code
+resolves only within a workload's scope, against the entries that workload sets in the
+repositories' IaC and config, and never from a process environment. Meada still never reads a
+process environment, nor the value of a `base_url_env` variable from one; what it reads is the
+value an environment entry sets in a repository, and a value a format marks secret is redacted
+(ADR 0025), never read. `inferred` also covers a match after the resolutions ADR 0026 names (an
+overridable value, a workload's environment, a Service, a pattern). ADR 0026 records the
+details.
+
 ### Configuration
 
 A `meada.toml` at each repository root declares what that side owns. It is versioned with the

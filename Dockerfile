@@ -24,6 +24,7 @@ COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY meada-core/ meada-core/
 COPY src/ src/
 COPY examples/golden_diff.rs examples/golden_diff.rs
+COPY examples/split_agents.rs examples/split_agents.rs
 COPY tests/golden/schema.txt tests/golden/schema.txt
 COPY tests/fixtures/*.json tests/fixtures/
 COPY ui/ ui/
@@ -36,6 +37,7 @@ COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY meada-core/ meada-core/
 COPY src/ src/
 COPY examples/golden_diff.rs examples/golden_diff.rs
+COPY examples/split_agents.rs examples/split_agents.rs
 COPY tests/golden/schema.txt tests/golden/schema.txt
 COPY build.rs ./
 COPY vendor/tree-sitter-kotlin-ng/ vendor/tree-sitter-kotlin-ng/

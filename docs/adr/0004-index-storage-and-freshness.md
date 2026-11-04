@@ -30,6 +30,13 @@ fresh, and how things in it are named.
   (`files.hash`), which freshness compares and which `context` checks before showing a span. Each
   symbol also stores the BLAKE3 of its span's exact bytes (`symbols.hash`, no normalisation),
   which `search` with kind `duplicate` groups by. Text is read from disk when shown.
+- (Amended 2026-11-04; #642, ADR 0025.) The index keeps the text of config and IaC scalars: each
+  config value's key path, value, scalar type and line, with a full-text index over that text for
+  `search`. Each value is cut at a named ceiling (`VALUE_MAX`, 1 KiB to start) and stored with a
+  mark when cut, and a value a format marks secret is stored as `redacted`. The reasons above are
+  met: the ceiling bounds the inflation, and the text lives in a stamped table refreshed with the
+  files it comes from, so it is as fresh as any row. Code stays a location only: no source text of
+  a symbol, a call or any other code is stored.
 
 ### Freshness
 

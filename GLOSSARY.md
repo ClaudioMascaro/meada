@@ -12,7 +12,8 @@ A git repository that Meada indexes on its own. It is the unit of ownership and 
 _Avoid_: project, codebase, service
 
 **Index**:
-What Meada builds for one repository: its symbols, calls and contracts, with no source text.
+What Meada builds for one repository: its symbols, calls and contracts, with no source text of
+code. Of config and IaC files it keeps the scalars, as config values (ADR 0025).
 _Avoid_: database, cache
 
 **Partial export**:
@@ -38,6 +39,52 @@ A range in a source file, stored as a location. The file's content hash (for fre
 showing the text) and, for a symbol's span, the hash of its exact bytes (for duplicates) are
 stored beside it. Its text is read from disk when shown.
 _Avoid_: snippet, line range
+
+**Config value**:
+One scalar of a YAML, JSON or IaC file, kept in the index with its file, key path, value, type
+(string, number or boolean) and line (ADR 0025). A value past its ceiling is stored cut, with a
+mark; one a format marks secret is stored as `redacted`. `search` finds it with kind `value`; it
+never enters the export.
+_Avoid_: setting, config entry, property
+
+**Key path**:
+Where a config value sits in its file, jq style: keys joined by dots, list items `[n]` from 0, a
+key that is not a plain identifier written `["..."]`, and a document index first in a file of
+several documents (`[2].spec.replicas`).
+_Avoid_: JSON path, selector, pointer
+
+**IaC node**:
+A resource-like block of an IaC file (Terraform or OpenTofu, Kubernetes, Compose, Crossplane,
+CloudFormation and SAM, Serverless), with an address (`aws_sqs_queue.orders`,
+`Deployment.apps/shop/api`, `services.web`), a type, a file and a span, and the label of the
+root module or overlay its evaluation starts from. `search` finds it with kind `iac`.
+_Avoid_: resource (a contract), block, node (a server-mode process), manifest
+
+**Reference**:
+A static pointer from one IaC node to another, such as a Terraform attribute naming another
+resource, a CloudFormation `Ref` or a Kubernetes Service selecting pods. It is stored like a call
+and walked by `trace`; it is not a link.
+_Avoid_: edge, dependency, link
+
+**Evaluation unit**:
+The IaC files evaluated together: a Terraform module directory (a local module once per call), a
+Kustomize tree per overlay, a CloudFormation or SAM template, a Compose project or a Serverless
+service file. A change to one of its files re-evaluates all of it.
+_Avoid_: stack, project, workspace
+
+**Pattern**:
+A name with a part static evaluation could not resolve, kept with a wildcard in its place. It
+links `inferred` to a literal name when its literal part has at least three characters and its
+wildcards fall on segment boundaries; it never links to another pattern. Not a binding's routing
+pattern.
+_Avoid_: glob, wildcard name, template
+
+**Type table**:
+The data file embedded in Meada that says what each IaC type provisions or runs: its contract
+kind and broker or resource kind, where its physical name lives and, for a workload, where its
+image, environment and code path live. `meada.toml` extends it for private modules and in-house
+custom resources. A type it does not know is still an IaC node, with no contract side.
+_Avoid_: catalog (a named workspace's repositories), schema, registry
 
 **Language pack**:
 What Meada knows about one language: the file extensions it handles and the tree-sitter
@@ -487,7 +534,8 @@ or a shared resource.
 _Avoid_: interface, integration
 
 **Contract kind**:
-A category of contract with its own matching rules, such as HTTP route, channel or package.
+A category of contract with its own matching rules, such as HTTP route, channel, package, resource,
+image or alert.
 A kind owns the library forms it reads in each language (the web frameworks and clients of HTTP,
 the broker clients of channels), one module per language.
 _Avoid_: contract type, protocol
@@ -548,16 +596,18 @@ _Avoid_: breaking change, mismatch, schema diff
 
 **Resource**:
 A shared thing that repositories read or write, such as a database, a bucket or a content
-dataset, declared in `meada.toml`.
+dataset, declared in `meada.toml` or provisioned by IaC. A curated kind (`s3`, `dynamodb`, ADR
+0026) shares the namespace of declared kinds, so both sides of one name join one contract.
 _Avoid_: datastore
 
 **Writer** and **reader**:
 The sides of a resource: what writes it (a provider of its contract) and what reads it (a
-consumer). Each is a `via` symbol of the entry, or the repository as a whole.
+consumer). Each is a `via` symbol of the entry, the repository as a whole, or a call of a cloud
+SDK form that writes or reads it (`GetObject` reads, ADR 0026).
 _Avoid_: producer, subscriber
 
 **Channel**:
-A queue or topic of a broker, identified by its broker kind and its name as evaluated:
+A queue, topic, bus or stream of a broker, identified by its broker kind and its name as evaluated:
 `channel::kafka::orders.created`. The same name under two broker kinds is two channels; broker
 clusters are not modelled, so one name of one kind is one channel across the workspace. Every
 consumer of a channel links to every producer of it, in the same repository too. A Redis stream
@@ -590,9 +640,45 @@ A resource side that is the repository as a whole, because its entry names no `v
 repository has. It shows as `(repository-level)` and a trace does not enter it.
 _Avoid_: global, whole-repo
 
+**Provisioner**:
+The side of a channel or resource contract that creates it: the IaC node that declares the
+queue, bucket or table, labelled by its address and its root module or overlay. Every other side
+links to each provisioner through a provisioning link, a link of its own kind; several
+provisioners of one name (one per environment) are normal, never ambiguous.
+_Avoid_: owner (a team's), creator, infrastructure side
+
+**Workload**:
+An IaC node that runs code, as the type table marks it: a Kubernetes pod template owner, a
+Compose service, an ECS task definition, a Cloud Run service or job, a Lambda or Azure function.
+It is tied to its code through the image it runs or a code path in its own repository.
+_Avoid_: service, deployment, app
+
+**Environment entry**:
+A variable a workload sets, with its name and its target: a literal, an IaC node's attribute, a
+ConfigMap or Secret key, or `envFrom`. An environment read in code resolves against the entries
+of the workloads that run that code, and only those.
+_Avoid_: env var (the read in code), setting
+
+**Image contract**:
+The contract `image::<registry>/<repository>` between the repository that builds an image and the
+workloads that run it, the name normalized (Docker Hub short names expanded, tag and digest dropped,
+lowercase). Its **builder** is the provider, the repository whose CI or build configuration
+publishes the image; its **runner** is the consumer, the workload whose image field names it.
+_Avoid_: container, artifact; publisher and deployer (for builder and runner)
+
+**Alert contract**:
+The contract `alert::<key>::<value>` between what raises an alert and what routes it. Its
+**emitter** is the provider, a rule's label or a monitor's tag; its **matcher** is the consumer,
+a routing condition that tests it (OpsGenie, PagerDuty, Alertmanager). Equality links `exact`,
+a regular expression, prefix or containment `inferred`.
+_Avoid_: alert route; router (HTTP vocabulary), source and sink (for emitter and matcher)
+
 **Link**:
 A connection Meada makes between a consumer and a provider through a contract. It carries a
-level and a reason.
+level and a reason. A **provisioning link** is a link of its own kind, between any other side of
+a contract and a provisioner of it (ADR 0026). A config value that names a contract is a **use**
+side with no direction: it joins only provisioning links and orphans, never a consumer to a
+provider.
 _Avoid_: edge, bridge, connection
 
 **Level**:
