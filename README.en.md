@@ -17,7 +17,7 @@ binary, and the last column is the command your agent's MCP configuration runs.
 | Rust | `cargo install meada` | `meada mcp` |
 | Linux or macOS | the shell installer below | `meada mcp` |
 | Any system | the archive for your system from the [GitHub releases](https://github.com/ClaudioMascaro/meada/releases), with `meada` on your `PATH` | `meada mcp` |
-| Docker | `docker pull ghcr.io/claudiomascaro/meada:1.1.0` | the `docker run` line in [Connect an agent](#connect-an-agent-mcp) |
+| Docker | `docker pull ghcr.io/claudiomascaro/meada:1.2.0` | the `docker run` line in [Connect an agent](#connect-an-agent-mcp) |
 
 ```sh
 # Shell installer (Linux and macOS)
@@ -74,7 +74,7 @@ With Docker (Linux and macOS):
   "mcpServers": {
     "meada": {
       "command": "sh",
-      "args": ["-c", "exec docker run -i --rm --network none --user \"$(id -u):$(id -g)\" -v \"${PWD%/*}:${PWD%/*}\" -w \"$PWD\" ghcr.io/claudiomascaro/meada:1.1.0 mcp"]
+      "args": ["-c", "exec docker run -i --rm --network none --user \"$(id -u):$(id -g)\" -v \"${PWD%/*}:${PWD%/*}\" -w \"$PWD\" ghcr.io/claudiomascaro/meada:1.2.0 mcp"]
     }
   }
 }
@@ -96,7 +96,7 @@ and how to read the levels in an answer. For Claude Code:
 
 ```sh
 mkdir -p ~/.claude/skills/meada
-curl -fsSL https://raw.githubusercontent.com/ClaudioMascaro/meada/v1.1.0/skills/meada/SKILL.md -o ~/.claude/skills/meada/SKILL.md
+curl -fsSL https://raw.githubusercontent.com/ClaudioMascaro/meada/v1.2.0/skills/meada/SKILL.md -o ~/.claude/skills/meada/SKILL.md
 ```
 
 Other agents: see [Agents and MCP](https://claudiomascaro.github.io/meada/en/mcp/#agent-skill).
