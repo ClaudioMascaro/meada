@@ -50,9 +50,11 @@ pub enum Coverage {
     Excluded,
 }
 
-/// What a [`Diagnostic`] observes: the stable text the front end words in either language.
+/// What a [`Diagnostic`] observes: the stable text the front end words in either language. A
+/// later minor version may add a code, so a match from outside this crate needs a wildcard arm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum DiagnosticCode {
     IgnoredByRepository,
     UnknownUntilIngested,
