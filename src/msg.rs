@@ -136,6 +136,10 @@ pub enum Msg<'a> {
     FileMisparsed {
         path: &'a str,
     },
+    /// A Backstage plugin whose `pluginId` Meada cannot read (#615): its routers stay at the root.
+    BackstageUnmounted {
+        site: &'a str,
+    },
     DocumentUnreadable {
         path: &'a str,
         line: usize,
@@ -1775,6 +1779,11 @@ impl Msg<'_> {
                 format!("{path}: left out, the grammar misreads it: no symbols or calls"),
                 format!("{path}: deixado de fora, a gramática o lê errado: sem símbolos nem chamadas"),
                 format!("{path}: dejado fuera, la gramática lo lee mal: sin símbolos ni llamadas"),
+            ),
+            Msg::BackstageUnmounted { site } => pick(
+                format!("{site}: Backstage plugin whose pluginId is neither a string literal nor a const of its file bound to one: its routes stay at the root, not under /api/<pluginId>"),
+                format!("{site}: plugin do Backstage cujo pluginId não é literal de texto nem const do seu arquivo ligada a um: suas rotas ficam na raiz, não sob /api/<pluginId>"),
+                format!("{site}: plugin de Backstage cuyo pluginId no es literal de texto ni const de su archivo ligada a uno: sus rutas quedan en la raíz, no bajo /api/<pluginId>"),
             ),
             Msg::DocumentUnreadable { path, line, error } => pick(
                 format!("{path}:{line}: unreadable document ({error}), ignored"),

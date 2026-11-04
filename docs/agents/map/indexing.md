@@ -630,7 +630,10 @@ from ...", with the whole list. A value the index now stores joins it.
   object parameter reading its names (`Param::fields`) off the literal object the caller passes.
   A call to a function that only returns a string (`Def::lone_string`, filled by the TS/JS pack for an
   expression body or one lone `return`) folds to it with the call's arguments (`Code::built`, #536):
-  `exact` calls alone, every part known or the call stays as written.
+  `exact` calls alone, every part known or the call stays as written. The TS/JS pack lists each
+  `return` of a function (and an arrow's expression body) in `Def::return_values` (#615), so the
+  value flow follows a router or client a factory returns; a `return` of a function that is no
+  definition (one returned in place) is nobody's.
   `Code::expand` returns, for each site, the wrapper calls it
   climbed (`Expanded::frames`, `Frame {def, path, index}`, innermost first), and `Code::uses(path, index)` reads
   `Call::uses` like `args` (a file without full facts is a miss). An argument binds a parameter as its `Param::binds` says: by position or by

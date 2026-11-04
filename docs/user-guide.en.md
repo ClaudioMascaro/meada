@@ -1039,6 +1039,17 @@ read) generates no route, and a router mounted only under such a prefix is left 
 all. A literal `:id` is still a parameter. No client besides `fetch` is read: `axios`, `got` and
 `XMLHttpRequest` generate no consumer.
 
+In Backstage, the router a backend plugin gives its `httpRouter` (`httpRouter.use(r)`, with
+`httpRouter` taken from `coreServices.httpRouter` in the `deps` of `registerInit`) holds under
+`/api/<pluginId>`, the path where the framework mounts it, when `createBackendPlugin`, imported
+from a `@backstage/` package, writes its `pluginId` as a literal or as a `const` of the same file
+bound to one. A plugin whose `pluginId` cannot be read that way (an environment read, an import)
+leaves its router at the root, as before, and `meada status` names the plugin. On the
+consumer side, a URL that starts with `discovery.getBaseUrl('<id>')` (held by a constant or
+written in the URL itself) starts at `/api/<id>`, and the link's reason names the plugin and that
+mount; a hostless URL of a route that the mount of a plugin of the same repository serves names it
+too. The `proxy` plugin is not read.
+
 **Environment.** `process.env.X`, `process.env["X"]` and `import.meta.env.X`, alone or passing
 through text methods such as `trim()`, `replace(...)` and `toLowerCase()`. A URL that starts with
 such a read links through the peer's `base_url_env`. `.env` files are not read. So does

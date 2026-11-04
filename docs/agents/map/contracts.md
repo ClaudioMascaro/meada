@@ -11,7 +11,14 @@ this file, and a change to these modules updates it.
   the message libraries of each language): the
   `ContractKind` trait and the HTTP kind (`http.rs`: the contract and path rules, the mount
   machinery and the shared consumer readers; one submodule per language: `http/ts.rs` and
-  `http/ts/clients.rs`, Express and Next.js route-file providers and `fetch` consumers;
+  `http/ts/clients.rs`, Express and Next.js route-file providers and `fetch` consumers, with
+  `http/ts/backstage.rs` mounting each Backstage backend plugin's router at `/api/<pluginId>` (a
+  mount node per `createBackendPlugin` call in Express's `Mounts`) and folding a
+  `discovery.getBaseUrl('<id>')` base to `/api/<id>` (a `client:` `via`, so the reason names
+  it; `backstage::name` gives the same `via` to a hostless consumer of a route a plugin's mount
+  serves, from the routes `ts::providers` reports as mounted; a plugin whose `pluginId` is
+  neither a literal nor a `const` of the file bound to one is a `Role::Unmounted` row that
+  `Http::status` reports);
   `http/python.rs` and `http/python/clients.rs`, FastAPI, Flask and Django providers and the
   requests, httpx and aiohttp consumers, whose rows also list reqwest and ureq; `http/rust.rs`
   and `http/rust/axum.rs`, actix-web, Rocket and axum providers; `http/go.rs` and

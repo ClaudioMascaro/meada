@@ -3,28 +3,37 @@
 //! mounts, the app or router followed through `Code::origins` with `Follow::Values` (constants,
 //! imports, arguments and returns), and what `express()` or `Router()` names outside the
 //! repository read with `Code::outside`; the Express rules do not run outside a pack with `js`
-//! files. Next.js app-router route files: `app/users/[id]/route.ts`
+//! files. A Backstage backend plugin is a mount of its own (`backstage`). Next.js app-router
+//! route files: `app/users/[id]/route.ts`
 //! exporting `GET`, `POST`... serves `/users/{}`, route groups `(name)` dropped. `provider_shape`
 //! is the one place that picks the source of a route's code shape, in the order of ADR 0009: a
 //! document, then the zod schema, then the returned literals. Seams of the root reused:
 //! `prefixes`, `join`, `normalize_path`, `provider`, `METHODS`, `HTTP_METHODS`.
 
+mod backstage;
 mod clients;
 mod config;
 
+use std::collections::BTreeSet;
+
+pub(super) use backstage::name;
 pub(super) use clients::consumers;
 
 use super::{
     CallAt, HTTP_METHODS, METHODS, Mounts, contract, join, normalize_path, prefixes, provider,
 };
-use crate::contract::{Found, Site};
+use crate::contract::{Found, Role, Site};
 use crate::lang::{Export, Value, literal};
 use crate::literals::{Handler, Literals};
 use crate::resolve::{Code, Follow, Of};
 use crate::shape::Shape;
 
-/// Express and Next.js route-file providers, with the shapes their handlers return (spec #23).
-pub(super) fn providers(code: &Code, literals: &mut Literals) -> Vec<Found> {
+/// Express and Next.js route-file providers, with the shapes their handlers return (spec #23),
+/// and each route a Backstage plugin's mount serves, with the plugin's id (`backstage::name`).
+pub(super) fn providers(
+    code: &Code,
+    literals: &mut Literals,
+) -> (Vec<Found>, Vec<(String, String)>) {
     let mut found = Vec::new();
     for (&path, facts) in code.files() {
         let Some(route) = next_route(path) else {
@@ -57,8 +66,9 @@ pub(super) fn providers(code: &Code, literals: &mut Literals) -> Vec<Found> {
             });
         }
     }
-    found.extend(express(code, literals));
-    found
+    let (express, mounted) = express(code, literals);
+    found.extend(express);
+    (found, mounted)
 }
 
 /// The route a Next.js app-router file serves: `app/users/[id]/route.ts` (or under
@@ -123,11 +133,11 @@ fn provider_shape(
 /// router, under every prefix of `app.use(prefix, router)` mounts, at any depth. The app or
 /// router is followed through constants, imports, arguments and return values.
 // ponytail: `router.route(path)` chains and `require` are not followed.
-fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
+fn express(code: &Code, literals: &mut Literals) -> (Vec<Found>, Vec<(String, String)>) {
     // The names Express is known by are spellings (`Router()`), which any other language may
     // give its own functions and types.
     if !code.pack().extensions().contains(&"js") {
-        return Vec::new();
+        return Default::default();
     }
     let routers = |path, scope, name| -> Vec<CallAt> {
         let origins = code.origins(
@@ -140,6 +150,20 @@ fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
         );
         (origins.into_iter().filter_map(|o| o.call))
             .filter(|&r| is_express(code, r))
+            .collect()
+    };
+    // The apps and routers `arg` may be, as a mount gives it.
+    let mounted = |path, scope, arg| -> Vec<CallAt> {
+        let origins = code.origins(
+            path,
+            scope,
+            Of::Value(arg),
+            Follow::Values {
+                passes: crate::resolve::passes_nothing,
+            },
+        );
+        (origins.into_iter().filter_map(|o| o.call))
+            .filter(|&c| is_express(code, c))
             .collect()
     };
     let mut mounts = Mounts::new();
@@ -203,23 +227,48 @@ fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
                 _ => (None, &args[1..]),
             };
             for arg in rest {
-                let children = code.origins(
-                    path,
-                    &call.scope,
-                    Of::Value(arg),
-                    Follow::Values {
-                        passes: crate::resolve::passes_nothing,
-                    },
-                );
-                let children = children.into_iter().filter_map(|o| o.call);
-                for child in children.filter(|&c| is_express(code, c)) {
+                for child in mounted(path, &call.scope, arg) {
                     let parents = mounts.entry(child).or_default();
                     parents.extend(ats.iter().map(|&at| (at, prefix.clone())));
                 }
             }
         }
     }
-    let mut found = Vec::new();
+    // A Backstage plugin is a mount node nothing mounts: its routers take `/api/<pluginId>`.
+    let mut plugins = BTreeSet::new();
+    let mut unmounted = Vec::new();
+    for (plugin, id, uses) in backstage::plugins(code) {
+        // A plugin that mounts nothing has no routes to leave at the root.
+        if uses.is_empty() {
+            continue;
+        }
+        let Some(id) = id else {
+            let (path, index) = plugin;
+            unmounted.push(Found {
+                role: Role::Unmounted,
+                contract: None,
+                ..provider(
+                    Site::Call {
+                        path: path.into(),
+                        index,
+                    },
+                    String::new(),
+                )
+            });
+            continue;
+        };
+        plugins.insert(plugin);
+        for (path, scope, arg) in uses {
+            for child in mounted(path, scope, arg) {
+                let parents = mounts.entry(child).or_default();
+                parents.push((plugin, Some(backstage::mount(&id))));
+            }
+        }
+    }
+    let mut found = unmounted;
+    // The routes each plugin's mount serves, by contract and plugin id (`backstage::name`).
+    let mut served = Vec::new();
+    let plugin = |n: CallAt| plugins.contains(&n).then(String::new);
     for (path, n, at, method) in routes {
         let scope = &code.files()[path].calls[n].scope;
         // `app.get("env")` reads a setting.
@@ -263,6 +312,17 @@ fn express(code: &Code, literals: &mut Literals) -> Vec<Found> {
                 ..provider(site, contract(&method, &full))
             });
         }
+        // The prefixes whose mounts start at a Backstage plugin: the routes it serves.
+        if plugins.is_empty() {
+            continue;
+        }
+        for prefix in prefixes(at, &mounts, &plugin, &mut Vec::new()) {
+            let id = prefix
+                .strip_prefix("/api/")
+                .and_then(|p| p.split('/').next());
+            let full = normalize_path(&join(&prefix, &route));
+            served.extend(id.map(|id| (contract(&method, &full), id.to_string())));
+        }
     }
-    found
+    (found, served)
 }

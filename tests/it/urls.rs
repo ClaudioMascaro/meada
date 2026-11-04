@@ -344,3 +344,114 @@ fn a_url_a_function_only_builds_folds_at_the_call_and_through_a_constant() {
         assert_eq!(linked(file), Vec::<String>::new(), "{file}");
     }
 }
+
+/// Backstage (#615): each backend plugin's router is served under `/api/<pluginId>`, and a URL
+/// from `discovery.getBaseUrl('<pluginId>')` starts there; a plugin whose `pluginId` is no
+/// literal keeps its routes at the root.
+#[test]
+fn backstage_plugins_serve_under_api_and_their_plugin_id() {
+    let repo = fixture_repo(
+        "urls_backstage",
+        "http-backstage",
+        Some("https://example.com/acme/backstage.git"),
+    );
+
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let mut providers: Vec<&str> = (json["providers"].as_array().unwrap())
+        .iter()
+        .filter_map(|p| p["contract"].as_str())
+        .collect();
+    providers.sort();
+    // `legacy` reads its `pluginId` from the environment, `shared` imports it and `chained` binds
+    // it to another constant: their routers stay at the root.
+    assert_eq!(
+        providers,
+        [
+            "http::GET::/api/approval/requests/{}",
+            "http::GET::/api/catalog/entities",
+            "http::GET::/api/orders/requests/{}",
+            "http::GET::/chain",
+            "http::GET::/health",
+            "http::GET::/ping",
+        ]
+    );
+    let links: Vec<_> = (json["links"].as_array().unwrap())
+        .iter()
+        .map(|l| {
+            let consumer = l["consumer"].as_str().unwrap();
+            let consumer = consumer.rsplit_once("clients.ts::").unwrap().1;
+            let provider = l["provider"].as_str().unwrap();
+            (
+                consumer,
+                provider.rsplit_once("::").unwrap().1,
+                l["level"].as_str(),
+            )
+        })
+        .collect();
+    let approval = "createRouter.GET /api/approval/requests/{}";
+    let orders = "createRouter.GET /api/orders/requests/{}";
+    assert_eq!(
+        links,
+        [
+            ("getApproval::fetch#0", approval, Some("inferred")),
+            (
+                "getApprovalFromBrowser::fetch#0",
+                approval,
+                Some("inferred")
+            ),
+            ("getOrder::fetch#0", orders, Some("inferred")),
+            (
+                "listEntities::fetch#0",
+                "GET /api/catalog/entities",
+                Some("inferred"),
+            ),
+        ]
+    );
+    // Each names the mount: through `getBaseUrl`, or by a route the plugin's mount serves.
+    for link in json["links"].as_array().unwrap() {
+        let reason = link["reason"].as_str().unwrap();
+        let plugin = ["orders", "catalog", "approval"]
+            .into_iter()
+            .find(|p| reason.contains(&format!("plugin {p}")))
+            .unwrap();
+        let mount = format!("host unresolved (Backstage plugin {plugin} at /api/{plugin})");
+        assert!(reason.starts_with(&mount), "{reason}");
+    }
+    // A `getBaseUrl` of something other than the discovery service folds nothing, and a path
+    // under a mount that no route of the plugin serves names no plugin.
+    let consumer = |name: &str| {
+        let all = json["consumers"].as_array().unwrap();
+        let site = |c: &&serde_json::Value| c["site"].as_str().unwrap().contains(name);
+        let c = all.iter().find(site).unwrap();
+        (c["contract"].as_str().unwrap(), c["via"].as_str())
+    };
+    assert_eq!(
+        consumer("::getSetting::"),
+        ("http::GET::/requests/{}", None)
+    );
+    assert_eq!(
+        consumer("::listOrderNotes::"),
+        ("http::GET::/api/orders/notes", None)
+    );
+    assert_eq!(consumer("::withHeader::"), ("http::GET::/requests/1", None));
+    // `meada status` names each plugin it left at the root, and no other.
+    let status = meada::engine::status(&repo).unwrap();
+    let left: Vec<&str> = (status.lines())
+        .filter(|l| l.contains("Backstage"))
+        .map(str::trim)
+        .collect();
+    let line = |path: &str| {
+        format!(
+            "plugins/{path}/src/plugin.ts::createBackendPlugin#0: Backstage plugin whose pluginId \
+             is neither a string literal nor a const of its file bound to one: its routes stay at \
+             the root, not under /api/<pluginId>"
+        )
+    };
+    assert_eq!(
+        left,
+        ["chained-backend", "legacy-backend", "shared-backend"].map(line),
+        "{status}"
+    );
+}

@@ -8,6 +8,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Backstage backends: the router a backend plugin gives its `httpRouter`
+  (`coreServices.httpRouter`) is served under `/api/<pluginId>` when `createBackendPlugin` writes
+  its `pluginId` as a literal or as a `const` of the file bound to one, so two plugins with the
+  same relative path no longer collide, and a URL
+  that starts with `discovery.getBaseUrl('<id>')` (held by a constant or written in place) starts
+  at `/api/<id>`, its link's reason naming the plugin's mount (as does a hostless call of a route
+  the plugin serves in its own repository). A plugin whose `pluginId` cannot be read stays at the
+  root, and `meada status` names it. TypeScript and JavaScript functions now give their `return`
+  values and an arrow's expression body to the value flow, so a router a factory returns
+  (`httpRouter.use(await createRouter())`) is followed (#615).
 - Go: a struct field tagged `env:"X"` (cleanenv, caarlos0/env) or `envconfig:"X"`
   (kelseyhightower/envconfig) is the environment read `X` where the field is read
   (`cfg.API.URL`), so `base_url_env` links such a call as `inferred` instead of `ambiguous`
@@ -128,6 +138,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- An Express app or router a TypeScript or JavaScript function returns now takes the prefixes of
+  the mounts it is given to: `app.use('/v1', makeRouter())` serves `makeRouter`'s routes under
+  `/v1/...`, where they were served at the root, and the links of consumers of those paths change
+  with them (#615).
 - A refresh keeps the rows of each group of language packs that resolve together (TypeScript and
   JavaScript, Rust, Python, ...) when no file of the group changed and the config files,
   manifests, file list and exports did not move: its contracts are not extracted again, its calls

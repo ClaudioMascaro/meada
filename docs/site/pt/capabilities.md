@@ -81,7 +81,7 @@ O Meada liga consumidores e provedores, inclusive entre linguagens e atrás de g
 
 | Linguagem | Consumidores HTTP | Provedores HTTP |
 | --- | --- | --- |
-| TypeScript / JavaScript | `fetch` | Next.js app router, Express |
+| TypeScript / JavaScript | `fetch`, `discovery.getBaseUrl` do Backstage | Next.js app router, Express, plugins de backend do Backstage |
 | Python | `requests`, `httpx`, `aiohttp` | FastAPI, Flask, Django |
 | Rust | `reqwest`, `ureq` | axum, actix-web, Rocket |
 | Go | `net/http`, resty | `net/http`, gin, echo, chi, gorilla/mux |

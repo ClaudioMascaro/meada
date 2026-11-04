@@ -1,10 +1,12 @@
 //! TypeScript and JavaScript consumers (spec #23): `fetch(url, init)`, only in a pack whose
 //! globals bind `fetch` (also a call to a parameter defaulting to `fetch`). A client wrapper is
-//! read at each of its call sites through `Code::expand`, and the shape the consumer reads
+//! read at each of its call sites through `Code::expand`; a URL whose base is Backstage's
+//! `getBaseUrl('<id>')` starts at `/api/<id>` (`backstage`), and the shape the consumer reads
 //! of the response is the field paths `response_reads` reads over the frames climbed. Seams of
 //! the root reused: its `fetch(args)` reader (`locate`, `method`, `fragments`) and `consumer`.
 
 use super::super::{consumer, fetch};
+use super::backstage;
 use super::config::Config;
 use crate::contract::Found;
 use crate::declared::{self, Declared, Types};
@@ -32,8 +34,17 @@ pub(in crate::http) fn consumers(
             if !is_fetch || code.args(path, n).is_none_or(<[_]>::is_empty) {
                 continue;
             }
+            // A URL from Backstage's `discovery.getBaseUrl('<id>')` starts at the plugin's mount.
+            let plugin = backstage::base(code, path, n);
             let expanded = code.expand(Expand::Call(path, n), &|args, _| {
-                fetch(&config.decided(args))
+                let args = config.decided(args);
+                let folded =
+                    (plugin.as_deref()).and_then(|id| Some((id, backstage::based(&args, id)?)));
+                let mut read = fetch(folded.as_ref().map_or(&args[..], |(_, args)| args))?;
+                if let (None, Some((id, _))) = (&read.via, folded) {
+                    read.via = Some(backstage::client(id));
+                }
+                Some(read)
             });
             for Expanded {
                 site: (site, at),

@@ -81,7 +81,7 @@ Meada connects consumers and providers across languages, including behind gatewa
 
 | Language | HTTP consumers | HTTP providers |
 | --- | --- | --- |
-| TypeScript / JavaScript | `fetch` | Next.js app router, Express |
+| TypeScript / JavaScript | `fetch`, Backstage `discovery.getBaseUrl` | Next.js app router, Express, Backstage backend plugins |
 | Python | `requests`, `httpx`, `aiohttp` | FastAPI, Flask, Django |
 | Rust | `reqwest`, `ureq` | axum, actix-web, Rocket |
 | Go | `net/http`, resty | `net/http`, gin, echo, chi, gorilla/mux |

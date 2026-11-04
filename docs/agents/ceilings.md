@@ -1660,7 +1660,26 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   resource or Rocket instance) is not read.
 - `http/ts.rs`: `router.route(path)` chains and `require` are not followed. A route path or
   prefix that depends on a parameter is not read through callers (it yields no route;
-  `http.rs` `path_literal`, for every framework). `http/python.rs`: a FastAPI
+  `http.rs` `path_literal`, for every framework). `http/ts/backstage.rs` (#615): a backend
+  plugin mounts its routers under `/api/<pluginId>` only when `createBackendPlugin` is imported
+  from a `@backstage/` package and writes `pluginId` as a string literal or as a `const` of the
+  same file bound to one; any other `pluginId` (an environment read, an import, a parameter,
+  a `const` bound to another `const`)
+  mounts nothing, so its routers stay at the root, and `meada status` names the plugin
+  (`Msg::BackstageUnmounted`). Only
+  what `register` itself gives `<dep>.use(...)` is read, `<dep>` a `deps` key of a `registerInit`
+  written in `register` and bound to `coreServices.httpRouter`: a helper `register` calls and a
+  renamed destructured `httpRouter` (`{ httpRouter: r }`) are not followed, and such a plugin,
+  like one whose `register` is not a function written in place, is neither mounted nor named by
+  `meada status`. On the consumer side only
+  a URL whose first part is `<x>.getBaseUrl('<literal>')`, held by a constant or written in
+  place as the first call of the `fetch`, folds to `/api/<literal>`, and only when the receiver's
+  last name holds `discovery` (`discovery`, `this.discovery`, `discoveryApi`; by name, not by
+  type): another receiver, a base passed as a parameter and a non-literal id leave the base
+  unknown, and the `proxy` plugin (`getBaseUrl('proxy')`, `proxy.endpoints`) is not read. A
+  hostless call names a plugin in its reason only for a route that plugin's mount serves in the
+  consumer's own repository (`backstage::name`); in another repository it links as any hostless
+  URL does. `http/python.rs`: a FastAPI
   mount whose child cannot be read hides every other app of its framework that nothing else
   mounts. Django: one `include()` whose argument cannot be read leaves no root URLconf; the
   walk reads at most `URLCONF_BUDGET` (2^15) entries over every root and `include()` (a

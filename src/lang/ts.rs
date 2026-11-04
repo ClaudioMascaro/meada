@@ -58,6 +58,8 @@ impl LanguagePack for TsJs {
         let parents = Parents::new(tree.root_node(), src);
         let mut facts = Facts::default();
         let mut uses = uses::Uses::new(src, &parents);
+        // Each function definition by its node: the `return`s written in its body.
+        let mut functions: HashMap<usize, usize> = HashMap::new();
         // Explicit stack instead of recursion: generated code can nest deeper than the call
         // stack.
         let mut stack = vec![Visit {
@@ -87,12 +89,20 @@ impl LanguagePack for TsJs {
             let is_def = defined.is_some();
             if let Some((name, kind, range)) = defined {
                 inner = qualify(&scope, &name);
+                functions.insert(node.id(), facts.defs.len());
                 facts.defs.push(Def {
                     params: params(node, src, &inner, &parents),
                     returns: (node.child_by_field_name("return_type"))
                         .and_then(|t| types::returned(t, src, &parents)),
                     type_params: types::type_parameters(node, src),
                     lone_string: lone_string(node, src, &inner, &parents),
+                    // An arrow function's expression body is what it returns.
+                    return_values: (node.child_by_field_name("body"))
+                        .filter(|b| {
+                            node.kind() == "arrow_function" && b.kind() != "statement_block"
+                        })
+                        .map(|b| vec![value(b, src, &inner, &parents)])
+                        .unwrap_or_default(),
                     ..Def::new(inner.clone(), kind, range)
                 });
             }
@@ -151,6 +161,16 @@ impl LanguagePack for TsJs {
                 }
                 "import_statement" => imports(node, src, &mut facts.imports),
                 "export_statement" => exports(node, src, &mut facts.exports),
+                // A `return` of a function that is no definition (one returned in place, or
+                // one past `DEFINITION_DEPTH`) is nobody's.
+                "return_statement" => {
+                    if let (Some(&at), Some(returned)) =
+                        (functions.get(&body.id()), named(node).next())
+                    {
+                        let returned = value(returned, src, &scope, &parents);
+                        facts.defs[at].return_values.push(returned);
+                    }
+                }
                 _ => {}
             }
             let named = binds(node, src, &parents);
@@ -1602,6 +1622,39 @@ mod tests {
             Value::New(_, args) => 1 + args.iter().map(depth).max().unwrap_or(0),
             _ => 1,
         }
+    }
+
+    /// Each `return` of a function is one of its values; a nested function's are its own, and
+    /// those of a function that is no definition (one returned in place) belong to nobody.
+    #[test]
+    fn a_function_lists_the_values_it_returns() {
+        let facts = parse(
+            "function make() {\n  const r = Router();\n  const inner = () => { return 2; };\n  \
+             if (x) { return r; }\n  return () => { return 1; };\n}\n",
+        );
+        let returned = |name: &str| -> Vec<String> {
+            let def = facts.defs.iter().find(|d| d.name == name).unwrap();
+            (def.return_values.iter())
+                .map(|v| match v {
+                    Value::Ref(r) => r.clone(),
+                    Value::Scalar(_) => "scalar".into(),
+                    Value::Unknown => "?".into(),
+                    _ => "other".into(),
+                })
+                .collect()
+        };
+        assert_eq!(returned("make"), ["r", "?"]);
+        assert_eq!(returned("make.inner"), ["scalar"]);
+        // A callback written in place, and an arrow's expression body.
+        let facts = parse("const f = () => Router();\nxs.map((x) => { return x; });\n");
+        let values = |d: &Def| d.return_values.len();
+        assert_eq!(facts.defs.iter().map(values).collect::<Vec<_>>(), [1, 1]);
+        // Past `DEFINITION_DEPTH` the innermost function is no definition: its `return` is
+        // nobody's, not the deepest definition's.
+        let n = DEFINITION_DEPTH + 1;
+        let src = format!("{}return 1;{}", "f(() => { ".repeat(n), " });".repeat(n));
+        let facts = parse(&src);
+        assert!(facts.defs.iter().all(|d| d.return_values.is_empty()));
     }
 
     #[test]

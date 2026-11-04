@@ -9,6 +9,7 @@ use crate::entry::EntryKind;
 use crate::index::{self, Consumer, Export as IndexExport, Gateway, Indexed, Provider};
 use crate::lang::{Depends, Part, Value, literal, property};
 use crate::literals::Literals;
+use crate::msg::Msg;
 use crate::resolve::Code;
 use crate::shape::{self, Shape};
 use crate::workspace::Repository;
@@ -626,8 +627,11 @@ impl ContractKind for Http {
         let mut found = Vec::new();
         // One reader of each shape source for the whole extraction: each budget per file once.
         let mut literals = Literals::default();
-        found.extend(ts::consumers(code, indexed, &mut literals));
-        found.extend(ts::providers(code, &mut literals));
+        let mut consumers = ts::consumers(code, indexed, &mut literals);
+        let (providers, mounted) = ts::providers(code, &mut literals);
+        ts::name(&mut consumers, &mounted);
+        found.extend(consumers);
+        found.extend(providers);
         found.extend(python::consumers(code));
         found.extend(rust::providers(code));
         found.extend(go::providers(code));
@@ -847,6 +851,18 @@ impl ContractKind for Http {
     /// the route it consumes.
     fn calls_from_definition(&self) -> bool {
         true
+    }
+
+    /// The Backstage plugins whose routers stay at the root for want of a literal `pluginId`
+    /// (#615).
+    fn status(&self, repo: &Repository, export: &IndexExport, _links: &[Link]) -> Vec<String> {
+        let prefix = format!("{}::", repo.identity);
+        (export.unmounted.iter())
+            .map(|site| {
+                let site = site.strip_prefix(&prefix).unwrap_or(site);
+                Msg::BackstageUnmounted { site }.text()
+            })
+            .collect()
     }
 
     /// The drift of the links, once the decisions are replayed (`drift`).

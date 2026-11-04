@@ -1041,6 +1041,17 @@ leitura de ambiente) não gera rota, e um roteador montado só sob um prefixo as
 algum. Um `:id` literal continua sendo parâmetro. Nenhum cliente além do `fetch` é lido: `axios`,
 `got` e `XMLHttpRequest` não geram consumidor.
 
+No Backstage, o roteador que um plugin de backend entrega ao `httpRouter` (`httpRouter.use(r)`,
+com o `httpRouter` vindo de `coreServices.httpRouter` nos `deps` do `registerInit`) vale sob
+`/api/<pluginId>`, o caminho em que o framework o monta, quando o `createBackendPlugin`, importado
+de um pacote `@backstage/`, escreve o `pluginId` como literal ou como uma `const` do mesmo arquivo
+ligada a um literal. Um plugin cujo `pluginId` não se lê assim (uma leitura de ambiente, um
+import) deixa o roteador na raiz, como antes, e o `meada status` aponta o plugin. Do lado do
+consumidor, uma URL que começa por `discovery.getBaseUrl('<id>')` (numa constante ou escrito na
+própria URL) começa em `/api/<id>`, e o motivo da ligação nomeia o plugin e essa montagem; uma URL
+sem host de uma rota que a montagem de um plugin do mesmo repositório serve também o nomeia. O plugin `proxy` não
+é lido.
+
 **Ambiente.** `process.env.X`, `process.env["X"]` e `import.meta.env.X`, sozinhos ou passando por
 métodos de texto como `trim()`, `replace(...)` e `toLowerCase()`. A URL que começa por uma leitura
 assim liga pelo `base_url_env` do par. Arquivos `.env` não são lidos. O mesmo vale para a
