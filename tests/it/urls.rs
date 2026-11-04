@@ -455,3 +455,120 @@ fn backstage_plugins_serve_under_api_and_their_plugin_id() {
         "{status}"
     );
 }
+
+/// Backstage's proxy plugin (#616): `getBaseUrl('proxy')` plus `/<endpoint>` and
+/// `/api/proxy/<endpoint>` are calls to the `target` of the endpoint in `app-config*.yaml`. A
+/// `${VAR}` target goes through the peer's `base_url_env`, a literal URL is a host, and any
+/// other target leaves the call unlinked, which `meada status` says.
+#[test]
+fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
+    let case = "urls_backstage_proxy";
+    let web = fixture_repo(
+        case,
+        "ts-backstage-proxy",
+        Some("https://example.com/backstage/web.git"),
+    );
+    fixture_repo(
+        case,
+        "go-backstage-inventory",
+        Some("https://example.com/backstage/inventory.git"),
+    );
+
+    let export = Engine::open(&web).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let function = |site: &str| site.split("::").nth(2).unwrap().to_string();
+    let mut consumers: Vec<_> = (json["consumers"].as_array().unwrap())
+        .iter()
+        .map(|c| {
+            let site = function(c["site"].as_str().unwrap());
+            (site, c["contract"].as_str().unwrap(), c["via"].as_str())
+        })
+        .collect();
+    consumers.sort();
+    let inventory = Some("env:INVENTORY_URL through proxy endpoint /inventory");
+    let unread = Some(
+        "client:Backstage proxy endpoint /legacy (its target is neither ${VAR} nor an http(s) URL)",
+    );
+    let expected = [
+        // `/inventoryx` is no `/inventory`.
+        (
+            "otherEndpoint",
+            "http::GET::/api/proxy/inventoryx/clusters",
+            None,
+        ),
+        ("viaBrowserPath", "http::GET::/clusters", inventory),
+        ("viaDiscovery", "http::GET::/clusters", inventory),
+        (
+            "viaLiteralTarget",
+            "http::GET::/clusters",
+            Some("host:stock.example.com through proxy endpoint /stock"),
+        ),
+        ("viaTemplate", "http::GET::/clusters", inventory),
+        (
+            "viaUnreadAgain",
+            "http::GET::/api/proxy/legacy/clusters",
+            unread,
+        ),
+        (
+            "viaUnreadTarget",
+            "http::GET::/api/proxy/legacy/clusters",
+            unread,
+        ),
+    ];
+    assert_eq!(consumers, expected.map(|(f, c, v)| (f.to_string(), c, v)));
+
+    // The two calls of the issue and the template link to the peer; the unread target links
+    // nothing.
+    let links: Vec<_> = (json["links"].as_array().unwrap())
+        .iter()
+        .map(|l| {
+            let consumer = function(l["consumer"].as_str().unwrap());
+            let provider = l["provider"].as_str().unwrap();
+            (
+                consumer,
+                provider,
+                l["level"].as_str(),
+                l["reason"].as_str(),
+            )
+        })
+        .collect();
+    let peer = "example.com/backstage/inventory";
+    let through = format!(
+        "base URL from INVENTORY_URL through the proxy endpoint /inventory, a base_url_env of peer {peer}"
+    );
+    let served = |function: &str, level, reason: &str| {
+        (
+            function.to_string(),
+            format!("{peer}::main.go::clusters"),
+            Some(level),
+            Some(reason.to_string()),
+        )
+    };
+    let links: Vec<_> = (links.iter())
+        .map(|(c, p, l, r)| (c.clone(), p.to_string(), *l, r.map(str::to_string)))
+        .collect();
+    assert_eq!(
+        links,
+        [
+            served("viaBrowserPath", "inferred", &through),
+            served("viaDiscovery", "inferred", &through),
+            served(
+                "viaLiteralTarget",
+                "exact",
+                &format!(
+                    "host stock.example.com through the proxy endpoint /stock is served by {peer}"
+                ),
+            ),
+            served("viaTemplate", "inferred", &through),
+        ]
+    );
+    let status = meada::engine::status(&web).unwrap();
+    let said: Vec<&str> = status.lines().filter(|l| l.contains("proxy")).collect();
+    assert_eq!(
+        said,
+        [
+            "  Backstage proxy endpoint /legacy: its target is neither ${VAR} nor an http(s) URL, so 2 call(s) through it stay unlinked"
+        ],
+        "{status}"
+    );
+}

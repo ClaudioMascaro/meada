@@ -1,0 +1,8 @@
+proxy:
+  endpoints:
+    '/inventory':
+      target: ${INVENTORY_URL}
+    '/stock':
+      target: https://stock.example.com/
+    '/legacy':
+      target: ${LEGACY_URL}/v2

@@ -1676,7 +1676,7 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   place as the first call of the `fetch`, folds to `/api/<literal>`, and only when the receiver's
   last name holds `discovery` (`discovery`, `this.discovery`, `discoveryApi`; by name, not by
   type): another receiver, a base passed as a parameter and a non-literal id leave the base
-  unknown, and the `proxy` plugin (`getBaseUrl('proxy')`, `proxy.endpoints`) is not read. A
+  unknown. A
   hostless call names a plugin in its reason only for a route that plugin's mount serves in the
   consumer's own repository (`backstage::name`); in another repository it links as any hostless
   URL does. `http/python.rs`: a FastAPI
@@ -1795,6 +1795,18 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   libraries (`env-prefix`, `envPrefix`, envconfig's `Process("app")`) are not applied; nesting past
   64 levels is not read (#618).
 
+- Backstage proxy endpoints (#616, `http/ts/config.rs`): a `fetch` URL whose leading literal text
+  is `/api/proxy/<ep>` (also what `getBaseUrl('proxy')` folds to), `<ep>` an endpoint of
+  `proxy.endpoints` in the `app-config*.yaml` files (the lookup of the configuration reads
+  above), the longest matching endpoint, followed by `/`, `?`, `#` or the end of the URL. Only
+  the `target` form is read: the string shorthand (`'/ep': 'https://...'`) and a `|` in an
+  endpoint name are not. A target that is exactly `${VAR}` is the variable, one that is
+  a literal `http(s)://` URL is the host (a trailing `/` dropped, its path kept); any other
+  target (`${VAR}/v2`, `${VAR:-default}`, a URL with a placeholder) leaves the URL as written, with a
+  `client:` `via` the link's reason shows, and `meada status` names the endpoint and its calls.
+  The proxy's per-endpoint options (`pathRewrite`, `allowedMethods`) are not read, so the path
+  after the endpoint is taken unchanged; only a consumer in the repository holding the
+  `app-config` is rewritten (#616).
 - Backstage configuration reads (#617, `CONFIG_READS` in `lang/ts.rs`, read by `http/ts/config.rs`): `config.getString('a.b')`
   and `getOptionalString('a.b')` with a literal key are read from the `app-config*.yaml` files of
   the repository, `app-config.yaml` first and the first file holding the key winning, whatever

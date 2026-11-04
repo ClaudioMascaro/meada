@@ -16,7 +16,7 @@ mod config;
 
 use std::collections::BTreeSet;
 
-pub(super) use backstage::name;
+pub(super) use backstage::{name, unread};
 pub(super) use clients::consumers;
 
 use super::{

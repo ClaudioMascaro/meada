@@ -140,6 +140,12 @@ pub enum Msg<'a> {
     BackstageUnmounted {
         site: &'a str,
     },
+    /// A Backstage proxy endpoint (#616) whose `target` is neither `${VAR}` nor an `http(s)://`
+    /// URL: its `calls` stay unlinked.
+    BackstageProxyTarget {
+        endpoint: &'a str,
+        calls: usize,
+    },
     DocumentUnreadable {
         path: &'a str,
         line: usize,
@@ -1784,6 +1790,11 @@ impl Msg<'_> {
                 format!("{site}: Backstage plugin whose pluginId is neither a string literal nor a const of its file bound to one: its routes stay at the root, not under /api/<pluginId>"),
                 format!("{site}: plugin do Backstage cujo pluginId não é literal de texto nem const do seu arquivo ligada a um: suas rotas ficam na raiz, não sob /api/<pluginId>"),
                 format!("{site}: plugin de Backstage cuyo pluginId no es literal de texto ni const de su archivo ligada a uno: sus rutas quedan en la raíz, no bajo /api/<pluginId>"),
+            ),
+            Msg::BackstageProxyTarget { endpoint, calls } => pick(
+                format!("Backstage proxy endpoint {endpoint}: its target is neither ${{VAR}} nor an http(s) URL, so {calls} call(s) through it stay unlinked"),
+                format!("endpoint de proxy do Backstage {endpoint}: seu target não é ${{VAR}} nem uma URL http(s), então {calls} chamada(s) por ele ficam sem ligação"),
+                format!("endpoint de proxy de Backstage {endpoint}: su target no es ${{VAR}} ni una URL http(s), así que {calls} llamada(s) por él quedan sin enlace"),
             ),
             Msg::DocumentUnreadable { path, line, error } => pick(
                 format!("{path}:{line}: unreadable document ({error}), ignored"),

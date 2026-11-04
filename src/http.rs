@@ -113,6 +113,11 @@ fn fetches(args: &[Value]) -> Option<Vec<Read>> {
 /// language's reader writes it.
 const CLIENT_VIA: &str = "client:";
 
+/// What a consumer's `via` holds between how it names the provider's repository and the proxy
+/// endpoint its URL went through (`env:API_URL through proxy endpoint /api`): the reason of its
+/// link names the endpoint.
+const PROXY_VIA: &str = " through proxy endpoint ";
+
 /// The mark of the default's reading of `${X:default}` (`fetches`), after its `host:` `via`.
 const DEFAULT: &str = "|default";
 
@@ -754,7 +759,13 @@ impl ContractKind for Http {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
         };
-        let via = consumer.via.as_deref();
+        // The proxy endpoint a URL went through, which the reason names.
+        let (via, endpoint) = match consumer.via.as_deref().map(|v| v.split_once(PROXY_VIA)) {
+            Some(Some((via, endpoint))) => (Some(via), Some(endpoint)),
+            _ => (consumer.via.as_deref(), None),
+        };
+        let through = endpoint.map(|e| format!(" through the proxy endpoint {e}"));
+        let through = through.as_deref().unwrap_or_default();
         // A route serves a consumer by its code path, or by its gateway path with the reason
         // for the rewrite. Within one repository a code path match wins over gateway path
         // matches; across repositories both are candidates.
@@ -778,41 +789,46 @@ impl ContractKind for Http {
         let peers: Vec<&str> = var
             .map(|var| from.config.peers_reading(var).collect())
             .unwrap_or_default();
-        let (fits, level, reason): (Vec<_>, _, _) =
-            if let Some(host) = via.and_then(|v| v.strip_prefix("host:")) {
-                let fits = serving
-                    .filter(|(_, p, _)| p.hosts.iter().any(|h| h.eq_ignore_ascii_case(host)))
-                    .collect();
-                (fits, Level::Exact, format!("host {host} is served by"))
-            } else if let (Some(var), false) = (var, peers.is_empty()) {
-                let fits = serving
-                    .filter(|(m, ..)| peers.contains(&m.identity.as_str()))
-                    .collect();
-                (
-                    fits,
-                    Level::Inferred,
-                    format!("base URL from {var}, a base_url_env of peer"),
-                )
-            } else {
-                // The host is unresolved: a relative URL, an unknown base, or a variable no
-                // peer names. Exactly one repository serving the route is enough.
-                let fits: Vec<_> = serving.collect();
-                let mut repos: Vec<&str> = fits.iter().map(|(m, ..)| m.identity.as_str()).collect();
-                repos.sort();
-                repos.dedup();
-                // A client that names itself says so (`CLIENT_VIA`).
-                let client = via.and_then(|v| v.strip_prefix(CLIENT_VIA));
-                let why = match (var, client) {
-                    (Some(var), _) => format!("base URL from {var}, no peer's base_url_env"),
-                    (None, Some(client)) => format!("host unresolved ({client})"),
-                    (None, None) => "host unresolved".to_string(),
-                };
-                let reason = match repos.len() {
-                    1 => format!("{why}; the only repository serving it is"),
-                    _ => format!("{why}; served by"),
-                };
-                (fits, Level::Inferred, reason)
+        let (fits, level, reason): (Vec<_>, _, _) = if let Some(host) =
+            via.and_then(|v| v.strip_prefix("host:"))
+        {
+            let fits = serving
+                .filter(|(_, p, _)| p.hosts.iter().any(|h| h.eq_ignore_ascii_case(host)))
+                .collect();
+            (
+                fits,
+                Level::Exact,
+                format!("host {host}{through} is served by"),
+            )
+        } else if let (Some(var), false) = (var, peers.is_empty()) {
+            let fits = serving
+                .filter(|(m, ..)| peers.contains(&m.identity.as_str()))
+                .collect();
+            (
+                fits,
+                Level::Inferred,
+                format!("base URL from {var}{through}, a base_url_env of peer"),
+            )
+        } else {
+            // The host is unresolved: a relative URL, an unknown base, or a variable no
+            // peer names. Exactly one repository serving the route is enough.
+            let fits: Vec<_> = serving.collect();
+            let mut repos: Vec<&str> = fits.iter().map(|(m, ..)| m.identity.as_str()).collect();
+            repos.sort();
+            repos.dedup();
+            // A client that names itself says so (`CLIENT_VIA`).
+            let client = via.and_then(|v| v.strip_prefix(CLIENT_VIA));
+            let why = match (var, client) {
+                (Some(var), _) => format!("base URL from {var}{through}, no peer's base_url_env"),
+                (None, Some(client)) => format!("host unresolved ({client})"),
+                (None, None) => "host unresolved".to_string(),
             };
+            let reason = match repos.len() {
+                1 => format!("{why}; the only repository serving it is"),
+                _ => format!("{why}; served by"),
+            };
+            (fits, Level::Inferred, reason)
+        };
         let ambiguous = fits.len() > 1;
         fits.iter()
             .map(|(repo, provider, gateway)| {
@@ -854,15 +870,28 @@ impl ContractKind for Http {
     }
 
     /// The Backstage plugins whose routers stay at the root for want of a literal `pluginId`
-    /// (#615).
+    /// (#615), and the proxy endpoints whose target is not read (#616), with their calls.
     fn status(&self, repo: &Repository, export: &IndexExport, _links: &[Link]) -> Vec<String> {
         let prefix = format!("{}::", repo.identity);
-        (export.unmounted.iter())
+        let mut lines: Vec<String> = (export.unmounted.iter())
             .map(|site| {
                 let site = site.strip_prefix(&prefix).unwrap_or(site);
                 Msg::BackstageUnmounted { site }.text()
             })
-            .collect()
+            .collect();
+        let mut unread = std::collections::BTreeMap::new();
+        for endpoint in export
+            .consumers
+            .iter()
+            .filter_map(|c| ts::unread(c.via.as_deref()?))
+        {
+            *unread.entry(endpoint).or_insert(0) += 1;
+        }
+        lines.extend(
+            (unread.into_iter())
+                .map(|(endpoint, calls)| Msg::BackstageProxyTarget { endpoint, calls }.text()),
+        );
+        lines
     }
 
     /// The drift of the links, once the decisions are replayed (`drift`).
