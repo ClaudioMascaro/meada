@@ -224,9 +224,13 @@ impl LanguagePack for TsJs {
                     &scope,
                     &parents,
                 );
+                // A `new URL` whose path or host the file writes through its name is no longer
+                // the string it was built from.
+                let rewritten = is_url_new(*value_node, src, &parents)
+                    && parents.written.contains(name.as_str());
                 facts.consts.push(Const {
                     name: qualify(&scope, name),
-                    value,
+                    value: if rewritten { Value::Unknown } else { value },
                     ty,
                     scope: None,
                 });
@@ -587,14 +591,25 @@ fn definition(
 struct Parents<'t> {
     up: HashMap<usize, Node<'t>>,
     assigned: HashSet<String>,
+    /// The names a member is written through (`u.p = ..`, `u.p += ..`, `u["p"] = ..`), except
+    /// `search` and `hash`, which keep the path of a URL (WHATWG URL Standard).
+    // ponytail: per name across the whole file, whichever function writes it; see `docs/agents/ceilings.md`.
+    written: HashSet<String>,
+    /// Whether the file declares a `URL` or imports one from a relative path: `new URL(x)` is then
+    /// no runtime global.
+    url_declared: bool,
 }
 
 impl<'t> Parents<'t> {
     fn new(root: Node<'t>, src: &[u8]) -> Self {
         let mut up = HashMap::new();
         let mut assigned = HashSet::new();
+        let mut written = HashSet::new();
+        let mut url_declared = false;
         let mut stack = vec![root];
         while let Some(node) = stack.pop() {
+            url_declared |= declares_url(node, src);
+            written.extend(member_written(node, src));
             let target = match node.kind() {
                 "assignment_expression" | "augmented_assignment_expression" => {
                     node.child_by_field_name("left")
@@ -612,12 +627,96 @@ impl<'t> Parents<'t> {
                 stack.push(child);
             }
         }
-        Self { up, assigned }
+        Self {
+            up,
+            assigned,
+            written,
+            url_declared,
+        }
     }
 
     fn of(&self, node: Node) -> Option<Node<'t>> {
         self.up.get(&node.id()).copied()
     }
+}
+
+/// Whether `node` declares the name `URL` as a value of the file: a class, function or variable
+/// of that name, or an import of it from a relative path.
+fn declares_url(node: Node, src: &[u8]) -> bool {
+    match node.kind() {
+        "class_declaration"
+        | "abstract_class_declaration"
+        | "function_declaration"
+        | "generator_function_declaration"
+        | "enum_declaration" => node
+            .child_by_field_name("name")
+            .is_some_and(|n| text(n, src) == "URL"),
+        // `const { URL } = require("url")` binds the global itself; only a relative `require`
+        // (or any other initializer) is the repository's.
+        "variable_declarator" => {
+            let package = (node.child_by_field_name("value")).is_some_and(|v| {
+                v.kind() == "call_expression"
+                    && (v.child_by_field_name("function"))
+                        .is_some_and(|f| text(f, src) == "require")
+                    && (v.child_by_field_name("arguments"))
+                        .and_then(|a| named(a).next())
+                        .is_some_and(|a| a.kind() == "string" && !unquote(a, src).starts_with('.'))
+            });
+            !package
+                && (node.child_by_field_name("name"))
+                    .is_some_and(|n| bound(n, src).iter().any(|name| name == "URL"))
+        }
+        // A parameter or a `catch` binding of that name hides the global as well.
+        "formal_parameters" => bound(node, src).iter().any(|name| name == "URL"),
+        "catch_clause" => (node.child_by_field_name("parameter"))
+            .is_some_and(|n| bound(n, src).iter().any(|name| name == "URL")),
+        "arrow_function" => {
+            (node.child_by_field_name("parameter")).is_some_and(|n| text(n, src) == "URL")
+        }
+        "import_statement" => {
+            let mut bindings = Vec::new();
+            imports(node, src, &mut bindings);
+            bindings
+                .iter()
+                .any(|i| i.local == "URL" && i.source.starts_with('.'))
+        }
+        _ => false,
+    }
+}
+
+/// Whether `node` is `new URL(..)` of the runtime global: no declaration of the file hides it.
+fn is_url_new(node: Node, src: &[u8], up: &Parents) -> bool {
+    node.kind() == "new_expression"
+        && !up.url_declared
+        && (node.child_by_field_name("constructor"))
+            .is_some_and(|c| c.kind() == "identifier" && text(c, src) == "URL")
+}
+
+/// The name `node` writes a member of, when it is `u.p = ..` or `u.p += ..` (or `u["p"]`) and
+/// `p` is neither `search` nor `hash`.
+fn member_written(node: Node, src: &[u8]) -> Option<String> {
+    if !matches!(
+        node.kind(),
+        "assignment_expression" | "augmented_assignment_expression"
+    ) {
+        return None;
+    }
+    let left = node.child_by_field_name("left")?;
+    let object = left.child_by_field_name("object")?;
+    let member = match left.kind() {
+        "member_expression" => text(left.child_by_field_name("property")?, src).to_string(),
+        "subscript_expression" => {
+            let index = left.child_by_field_name("index")?;
+            if index.kind() == "string" {
+                unquote(index, src)
+            } else {
+                String::new()
+            }
+        }
+        _ => return None,
+    };
+    (object.kind() == "identifier" && member != "search" && member != "hash")
+        .then(|| text(object, src).to_string())
 }
 
 /// The string a function returns when that is all its body does: an arrow function's expression
@@ -1118,7 +1217,7 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
         kind if FUNCTIONS.contains(&kind) && written_in_place(node, up) => {
             function(scope, &inline(node))
         }
-        kind => match parts(node, src) {
+        kind => match parts(node, src, up) {
             Some(parts) => Value::Str(parts),
             None if kind == "call_expression" => {
                 let args = node.child_by_field_name("arguments");
@@ -1193,17 +1292,17 @@ fn declared(
 
 /// A string expression folded into literal text, environment reads and holes; `None` when
 /// `node` is not a string expression Meada folds.
-fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
-    parts_at(node, src, 0)
+fn parts(node: Node, src: &[u8], up: &Parents) -> Option<Vec<Part>> {
+    parts_at(node, src, up, 0)
 }
 
 /// `parts` of a node `depth` levels inside the expression it started from; past `FOLD_DEPTH`
 /// the rest is a hole.
-fn parts_at(node: Node, src: &[u8], depth: usize) -> Option<Vec<Part>> {
+fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Part>> {
     if depth >= FOLD_DEPTH {
         return Some(vec![Part::Hole]);
     }
-    let parts = |n: Node| parts_at(n, src, depth + 1);
+    let parts = |n: Node| parts_at(n, src, up, depth + 1);
     // Anything inside a string that is not itself foldable is a hole.
     let inside = |n: Node| parts(n).unwrap_or_else(|| vec![Part::Hole]);
     match node.kind() {
@@ -1252,13 +1351,67 @@ fn parts_at(node: Node, src: &[u8], depth: usize) -> Option<Vec<Part>> {
         | "non_null_expression"
         | "as_expression"
         | "satisfies_expression" => parts(named(node).next()?),
-        _ => env_read(node, src, depth).map(|env| vec![env]),
+        _ => url_form(node, src, up, depth)
+            .or_else(|| env_read(node, src, up, depth).map(|env| vec![env])),
+    }
+}
+
+/// The URL forms that pass a string through, as the WHATWG URL Standard reads them: `new URL(x)`
+/// with one argument parses `x` (#dom-url-url), and `u.toString()`, `u.href` and `String(u)` are
+/// the URL's `href` (#dom-url-href). The receiver is a `new URL(..)` or a name no member write
+/// reaches (`Parents::written`): a write to the path or the host changes what it holds.
+fn url_form(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Part>> {
+    let parts = |n: Node| parts_at(n, src, up, depth + 1);
+    let written = |n: Node| n.kind() == "identifier" && up.written.contains(text(n, src));
+    let url = |n: Node| match n.kind() {
+        "identifier" if !written(n) => parts(n),
+        "new_expression" => parts(n),
+        _ => None,
+    };
+    fn one(arguments: Option<Node<'_>>) -> Option<Node<'_>> {
+        let mut args = named(arguments.filter(|a| a.kind() == "arguments")?);
+        let first = args.next()?;
+        args.next().is_none().then_some(first)
+    }
+    match node.kind() {
+        "new_expression" => {
+            let argument = one(node.child_by_field_name("arguments"))?;
+            parts(argument).filter(|_| is_url_new(node, src, up))
+        }
+        "member_expression" => {
+            let property = node.child_by_field_name("property")?;
+            let object = node.child_by_field_name("object")?;
+            if text(property, src) == "href" {
+                url(object)
+            } else {
+                None
+            }
+        }
+        "call_expression" => {
+            let function = callee_node(node)?;
+            let arguments = node.child_by_field_name("arguments");
+            match function.kind() {
+                "member_expression"
+                    if (function.child_by_field_name("property"))
+                        .is_some_and(|p| text(p, src) == "toString")
+                        && arguments.is_some_and(|a| named(a).next().is_none()) =>
+                {
+                    url(function.child_by_field_name("object")?)
+                }
+                "identifier" if text(function, src) == "String" => {
+                    let argument = one(arguments)?;
+                    parts(argument).filter(|_| !written(argument))
+                }
+                _ => None,
+            }
+        }
+        _ => None,
     }
 }
 
 /// `process.env.X`, `process.env["X"]` or `import.meta.env.X`, also through string method
 /// calls such as `.replace(...)` or `.trim()`.
-fn env_read(node: Node, src: &[u8], depth: usize) -> Option<Part> {
+fn env_read(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Part> {
     const STRING_METHODS: &[&str] = &[
         "replace",
         "replaceAll",
@@ -1293,6 +1446,7 @@ fn env_read(node: Node, src: &[u8], depth: usize) -> Option<Part> {
             single_env(parts_at(
                 function.child_by_field_name("object")?,
                 src,
+                up,
                 depth + 1,
             )?)
         }
@@ -1569,6 +1723,147 @@ mod tests {
         assert!(matches!(args[0].args.as_slice(), [Value::Ref(name)] if name == "url"));
         assert_eq!(args[0].arg_types, [None]);
         assert!(matches!(args[1].args.as_slice(), [Value::Str(_)]));
+    }
+
+    /// The text of the literal parts of a folded value, `<env>` for an environment read, `?`
+    /// for a name and `_` for a hole; `None` when the value is no string.
+    fn folded(value: &Value) -> Option<String> {
+        let Value::Str(parts) = value else {
+            return None;
+        };
+        Some(
+            parts
+                .iter()
+                .map(|p| match p {
+                    Part::Text(t) => t.clone(),
+                    Part::Env(e) => format!("<{e}>"),
+                    Part::Ref(_) => "?".into(),
+                    _ => "_".into(),
+                })
+                .collect(),
+        )
+    }
+
+    fn fetched(src: &str) -> Vec<Option<String>> {
+        let facts = parse(src);
+        let calls = facts.calls.iter().filter(|c| c.callee == "fetch");
+        calls.map(|c| folded(&c.args[0])).collect()
+    }
+
+    /// WHATWG URL Standard: `new URL(x)` parses `x` (#dom-url-url), and `toString()`, `href` and
+    /// `String(u)` give its `href` (#dom-url-href), also inside a template string.
+    #[test]
+    fn a_url_of_one_argument_is_the_string_it_parses() {
+        let got = fetched(
+            "fetch(new URL('https://h.example.com/a'));\n\
+             fetch(new URL(`${process.env.API_URL}/a`).toString());\n\
+             fetch(new URL('https://h.example.com/b').href);\n\
+             fetch(String(new URL('https://h.example.com/c')));\n\
+             fetch(`${new URL('https://h.example.com/d')}/e`);\n\
+             const u = new URL(base); fetch(u.toString()); fetch(u.href); fetch(String(u));\n\
+             fetch(`${u}`);\n",
+        );
+        let host = |p: &str| Some(format!("https://h.example.com/{p}"));
+        assert_eq!(got[0], host("a"));
+        assert_eq!(got[1], Some("<API_URL>/a".into()));
+        assert_eq!(got[2], host("b"));
+        assert_eq!(got[3], host("c"));
+        assert_eq!(got[4], Some("https://h.example.com/d/e".into()));
+        // A name folds through the existing name folding at the shared side.
+        assert!(
+            got[5..].iter().all(|g| g.as_deref() == Some("?")),
+            "{got:?}"
+        );
+    }
+
+    /// Only a call with the shape of the standard's reads: `toString(16)`, `new URL(x, base)` and
+    /// a `href` of anything but a name or a `new URL(..)` stay as they were.
+    #[test]
+    fn other_shapes_of_those_names_stay_calls() {
+        let facts = parse(
+            "fetch(n.toString(16));\n\
+             fetch(new URL('/a', base));\n\
+             fetch(new URL(...parts));\n\
+             fetch(o.p.href);\n\
+             fetch(String());\n\
+             fetch(String(a, b));\n",
+        );
+        let args: Vec<_> = (facts.calls.iter())
+            .filter(|c| c.callee == "fetch")
+            .map(|c| &c.args[0])
+            .collect();
+        assert!(matches!(args[0], Value::Call(i) if i.callee == "n.toString"));
+        assert!(matches!(args[1], Value::New(c, a) if c == "URL" && a.len() == 2));
+        assert!(matches!(args[2], Value::New(c, _) if c == "URL"));
+        assert!(matches!(args[3], Value::Unknown));
+        assert!(matches!(args[4], Value::Call(_)));
+        assert!(matches!(args[5], Value::Call(_)));
+    }
+
+    /// WHATWG URL Standard: `searchParams` changes only the query (#dom-url-searchparams), as
+    /// `search` and `hash` do; a write to any other member changes the path or the host.
+    #[test]
+    fn a_member_write_other_than_the_query_leaves_the_url_unknown() {
+        let unknown = |src: &str| {
+            let facts = parse(src);
+            let c = facts.consts.iter().find(|c| c.name == "u").unwrap();
+            matches!(c.value, Value::Unknown)
+        };
+        let url = "const u = new URL('https://h.example.com/a');\n";
+        assert!(!unknown(url));
+        assert!(!unknown(&format!("{url}u.searchParams.set('k', 'v');")));
+        assert!(!unknown(&format!("{url}u.searchParams.append('k', 'v');")));
+        assert!(!unknown(&format!(
+            "{url}u.search = '?k=v'; u.hash += '#h'; u['hash'] = 'x';"
+        )));
+        for write in [
+            "u.pathname = '/b';",
+            "u.pathname += '/b';",
+            "u.host = 'other';",
+            "u.href = 'https://o.example.com/';",
+            "u['pathname'] = '/b';",
+            "u[key] = '/b';",
+        ] {
+            assert!(unknown(&format!("{url}{write}")), "{write}");
+        }
+        // The pass-through forms of a written name stay calls and members, as they were.
+        let facts = parse(&format!(
+            "{url}u.pathname = '/b'; fetch(u.toString()); fetch(u.href);"
+        ));
+        let args: Vec<_> = (facts.calls.iter())
+            .filter(|c| c.callee == "fetch")
+            .map(|c| &c.args[0])
+            .collect();
+        assert!(matches!(args[0], Value::Call(i) if i.callee == "u.toString"));
+        assert!(matches!(args[1], Value::Member(o, p) if o == "u" && p == "href"));
+    }
+
+    /// A file that declares a `URL`, or imports one from a relative path, has no runtime global
+    /// of that name: its `new URL(x)` is the repository's constructor.
+    #[test]
+    fn a_url_the_file_declares_or_imports_from_the_repository_is_no_global() {
+        for head in [
+            "class URL { constructor(p) {} }\n",
+            "function URL(p) {}\n",
+            "const URL = makeUrl();\n",
+            "import { URL } from './url';\n",
+            "import { Other as URL } from '../url';\n",
+            "import URL from './url';\n",
+            "function f(URL) { return URL; }\n",
+            "const f = (URL) => URL;\n",
+            "try { run(); } catch (URL) {}\n",
+        ] {
+            let got = fetched(&format!("{head}fetch(new URL('https://h.example.com/a'));"));
+            assert_eq!(got, [None], "{head}");
+        }
+        // An import from a package, or a `require` of one, is the same global.
+        let got = fetched(
+            "const { URL } = require('node:url');\nfetch(new URL('https://h.example.com/a'));",
+        );
+        assert_eq!(got, [Some("https://h.example.com/a".into())]);
+        let got =
+            fetched("import { URL } from 'node:url';\nfetch(new URL('https://h.example.com/a'));");
+        assert_eq!(got, [Some("https://h.example.com/a".into())]);
     }
 
     /// How many calls deep the first argument of `value` goes.

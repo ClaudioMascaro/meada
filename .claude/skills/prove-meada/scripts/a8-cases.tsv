@@ -6,10 +6,13 @@
 # consumer must have: provider repository, level (* any), then text its reason must hold.
 # The ticket that lands a flow turns its rows from pending to landed in the same PR.
 g8	ordersTpl	contract	http::GET::/orders	control	-	http::GET::/orders	control: template string
-g8	ordersUrl	contract	http::GET::/orders	pending	-	null	new URL + searchParams + toString()
-g8	ordersUrlEnv	contract	http::GET::/orders	pending	-	null	new URL(env) + toString()
-g8	ordersUrlEnv	via	env:API_URL	pending	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	new URL(env) + toString(): via
-g8	ordersHref	contract	http::GET::/orders	pending	-	null	new URL(...).href
+g8	ordersUrl	contract	http::GET::/orders	landed	-	null	new URL + searchParams + toString()
+g8	ordersUrlEnv	contract	http::GET::/orders	landed	-	null	new URL(env) + toString()
+g8	ordersUrlEnv	via	env:API_URL	landed	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	new URL(env) + toString(): via
+g8	ordersHref	contract	http::GET::/orders	landed	-	null	new URL(...).href
+g8	ordersString	contract	http::GET::/orders	landed	-	null	new URL + String(u)
+g8	ordersInTemplate	contract	http::GET::/orders	landed	-	null	new URL + ${u} in a template string
+g8	ordersWritten	contract	null	control	-	null	control: a write to the path leaves the URL unknown
 g9	OrdersInline	via	env:API_URL	control	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	env:API_URL	control: Go tag read inline
 g9	ordersInline	via	env:API_URL	control	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	env:API_URL	control: TS config.getString inline
 g9	Client.OrdersDirect	via	env:API_URL	pending	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	Go field, direct use

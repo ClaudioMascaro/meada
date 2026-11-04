@@ -104,6 +104,21 @@ export async function ordersUrlEnv() {
 export async function ordersHref(base: string) {
   return fetch(new URL(`${base}/orders`).href);
 }
+// String(u) and a template string pass the URL through too
+export async function ordersString(base: string) {
+  const url = new URL(`${base}/orders`);
+  return fetch(String(url));
+}
+export async function ordersInTemplate(base: string) {
+  const url = new URL(`${base}/orders`);
+  return fetch(`${url}`);
+}
+// a write to the path leaves the URL unknown
+export async function ordersWritten(base: string) {
+  const moved = new URL(`${base}/orders`);
+  moved.pathname = '/other';
+  return fetch(moved.toString());
+}
 EOF
   mk g8
 }
@@ -265,14 +280,15 @@ links_of() { # <export> <fn>
     | "\(.provider | split("::")[0]) \(.level) \(.reason // "")"] | unique[]' "$1"
 }
 
-# The export without the checkout facts and without the consumers and links of the given
+# The export without the checkout facts and without the consumers, links and processes of the given
 # functions (the landed cases, which answer to the spec, not to the base).
 rest() { # <export> <fn,fn,...>
   jq -S --arg fns "$2" '($fns | split(",")) as $skip
     | def mine(s): (s | split("::")[2]) as $f | $skip | index($f) != null;
     del(.commit, .dirty)
     | .consumers |= map(select(mine(.site) | not))
-    | .links |= map(select(mine(.consumer) | not))' "$1"
+    | .links |= map(select(mine(.consumer) | not))
+    | .processes |= map(select(mine(.entry_point) | not))' "$1"
 }
 
 check() { # <base bin> <head bin> <run>
@@ -334,7 +350,7 @@ check() { # <base bin> <head bin> <run>
     echo
     echo "## Everything else against the base"
     echo
-    echo "Each export without \`commit\`, \`dirty\` and the consumers and links of the landed cases"
+    echo "Each export without \`commit\`, \`dirty\` and the consumers, links and processes of the landed cases"
     echo "(those answer to the spec above); the controls and pending cases stay in."
     echo
   } >> "$out"

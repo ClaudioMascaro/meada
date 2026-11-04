@@ -18,7 +18,7 @@ repro's (#684):
 |---|---|---|
 | `api`, `other` | peers | Go `net/http`, both serve `GET /orders`: only `base_url_env` can pick `api` |
 | `inventory` | peer | Go gin, serves `GET /clusters`, behind the Backstage proxy |
-| `g8` | consumer | TS URL builders: a template string, `new URL(..)` with `searchParams` and `toString()`, `new URL(env)`, `.href` |
+| `g8` | consumer | TS URL builders: a template string, `new URL(..)` with `searchParams` and `toString()`, `new URL(env)`, `.href`, `String(u)`, `${u}`, a path write |
 | `g9` | consumer | Go cleanenv tag read inline and in a struct field (direct and through a `send()` wrapper); TS `config.getString` inline and in a readonly field set in the constructor |
 | `g10a` to `g10c` | consumers | Backstage `config.getString`: the value inline, through `$include` with a `#` key path, through `$include` of a whole block |
 | `g10d` to `g10g` | consumers | Backstage `discovery.getBaseUrl('proxy')`: `proxy.endpoints` inline, the legacy shape inline, each through `$include` |
@@ -44,8 +44,9 @@ no symbol), and writes `$RUN/peers/peers.md`:
      the base, links included, and does not count against the verdict. A pending case that meets
      the spec prints `MEETS SPEC: mark it landed` and counts as a difference until its row says
      `landed`.
-2. **Everything else**: each export, without `commit`, `dirty` and the consumers and links of the
-   landed cases, equal to the base's: a pending case's other fields and links answer to the base.
+2. **Everything else**: each export, without `commit`, `dirty` and the consumers, links and
+   processes of the landed cases, equal to the base's: a pending case's other fields and links
+   answer to the base.
 
 Exit 0: no difference, 1: differences, 2: a run failed (BLOCKED). About 10 s with debug builds.
 
@@ -60,7 +61,7 @@ through `/create-prove-it`, and adds its paths to SKILL.md's Scope row.
 | Flow (#683) | Cases | Ticket | State |
 |---|---|---|---|
 | Controls: template string, cleanenv tag inline, `config.getString` inline, `proxy.endpoints` inline | 5 | existing | control |
-| TS URL builders, one argument | 4 (`g8`) | to come | pending |
+| TS URL builders, one argument | 7 (`g8`) | #685 | landed |
 | TS `new URL(ref, base)` join | none yet | to come | no case |
 | Go struct field | 2 (`g9`) | to come | pending |
 | TS readonly field | 1 (`g9`) | to come | pending |

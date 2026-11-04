@@ -333,13 +333,32 @@ fn a_url_a_function_only_builds_folds_at_the_call_and_through_a_constant() {
     assert_eq!(linked("src/plain.js"), ["http::GET::/api/vets"]);
     // An arrow function with a block body folds when the block is one `return` and not otherwise.
     assert_eq!(linked("src/block.ts"), ["http::GET::/api/vets"]);
+    // `new URL(x)` of one argument is `x` (WHATWG URL Standard), through `toString()`, `href`,
+    // `String(u)`, a template string and a client wrapper; `searchParams`, `search` and `hash`
+    // keep the path.
+    assert_eq!(
+        linked("src/whatwg.ts"),
+        [
+            "http::GET::/api/owners",
+            "http::GET::/api/owners",
+            "http::GET::/api/owners",
+            "http::GET::/api/vets",
+            "http::GET::/api/vets",
+            "http::GET::/api/vets",
+        ]
+    );
     // A base read from the environment, a body of two statements, a name match and a name a
-    // parameter, a `catch` binding or a local hides fold nothing.
+    // parameter, a `catch` binding or a local hides fold nothing; neither does a `new URL`
+    // written through its path or host, nor a `URL` the file declares or imports from the
+    // repository.
     for file in [
         "src/env.ts",
         "src/statements.ts",
         "src/names.ts",
         "src/hidden.ts",
+        "src/written.ts",
+        "src/declared.ts",
+        "src/own.ts",
     ] {
         assert_eq!(linked(file), Vec::<String>::new(), "{file}");
     }

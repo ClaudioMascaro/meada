@@ -254,6 +254,22 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   rest is a hole), and a member chain in a callee is cut to the node kind. The parent of every node is read once (`Parents`, which
   `lang/ts/uses.rs` and `lang/ts/types.rs` climb too), as `Node::parent` is linear in the
   tree's depth.
+- `lang/ts.rs` (`url_form`, `Parents::written`, #685): `new URL(x)` of one argument is `x`, and
+  `u.toString()` with no argument, `u.href` and `String(u)` pass the value of `u` through, where
+  `u` is a name or a `new URL(..)`, also inside a template string (`${u}` folds through the name).
+  They follow the WHATWG URL Standard (the constructor parses its argument, `toString()` is
+  `href`), so a URL that `searchParams`, `search` or `hash` changes keeps its path. `new URL`
+  stays a call when the file declares a `URL` (class, function, variable) or imports one from a
+  relative path; an import from a package, or from an alias the tsconfig maps, is read as the
+  global. Member writes (`u.p = ..`, `u.p += ..`, `u["p"] = ..` for any `p` but `search` and
+  `hash`) are tracked per name across the whole file, whichever function writes them: a `const`
+  built by `new URL` whose name is written holds an unknown value, and the pass-through forms of
+  that name are not read, so two functions that use the same name for different URLs lose both.
+  A mutation inside a function the URL is passed to is not seen, so a wrapper called with the
+  URL folds to the string it was built from. A parameter, a `catch` binding or a variable named
+  `URL` (but not a destructured `require` of a package) also stops the fold. `new URL(x, base)`
+  is not read, and a `toString` or `href` that a repository class defines on a name is read as a
+  pass-through of that name, not followed to the method.
 - `lang/ts.rs` (`Facts::locals`): a local binding hides the name in its whole enclosing
   definition, whatever block holds it, the definition's own definitions, constants and
   parameters of that name included, and a function that is no definition (a method or arrow of an

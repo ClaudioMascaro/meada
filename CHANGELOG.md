@@ -34,6 +34,12 @@ All notable changes to Meada are recorded here. The format follows
   the same name. The `default` of a `variable` with `sensitive = true` and every value a
   `.tfvars` file gives a variable of that name are stored as `redacted`. A file that does
   not parse is skipped and counted by `meada status` (#640).
+- TypeScript consumers through `new URL(x)`: `new URL(x)` with one argument is `x` (unless the file
+  declares a `URL` or imports one from a relative path), and `u.toString()`, `u.href`, `String(u)`
+  and `` `${u}` `` pass the URL through, in a constant or built in place, so a `fetch` or a client
+  wrapper called with one links to its route and a base URL read from the environment shows its
+  `via`. A change through `u.searchParams`, `u.search` or `u.hash` keeps the path; a write to any
+  other member of a `new URL` constant leaves it unresolved (#685).
 
 ### Changed
 
