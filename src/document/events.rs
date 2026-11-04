@@ -65,7 +65,8 @@ pub enum Step {
 pub struct Scalar<'a> {
     /// The 0-based index of its document in the stream.
     pub document: usize,
-    /// Its position in its document, from the root; empty when the document is the scalar.
+    /// Its position in its document, from the root, the steps its key path is written from;
+    /// empty when the document is the scalar.
     pub path: &'a [Step],
     /// A string, a number, a boolean or null.
     pub value: &'a Value,
@@ -251,13 +252,14 @@ fn json(text: &str, b: &mut Builder) -> Result<bool, Error> {
     Ok(false)
 }
 
-/// A collection being read, with its anchor, the cost of what it holds so far and how many
-/// collections deep it is, itself included.
+/// A collection being read, with its anchor, the cost of what it holds so far, how many
+/// collections deep it is, itself included, and whether it is, or is inside, a mapping key.
 struct Open {
     node: Node,
     anchor: usize,
     cost: usize,
     depth: usize,
+    in_key: bool,
 }
 
 enum Node {
@@ -306,6 +308,10 @@ impl Builder<'_> {
         self.error.get_or_insert((line, reason.to_string()));
     }
 
+    fn too_deep(&mut self, line: usize) {
+        self.fail(line, &format!("nested deeper than {MAX_NESTING} levels"));
+    }
+
     /// Whether the next node is a mapping key.
     fn at_key(&self) -> bool {
         matches!(
@@ -336,10 +342,7 @@ impl Builder<'_> {
         if !self.charge(cost, line) {
             return;
         }
-        if !self.at_key() {
-            self.begin();
-            self.hand_out(&value, line);
-        }
+        self.hand_out(&value, line);
         self.remember(anchor, &value, cost, 0);
         self.place(value, cost, 0, line);
     }
@@ -349,28 +352,24 @@ impl Builder<'_> {
             return self.fail(line, "an alias to no anchor");
         };
         if self.stack.len() + anchored.depth > MAX_NESTING {
-            let reason = format!("nested deeper than {MAX_NESTING} levels");
-            return self.fail(line, &reason);
+            return self.too_deep(line);
         }
         if !self.charge(anchored.cost, line) {
             return;
         }
-        if !self.at_key() {
-            self.begin();
-            self.hand_out(&anchored.value, line);
-        }
+        self.hand_out(&anchored.value, line);
         self.place(anchored.value, anchored.cost, anchored.depth, line);
     }
 
     fn open(&mut self, sequence: bool, anchor: usize, line: usize) {
         if self.stack.len() == MAX_NESTING {
-            let reason = format!("nested deeper than {MAX_NESTING} levels");
-            return self.fail(line, &reason);
+            return self.too_deep(line);
         }
         if !self.charge(1, line) {
             return;
         }
         self.begin();
+        let in_key = self.at_key() || self.stack.last().is_some_and(|open| open.in_key);
         let node = if sequence {
             Node::Sequence(Vec::new())
         } else {
@@ -381,6 +380,7 @@ impl Builder<'_> {
             anchor,
             cost: 1,
             depth: 1,
+            in_key,
         });
         self.path.push(Step::Index(0));
     }
@@ -398,9 +398,14 @@ impl Builder<'_> {
         self.place(value, open.cost, open.depth, line);
     }
 
-    /// Hands every scalar of `value`, read at the path, to `each`. A walk over an explicit
-    /// stack: an aliased node is as deep as `MAX_NESTING` allows.
+    /// Hands every scalar of `value`, read at the path, to `each`, unless it is a mapping key or
+    /// inside one, which is no value. A walk over an explicit stack: an aliased node is as deep
+    /// as `MAX_NESTING` allows.
     fn hand_out(&mut self, value: &Value, line: usize) {
+        if self.at_key() || self.stack.last().is_some_and(|open| open.in_key) {
+            return;
+        }
+        self.begin();
         let base = self.path.len();
         let mut pending = vec![(0, None, value)];
         while let Some((below, step, value)) = pending.pop() {
@@ -662,11 +667,16 @@ mod tests {
     fn unreadable_yaml_gives_its_line_and_reason() {
         let (line, _) = first(Syntax::Yaml, b"a: 1\nb: [unclosed\n").unwrap_err();
         assert_eq!(line, 3);
-        let (line, reason) = first(Syntax::Yaml, b"? [a]\n: 1\n").unwrap_err();
+        // A collection as a key: no scalar of it is handed out as a value.
+        let mut handed = Vec::new();
+        let result = read(Syntax::Yaml, b"? [a, {b: c}]\n: 1\n", |s| {
+            handed.push(s.value.clone())
+        });
         assert_eq!(
-            (line, reason.as_str()),
-            (1, "a mapping key that is not a scalar")
+            result,
+            Err((1, "a mapping key that is not a scalar".into()))
         );
+        assert_eq!(handed, Vec::<Value>::new());
         assert_eq!(
             first(Syntax::Yaml, b"a: 1\nb: \xff\n"),
             Err((2, "not UTF-8".into()))
