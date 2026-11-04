@@ -1,0 +1,24 @@
+# A8 peer workspace cases (spec #683, ticket #684), read by a8-peers.sh. Tab-separated:
+# workspace, consumer function (the third part of its site), field (contract or via), answer
+# key, state, link, what 1.2.0 prints, case. State: control (the answer key and the base
+# binary), landed (the spec), pending (the spec once its A8 ticket lands; until then it must read
+# as the 1.2.0 column and does not count). Link: - when #683 names none, else the one link the
+# consumer must have: provider repository, level (* any), then text its reason must hold.
+# The ticket that lands a flow turns its rows from pending to landed in the same PR.
+g8	ordersTpl	contract	http::GET::/orders	control	-	http::GET::/orders	control: template string
+g8	ordersUrl	contract	http::GET::/orders	pending	-	null	new URL + searchParams + toString()
+g8	ordersUrlEnv	contract	http::GET::/orders	pending	-	null	new URL(env) + toString()
+g8	ordersUrlEnv	via	env:API_URL	pending	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	new URL(env) + toString(): via
+g8	ordersHref	contract	http::GET::/orders	pending	-	null	new URL(...).href
+g9	OrdersInline	via	env:API_URL	control	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	env:API_URL	control: Go tag read inline
+g9	ordersInline	via	env:API_URL	control	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	env:API_URL	control: TS config.getString inline
+g9	Client.OrdersDirect	via	env:API_URL	pending	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	Go field, direct use
+g9	Client.Orders	via	env:API_URL	pending	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	Go field, through the send() wrapper
+g9	OrdersClient.list	via	env:API_URL	pending	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	TS field set in the constructor
+g10a	ordersConfig	via	env:API_URL	control	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	env:API_URL	control: config value inline (g10a)
+g10b	ordersConfig	via	env:API_URL	pending	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	config value via $include file#key (g10b)
+g10c	ordersConfig	via	env:API_URL	pending	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	config block via $include file (g10c)
+g10d	listClusters	contract	http::GET::/clusters	control	example.com/acme/inventory inferred INVENTORY_URL through the proxy endpoint /inventory	http::GET::/clusters	control: proxy.endpoints inline (g10d)
+g10e	listClusters	contract	http::GET::/clusters	pending	example.com/acme/inventory * INVENTORY_URL through the proxy endpoint /inventory	http::GET::/api/proxy/inventory/clusters	legacy proxy (no endpoints:) inline (g10e)
+g10f	listClusters	contract	http::GET::/clusters	pending	example.com/acme/inventory * INVENTORY_URL through the proxy endpoint /inventory	http::GET::/api/proxy/inventory/clusters	proxy.endpoints via $include (g10f)
+g10g	listClusters	contract	http::GET::/clusters	pending	example.com/acme/inventory * INVENTORY_URL through the proxy endpoint /inventory	http::GET::/api/proxy/inventory/clusters	legacy proxy via $include (g10g)

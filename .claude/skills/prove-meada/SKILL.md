@@ -43,6 +43,7 @@ Follow each changed file to the surfaces and flows it reaches. Internal code cou
 | `deploy/`, `Dockerfile`, `scripts/{compose-check,helm-check,container-smoke,ui-tarball}`, `.github/workflows/{compose,helm,container}.yml` | yes: every deployment | deploy | [references/deploy.md](references/deploy.md) |
 | `src/config_values.rs`, `src/index.rs` (`hidden_ci`, `config_files`), `src/document/` (the event reader), `src/msg.rs` (`ConfigFiles`) | yes: A7 config values | CLI (`meada status`), MCP stdio and HTTP | A7 config values: `prove.py values --http` over `infra.tsv` and `meada` ([references/config-iac.md](references/config-iac.md)) |
 | A7 IaC, infrastructure contracts, workloads, HTTP through IaC, alerts, `via` (spec #642; no path yet: each A7 ticket names its own here) | yes: A7 | CLI, MCP stdio and HTTP, console graph | the A7 flow table in [references/config-iac.md](references/config-iac.md): each A7 ticket adds its paths here and its flow there |
+| `src/lang/ts.rs`, `src/lang/ts/`, `src/lang/go.rs`, `src/lang/go/`, `src/http.rs`, `src/http/ts.rs`, `src/http/ts/` (`config.rs`: the Backstage config reader), `src/http/go.rs`, `src/http/go/`, `src/resolve.rs`, `src/lang/mod.rs` and `src/index.rs` (the config inputs: `config_files`, `configs_found`, `configs_digest`) | yes: A8 base URLs (spec #683) | CLI (`meada export`) | A8 peer workspaces: `a8-peers.sh check` ([references/peers.md](references/peers.md)), beside the corpus entries the rows above name |
 | `tests/golden/` | answer keys | none, but every changed golden is audited | `prove.py rebless` |
 
 A change that only touches tests, docs or this skill reaches no surface: say so in the receipt and stop. A change to launch config (env vars, ports, dependencies, migrations) reaches every surface: smoke test each one. Here that is `Cargo.toml`, `Cargo.lock`, `build.rs`, `rust-toolchain.toml`: run `--repos all --http` and the console in viewer mode.
@@ -92,6 +93,8 @@ Ladder, best first: 1 an old system that does the same job, 2 a snapshot, 3 an i
 | Compose and Helm renders | existing | the renders at the base | 1 | `prove.py deploy` | the deploy files before the change |
 | A7 config values (`search` kind `value`, the status config line) | new | spec #642's user stories 1 to 17, through `prove.py values`'s own reading of the files | 4 | `prove.py values` | the maintainer; the oracle reads the files, never Meada |
 | Every other answer of an A7 entry, and a repository with no config | existing | the base binary on the same copy | 1 | `prove.py values` (status, export, default search), `prove.py run` | the code before the change |
+| A8 base URL cases (`a8-cases.tsv`, `landed`) | new | spec #683's expected lines (#684's table) | 4 | `a8-peers.sh check` | the maintainer |
+| The 5 A8 controls and every other field of the peer workspaces' exports | existing | the base binary on the same generated workspaces | 1 | `a8-peers.sh check` | the code before the change |
 | A new flow that copies nothing | new | the issue | 4 | Find the spec, at run time | the maintainer |
 
 - **Never edit an answer key to make a check pass.** If the app and the answer key disagree, the verdict is BROKEN; only the user changes an answer key.
@@ -186,6 +189,16 @@ One section per surface. `/create-prove-it` adds a section when the app gains a 
 **Done looks like**: `values.md` shows per entry the status config line equal to the oracle (absent on `a7-noconfig`), the other status lines and the export equal to base, every value query equal to the oracle line by line, and "N/N answers byte-equal to stdio" over HTTP; stories 14 and 16 judged by the checker, 15 under Not covered.
 
 **Could fool you**: one value per file is sampled; a flow of the A7 table still `pending` has no check (UNPROVEN); the oracle's own conventions are questions for the maintainer, never a fix to the oracle. The full list: the reference's "Could fool you".
+
+### A8: base URLs across peer workspaces (spec #683)
+
+**Drive**: `$S/a8-peers.sh check "$RUN/bin/meada-base" "$RUN/bin/meada-head" "$RUN/peers"`: it generates neutral sibling repositories under `example.com/acme` (two peers serving `GET /orders`, one behind the Backstage proxy, one consumer per case shape), indexes and exports them with both binaries and compares each case of `scripts/a8-cases.tsv`. The workspaces, the case states and what could fool it: [references/peers.md](references/peers.md).
+
+**Copies**: nothing. A `landed` case answers to #683, a control and every other export field to the base binary.
+
+**Done looks like**: `peers.md` with every control and landed case `PASS`, every `pending` case `PENDING (as 1.2.0, not counted)` and named so on the receipt, and every workspace "equal to base".
+
+**Could fool you**: a `pending` case passes on 1.2.0's value, so it proves only that nothing moved it; the script reads the export, not the MCP answers. The full list: the reference's "Could fool you".
 
 ### Varies by and deliberate
 
