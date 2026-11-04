@@ -1,13 +1,13 @@
 //! Provider documents (spec #21): OpenAPI and AsyncAPI files a repository with a `[serve]`
 //! table keeps. `refresh` reads each one into a `Summary`, derived from its bytes alone and
 //! stored in the index; `Http::declare` turns the routes into provider contracts at query time,
-//! `Channel::declare` the channel sides, and `report` gives the status lines. Readers see the JSON value model whatever the syntax (`yaml.rs`);
+//! `Channel::declare` the channel sides, and `report` gives the status lines. Readers see the JSON value model whatever the syntax (`events.rs`);
 //! `schema.rs` reads a response schema into a shape.
 
 mod asyncapi;
+pub(crate) mod events;
 mod openapi;
 mod schema;
-pub(crate) mod yaml;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -237,27 +237,8 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
 fn parse(path: &str, src: &[u8]) -> Result<Value, (usize, String)> {
     let breaks = src.iter().filter(|&&b| b == b'\n').count();
     let last = breaks + usize::from(!src.ends_with(b"\n"));
-    parse_any(path, src).map_err(|(line, error)| (line.min(last.max(1)), error))
-}
-
-fn parse_any(path: &str, src: &[u8]) -> Result<Value, (usize, String)> {
-    if path.ends_with(".json") {
-        return serde_json::from_slice(src).map_err(|e| {
-            let error = e.to_string();
-            // The position is the line; the column is noise in a status line.
-            let error = error.split(" at line ").next().unwrap_or(&error);
-            (e.line(), error.to_string())
-        });
-    }
-    let text = std::str::from_utf8(src).map_err(|e| {
-        let line = src[..e.valid_up_to()]
-            .iter()
-            .filter(|&&b| b == b'\n')
-            .count()
-            + 1;
-        (line, "not UTF-8".to_string())
-    })?;
-    yaml::parse(text)
+    events::first(events::Syntax::of(path), src)
+        .map_err(|(line, error)| (line.min(last.max(1)), error))
 }
 
 /// The status lines of `repo` (its index content `export`) about its documents, in path

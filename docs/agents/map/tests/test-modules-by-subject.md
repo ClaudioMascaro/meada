@@ -5,7 +5,9 @@
   `requirements.txt`, `Cargo.toml`, `go.mod`, `pom.xml`, Gradle builds, `gradle.properties` and
   version catalogs (also `Maven::inherit` over many builds), `.csproj` and
   `Directory.Build.props` (also `Nuget::inherit`), `msbuild::read` and `props`, Spring's
-  `application.properties` and `.yml` (also placeholders) and `appsettings.json`, and the walks
+  `application.properties` and `.yml` (also placeholders), `appsettings.json`, the YAML and JSON
+  event reader (`document::events::read`: many documents, deep and wide, aliases fanning out and
+  nesting one level deeper each, JSON deep and wide and past `serde_json`'s limit), and the walks
   `Maven::entries` and `Nuget::entries` over modules and projects that pass on to each other.
   Each row builds a file within `lang::MAX_BYTES` (many keys, deep nesting, wide fan-out), reads
   it on a thread of its own and answers the size of what came back; the test holds every row to

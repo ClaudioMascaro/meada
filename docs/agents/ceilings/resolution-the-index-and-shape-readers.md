@@ -333,8 +333,10 @@
 - `document/`: a document never fails indexing, so its readers have fixed limits; deeper or
   larger parts are unreadable or open. `mod.rs`: `DOCUMENT_BYTES_MAX` (16 MiB, above the largest public
   single-file descriptions, GitHub's REST API and Stripe's SDK spec at 10 to 15 MB): a larger
-  document is unreadable at its first line. `yaml.rs`: `MAX_NESTING` (128 nested collections, as
-  `serde_json` has for JSON) and the alias budget (`EXPANSION` times the source plus `SLACK`, no
+  document is unreadable at its first line. `events.rs`, the YAML and JSON event reader: `MAX_NESTING` (128 nested
+  collections, as `serde_json` has for JSON, an alias's node counted at the depth it lands) and
+  the alias budget, which also charges every document of a stream (no count of documents per
+  file of its own yet: ADR 0025 names one, which config values set) (`EXPANSION` times the source plus `SLACK`, no
   marker). `schema.rs`: `MAX_DEPTH` (128 levels per shape), `WORK` (64 MiB per document) and
   `BUDGET` (10,000 schemas per shape, no marker). `openapi.rs`: a path item reference behind
   another one that is external is dropped without a status line (no marker).
@@ -374,7 +376,7 @@
 - `jvm/spring.rs` (spec #26, #89): `PLACEHOLDER_DEPTH` (32) bounds how many keys deep a
   placeholder is resolved, a cycle included, and `PLACEHOLDER_BUDGET` (64 KiB) what one value
   may cost (each placeholder visited, each byte copied); past either the rest is an unknown
-  part. The YAML file goes through the provider documents' reader (`document/yaml.rs`), with its
+  part. The YAML file goes through the event reader (`document/events.rs`), with its
   budget and nesting limit; a `.properties` file is bounded by `lang::MAX_BYTES` like every pack
   config. A same-package `System` type in another file is not seen by the Java pack's
   `getenv`.

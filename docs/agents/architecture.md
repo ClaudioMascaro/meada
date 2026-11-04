@@ -93,7 +93,7 @@ for the area a change touches.
 - `jvm/`: what the JVM ecosystems and kinds share: the Maven and Gradle readers, Spring configuration, file readers. [languages](map/languages.md), [seams](map/seams.md)
 - `dotnet/`: what the .NET pack and ecosystems share (spec #28): the MSBuild project reader and what builds on it. [seams](map/seams.md)
 - `xml.rs`: the bounds the XML build readers of `jvm/` and `dotnet/` share. [seams](map/seams.md)
-- `document/`: OpenAPI and AsyncAPI provider documents, read into a `Summary` (spec #21). [documents](map/documents.md)
+- `document/`: OpenAPI and AsyncAPI provider documents, read into a `Summary` (spec #21), and `events.rs`, the one YAML and JSON event reader every YAML or JSON reader goes through (#646). [documents](map/documents.md)
 - `literals.rs`, `zod.rs`, `declared.rs`: the shape of a route read from its handler's returned literals, zod schemas and declared types (spec #23); `lang/ts/types.rs` finds the schema a `z.infer` annotation names. [documents](map/documents.md)
 - `decisions.rs`: `meada.decisions.toml` and its replay at query time. [decisions](map/decisions.md)
 - `decide.rs`, `decider/`: `meada decide` and decider mode, the only network path. [decisions](map/decisions.md)

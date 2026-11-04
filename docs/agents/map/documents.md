@@ -7,7 +7,7 @@ this file, and a change to these modules updates it.
 - `document/` (spec #21): provider documents. `mod.rs`: `is_document(path)` (discovery by file
   name: `{openapi,asyncapi}.{yaml,yml,json}` and `*.{openapi,asyncapi}.{yaml,yml,json}`),
   `read(path, bytes) ->
-  Summary` (never fails: JSON by extension through `serde_json`, else YAML; what cannot be read
+  Summary` (never fails: JSON by extension, else YAML, both through `events::first`; what cannot be read
   becomes a `Problem`, with the line clamped to the file's last line; the content decides,
   since a listed document can have any name: a top-level `openapi` field goes to `openapi.rs`,
   an `asyncapi` one to `asyncapi.rs`, and with neither the name only picks which format it is
@@ -72,14 +72,24 @@ this file, and a change to these modules updates it.
   `Problem::UnknownServer` (the channel is ignored on it). A name holding `{` or `}` is a `Problem::Parameters` and
   ignored (AMQP bindings are not read). Sides with the same broker kind, name and role (several
   operations, several servers of one kind) are one, their payloads read together as one
-  `oneOf` shape. `yaml.rs`: `parse(text) -> Result<Value,
-  (line, reason)>` over `yaml-rust2`'s event parser, taken one event at a time with
-  `Parser::next_token` (never `YamlLoader`, nor `Parser::load`, which recurses per level of
-  nesting), the collections being read on an explicit stack, at most `MAX_NESTING` (128, as
-  `serde_json`) deep (deeper, the document is unreadable at that line): first document only, keys as written, plain scalars typed by the YAML 1.2 core schema,
-  quoted and block scalars strings, a non-scalar key an error, and every node built, aliases
-  included, charged to a budget of 4 times the source length plus 64 KiB (over it, the
-  document is unreadable). Readers only see `serde_json::Value`.
+  `oneOf` shape. `events.rs` (#646): the event reader every YAML and JSON reader goes through
+  (provider documents, Spring's `read_yaml` and with it Backstage's `app-config*.yaml`).
+  `first(syntax, bytes) -> Result<Value, (line, reason)>` reads the first document and nothing
+  past it; `read(syntax, bytes, each)` reads every document of a stream into a `Vec<Value>` and
+  hands `each` every scalar as a `Scalar {document, path: &[Step], value, line}` (`Step::{Key,
+  Index}`, 0-based document and index, 1-based line; a block scalar's line is its text's first,
+  a scalar an alias repeats has the alias's line, an aliased mapping's scalars come in key
+  order); `Syntax::of(path)` is JSON by the `.json` extension, YAML otherwise. YAML goes through
+  `yaml-rust2`'s event parser, taken one event at a time with `Parser::next_token` (never
+  `YamlLoader`, nor `Parser::load`, which recurses per level of nesting): keys as written, plain
+  scalars typed by the YAML 1.2 core schema, quoted and block scalars strings, a non-scalar key
+  an error, anchors per document. JSON is read by `serde_json` first (its line and reason are
+  the error, as before), then a lexer over the accepted text decodes each string and literal
+  with `serde_json`, so the tree is `serde_json`'s. Both build on one explicit stack, at most
+  `MAX_NESTING` (128, as `serde_json`) collections deep, an alias's node counted at the depth
+  it lands (deeper, the stream is unreadable at that line), and every node built and every
+  document, aliases included, is charged to a budget of 4 times the source length plus 64 KiB
+  (over it, the stream is unreadable). Readers only see `serde_json::Value`.
 - `shape.rs` (in `meada-core`, reached as `crate::shape`; spec #21, ADR 0009): `Shape {source, fields, open, scalars, declared, optional,
   imports, guessed}`, the one form of what a
   contract carries, whatever it is read from, so shape drift (spec #23) compares shapes without

@@ -181,7 +181,9 @@ fn read_properties(src: &str) -> Properties {
 /// when its joined keys pass `YAML_KEY_BUDGET`), and so is a document
 /// that activates on a profile.
 pub fn read_yaml(src: &str) -> Properties {
-    let Ok(root) = crate::document::yaml::parse(src) else {
+    let Ok(root) =
+        crate::document::events::first(crate::document::events::Syntax::Yaml, src.as_bytes())
+    else {
         return Properties::new();
     };
     let mut out = Properties::new();

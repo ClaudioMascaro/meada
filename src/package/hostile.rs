@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 use super::maven::Maven;
 use super::nuget::Nuget;
 use super::{Ecosystem, Export, Manifest, Providers, read_manifest};
+use crate::document::events::{self, Syntax};
 use crate::dotnet::{appsettings, msbuild};
 use crate::jvm::spring;
 use crate::lang::csharp::CSharp;
@@ -82,6 +83,15 @@ fn project_size(project: Option<msbuild::Project>) -> usize {
     let references = (project.packages.iter().chain(&project.projects))
         .map(|r| r.include.len() + r.version.as_ref().map_or(0, String::len));
     usings.chain(references).sum()
+}
+
+/// How many documents and scalars the event reader gives for `text` read as `syntax`, every
+/// document and every scalar with its position; a stream it cannot read gives the scalars handed
+/// out before it stopped.
+fn events(syntax: Syntax, text: String) -> usize {
+    let mut handed = 0;
+    let documents = events::read(syntax, &file(text), |_| handed += 1);
+    handed + documents.map_or(0, |d| d.len())
 }
 
 /// An SDK-style project file with `body` in it.
@@ -595,6 +605,39 @@ fn probes() -> Vec<Probe> {
                 )
             });
             configured("application.yml", first + &levels)
+        }),
+        // YAML and JSON: the event reader (`document::events`), every document and scalar
+        ("events: many documents", || {
+            events(
+                Syntax::Yaml,
+                fill(1, |i| format!("--- {{k{i}: [a, &a{i} b, *a{i}]}}\n")),
+            )
+        }),
+        ("events: deep and wide", || {
+            // At the nesting limit, every scalar is handed out at the full depth.
+            let wide = fill(1, |_| "1, ".into());
+            events(Syntax::Yaml, format!("{}[{wide}1]\n", "- ".repeat(127)))
+        }),
+        ("events: aliases fanning out", || {
+            let anchor = format!("a: &a [{}]\n", vec!["x"; 1000].join(", "));
+            events(Syntax::Yaml, anchor + &fill(1, |i| format!("b{i}: *a\n")))
+        }),
+        ("events: aliases one level deeper each", || {
+            // Each anchor holds the one before: the nesting limit stops it, not the stack.
+            let first = "a0: &a0 [x]\n".to_string();
+            events(
+                Syntax::Yaml,
+                first + &fill(1, |i| format!("a{}: &a{0} [*a{i}]\n", i + 1)),
+            )
+        }),
+        ("events: deep and wide json", || {
+            let wide = fill(1, |_| "1,".into());
+            let nest = |c: &str| c.repeat(100);
+            events(Syntax::Json, format!("{}{wide}1{}", nest("["), nest("]")))
+        }),
+        ("events: json nested past serde_json's limit", || {
+            let nest = |c: &str| c.repeat(NESTING);
+            events(Syntax::Json, format!("{}1{}", nest("["), nest("]")))
         }),
         // .NET: `appsettings.json`
         ("appsettings: many keys", || {
