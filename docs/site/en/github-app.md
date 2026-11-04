@@ -104,8 +104,10 @@ writes to Postgres, in one transaction, a permissions set that replaces the prev
 collaborator listed with its `role_name`. Under `[refresh_lock]` the set carries the job's
 `MEADA_REFRESH_FENCE`, and a set with a higher fence already written refuses the run. A 403 or
 429 passes to the next installation; with every one throttled, on a 5xx, a timeout or a `Link`
-header that leaves the repository's listing, nothing is written and the exit is 1. A 404, or an
-owner no installation covers, gives a warning and no rows.
+header that leaves the repository's listing, nothing is written and the exit is 1. A 403 with quota left (`x-ratelimit-remaining` above 0, no `retry-after`) and
+the body `Resource not accessible by integration` is a missing permission, not a throttle: the
+repository is recorded as `forbidden`, gets no rows and a warning, and the installation stays in
+the rotation. A 404, or an owner no installation covers, gives a warning and no rows.
 
 With `source = "store"`, every addition whose `added_by` holds no role in `roles` is left out:
 the command writes `<index_dir>/workspace/excluded` (the version id, then the excluded

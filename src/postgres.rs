@@ -129,7 +129,7 @@ const MIGRATIONS: &[&str] = &[
      );",
     // 5: the permissions set (#331), one kept: `meada github-app roles` replaces it in one
     // transaction, its repositories what GitHub showed of each identity on the host (`listed`,
-    // `not_found`, `uncovered`, `not_a_repository`), its rows every collaborator GitHub listed,
+    // `not_found`, `forbidden`, `uncovered`, `not_a_repository`), its rows every collaborator GitHub listed,
     // and its exclusions the additions left out (`no_role`, `role_not_accepted`); times from
     // Postgres's clock.
     "CREATE TABLE {schema}.permission_sets (

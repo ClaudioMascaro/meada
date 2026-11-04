@@ -76,6 +76,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- GitHub App: a 403 `Resource not accessible by integration` with quota left (no `retry-after`,
+  `x-ratelimit-remaining` above 0) is a permission failure, not a throttle: `github-app roles`
+  records the repository as `forbidden` (no rows, a warning) and the installation stays eligible
+  for the role check and keeps minting. A 403 or 429 with `retry-after` or an empty quota still
+  throttles, as does any 403 outside the role check's collaborators listing (ADR 0013 amended,
+  #452).
 - prove-meada scripts: the console page checks sign in again when a route lands on the sign-in page
   and fail the route that stays there, the Helm overlays `values-identity.yaml` and
   `values-workspaces.yaml` render in their stack (as `scripts/helm-check` does) instead of failing

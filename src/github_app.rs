@@ -61,6 +61,9 @@ const THROTTLE_FIRST: u64 = 60;
 // ponytail: one REST request, connection to last byte.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 // ponytail: the most bytes of one REST answer read; past it the request fails.
+// ponytail: a 403's body is read up to this many bytes to tell a permission denial from a
+// throttle; one that fills it counts as a throttle.
+const DENIAL_MAX: u64 = 4 << 10;
 const ANSWER_MAX: u64 = 4 << 20;
 // ponytail: the most pages of installations listed per App, `PER_PAGE` each.
 const PAGES_MAX: u32 = 100;
@@ -276,15 +279,41 @@ enum Failure {
         #[cfg_attr(not(all(feature = "postgres", feature = "oidc")), expect(dead_code))] u16,
         Option<u64>,
     ),
+    /// A 403 that is no rate limit: the quota shows left and the body is GitHub's permission
+    /// message (the App lacks a permission on the resource, #452).
+    Forbidden(String),
     /// 404.
     Missing(String),
     Other(String),
 }
 
+impl Failure {
+    /// Outside a repository's collaborators listing a 403 stays a throttle (ADR 0013).
+    fn throttled(self) -> Self {
+        match self {
+            Failure::Forbidden(_) => Failure::Throttled(403, None),
+            other => other,
+        }
+    }
+}
+
+/// The unsigned integer in header `name`, if it holds one.
+fn number(headers: &HeaderMap, name: &str) -> Option<u64> {
+    headers.get(name)?.to_str().ok()?.trim().parse().ok()
+}
+
+/// Whether a 403 is a permission failure and no throttle: no `retry-after`, a
+/// `x-ratelimit-remaining` above 0, and GitHub's permission message in the body.
+fn is_permission_denial(headers: &HeaderMap, body: &[u8]) -> bool {
+    number(headers, "retry-after").is_none()
+        && number(headers, "x-ratelimit-remaining").is_some_and(|left| left > 0)
+        && String::from_utf8_lossy(body).contains("Resource not accessible by integration")
+}
+
 /// The seconds a 403 or 429 says to wait: `retry-after`, else until `x-ratelimit-reset` when
 /// `x-ratelimit-remaining` is 0, else nothing.
 fn wait(headers: &HeaderMap, now: u64) -> Option<u64> {
-    let number = |name: &str| headers.get(name)?.to_str().ok()?.trim().parse::<u64>().ok();
+    let number = |name: &str| number(headers, name);
     if let Some(after) = number("retry-after") {
         return Some(after);
     }
@@ -295,7 +324,8 @@ fn wait(headers: &HeaderMap, now: u64) -> Option<u64> {
 }
 
 /// `GET url` (or `POST`, with no body) with the bearer `jwt` (the App's JWT, or an installation
-/// token): at most `ANSWER_MAX` bytes of a success answer, and its `Link` header. No error
+/// token): at most `ANSWER_MAX` bytes of a success answer, and its `Link` header; a 403's body up
+/// to `DENIAL_MAX`, to tell a permission denial (`Failure::Forbidden`) from a throttle. No error
 /// carries the bearer.
 fn call(
     agent: &ureq::Agent,
@@ -316,6 +346,15 @@ fn call(
     let other = |e: ureq::Error| Failure::Other(scrub(&format!("{url}: {e}"), Some(jwt)));
     let mut response = sent.map_err(other)?;
     let status = response.status().as_u16();
+    if status == 403 {
+        // A body that cannot be read (or fills the limit) is no permission message: a throttle.
+        let body = response.body_mut().with_config().limit(DENIAL_MAX);
+        let body = body.read_to_vec().unwrap_or_default();
+        if is_permission_denial(response.headers(), &body) {
+            let why = Msg::GithubAppStatus { url, status }.text();
+            return Err(Failure::Forbidden(why));
+        }
+    }
     if matches!(status, 403 | 429) {
         return Err(Failure::Throttled(status, wait(response.headers(), now())));
     }
@@ -544,7 +583,7 @@ impl<'a> Run<'a> {
         throttled: &str,
     ) -> Result<(), String> {
         let jwt = self.jwt(app)?;
-        let found = match list(&self.agent, app, &jwt) {
+        let found = match list(&self.agent, app, &jwt).map_err(Failure::throttled) {
             Ok(found) => found,
             Err(Failure::Throttled(_, wait)) => {
                 let secs = self.mark(throttled, wait).await?;
@@ -553,7 +592,9 @@ impl<'a> Run<'a> {
                     .push(Msg::GithubAppMarked { what: &what, secs }.text());
                 return Ok(());
             }
-            Err(Failure::Other(why) | Failure::Missing(why)) => return Err(why),
+            Err(Failure::Other(why) | Failure::Missing(why) | Failure::Forbidden(why)) => {
+                return Err(why);
+            }
         };
         let mut replace = cmd("EVAL");
         replace.arg(REPLACE).arg(1).arg(held).arg(INSTALLATIONS_TTL);
@@ -672,17 +713,20 @@ impl<'a> Run<'a> {
         throttled: &str,
     ) -> Result<Option<(String, u64)>, String> {
         let jwt = self.jwt(at.app)?;
-        let (token, expires) = match mint(&self.agent, at.app, at.id, &jwt) {
-            Ok(minted) => minted,
-            Err(Failure::Throttled(_, wait)) => {
-                let secs = self.mark(throttled, wait).await?;
-                let what = format!("installation {}", at.id);
-                self.notes
-                    .push(Msg::GithubAppMarked { what: &what, secs }.text());
-                return Ok(None);
-            }
-            Err(Failure::Other(why) | Failure::Missing(why)) => return Err(why),
-        };
+        let (token, expires) =
+            match mint(&self.agent, at.app, at.id, &jwt).map_err(Failure::throttled) {
+                Ok(minted) => minted,
+                Err(Failure::Throttled(_, wait)) => {
+                    let secs = self.mark(throttled, wait).await?;
+                    let what = format!("installation {}", at.id);
+                    self.notes
+                        .push(Msg::GithubAppMarked { what: &what, secs }.text());
+                    return Ok(None);
+                }
+                Err(Failure::Other(why) | Failure::Missing(why) | Failure::Forbidden(why)) => {
+                    return Err(why);
+                }
+            };
         let ttl = expires.saturating_sub(now()).saturating_sub(TOKEN_MARGIN);
         if ttl > 0 {
             let value = format!("{expires} {token}");
@@ -1611,6 +1655,8 @@ enum Shown {
     Listed(Vec<Row>),
     /// A 404.
     NotFound,
+    /// A 403 that is a missing permission, not a throttle (#452).
+    Forbidden,
     /// No installation covers the owner.
     Uncovered,
 }
@@ -1622,13 +1668,15 @@ impl Shown {
         match self {
             Shown::Listed(_) => "listed",
             Shown::NotFound => "not_found",
+            Shown::Forbidden => "forbidden",
             Shown::Uncovered => "uncovered",
         }
     }
 }
 
 /// The collaborators of `identity` (`owner/repo` on `host`) and their roles, through the
-/// installations covering the owner in `Run::rotation`'s order: a 403 or 429 marks the
+/// installations covering the owner in `Run::rotation`'s order: a permission 403 is
+/// `Shown::Forbidden`, a 403 or 429 marks the
 /// installation throttled and passes to the next. `Shown::Uncovered` or `Shown::NotFound`, with a
 /// stderr line, when no installation covers the owner or GitHub answers 404. Every other failure, every installation
 /// throttled included, is the line that fails the run.
@@ -1670,6 +1718,10 @@ async fn listed(
                 run.notes.push(Msg::RolesNotFound(identity).text());
                 return Ok(Shown::NotFound);
             }
+            Err(Failure::Forbidden(_)) => {
+                run.notes.push(Msg::RolesForbidden(identity).text());
+                return Ok(Shown::Forbidden);
+            }
             Err(Failure::Throttled(status, wait)) => {
                 let key = run.installation_key(host, at.id, "throttled");
                 let secs = run.mark(&key, wait).await.map_err(|e| failed(&e))?;
@@ -1678,7 +1730,9 @@ async fn listed(
                     .push(Msg::GithubAppMarked { what: &what, secs }.text());
                 last = Some(status);
             }
-            Err(Failure::Other(why) | Failure::Missing(why)) => return Err(failed(&why)),
+            Err(Failure::Other(why) | Failure::Missing(why)) => {
+                return Err(failed(&why));
+            }
         }
     }
     Err(failed(&Msg::RolesThrottled(last).text()))
@@ -1985,6 +2039,37 @@ mod tests {
         ];
         assert_eq!(wait(&headers(&left), 1000), None);
         assert_eq!(wait(&headers(&[]), 1000), None);
+    }
+
+    #[test]
+    fn a_403_is_a_permission_failure_only_with_quota_left_and_the_permission_message() {
+        let headers = |pairs: &[(&'static str, &str)]| {
+            let mut map = HeaderMap::new();
+            for (k, v) in pairs {
+                map.insert(*k, v.parse().unwrap());
+            }
+            map
+        };
+        let body = br#"{"message":"Resource not accessible by integration"}"#;
+        // Permission 403.
+        assert!(is_permission_denial(
+            &headers(&[("x-ratelimit-remaining", "4999")]),
+            body
+        ));
+        // Rate-limited 403: quota spent, or `retry-after`, or another message.
+        assert!(!is_permission_denial(
+            &headers(&[("x-ratelimit-remaining", "0")]),
+            body
+        ));
+        let after = [("x-ratelimit-remaining", "4999"), ("retry-after", "30")];
+        assert!(!is_permission_denial(&headers(&after), body));
+        let secondary = br#"{"message":"You have exceeded a secondary rate limit"}"#;
+        assert!(!is_permission_denial(
+            &headers(&[("x-ratelimit-remaining", "4999")]),
+            secondary
+        ));
+        // No rate-limit header: stays a throttle (429 never reaches `permission`).
+        assert!(!is_permission_denial(&headers(&[]), body));
     }
 
     #[test]

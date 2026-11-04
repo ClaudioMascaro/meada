@@ -725,6 +725,8 @@ pub enum Msg<'a> {
     RolesUncovered(&'a str),
     #[cfg(feature = "github-app")]
     RolesNotFound(&'a str),
+    #[cfg(feature = "github-app")]
+    RolesForbidden(&'a str),
     /// A collaborator listed without a valid login or role, never echoing either.
     #[cfg(feature = "github-app")]
     RolesSkipped(&'a str),
@@ -3367,6 +3369,18 @@ impl Msg<'_> {
                 ),
                 format!(
                     "{identity}: ninguna instalación de GitHub App cubre al dueño; no recibe filas"
+                ),
+            ),
+            #[cfg(feature = "github-app")]
+            Msg::RolesForbidden(identity) => pick(
+                format!(
+                    "{identity}: GitHub answers 403 (permission, not a rate limit) for its collaborators; it gets no rows"
+                ),
+                format!(
+                    "{identity}: o GitHub responde 403 (permissão, não limite de taxa) para os colaboradores; não recebe linhas"
+                ),
+                format!(
+                    "{identity}: GitHub responde 403 (permiso, no límite de tasa) para los colaboradores; no recibe filas"
                 ),
             ),
             #[cfg(feature = "github-app")]

@@ -459,6 +459,28 @@ fn a_set_is_never_replaced_by_a_lower_fence_or_a_failed_listing() {
         "{stderr}"
     );
     below(6);
+
+    // A 403 with quota left and the permission message is no throttle: the repository gets a
+    // warning and no rows, both installations stay unmarked and the run goes on.
+    case.api.with(|s| {
+        s.listing_status = None;
+        s.listing_forbidden = Some("chain/web".into());
+    });
+    let (_, stderr, code) = case.roles(MANIFEST, Some(9));
+    assert_eq!(code, Some(0), "{stderr}");
+    assert!(
+        stderr.contains(&format!("{WEB}: GitHub answers 403 (permission")),
+        "{stderr}"
+    );
+    assert!(!stderr.contains("throttled"), "{stderr}");
+    let marked: bool = redis::cmd("EXISTS")
+        .arg(format!(
+            "{}:github-app:{HOST}:installation:11:throttled",
+            prefix(case.case)
+        ))
+        .query(&mut valkey)
+        .unwrap();
+    assert!(!marked);
 }
 
 /// An addition whose `added_by` GitHub lists with no role, or only with one outside `roles`,

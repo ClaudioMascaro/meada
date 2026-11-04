@@ -386,7 +386,8 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   the operator prunes it in SQL; Meada never deletes a record, and a page of `GET /api/v1/audit`
   answers at most 100.
 - `github_app.rs`: each REST request takes at most `REQUEST_TIMEOUT` (10 seconds) and reads at
-  most `ANSWER_MAX` (4 MiB); an App's installations are listed over at most `PAGES_MAX` pages of
+  most `ANSWER_MAX` (4 MiB), a 403's body at most `DENIAL_MAX` (4 KiB, one that fills it counts as a
+  throttle, #452); an App's installations are listed over at most `PAGES_MAX` pages of
   `PER_PAGE` (100 each; 10,000 installations), the rest unseen; the role check lists one repository's
   collaborators over at most `COLLABORATOR_PAGES_MAX` pages of 100 (100,000 collaborators), past
   which the run fails, writing nothing; with `[catalog]` (#341) it lists one installation's

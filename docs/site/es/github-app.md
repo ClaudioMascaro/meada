@@ -106,7 +106,9 @@ y escribe en Postgres, en una transacción, un conjunto de permisos que reemplaz
 cada colaborador listado con su `role_name`. Bajo `[refresh_lock]` el conjunto lleva el
 `MEADA_REFRESH_FENCE` del job, y un conjunto con un fence mayor ya escrito rechaza la ejecución.
 Un 403 o 429 pasa a la siguiente instalación; con todas limitadas, en un 5xx, un timeout o un
-encabezado `Link` que sale del listado del repositorio, no se escribe nada y la salida es 1. Un
+encabezado `Link` que sale del listado del repositorio, no se escribe nada y la salida es 1. Un 403 con cuota restante (`x-ratelimit-remaining` mayor que 0, sin `retry-after`) y cuerpo
+`Resource not accessible by integration` es falta de permiso, no limitación: el repositorio se
+registra como `forbidden`, no recibe filas, da un aviso y la instalación sigue en la rotación. Un
 404, o un owner que ninguna instalación cubre, da un aviso y ninguna fila.
 
 Con `source = "store"`, toda adición cuyo `added_by` no tiene un rol de `roles` queda fuera: el
