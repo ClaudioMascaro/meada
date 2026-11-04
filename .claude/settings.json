@@ -9,7 +9,8 @@
   },
   "enabledPlugins": {
     "mattpocock-skills@claude-plugins-official": false,
-    "ponytail@ponytail": true
+    "ponytail@ponytail": true,
+    "ray-amjad-skills@ray-amjad": false
   },
   "env": {
     "PONYTAIL_DEFAULT_MODE": "lite"
