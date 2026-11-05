@@ -198,7 +198,7 @@ const MAX_GLOB_PARTS: usize = 64;
 /// Whether the glob `pattern`, relative and `/`-separated, fits the relative path `path`: `**`
 /// is any number of directories, and `*` in a part any run of characters within it. Matched
 /// part by part without recursion, each pair of parts once, so a hostile glob stays bounded.
-// shortcut: `?` and `[...]` are matched literally; read them when a real workspace uses one.
+// ponytail: `?` and `[...]` are matched literally; read them when a real workspace uses one.
 fn glob(pattern: &str, path: &str) -> bool {
     let (Some(pattern), Some(path)) = (relative("", pattern), relative("", path)) else {
         return false;
