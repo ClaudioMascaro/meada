@@ -67,6 +67,20 @@ All notable changes to Meada are recorded here. The format follows
   context (a path inside the repository, from its root) for the image contract, and `context`
   shows both. `search` kind `iac`, `context` and `trace` answer for them. The index schema
   changes, so existing indexes are rebuilt; release level minor (#652).
+- CloudFormation and SAM templates as IaC nodes (ADR 0025): a YAML file (the short-form tags
+  `!Ref`, `!Sub`, `!GetAtt`, `!Join` and the rest are read) or a JSON file with a `Resources`
+  mapping that carries `AWSTemplateFormatVersion` or the SAM transform
+  (`AWS::Serverless-2016-10-31`) is one evaluation unit, rooted at the template's path, and each
+  resource is a node addressed by its logical id, its type (`AWS::SQS::Queue`,
+  `AWS::Serverless::Function`) the node's type. `Ref`, `Fn::GetAtt` (with the attribute in the
+  `via`), the variables of `Fn::Sub` and `DependsOn` are references. The physical name of the
+  types the contract kinds will read (queues, topics, buckets, tables, functions, streams,
+  secrets and a few more) is evaluated within the template: a parameter's default (marked
+  overridable), `Ref`, `Fn::Sub`, `Fn::GetAtt` and `Fn::Join`; a pseudo parameter, an import and
+  any other function are unresolved parts and the name a pattern. A parameter with `NoEcho` has
+  its default stored as `redacted` among the config values and used for no name. `search` kind
+  `iac`, `context` and `trace` answer for them; a changed template is evaluated again alone. The
+  index schema changes, so existing indexes are rebuilt; release level minor (#653).
 - Kubernetes objects and Kustomize overlays as IaC nodes (ADR 0025): every YAML or JSON document
   with an `apiVersion`, a `kind` and a `metadata.name` is a node addressed
   `<Kind>[.<group>]/<namespace>/<name>` (no namespace for a cluster-scoped kind). Each directory

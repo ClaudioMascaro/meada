@@ -1,0 +1,37 @@
+example.com/acme/infra sam/template.yaml:23 OrdersFunction
+  example.com/acme/infra sam/template.yaml:19 OrdersApi via Ref
+  example.com/acme/infra sam/template.yaml:44 OrdersQueue via Fn::GetAtt.Arn
+  example.com/acme/infra sam/template.yaml:44 OrdersQueue via Ref (see above)
+  example.com/acme/infra sam/template.yaml:48 OrdersTable via Ref
+chain: exact · 0 hops · 1 repos · 98 tokens
+
+example.com/acme/infra cfn/stack.yaml:27 AlertsTopic
+  example.com/acme/infra cfn/stack.yaml:15 JobsQueue via Fn::GetAtt.Arn
+    example.com/acme/infra cfn/stack.yaml:23 JobsDeadLetter via DependsOn
+    example.com/acme/infra cfn/stack.yaml:23 JobsDeadLetter via Fn::GetAtt.Arn (see above)
+chain: exact · 0 hops · 1 repos · 85 tokens
+
+example.com/acme/infra cfn/stack.json:17 Consumer
+  example.com/acme/infra cfn/stack.json:10 Stream via DependsOn
+  example.com/acme/infra cfn/stack.json:10 Stream via Fn::GetAtt.Arn (see above)
+  example.com/acme/infra cfn/stack.json:10 Stream via Ref (see above)
+chain: exact · 0 hops · 1 repos · 78 tokens
+
+example.com/acme/infra sam/template.yaml:44 OrdersQueue
+  example.com/acme/infra sam/template.yaml:23 OrdersFunction via Fn::GetAtt.Arn
+  example.com/acme/infra sam/template.yaml:23 OrdersFunction via Ref (see above)
+chain: exact · 0 hops · 1 repos · 66 tokens
+
+example.com/acme/infra cfn/stack.yaml:23 JobsDeadLetter
+  example.com/acme/infra cfn/stack.yaml:15 JobsQueue via DependsOn
+    example.com/acme/infra cfn/stack.yaml:27 AlertsTopic via Fn::GetAtt.Arn
+    example.com/acme/infra cfn/stack.yaml:43 QueueLogs via Fn::Sub
+    example.com/acme/infra cfn/stack.yaml:53 SharedName via Ref
+  example.com/acme/infra cfn/stack.yaml:15 JobsQueue via Fn::GetAtt.Arn (see above)
+chain: exact · 0 hops · 1 repos · 116 tokens
+
+example.com/acme/infra cfn/stack.json:10 Stream
+  example.com/acme/infra cfn/stack.json:17 Consumer via DependsOn
+  example.com/acme/infra cfn/stack.json:17 Consumer via Fn::GetAtt.Arn (see above)
+  example.com/acme/infra cfn/stack.json:17 Consumer via Ref (see above)
+chain: exact · 0 hops · 1 repos · 79 tokens

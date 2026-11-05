@@ -324,9 +324,9 @@ words:
 | `<iac-section>` | `values` | The config values of its block. |
 | `<none>` | ` none` | The section has no line. |
 | `<variable>` | `var.<word>` | A root module's variable. |
-| `<overridable-from>` | `default` | Its value is its default, at the variable's block. |
+| `<overridable-from>` | `default` | Its value is its default, at the variable's block (a CloudFormation `Parameters.<name>`, at its `Default`). |
 | `<overridable-from>` | `tfvars` | Its value comes from a var file (`terraform.tfvars`, `*.auto.tfvars`), at the value's line. |
-| `<via>` | ` via <text>` | What the reference went through: a variable, local or module output (`var.queue_arn`, `local.topic`, `module.orders.queue_arn`), or for a Kubernetes object how it names the other (`selector app=api`, `env DATABASE_URL`, `envFrom`, `volume settings`, `serviceAccountName`, `backend shop.example.com/api`, `defaultBackend`). |
+| `<via>` | ` via <text>` | What the reference went through: a variable, local or module output (`var.queue_arn`, `local.topic`, `module.orders.queue_arn`), or for a Kubernetes object how it names the other (`selector app=api`, `env DATABASE_URL`, `envFrom`, `volume settings`, `serviceAccountName`, `backend shop.example.com/api`, `defaultBackend`), or for a CloudFormation or SAM resource the intrinsic that names the other (`Ref`, `Fn::GetAtt.Arn`, `Fn::Sub`, `DependsOn`). |
 | `<iac-mark>` | ` (overridable)` | A default (`${VAR:-default}`) gave the text. |
 | `<iac-mark>` | ` (unresolved)` | A variable with no default is still in the text, as `${VAR}`. |
 | `<iac-pass>` | `<address> (root <iac-root>)` | The node in its root module. |

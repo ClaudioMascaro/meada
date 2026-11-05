@@ -429,6 +429,26 @@ Cada servicio es un nodo IaC `services.<nombre>` de tipo `service`.
   raíz; una ruta absoluta, una URL, una que sale de la raíz o una con una parte sin resolver no.
 - **Consultas**: como en los nodos Terraform, `search` con `kind = "iac"`, `context` y `trace`.
 
+### CloudFormation y SAM
+
+Una plantilla YAML (las etiquetas cortas `!Ref`, `!Sub`, `!GetAtt`, `!Join` y las demás se leen) o
+JSON con un mapa `Resources` que lleve `AWSTemplateFormatVersion` o la transformación SAM
+(`AWS::Serverless-2016-10-31`) se lee como una unidad de evaluación, con raíz en su ruta. Cada
+recurso es un nodo IaC direccionado por su id lógico, y su tipo (`AWS::SQS::Queue`,
+`AWS::Serverless::Function`) es el tipo del nodo.
+
+- **Referencias**: `Ref`, `Fn::GetAtt` (con el atributo en el `via`, `via Fn::GetAtt.Arn`), las
+  variables de `Fn::Sub` y `DependsOn`.
+- **Nombres**: el nombre físico de cola, tema, bucket, tabla, función, stream, secreto y algunos
+  tipos más se evalúa dentro de la plantilla a partir del valor por defecto de un parámetro
+  (`context` lo lista en `overridable:`), `Ref`, `Fn::Sub`, `Fn::GetAtt` y `Fn::Join`. Un pseudo
+  parámetro (`AWS::Region`), un import y cualquier otra función son partes sin resolver: el
+  nombre pasa a ser un patrón, mostrado `pattern "assets-prod-*"`.
+- **Secretos**: un parámetro con `NoEcho` tiene su valor por defecto guardado como `redacted` y
+  ningún nombre pasa por él.
+- **Consultas**: como en los nodos Terraform, `search` con `kind = "iac"`, `context` y `trace`.
+- **No seguidos**: stacks anidados, macros, condiciones y mapeos.
+
 ## 4. `meada.toml`: referencia
 
 Cada repositorio puede tener un `meada.toml` en la raíz, versionado en git, que dice con quién

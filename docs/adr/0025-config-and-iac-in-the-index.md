@@ -275,6 +275,48 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   the root itself); an absolute path, a URL, a path that climbs out of the root or one with an
   unresolved part is not recorded. No file is touched, so no symlink is followed.
 
+### CloudFormation and SAM nodes (#653)
+
+- **Unit.** A YAML or JSON file that says `AWSTemplateFormatVersion` or the SAM transform
+  (`AWS::Serverless-2016-10-31`, alone or in a list) and holds a `Resources` mapping is one
+  evaluation unit, its root labelled by its path. Nothing joins two templates (a nested stack, an
+  `Fn::ImportValue` and a `Fn::Transform` are not followed), so a changed template is evaluated
+  again alone and no other root is touched.
+- **YAML tags.** The event reader has a mode that reads a node tagged `!Name` as the mapping
+  `{"Fn::Name": node}` (`!Ref` and `!Condition` as `Ref` and `Condition`), the long form JSON
+  templates use, so both syntaxes reach one evaluator. The mode is opt-in: the config values and
+  every other reader still ignore tags.
+- **Nodes.** Each resource with a `Type` of the form `Provider::Service::Resource` or
+  `Custom::Name` is a node at its logical id, with that type, at the lines of its block. A
+  resource with no such type is no node. The `::` also tells these rows from Kubernetes kinds and
+  Terraform types, which never hold one, so each refresh rewrites its own rows only.
+- **References.** `Ref`, `Fn::GetAtt` (`[Resource, Attribute]` or `Resource.Attribute`, the
+  attribute in the `via`: `Fn::GetAtt.Arn`; a computed attribute, `[Resource, !Ref Param]`, gives
+  the `via` `Fn::GetAtt`), the `${Resource}` and `${Resource.Attribute}`
+  variables of `Fn::Sub` that its own variable map does not define (`${!Text}` is a literal) and
+  `DependsOn` (a string or a list), wherever they sit in the resource, each `exact`. A name that
+  is no resource of the template (a parameter, a pseudo parameter) is no reference.
+- **Evaluation.** The property that holds a type's physical name (`QueueName`, `TopicName`,
+  `BucketName`, `TableName`, `FunctionName`, ...) is evaluated with `Ref`, `Fn::Sub`,
+  `Fn::GetAtt` and `Fn::Join` over the template's own values: a parameter's default (the
+  overridable value of the rule for evaluated names, recorded with its line), another resource's
+  name where the type says `Ref` returns it (a bucket, a table, a function) and `Fn::GetAtt` of
+  the attribute that is that property, and literals. A pseudo parameter (`AWS::Region`), an
+  `Fn::ImportValue`, any other function, a parameter with no default, of a list type, of an SSM
+  parameter value type or with `NoEcho`, and an attribute the type does not say are unresolved
+  parts: a `*`, and the name a pattern. A resource that sets no name (CloudFormation generates it) has none.
+- **Names by type.** A short table maps the types the contract kinds will read to their name
+  property; the type table of the spec replaces it. A type outside it is still a node, with its
+  references, and has no physical name.
+- **Secrets.** A parameter with `NoEcho` (true, or a string that reads as true: `true`, `yes`,
+  `on` or `y` in any case, since CloudFormation's YAML 1.1 types the plain ones as booleans and
+  redacting too much is the safe direction) in a template has its `Default` stored as `redacted`
+  among the config values, and no name is resolved through it.
+- **Limits.** `INTRINSIC_DEPTH_MAX` (nesting of functions and of resources naming each other),
+  `PHYSICAL_NAME_MAX` (a name longer is unresolved), and the shared `NODES_MAX`,
+  `REFERENCES_MAX` and `ROOT_STORED_MAX`, each fed an input past it by a unit test. The hostile
+  probes hold the reader to a file of the size ceiling.
+
 ### IaC node
 
 An IaC node is a resource-like block of any format, with an address, a type, a file and a span.

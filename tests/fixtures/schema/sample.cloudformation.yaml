@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+  Token:
+    Type: String
+    NoEcho: true
+    Default: secret
+Resources:
+  Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${Stage}-${AWS::Region}-jobs"
+  Worker:
+    Type: AWS::Serverless::Function
+    DependsOn: Queue
+    Properties:
+      FunctionName: !Join ["-", [!Ref Stage, worker]]
+      Environment:
+        Variables:
+          QUEUE: !GetAtt Queue.Arn

@@ -119,7 +119,9 @@ pub(crate) fn schema_version() -> i32 {
 /// files, told apart by their path) whole when a Kubernetes file changed (`kube::refresh`).
 /// `iac_images` holds the images of a Kubernetes workload once its overlay changed them
 /// (`kube::Image`) and `iac_unresolved` the Kustomize entries not followed (`kube::Unresolved`),
-/// rewritten with them. None is exported.
+/// rewritten with them. The CloudFormation and SAM nodes (#653), a resource each with its type
+/// `AWS::...` and its template as root, are rewritten per template whose file changed or left
+/// (`iac::refresh_template`). None is exported.
 pub(crate) const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -750,6 +752,10 @@ fn refresh_keeping(
             if kube::changed(&tx, path, Some(src))? {
                 kubernetes.set(true);
             }
+            // A template is its own unit: only its own rows are rewritten.
+            if iac::template_changed(&tx, path, Some(src))? {
+                iac::refresh_template(&tx, path, Some(src))?;
+            }
             let (outcome, rows) = config_values::read_with(path, src, &sensitive.of(path)?);
             config_values::store(&tx, path, &rows)?;
             Ok(serde_json::to_string(&outcome)?)
@@ -758,6 +764,9 @@ fn refresh_keeping(
     let mut kube_left = false;
     for path in &gone {
         kube_left = kube_left || kube::changed(&tx, path, None)?;
+        if iac::template_changed(&tx, path, None)? {
+            iac::refresh_template(&tx, path, None)?;
+        }
         config_values::forget(&tx, path)?;
     }
     let mut dirs = terraform.into_inner();
@@ -3665,6 +3674,15 @@ mod tests {
         .collect();
         actual += "\nsample.kustomization.yaml\n";
         actual += &format!("{:#?}\n", kube::evaluate(&files));
+
+        // The IaC nodes and references of a CloudFormation template (#653), and its config values
+        // with a `NoEcho` default redacted.
+        let src = fs::read(tests.join("fixtures/schema/sample.cloudformation.yaml")).unwrap();
+        actual += "\nsample.cloudformation.yaml\n";
+        let files = [("stack/template.yaml".to_string(), src.clone())];
+        actual += &format!("{:#?}\n", crate::iac::evaluate(&files));
+        let (_, rows) = config_values::read("stack/template.yaml", &src);
+        actual.extend(rows.iter().map(|row| format!("{row:?}\n")));
 
         let golden = tests.join("golden/schema.txt");
         if std::env::var_os("MEADA_BLESS").is_some_and(|v| v == "1") {

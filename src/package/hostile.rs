@@ -132,6 +132,18 @@ fn compose(text: String) -> usize {
     nodes.chain(references).sum()
 }
 
+/// The bytes of the addresses, names and references the IaC nodes of `text`, a lone
+/// `template.yaml` of CloudFormation (#653), store.
+fn template(text: String) -> usize {
+    let head = "AWSTemplateFormatVersion: x\n";
+    let (nodes, references) =
+        crate::iac::evaluate(&[("template.yaml".into(), file(format!("{head}{text}")))]);
+    let nodes = (nodes.iter()).map(|n| n.address.len() + n.name.as_ref().map_or(0, String::len));
+    let references = (references.iter())
+        .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
+    nodes.chain(references).sum()
+}
+
 /// The bytes of the addresses, references, images and unresolved entries `kube::evaluate` stores
 /// for the files `files` (path and text) of one repository.
 fn objects(files: Vec<(&str, String)>) -> usize {
@@ -861,6 +873,113 @@ fn probes() -> Vec<Probe> {
                 "x: &base {{image: a, depends_on: [s0]}}\nservices:\n{services}"
             ))
         }),
+        // CloudFormation and SAM (#653): what one template's evaluation stores
+        (
+            "cloudformation: tagged intrinsics nested to the limit",
+            || {
+                let nest = "!Join ['', [".repeat(60) + "x" + &"]]".repeat(60);
+                let resources = fill(1, |i| {
+                    format!(
+                        "  R{i}:\n    Type: AWS::SQS::Queue\n    Properties:\n      QueueName: {nest}\n"
+                    )
+                });
+                template(format!("Resources:\n{resources}"))
+            },
+        ),
+        ("cloudformation: every resource depends on many", || {
+            let deps = (0..100)
+                .map(|i| format!("R{i}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let resources = fill(4, |i| {
+                format!("  R{i}:\n    Type: AWS::SQS::Queue\n    DependsOn: [{deps}]\n")
+            });
+            template(format!("Resources:\n{resources}"))
+        }),
+        ("cloudformation: names built from a long default", || {
+            let long = "n".repeat(900);
+            let resources = fill(4, |i| {
+                format!(
+                    "  R{i}:\n    Type: AWS::SQS::Queue\n    Properties:\n      QueueName: !Sub '${{P}}${{P}}${{P}}'\n"
+                )
+            });
+            template(format!(
+                "Parameters:\n  P:\n    Default: {long}\nResources:\n{resources}"
+            ))
+        }),
+        (
+            "cloudformation: a chain of resources naming the last",
+            || {
+                let resources = fill(1, |i| {
+                    format!(
+                        "  R{i:06}:\n    Type: AWS::S3::Bucket\n    Properties:\n      BucketName: !Sub '${{R{:06}}}-x'\n",
+                        i + 1
+                    )
+                });
+                template(format!("Resources:\n{resources}"))
+            },
+        ),
+        ("cloudformation: an alias per resource", || {
+            let resources = fill(4, |i| format!("  R{i}: *base\n"));
+            template(format!(
+                "x: &base {{Type: AWS::SQS::Queue, DependsOn: R0}}\nResources:\n{resources}"
+            ))
+        }),
+        (
+            "cloudformation: an aliased section of many resources",
+            || {
+                let resources = fill(4, |i| {
+                    format!(
+                        "  R{i}:\n    Type: AWS::SQS::Queue\n    Properties:\n      QueueName: q\n"
+                    )
+                });
+                template(format!("x: &r\n{resources}Resources: *r\n"))
+            },
+        ),
+        (
+            "cloudformation: an aliased section of one-line resources",
+            || {
+                let resources = fill(2, |i| format!("  R{i}: {{Type: AWS::SQS::Queue}}\n"));
+                template(format!("x: &r\n{resources}Resources: *r\n"))
+            },
+        ),
+        ("cloudformation: flat JSON of many resources", || {
+            let resources = fill(4, |i| {
+                format!("\"R{i}\": {{\n\"Type\": \"AWS::SQS::Queue\"\n}},\n")
+            });
+            template(format!(
+                "{{\n\"Resources\": {{\n{resources}\"Z\": {{}}\n}}\n}}\n"
+            ))
+        }),
+        ("compose: flat JSON of many services", || {
+            let services = fill(4, |i| format!("\"s{i}\": {{\n\"image\": \"a\"\n}},\n"));
+            compose(format!(
+                "{{\n\"services\": {{\n{services}\"z\": {{}}\n}}\n}}\n"
+            ))
+        }),
+        ("compose: a long blank line above an alias", || {
+            let services = fill(4, |i| format!("  s{i}: {{image: a}}\n"));
+            let blanks = " ".repeat(MAX_BYTES / 2);
+            compose(format!("x: &all\n{services}{blanks}\nservices: *all\n"))
+        }),
+        ("compose: an aliased section of many services", || {
+            let services = fill(4, |i| format!("  s{i}:\n    image: a\n"));
+            compose(format!("x: &all\n{services}services: *all\n"))
+        }),
+        (
+            "cloudformation: tagged aliases that expand past the budget",
+            || {
+                let mut text = String::from("x0: &l0 !Ref [x, x, x, x, x, x, x, x, x, x]\n");
+                for n in 1..=9 {
+                    let p = n - 1;
+                    text += &format!(
+                        "x{n}: &l{n} !Ref [{}]\n",
+                        vec![format!("*l{p}"); 10].join(", ")
+                    );
+                }
+                template(format!("{text}Resources: {{}}\n"))
+            },
+        ),
         // Kubernetes and Kustomize (#651): what one repository's evaluation stores
         ("kustomize: a chain of bases", || {
             let mut files: Vec<(String, String)> = Vec::new();

@@ -220,12 +220,143 @@ fn unmerge(value: &Value) -> Value {
     }
 }
 
+/// How many lines `KeyLines::end_of` steps back one by one before it looks the block's end up.
+const WALK_BACK: usize = 64;
+
+/// The indent of `line`, the leading blanks (a blank line has none).
+fn indent(line: &str) -> usize {
+    if line.trim().is_empty() {
+        0
+    } else {
+        line.len() - line.trim_start().len()
+    }
+}
+
+/// `table[p][i]` is the greatest indent among the `2^p` lines from line `i` (0-based) on; a level
+/// has one entry per window that fits. `log(lines)` levels, each as long as the text.
+fn windows(indents: &[u32]) -> Vec<Vec<u32>> {
+    let mut table: Vec<Vec<u32>> = vec![indents.to_vec()];
+    while let Some(last) = table.last() {
+        let half = 1usize << (table.len() - 1);
+        if last.len() <= half {
+            break;
+        }
+        let next: Vec<u32> = (0..last.len() - half)
+            .map(|i| last[i].max(last[i + half]))
+            .collect();
+        table.push(next);
+    }
+    table
+}
+
+/// A plain key at the start of `line` and what follows it: up to the first `:` that ends the line
+/// or is followed by a blank (`a:b:` is the key `a:b`).
+fn plain_key(line: &str) -> Option<(&str, &str)> {
+    let mut chars = line.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        if c == ':' && chars.peek().is_none_or(|(_, n)| n.is_whitespace()) {
+            return Some((line[..i].trim_end(), &line[i..]));
+        }
+    }
+    None
+}
+
+/// The line of each entry of a section's mapping (`services`, `Resources`): the key line the event
+/// reader gave, else, for an entry that came by an alias (`services: *all`), the nearest line
+/// above the first scalar that starts with the key, found in one pass over the text.
+pub(super) struct KeyLines<'a> {
+    lines: &'a [&'a str],
+    read: BTreeMap<&'a str, usize>,
+    /// The 1-based lines that start a key, by the key's text, built when an entry has no read line.
+    by_text: std::cell::OnceCell<BTreeMap<String, Vec<usize>>>,
+    /// The indent of each line, found once: a line of blanks costs its length to trim.
+    indents: Vec<u32>,
+    /// The maximum indent over each window of `2^p` lines (`windows`), built when `end_of` needs it.
+    windows: std::cell::OnceCell<Vec<Vec<u32>>>,
+}
+
+impl<'a> KeyLines<'a> {
+    pub(super) fn new(lines: &'a [&'a str], section: &str, keys: &'a [events::KeyLine]) -> Self {
+        KeyLines {
+            lines,
+            read: (keys.iter())
+                .filter(|k| k.section == section)
+                .map(|k| (k.key.as_str(), k.line))
+                .collect(),
+            by_text: std::cell::OnceCell::new(),
+            indents: lines.iter().map(|l| indent(l) as u32).collect(),
+            windows: std::cell::OnceCell::new(),
+        }
+    }
+
+    /// The last line of the block that starts at line `line` and whose last scalar is at `last`:
+    /// the last line at or before it that is indented deeper than the key (a null value reports
+    /// the line after it; a blank line, or one no deeper, ends nothing). A block ends within a few
+    /// lines of `last`, except for the entries of an aliased section, which all begin at the
+    /// alias's line, and for flat text: those look it up in a table of the maximum indent over
+    /// the windows of the text, in `log(lines)` steps.
+    pub(super) fn end_of(&self, line: usize, last: usize) -> usize {
+        let key_indent = self.indents.get(line - 1).map_or(0, |&i| i as usize);
+        let from = last.max(line).min(self.lines.len().max(line));
+        let deeper =
+            |at: usize| (self.indents.get(at - 1)).is_some_and(|&i| i as usize > key_indent);
+        let mut end = from;
+        for _ in 0..WALK_BACK {
+            if end <= line {
+                return line;
+            }
+            if deeper(end) {
+                return end;
+            }
+            end -= 1;
+        }
+        // Every window of `2^p` lines ending at `pos` that holds nothing deeper is skipped, the
+        // widest first: what is left is the first line from `end` back that is deeper.
+        let table = self.windows.get_or_init(|| windows(&self.indents));
+        let mut pos = end.min(self.lines.len()); // 1-based, the last line not yet ruled out
+        for (p, level) in table.iter().enumerate().rev() {
+            let width = 1usize << p;
+            if pos >= width && level[pos - width] as usize <= key_indent {
+                pos -= width;
+            }
+        }
+        pos.max(line)
+    }
+
+    /// The line of the entry `name` whose first scalar is at line `first`.
+    pub(super) fn of(&self, name: &str, first: usize) -> usize {
+        if let Some(&line) = self.read.get(name) {
+            return line;
+        }
+        let by_text = self.by_text.get_or_init(|| {
+            let mut by: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+            for (i, l) in self.lines.iter().enumerate() {
+                let l = l.trim_start();
+                let key = match l.chars().next() {
+                    Some(q @ ('"' | '\'')) => l[1..].split_once(q),
+                    _ => plain_key(l),
+                };
+                if let Some((key, rest)) = key
+                    && rest.trim_start().starts_with(':')
+                {
+                    by.entry(key.to_string()).or_default().push(i + 1);
+                }
+            }
+            by
+        });
+        let nearest = by_text
+            .get(name)
+            .and_then(|at| at.iter().rev().find(|&&l| l <= first));
+        nearest.copied().unwrap_or(first)
+    }
+}
+
 /// The services of the Compose file `src` at `path`, in name order.
 fn read(path: &str, src: &[u8]) -> BTreeMap<String, Service> {
     let dir = config_values::parent(path);
     // The first and last line of the scalars under each service.
     let mut spans: BTreeMap<String, (usize, usize)> = BTreeMap::new();
-    let documents = events::read(Syntax::Yaml, src, |scalar| {
+    let documents = events::read_keyed(Syntax::Yaml, src, false, |scalar| {
         if let [Step::Key(top), Step::Key(name), ..] = scalar.path
             && top == "services"
         {
@@ -236,7 +367,7 @@ fn read(path: &str, src: &[u8]) -> BTreeMap<String, Service> {
             span.1 = span.1.max(scalar.line);
         }
     });
-    let Ok(documents) = documents else {
+    let Ok((documents, key_lines)) = documents else {
         return BTreeMap::new();
     };
     let Some(Value::Object(services)) = documents
@@ -248,37 +379,15 @@ fn read(path: &str, src: &[u8]) -> BTreeMap<String, Service> {
     };
     let text = String::from_utf8_lossy(src);
     let lines: Vec<&str> = text.lines().collect();
+    let key_line = KeyLines::new(&lines, "services", &key_lines);
     let mut found = BTreeMap::new();
     for (name, body) in &services {
         let Value::Object(body) = body else {
             continue;
         };
         let (first, last) = spans.get(name).copied().unwrap_or((1, 1));
-        // The key's own line: the nearest one at or above the first scalar that starts with it.
-        let keyed = |l: &&str| {
-            let l = l.trim_start();
-            [name.clone(), format!("\"{name}\""), format!("'{name}'")]
-                .iter()
-                .any(|k| {
-                    l.strip_prefix(k.as_str())
-                        .is_some_and(|r| r.trim_start().starts_with(':'))
-                })
-        };
-        let line = (lines.iter().enumerate().take(first).rev())
-            .find(|(_, l)| keyed(l))
-            .map_or(first, |(i, _)| i + 1);
-        // A null value reports the line after it: step back over lines that are not nested in
-        // the service (blank, or indented no deeper than its key).
-        let indent = |l: &str| l.len() - l.trim_start().len();
-        let key_indent = lines.get(line - 1).map_or(0, |l| indent(l));
-        let mut end = last.max(line).min(lines.len().max(line));
-        while end > line
-            && lines
-                .get(end - 1)
-                .is_none_or(|l| l.trim().is_empty() || indent(l) <= key_indent)
-        {
-            end -= 1;
-        }
+        let line = key_line.of(name, first);
+        let end = key_line.end_of(line, last);
         let image = body.get("image").and_then(Value::as_str).map(|s| {
             let Expanded { text, overridable } = expand(s);
             Resolved { text, overridable }
@@ -662,5 +771,101 @@ mod tests {
         let files = [("compose.yaml".to_string(), BASE.as_bytes().to_vec())];
         let (nodes, _) = evaluate(&files, &mut 40);
         assert!(nodes.len() < 3);
+    }
+
+    #[test]
+    fn a_nested_key_spelled_like_its_service_does_not_move_its_lines() {
+        let text = "services:\n  db: {image: p}\n  web:\n    environment:\n      web: 1\n      db: 2\n    image: w\n";
+        let (nodes, _) = unit(&[("compose.yaml", text)]);
+        let web = nodes.iter().find(|n| n.address == "services.web").unwrap();
+        assert_eq!((web.line, web.end_line), (3, 7));
+    }
+
+    #[test]
+    fn a_services_section_that_is_an_alias_starts_at_the_key_lines_of_its_anchor() {
+        let text = "x-all: &all\n  app:\n    image: app:1\n  worker:\n    image: w:1\n    depends_on: [app]\nservices: *all\n";
+        let (nodes, _) = unit(&[("compose.yaml", text)]);
+        let at: Vec<_> = nodes
+            .iter()
+            .map(|n| (n.address.as_str(), n.line, n.end_line))
+            .collect();
+        assert_eq!(at, [("services.app", 2, 6), ("services.worker", 4, 6)]);
+    }
+
+    #[test]
+    fn an_aliased_entry_whose_key_holds_a_colon_is_found_by_its_whole_key() {
+        let text = "x-all: &all\n  a:b:\n    image: colon\n  nb:\n    image: nb\nservices: *all\n";
+        let (nodes, _) = unit(&[("compose.yaml", text)]);
+        let at: Vec<_> = nodes.iter().map(|n| (n.address.as_str(), n.line)).collect();
+        assert_eq!(at, [("services.a:b", 2), ("services.nb", 4)]);
+    }
+
+    #[test]
+    fn an_aliased_section_of_one_line_entries_is_walked_once_not_per_entry() {
+        let entries: String = (0..40_000)
+            .map(|i| format!("  s{i}: {{image: a}}\n"))
+            .collect();
+        let text = format!("x: &all\n{entries}services: *all\n");
+        let start = std::time::Instant::now();
+        let (nodes, _) = unit(&[("compose.yaml", &text)]);
+        assert!(nodes.len() > 1000);
+        assert!(
+            start.elapsed() < std::time::Duration::from_secs(10),
+            "{:?}",
+            start.elapsed()
+        );
+    }
+
+    #[test]
+    fn flat_text_and_entries_at_every_indent_are_walked_in_linear_time() {
+        // JSON with nothing indented: no line is deeper than any key.
+        let entries: String = (0..20_000)
+            .map(|i| format!("\"s{i}\": {{\n\"image\": \"a\"\n}},\n"))
+            .collect();
+        let flat = format!("{{\n\"services\": {{\n{entries}\"z\": {{}}\n}}\n}}\n");
+        // Flow entries of an aliased section, each at a smaller indent than the one before.
+        let deep: String = (0..1_400)
+            .map(|i| format!("{}s{i}: {{image: a}},\n", " ".repeat(1_500 - i)))
+            .collect();
+        let deep = format!("x: &all {{\n{deep}}}\nservices: *all\n");
+        for text in [flat, deep] {
+            let start = std::time::Instant::now();
+            let (nodes, _) = unit(&[("compose.yaml", &text)]);
+            assert!(nodes.len() > 1000);
+            assert!(
+                start.elapsed() < std::time::Duration::from_secs(10),
+                "{:?}",
+                start.elapsed()
+            );
+        }
+    }
+
+    #[test]
+    fn a_block_ends_at_its_last_deeper_line_however_far_the_walk_goes() {
+        // The entry's last scalar is far below it (an alias), past a long run of lines no deeper: the
+        // walk back finds the entry's own last line.
+        let run = "  other: 1\n".repeat(500);
+        let text = format!("x: &all\n  a:\n    image: a\n{run}services: *all\n");
+        let (nodes, _) = unit(&[("compose.yaml", &text)]);
+        let a = nodes.iter().find(|n| n.address == "services.a").unwrap();
+        assert_eq!((a.line, a.end_line), (2, 3));
+    }
+
+    #[test]
+    fn a_long_line_of_blanks_above_an_alias_is_read_once() {
+        // Every entry of the aliased section walks back from the alias line over the blank line.
+        let entries: String = (0..10_000)
+            .map(|i| format!("  s{i}: {{image: a}}\n"))
+            .collect();
+        let blanks = " ".repeat(600_000);
+        let text = format!("x: &all\n{entries}{blanks}\nservices: *all\n");
+        let start = std::time::Instant::now();
+        let (nodes, _) = unit(&[("compose.yaml", &text)]);
+        assert!(nodes.len() > 1000);
+        assert!(
+            start.elapsed() < std::time::Duration::from_secs(10),
+            "{:?}",
+            start.elapsed()
+        );
     }
 }

@@ -5,7 +5,7 @@
   prove.py rebless --base SHA --run DIR
   prove.py deploy --base SHA --run DIR
   prove.py values --base-bin B --head-bin H --repos a7-probe,meada --run DIR [--http]
-  prove.py iac --base-bin B --head-bin H --repos a7-iac,a7-names,terraform-sqs --run DIR [--http]   (python-hcl2)
+  prove.py iac --base-bin B --head-bin H --repos a7-iac,a7-names,a7-cfn,terraform-sqs,sam-rust --run DIR [--http]   (python-hcl2, PyYAML)
   prove.py clean DIR
 
 `run` indexes each corpus repository twice from cold with each binary (determinism and the
@@ -1120,10 +1120,11 @@ def cmd_values(a):
 
 
 def cmd_iac(a):
-    """A7 IaC nodes (#649): the oracle's nodes and references against `search` kind `iac`,
+    """A7 IaC nodes (#649, and #653 for CloudFormation): the oracle's nodes and references against `search` kind `iac`,
     `context` and `trace` both ways over stdio (and HTTP with `--http`); the base answers the
     default search, `meada status` and the export, which the change leaves alone."""
     sys.dont_write_bytecode = True  # no __pycache__ left in the skill's folder
+    import cfn_oracle as cfn  # needs PyYAML: see SKILL.md's Gotchas
     import tf_oracle as tf  # needs python-hcl2: see SKILL.md's Gotchas
     os.environ["LANG"] = "C.UTF-8"
     run = Path(a.run).resolve()
@@ -1135,6 +1136,9 @@ def cmd_iac(a):
         if not src.exists():
             fetch(name, src)
         nodes, references, unreadable = tf.evaluate(src)
+        # #653: the CloudFormation and SAM templates join the Terraform nodes, in the same shape.
+        cf_nodes, cf_references, cf_unreadable = cfn.evaluate(src)
+        nodes, references, unreadable = nodes + cf_nodes, sorted(references + cf_references), unreadable + cf_unreadable
         recs = {}
         for side, bin in (("head", a.head_bin), ("base", a.base_bin)):
             repo, out = run / "work" / side / name, run / side / name
@@ -1171,8 +1175,12 @@ def cmd_iac(a):
         same = body((run / "base" / name / "export1.json").read_bytes()) == body((run / "head" / name / "export1.json").read_bytes())
         differences += not same
         report.append(f"meada export: {'byte-equal to base (no IaC node in it)' if same else 'DIFFERS from base'}")
-        differences += h["status"] != b["status"]
-        report.append(f"meada status: {'equal to base' if h['status'] == b['status'] else 'DIFFERS from base'}")
+        # #653: a `NoEcho` parameter's default is redacted, so the config line's count rises by the
+        # oracle's count of them; every other line, and the rest of that one, equals the base's.
+        extra = cfn.redacted_defaults(src)
+        want_status = re.sub(r"redacted: (\d+)", lambda m: f"redacted: {int(m[1]) + extra}", b["status"]) if extra else b["status"]
+        differences += h["status"] != want_status
+        report.append(f"meada status: {'equal to base' if h['status'] == b['status'] else 'equal to base but for ' + str(extra) + ' redacted NoEcho default(s)' if h['status'] == want_status else 'DIFFERS from base'}")
         # The sample: nodes with references both ways first, then the rest, spread over the list.
         linked = {r[1] for r in references} & {r[2] for r in references}
         ordered = sorted(nodes, key=lambda n: (n["address"] not in linked, n["path"], n["line"], n["address"], n["root"]))

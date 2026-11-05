@@ -423,3 +423,216 @@ fn compose_and_kubernetes_nodes_keep_each_other_when_one_changes() {
             .contains("Pod")
     );
 }
+
+/// CloudFormation and SAM (#653): the fixture `cloudformation-nodes` holds a SAM application
+/// (`sam/template.yaml`), a plain template with parameters (`cfn/stack.yaml`), a JSON template
+/// and a file with `Resources` but no version or transform, which is no template. Each resource
+/// is a node at its logical id, its type `AWS::...`, its root the template's path, its name
+/// resolved within the template.
+#[test]
+fn cloudformation_and_sam_resources_are_nodes_with_references_and_names() {
+    let repo = fixture_repo("iac_cfn", "cloudformation-nodes", ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let search = answers(
+        &[
+            "AWS::SQS::Queue",
+            "dev",
+            "assets-prod",
+            "OrdersFunction",
+            "Serverless",
+            "ignored",
+            "nothing-here",
+        ],
+        |q| engine.search(q, Some("iac"), None).unwrap(),
+    );
+    assert_golden("cloudformation-nodes.search.txt", &search);
+    let questions = [
+        "OrdersFunction",
+        "OrdersQueue",
+        "OrdersTable",
+        "JobsQueue",
+        "AlertsTopic",
+        "AssetsBucket",
+        "Database",
+        "QueueLogs",
+        "SharedName",
+        "BucketAlias",
+        "Literal",
+        "Consumer",
+        "JobsQueue (root cfn/stack.yaml)",
+        "cfn/stack.json::Stream",
+    ];
+    let context = answers(&questions, |q| engine.context(q, None).unwrap());
+    assert_golden("cloudformation-nodes.context.txt", &context);
+    let down = |q: &str| engine.trace(Start::From(q), Direction::Down, None).unwrap();
+    let up = |q: &str| engine.trace(Start::From(q), Direction::Up, None).unwrap();
+    let trace = [
+        answers(&["OrdersFunction", "AlertsTopic", "Consumer"], down),
+        answers(&["OrdersQueue", "JobsDeadLetter", "Stream"], up),
+    ];
+    assert_golden("cloudformation-nodes.trace.txt", &trace.join("\n"));
+    // A file with `Resources` and no version or transform is no template.
+    let none = engine.search("ignored", Some("iac"), None).unwrap();
+    assert!(!none.contains("not-a-template"), "{none}");
+}
+
+/// A `NoEcho` parameter's default is stored as `redacted` among the config values, and no name
+/// is resolved through it.
+#[test]
+fn a_no_echo_parameter_keeps_its_default_redacted() {
+    let repo = fixture_repo("iac_cfn_noecho", "cloudformation-nodes", ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let values = engine
+        .search("Parameters.DbPassword", Some("value"), None)
+        .unwrap();
+    assert!(
+        values.contains("Parameters.DbPassword.Default = redacted"),
+        "{values}"
+    );
+    assert!(!values.contains("hunter2"), "{values}");
+    assert!(
+        !engine
+            .search("hunter2", Some("value"), None)
+            .unwrap()
+            .contains("Default")
+    );
+}
+
+/// A change to a template changes its nodes at the next query, as a cold index gives them; an
+/// added template, a deleted one, and a file that stops being a template do the same, and a
+/// template no change reached keeps its stored rows (one rewritten by hand survives).
+#[test]
+fn a_changed_template_is_evaluated_again_alone() {
+    let repo = fixture_repo("iac_cfn_edit", "cloudformation-nodes", ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let ask = |e: &Engine| {
+        let names = ["OrdersQueue", "JobsQueue", "Stream", "Extra"];
+        answers(&names, |q| e.context(q, None).unwrap())
+    };
+    let before = ask(&engine);
+    assert!(before.contains("name: \"shop-orders-dev\""), "{before}");
+    let db = rusqlite::Connection::open(repo.join(".meada/index.db")).unwrap();
+    db.execute(
+        "UPDATE iac_nodes SET type = 'AWS::Kept::Kept' WHERE address = 'Stream'",
+        [],
+    )
+    .unwrap();
+    // The SAM template changes: its nodes follow, the JSON template's row is not rewritten.
+    let sam = repo.join("sam/template.yaml");
+    let text = fs::read_to_string(&sam).unwrap();
+    fs::write(&sam, text.replace("Default: dev", "Default: qa")).unwrap();
+    let edited = ask(&engine);
+    assert!(edited.contains("name: \"shop-orders-qa\""), "{edited}");
+    assert!(edited.contains("type: AWS::Kept::Kept"), "{edited}");
+    db.execute(
+        "UPDATE iac_nodes SET type = 'AWS::Kinesis::Stream' WHERE address = 'Stream'",
+        [],
+    )
+    .unwrap();
+    // An added template.
+    let extra = "AWSTemplateFormatVersion: '2010-09-09'\nResources:\n  Extra:\n    Type: AWS::SNS::Topic\n    Properties:\n      TopicName: extra\n";
+    fs::write(repo.join("cfn/extra.yaml"), extra).unwrap();
+    let added = ask(&engine);
+    assert!(added.contains("name: \"extra\""), "{added}");
+    fs::remove_dir_all(repo.join(".meada")).unwrap();
+    assert_eq!(added, ask(&Engine::open(&repo).unwrap()));
+    // A file that stops saying it is a template, and one that leaves.
+    let engine = Engine::open(&repo).unwrap();
+    fs::write(
+        repo.join("cfn/extra.yaml"),
+        extra.replace("AWSTemplateFormatVersion: '2010-09-09'\n", ""),
+    )
+    .unwrap();
+    let stopped = engine.search("Extra", Some("iac"), None).unwrap();
+    assert!(!stopped.contains("cfn/extra.yaml"), "{stopped}");
+    fs::write(repo.join("cfn/extra.yaml"), extra).unwrap();
+    assert!(
+        engine
+            .search("Extra", Some("iac"), None)
+            .unwrap()
+            .contains("cfn/extra.yaml")
+    );
+    fs::remove_file(repo.join("cfn/extra.yaml")).unwrap();
+    let gone = engine.search("Extra", Some("iac"), None).unwrap();
+    assert!(!gone.contains("cfn/extra.yaml"), "{gone}");
+    fs::remove_dir_all(repo.join(".meada")).unwrap();
+    assert_eq!(
+        gone,
+        Engine::open(&repo)
+            .unwrap()
+            .search("Extra", Some("iac"), None)
+            .unwrap()
+    );
+}
+
+/// Templates, Kubernetes objects, Compose services and Terraform share the node tables: a change
+/// to one kind leaves the others' rows as they are.
+#[test]
+fn template_and_kubernetes_nodes_keep_each_other_when_one_changes() {
+    let repo = fixture_repo("iac_cfn_kube", "cloudformation-nodes", ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let queue = engine.context("OrdersQueue", None).unwrap();
+    fs::create_dir_all(repo.join("k8s")).unwrap();
+    let pod = "apiVersion: v1\nkind: Pod\nmetadata:\n  name: probe\nspec:\n  containers: []\n";
+    fs::write(repo.join("k8s/pod.yaml"), pod).unwrap();
+    assert!(
+        engine
+            .search("probe", Some("iac"), None)
+            .unwrap()
+            .contains("Pod")
+    );
+    assert_eq!(engine.context("OrdersQueue", None).unwrap(), queue);
+    let sam = repo.join("sam/template.yaml");
+    let text = fs::read_to_string(&sam).unwrap();
+    fs::write(&sam, text.replace("shop", "store")).unwrap();
+    assert!(
+        engine
+            .context("OrdersQueue", None)
+            .unwrap()
+            .contains("store-orders-dev")
+    );
+    assert!(
+        engine
+            .search("probe", Some("iac"), None)
+            .unwrap()
+            .contains("Pod")
+    );
+    fs::write(repo.join("k8s/pod.yaml"), pod.replace("probe", "probe2")).unwrap();
+    assert!(
+        engine
+            .context("OrdersQueue", None)
+            .unwrap()
+            .contains("store-orders-dev")
+    );
+    assert!(
+        engine
+            .search("probe2", Some("iac"), None)
+            .unwrap()
+            .contains("Pod")
+    );
+}
+
+/// A file past the per-file size ceiling is no template (config values count it unreadable): its
+/// nodes are not stored, and a small one in the same directory is.
+#[test]
+fn a_template_past_the_size_ceiling_adds_no_node() {
+    let repo = fixture_repo("iac_cfn_big", "cloudformation-nodes", ORIGIN);
+    let padding = "#".repeat(2 << 20);
+    let big = format!(
+        "AWSTemplateFormatVersion: '2010-09-09'\nResources:\n  Huge:\n    Type: AWS::SNS::Topic\n{padding}\n"
+    );
+    fs::write(repo.join("cfn/huge.yaml"), big).unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    assert!(
+        engine
+            .search("Huge", Some("iac"), None)
+            .unwrap()
+            .contains("no matches")
+    );
+    assert!(
+        engine
+            .search("OrdersQueue", Some("iac"), None)
+            .unwrap()
+            .contains("sam/template.yaml")
+    );
+}

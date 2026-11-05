@@ -1,8 +1,9 @@
 //! IaC nodes (#649, ADR 0025): every Terraform and OpenTofu resource, data block and module call
 //! of the `.tf` and `.tofu` files a repository holds, with an address, a type, a file, a span and
 //! the root module that roots its evaluation, and the static references between them, stored like
-//! calls. `search` finds a node with the kind `iac`, `context` explains it and `trace` walks its
-//! references both ways. Never exported.
+//! calls. A Compose project (#652, `compose`) and a CloudFormation or SAM template (#653,
+//! `cloudformation`) give nodes of the same shape. `search` finds a node with the kind `iac`,
+//! `context` explains it and `trace` walks its references both ways. Never exported.
 //!
 //! A directory of Terraform files is a module. A module block whose `source` is a local path
 //! (`./` or `../`, staying inside the repository) calls the module of that directory; a directory
@@ -50,6 +51,7 @@ use crate::trace::Direction;
 use meada_core::export::Level;
 use meada_core::trace::{Chain, Row};
 
+pub(crate) mod cloudformation;
 mod compose;
 mod functions;
 
@@ -1576,7 +1578,13 @@ impl Repository {
 /// repository, each root module evaluated alone, in root and file order.
 #[cfg(test)]
 pub(crate) fn evaluate(files: &[(String, Vec<u8>)]) -> (Vec<Node>, Vec<Reference>) {
-    Repository::read(files).evaluate(|_| true, STORED_MAX)
+    let (mut nodes, mut references) = Repository::read(files).evaluate(|_| true, STORED_MAX);
+    for (path, src) in files.iter().filter(|(p, s)| cloudformation::wanted(p, s)) {
+        let (n, r) = cloudformation::evaluate(path, src);
+        nodes.extend(n);
+        references.extend(r);
+    }
+    (nodes, references)
 }
 
 /// Evaluates again the root modules of `repository` whose unit holds a directory of `dirs`
@@ -1601,7 +1609,7 @@ pub(crate) fn refresh(
         .collect();
     for root in &stored {
         if again.contains(root.as_str()) || !units.iter().any(|(r, _)| r == root) {
-            forget(tx, Some(root), true)?;
+            forget(tx, Some(root), Owner::Terraform)?;
         }
     }
     let bytes = |sql: &str| -> Result<usize> {
@@ -1638,13 +1646,35 @@ fn terraform_path(column: &str) -> String {
     format!("({})", any.join(" OR "))
 }
 
-/// Deletes the stored nodes and references of the Terraform files (`terraform`) or of the
-/// others, of the root `root` or of every root.
-pub(crate) fn forget(tx: &Transaction, root: Option<&str>, terraform: bool) -> Result<()> {
-    let own = match terraform {
-        true => terraform_path("path"),
-        false => format!("NOT {}", terraform_path("path")),
-    };
+/// Who writes a stored node. The Terraform and Compose nodes (#649, #652), the Kubernetes nodes
+/// (#651) and the CloudFormation nodes (#653) share the tables, and each is rewritten by its own
+/// refresh, so each touches the rows it owns only.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Owner {
+    /// A node of a Terraform, OpenTofu or Compose file, told apart by the name of its file.
+    Terraform,
+    /// A node of any other file whose type has no `::`: a Kubernetes kind.
+    Kubernetes,
+    /// A node of any other file whose type has a `::`: `AWS::SQS::Queue`, `Custom::Name`.
+    CloudFormation,
+}
+
+impl Owner {
+    /// The condition that a row of `iac_nodes` is owned by `self`.
+    pub(crate) fn sql(self) -> String {
+        let own = terraform_path("path");
+        let typed = "type LIKE '%::%'";
+        match self {
+            Owner::Terraform => own,
+            Owner::Kubernetes => format!("(NOT {own} AND NOT {typed})"),
+            Owner::CloudFormation => format!("(NOT {own} AND {typed})"),
+        }
+    }
+}
+
+/// Deletes the stored nodes and references `owner` writes, of the root `root` or of every root.
+pub(crate) fn forget(tx: &Transaction, root: Option<&str>, owner: Owner) -> Result<()> {
+    let own = owner.sql();
     let mut args: Vec<&dyn rusqlite::ToSql> = Vec::new();
     let mut scope = String::new();
     if let Some(root) = &root {
@@ -1663,6 +1693,35 @@ pub(crate) fn forget(tx: &Transaction, root: Option<&str>, terraform: bool) -> R
         &format!("DELETE FROM iac_nodes WHERE {own}{scope}"),
         args.as_slice(),
     )?;
+    Ok(())
+}
+
+/// Whether a refresh that read the file `path` again (`src`) or lost it (`None`) changes the
+/// CloudFormation nodes: it says it is a template, or it held nodes.
+pub(crate) fn template_changed(tx: &Transaction, path: &str, src: Option<&[u8]>) -> Result<bool> {
+    if !cloudformation::is_source(path) {
+        return Ok(false);
+    }
+    if src.is_some_and(|src| cloudformation::wanted(path, src)) {
+        return Ok(true);
+    }
+    let held = format!(
+        "SELECT 1 FROM iac_nodes WHERE path = ?1 AND {} LIMIT 1",
+        Owner::CloudFormation.sql()
+    );
+    Ok(tx.prepare_cached(&held)?.exists(params![path])?)
+}
+
+/// Replaces the nodes and references of the template at `path` with those of `src` (`None` for a
+/// file that left): a template is its own evaluation unit, so no other root is touched.
+pub(crate) fn refresh_template(tx: &Transaction, path: &str, src: Option<&[u8]>) -> Result<()> {
+    forget(tx, Some(path), Owner::CloudFormation)?;
+    // ponytail: a file past `MAX_BYTES` is no template, as config values count it unreadable.
+    let readable = |s: &&[u8]| s.len() <= MAX_BYTES && cloudformation::wanted(path, s);
+    if let Some(src) = src.filter(readable) {
+        let (nodes, references) = cloudformation::evaluate(path, src);
+        insert(tx, &nodes, &references)?;
+    }
     Ok(())
 }
 

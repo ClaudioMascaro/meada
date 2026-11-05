@@ -835,16 +835,18 @@ pub(crate) fn changed(tx: &Transaction, path: &str, src: Option<&[u8]>) -> Resul
     if src.map_or_else(|| is_kustomization(path), |src| wanted(path, src)) {
         return Ok(true);
     }
-    let held = tx
-        .prepare_cached("SELECT 1 FROM iac_nodes WHERE path = ?1 LIMIT 1")?
-        .exists(params![path])?;
+    let held = format!(
+        "SELECT 1 FROM iac_nodes WHERE path = ?1 AND {} LIMIT 1",
+        crate::iac::Owner::Kubernetes.sql()
+    );
+    let held = tx.prepare_cached(&held)?.exists(params![path])?;
     Ok(held)
 }
 
 /// Replaces every stored Kubernetes node, reference, image and unresolved entry with `output`'s;
 /// the Terraform rows stay.
 pub(crate) fn refresh(tx: &Transaction, output: &Output) -> Result<()> {
-    crate::iac::forget(tx, None, false)?;
+    crate::iac::forget(tx, None, crate::iac::Owner::Kubernetes)?;
     crate::iac::insert(tx, &output.nodes, &output.references)?;
     tx.execute_batch("DELETE FROM iac_images; DELETE FROM iac_unresolved;")?;
     let mut insert = tx.prepare_cached("INSERT INTO iac_images VALUES (?1, ?2, ?3, ?4)")?;

@@ -569,6 +569,37 @@
   (the `ponytail:` in `index::refresh_keeping`), reading every YAML or JSON file that says
   `apiVersion`. The Kustomize `images` transformer matches the name before the tag, as written
   (a `newTag` such as `1.20` read by YAML as a number loses its zero).
+- `iac/cloudformation.rs` (#653, ADR 0025): a template reuses `NODES_MAX` (resources past it in
+  logical id order are left out), `REFERENCES_MAX` (per resource, in address order) and
+  `ROOT_STORED_MAX` (per template: the cut is by the template's own budget, with no
+  repository-wide one, since each template is its own unit and a file is read once) and adds
+  `INTRINSIC_DEPTH_MAX` (32 functions, or resources naming each other, inside one another; a
+  deeper name is unresolved, and a name evaluated through a cycle or cut at that depth gets the
+  partial result, memoized, so a resource named through one has it in logical id order: an
+  evaluation per path of a diamond of references would be exponential) and `PHYSICAL_NAME_MAX` (1
+  KiB; a name that grows past it is unresolved). Only `Ref`, `Fn::GetAtt`, `Fn::Sub` and
+  `Fn::Join` are evaluated: `Fn::Select`, `Fn::Split`, `Fn::FindInMap`, `Fn::If`,
+  `Fn::ImportValue`, conditions, mappings and `Fn::Transform` leave an unresolved part. The name
+  property per type is a short table (`NAMED`), so a type outside it has no physical name until
+  the type table of spec #642 lands, and a `GetAtt` is resolved only for the attribute named like
+  that property; one with a computed attribute (`[R, !Ref P]`) is a reference `via Fn::GetAtt`
+  that resolves no name. A `NoEcho` is read as true for `true`, `yes`, `on` and `y` in any case,
+  quoted or not (YAML 1.1 types the plain ones as booleans, this reader cannot tell), and no other
+  YAML 1.1 boolean is typed (a parameter `Default: yes` is the text `yes`). A parameter of an
+  `AWS::SSM::Parameter::Value<...>` type or a list type gives no name. Nested stacks, SAM's
+  implicit `ServerlessRestApi` and its generated roles, `Globals`, `Fn::Transform` macros and
+  `AWS::Include` are not expanded, and a `Transform` that names only another macro makes no
+  template. A YAML template needs `AWSTemplateFormatVersion` or the SAM transform, as a JSON one
+  does. A template past `lang::MAX_BYTES` is no template (config values count it as unreadable). A
+  node starts at its key's line (read by the event reader, `document::events::read_keyed`; for an
+  entry that came by an alias, `services: *all`, the nearest line above that starts with the key)
+  and ends at its last scalar (an aliased section's entries all end at the alias's line, backed
+  over lines no deeper than the key; a block scalar's line is its first line of text), and a line
+  broken by a lone CR is a break to the reader, so a Compose file written so has its services' key
+  lines where the reader puts them (the text scan before #653 had them one line late). The table
+  `end_of` looks block ends up in costs 4 bytes per line of the file per level, built once per
+  file, only for a block whose end is more than 64 lines from its last scalar. A `Fn::GetAtt` in
+  dotted string form splits at its first dot, so an attribute with dots is kept whole.
 - `iac/compose.rs` (#652, ADR 0025): a Compose unit reuses `NODES_MAX`, `REFERENCES_MAX`,
   `ROOT_STORED_MAX` and `STORED_MAX` (services past `NODES_MAX` in name order, and references past
   `REFERENCES_MAX` per service, are left out; shared-network references take the first services of

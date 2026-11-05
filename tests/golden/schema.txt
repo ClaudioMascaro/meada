@@ -3390,3 +3390,88 @@ Output {
         },
     ],
 }
+
+sample.cloudformation.yaml
+(
+    [
+        Node {
+            address: "Queue",
+            root: "stack/template.yaml",
+            ty: "AWS::SQS::Queue",
+            name: Some(
+                "dev-*-jobs",
+            ),
+            pattern: true,
+            overridable: [
+                Overridable {
+                    path: "stack/template.yaml",
+                    line: 6,
+                    variable: "Parameters.Stage",
+                    tfvars: false,
+                },
+            ],
+            path: "stack/template.yaml",
+            line: 12,
+            end_line: 15,
+            block: "Resources.Queue",
+            image: None,
+            build: None,
+        },
+        Node {
+            address: "Worker",
+            root: "stack/template.yaml",
+            ty: "AWS::Serverless::Function",
+            name: Some(
+                "dev-worker",
+            ),
+            pattern: false,
+            overridable: [
+                Overridable {
+                    path: "stack/template.yaml",
+                    line: 6,
+                    variable: "Parameters.Stage",
+                    tfvars: false,
+                },
+            ],
+            path: "stack/template.yaml",
+            line: 16,
+            end_line: 23,
+            block: "Resources.Worker",
+            image: None,
+            build: None,
+        },
+    ],
+    [
+        Reference {
+            root: "stack/template.yaml",
+            source: "Worker",
+            target: "Queue",
+            via: Some(
+                "DependsOn",
+            ),
+        },
+        Reference {
+            root: "stack/template.yaml",
+            source: "Worker",
+            target: "Queue",
+            via: Some(
+                "Fn::GetAtt.Arn",
+            ),
+        },
+    ],
+)
+Row { key: "AWSTemplateFormatVersion", value: Some("2010-09-09"), kind: "string", line: 1, cut: false }
+Row { key: "Transform", value: Some("AWS::Serverless-2016-10-31"), kind: "string", line: 2, cut: false }
+Row { key: "Parameters.Stage.Type", value: Some("String"), kind: "string", line: 5, cut: false }
+Row { key: "Parameters.Stage.Default", value: Some("dev"), kind: "string", line: 6, cut: false }
+Row { key: "Parameters.Token.Type", value: Some("String"), kind: "string", line: 8, cut: false }
+Row { key: "Parameters.Token.NoEcho", value: Some("true"), kind: "boolean", line: 9, cut: false }
+Row { key: "Parameters.Token.Default", value: None, kind: "string", line: 10, cut: false }
+Row { key: "Resources.Queue.Type", value: Some("AWS::SQS::Queue"), kind: "string", line: 13, cut: false }
+Row { key: "Resources.Queue.Properties.QueueName", value: Some("${Stage}-${AWS::Region}-jobs"), kind: "string", line: 15, cut: false }
+Row { key: "Resources.Worker.Type", value: Some("AWS::Serverless::Function"), kind: "string", line: 17, cut: false }
+Row { key: "Resources.Worker.DependsOn", value: Some("Queue"), kind: "string", line: 18, cut: false }
+Row { key: "Resources.Worker.Properties.FunctionName[0]", value: Some("-"), kind: "string", line: 20, cut: false }
+Row { key: "Resources.Worker.Properties.FunctionName[1][0]", value: Some("Stage"), kind: "string", line: 20, cut: false }
+Row { key: "Resources.Worker.Properties.FunctionName[1][1]", value: Some("worker"), kind: "string", line: 20, cut: false }
+Row { key: "Resources.Worker.Properties.Environment.Variables.QUEUE", value: Some("Queue.Arn"), kind: "string", line: 23, cut: false }

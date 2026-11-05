@@ -75,8 +75,10 @@ this file, and a change to these modules updates it.
   `oneOf` shape. `events.rs` (#646): the event reader every YAML and JSON reader goes through
   (provider documents, Spring's `read_yaml` and with it Backstage's `app-config*.yaml`).
   `first(syntax, bytes) -> Result<Value, (line, reason)>` reads the first document and nothing
-  past it; `read(syntax, bytes, each)` reads every document of a stream into a `Vec<Value>` and
-  hands `each` every scalar as a `Scalar {document, path: &[Step], value, line}` (`Step::{Key,
+  past it; `read(syntax, bytes, each)` reads every document of a stream into a `Vec<Value>`
+  (`read_keyed`, #653, the same with each second-level key's line and, with `tags`, a node tagged
+  `!Name` read as `{"Fn::Name": node}`, for CloudFormation) and hands `each` every scalar as a
+  `Scalar {document, path: &[Step], value, line}` (`Step::{Key,
   Index}`, 0-based document and index, 1-based line; a block scalar's line is its text's first,
   a scalar an alias repeats has the alias's line, an aliased mapping's scalars come in key
   order); `Syntax::of(path)` is JSON by the `.json` extension, YAML otherwise. YAML goes through
@@ -203,6 +205,19 @@ this file, and a change to these modules updates it.
   `image` and `build` (`iac::Resolved`: text and overridable flag, from `expand` and `context`,
   which keeps a build path only inside the repository) and its references from `depends_on`,
   `links` and shared `networks`. `iac::context` prints `image:` and `build:` for them.
+- `iac/cloudformation.rs` (#653, ADR 0025): CloudFormation and SAM templates as IaC nodes, one
+  unit per file (root: its path). `wanted` (a YAML or JSON file that says
+  `AWSTemplateFormatVersion` or the SAM transform) and `is_template` (the parsed document) decide;
+  `evaluate(path, bytes)` reads it with `document::events::read_keyed` (a `!Name` tag is the map
+  `{"Fn::Name": node}`), takes each resource of a `Provider::Service::Resource` type as a node at
+  its logical id (`read_keyed` gives its key line, `iac::compose::KeyLines::end_of` its last),
+  `referenced` collects `Ref`, `Fn::GetAtt`, the variables of `Fn::Sub` and `DependsOn`, and
+  `Eval` resolves the name property `NAMED` gives per type with `Ref`, `Fn::Sub`, `Fn::GetAtt` and
+  `Fn::Join` (a parameter's default is an `iac::Overridable`; `no_echo` is also what
+  `config_values` redacts a default by). The index rewrites a template's own rows
+  (`iac::template_changed`, `iac::refresh_template`) as the closure reading its config file runs,
+  and `iac::Owner` keeps each refresh to its own rows: Terraform and Compose by file name,
+  Kubernetes by a type with no `::`, CloudFormation by one with it.
 - `shape.rs` (in `meada-core`, reached as `crate::shape`; spec #21, ADR 0009): `Shape {source, fields, open, scalars, declared, optional,
   imports, guessed}`, the one form of what a
   contract carries, whatever it is read from, so shape drift (spec #23) compares shapes without

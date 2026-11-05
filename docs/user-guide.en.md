@@ -424,6 +424,26 @@ of type `service`.
   path, a URL, one that climbs out of the root or one with an unresolved part is not.
 - **Queries**: as for Terraform nodes, `search` with `kind = "iac"`, `context` and `trace`.
 
+### CloudFormation and SAM
+
+A YAML template (the short-form tags `!Ref`, `!Sub`, `!GetAtt`, `!Join` and the rest are read) or a
+JSON one with a `Resources` mapping that carries `AWSTemplateFormatVersion` or the SAM transform
+(`AWS::Serverless-2016-10-31`) is read as one evaluation unit, rooted at its path. Each resource
+is an IaC node addressed by its logical id, its type (`AWS::SQS::Queue`,
+`AWS::Serverless::Function`) the node's type.
+
+- **References**: `Ref`, `Fn::GetAtt` (with the attribute in the `via`, `via Fn::GetAtt.Arn`), the
+  variables of `Fn::Sub` and `DependsOn`.
+- **Names**: the physical name of a queue, topic, bucket, table, function, stream, secret and a
+  few more types is evaluated within the template from a parameter's default (`context` lists it
+  under `overridable:`), `Ref`, `Fn::Sub`, `Fn::GetAtt` and `Fn::Join`. A pseudo parameter
+  (`AWS::Region`), an import and any other function are unresolved parts: the name is a pattern,
+  shown `pattern "assets-prod-*"`.
+- **Secrets**: a parameter with `NoEcho` has its default stored as `redacted` and no name goes
+  through it.
+- **Queries**: as for Terraform nodes, `search` with `kind = "iac"`, `context` and `trace`.
+- **Not followed**: nested stacks, macros, conditions and mappings.
+
 ## 4. `meada.toml`: reference
 
 Each repository may have a `meada.toml` at its root, versioned in git, that says who it talks to.

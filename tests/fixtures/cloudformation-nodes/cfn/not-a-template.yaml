@@ -1,0 +1,6 @@
+# Resources with no AWSTemplateFormatVersion and no SAM transform: not a template.
+Resources:
+  Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: ignored

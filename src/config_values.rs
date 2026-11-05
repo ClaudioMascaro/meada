@@ -273,6 +273,9 @@ enum SecretPlace {
     /// Under the top-level key `<name>` of a `.tfvars.json` file: secret when the variable is
     /// sensitive.
     Tfvars(String),
+    /// Under `Parameters.<name>.Default`: secret when the file is a CloudFormation template and
+    /// the parameter says `NoEcho`.
+    Parameter(String),
 }
 
 impl SecretPlace {
@@ -287,6 +290,11 @@ impl SecretPlace {
                 if v == "variable" && d == "default" && terraform_json(file) =>
             {
                 SecretPlace::Variable(name.clone())
+            }
+            [Step::Key(p), Step::Key(name), Step::Key(d), ..]
+                if p == "Parameters" && d == "Default" =>
+            {
+                SecretPlace::Parameter(name.clone())
             }
             [first, ..] if held(Some(first)) => SecretPlace::Root,
             [Step::Key(items), Step::Index(n), rest @ ..]
@@ -465,6 +473,7 @@ pub(crate) fn read_with(
                     SecretPlace::Tfvars(name) => {
                         sensitive.contains(&name) || sensitive.contains(ANY_VARIABLE)
                     }
+                    SecretPlace::Parameter(name) => crate::iac::cloudformation::no_echo(doc, &name),
                 };
                 if hidden {
                     row.value = None;

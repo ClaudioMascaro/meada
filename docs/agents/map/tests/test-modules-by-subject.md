@@ -56,6 +56,13 @@
   `iac`, `context` and `trace` against `compose-nodes.{search,context,trace}.txt`, and an edited
   then deleted override equal to a cold index; the unit tests of `iac::compose` for variable
   expansion, merge keys and the ceilings),
+  `cloudformation` (#653, in `iac`: the `cloudformation-nodes` fixture, a SAM application, a plain
+  template with parameters, a JSON template and a file that is no template; `search` kind `iac`,
+  `context` and `trace` against `cloudformation-nodes.{search,context,trace}.txt`, a `NoEcho`
+  default redacted, a changed, added, deleted and no-longer-template file equal to a cold index,
+  a row rewritten by hand surviving the edit of another template, and template and Kubernetes
+  nodes keeping each other's rows; the unit tests of `iac::cloudformation` for the intrinsic
+  functions and the ceilings, those of `document::events` for the tagged reading),
   `decorations` (the `decorations` fixture: Java, Kotlin, C#,
   Python and Rust calls that decorate a definition carry `CallSite::decorates`, ordinary calls do
   not, and `context` lists them under `annotations:`), `docs` (the repository map against the code:

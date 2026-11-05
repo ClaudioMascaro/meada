@@ -18,7 +18,8 @@ lands it writes the check.
 | Config values: `search` kind `value`, the default search's fallback, `meada status`'s config line, values kept out of the export | 1 to 17 | CLI (`meada status`, `meada export`), MCP stdio, MCP HTTP | `a7-probe` and every `infra.tsv` entry, plus `meada` | `prove.py values --http` | landed (#639) |
 | IaC nodes, Terraform: `search` kind `iac`, `context` and `trace` both ways over references, nodes kept out of the default search and the export | #649's criteria (of 18 to 31) | MCP stdio and HTTP, CLI (`meada status`, `meada export`) | `a7-iac`, `terraform-sqs` | `prove.py iac --http` | landed (#649) |
 | Static evaluation of Terraform names: evaluated names and patterns in `search` and `context`, the `overridable:` section, `count` and `for_each` over values that resolve | #650's criteria | MCP stdio and HTTP | `a7-names`, `a7-iac`, `terraform-sqs` | `prove.py iac --http` (its oracle `tf_names.py`) | landed (#650) |
-| IaC nodes of the other formats (Kubernetes, Kustomize, Compose, Crossplane, CloudFormation and SAM, Serverless) | 18 to 31 | MCP stdio and HTTP, CLI status | `boutique`, `crossplane-aws`, `sam-rust`, `kube-prometheus` | to write | pending |
+| IaC nodes, CloudFormation and SAM: `search` kind `iac`, `context` and `trace` on a logical id, `Ref`, `Fn::GetAtt`, `Fn::Sub` and `DependsOn` references, names evaluated within the template (a parameter's default as `overridable:`, pseudo parameters and imports as patterns), `NoEcho` | #653's criteria (of 18 to 31) | MCP stdio and HTTP, CLI (`meada status`, `meada export`) | `a7-cfn`, `sam-rust` | `prove.py iac --http` (its oracle `cfn_oracle.py`) | landed (#653) |
+| IaC nodes of the other formats (Kubernetes, Kustomize, Compose, Crossplane, Serverless) | 18 to 31 | MCP stdio and HTTP, CLI status | `boutique`, `crossplane-aws`, `kube-prometheus` | to write | pending |
 | Infrastructure contracts: provisioner sides and links, SDK and config use sides, subscriptions, patterns, orphans | 32 to 43, 57 to 60 | CLI export and status, MCP | `terraform-sqs`, `sam-rust`, `crossplane-aws` | to write | pending |
 | Workloads, image contract, environment entries | 44 to 49 | CLI export, MCP | `boutique`, `sam-rust` | to write | pending |
 | HTTP through IaC: Services, Ingress, IaC-declared routes | 50 to 52 | CLI export, MCP | `boutique`, `sam-rust` | to write | pending |
@@ -36,6 +37,7 @@ them (most hold no code, so their exports have no symbol).
 |---|---|---|---|---|
 | `a7-probe` | `scripts/a7-probe/` (this skill) | the working tree | Apache-2.0 | stories 6 to 13, case by case |
 | `a7-iac` | `scripts/a7-iac/` (this skill) | the working tree | Apache-2.0 | #649's Terraform shapes, case by case (its README lists them) |
+| `a7-cfn` | `scripts/a7-cfn/` (this skill) | the working tree | Apache-2.0 | #653's templates: a SAM application, a plain template with a `NoEcho` parameter, a list and one with no default, `Fn::Sub` in its forms, `Fn::Join`, an import, a pseudo parameter, a JSON template, a file that is no template (its README lists them) |
 | `a7-names` | `scripts/a7-names/` (this skill) | the working tree | Apache-2.0 | #650's names: locals, variables, var files, a `for_each` over a literal set and over a variable, a local module, `terraform.workspace`, a data source, a registry module, a conditional `count`, a sensitive variable (its README lists them) |
 | `a7-noconfig` | `scripts/a7-noconfig/` (this skill) | the working tree | Apache-2.0 | a repository with no config: no config line, everything else as the base |
 | `terraform-sqs` | terraform-aws-modules/terraform-aws-sqs | `a68b4d515f9ccc729fb8bf84c6760c6b91302ce0` | Apache-2.0 | Terraform on AWS: SQS queues, a registry module family, `for_each`, examples as root modules |
@@ -131,6 +133,28 @@ type, physical name, file, first and last line, root module) and the references,
 - A root's variable is the last value of `terraform.tfvars`, `terraform.tfvars.json`, then the
   `*.auto.tfvars` and `*.auto.tfvars.json` in name order, else its default, and is `overridable` (the value's line, or the variable block's first
   line); a local module's variable is the call's argument, else its default, never overridable.
+
+### CloudFormation oracle conventions (#653)
+
+- A template is a YAML or JSON file the walk visits (no hidden part, no symlink, within 1 MiB)
+  whose document has a `Resources` mapping and `AWSTemplateFormatVersion` or the SAM transform
+  (a string or a list holding it); a resource with a `Type` that has no `::` is no node.
+- Lines: the node starts at its key's line (the outermost line of that name under `Resources`)
+  and ends at its last value scalar's.
+- `NoEcho` is true for `true`, `yes`, `on` and `y` in any case, plain or quoted (redacting too
+  much is the safe direction). A parameter of a list type or of `AWS::SSM::Parameter::Value<...>`
+  gives no name. `Fn::GetAtt` whose attribute is computed (`!Ref Param`) is a reference
+  `via Fn::GetAtt`.
+- References: `Ref`, `Fn::GetAtt` (both forms, `via Fn::GetAtt.<attribute>`), the `${Resource}` and
+  `${Resource.Attribute}` variables of `Fn::Sub` that its map does not define, and `DependsOn`,
+  anywhere in the resource; a name that is no resource of the template is dropped; at most 64
+  per resource.
+- A physical name is the property the oracle's own table gives per type (`NAMED`, the same short
+  list the ticket's ADR section names), evaluated with `Ref`, `Fn::Sub`, `Fn::GetAtt` and
+  `Fn::Join`; `Ref` of a resource is its name only where the table says so; any other function, a
+  pseudo parameter, an import, a `NoEcho`, list or default-less parameter is `*`; a name over 1,024
+  bytes, or nested over 32 deep, is `*`. A parameter's default is `overridable` at its `Default`'s
+  line.
 
 A difference on one of these is a question for the maintainer, BROKEN until answered.
 

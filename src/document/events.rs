@@ -5,8 +5,10 @@
 //!
 //! YAML: `yaml-rust2`'s event parser. A mapping key is the scalar text as written (`200:` is the
 //! key `"200"`); a plain scalar is typed by the YAML 1.2 core schema, a quoted or block one is a
-//! string; tags are not read. An alias repeats the node its anchor holds in the same document,
-//! its scalars handed out again at the alias's line.
+//! string; tags are not read, except by `read_keyed` with `tags`, which turns a node tagged `!Name` into the
+//! mapping `{"Fn::Name": node}` (`!Ref` into `{"Ref": node}`, `!Condition` into `{"Condition":
+//! node}`), the long form CloudFormation gives its intrinsic functions. An alias repeats the node
+//! its anchor holds in the same document, its scalars handed out again at the alias's line.
 //!
 //! JSON: `serde_json` reads the text first, so a JSON file reads, or fails with the same line and
 //! reason, as `serde_json` has it; a lexer then walks the text it accepted, each string and
@@ -20,7 +22,7 @@
 use std::collections::HashMap;
 
 use serde_json::{Map, Number, Value};
-use yaml_rust2::parser::{Event, Parser};
+use yaml_rust2::parser::{Event, Parser, Tag};
 use yaml_rust2::scanner::TScalarStyle;
 
 /// What a node costs, besides the bytes of its text: the budget is `EXPANSION` times the
@@ -93,6 +95,37 @@ pub fn read(
     Ok(documents)
 }
 
+/// The line of a key of the first document's second level: `section` is its top-level key and `key`
+/// its own (`Resources` and a logical id, `services` and a service name).
+#[derive(Debug, PartialEq)]
+pub struct KeyLine {
+    pub section: String,
+    pub key: String,
+    /// 1-based.
+    pub line: usize,
+}
+
+/// `read` that also gives the line of every second-level key of the first document, and, with
+/// `tags`, keeps CloudFormation's short-form tags: a node tagged `!Name` is read as the mapping
+/// `{"Fn::Name": node}` (`Ref` and `Condition` without the prefix). The scalars handed to `each`
+/// are the nodes' own, at the path of the tagged node, so a line is the one of the text. A JSON
+/// text has no tags and reads as `read` does.
+pub fn read_keyed(
+    syntax: Syntax,
+    src: &[u8],
+    tags: bool,
+    mut each: impl FnMut(Scalar<'_>),
+) -> Result<(Vec<Value>, Vec<KeyLine>), Error> {
+    let mut reader = Reader::new(syntax, src, &mut each)?;
+    reader.builder.tags = tags;
+    reader.builder.keyed = true;
+    let mut documents = Vec::new();
+    while let Some(document) = reader.document()? {
+        documents.push(document);
+    }
+    Ok((documents, std::mem::take(&mut reader.builder.keys)))
+}
+
 /// The first document of `src`, null when the stream has none. Nothing past it is read, so a
 /// later document that cannot be read changes nothing.
 pub fn first(syntax: Syntax, src: &[u8]) -> Result<Value, Error> {
@@ -151,6 +184,9 @@ impl<'s, 'f> Reader<'s, 'f> {
             root: None,
             error: None,
             each,
+            tags: false,
+            keyed: false,
+            keys: Vec::new(),
         };
         Ok(Reader { source, builder })
     }
@@ -188,17 +224,24 @@ fn yaml(parser: &mut Parser<std::str::Chars<'_>>, b: &mut Builder) -> Result<boo
             Event::DocumentStart => {
                 b.charge(1, line);
             }
-            Event::Scalar(text, style, anchor, _) => {
+            Event::Scalar(text, style, anchor, tag) => {
                 let cost = 1 + text.len();
                 let value = match style {
                     TScalarStyle::Plain if !b.at_key() => plain(text),
                     _ => Value::String(text),
                 };
-                b.scalar(value, cost, anchor, line);
+                let wrap = b.wrapper(&tag);
+                b.scalar(value, cost, anchor, line, wrap);
             }
             Event::Alias(anchor) => b.alias(anchor, line),
-            Event::SequenceStart(anchor, _) => b.open(true, anchor, line),
-            Event::MappingStart(anchor, _) => b.open(false, anchor, line),
+            Event::SequenceStart(anchor, tag) => {
+                let wrap = b.wrapper(&tag);
+                b.open(true, anchor, line, wrap);
+            }
+            Event::MappingStart(anchor, tag) => {
+                let wrap = b.wrapper(&tag);
+                b.open(false, anchor, line, wrap);
+            }
             Event::SequenceEnd | Event::MappingEnd => b.close(line),
             _ => {}
         }
@@ -220,7 +263,7 @@ fn json(text: &str, b: &mut Builder) -> Result<bool, Error> {
         match c {
             b'\n' => line += 1,
             b' ' | b'\t' | b'\r' | b',' | b':' => {}
-            b'[' | b'{' => b.open(c == b'[', 0, line),
+            b'[' | b'{' => b.open(c == b'[', 0, line, None),
             b']' | b'}' => b.close(line),
             _ => {
                 if c == b'"' {
@@ -235,7 +278,7 @@ fn json(text: &str, b: &mut Builder) -> Result<bool, Error> {
                     }
                 }
                 match text.get(start..at).map(serde_json::from_str::<Value>) {
-                    Some(Ok(value)) => b.scalar(value, 1 + at - start, 0, line),
+                    Some(Ok(value)) => b.scalar(value, 1 + at - start, 0, line, None),
                     _ => b.fail(
                         line,
                         "a token serde_json accepted and the lexer cannot read",
@@ -258,6 +301,8 @@ struct Open {
     cost: usize,
     depth: usize,
     in_key: bool,
+    /// The key the node is wrapped in when it closes: its tag's, under `read_keyed` with `tags`.
+    wrap: Option<String>,
 }
 
 enum Node {
@@ -286,6 +331,11 @@ struct Builder<'f> {
     root: Option<Value>,
     error: Option<Error>,
     each: &'f mut dyn FnMut(Scalar<'_>),
+    /// Whether a node's tag wraps it (`read_keyed` with `tags`).
+    tags: bool,
+    /// Whether the second-level keys of the first document are recorded (`read_keyed`).
+    keyed: bool,
+    keys: Vec<KeyLine>,
 }
 
 impl Builder<'_> {
@@ -336,13 +386,53 @@ impl Builder<'_> {
         }
     }
 
-    fn scalar(&mut self, value: Value, cost: usize, anchor: usize, line: usize) {
+    /// The key a node tagged `tag` is wrapped in: under `read_keyed` with `tags`, `Fn::<name>` for `!<name>`
+    /// (`Ref` and `Condition` as they are), and never a mapping key.
+    fn wrapper(&self, tag: &Option<Tag>) -> Option<String> {
+        let tag = tag.as_ref().filter(|t| self.tags && t.handle == "!")?;
+        if tag.suffix.is_empty() || self.at_key() || self.stack.last().is_some_and(|o| o.in_key) {
+            return None;
+        }
+        Some(match tag.suffix.as_str() {
+            "Ref" | "Condition" => tag.suffix.clone(),
+            name => format!("Fn::{name}"),
+        })
+    }
+
+    /// Wraps `value` in `{wrap: value}` when it has a wrapper, charging the node.
+    fn wrapped(
+        &mut self,
+        value: Value,
+        wrap: Option<String>,
+        cost: usize,
+        depth: usize,
+        line: usize,
+    ) -> (Value, usize, usize) {
+        match wrap {
+            Some(key) if self.charge(1, line) => {
+                let mut map = Map::new();
+                map.insert(key, value);
+                (Value::Object(map), cost + 1, depth + 1)
+            }
+            _ => (value, cost, depth),
+        }
+    }
+
+    fn scalar(
+        &mut self,
+        value: Value,
+        cost: usize,
+        anchor: usize,
+        line: usize,
+        wrap: Option<String>,
+    ) {
         if !self.charge(cost, line) {
             return;
         }
         self.hand_out(&value, line);
-        self.remember(anchor, &value, cost, 0);
-        self.place(value, cost, 0, line);
+        let (value, cost, depth) = self.wrapped(value, wrap, cost, 0, line);
+        self.remember(anchor, &value, cost, depth);
+        self.place(value, cost, depth, line);
     }
 
     fn alias(&mut self, anchor: usize, line: usize) {
@@ -359,7 +449,7 @@ impl Builder<'_> {
         self.place(anchored.value, anchored.cost, anchored.depth, line);
     }
 
-    fn open(&mut self, sequence: bool, anchor: usize, line: usize) {
+    fn open(&mut self, sequence: bool, anchor: usize, line: usize, wrap: Option<String>) {
         if self.stack.len() == MAX_NESTING {
             return self.too_deep(line);
         }
@@ -379,6 +469,7 @@ impl Builder<'_> {
             cost: 1,
             depth: 1,
             in_key,
+            wrap,
         });
         self.path.push(Step::Index(0));
     }
@@ -392,8 +483,9 @@ impl Builder<'_> {
             Node::Sequence(items) => Value::Array(items),
             Node::Mapping(map, _) => Value::Object(map),
         };
-        self.remember(open.anchor, &value, open.cost, open.depth);
-        self.place(value, open.cost, open.depth, line);
+        let (value, cost, depth) = self.wrapped(value, open.wrap, open.cost, open.depth, line);
+        self.remember(open.anchor, &value, cost, depth);
+        self.place(value, cost, depth, line);
     }
 
     /// Hands every scalar of `value`, read at the path, to `each`, unless it is a mapping key or
@@ -448,7 +540,17 @@ impl Builder<'_> {
                     if let Some(step) = self.path.last_mut() {
                         *step = Step::Key(text.clone());
                     }
-                    *key = Some(text);
+                    *key = Some(text.clone());
+                    if let (true, 0, [Step::Key(section), Step::Key(_)]) =
+                        (self.keyed, self.document, &self.path[..])
+                    {
+                        let section = section.clone();
+                        self.keys.push(KeyLine {
+                            section,
+                            key: text,
+                            line,
+                        });
+                    }
                 }
                 _ => self.fail(line, "a mapping key that is not a scalar"),
             },
@@ -754,5 +856,75 @@ mod tests {
             handed < src.len() * super::EXPANSION + super::SLACK,
             "{handed}"
         );
+    }
+
+    fn tagged(syntax: Syntax, src: &[u8]) -> Result<Vec<Value>, super::Error> {
+        super::read_keyed(syntax, src, true, |_| {}).map(|r| r.0)
+    }
+
+    #[test]
+    fn the_second_level_keys_of_the_first_document_come_with_their_lines() {
+        let yaml = "a:\n  x: 1\n  y:\n    x: 2\nb:\n  - z: 1\n---\na:\n  late: 1\n";
+        let (_, keys) = super::read_keyed(Syntax::Yaml, yaml.as_bytes(), false, |_| {}).unwrap();
+        let shown: Vec<_> = keys
+            .iter()
+            .map(|k| (k.section.as_str(), k.key.as_str(), k.line))
+            .collect();
+        assert_eq!(shown, [("a", "x", 2), ("a", "y", 3)]);
+        // JSON: a key's colon on a later line, and everything on one line.
+        let json = "{\"a\": {\"k\"\n  : 1,\n \"m\": 2}}";
+        let (_, keys) = super::read_keyed(Syntax::Json, json.as_bytes(), false, |_| {}).unwrap();
+        let shown: Vec<_> = keys.iter().map(|k| (k.key.as_str(), k.line)).collect();
+        assert_eq!(shown, [("k", 1), ("m", 3)]);
+    }
+
+    #[test]
+    fn tagged_reading_wraps_a_tagged_node_in_its_long_form_and_plain_reading_does_not() {
+        let src = "a: !Ref X\nb: !Sub [\"${A}\", {A: !GetAtt [R, Arn]}]\nc: !Condition Y\nd: !If [c, !Ref Z, ~]\nf: &n !Join ['', [a]]\ng: *n\n";
+        let mut seen = Vec::new();
+        let (documents, _) = super::read_keyed(Syntax::Yaml, src.as_bytes(), true, |s| {
+            seen.push((s.path.len(), s.value.clone(), s.line));
+        })
+        .unwrap();
+        assert_eq!(
+            documents[0],
+            json!({
+                "a": {"Ref": "X"},
+                "b": {"Fn::Sub": ["${A}", {"A": {"Fn::GetAtt": ["R", "Arn"]}}]},
+                "c": {"Condition": "Y"},
+                "d": {"Fn::If": ["c", {"Ref": "Z"}, null]},
+                "f": {"Fn::Join": ["", ["a"]]},
+                "g": {"Fn::Join": ["", ["a"]]},
+            })
+        );
+        // The scalars handed out are the nodes' own, at the path and line of the text.
+        assert_eq!(seen[0], (1, json!("X"), 1));
+        // A tag a plain read ignores.
+        let (plain, _) = scalars(Syntax::Yaml, "a: !Ref X\nb: !Sub [x]\n");
+        assert_eq!(plain[0], json!({"a": "X", "b": ["x"]}));
+        // A tag on a mapping key is no wrapper, and JSON has no tags.
+        let read = tagged(Syntax::Yaml, b"!Ref k: v\n").unwrap();
+        assert_eq!(read[0], json!({"k": "v"}));
+        let json = tagged(Syntax::Json, br#"{"Ref": "X"}"#).unwrap();
+        assert_eq!(json[0], json!({"Ref": "X"}));
+    }
+
+    #[test]
+    fn tagged_nodes_count_against_the_budget_and_the_nesting_like_any_other() {
+        // A tag on every node of a deep flow sequence is still read within the nesting limit.
+        let nest = |n: usize| "!Join [".repeat(n) + "x" + &"]".repeat(n);
+        assert!(tagged(Syntax::Yaml, nest(100).as_bytes()).is_ok());
+        let (_, reason) = tagged(Syntax::Yaml, nest(200).as_bytes()).unwrap_err();
+        assert_eq!(reason, "nested deeper than 128 levels");
+        // Aliases of tagged nodes expand within the same budget.
+        let mut src = String::from("l0: &l0 !Ref [x, x, x, x, x, x, x, x, x, x]\n");
+        for n in 1..=9 {
+            let p = n - 1;
+            src += &format!(
+                "l{n}: &l{n} !Ref [*l{p}, *l{p}, *l{p}, *l{p}, *l{p}, *l{p}, *l{p}, *l{p}, *l{p}, *l{p}]\n"
+            );
+        }
+        let (_, reason) = tagged(Syntax::Yaml, src.as_bytes()).unwrap_err();
+        assert_eq!(reason, "aliases expand beyond the size limit");
     }
 }

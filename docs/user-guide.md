@@ -423,6 +423,26 @@ na mesma pasta é lido como um projeto, enraizado na pasta. Cada serviço é um 
   resolvida não são.
 - **Consultas**: como nos nós Terraform, `search` com `kind = "iac"`, `context` e `trace`.
 
+### CloudFormation e SAM
+
+Um template YAML (as tags curtas `!Ref`, `!Sub`, `!GetAtt`, `!Join` e as demais são lidas) ou
+JSON com um mapa `Resources` que traga `AWSTemplateFormatVersion` ou a transformação SAM
+(`AWS::Serverless-2016-10-31`) é lido como uma unidade de avaliação, enraizada no seu caminho.
+Cada recurso é um nó IaC endereçado pelo seu id lógico, e seu tipo (`AWS::SQS::Queue`,
+`AWS::Serverless::Function`) é o tipo do nó.
+
+- **Referências**: `Ref`, `Fn::GetAtt` (com o atributo no `via`, `via Fn::GetAtt.Arn`), as
+  variáveis de `Fn::Sub` e `DependsOn`.
+- **Nomes**: o nome físico de fila, tópico, bucket, tabela, função, stream, segredo e mais alguns
+  tipos é avaliado dentro do template a partir do padrão de um parâmetro (o `context` o lista em
+  `overridable:`), `Ref`, `Fn::Sub`, `Fn::GetAtt` e `Fn::Join`. Um pseudo parâmetro
+  (`AWS::Region`), um import e qualquer outra função são partes não resolvidas: o nome vira um
+  padrão, mostrado `pattern "assets-prod-*"`.
+- **Segredos**: um parâmetro com `NoEcho` tem o padrão guardado como `redacted` e nenhum nome
+  passa por ele.
+- **Consultas**: como nos nós Terraform, `search` com `kind = "iac"`, `context` e `trace`.
+- **Não seguidos**: stacks aninhadas, macros, condições e mapeamentos.
+
 ## 4. `meada.toml`: referência
 
 Cada repositório pode ter um `meada.toml` na raiz, versionado no git, que diz com quem ele
