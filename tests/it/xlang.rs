@@ -1002,7 +1002,8 @@ fn a_declarative_client_method_is_an_open_item_at_its_definition() {
 /// `${VAR}` in `app-config*.yaml` (#617): the read is the variable, which the peer's
 /// `base_url_env` maps, so two providers of the route no longer leave the link `ambiguous`. A
 /// literal value and a key no file holds leave the host unresolved. A `readonly`, `private` or
-/// `#x` field the constructor writes once with the read holds it in every method (#688).
+/// `#x` field the constructor writes once with the read holds it in every method (#688). A value
+/// a partial gives through `$include`, and a `$env` value, read as if inline (#689).
 #[test]
 fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
     let case = "xlang_backstage";
@@ -1035,6 +1036,10 @@ fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
         ("viaGetString", Some("env:API_URL")),
         ("viaOptional", Some("env:OPT_URL")),
         ("viaLocalFile", Some("env:LOCAL_URL")),
+        // Through a partial's key path, a whole partial and `$env` (#689).
+        ("viaIncludedKey", Some("env:API_URL")),
+        ("viaIncludedBlock", Some("env:API_URL")),
+        ("viaEnvValue", Some("env:API_URL")),
         ("literalValue", None),
         ("missingKey", None),
         // Another pack's config file (`application.yaml`) is no Backstage config.
@@ -1061,7 +1066,14 @@ fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
         .iter()
         .filter(|l| {
             let consumer = l["consumer"].as_str().unwrap();
-            consumer.contains("viaGetString") || consumer.contains("OrdersClient")
+            [
+                "viaGetString",
+                "OrdersClient",
+                "viaIncludedKey",
+                "viaIncludedBlock",
+            ]
+            .iter()
+            .any(|f| consumer.contains(f))
         })
         .map(|l| {
             (
@@ -1076,7 +1088,7 @@ fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
         "inferred",
         "base URL from API_URL, a base_url_env of peer example.com/backstage/api",
     );
-    assert_eq!(links, [link, link]);
+    assert_eq!(links, [link; 4]);
 }
 
 /// A Python service reads a base URL from a pydantic-settings field (#619): the read is

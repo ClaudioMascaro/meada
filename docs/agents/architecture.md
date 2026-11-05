@@ -274,8 +274,9 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   in `lang/mod.rs` (`CODING_STANDARDS.md`). Three questions are
   required: `prefix`, `extract` (receives `Code`, never the syntax tree, and `Indexed`, what the
   index read of the repository besides: the manifests and tsconfigs, the exported rows, the
-  files of every pack and the bytes of the config files the packs list (`Indexed::configs`,
-  never stored: Java's Spring `application.properties` and `application.yml`), which a kind
+  files of every pack and the bytes of the config files the packs list and of the inputs they
+  name (`Indexed::configs`, never stored: Java's Spring `application.properties` and
+  `application.yml`, Backstage's `$include` partials, #689, with `Indexed::symlinks`), which a kind
   reads when its contracts depend on what the manifests or a configuration say;
   it returns `Found` with a `Site`: `Def`, `Inline`, `File`, `Call`) and
   `link` (receives the whole workspace's providers and exports). The others have a default

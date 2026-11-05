@@ -64,9 +64,27 @@ pub enum Role {
     /// `createBackendPlugin` call, no `contract`: its routers stay at the root. Stored, never
     /// exported; `meada status` reports it.
     Unmounted,
+    /// Neither side: a Backstage `$include` Meada did not follow (#689), no `contract`: the
+    /// including config file in `via`, the reason in `method` and the include as written in
+    /// `fragments`, at the first file of the TS and JavaScript group (it has no code site of its
+    /// own). Stored, never exported; `meada status` reports it.
+    Unfollowed,
 }
 
 impl Role {
+    /// Every role, in declaration order: the stored format's golden lists their names.
+    #[cfg(test)]
+    pub const ALL: [Role; 8] = [
+        Role::Provider,
+        Role::Consumer,
+        Role::Binding,
+        Role::Publish,
+        Role::Import,
+        Role::Shape,
+        Role::Unmounted,
+        Role::Unfollowed,
+    ];
+
     /// The name the index stores.
     pub fn name(self) -> &'static str {
         match self {
@@ -77,6 +95,7 @@ impl Role {
             Role::Import => "import",
             Role::Shape => "shape",
             Role::Unmounted => "unmounted",
+            Role::Unfollowed => "unfollowed",
         }
     }
 }

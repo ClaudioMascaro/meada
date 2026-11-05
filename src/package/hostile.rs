@@ -628,7 +628,48 @@ fn probes() -> Vec<Probe> {
                     "    '/e{i}':\n      target: https://h{i}\n      pathRewrite:\n        '^/api/proxy/e{i}': ''\n        '^/r{i}': '/'\n"
                 )
             });
-            crate::http::app_config_probe(file(format!("proxy:\n  endpoints:\n{endpoints}")))
+            let root = file(format!("proxy:\n  endpoints:\n{endpoints}"));
+            crate::http::app_config_probe(&[("app-config.yaml", root)])
+        }),
+        // Backstage's `$include` (#689): one partial named from far more keys than
+        // `includes::INCLUDES`, each grafting it, so the count stops it.
+        ("app-config: an include fanned out to many keys", || {
+            let root = fill(8, |i| format!("k{i}: {{ $include: p.yaml }}\n"));
+            let partial = fill(256, |i| format!("p{i}: {{ url: '${{U{i}}}' }}\n"));
+            crate::http::app_config_probe(&[
+                ("app-config.yaml", file(root)),
+                ("p.yaml", file(partial)),
+            ])
+        }),
+        // A chain of partials far past `includes::DEPTH`, each a mapping of many keys.
+        ("app-config: a chain of includes past the depth", || {
+            let mut files = vec![(
+                "app-config.yaml".to_string(),
+                file("k: { $include: c1.yaml }\n".into()),
+            )];
+            for n in 1..=64 {
+                let keys = fill(128, |i| format!("v{i}: x\n"));
+                files.push((
+                    format!("c{n}.yaml"),
+                    file(format!("{keys}k: {{ $include: c{}.yaml }}\n", n + 1)),
+                ));
+            }
+            let files: Vec<(&str, Vec<u8>)> =
+                files.iter().map(|(p, s)| (p.as_str(), s.clone())).collect();
+            crate::http::app_config_probe(&files)
+        }),
+        // Two partials that include each other from many keys each: past `includes::INCLUDES`
+        // grafts (or `MAX_BYTES` grafted, for larger ones) the count stops what the cycle check
+        // does not.
+        ("app-config: a cycle of includes", || {
+            let root = "a: { $include: a.yaml }\nb: { $include: b.yaml }\n".to_string();
+            let a = fill(256, |i| format!("a{i}: {{ $include: b.yaml }}\n"));
+            let b = fill(256, |i| format!("b{i}: {{ $include: a.yaml }}\n"));
+            crate::http::app_config_probe(&[
+                ("app-config.yaml", file(root)),
+                ("a.yaml", file(a)),
+                ("b.yaml", file(b)),
+            ])
         }),
         // Spring: `application.properties`, `application.yml`
         ("spring: many properties", || {

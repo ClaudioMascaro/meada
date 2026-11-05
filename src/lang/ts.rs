@@ -7,7 +7,7 @@ use std::rc::Rc;
 use tree_sitter::{Language, Node, Parser};
 
 use super::{
-    Binds, Call, Const, Def, Export, Facts, Field, Import, Imported, Invocation, Kind,
+    Binds, Call, ConfigInput, Const, Def, Export, Facts, Field, Import, Imported, Invocation, Kind,
     LanguagePack, Modules, Param, Part, Ty, Value, children, named, text,
 };
 use crate::{Result, package, qualify};
@@ -324,6 +324,11 @@ impl LanguagePack for TsJs {
             // Backstage's configuration, which `http::ts` reads for `config.getString`.
             "**/app-config*.yaml",
         ]
+    }
+
+    /// The `$include` targets of Backstage's `app-config*.yaml` (#689).
+    fn config_inputs<'b>(&self, configs: &[(&str, &[u8])], read: &dyn Fn(&str) -> ConfigInput<'b>) {
+        crate::http::config_inputs(configs, read);
     }
 
     fn receiver(&self) -> Option<&'static str> {

@@ -5,7 +5,7 @@
 #   a8-peers.sh check BASE_BIN HEAD_BIN RUN
 #
 # `gen` writes the peers (`api` and `other` both serve GET /orders, `inventory` serves
-# GET /clusters) and one consumer repository per workspace (g8, g9, g10a to g10g), each from
+# GET /clusters) and one consumer repository per workspace (g8, g9, g10a to g10h), each from
 # heredocs, each `git init` with an origin under https://example.com/acme/ and one commit at fixed
 # dates. `check` generates one copy per binary (RUN/base, RUN/head), indexes and exports every
 # consumer with its binary, compares each case of a8-cases.tsv with its answer key, and
@@ -281,6 +281,7 @@ cfg_include() {
   { backend; printf 'acme:\n  api: { $include: ./partials/acme.yaml#api }\n'; } > "$1/config/app-config.yaml"
   printf 'api:\n  baseUrl: ${API_URL}\n' > "$1/config/partials/acme.yaml"
 }
+cfg_env() { { backend; printf 'acme:\n  api:\n    baseUrl: { $env: API_URL }\n'; } > "$1/config/app-config.yaml"; }
 cfg_include_whole() {
   { backend; printf 'acme: { $include: ./partials/acme.yaml }\n'; } > "$1/config/app-config.yaml"
   printf 'api:\n  baseUrl: ${API_URL}\n' > "$1/config/partials/acme.yaml"
@@ -303,7 +304,7 @@ gen() { # <dir>
    gen_peers; gen_g8; gen_g9
    g10 g10a ts_cfg cfg_inline; g10 g10b ts_cfg cfg_include; g10 g10c ts_cfg cfg_include_whole
    g10 g10d ts_proxy px_endpoints; g10 g10e ts_proxy px_legacy
-   g10 g10f ts_proxy px_inc_ep; g10 g10g ts_proxy px_inc_legacy)
+   g10 g10f ts_proxy px_inc_ep; g10 g10g ts_proxy px_inc_legacy; g10 g10h ts_cfg cfg_env)
 }
 
 # The workspaces each case reads, in the order of a8-cases.tsv.

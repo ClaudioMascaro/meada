@@ -1,0 +1,15 @@
+# One `$include` per reason Meada does not follow it (#689), and one it follows. The test adds
+# `partials/link.yaml`, a symbolic link, and `partials/big.yaml`, too large to keep here.
+followed: { $include: ./partials/ok.yaml }
+absolute: { $include: /etc/backstage/app.yaml }
+outside: { $include: ../outside.yaml }
+variable: { $include: './${ENV}/app.yaml' }
+extension: { $include: ./partials/notes.txt }
+symlink: { $include: ./partials/link.yaml }
+missing: { $include: ./partials/gone.yaml }
+unreadable: { $include: ./partials/broken.yaml }
+keyPath: { $include: './partials/ok.yaml#nope' }
+sibling: { $include: ./partials/ok.yaml, extra: 1 }
+notAPath: { $include: 3 }
+cycle: { $include: ./partials/cycle.yaml }
+depth: { $include: ./chain/c1.yaml }

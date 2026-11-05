@@ -2285,6 +2285,7 @@ mod tests {
                 exported: &exported,
                 files: &names,
                 configs: &[],
+                symlinks: &[],
             };
             let found = Packages.extract(&code, &indexed);
             let mut rows: Vec<_> = (found.iter())
@@ -2894,6 +2895,7 @@ mod tests {
             links: Vec::new(),
             stale_decisions: Vec::new(),
             unmounted: Vec::new(),
+            unfollowed: Vec::new(),
         }
     }
 

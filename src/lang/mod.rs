@@ -70,6 +70,19 @@ pub trait LanguagePack {
     /// every file whose name ends with the rest (`**/*.csproj`).
     fn config_files(&self) -> &'static [&'static str];
 
+    /// Further config inputs the pack's config files name (#689): Backstage's `$include`
+    /// targets of an `app-config*.yaml`. The pack asks `read` for each path it would read, as
+    /// the config files `configs` (in `config_files` order) name them, and the index keeps each
+    /// file `read` gives as one of the pack's config files (in its digest, so an edit to it alone
+    /// extracts the pack's group again) and each symbolic link it refuses
+    /// (`Indexed::symlinks`). None by default.
+    fn config_inputs<'b>(
+        &self,
+        _configs: &[(&str, &[u8])],
+        _read: &dyn Fn(&str) -> ConfigInput<'b>,
+    ) {
+    }
+
     /// What the pack's files give one another before they resolve (`Join`), built from the
     /// config files as `layout` gets them and the facts of every file of the pack, as parsed:
     /// C#'s `global using` directives and a project file's usings bind in every file of their
@@ -291,6 +304,18 @@ pub struct Layout {
     /// included, after its own names and imports, and an import that names one of them names
     /// them all: a member is what any of them exports, several that define it `ambiguous`.
     pub shared: Vec<Vec<String>>,
+}
+
+/// What the index finds at a path a pack's config file names (`LanguagePack::config_inputs`).
+#[derive(Clone)]
+pub enum ConfigInput<'b> {
+    /// The file's bytes, read as a config file is (`index::read_config`): up to one byte past
+    /// `MAX_BYTES`, so a longer file shows as longer than the limit.
+    Read(std::borrow::Cow<'b, [u8]>),
+    /// A symbolic link on the way to the path, which the index does not follow.
+    Symlink,
+    /// No file the walk sees: absent, ignored (`.gitignore`, `.meadaignore`) or hidden.
+    Missing,
 }
 
 /// Every pack Meada ships, in a fixed order.

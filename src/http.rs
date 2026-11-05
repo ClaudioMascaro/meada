@@ -25,6 +25,7 @@ mod swift;
 mod ts;
 #[cfg(test)]
 pub(crate) use ts::app_config_probe;
+pub(crate) use ts::{INCLUDE_DEPTH, INCLUDES, IncludeReason, config_inputs};
 
 pub use meada_core::http::{PARAM, normalize_path};
 
@@ -635,11 +636,14 @@ impl ContractKind for Http {
         let mut found = Vec::new();
         // One reader of each shape source for the whole extraction: each budget per file once.
         let mut literals = Literals::default();
-        let mut consumers = ts::consumers(code, indexed, &mut literals);
+        // One reader of Backstage's `app-config*.yaml` for the extraction (`ts::Config`).
+        let config = ts::Config::new(indexed);
+        let mut consumers = ts::consumers(code, &config, &mut literals);
         let (providers, mounted) = ts::providers(code, &mut literals);
         ts::name(&mut consumers, &mounted);
         found.extend(consumers);
         found.extend(providers);
+        found.extend(ts::unfollowed(code, &config));
         found.extend(python::consumers(code));
         found.extend(rust::providers(code));
         found.extend(go::providers(code));
@@ -873,7 +877,8 @@ impl ContractKind for Http {
     }
 
     /// The Backstage plugins whose routers stay at the root for want of a literal `pluginId`
-    /// (#615), and the proxy endpoints whose target is not read (#616), with their calls.
+    /// (#615), the proxy endpoints whose target is not read (#616), with their calls, and the
+    /// `$include`s of `app-config*.yaml` not followed, with their reason (#689).
     fn status(&self, repo: &Repository, export: &IndexExport, _links: &[Link]) -> Vec<String> {
         let prefix = format!("{}::", repo.identity);
         let mut lines: Vec<String> = (export.unmounted.iter())
@@ -894,6 +899,14 @@ impl ContractKind for Http {
             (unread.into_iter())
                 .map(|(endpoint, calls)| Msg::BackstageProxyTarget { endpoint, calls }.text()),
         );
+        lines.extend(ts::unfollowed_of(&export.unfollowed).iter().map(|u| {
+            Msg::BackstageInclude {
+                file: &u.file,
+                include: &u.include,
+                reason: u.reason,
+            }
+            .text()
+        }));
         lines
     }
 

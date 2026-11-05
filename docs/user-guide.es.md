@@ -1295,7 +1295,17 @@ para la lectura de configuración de Backstage, `config.getString('a.b')` o
 `config.getOptionalString('a.b')`, cuando algún `app-config*.yaml` del repositorio guarda
 `a.b: ${VAR}` (primero `app-config.yaml`, y vale el primer archivo que tiene la clave): la lectura
 es la variable `VAR`. Un valor literal o una clave que ningún archivo tiene dejan la base sin
-resolver.
+resolver. Un bloque llevado a un archivo parcial con `{ $include: ./parciales/a.yaml }` (o
+`./parciales/a.yaml#a.b`, para solo su clave `a.b`) y un valor `{ $env: VAR }` se leen como si
+estuvieran en el propio archivo, como Backstage los aplica: la ruta parte de la carpeta del
+archivo que incluye, solo se leen archivos `.json`, `.yaml` y `.yml`, y un parcial puede incluir
+otro, desde su propia carpeta. Un parcial es entrada del índice: editar solo él cambia la
+respuesta en la próxima consulta. No se siguen una ruta absoluta, una que sale del repositorio, un
+enlace simbólico, un `${` en la ruta, otra extensión, un archivo o ruta de clave que no existe, un
+objeto con otra clave junto a `$include`, un ciclo, más de 8 inclusiones de profundidad, más de 64
+inclusiones desde un `app-config` y más de 1 MiB de parciales injertados en él: las claves bajo
+ese `$include` quedan sin leer, y `meada status` nombra cada uno con su motivo. `$file` no se lee,
+y un `app-config` o parcial de más de 1 MiB se ignora.
 
 **Manifiestos.** `package.json` (`name`, `version`, los cuatro campos de dependencias, `exports`,
 `types`, `module` y `main`) y `tsconfig.json` (`paths`, `baseUrl`, `outDir`, `rootDir`). Vea npm

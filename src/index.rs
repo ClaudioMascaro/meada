@@ -77,8 +77,11 @@ pub(crate) fn schema_version() -> i32 {
 /// row (issue #175) is the shape of the module-level constant or type `method` a file exports,
 /// read for the view `via` (`shape::Want`), kept only in a repository with a named manifest.
 /// An `unmounted` row (#615) is a Backstage plugin whose `pluginId` cannot be read, at its
-/// `createBackendPlugin` call, no `contract`: `meada status` reports it. `exports` holds what each file exports (`resolve::Exported`): a `name` with the `file` and
-/// `target` definition, constant or type it names (`target`
+/// `createBackendPlugin` call, no `contract`: `meada status` reports it. An `unfollowed` row
+/// (#689) is a Backstage `$include` not followed, at the first file of the TS and JavaScript
+/// group, no `contract`: the including file in `via`, the reason in `method` and the include as
+/// written in `fragments`; `meada status` reports it. `exports` holds what each file exports
+/// (`resolve::Exported`): a `name` with the `file` and `target` definition, constant or type it names (`target`
 /// NULL for a whole file, `file` NULL for nothing the repository holds), or, with `name` NULL,
 /// an `export * from` the file `file`. Both are rewritten with the contracts, and read at query
 /// time to resolve imports of a package into another repository (spec #22). `communities`
@@ -638,9 +641,12 @@ pub struct Indexed<'a> {
     pub exported: &'a [Exported],
     /// The files of every pack, as kept.
     pub files: &'a [&'a str],
-    /// The config files every pack lists (`LanguagePack::config_files`), as read on this
-    /// refresh: path and bytes, which no kind keeps.
+    /// The config files every pack lists (`LanguagePack::config_files`) and the inputs they name
+    /// (`LanguagePack::config_inputs`), as read on this refresh: path and bytes, each path once,
+    /// which no kind keeps.
     pub configs: &'a [(&'a str, &'a [u8])],
+    /// The config inputs a pack named that are symbolic links, which the index does not read.
+    pub symlinks: &'a [&'a str],
 }
 
 /// Brings the index up to date with the files a language pack handles under `root`: tracked
@@ -813,6 +819,7 @@ fn refresh_keeping(
         walked,
         packs,
         configs,
+        symlinks,
         digest,
         settings,
     } = packs_of(root, &all);
@@ -916,7 +923,7 @@ fn refresh_keeping(
         .collect();
     let found_configs = |pack: usize| -> Vec<(&str, &[u8])> {
         (configs.get(&pack).into_iter().flatten())
-            .map(|(n, c)| (*n, c.as_slice()))
+            .map(|(n, c)| (n.as_str(), c.as_slice()))
             .collect()
     };
     // What each pack's files give one another (`LanguagePack::join`), from the facts as parsed:
@@ -1073,15 +1080,20 @@ fn refresh_keeping(
             params![f.path, f.name, f.least as i64, f.most.map(|m| m as i64)],
         )?;
     }
+    // A pack's config input may be another pack's config file: each path once.
+    let mut seen = HashSet::new();
     let pack_configs: Vec<(&str, &[u8])> = (configs.values().flatten())
-        .map(|(path, src)| (*path, src.as_slice()))
+        .filter(|(path, _)| seen.insert(path.as_str()))
+        .map(|(path, src)| (path.as_str(), src.as_slice()))
         .collect();
+    let symlinks: Vec<&str> = symlinks.iter().map(String::as_str).collect();
     let indexed = Indexed {
         manifests: &manifests,
         tsconfigs: &tsconfigs,
         exported: &exported,
         files: &files,
         configs: &pack_configs,
+        symlinks: &symlinks,
     };
 
     // Contracts, from every file of the groups not kept. Values are not kept in the index, so
@@ -1458,8 +1470,10 @@ struct Packs<'a> {
     walked: Vec<(&'a String, &'a PathBuf, usize)>,
     /// The pack of each of them, by path.
     packs: BTreeMap<&'a str, usize>,
-    /// The config files read, per pack: path and content.
-    configs: BTreeMap<usize, Vec<(&'a str, Vec<u8>)>>,
+    /// The config files read, per pack: path and content, the inputs they name after them.
+    configs: BTreeMap<usize, Vec<(String, Vec<u8>)>>,
+    /// The config inputs the packs named that are symbolic links, sorted.
+    symlinks: BTreeSet<String>,
     /// The BLAKE3 of the config files read, before `configs_digest` folds the manifests in.
     digest: blake3::Hasher,
     /// What the configs make of each file's facts (`LanguagePack::settings`), per pack: a file
@@ -1471,16 +1485,20 @@ struct Packs<'a> {
 type Setting = Box<dyn Fn(&str) -> String>;
 
 /// The packs of the files `walk` found under `root`, their config files read (`read_config`)
-/// on every call: they are few and small. A `**/` name takes every file of that name (or, for
-/// `**/*.ext`, of that ending) the walk found, in path order.
+/// on every call: they are few and small, though Backstage's roots are parsed and grafted to find
+/// their inputs. A `**/` name takes every file of that name (or, for
+/// `**/*.ext`, of that ending) the walk found, in path order. The inputs those name
+/// (`LanguagePack::config_inputs`) follow them, read the same way when the walk sees them.
 fn packs_of<'a>(root: &Path, all: &'a [(String, PathBuf)]) -> Packs<'a> {
     let walked: Vec<(&String, &PathBuf, usize)> = (all.iter())
         .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
         .collect();
     let packs: BTreeMap<&str, usize> = walked.iter().map(|(p, _, k)| (p.as_str(), *k)).collect();
-    let mut configs: BTreeMap<usize, Vec<(&str, Vec<u8>)>> =
+    let mut configs: BTreeMap<usize, Vec<(String, Vec<u8>)>> =
         packs.values().map(|&pack| (pack, Vec::new())).collect();
     let mut digest = blake3::Hasher::new();
+    let seen: HashSet<&str> = all.iter().map(|(path, _)| path.as_str()).collect();
+    let mut symlinks = BTreeSet::new();
     for (&pack, found) in &mut configs {
         for &name in lang::pack(pack).config_files() {
             let paths: BTreeSet<&str> = match name.strip_prefix("**/") {
@@ -1496,14 +1514,32 @@ fn packs_of<'a>(root: &Path, all: &'a [(String, PathBuf)]) -> Packs<'a> {
                 if let Some(src) = read_config(root, path) {
                     digest.update(format!("{pack}\0{path}\0{}\0", src.len()).as_bytes());
                     digest.update(&src);
-                    found.push((path, src));
+                    found.push((path.to_string(), src));
                 }
+            }
+        }
+        let inputs = config_inputs(root, pack, found, &seen);
+        for (path, input) in inputs {
+            match input {
+                lang::ConfigInput::Read(src) => {
+                    digest.update(format!("{pack}\0{path}\0{}\0", src.len()).as_bytes());
+                    digest.update(&src);
+                    found.push((path, src.into_owned()));
+                }
+                lang::ConfigInput::Symlink => {
+                    digest.update(format!("{pack}\0{path}\0symlink\0").as_bytes());
+                    symlinks.insert(path);
+                }
+                lang::ConfigInput::Missing => {}
             }
         }
     }
     let settings = (configs.iter())
         .map(|(&pack, found)| {
-            let found: Vec<(&str, &[u8])> = found.iter().map(|(n, c)| (*n, c.as_slice())).collect();
+            let found: Vec<(&str, &[u8])> = found
+                .iter()
+                .map(|(n, c)| (n.as_str(), c.as_slice()))
+                .collect();
             (pack, lang::pack(pack).settings(&found))
         })
         .collect();
@@ -1511,9 +1547,60 @@ fn packs_of<'a>(root: &Path, all: &'a [(String, PathBuf)]) -> Packs<'a> {
         walked,
         packs,
         configs,
+        symlinks,
         digest,
         settings,
     }
+}
+
+/// What each input the config files `found` of `pack` name holds
+/// (`LanguagePack::config_inputs`), by path, those already among `found` left out: read as a
+/// config file is when the walk sees it (`seen`), else a symbolic link or missing. Like the walk,
+/// the read goes through no symbolic link.
+fn config_inputs(
+    root: &Path,
+    pack: usize,
+    found: &[(String, Vec<u8>)],
+    seen: &HashSet<&str>,
+) -> BTreeMap<String, lang::ConfigInput<'static>> {
+    let configs: Vec<(&str, &[u8])> = found
+        .iter()
+        .map(|(p, s)| (p.as_str(), s.as_slice()))
+        .collect();
+    let inputs = std::cell::RefCell::new(BTreeMap::new());
+    let read = |path: &str| {
+        let input = match seen
+            .contains(path)
+            .then(|| read_config(root, path))
+            .flatten()
+        {
+            Some(src) => lang::ConfigInput::Read(src.into()),
+            None if plain_file(root, path).is_none() && through_link(root, path) => {
+                lang::ConfigInput::Symlink
+            }
+            None => lang::ConfigInput::Missing,
+        };
+        inputs.borrow_mut().insert(path.to_string(), input.clone());
+        input
+    };
+    lang::pack(pack).config_inputs(&configs, &read);
+    let mut inputs = inputs.into_inner();
+    inputs.retain(|path, _| !configs.iter().any(|(p, _)| p == path));
+    inputs
+}
+
+/// Whether a symbolic link lies on the way from `root` to `path`.
+fn through_link(root: &Path, path: &str) -> bool {
+    let mut abs = root.to_path_buf();
+    for segment in path.split('/') {
+        abs.push(segment);
+        match fs::symlink_metadata(&abs) {
+            Ok(meta) if meta.file_type().is_symlink() => return true,
+            Ok(_) => {}
+            Err(_) => return false,
+        }
+    }
+    false
 }
 
 /// `meta.configs`: the config files' digest with the stored manifests folded in, and the
@@ -2345,6 +2432,9 @@ pub(crate) struct Export {
     /// The sites of the Backstage plugins whose `pluginId` cannot be read (`unmounted` rows,
     /// #615), sorted. Shown by `meada status` only.
     pub(crate) unmounted: Vec<String>,
+    /// The Backstage `$include`s not followed (`unfollowed` rows, #689), as stored: `via`,
+    /// `fragments` and `method`, sorted. Shown by `meada status` only, which the HTTP kind reads.
+    pub(crate) unfollowed: Vec<(String, Option<String>, Option<String>)>,
 }
 
 /// Puts `providers` back in the order `export` reads them in, after a kind's `declare` added
@@ -2615,6 +2705,13 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         .prepare("SELECT site FROM contracts WHERE role = 'unmounted' ORDER BY site")?
         .query_map([], |r| r.get(0))?
         .collect::<rusqlite::Result<_>>()?;
+    let unfollowed = db
+        .prepare(
+            "SELECT via, fragments, method FROM contracts WHERE role = 'unfollowed' \
+             ORDER BY via, fragments, method",
+        )?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+        .collect::<rusqlite::Result<_>>()?;
     let publishes = db
         .prepare(
             "SELECT via, method, site FROM contracts \
@@ -2772,6 +2869,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         documents,
         stale_decisions: Vec::new(),
         unmounted,
+        unfollowed,
     })
 }
 
@@ -3689,6 +3787,17 @@ mod tests {
         actual += &format!("{:#?}\n", crate::iac::evaluate(&files));
         let (_, rows) = config_values::read("stack/template.yaml", &src);
         actual.extend(rows.iter().map(|row| format!("{row:?}\n")));
+        // The roles a `contracts` row stores, and the reasons an `unfollowed` row (#689) does.
+        actual += "\ncontracts.role\n";
+        actual.extend(
+            crate::contract::Role::ALL
+                .iter()
+                .map(|role| format!("{}\n", role.name())),
+        );
+        actual += "\nunfollowed.method\n";
+        actual.extend(
+            (crate::http::IncludeReason::ALL.iter()).map(|reason| format!("{}\n", reason.name())),
+        );
 
         let golden = tests.join("golden/schema.txt");
         if std::env::var_os("MEADA_BLESS").is_some_and(|v| v == "1") {

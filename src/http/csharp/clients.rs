@@ -621,6 +621,7 @@ mod tests {
             exported: &[],
             files: &[],
             configs,
+            symlinks: &[],
         };
         consumers(code, &indexed)
     }

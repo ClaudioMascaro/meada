@@ -35,7 +35,10 @@ from ...", with the whole list. A value the index now stores joins it.
   parts, scalar leaves, declared and optional paths and the imports they leave to fill, issue
   #175; what crosses repositories is this shape of an exported name,
   never its source text), the Backstage plugins whose `pluginId` cannot be read (`contracts`
-  rows of role `unmounted`, no contract, at the `createBackendPlugin` call, issue #615), the names of the Cargo features a Rust crate enables by default
+  rows of role `unmounted`, no contract, at the `createBackendPlugin` call, issue #615), the
+  Backstage `$include`s not followed (`contracts` rows of role `unfollowed`, no contract, at the
+  TS group's first file: the including config file's path in `via`, the include as written in
+  `fragments` and the reason's name in `method`, #689; never a value the include resolves to), the names of the Cargo features a Rust crate enables by default
   (`files.setting`, a comma-separated list per file, from `[features] default`), the Rust item
   macros a file invokes (#398: the lines after it in `files.setting`, each a macro's name and the
   `cfg` predicates its arm writes, as tokens; `Facts::macro_rules`, the outer attributes each

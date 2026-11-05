@@ -759,6 +759,7 @@ mod tests {
             exported: &[],
             files: &[],
             configs: &configs,
+            symlinks: &[],
         };
         let lines = crate::channel::message::lines(messages(&code, &indexed));
         let module = format!("{module}::");
@@ -1650,6 +1651,7 @@ mod tests {
                 exported: &[],
                 files: &[],
                 configs: &[],
+                symlinks: &[],
             };
             (0..3)
                 .map(|_| {
@@ -1689,6 +1691,7 @@ mod tests {
                 exported: &[],
                 files: &[],
                 configs: &[],
+                symlinks: &[],
             };
             (0..3)
                 .map(|_| {

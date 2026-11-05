@@ -715,3 +715,89 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
     ];
     assert_eq!(status.lines().collect::<Vec<_>>(), expected, "{status}");
 }
+
+/// Backstage's `$include` (#689): an include Meada does not follow leaves its subtree unread, and
+/// `meada status` names it with its reason, one fixture case per reason. A read through the
+/// include it follows is the variable the partial names; one under an include it does not follow
+/// stays a hole.
+#[test]
+fn backstage_includes_not_followed_are_named_with_their_reason() {
+    let repo = fixture_repo(
+        "urls_backstage_includes",
+        "ts-backstage-includes",
+        Some("https://example.com/backstage/includes.git"),
+    );
+    std::os::unix::fs::symlink("ok.yaml", repo.join("partials/link.yaml")).unwrap();
+    // Two of these graft more than `lang::MAX_BYTES` into one root.
+    let big = format!("url: u\npad: '{}'\n", "x".repeat(600 * 1024));
+    std::fs::write(repo.join("partials/big.yaml"), big).unwrap();
+
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let via = |function: &str| {
+        (json["consumers"].as_array().unwrap().iter())
+            .find(|c| {
+                c["site"]
+                    .as_str()
+                    .unwrap()
+                    .contains(&format!("::{function}::"))
+            })
+            .map(|c| c["via"].clone())
+            .unwrap_or_else(|| panic!("no consumer in {function}"))
+    };
+    assert_eq!(via("viaFollowed"), "env:OK_URL");
+    assert_eq!(via("viaMissing"), serde_json::Value::Null);
+
+    let status = meada::engine::status(&repo).unwrap();
+    let named: Vec<&str> = (status.lines())
+        .filter(|l| l.contains("Backstage $include"))
+        .map(str::trim)
+        .collect();
+    let line = |file: &str, include: &str, why: &str| {
+        format!(
+            "{file}: Backstage $include {include} not followed ({why}): the keys under it stay \
+             unread"
+        )
+    };
+    let root = "app-config.yaml";
+    assert_eq!(
+        named,
+        [
+            line(
+                "app-config.size.yaml",
+                "./partials/big.yaml",
+                "past 1 MiB of included files"
+            ),
+            line(root, "../outside.yaml", "a path that leaves the repository"),
+            line(root, "./${ENV}/app.yaml", "a ${ in the path"),
+            line(root, "./partials/broken.yaml", "a file that does not parse"),
+            line(
+                root,
+                "./partials/gone.yaml",
+                "no such file, or one ignored or hidden"
+            ),
+            line(root, "./partials/link.yaml", "a symbolic link"),
+            line(
+                root,
+                "./partials/notes.txt",
+                "not a .json, .yaml or .yml file"
+            ),
+            line(root, "./partials/ok.yaml", "another key beside $include"),
+            line(
+                root,
+                "./partials/ok.yaml#nope",
+                "a key path the file does not hold"
+            ),
+            line(root, "/etc/backstage/app.yaml", "an absolute path"),
+            line(root, "3", "a value that is not a path"),
+            line("chain/c8.yaml", "c9.yaml", "deeper than 8 includes"),
+            line("partials/cycle.yaml", "../app-config.yaml", "a cycle"),
+            line(
+                "partials/many.yaml",
+                "one.yaml",
+                "more than 64 includes from one root"
+            ),
+        ],
+        "{status}"
+    );
+}

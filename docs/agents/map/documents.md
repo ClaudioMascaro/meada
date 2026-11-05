@@ -73,7 +73,8 @@ this file, and a change to these modules updates it.
   ignored (AMQP bindings are not read). Sides with the same broker kind, name and role (several
   operations, several servers of one kind) are one, their payloads read together as one
   `oneOf` shape. `events.rs` (#646): the event reader every YAML and JSON reader goes through
-  (provider documents, Spring's `read_yaml` and with it Backstage's `app-config*.yaml`).
+  (provider documents, Spring's `read_yaml`, and Backstage's `app-config*.yaml` with the partials
+  they include, through `spring::flatten`).
   `first(syntax, bytes) -> Result<Value, (line, reason)>` reads the first document and nothing
   past it; `read(syntax, bytes, each)` reads every document of a stream into a `Vec<Value>`
   (`read_keyed`, #653, the same with each second-level key's line and, with `tags`, a node tagged

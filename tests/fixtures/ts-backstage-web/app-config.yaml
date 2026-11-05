@@ -2,3 +2,9 @@ api:
   baseUrl: ${API_URL}
   optionalUrl: ${OPT_URL}
   literalUrl: http://other.example.com
+# Includes (#689): a key path of a partial, a whole partial, and `$env`.
+included:
+  keyed: { $include: ./config/partials/acme.yaml#api }
+  whole: { $include: ./config/partials/acme.yaml }
+fromEnv:
+  baseUrl: { $env: API_URL }

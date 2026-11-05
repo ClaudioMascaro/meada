@@ -397,6 +397,39 @@ fn edit(repo: &Path) {
     fs::write(repo.join("tsconfig.json"), "{}\n").unwrap();
 }
 
+/// Edits a Backstage config partial (#689), and nothing else: its root `app-config.yaml` includes
+/// it, so the refreshed export reads the new variable, as a cold export of the same files does.
+#[test]
+fn a_refresh_after_editing_only_a_backstage_partial_equals_a_cold_export() {
+    const PARTIAL: &str = "config/partials/acme.yaml";
+    let edit = |repo: &Path| replace(repo, PARTIAL, "${API_URL}", "${PARTIAL_URL}");
+    let repo = fixture_repo("fresh_partial", "ts-backstage-web", WEB);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_partial_cold", "ts-backstage-web", WEB, edit)
+    );
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    let via = |function: &str| {
+        (json["consumers"].as_array().unwrap().iter())
+            .find(|c| {
+                c["site"]
+                    .as_str()
+                    .unwrap()
+                    .contains(&format!("::{function}::"))
+            })
+            .map(|c| c["via"].clone())
+    };
+    assert_eq!(via("viaIncludedKey"), Some("env:PARTIAL_URL".into()));
+    assert_eq!(via("viaIncludedBlock"), Some("env:PARTIAL_URL".into()));
+    assert_eq!(via("viaGetString"), Some("env:API_URL".into()));
+}
+
 /// Edits, adds and deletes `.swift` files of the SwiftPM fixture, then edits its `Package.swift`
 /// alone: each refreshed export equals a cold export of the same files (spec #29, #117).
 #[test]

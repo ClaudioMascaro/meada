@@ -433,3 +433,28 @@
   not exactly `${VAR}` (a literal, `${VAR:-default}`, text around the placeholder), a key no file
   holds and a read passed in from another file's wrapper leave the base unresolved. The pack reads the call by its member name alone, so the receiver is
   not checked: a `getString` of another library with a key a config holds reads the same.
+- Backstage `$include` and `$env` (#689, `http/ts/config/includes.rs`): an include nests at most
+  `DEPTH` (8) deep, one root follows at most `INCLUDES` (64) includes (every file it reaches
+  counted, refused ones past the path checks included) and grafts at most `GRAFTED_MAX`
+  (`lang::MAX_BYTES`, 1 MiB) of included files, each include counting its file again; the include
+  past a bound, a cycle (a file already on the way from the root), an absolute path, a path that
+  leaves the repository, a `${` in it, an extension other than `.json`, `.yaml` and `.yml`
+  (case-sensitive, as Backstage's), a symbolic link on the way, a file the walk does not see
+  (absent, ignored or hidden, all `missing`), a file past `lang::MAX_BYTES` or that does not
+  parse, a missing key path, a sibling key and a value that is not text are not followed: the
+  subtree is null, so a read under it stays a hole, and `meada status` names the include with its
+  reason. A root past `lang::MAX_BYTES` is dropped. Not read at all, and not named: an include
+  inside a list (lists are not flattened), `$include` at the root of a document and as the value
+  an include gives (Backstage applies neither), `$env` beside another key (the object is unread)
+  and `$file` (its object stays as written, so no read reaches the file). The rows `meada status`
+  reads (`Role::Unfollowed`) have no code site and sit in the TS and JavaScript group's first
+  file, so a repository without TS or JavaScript files names none. Backstage roots no longer
+  drop a document holding Spring's profile keys (`spring.profiles`), which only `read_yaml` checks.
+  The cycle check compares files, not key paths: a partial that includes another key path of
+  itself is a `cycle`. A grafted root is flattened under `spring::flatten`'s `YAML_KEY_BUDGET`
+  whole, so grafts that push its joined keys past it drop the root's keys, inline ones included,
+  with no status line. The includes refused before the count (absolute, outside, `${`, extension,
+  sibling, not a path) are each named, as many as the root writes (linear in its bytes). The graft
+  recurses, bounded by `DEPTH` + 1 documents of at most `MAX_NESTING` levels each. A partial whose
+  name ends with `tsconfig.json` joins the TS pack's configs and is read as a tsconfig too. The
+  index grafts every root on each freshness check (`packs_of`), and the extraction once more.

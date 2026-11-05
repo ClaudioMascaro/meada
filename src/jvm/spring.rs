@@ -185,10 +185,21 @@ pub fn read_yaml(src: &str) -> Properties {
     let Ok(root) = events::first(Syntax::Yaml, src.as_bytes()) else {
         return Properties::new();
     };
+    let out = flatten(&root);
+    if PROFILE_KEYS.iter().any(|k| out.contains_key(*k)) {
+        return Properties::new();
+    }
+    out
+}
+
+/// The scalars of a tree, by their keys joined with dots (`api.url`): a list and a null are left
+/// out, and so is everything when the joined keys pass `YAML_KEY_BUDGET`. `read_yaml` reads a
+/// Spring file through it, and Backstage's `app-config*.yaml` once its includes are grafted.
+pub fn flatten(root: &serde_json::Value) -> Properties {
     let mut out = Properties::new();
     // The YAML reader bounds the nesting; the walk is an explicit stack.
     let mut budget = YAML_KEY_BUDGET;
-    let mut pending = vec![(String::new(), &root)];
+    let mut pending = vec![(String::new(), root)];
     while let Some((key, value)) = pending.pop() {
         let scalar = match value {
             serde_json::Value::Object(map) => {
@@ -211,9 +222,6 @@ pub fn read_yaml(src: &str) -> Properties {
             _ => continue,
         };
         out.insert(key, scalar);
-    }
-    if PROFILE_KEYS.iter().any(|k| out.contains_key(*k)) {
-        return Properties::new();
     }
     out
 }

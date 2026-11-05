@@ -1273,7 +1273,17 @@ such a read links through the peer's `base_url_env`. `.env` files are not read. 
 Backstage's configuration read, `config.getString('a.b')` or `config.getOptionalString('a.b')`,
 when an `app-config*.yaml` of the repository holds `a.b: ${VAR}` (`app-config.yaml` first, the
 first file with the key wins): the read is the variable `VAR`. A literal value or a key no file
-holds leaves the base unresolved.
+holds leaves the base unresolved. A block moved to a partial file with
+`{ $include: ./partials/a.yaml }` (or `./partials/a.yaml#a.b`, for its key `a.b` alone) and a
+value `{ $env: VAR }` are read as if written in the file itself, as Backstage applies them: the
+path starts from the including file's directory, only `.json`, `.yaml` and `.yml` files are read,
+and a partial may include another, from its own directory. A partial is an input of the index:
+editing it alone changes the answer on the next query. Not followed: an absolute path, one that
+leaves the repository, a symbolic link, a `${` in the path, another extension, a file or key path
+that does not exist, an object with another key beside `$include`, a cycle, more than 8 includes
+deep, more than 64 includes from one `app-config` and more than 1 MiB of partials grafted into
+it: the keys under that `$include` stay unread, and `meada status` names each with its reason.
+`$file` is not read, and an `app-config` or partial over 1 MiB is ignored.
 
 **Manifests.** `package.json` (`name`, `version`, the four dependency fields, `exports`, `types`,
 `module` and `main`) and `tsconfig.json` (`paths`, `baseUrl`, `outDir`, `rootDir`). See npm in

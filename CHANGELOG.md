@@ -47,6 +47,18 @@ All notable changes to Meada are recorded here. The format follows
   the constructor reads, a Backstage `config.getString` through `app-config*.yaml` included, and
   links through `base_url_env`. A public mutable field, a second or conditional write, a write
   outside the constructor, a constructor parameter and a JavaScript file stay unknown (#688).
+- Backstage's `app-config*.yaml` follows `$include` and reads `$env`: a block moved to a partial
+  (`{ $include: ./partials/acme.yaml }`, or `./partials/acme.yaml#api` for one key path of it)
+  and a value written `{ $env: API_URL }` are read as if inline, so a `config.getString` through
+  them links through `base_url_env`. The path resolves against the including file's directory,
+  only `.json`, `.yaml` and `.yml` files are read, and includes nest from their own directory. A
+  partial is a config input of the index, so editing it alone changes the answer on the next
+  refresh. An absolute path, one that leaves the repository, a symbolic link, a `${` in the path,
+  another extension, a missing file or key path, a sibling key, a cycle, a depth past 8, more
+  than 64 includes from one root and more than 1 MiB grafted into one root are not followed:
+  their keys stay unread and `meada status` names each include with its reason. `$file` stays
+  unread, and a config file past 1 MiB is dropped, not parsed by half. The index schema golden
+  changes (it now lists the stored roles), so existing indexes are rebuilt (#689).
 - IaC nodes (ADR 0025): every Terraform and OpenTofu `resource`, `data` block and `module` call
   of a `*.tf` or `*.tofu` file is a node with an address (`<type>.<name>`, `data.<type>.<name>`,
   `module.<name>`), a type, a file, its lines and the root module that roots its evaluation (a

@@ -209,7 +209,11 @@ environment reads; the architecture map keeps the lead of the first:
   three more: `config_files` names with a `**/` prefix (every `Cargo.toml` the walk finds, in
   path order, or with `**/*.ext` every file ending so, as C#'s `**/*.csproj`; `lang::names_config`
   in the index and in `meada decide`, each read as a root config is (`read_config`) and folded into the configs digest on
-  every refresh) and `layout`, which `refresh` calls once per pack and refresh with the configs
+  every refresh; `config_inputs` (#689) names the further files those configs name, which the
+  index reads the same way when the walk sees them and appends to the pack's configs, a symbolic
+  link on the way going to `Indexed::symlinks`, both in the digest: the TS pack's are Backstage's
+  `$include` targets, asked for by `http/ts/config.rs` grafting each root as the reader does) and
+  `layout`, which `refresh` calls once per pack and refresh with the configs
   and every file the pack parsed, and which answers five things from one build (Rust's crate
   `Tree`, so the manifests are parsed and the module trees walked once): `Layout::members` (the
   files it builds; the rest keep their facts in `files` with an empty `resolved` and no rows,

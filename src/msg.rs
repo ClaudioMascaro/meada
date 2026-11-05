@@ -162,6 +162,14 @@ pub enum Msg<'a> {
         endpoint: &'a str,
         calls: usize,
     },
+    /// A Backstage `$include` of an `app-config*.yaml` or of a file it includes (#689) that is not
+    /// followed: the file it is written in, the include as written and why. The keys under it
+    /// stay unread.
+    BackstageInclude {
+        file: &'a str,
+        include: &'a str,
+        reason: crate::http::IncludeReason,
+    },
     DocumentUnreadable {
         path: &'a str,
         line: usize,
@@ -1848,6 +1856,77 @@ impl Msg<'_> {
                 format!("endpoint de proxy do Backstage {endpoint}: seu target ou o caminho que ele recebe não é lido (um target que não é ${{VAR}} nem uma URL http(s), um pathRewrite que faz mais que tirar o endpoint, ignorePath, prependPath, ou arquivos app-config que divergem), então {calls} chamada(s) por ele ficam sem ligação"),
                 format!("endpoint de proxy de Backstage {endpoint}: su target o la ruta que recibe no se lee (un target que no es ${{VAR}} ni una URL http(s), un pathRewrite que hace más que quitar el endpoint, ignorePath, prependPath, o archivos app-config que difieren), así que {calls} llamada(s) por él quedan sin enlace"),
             ),
+            Msg::BackstageInclude {
+                file,
+                include,
+                reason,
+            } => {
+                use crate::http::IncludeReason as R;
+                let (depth, count) = (crate::http::INCLUDE_DEPTH, crate::http::INCLUDES);
+                let mib = crate::lang::MAX_BYTES >> 20;
+                let words = |(en, pt, es): (&str, &str, &str)| (en.into(), pt.into(), es.into());
+                let (en, pt, es): (String, String, String) = match reason {
+                    R::Absolute => words(("an absolute path", "caminho absoluto", "ruta absoluta")),
+                    R::Outside => words((
+                        "a path that leaves the repository",
+                        "caminho que sai do repositório",
+                        "ruta que sale del repositorio",
+                    )),
+                    R::Variable => words(("a ${ in the path", "${ no caminho", "${ en la ruta")),
+                    R::Extension => words((
+                        "not a .json, .yaml or .yml file",
+                        "não é arquivo .json, .yaml ou .yml",
+                        "no es archivo .json, .yaml o .yml",
+                    )),
+                    R::Symlink => words(("a symbolic link", "link simbólico", "enlace simbólico")),
+                    R::Missing => words((
+                        "no such file, or one ignored or hidden",
+                        "arquivo inexistente, ignorado ou oculto",
+                        "archivo inexistente, ignorado u oculto",
+                    )),
+                    R::Unreadable => words((
+                        "a file that does not parse",
+                        "arquivo que não se lê",
+                        "archivo que no se lee",
+                    )),
+                    R::KeyPath => words((
+                        "a key path the file does not hold",
+                        "caminho de chave que o arquivo não tem",
+                        "ruta de clave que el archivo no tiene",
+                    )),
+                    R::Sibling => words((
+                        "another key beside $include",
+                        "outra chave ao lado de $include",
+                        "otra clave junto a $include",
+                    )),
+                    R::NotPath => words((
+                        "a value that is not a path",
+                        "valor que não é caminho",
+                        "valor que no es ruta",
+                    )),
+                    R::Cycle => words(("a cycle", "ciclo", "ciclo")),
+                    R::Depth => (
+                        format!("deeper than {depth} includes"),
+                        format!("mais fundo que {depth} includes"),
+                        format!("más hondo que {depth} includes"),
+                    ),
+                    R::Count => (
+                        format!("more than {count} includes from one root"),
+                        format!("mais de {count} includes a partir de uma raiz"),
+                        format!("más de {count} includes desde una raíz"),
+                    ),
+                    R::Size => (
+                        format!("past {mib} MiB of included files"),
+                        format!("mais de {mib} MiB de arquivos incluídos"),
+                        format!("más de {mib} MiB de archivos incluidos"),
+                    ),
+                };
+                pick(
+                    format!("{file}: Backstage $include {include} not followed ({en}): the keys under it stay unread"),
+                    format!("{file}: $include do Backstage {include} não seguido ({pt}): as chaves sob ele ficam sem leitura"),
+                    format!("{file}: $include de Backstage {include} no seguido ({es}): las claves bajo él quedan sin leer"),
+                )
+            }
             Msg::DocumentUnreadable { path, line, error } => pick(
                 format!("{path}:{line}: unreadable document ({error}), ignored"),
                 format!("{path}:{line}: documento ilegível ({error}), ignorado"),

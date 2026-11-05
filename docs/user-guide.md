@@ -1276,7 +1276,18 @@ assim liga pelo `base_url_env` do par. Arquivos `.env` não são lidos. O mesmo 
 leitura de configuração do Backstage, `config.getString('a.b')` ou `config.getOptionalString('a.b')`,
 quando algum `app-config*.yaml` do repositório guarda `a.b: ${VAR}` (o `app-config.yaml` primeiro, e
 vale o primeiro arquivo que tem a chave): a leitura é a variável `VAR`. Um valor literal ou uma
-chave que nenhum arquivo tem deixam a base sem resolver.
+chave que nenhum arquivo tem deixam a base sem resolver. Um bloco levado para um arquivo parcial
+com `{ $include: ./parciais/a.yaml }` (ou `./parciais/a.yaml#a.b`, para só a chave `a.b` dele) e um
+valor `{ $env: VAR }` são lidos como se estivessem no próprio arquivo, como o Backstage os aplica:
+o caminho parte da pasta do arquivo que inclui, só arquivos `.json`, `.yaml` e `.yml` são lidos, e
+um parcial pode incluir outro, a partir da sua própria pasta. Um parcial é entrada do índice:
+editar só ele muda a resposta na próxima consulta. Não são seguidos um caminho absoluto, um que
+sai do repositório, um link simbólico, um `${` no caminho, outra extensão, um arquivo ou caminho
+de chave que não existe, um objeto com outra chave ao lado de `$include`, um ciclo, mais de 8
+inclusões de profundidade, mais de 64 inclusões a partir de um `app-config` e mais de 1 MiB de
+parciais enxertados nele: as chaves sob esse `$include` ficam sem leitura, e o `meada status`
+nomeia cada um com o motivo. `$file` não é lido, e um `app-config` ou parcial com mais de 1 MiB é
+ignorado.
 
 **Manifestos.** `package.json` (`name`, `version`, os quatro campos de dependências, `exports`,
 `types`, `module` e `main`) e `tsconfig.json` (`paths`, `baseUrl`, `outDir`, `rootDir`). Veja o

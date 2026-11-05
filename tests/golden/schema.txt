@@ -3637,3 +3637,29 @@ Row { key: "Resources.Worker.Properties.FunctionName[0]", value: Some("-"), kind
 Row { key: "Resources.Worker.Properties.FunctionName[1][0]", value: Some("Stage"), kind: "string", line: 20, cut: false }
 Row { key: "Resources.Worker.Properties.FunctionName[1][1]", value: Some("worker"), kind: "string", line: 20, cut: false }
 Row { key: "Resources.Worker.Properties.Environment.Variables.QUEUE", value: Some("Queue.Arn"), kind: "string", line: 23, cut: false }
+
+contracts.role
+provider
+consumer
+binding
+publish
+import
+shape
+unmounted
+unfollowed
+
+unfollowed.method
+absolute
+outside
+variable
+extension
+symlink
+missing
+unreadable
+key-path
+sibling
+not-a-path
+cycle
+depth
+count
+size

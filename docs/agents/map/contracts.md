@@ -22,7 +22,10 @@ this file, and a change to these modules updates it.
   `Http::status` reports; `http/ts/config.rs` reads the `proxy.endpoints` of `app-config*.yaml`
   (#616): a URL that starts with `/api/proxy/<ep>` is rewritten to the endpoint's `target`, the
   consumer's `via` keeping the endpoint after `PROXY_VIA` for the reason, and an endpoint whose
-  target is not read gives the `client:` `via` that `backstage::unread` finds for `status`);
+  target is not read gives the `client:` `via` that `backstage::unread` finds for `status`; each
+  root is a tree first, `config/includes.rs` grafting its `$include`s and reading its `$env`s,
+  #689, then flattened by `spring::flatten`, and an include not followed is a `Role::Unfollowed`
+  row of the TS group's first file that `Http::status` names);
   `http/python.rs` and `http/python/clients.rs`, FastAPI, Flask and Django providers and the
   requests, httpx and aiohttp consumers, whose rows also list reqwest and ureq; `http/rust.rs`
   and `http/rust/axum.rs`, actix-web, Rocket and axum providers; `http/go.rs` and

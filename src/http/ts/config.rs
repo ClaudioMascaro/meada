@@ -6,6 +6,13 @@
 //! (`Part::Env`), which `base_url_env` then maps. A literal value, a key no file holds and a
 //! read with a member left over stay unknown, as before.
 //!
+//! Each root is read as a tree first (`includes`): an object whose only key is `$include` is
+//! replaced by the file (or the `#` key path of it) its value names, and one whose only key is
+//! `$env` by `${VAR}` (#689); the tree is then flattened as Spring's YAML is
+//! (`spring::flatten`). A root past `lang::MAX_BYTES` is dropped, and a partial is never a root.
+//! The includes not followed are `Role::Unfollowed` rows of the extraction (`unfollowed`), which
+//! `meada status` names.
+//!
 //! The same files hold Backstage's proxy table (#616): `proxy.endpoints['/<ep>'].target`. A URL
 //! that starts with `/api/proxy/<ep>` (the proxy plugin's mount, also what `getBaseUrl('proxy')`
 //! folds to) is a call to that target: a `${VAR}` target is the variable `VAR`, an `http(s)://`
@@ -20,18 +27,36 @@
 // directory, and profiles are not merged: the first file holding the key wins. Scope the lookup
 // by directory if a monorepo's apps keep different values under one key.
 
+mod includes;
+
 use std::cell::OnceCell;
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::jvm::spring::{Properties, read_yaml};
-use crate::lang::{Part, Value};
+pub(crate) use includes::{DEPTH, INCLUDES, Reason, Unfollowed};
+
+use crate::contract::{Found, Role, Site};
+use crate::index::Indexed;
+use crate::jvm::spring::{Properties, flatten};
+use crate::lang::{ConfigInput, Part, Value};
+use crate::resolve::Code;
 
 /// The reads of one extraction; the configuration files are parsed the first time one asks.
-pub(super) struct Config<'i> {
+pub(in crate::http) struct Config<'i> {
     files: &'i [(&'i str, &'i [u8])],
-    /// The keys of every file, and the keys two files give different values.
-    keys: OnceCell<(Properties, BTreeSet<String>)>,
+    /// The config inputs that are symbolic links (`Indexed::symlinks`).
+    symlinks: &'i [&'i str],
+    keys: OnceCell<Read>,
     endpoints: OnceCell<Vec<Endpoint>>,
+}
+
+/// What the `app-config*.yaml` files give, read once.
+struct Read {
+    /// The keys of every file, the first file holding a key giving its value.
+    keys: Properties,
+    /// The keys two files give different values.
+    contested: BTreeSet<String>,
+    /// The includes no root followed, each once, sorted.
+    unfollowed: Vec<Unfollowed>,
 }
 
 /// A proxy endpoint: its name, its target, and whether its `pathRewrite` strips only `<ep>/`
@@ -59,9 +84,14 @@ pub(super) struct Proxied {
 const PROXY: &str = "/api/proxy";
 
 impl<'i> Config<'i> {
-    pub(super) fn new(configs: &'i [(&'i str, &'i [u8])]) -> Self {
+    pub(in crate::http) fn new(indexed: &Indexed<'i>) -> Self {
+        Self::of(indexed.configs, indexed.symlinks)
+    }
+
+    fn of(configs: &'i [(&'i str, &'i [u8])], symlinks: &'i [&'i str]) -> Self {
         Self {
             files: configs,
+            symlinks,
             keys: OnceCell::new(),
             endpoints: OnceCell::new(),
         }
@@ -90,11 +120,12 @@ impl<'i> Config<'i> {
 
     /// The keys of every `app-config*.yaml`, parsed the first time they are asked for.
     fn keys(&self) -> &Properties {
-        &self.read().0
+        &self.read().keys
     }
 
-    /// The keys of every `app-config*.yaml`, and those two of them disagree on.
-    fn read(&self) -> &(Properties, BTreeSet<String>) {
+    /// The keys of every `app-config*.yaml`, those two of them disagree on, and the includes
+    /// not followed.
+    fn read(&self) -> &Read {
         self.keys.get_or_init(|| {
             let mut files: Vec<_> = self
                 .files
@@ -103,13 +134,23 @@ impl<'i> Config<'i> {
                 .collect();
             // `app-config.yaml` is read first and wins: which override a deployment loads is not known.
             files.sort_by_key(|(p, _)| (!p.ends_with("app-config.yaml"), *p));
+            let by_path: BTreeMap<&str, &[u8]> = self.files.iter().copied().collect();
+            // What the index gave for each path a root's includes name.
+            let read = |path: &str| match by_path.get(path) {
+                Some(src) => ConfigInput::Read((*src).into()),
+                None if self.symlinks.contains(&path) => ConfigInput::Symlink,
+                None => ConfigInput::Missing,
+            };
             let mut keys = BTreeMap::new();
             let mut contested = BTreeSet::new();
-            for (_, src) in files {
-                let Ok(src) = std::str::from_utf8(src) else {
+            let mut unfollowed = BTreeSet::new();
+            for (path, src) in files {
+                let (tree, refused) = includes::tree(path, src, &read);
+                unfollowed.extend(refused);
+                let Some(tree) = tree else {
                     continue;
                 };
-                for (k, v) in read_yaml(src) {
+                for (k, v) in flatten(&tree) {
                     match keys.get(&k) {
                         Some(kept) if *kept != v => {
                             contested.insert(k);
@@ -121,8 +162,17 @@ impl<'i> Config<'i> {
                     }
                 }
             }
-            (keys, contested)
+            Read {
+                keys,
+                contested,
+                unfollowed: unfollowed.into_iter().collect(),
+            }
         })
+    }
+
+    /// The includes no root followed, each once, sorted.
+    fn unfollowed(&self) -> &[Unfollowed] {
+        &self.read().unfollowed
     }
 
     /// `proxy.endpoints['/<ep>'].target`, longest endpoint first.
@@ -159,7 +209,9 @@ impl<'i> Config<'i> {
     // ponytail: a rule with a null replacement is not in the flattened keys, so an endpoint whose
     // only rule is null reads as having none; read the parsed document if that shows up.
     fn strips(&self, raw: &str, name: &str) -> (bool, bool) {
-        let (keys, contested) = self.read();
+        let Read {
+            keys, contested, ..
+        } = self.read();
         let all = format!("proxy.endpoints.{raw}.");
         // Which file a deployment loads last is not known, so a key the files disagree on is
         // not read; `ignorePath` and `prependPath: false` change the path the target gets.
@@ -265,21 +317,76 @@ fn target(value: &str) -> Target {
     }
 }
 
+/// The includes of the `app-config*.yaml` among `configs` (`LanguagePack::config_inputs`): each
+/// root grafted as the reader grafts it, so `read` is asked for every file the reader will look
+/// for, and nothing else.
+pub(crate) fn config_inputs<'b>(configs: &[(&str, &[u8])], read: &dyn Fn(&str) -> ConfigInput<'b>) {
+    for (path, src) in configs.iter().filter(|(p, _)| is_app_config(p)) {
+        includes::tree(path, src, read);
+    }
+}
+
+/// The includes of Backstage's `app-config*.yaml` that no root followed, as rows of the TS and
+/// JavaScript group (`Role::Unfollowed`, which `meada status` names): the including file in
+/// `via`, the reason in `method` and the include as written in `fragments`. They hold no code
+/// site, so each sits in the group's first file, where its rows are kept with the group's
+/// (`refresh` keeps a group's rows by its files).
+pub(in crate::http) fn unfollowed(code: &Code, config: &Config) -> Vec<Found> {
+    let Some(&first) = code.files().keys().next() else {
+        return Vec::new();
+    };
+    if !code.pack().extensions().contains(&"js") {
+        return Vec::new();
+    }
+    (config.unfollowed().iter())
+        .map(|u| Found {
+            role: Role::Unfollowed,
+            site: Site::File(first.to_string()),
+            contract: None,
+            via: Some(u.file.clone()),
+            method: Some(u.reason.name().to_string()),
+            fragments: vec![u.include.clone()],
+            shape: None,
+        })
+        .collect()
+}
+
+/// The includes not followed that the `unfollowed` rows of an index hold, as stored (`via`,
+/// `fragments`, `method`, `index::Export::unfollowed`); a row this build cannot read is left out.
+pub(in crate::http) fn unfollowed_of(
+    rows: &[(String, Option<String>, Option<String>)],
+) -> Vec<Unfollowed> {
+    (rows.iter())
+        .filter_map(|(file, fragments, reason)| {
+            let include: Vec<String> = serde_json::from_str(fragments.as_deref()?).ok()?;
+            Some(Unfollowed {
+                file: file.clone(),
+                include: include.into_iter().next()?,
+                reason: Reason::parse(reason.as_deref()?)?,
+            })
+        })
+        .collect()
+}
+
 /// Whether `path` is one of Backstage's `app-config*.yaml`: the configs of every pack come in
 /// together, Spring's `application.yaml` among them.
 fn is_app_config(path: &str) -> bool {
     crate::lang::names_config("app-config*.yaml", path.rsplit('/').next().unwrap_or(path))
 }
 
-/// What an `app-config.yaml` gives a call through its proxy table: the size of the keys read and
-/// of the endpoints (`package::hostile`).
+/// What the `app-config.yaml` among `files` (with the partials it includes) gives a call through
+/// its proxy table: the size of the keys read, of the endpoints and of the includes not followed
+/// (`package::hostile`).
 #[cfg(test)]
-pub(crate) fn probe(text: Vec<u8>) -> usize {
-    let files = [("app-config.yaml", text.as_slice())];
-    let config = Config::new(&files);
+pub(crate) fn probe(files: &[(&str, Vec<u8>)]) -> usize {
+    let files: Vec<(&str, &[u8])> = files.iter().map(|(p, s)| (*p, s.as_slice())).collect();
+    let config = Config::of(&files, &[]);
     // A miss walks every endpoint.
     let url = [Value::Str(vec![Part::Text("/api/proxy/zz/x".into())])];
     let missed = config.proxied(&url).is_some() as usize;
     let keys: usize = (config.keys().iter()).map(|(k, v)| k.len() + v.len()).sum();
-    keys + config.endpoints().len() + missed
+    let unfollowed: usize = (config.unfollowed().iter())
+        .map(|u| u.file.len() + u.include.len())
+        .sum();
+    keys + config.endpoints().len() + missed + unfollowed
 }

@@ -706,6 +706,7 @@ export async function listen() {
             exported: &[],
             files: &["a.ts"],
             configs: &[],
+            symlinks: &[],
         };
         let sites: Vec<_> = Channel
             .extract(&code, &indexed)

@@ -12,7 +12,6 @@ use super::backstage;
 use super::config::Config;
 use crate::contract::Found;
 use crate::declared::{self, Declared, Types};
-use crate::index::Indexed;
 use crate::lang::ts::GLOBAL_URL;
 use crate::lang::{Part, Step, Ty, Value};
 use crate::literals::Literals;
@@ -22,11 +21,10 @@ use crate::shape::{self, Import, Shape, Source, under};
 /// `fetch` consumers with the shape each reads of its response (spec #23).
 pub(in crate::http) fn consumers(
     code: &Code,
-    indexed: &Indexed,
+    config: &Config,
     literals: &mut Literals,
 ) -> Vec<Found> {
     let mut found = Vec::new();
-    let config = Config::new(indexed.configs);
     // `fetch` is a consumer only where the language binds it everywhere.
     let global = code.binds_everywhere("fetch");
     for (&path, facts) in code.files() {
