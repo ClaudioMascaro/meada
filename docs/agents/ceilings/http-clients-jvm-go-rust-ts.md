@@ -410,9 +410,16 @@
 - Backstage proxy endpoints (#616, `http/ts/config.rs`): a `fetch` URL whose leading literal text
   is `/api/proxy/<ep>` (also what `getBaseUrl('proxy')` folds to), `<ep>` an endpoint of
   `proxy.endpoints` in the `app-config*.yaml` files (the lookup of the configuration reads
-  above), the longest matching endpoint, followed by `/`, `?`, `#` or the end of the URL. Only
-  the `target` form is read: the string shorthand (`'/ep': 'https://...'`) and a `|` in an
-  endpoint name are not. A target that is exactly `${VAR}` is the variable, one that is
+  above), the longest matching endpoint, followed by `/`, `?`, `#` or the end of the URL. With
+  no `proxy.endpoints.*` key in the flattened set of every file the endpoints are the keys of
+  `proxy` that start with `/` (Backstage's legacy shape, #690: `endpoints` wins when any file
+  has it, so a legacy key beside it is no endpoint); a string value is `{ target }` in either
+  shape (`config::expand`, before the flattening), and the options another file gives the same
+  endpoint apply to it. A `|` in an endpoint name is not read. An endpoint whose name has a `.`
+  and a key named `target` below it are told apart only by the `.target` suffix, so a string
+  endpoint named `/a.target` reads as the endpoint `/a`. A `proxy.endpoints` behind an include
+  that is not followed is no key (an empty `endpoints` object is one, and hides the legacy
+  keys), so the legacy keys beside it are read as endpoints (`meada status` names the include). A target that is exactly `${VAR}` is the variable, one that is
   a literal `http(s)://` URL is the host (a trailing `/` dropped, its path kept); any other
   target (`${VAR}/v2`, `${VAR:-default}`, a URL with a placeholder) leaves the URL as written, with a
   `client:` `via` the link's reason shows, and `meada status` names the endpoint and its calls.

@@ -1,4 +1,7 @@
 proxy:
+  # Both shapes: Backstage reads `endpoints` when it exists, so the legacy keys are not endpoints.
+  '/oldshape':
+    target: ${INVENTORY_URL}
   endpoints:
     '/inventory':
       target: ${INVENTORY_URL}
@@ -28,3 +31,18 @@ proxy:
       ignorePath: true
     '/disputed':
       target: https://stock.example.com
+    # The string shorthand is `{ target }` with the default `pathRewrite`.
+    '/short': https://short.example.com
+    '/shortenv': ${INVENTORY_URL}
+    '/shortenvdirect':
+      $env: INVENTORY_URL
+    # `app-config.production.yaml` gives these strings the options of the object form.
+    '/shortignored': https://stock.example.com
+    '/shortprepend': https://stock.example.com
+    '/shortrewrite': https://stock.example.com
+    '/shortstripped': https://stock.example.com
+    # An endpoint in an included partial: the whole object, and a string through a key path.
+    '/included':
+      $include: ./partials/inventory.yaml
+    '/includedshort':
+      $include: ./partials/targets.yaml#stock

@@ -66,7 +66,7 @@ through `/create-prove-it`, and adds its paths to SKILL.md's Scope row.
 | Go struct field | 2 (`g9`) | to come | pending |
 | TS readonly field | 1 (`g9`) | #688 | landed |
 | Backstage `$include` and `$env` | 3 (`g10b`, `g10c`, `g10h`) | #689 | landed |
-| Backstage proxy shapes | 3 (`g10e` to `g10g`) | to come | pending (`g10f`, `endpoints` inside an include, landed with #689) |
+| Backstage proxy shapes | 3 (`g10e` to `g10g`) | #690 | landed (`g10f`, `endpoints` inside an include, landed with #689) |
 
 ## Could fool you
 

@@ -560,6 +560,22 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
         ))
     };
     let (stripped_via, slashed_via) = (stock("/stripped"), stock("/slashed"));
+    let short = Some("host:short.example.com through proxy endpoint /short".to_string());
+    let inventory_at = |endpoint: &str| {
+        Some(format!(
+            "env:INVENTORY_URL through proxy endpoint {endpoint}"
+        ))
+    };
+    let unread = |endpoint: &str| format!("client:Backstage proxy endpoint {endpoint}{said}");
+    let (shortenv_via, shortenvdirect_via) =
+        (inventory_at("/shortenv"), inventory_at("/shortenvdirect"));
+    let (included_via, includedshort_via) = (inventory_at("/included"), stock("/includedshort"));
+    let shortstripped_via = stock("/shortstripped");
+    let (shortignored_said, shortprepend_said, shortrewrite_said) = (
+        unread("/shortignored"),
+        unread("/shortprepend"),
+        unread("/shortrewrite"),
+    );
     let mut expected = [
         // `/inventoryx` is no `/inventory`.
         (
@@ -621,6 +637,68 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
             "http::GET::/api/proxy/disputed/clusters",
             Some(disputed.as_str()),
         ),
+        // A string is `{ target }` with the default `pathRewrite`, under `endpoints`: a host, or a
+        // variable written as `${VAR}` or `$env`. The options another file gives the same
+        // endpoint apply to it.
+        ("viaShort", "http::GET::/clusters", short.as_deref()),
+        (
+            "viaShortEnv",
+            "http::GET::/clusters",
+            shortenv_via.as_deref(),
+        ),
+        (
+            "viaShortEnvDirect",
+            "http::GET::/clusters",
+            shortenvdirect_via.as_deref(),
+        ),
+        (
+            "viaShortIgnored",
+            "http::GET::/api/proxy/shortignored/clusters",
+            Some(shortignored_said.as_str()),
+        ),
+        (
+            "viaShortPrepend",
+            "http::GET::/api/proxy/shortprepend/clusters",
+            Some(shortprepend_said.as_str()),
+        ),
+        (
+            "viaShortRewrite",
+            "http::GET::/api/proxy/shortrewrite/clusters",
+            Some(shortrewrite_said.as_str()),
+        ),
+        (
+            "viaShortStripped",
+            "http::GET::/clusters",
+            shortstripped_via.as_deref(),
+        ),
+        // An endpoint in an included partial, whole or as the string a key path selects.
+        (
+            "viaIncluded",
+            "http::GET::/clusters",
+            included_via.as_deref(),
+        ),
+        (
+            "viaIncludedShort",
+            "http::GET::/clusters",
+            includedshort_via.as_deref(),
+        ),
+        // Both shapes, in one file (`/oldshape`, `/prodshape`) or across files (`/localshape`,
+        // alone in its file): only `endpoints` is read, so a legacy key is no endpoint.
+        (
+            "viaOldShape",
+            "http::GET::/api/proxy/oldshape/clusters",
+            None,
+        ),
+        (
+            "viaProdShape",
+            "http::GET::/api/proxy/prodshape/clusters",
+            None,
+        ),
+        (
+            "viaLocalShape",
+            "http::GET::/api/proxy/localshape/clusters",
+            None,
+        ),
         // A part Meada cannot read in the endpoint, or right after it, names no endpoint.
         ("holeAfterEndpoint", "http::GET::/api/proxy/{}", None),
         ("holeInEndpoint", "http::GET::/api/proxy/{}/clusters", None),
@@ -647,6 +725,11 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
     let through = format!(
         "base URL from INVENTORY_URL through the proxy endpoint /inventory, a base_url_env of peer {peer}"
     );
+    let through_at = |endpoint: &str| {
+        format!(
+            "base URL from INVENTORY_URL through the proxy endpoint {endpoint}, a base_url_env of peer {peer}"
+        )
+    };
     let served = |function: &str, level, reason: &str| {
         (
             function.to_string(),
@@ -663,11 +746,32 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
         [
             served("viaBrowserPath", "inferred", &through),
             served("viaDiscovery", "inferred", &through),
+            served("viaIncluded", "inferred", &through_at("/included")),
+            served(
+                "viaIncludedShort",
+                "exact",
+                &format!(
+                    "host stock.example.com through the proxy endpoint /includedshort is served by {peer}"
+                ),
+            ),
             served(
                 "viaLiteralTarget",
                 "exact",
                 &format!(
                     "host stock.example.com through the proxy endpoint /stock is served by {peer}"
+                ),
+            ),
+            served("viaShortEnv", "inferred", &through_at("/shortenv")),
+            served(
+                "viaShortEnvDirect",
+                "inferred",
+                &through_at("/shortenvdirect")
+            ),
+            served(
+                "viaShortStripped",
+                "exact",
+                &format!(
+                    "host stock.example.com through the proxy endpoint /shortstripped is served by {peer}"
                 ),
             ),
             served(
@@ -703,9 +807,12 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
         unread("/ignored", 1),
         unread("/legacy", 2),
         unread("/rewritten", 1),
+        unread("/shortignored", 1),
+        unread("/shortprepend", 1),
+        unread("/shortrewrite", 1),
         unread("/slashed", 1),
         unread("/twice", 1),
-        "  config files: 2 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 17, \
+        "  config files: 5 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 39, \
          redacted: 0"
             .to_string(),
         "  wrong conclusion? report it: \
@@ -714,6 +821,155 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
         "example.com/backstage/inventory (../go-backstage-inventory) indexed, 1 files".to_string(),
     ];
     assert_eq!(status.lines().collect::<Vec<_>>(), expected, "{status}");
+}
+
+/// Backstage's legacy proxy shape (#690): with no `proxy.endpoints` in any file, the keys of
+/// `proxy` that start with `/` are the endpoints, as strings (`{ target }`) or objects, inline or
+/// in an included partial, in any `app-config*.yaml`, with the same `pathRewrite`, `ignorePath`
+/// and `prependPath` rules as `endpoints`.
+#[test]
+fn the_legacy_proxy_shape_and_its_strings_send_a_call_to_their_target() {
+    let case = "urls_backstage_proxy_legacy";
+    let web = fixture_repo(
+        case,
+        "ts-backstage-proxy-legacy",
+        Some("https://example.com/backstage/web.git"),
+    );
+    fixture_repo(
+        case,
+        "go-backstage-inventory",
+        Some("https://example.com/backstage/inventory.git"),
+    );
+    let export = Engine::open(&web).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let function = |site: &str| site.split("::").nth(2).unwrap().to_string();
+    let mut consumers: Vec<_> = (json["consumers"].as_array().unwrap())
+        .iter()
+        .map(|c| {
+            let site = function(c["site"].as_str().unwrap());
+            let via = c["via"].as_str().map(str::to_string);
+            (site, c["contract"].as_str().unwrap().to_string(), via)
+        })
+        .collect();
+    consumers.sort();
+    let said = " (its target or the path it gets is not read: a target neither ${VAR} nor an http(s) URL, a pathRewrite that does more than strip the endpoint, ignorePath, prependPath, or app-config files that disagree)";
+    let env = |ep: &str| format!("env:INVENTORY_URL through proxy endpoint {ep}");
+    let host = |h: &str, ep: &str| format!("host:{h} through proxy endpoint {ep}");
+    let unread = |ep: &str| format!("client:Backstage proxy endpoint {ep}{said}");
+    let served = |function: &str, via: String| {
+        (
+            function.to_string(),
+            "http::GET::/clusters".to_string(),
+            Some(via),
+        )
+    };
+    let unlinked = |function: &str, ep: &str| {
+        (
+            function.to_string(),
+            format!("http::GET::/api/proxy/{ep}/clusters"),
+            Some(unread(&format!("/{ep}"))),
+        )
+    };
+    let mut expected = vec![
+        served("viaInventory", env("/inventory")),
+        served("viaDiscovery", env("/inventory")),
+        // A string is `{ target }`: a host, or a variable.
+        served("viaStock", host("stock.example.com", "/stock")),
+        served("viaStockEnv", env("/stockenv")),
+        served("viaStripped", host("stock.example.com", "/stripped")),
+        // An endpoint in an included partial, and in another file.
+        served("viaIncluded", env("/included")),
+        served("viaFromFile", env("/fromfile")),
+        served(
+            "viaFromFileShort",
+            host("stock.example.com", "/fromfileshort"),
+        ),
+        served("viaLocal", host("local.example.com", "/local")),
+        // The rules of the object form, also over a string another file gives the options.
+        unlinked("viaRewritten", "rewritten"),
+        unlinked("viaIgnored", "ignored"),
+        unlinked("viaPrepended", "prepended"),
+        unlinked("viaShortIgnored", "shortignored"),
+        unlinked("viaShortRewritten", "shortrewritten"),
+        unlinked("viaShortPrepended", "shortprepended"),
+    ];
+    expected.sort();
+    assert_eq!(consumers, expected);
+
+    let links: Vec<_> = (json["links"].as_array().unwrap())
+        .iter()
+        .map(|l| {
+            (
+                function(l["consumer"].as_str().unwrap()),
+                l["level"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    let (inferred, exact) = ("inferred", "exact");
+    assert_eq!(
+        links,
+        [
+            ("viaDiscovery", inferred),
+            ("viaFromFile", inferred),
+            ("viaFromFileShort", exact),
+            ("viaIncluded", inferred),
+            ("viaInventory", inferred),
+            ("viaStock", exact),
+            ("viaStockEnv", inferred),
+            ("viaStripped", exact),
+        ]
+        .map(|(f, l)| (f.to_string(), l))
+    );
+    // `meada status` names each unread endpoint of the legacy shape, as it does one of `endpoints`.
+    let status = meada::engine::status(&web).unwrap();
+    let unread: Vec<_> = (status.lines())
+        .filter_map(|l| l.trim().strip_prefix("Backstage proxy endpoint "))
+        .map(|l| l.split(':').next().unwrap())
+        .collect();
+    assert_eq!(
+        unread,
+        [
+            "/ignored",
+            "/prepended",
+            "/rewritten",
+            "/shortignored",
+            "/shortprepended",
+            "/shortrewritten"
+        ],
+        "{status}"
+    );
+}
+
+/// A `proxy.endpoints` that exists, empty or not an object, is the table Backstage's proxy backend
+/// reads (#690), so the legacy keys of another file are no endpoints, and the call stays
+/// unlinked.
+#[test]
+fn an_empty_endpoints_table_still_hides_the_legacy_keys_of_another_file() {
+    for fixture in ["ts-backstage-proxy-empty", "ts-backstage-proxy-scalar"] {
+        let case = format!("urls_{}", fixture.replace('-', "_"));
+        let web = fixture_repo(
+            &case,
+            fixture,
+            Some("https://example.com/backstage/web.git"),
+        );
+        fixture_repo(
+            &case,
+            "go-backstage-inventory",
+            Some("https://example.com/backstage/inventory.git"),
+        );
+        let export = Engine::open(&web).unwrap().export().unwrap();
+        let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+        let consumers: Vec<_> = (json["consumers"].as_array().unwrap())
+            .iter()
+            .map(|c| c["contract"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            consumers,
+            ["http::GET::/api/proxy/inventory/clusters"],
+            "{fixture}"
+        );
+        assert!(json["links"].as_array().unwrap().is_empty(), "{fixture}");
+    }
 }
 
 /// Backstage's `$include` (#689): an include Meada does not follow leaves its subtree unread, and

@@ -13,16 +13,19 @@
 //! The includes not followed are `Role::Unfollowed` rows of the extraction (`unfollowed`), which
 //! `meada status` names.
 //!
-//! The same files hold Backstage's proxy table (#616): `proxy.endpoints['/<ep>'].target`. A URL
-//! that starts with `/api/proxy/<ep>` (the proxy plugin's mount, also what `getBaseUrl('proxy')`
-//! folds to) is a call to that target: a `${VAR}` target is the variable `VAR`, an `http(s)://`
-//! target is that host (with its path), and the rest of the URL follows it. A `pathRewrite` that
-//! only strips the endpoint (`'^/api/proxy/<ep>': ''`, or `'^/api/proxy/<ep>/': '/'` for a URL
-//! with a path) is what the proxy does anyway. Any other target (a template around the variable,
-//! a default, no `http`) and any other `pathRewrite` (another replacement, several rules, a
-//! pattern with regex characters), `ignorePath`, `prependPath: false` and an endpoint key the
-//! files give different values leave the URL as written and the call unlinked, and
-//! `meada status` says so.
+//! The same files hold Backstage's proxy table (#616): `proxy.endpoints['/<ep>'].target`, and, when
+//! no file has a `proxy.endpoints` key, the keys of `proxy` that start with `/` (the legacy shape
+//! `proxy['/<ep>'].target`, which Backstage's proxy backend reads when `endpoints` does not exist,
+//! across the merged files, #690). An endpoint written as a string is `{ target }` in either shape
+//! (`expand`), with the default `pathRewrite`. A URL that starts with `/api/proxy/<ep>` (the proxy
+//! plugin's mount, also what `getBaseUrl('proxy')` folds to) is a call to that target: a `${VAR}`
+//! target is the variable `VAR`, an `http(s)://` target is that host (with its path), and the rest
+//! of the URL follows it. A `pathRewrite` that only strips the endpoint (`'^/api/proxy/<ep>': ''`,
+//! or `'^/api/proxy/<ep>/': '/'` for a URL with a path) is what the proxy does anyway. Any other
+//! target (a template around the variable, a default, no `http`) and any other `pathRewrite`
+//! (another replacement, several rules, a pattern with regex characters), `ignorePath`,
+//! `prependPath: false` and an endpoint key the files give different values leave the URL as
+//! written and the call unlinked, and `meada status` says so.
 // ponytail: every `app-config*.yaml` of the repository serves every file of it, whatever the
 // directory, and profiles are not merged: the first file holding the key wins. Scope the lookup
 // by directory if a monorepo's apps keep different values under one key.
@@ -57,6 +60,9 @@ struct Read {
     contested: BTreeSet<String>,
     /// The includes no root followed, each once, sorted.
     unfollowed: Vec<Unfollowed>,
+    /// Whether any file has a `proxy.endpoints` that is not null, an empty object included:
+    /// Backstage reads that table whenever it exists, so an empty one leaves no key to say so.
+    endpoints_table: bool,
 }
 
 /// A proxy endpoint: its name, its target, and whether its `pathRewrite` strips only `<ep>/`
@@ -82,6 +88,9 @@ pub(super) struct Proxied {
 
 /// Where Backstage's proxy plugin is mounted.
 const PROXY: &str = "/api/proxy";
+/// The flattened keys of the proxy table's endpoints, and of its legacy shape.
+const ENDPOINTS: &str = "proxy.endpoints.";
+const LEGACY: &str = "proxy.";
 
 impl<'i> Config<'i> {
     pub(in crate::http) fn new(indexed: &Indexed<'i>) -> Self {
@@ -144,12 +153,15 @@ impl<'i> Config<'i> {
             let mut keys = BTreeMap::new();
             let mut contested = BTreeSet::new();
             let mut unfollowed = BTreeSet::new();
+            let mut endpoints_table = false;
             for (path, src) in files {
                 let (tree, refused) = includes::tree(path, src, &read);
                 unfollowed.extend(refused);
-                let Some(tree) = tree else {
+                let Some(mut tree) = tree else {
                     continue;
                 };
+                expand(&mut tree);
+                endpoints_table |= !tree["proxy"]["endpoints"].is_null();
                 for (k, v) in flatten(&tree) {
                     match keys.get(&k) {
                         Some(kept) if *kept != v => {
@@ -166,6 +178,7 @@ impl<'i> Config<'i> {
                 keys,
                 contested,
                 unfollowed: unfollowed.into_iter().collect(),
+                endpoints_table,
             }
         })
     }
@@ -175,24 +188,23 @@ impl<'i> Config<'i> {
         &self.read().unfollowed
     }
 
-    /// `proxy.endpoints['/<ep>'].target`, longest endpoint first.
-    // ponytail: only the `target` form is read: the string shorthand (`'/ep': 'https://...'`) is
-    // indistinguishable from a dotted endpoint name in the flattened keys; read it from the
-    // parsed document if configs in the wild use it.
+    /// `proxy.endpoints['/<ep>'].target`, longest endpoint first; with no `proxy.endpoints` key in
+    /// any file, `proxy['/<ep>'].target` (Backstage's legacy shape).
+    // ponytail: the flattened keys tell an endpoint `/a` with a `target` from a string endpoint
+    // named `/a.target` only by the suffix; read the parsed tree if an endpoint is named so.
     fn endpoints(&self) -> &[Endpoint] {
         self.endpoints.get_or_init(|| {
+            let prefix = self.table();
             let mut out: Vec<_> = (self.keys().iter())
                 .filter_map(|(key, value)| {
-                    let name = key
-                        .strip_prefix("proxy.endpoints.")?
-                        .strip_suffix(".target")?;
+                    let name = key.strip_prefix(prefix)?.strip_suffix(".target")?;
                     let raw = name;
                     let name = name.trim_end_matches('/');
                     // `|` is the separator of a consumer's twin readings (`keep_applicable`).
                     if !name.starts_with('/') || name.contains('|') {
                         return None;
                     }
-                    let (strip, slash) = self.strips(raw, name);
+                    let (strip, slash) = self.strips(prefix, raw, name);
                     let target = if strip { target(value) } else { Target::Unread };
                     Some((name.to_string(), target, slash))
                 })
@@ -202,17 +214,35 @@ impl<'i> Config<'i> {
         })
     }
 
+    /// The key prefix the endpoints are read under: `proxy.endpoints.` when any file has a key
+    /// there, else the legacy `proxy.`.
+    // ponytail: only the keys the index could read decide: a `proxy.endpoints` behind an include
+    // that is not followed (missing, symlink, too big) is no key, so the legacy keys beside it
+    // are read as endpoints, where Backstage reads only `endpoints`; `meada status` names the
+    // include. Read the unfollowed row's key path if that shows up.
+    fn table(&self) -> &'static str {
+        if self.read().endpoints_table {
+            return ENDPOINTS;
+        }
+        let keys = self.keys();
+        let endpoints = keys.range(ENDPOINTS.to_string()..).next();
+        match endpoints {
+            Some((k, _)) if k.starts_with(ENDPOINTS) => ENDPOINTS,
+            _ => LEGACY,
+        }
+    }
+
     /// Whether the `pathRewrite` of the endpoint `raw` (as written in the file; `name` without a
     /// trailing `/`) leaves the path after it as the target gets it, and whether it does so only
     /// for a path that starts with `/`: none, or the one rule that strips the endpoint, and no
     /// other option or file changes it.
     // ponytail: a rule with a null replacement is not in the flattened keys, so an endpoint whose
     // only rule is null reads as having none; read the parsed document if that shows up.
-    fn strips(&self, raw: &str, name: &str) -> (bool, bool) {
+    fn strips(&self, prefix: &str, raw: &str, name: &str) -> (bool, bool) {
         let Read {
             keys, contested, ..
         } = self.read();
-        let all = format!("proxy.endpoints.{raw}.");
+        let all = format!("{prefix}{raw}.");
         // Which file a deployment loads last is not known, so a key the files disagree on is
         // not read; `ignorePath` and `prependPath: false` change the path the target gets.
         let disputed = (contested.range(all.clone()..))
@@ -227,7 +257,7 @@ impl<'i> Config<'i> {
         if disputed || ignored || unprepended {
             return (false, false);
         }
-        let at = format!("proxy.endpoints.{raw}.pathRewrite");
+        let at = format!("{all}pathRewrite");
         let rules: Vec<_> = (self.keys().range(at.clone()..))
             .take_while(|(k, _)| k.starts_with(&at))
             .collect();
@@ -292,6 +322,28 @@ impl<'i> Config<'i> {
             args: Some(args),
         })
     }
+}
+
+/// Reads each string endpoint of the proxy table as `{ target }`, as Backstage's proxy backend
+/// does: a string value under `proxy.endpoints`, and one under a key of `proxy` that starts with
+/// `/` (the legacy shape). It is applied to every file's tree, so the flattened keys of both
+/// forms are `<ep>.target`.
+fn expand(tree: &mut serde_json::Value) {
+    use serde_json::{Map, Value};
+    let Some(Value::Object(proxy)) = tree.get_mut("proxy") else {
+        return;
+    };
+    let shorten = |table: &mut Map<String, Value>, legacy: bool| {
+        for (name, value) in table.iter_mut() {
+            if (!legacy || name.starts_with('/')) && value.is_string() {
+                *value = Value::Object(Map::from_iter([("target".to_string(), value.take())]));
+            }
+        }
+    };
+    if let Some(Value::Object(endpoints)) = proxy.get_mut("endpoints") {
+        shorten(endpoints, false);
+    }
+    shorten(proxy, true);
 }
 
 /// The variable a value is exactly `${VAR}` for.

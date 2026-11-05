@@ -1284,7 +1284,13 @@ how many calls go through it. A `pathRewrite` that only strips the endpoint (one
 the proxy does anyway, so the rest of the URL goes to the target; any other `pathRewrite` (another
 replacement, several rules) is read like a target that cannot be read: no link, and `meada status`
 says so. `ignorePath`, `prependPath: false` and an endpoint the `app-config*.yaml` files give
-different values (which one a deployment loads is not known) are read the same way.
+different values (which one a deployment loads is not known) are read the same way. As Backstage's
+proxy reads the configuration, the endpoints are those of `proxy.endpoints` and, when no file has
+that key, the keys of `proxy` that start with `/` (the legacy shape, accepted from before Backstage
+1.17); with both shapes, in one file or across files, only `endpoints` counts. An endpoint written
+as a string (`'/<endpoint>': https://...`) is `{ target }` with the default `pathRewrite`, in both
+shapes, and the rules above apply to it. An endpoint inside a partial included through `$include`
+counts as if it were in the file.
 
 **Environment.** `process.env.X`, `process.env["X"]` and `import.meta.env.X`, alone or passing
 through text methods such as `trim()`, `replace(...)` and `toLowerCase()`. A URL that starts with

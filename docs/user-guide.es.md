@@ -1305,7 +1305,13 @@ el endpoint y cuántas llamadas pasan por él. Un `pathRewrite` que solo quita e
 el proxy hace de todos modos, así que el resto de la URL va al destino; cualquier otro
 `pathRewrite` (otro reemplazo, varias reglas) se lee como un `target` ilegible: sin enlace, y
 `meada status` lo señala. `ignorePath`, `prependPath: false` y un endpoint al que los archivos
-`app-config*.yaml` dan valores distintos (no se sabe cuál carga el despliegue) se leen igual.
+`app-config*.yaml` dan valores distintos (no se sabe cuál carga el despliegue) se leen igual. Como
+el proxy de Backstage lee la configuración, los endpoints son los de `proxy.endpoints` y, cuando
+ningún archivo tiene esa clave, las claves de `proxy` que empiezan por `/` (la forma antigua,
+aceptada desde antes de Backstage 1.17); con las dos formas, en un archivo o en varios, solo vale
+`endpoints`. Un endpoint escrito como texto (`'/<endpoint>': https://...`) es `{ target }` con el
+`pathRewrite` por defecto, en las dos formas, y las reglas de arriba valen para él. Un endpoint
+dentro de un parcial incluido por `$include` vale como si estuviera en el archivo.
 
 **Entorno.** `process.env.X`, `process.env["X"]` e `import.meta.env.X`, solos o pasando por
 métodos de texto como `trim()`, `replace(...)` y `toLowerCase()`. La URL que empieza por una

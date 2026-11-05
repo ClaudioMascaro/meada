@@ -20,7 +20,9 @@ this file, and a change to these modules updates it.
   serves, from the routes `ts::providers` reports as mounted; a plugin whose `pluginId` is
   neither a literal nor a `const` of the file bound to one is a `Role::Unmounted` row that
   `Http::status` reports; `http/ts/config.rs` reads the `proxy.endpoints` of `app-config*.yaml`
-  (#616): a URL that starts with `/api/proxy/<ep>` is rewritten to the endpoint's `target`, the
+  (#616; with no `endpoints` key in any file, the keys of `proxy` that start with `/`, and a
+  string value as `{ target }` in either shape, #690): a URL that starts with `/api/proxy/<ep>` is
+  rewritten to the endpoint's `target`, the
   consumer's `via` keeping the endpoint after `PROXY_VIA` for the reason, and an endpoint whose
   target is not read gives the `client:` `via` that `backstage::unread` finds for `status`; each
   root is a tree first, `config/includes.rs` grafting its `$include`s and reading its `$env`s,

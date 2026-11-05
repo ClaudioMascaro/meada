@@ -59,6 +59,15 @@ All notable changes to Meada are recorded here. The format follows
   their keys stay unread and `meada status` names each include with its reason. `$file` stays
   unread, and a config file past 1 MiB is dropped, not parsed by half. The index schema golden
   changes (it now lists the stored roles), so existing indexes are rebuilt (#689).
+- Backstage proxy endpoints are read wherever Backstage's proxy backend reads them: under
+  `proxy.endpoints`, and, when no `app-config*.yaml` has that key, as the keys of `proxy` that
+  start with `/` (the legacy shape, accepted from before Backstage 1.17). A string value is
+  `{ target }` in either shape, with the default `pathRewrite`, and `ignorePath`, `prependPath`
+  and `pathRewrite` another file gives the same endpoint apply to it. An endpoint inside an
+  included partial counts as if inline. With both shapes, in one file or across files, only
+  `endpoints` is read. A `getBaseUrl('proxy')` call plus `/inventory/clusters` through any of
+  them is `http::GET::/clusters`, linked through `base_url_env` like an object `target`. A
+  minor bump (#690).
 - IaC nodes (ADR 0025): every Terraform and OpenTofu `resource`, `data` block and `module` call
   of a `*.tf` or `*.tofu` file is a node with an address (`<type>.<name>`, `data.<type>.<name>`,
   `module.<name>`), a type, a file, its lines and the root module that roots its evaluation (a

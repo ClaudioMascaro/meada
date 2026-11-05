@@ -1286,7 +1286,12 @@ que o proxy faz de qualquer jeito, então o resto da URL segue para o alvo; qual
 `pathRewrite` (outra substituição, várias regras) é lido como um `target` ilegível: sem ligação, e
 o `meada status` aponta. `ignorePath`, `prependPath: false` e um endpoint a que os arquivos
 `app-config*.yaml` dão valores diferentes (não se sabe qual deles o deploy carrega) são lidos do
-mesmo jeito.
+mesmo jeito. Como o proxy do Backstage lê a configuração, os endpoints são os de `proxy.endpoints`
+e, quando nenhum arquivo tem essa chave, as chaves de `proxy` que começam por `/` (a forma antiga,
+aceita desde antes do Backstage 1.17); com as duas formas, em um arquivo ou em vários, só vale
+`endpoints`. Um endpoint escrito como texto (`'/<endpoint>': https://...`) é `{ target }` com o
+`pathRewrite` padrão, nas duas formas, e as regras acima valem para ele. Um endpoint dentro de um
+parcial incluído por `$include` vale como se estivesse no arquivo.
 
 **Ambiente.** `process.env.X`, `process.env["X"]` e `import.meta.env.X`, sozinhos ou passando por
 métodos de texto como `trim()`, `replace(...)` e `toLowerCase()`. A URL que começa por uma leitura
