@@ -7,7 +7,7 @@ import { graphModel } from './graph';
 import type { GraphModel } from './graph';
 import './graph.css';
 
-const views = ['communities', 'contracts', 'links', 'drift', 'decisions'] as const;
+const views = ['communities', 'contracts', 'links', 'provisions', 'drift', 'decisions'] as const;
 type View = typeof views[number];
 
 function List({ values }: { values: string[] }) {
@@ -68,9 +68,19 @@ export function GraphPage({ api, locale }: { api: Api; locale: Language }) {
       <label className="graph-view-picker">{t.view}<select value={view} onChange={event => {
         const next = views.find(view => view === event.target.value);
         if (next) setView(next);
-      }}>{views.map(view => <option value={view} key={view}>{t[view]}</option>)}</select></label>
+      }}>{views.filter(view => view !== 'provisions' || graph.provisions.length > 0).map(view => <option value={view} key={view}>{t[view]}</option>)}</select></label>
       {view === 'communities' && table(t.communities, [t.community, t.members], graph.communities.map(row => [row.name, <List values={row.members} />]))}
-      {view === 'contracts' && table(t.contracts, [t.contract, t.providers, t.consumers], graph.contracts.map(row => [<code>{row.contract}</code>, <List values={row.providers} />, <List values={row.consumers} />]))}
+      {view === 'contracts' && table(t.contracts,
+        [t.contract, t.providers, t.consumers, ...(graph.contracts.some(row => row.provisioners) ? [t.provisioners] : [])],
+        graph.contracts.map(row => [<code>{row.contract}</code>, <List values={row.providers} />,
+          <List values={row.consumers} />,
+          ...(graph.contracts.some(row => row.provisioners) ? [<List values={row.provisioners ?? []} />] : []),
+        ]))}
+      {view === 'provisions' && table(t.provisions,
+        [t.contract, t.side, t.provisioner, t.level, t.reason], graph.provisions.map(row => [
+          <code>{row.contract}</code>, <code>{row.side}</code>,
+          <code>{row.provisioner} (root {row.root})</code>, row.level, row.reason,
+        ]))}
       {view === 'links' && table(t.links, [t.contract, t.consumer, t.provider, t.level], graph.links.map(row => [<code>{row.contract}</code>, <code>{row.consumer}</code>, <code>{row.provider}</code>, row.level]))}
       {view === 'drift' && table(t.drift, [t.contract, t.consumer, t.provider, t.missing, t.unchecked], graph.drift.map(row => [
         <code>{row.contract}</code>, <code>{row.consumer}</code>, <code>{row.provider}</code>,

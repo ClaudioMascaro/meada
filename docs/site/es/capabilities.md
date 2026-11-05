@@ -252,7 +252,43 @@ Cada `resource`, bloque `data` y llamada `module` de los archivos `*.tf` y `*.to
 | `context` en una dirección | Tipo, nombre físico (`(pattern)` cuando una parte no se resuelve), módulo raíz, las variables de la raíz por las que pasó el nombre (`overridable:`, `(default)` o `(tfvars)`), las referencias en los dos sentidos (`references:`, `referenced by:`, cada una con su `via`) y los valores de configuración del bloque |
 | `trace` desde una dirección | Las referencias, `down` (lo que el nodo alcanza) o `up` (lo que lo alcanza), dentro del módulo raíz y por los módulos locales |
 
-Toda referencia es `exact`: un nombre tal como está escrito, seguido sin evaluar valores. La evaluación estática resuelve el nombre físico de cada nodo y cada `count` y `for_each`, sin ejecutar Terraform ni acceder a la red, a partir de los valores del propio repositorio: los defaults de las variables, el `terraform.tfvars`, el `terraform.tfvars.json`, los `*.auto.tfvars` y los `*.auto.tfvars.json` de la raíz (en ese orden, ganando el archivo siguiente), los locals, las entradas y salidas de un módulo local por llamada, `each`, `count.index`, plantillas y las funciones puras de texto, colección y conversión del ADR 0025 con `jsonencode`. Data sources, atributos de resources, módulos del registro, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_`, variables sensibles y cualquier otra función nunca se evalúan: esa parte es un `*` y el nombre un patrón (`orders-*`), que por ahora no enlaza nada. Un nombre que pasó por una variable del módulo raíz, por su default o por un archivo de variables, la registra, ya que quien despliega puede cambiarla. Un valor de más de 64 KiB, una expresión cuya evaluación podría pasar de 1 MiB y lo que una raíz evalúa más allá de 64 MiB quedan sin resolver. Un archivo Terraform o de variables cambiado evalúa de nuevo solo los módulos raíz cuya unidad (la raíz y los módulos locales que llama) lo contiene. Un `count` o un `for_each` que no se resuelve da un solo nodo, sin clave; un módulo del registro o remoto es solo el nodo de la llamada; los archivos `.tf.json` y `.tofu.json` todavía no dan nodos. Los nodos nunca entran en `meada export`.
+Toda referencia es `exact`: un nombre tal como está escrito, seguido sin evaluar valores. La
+evaluación estática resuelve el nombre físico de cada nodo y cada `count` y `for_each`, sin ejecutar
+Terraform ni acceder a la red, a partir de los valores del propio repositorio: los defaults de las
+variables, el `terraform.tfvars`, el `terraform.tfvars.json`, los `*.auto.tfvars` y los
+`*.auto.tfvars.json` de la raíz (en ese orden, ganando el archivo siguiente), los locals, las
+entradas y salidas de un módulo local por llamada, `each`, `count.index`, plantillas y las funciones
+puras de texto, colección y conversión del ADR 0025 con `jsonencode`. Data sources, atributos de
+resources, módulos del registro, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_`, variables
+sensibles y cualquier otra función nunca se evalúan: esa parte es un `*` y el nombre un patrón
+(`orders-*`), que por ahora no enlaza nada. Un nombre que pasó por una variable del módulo raíz, por
+su default o por un archivo de variables, la registra, ya que quien despliega puede cambiarla. Un
+valor de más de 64 KiB, una expresión cuya evaluación podría pasar de 1 MiB y lo que una raíz evalúa
+más allá de 64 MiB quedan sin resolver. Un archivo Terraform o de variables cambiado evalúa de nuevo
+solo los módulos raíz cuya unidad (la raíz y los módulos locales que llama) lo contiene. Un `count`
+o un `for_each` que no se resuelve da un solo nodo, sin clave; un módulo del registro o remoto es
+solo el nodo de la llamada; los archivos `.tf.json` y `.tofu.json` todavía no dan nodos. Solo los
+nodos con un lado de contrato entran en `meada export`.
+
+### Provisionadores Terraform
+
+Un resource `aws_sqs_queue` provisiona `channel::sqs::<nombre>` por el argumento `name`;
+un `aws_s3_bucket` provisiona `resource::s3::<nombre>` por `bucket`. La tabla de tipos en
+`src/iac/types.toml`, integrada en el binario, también lee nombres en ARN y URL. Un
+`[[resource]]` declarado con `kind = "s3"` y el mismo `id` participa en ese contrato,
+conservando `declared`.
+
+Cada productor, consumidor, escritor y lector se enlaza con cada provisionador, identificado
+por dirección y módulo raíz. Raíces como `envs/dev` y `envs/prod` no son ambiguas entre sí.
+Nombres escritos dan `exact`; nombres que pasan por valores reemplazables dan `inferred`, con
+las variables y sus orígenes en el motivo. `context` en el bloque lista los lados del contrato;
+en un productor lista sus provisionadores. `trace` sigue del bloque al código con `down` y del
+código a la infraestructura con `up`. El export conserva `format: 1` y añade `iac_nodes`,
+`provisioners` y `provisions`, omitidos cuando están vacíos. Tipos no listados y bloques data no
+provisionan contratos. Un patrón con al menos tres caracteres literales y comodines en los límites
+de segmentos (`-`, `_`, `.`, `/`) se enlaza a un nombre literal en `inferred`, o `ambiguous` cuando
+coinciden varios nombres. Los patrones nunca se enlazan entre sí. El grafo de la consola muestra
+los provisionadores y sus enlaces propios.
 
 ## Kubernetes y Kustomize
 

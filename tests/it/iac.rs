@@ -152,20 +152,16 @@ fn a_small_budget_cuts_the_trace_of_a_node() {
     }
 }
 
-/// The nodes and their references stay out of `meada export`: the export of the fixture names
-/// no address.
+/// Nodes with no contract side and references stay out of `meada export` (ADR 0026).
 #[test]
-fn iac_nodes_stay_out_of_the_export() {
+fn only_iac_nodes_holding_contract_sides_enter_the_export() {
     let repo = fixture_repo("iac_export", "terraform-nodes", ORIGIN);
     let text = Engine::open(&repo).unwrap().export().unwrap();
-    for address in [
-        "aws_sns_topic.orders",
-        "module.orders",
-        "aws_sqs_queue.dlq",
-        "iac",
-    ] {
-        assert!(!text.contains(address), "{address} in {text}");
-    }
+    let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let nodes = json["iac_nodes"].as_array().unwrap();
+    assert!(!nodes.is_empty());
+    assert!(nodes.iter().all(|n| n["type"] == "aws_sqs_queue"));
+    assert!(json.get("iac_references").is_none());
 }
 
 /// An edited, an added and a deleted Terraform file change the nodes and references at the next

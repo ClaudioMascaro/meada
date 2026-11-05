@@ -497,6 +497,26 @@ tipo `Serverless::Function`.
 - **Consultas**: como en los nodos Terraform, `search` con `kind = "iac"`, `context` y `trace`.
 - **No se leen**: `serverless.ts`, los plugins y los valores de otros archivos.
 
+### Provisionadores Terraform
+
+Un resource `aws_sqs_queue` provisiona `channel::sqs::<nombre>` por el argumento `name`;
+un `aws_s3_bucket` provisiona `resource::s3::<nombre>` por `bucket`. La tabla de tipos en
+`src/iac/types.toml`, integrada en el binario, también lee nombres en ARN y URL. Un
+`[[resource]]` declarado con `kind = "s3"` y el mismo `id` participa en ese contrato,
+conservando `declared`.
+
+Cada productor, consumidor, escritor y lector se enlaza con cada provisionador, identificado
+por dirección y módulo raíz. Raíces como `envs/dev` y `envs/prod` no son ambiguas entre sí.
+Nombres escritos dan `exact`; nombres que pasan por valores reemplazables dan `inferred`, con
+las variables y sus orígenes en el motivo. `context` en el bloque lista los lados del contrato;
+en un productor lista sus provisionadores. `trace` sigue del bloque al código con `down` y del
+código a la infraestructura con `up`. El export conserva `format: 1` y añade `iac_nodes`,
+`provisioners` y `provisions`, omitidos cuando están vacíos. Tipos no listados y bloques data no
+provisionan contratos. Un patrón con al menos tres caracteres literales y comodines en los límites
+de segmentos (`-`, `_`, `.`, `/`) se enlaza a un nombre literal en `inferred`, o `ambiguous` cuando
+coinciden varios nombres. Los patrones nunca se enlazan entre sí. El grafo de la consola muestra
+los provisionadores y sus enlaces propios.
+
 ## 4. `meada.toml`: referencia
 
 Cada repositorio puede tener un `meada.toml` en la raíz, versionado en git, que dice con quién

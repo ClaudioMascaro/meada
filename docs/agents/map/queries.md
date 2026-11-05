@@ -6,6 +6,14 @@ this file, and a change to these modules updates it.
 
 ## Modules in brief
 
+- Provisioning (#656): `crate::iac::provision::context` lists a symbol's provisioners from its
+  own sides and its calls. `crate::engine::Engine::context_fresh` hydrates every side of a
+  selected IaC node before listing contracts; `crate::trace::Graph::provisioned_rows` continues
+  a downward IaC trace into code, while `crate::trace::Walk::provisioners_up` crosses back.
+  Provisioning links retain root labels, never enter consumer links or decision replay, and
+  do not change process membership. `crate::index::contracts` loads the same provisioner facts
+  for full and partial exports; `crate::engine::Engine::export` includes links touching the
+  local repository, including repository-level sides.
 - `engine.rs`: `Engine`, the one query seam (`open`, `refresh`, `export`, `search`, `context`,
   `trace`, open items, decisions, `status`); it builds the results of `search` and `context`,
   which `meada-core` renders. `Engine::export` names the indexed commit from its `CommitSource`

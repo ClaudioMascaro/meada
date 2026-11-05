@@ -252,7 +252,41 @@ Every `resource`, `data` block and `module` call of the `*.tf` and `*.tofu` file
 | `context` on an address | Type, physical name (`(pattern)` when a part is unresolved), root module, the root variables the name went through (`overridable:`, `(default)` or `(tfvars)`), the references both ways (`references:`, `referenced by:`, each with its `via`) and the block's config values |
 | `trace` from an address | The references, `down` (what the node reaches) or `up` (what reaches it), within the root module and through the local modules |
 
-Every reference is `exact`: a name as written, followed without evaluating values. Static evaluation resolves each node's physical name and each `count` and `for_each`, without running Terraform or reaching the network, from the repository's own values: variable defaults, the root's `terraform.tfvars`, `terraform.tfvars.json`, `*.auto.tfvars` and `*.auto.tfvars.json` (in that order, a later file winning), locals, a local module's inputs and outputs per call, `each`, `count.index`, templates and the pure string, collection and conversion functions of ADR 0025 with `jsonencode`. Data sources, resource attributes, registry modules, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_`, sensitive variables and any other function are never evaluated: such a part becomes a `*` and the name a pattern (`orders-*`), linked by nothing yet. A name that went through a root module's variable, by its default or a var file, records it, since a deployer can override it. A value over 64 KiB, an expression whose evaluation could make over 1 MiB and what a root evaluates past 64 MiB stay unresolved. A changed Terraform file or var file evaluates again only the root modules whose unit (the root and the local modules it calls) holds it. A `count` or `for_each` that does not resolve gives one node with no key; a registry or remote module is only the call's node; `.tf.json` and `.tofu.json` files give no nodes yet. Nodes never enter `meada export`.
+Every reference is `exact`: a name as written, followed without evaluating values. Static evaluation
+resolves each node's physical name and each `count` and `for_each`, without running Terraform or
+reaching the network, from the repository's own values: variable defaults, the root's
+`terraform.tfvars`, `terraform.tfvars.json`, `*.auto.tfvars` and `*.auto.tfvars.json` (in that
+order, a later file winning), locals, a local module's inputs and outputs per call, `each`,
+`count.index`, templates and the pure string, collection and conversion functions of ADR 0025 with
+`jsonencode`. Data sources, resource attributes, registry modules, `terraform.workspace`, `-var`,
+`-var-file`, `TF_VAR_`, sensitive variables and any other function are never evaluated: such a part
+becomes a `*` and the name a pattern (`orders-*`), linked by nothing yet. A name that went through a
+root module's variable, by its default or a var file, records it, since a deployer can override it.
+A value over 64 KiB, an expression whose evaluation could make over 1 MiB and what a root evaluates
+past 64 MiB stay unresolved. A changed Terraform file or var file evaluates again only the root
+modules whose unit (the root and the local modules it calls) holds it. A `count` or `for_each` that
+does not resolve gives one node with no key; a registry or remote module is only the call's node;
+`.tf.json` and `.tofu.json` files give no nodes yet. Only nodes holding a contract side enter `meada
+export`.
+
+### Terraform provisioners
+
+An `aws_sqs_queue` resource provisions `channel::sqs::<name>` through its `name` argument;
+an `aws_s3_bucket` provisions `resource::s3::<name>` through `bucket`. The type table in
+`src/iac/types.toml`, embedded in the binary, also reads names from ARNs and URLs. A declared
+`[[resource]]` with `kind = "s3"` and the same `id` joins that contract, keeping `declared`.
+
+Every producer, consumer, writer and reader links to each provisioner, identified by address
+and root module. Roots such as `envs/dev` and `envs/prod` are never ambiguous among themselves.
+Written names give `exact`; names passing through overridable values give `inferred`, with the
+variables and their sources in the reason. `context` on the block lists its contract sides;
+on a producer it lists provisioners. `trace` follows the block to code with `down` and code to
+infrastructure with `up`. Export keeps `format: 1` and adds `iac_nodes`, `provisioners` and
+`provisions`, omitted when empty. Unlisted types and data blocks do not provision contracts. A
+pattern
+with at least three literal characters and wildcards on segment boundaries (`-`, `_`, `.`, `/`)
+links to a literal name at `inferred`, or `ambiguous` when several names match. Patterns never
+link to patterns. The console graph lists provisioner sides and their separate links.
 
 ## Kubernetes and Kustomize
 

@@ -264,6 +264,7 @@ words:
 | `callees:` | callee, overload set, unresolved call |
 | `annotations:` | callee, overload set, unresolved call |
 | `consumers:` | package consumer |
+| `provisioners:` | provisioner |
 | `contracts:` | provides, shape fields, shape open, produces, publishes, consumes, consumes decided, consumes unresolved |
 
 | Kind | Line | Meaning |
@@ -297,6 +298,7 @@ words:
 | drift | `    drift: missing <missing>` | Under a consumer: the field paths it reads that the provider lacks, each with its level. |
 | not checked | `    not checked: <unchecked>` | Under a consumer: the field paths it reads under an open part of the shape. |
 | no contract | `` no <contract-kind> matches `<query>` `` | No side of the contract is in the workspace. |
+| provisioner | `<repository> <place> <address> (root <iac-root>)<mark?>` | A provisioner with its level and reason. |
 | iac type | `type: <iac-type>` | The IaC node's type. |
 | iac name | `name: <physical-name>` | The IaC node's physical name. |
 | iac root | `root: <iac-root>` | The IaC node's root module. |
@@ -342,6 +344,7 @@ words:
 | `<section>` | `callees` | What the symbol's calls reach. |
 | `<section>` | `annotations` | The symbol's calls that decorate a definition (attributes, decorators, annotations). |
 | `<section>` | `consumers` | The calls that reach the symbol through a package import. |
+| `<section>` | `provisioners` | The IaC nodes creating the symbol's resources. |
 | `<section>` | `contracts` | The contracts the symbol provides and consumes. |
 | `<empty-section>` | `callers` | No call reaches the symbol. |
 | `<empty-section>` | `callees` | The symbol calls nothing. |
@@ -361,6 +364,7 @@ words:
 | `<paths>` | `<text>` | Field paths joined by `, `. |
 | `<exchange>` | `<word>` | An exchange. |
 | `<key>` | `<word>` | A routing key. |
+| `<role>` | `provisioner` | Creates the resource. |
 | `<role>` | `writer` | Writes the resource. |
 | `<role>` | `reader` | Reads the resource. |
 | `<role>` | `producer` | Produces to the channel: the symbol around the producing call. |
@@ -370,6 +374,7 @@ words:
 | `<role>` | `dependent` | A dependency entry on the package, or a call that reaches it through an import. |
 | `<role>` | `binding <exchange> <binding-pattern>` | A binding that routes the exchange's messages to the queue. |
 | `<binding-pattern>` | `<word>` | The binding's routing pattern. |
+| `<side>` | `<place> <address> (root <iac-root>)` | A provisioner and its root. |
 | `<side>` | `<place> <caller>` | A side in code: the line and the symbol around it. |
 | `<side>` | `<path>` | A manifest. |
 | `<side>` | `<path> (top level)` | A route file serving with no function of its own. |
@@ -408,6 +413,7 @@ carries its level with no reason.
 
 | Kind | Line | Meaning |
 | --- | --- | --- |
+| provision | `<indent>provisions <contract> [<level>: <reason>] <text>` | A provisioning hop, with its root when it reaches IaC. |
 | process | `process <label>` | The process whose steps follow. |
 | node | `<indent><node><call-mark?><repeat?><drift?>` | A node the walk reaches through a call, or a start. |
 | link | `<indent><arrow> <node><repeat?><drift?>` | A node the walk reaches through a link. |

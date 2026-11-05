@@ -3770,3 +3770,48 @@ sample.serverless.yml
         },
     ],
 )
+
+sample.provision.tf
+(
+    [
+        Node {
+            address: "aws_s3_bucket.archive",
+            root: ".",
+            ty: "aws_s3_bucket",
+            name: Some(
+                "archive",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "main.tf",
+            line: 1,
+            end_line: 1,
+            block: "resource.aws_s3_bucket.archive",
+            image: None,
+            build: None,
+            role: None,
+            handler: None,
+            events: [],
+        },
+        Node {
+            address: "aws_sqs_queue.orders",
+            root: ".",
+            ty: "aws_sqs_queue",
+            name: Some(
+                "orders",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "main.tf",
+            line: 2,
+            end_line: 2,
+            block: "resource.aws_sqs_queue.orders",
+            image: None,
+            build: None,
+            role: None,
+            handler: None,
+            events: [],
+        },
+    ],
+    [],
+)

@@ -21,7 +21,8 @@ lands it writes the check.
 | IaC nodes, CloudFormation and SAM: `search` kind `iac`, `context` and `trace` on a logical id, `Ref`, `Fn::GetAtt`, `Fn::Sub` and `DependsOn` references, names evaluated within the template (a parameter's default as `overridable:`, pseudo parameters and imports as patterns), `NoEcho` | #653's criteria (of 18 to 31) | MCP stdio and HTTP, CLI (`meada status`, `meada export`) | `a7-cfn`, `sam-rust` | `prove.py iac --http` (its oracle `cfn_oracle.py`) | landed (#653) |
 | IaC nodes, Serverless (#654): `search` kind `iac`, `context` and `trace` on `functions.<name>` and on the `resources` section's logical ids, handler and events, `${self:...}` and `${opt:...}` resolved, `${env:...}` and `${ssm:...}` as patterns | #654's criteria (of 18 to 31) | MCP stdio and HTTP | `a7-sls` | by hand against the probe's README (no oracle yet: a follow-up) | landed, unchecked by script (#654) |
 | IaC nodes of the other formats (Kubernetes, Kustomize, Compose, Crossplane) | 18 to 31 | MCP stdio and HTTP, CLI status | `boutique`, `crossplane-aws`, `kube-prometheus` | to write | pending |
-| Infrastructure contracts: provisioner sides and links, SDK and config use sides, subscriptions, patterns, orphans | 32 to 43, 57 to 60 | CLI export and status, MCP | `terraform-sqs`, `sam-rust`, `crossplane-aws` | to write | pending |
+| Terraform SQS/S3 provisioners, bounded patterns, levels, root labels, context and trace | #656 | CLI export, MCP stdio and HTTP | neutral generated workspace | `provisions.py --head-bin BIN --run DIR` | landed (#656) |
+| Infrastructure contracts: SDK and config use sides, subscriptions, orphans | 32 to 43, 57 to 60 | CLI export and status, MCP | `terraform-sqs`, `sam-rust`, `crossplane-aws` | to write | pending |
 | Workloads, image contract, environment entries | 44 to 49 | CLI export, MCP | `boutique`, `sam-rust` | to write | pending |
 | HTTP through IaC: Services, Ingress, IaC-declared routes | 50 to 52 | CLI export, MCP | `boutique`, `sam-rust` | to write | pending |
 | Alert routing | 53 to 56 | CLI export, MCP | `kube-prometheus` | to write | pending |
@@ -214,3 +215,32 @@ A difference on one of these is a question for the maintainer, BROKEN until answ
 `kube-prometheus` with `--http`: about 1 min. `meada` alone: about 3.5 min (92,777 values; the
 oracle's PyYAML read is most of it). The slowest value query: 0.9 s on `meada`. `iac` over `a7-iac`
 and `terraform-sqs` with `--http`: about 20 s; the slowest query 0.02 s.
+
+## Terraform provisioning (#656)
+
+Run `python3 $S/provisions.py --head-bin "$RUN/bin/meada-head" --run "$RUN/provisions"`.
+The script creates neutral sibling repositories, never reads the feature's type table or test
+fixtures, and drives the compiled binary: eight provisioning links, every use at both roots,
+levels and overridable reasons, four exported nodes and provisioners, six context/trace queries
+through stdio and HTTP, and a same-size variable edit that removes two links then restores them.
+Its answer key is the supplied #656 ticket and ADR 0026, not its own output. The checker also
+reads the source behind each result and probes ARN/URL names, two roots sharing a local module,
+unknown types, unresolved names and the token budget. Existing code-only answers still compare
+against the base binary with `prove.py run --http` on the corpus selected by Scope.
+
+Export goldens use `meada_core::export::Export::write`, after clearing only fixture metadata
+and processes, rather than a generic JSON writer. The format-1 public contract includes canonical
+field order: JSON-value equality alone cannot prove its byte round trip. Run the public core
+export test named in Scope whenever an export golden changes.
+
+The earlier IaC oracle's assertion that every export equals base predates #656. For its Terraform
+corpus, inspect the complete export diff: only `iac_nodes`, `provisioners` and `provisions` may be
+added, each justified by source. Preserve the original oracle report and its failed equality;
+report this expected new flow separately from unchanged fields. Do not turn a failed oracle
+check green by deleting the added arrays without verifying every row against the input.
+
+This script's author also wrote the implementation. A fresh checker is required; the script is
+not an independent answer key. The script checks concrete and pattern names. The console graph
+additionally loads this generated
+workspace: its contracts show both root labels and its provisioning table shows every link, level
+and reason. Orphan status behavior remains pending.

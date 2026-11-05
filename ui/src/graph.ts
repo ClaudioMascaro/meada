@@ -6,9 +6,13 @@ interface Link {
   consumer: string; provider: string; contract: string; level: string; reason: string;
   by?: string; p?: number; drift?: { missing?: Record<string, string>; unchecked?: Record<string, string> };
 }
+interface Provisioner { contract: string; node: string; root: string }
+interface Provision {
+  side: string; provisioner: string; root: string; contract: string; level: string; reason: string;
+}
 interface Stale { call: string; target: string; cause: string }
-interface Export { repository: string; communities?: Community[]; providers: Side[]; consumers: Side[]; links: Link[]; stale_decisions?: Stale[] }
-interface Contract { contract: string; providers: string[]; consumers: string[] }
+interface Export { repository: string; communities?: Community[]; providers: Side[]; consumers: Side[]; links: Link[]; stale_decisions?: Stale[]; provisioners?: Provisioner[]; provisions?: Provision[] }
+interface Contract { contract: string; providers: string[]; consumers: string[]; provisioners?: string[] }
 
 /** parseExport checks every field with the release's Rust types before any model is built. */
 export function graphModel(text: string) {
@@ -25,7 +29,26 @@ export function graphModel(text: string) {
       row[side].push(entry.site);
     }
   }
+  for (const entry of data.provisioners ?? []) {
+    let row = contracts.get(entry.contract);
+    if (!row) {
+      row = { contract: entry.contract, providers: [], consumers: [] };
+      contracts.set(entry.contract, row);
+    }
+    (row.provisioners ??= []).push(`${entry.node} (root ${entry.root})`);
+  }
+  for (const entry of data.provisions ?? []) {
+    let row = contracts.get(entry.contract);
+    if (!row) {
+      row = { contract: entry.contract, providers: [], consumers: [] };
+      contracts.set(entry.contract, row);
+    }
+    const place = `${entry.provisioner} (root ${entry.root})`;
+    const provisioners = row.provisioners ??= [];
+    if (!provisioners.includes(place)) provisioners.push(place);
+  }
   return {
+    provisions: data.provisions ?? [],
     repository: data.repository,
     communities: data.communities ?? [],
     contracts: [...contracts.values()].sort((a, b) => a.contract < b.contract ? -1 : a.contract > b.contract ? 1 : 0),

@@ -195,8 +195,8 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   `var.<x>`, `local.<x>` or `module.<call>.<output>` alone is that name's value, a pattern
   included; anything else (a function over an unresolved value, an operator, a conditional) is
   `*` whole. The name is then a **pattern**: `search` shows it as `pattern "orders-*"` in place of
-  `name`, and `context` as `name: "orders-*" (pattern)`. A pattern links nothing yet (ADR 0026
-  fixes how it will).
+  `name`, and `context` as `name: "orders-*" (pattern)`. Terraform provisioners match patterns
+  against literal contract names under ADR 0026's rules (#656).
 - **Expansion.** A `count` that resolves to a whole number, or a `for_each` that resolves to an
   object or a list of strings (`toset` sorts and dedupes strings), gives one node per key, up to
   `EXPANSION_MAX`; a `count` or `for_each` that reads a module output is evaluated before the

@@ -30,6 +30,8 @@ example.com/acme/infra modules/queue/main.tf:13 module.orders.aws_sns_topic_subs
 example.com/acme/infra modules/worker/main.tf:5 module.worker.aws_lambda_event_source_mapping.this via var.queue_arn
 values:
 example.com/acme/infra modules/queue/main.tf:10 resource.aws_sqs_queue.this.name = var.name
+channel::sqs::orders
+  example.com/acme/infra provisioner modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (root envs/prod)
 
 example.com/acme/infra envs/prod/main.tf:35-38 aws_sqs_queue.dlq[1]
 type: aws_sqs_queue
@@ -42,6 +44,9 @@ example.com/acme/infra envs/prod/main.tf:40 aws_sqs_queue_redrive_allow_policy.d
 values:
 example.com/acme/infra envs/prod/main.tf:36 resource.aws_sqs_queue.dlq.count = 2
 example.com/acme/infra envs/prod/main.tf:37 resource.aws_sqs_queue.dlq.name = "dead-letters"
+channel::sqs::dead-letters
+  example.com/acme/infra provisioner envs/prod/main.tf:35 aws_sqs_queue.dlq[0] (root envs/prod)
+  example.com/acme/infra provisioner envs/prod/main.tf:35 aws_sqs_queue.dlq[1] (root envs/prod)
 
 example.com/acme/infra envs/prod/main.tf:44-48 module.audit
 type: module

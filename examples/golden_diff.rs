@@ -21,6 +21,9 @@ const KEYED: &[&str] = &[
     "consumers",
     "packages",
     "links",
+    "iac_nodes",
+    "provisioners",
+    "provisions",
 ];
 const OTHER: &[&str] = &[
     "files",
@@ -52,6 +55,9 @@ fn key(section: &str, v: &Value) -> String {
         "symbols" | "calls" => &["id"],
         "packages" => &["ecosystem", "directory", "name"],
         "links" => &["consumer", "provider", "contract"],
+        "iac_nodes" => &["identity", "root"],
+        "provisioners" => &["contract", "node", "root"],
+        "provisions" => &["side", "provisioner", "root", "contract"],
         "providers" | "consumers" => &["contract", "site"],
         _ => return v.to_string(),
     };
@@ -67,6 +73,7 @@ fn watched(section: &str) -> &'static [&'static str] {
     match section {
         "calls" => &["level", "target", "candidates"],
         "links" => &["level"],
+        "provisions" => &["level", "reason"],
         "packages" => &["version"],
         "consumers" => &["via"],
         _ => &[],

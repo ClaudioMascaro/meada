@@ -223,7 +223,16 @@ impl Engine {
         let links = all.into_iter();
         let links =
             links.filter(|l| l.consumer.starts_with(&here) || l.provider.starts_with(&here));
+        let provisions = iac::provision::links(&exports)
+            .into_iter()
+            .filter(|l| {
+                l.side == self.identity
+                    || l.side.starts_with(&here)
+                    || l.provisioner.starts_with(&here)
+            })
+            .collect();
         let mut export = exports.swap_remove(0);
+        export.provisions = provisions;
         export.processes = processes;
         export.links = links.collect();
         export.stale_decisions = evaluations.swap_remove(0).stale;
@@ -482,6 +491,18 @@ impl Engine {
         let starts = trace::starts(&mut partial, start, changes.as_deref(), direction)?;
         let none = starts.is_empty();
         trace::read(&mut partial, &links, starts, direction, true)?;
+        if none && direction == Direction::Down {
+            let uses: Vec<String> = iac::provision::links(&partial.exports)
+                .into_iter()
+                .map(|l| l.side)
+                .collect();
+            let sites = uses
+                .iter()
+                .flat_map(|site| (0..self.workspace.repos.len()).map(move |n| (n, site.clone())))
+                .collect();
+            partial.sites(sites)?;
+            trace::read(&mut partial, &links, uses, direction, true)?;
+        }
         let exports = partial.exports;
         let graph = trace::Graph::new(&self.workspace, &exports, &links);
         // An IaC node (#649) by its address, when nothing of the code has that name: its
@@ -491,7 +512,10 @@ impl Engine {
             && none
             && graph.answer(start, None, direction, Some(usize::MAX / 8))
                 == format!("{}\n", trace::no_start(from))
-            && let Some(iac) = iac::trace(&self.indexes(), from, direction, budget)?
+            && let Some(iac) =
+                iac::trace(&self.indexes(), from, direction, budget, |r, n, depth| {
+                    graph.provisioned_rows(r, n, depth)
+                })?
         {
             return Ok(iac);
         }
@@ -912,6 +936,24 @@ impl Engine {
                 sides.push((order, line, shape));
             }
         }
+        for export in exports {
+            for p in &export.provisioners {
+                if p.contract == contract || p.matches(contract) {
+                    sides.push((
+                        3,
+                        format!(
+                            "{} provisioner {}:{} {} (root {})",
+                            export.repository,
+                            p.node.path,
+                            p.node.line,
+                            p.node.address,
+                            p.node.root
+                        ),
+                        Vec::new(),
+                    ));
+                }
+            }
+        }
         if sides.is_empty() {
             return vec![format!("no {} matches `{contract}`", kind.prefix())];
         }
@@ -991,7 +1033,43 @@ impl Engine {
         let [(n, symbol_found)] = found[..] else {
             if found.is_empty() {
                 // An IaC node (#649) by its address, when no symbol has that name.
-                if let Some(lines) = iac::context(&self.indexes(), symbol)? {
+                if let Some(mut lines) = iac::context(&self.indexes(), symbol)? {
+                    let nodes = iac::found(&self.indexes(), symbol)?;
+                    if let [(n, node)] = &nodes[..] {
+                        let identity =
+                            format!("{}::{}::{}", repos[*n].identity, node.path, node.address);
+                        let provisions = iac::provision::links(&partial.exports);
+                        let contracts = partial.exports[*n]
+                            .provisioners
+                            .iter()
+                            .filter(|p| p.identity == identity && p.node.root == node.root)
+                            .map(|p| p.contract.clone())
+                            .chain(
+                                provisions
+                                    .iter()
+                                    .filter(|l| l.provisioner == identity && l.root == node.root)
+                                    .map(|l| l.contract.clone()),
+                            )
+                            .collect::<std::collections::BTreeSet<_>>();
+                        let sites = provisions
+                            .iter()
+                            .filter(|l| l.provisioner == identity && l.root == node.root)
+                            .flat_map(|l| (0..repos.len()).map(move |n| (n, l.side.clone())))
+                            .collect();
+                        partial.sites(sites)?;
+                        for contract in contracts {
+                            if let Some(kind) = contract::kind_of(&contract)
+                                && let Some(view) = kind.view(&contract)
+                            {
+                                lines.extend(self.contract_sides(
+                                    &partial.exports,
+                                    &contract,
+                                    view,
+                                    kind,
+                                ));
+                            }
+                        }
+                    }
                     return Ok(render::budgeted(&lines, budget));
                 }
                 return Ok(format!("no symbol matches `{symbol}`\n"));
@@ -1075,6 +1153,7 @@ impl Engine {
         let sections = (KINDS.iter())
             .flat_map(|k| k.context_sections(&exports, repos, &links, &symbol_found.id));
         tail.extend(sections);
+        tail.extend(iac::provision::context(&exports, &symbol_found.id));
         let workspace = (exports.as_slice(), links.as_slice());
         tail.extend(contracts(
             identity,

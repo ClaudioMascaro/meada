@@ -424,6 +424,9 @@ sends the MCP-shaped query that `playground.ts` builds, displaying the answer un
 `parseExport` before deriving communities, contracts, cross-repository links, drift and
 applied/stale decisions. View changes are local; explicit generation exports are cached in the
 page and a current-generation load reads again. `graph-i18n.ts` holds this area's pt-BR/en copy.
+Provisioner sides (#656) join their contracts with the IaC address and root label; provisioning
+links have a separate view with every side, root, level and reason. The export parser in
+meada-core validates these optional arrays before the graph reads them.
 `OperationalPage.tsx` reads the fleet, store, repositories, credentials and admission routes;
 `operations.ts` projects their checked DTOs, with bilingual copy in `operations-i18n.ts`.
 Missing modules name their sections, errors remain local to the page, and the pasted token

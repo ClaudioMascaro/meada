@@ -2423,6 +2423,8 @@ pub(crate) struct Export {
     /// The repository's communities (spec #31), by name, each with its sorted members.
     pub(crate) communities: Vec<Community>,
     pub(crate) links: Vec<Link>,
+    pub(crate) provisioners: Vec<iac::provision::Side>,
+    pub(crate) provisions: Vec<written::Provision>,
     /// The repository's entry points (spec #31), sorted by identity. Not exported as such:
     /// `processes` is what the export shows.
     pub(crate) entry_points: Vec<EntryPoint>,
@@ -2496,6 +2498,15 @@ impl Export {
         out.imports = self.imports;
         out.communities = self.communities;
         out.links = self.links;
+        for side in self.provisioners {
+            let (node, provisioner) = side.written();
+            out.iac_nodes.push(node);
+            out.provisioners.push(provisioner);
+        }
+        out.iac_nodes
+            .sort_by(|a, b| (&a.identity, &a.root).cmp(&(&b.identity, &b.root)));
+        out.iac_nodes.dedup();
+        out.provisions = self.provisions;
         out.processes = self.processes;
         out.stale_decisions = self.stale_decisions;
         out
@@ -2865,6 +2876,8 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         imports: Vec::new(),
         communities: Vec::new(),
         links: Vec::new(),
+        provisioners: iac::provision::read(db, identity)?,
+        provisions: Vec::new(),
         entry_points,
         processes: Vec::new(),
         documents,
@@ -3806,6 +3819,11 @@ mod tests {
         actual += "\nsample.serverless.yml\n";
         let files = [("api/serverless.yml".to_string(), src)];
         actual += &format!("{:#?}\n", crate::iac::evaluate(&files));
+
+        // Type-specific physical names (#656) change stored IaC name values.
+        let src = fs::read(tests.join("fixtures/schema/sample.provision.tf")).unwrap();
+        actual += "\nsample.provision.tf\n";
+        actual += &format!("{:#?}\n", crate::iac::evaluate(&[("main.tf".into(), src)]));
 
         let golden = tests.join("golden/schema.txt");
         if std::env::var_os("MEADA_BLESS").is_some_and(|v| v == "1") {

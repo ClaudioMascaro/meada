@@ -491,6 +491,25 @@ evaluation unit, rooted at its path. Each function is an IaC node `functions.<na
 - **Queries**: as for Terraform nodes, `search` with `kind = "iac"`, `context` and `trace`.
 - **Not read**: `serverless.ts`, plugins and values from other files.
 
+### Terraform provisioners
+
+An `aws_sqs_queue` resource provisions `channel::sqs::<name>` through its `name` argument;
+an `aws_s3_bucket` provisions `resource::s3::<name>` through `bucket`. The type table in
+`src/iac/types.toml`, embedded in the binary, also reads names from ARNs and URLs. A declared
+`[[resource]]` with `kind = "s3"` and the same `id` joins that contract, keeping `declared`.
+
+Every producer, consumer, writer and reader links to each provisioner, identified by address
+and root module. Roots such as `envs/dev` and `envs/prod` are never ambiguous among themselves.
+Written names give `exact`; names passing through overridable values give `inferred`, with the
+variables and their sources in the reason. `context` on the block lists its contract sides;
+on a producer it lists provisioners. `trace` follows the block to code with `down` and code to
+infrastructure with `up`. Export keeps `format: 1` and adds `iac_nodes`, `provisioners` and
+`provisions`, omitted when empty. Unlisted types and data blocks do not provision contracts. A
+pattern
+with at least three literal characters and wildcards on segment boundaries (`-`, `_`, `.`, `/`)
+links to a literal name at `inferred`, or `ambiguous` when several names match. Patterns never
+link to patterns. The console graph lists provisioner sides and their separate links.
+
 ## 4. `meada.toml`: reference
 
 Each repository may have a `meada.toml` at its root, versioned in git, that says who it talks to.

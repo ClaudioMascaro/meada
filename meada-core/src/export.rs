@@ -99,7 +99,18 @@ pub struct Export {
     /// The repository's communities (spec #31), by name, each with its sorted members.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub communities: Vec<Community>,
+    /// The IaC nodes of the repository that hold a contract side (ADR 0026, #656), by
+    /// identity, then root.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub iac_nodes: Vec<IacNode>,
+    /// The provisioner sides of the repository (ADR 0026, #656), by contract, node, root.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub provisioners: Vec<Provisioner>,
     pub links: Vec<Link>,
+    /// The provisioning links that touch the repository (ADR 0026, #656): from every other
+    /// side of a contract to each of its provisioners, by side, provisioner, root, contract.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub provisions: Vec<Provision>,
     /// The process of each entry point (spec #31), in entry point order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub processes: Vec<Process>,
@@ -127,7 +138,10 @@ impl Default for Export {
             dependencies: Vec::new(),
             imports: Vec::new(),
             communities: Vec::new(),
+            iac_nodes: Vec::new(),
+            provisioners: Vec::new(),
             links: Vec::new(),
+            provisions: Vec::new(),
             processes: Vec::new(),
             stale_decisions: Vec::new(),
         }
@@ -398,6 +412,70 @@ impl Import {
 pub struct Community {
     pub name: String,
     pub members: Vec<String>,
+}
+
+/// An IaC node that holds a contract side (ADR 0025, ADR 0026): its identity
+/// (`<repository>::<path>::<address>`), its address, its type, the label of the root module that
+/// roots its evaluation and its span, by line (`line` to `end_line`, 1-based, in `path`). A
+/// local module two roots instantiate gives one node per root, of the same identity.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[non_exhaustive]
+pub struct IacNode {
+    pub identity: String,
+    pub address: String,
+    #[serde(rename = "type")]
+    pub ty: String,
+    pub root: String,
+    pub path: String,
+    pub line: usize,
+    pub end_line: usize,
+}
+
+/// A provisioner side (ADR 0026): the IaC node `node` (an [`IacNode`]'s identity) of the root
+/// `root` creates what the contract `contract` names.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[non_exhaustive]
+pub struct Provisioner {
+    pub contract: String,
+    pub node: String,
+    pub root: String,
+}
+
+/// A provisioning link (ADR 0026): the side `side` of the contract `contract` (a producer,
+/// consumer, writer or reader: a call site, a symbol or a repository) to its provisioner
+/// `provisioner` of the root `root`, with a level and a reason like any link. Never a consumer
+/// to provider link, so it has an array of its own.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
+pub struct Provision {
+    pub side: String,
+    pub provisioner: String,
+    pub root: String,
+    pub contract: String,
+    pub level: Level,
+    pub reason: String,
+}
+
+impl Provision {
+    /// Every current field, in declaration order. A field added later is optional: it starts
+    /// empty and is set after `new`.
+    pub fn new(
+        side: String,
+        provisioner: String,
+        root: String,
+        contract: String,
+        level: Level,
+        reason: String,
+    ) -> Self {
+        Self {
+            side,
+            provisioner,
+            root,
+            contract,
+            level,
+            reason,
+        }
+    }
 }
 
 /// A consumer linked to a provider through a contract. Each side is a call site, a symbol, a

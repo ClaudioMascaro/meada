@@ -46,6 +46,7 @@ mod packages;
 mod partial;
 mod postgres;
 mod processes;
+mod provision;
 mod pypi;
 mod query;
 mod refresh_lock;

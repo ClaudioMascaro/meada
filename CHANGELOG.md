@@ -8,6 +8,15 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Terraform provisioners (ADR 0026): `aws_sqs_queue` and `aws_s3_bucket` join the SQS channel
+  and S3 resource contracts by physical name, using an embedded, documented type table. Every
+  producer, consumer, writer and reader links to each root's provisioner; overridable names
+  link at `inferred` with their variables in the reason. `context` lists the sides and
+  provisioners, and `trace` crosses provisioning links both ways. Bounded name patterns link
+  literal names at `inferred` (several names: `ambiguous`); the console graph lists provisioner
+  sides and provisioning links. Export format 1 gains optional
+  `iac_nodes`, `provisioners` and `provisions` arrays. The stored-name sample changes the schema,
+  rebuilding older indexes. Release level: minor for both meada and meada-core (#656).
 - Config values (ADR 0025): every scalar of every `*.yaml`, `*.yml` and `*.json` file the walk
   visits, and of the YAML and JSON files under the CI configuration at the root (`.github/`,
   `.gitlab-ci.yml`, `.gitlab/`, `.circleci/`, `.buildkite/`, `.drone.yml`), is indexed with its

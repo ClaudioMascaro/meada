@@ -77,6 +77,10 @@ The crates are described in the [architecture map](../architecture.md#crates). T
 - `meada-core/src/msg.rs`: the messages of those checks and the language setting the binary's
   `msg.rs` reads too; `meada-core/src/http.rs`: `normalize_path` and `PARAM`, which the HTTP
   kind re-exports. `qualify` and `parent` (dotted names) live in its `meada-core/src/lib.rs`.
+- Provisioning export (#656): `meada_core::export::IacNode`, `meada_core::export::Provisioner`
+  and `meada_core::export::Provision` carry the optional format-1 arrays `iac_nodes`,
+  `provisioners` and `provisions`. Empty arrays are omitted; node identity and root label
+  distinguish module instances, and provisioning links keep their own level and reason.
 - `meada-core/src/export.rs`: the export's types as `meada export` writes them (`Export` and
   every piece, `Level`, `Link`, `Process` with its `Step`, `Via` and `Mark`, `Stale`, `Cause`,
   `EntryKind`, `Format`, `How`), `Serialize` and `Deserialize`, so a parsed export written again

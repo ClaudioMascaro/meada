@@ -69,3 +69,40 @@ test('loading the current generation again reads the latest export instead of a 
   await waitFor(() => expect(host.textContent).toContain('new-generation-community'));
   expect(fetch).toHaveBeenCalledTimes(2);
 });
+
+test('Terraform contract sides and provisioning links retain each root and evidence', async () => {
+  const text = readFileSync('../tests/golden/provision-infra.export.json', 'utf8');
+  const data = JSON.parse(text);
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(text)));
+  await act(() => root.render(<GraphPage api={new Api(new Auth(config))} locale="en" />));
+  await act(() => {
+    fireEvent.change(getByRole(host, 'textbox', { name: 'Repository' }), {
+      target: { value: 'example.com/provision/infra' },
+    });
+    fireEvent.submit(getByRole(host, 'form', { name: 'Code graph' }));
+  });
+  await waitFor(() => expect(getByRole(host, 'table', { name: 'Communities' })).toBeDefined());
+  await act(() => {
+    fireEvent.change(getByRole(host, 'combobox', { name: 'Graph view' }), {
+      target: { value: 'contracts' },
+    });
+  });
+  const contracts = getByRole(host, 'table', { name: 'Contracts' });
+  expect(getByRole(contracts, 'columnheader', { name: 'Provisioners' })).toBeDefined();
+  for (const side of data.provisioners) {
+    expect(contracts.textContent).toContain(`${side.node} (root ${side.root})`);
+  }
+  await act(() => {
+    fireEvent.change(getByRole(host, 'combobox', { name: 'Graph view' }), {
+      target: { value: 'provisions' },
+    });
+  });
+  const links = getByRole(host, 'table', { name: 'Provisioning links' });
+  expect(links.querySelectorAll('tbody tr')).toHaveLength(16);
+  for (const link of data.provisions) {
+    expect(links.textContent).toContain(`${link.provisioner} (root ${link.root})`);
+    expect(links.textContent).toContain(link.side);
+    expect(links.textContent).toContain(link.level);
+    expect(links.textContent).toContain(link.reason);
+  }
+});

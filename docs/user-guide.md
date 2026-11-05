@@ -490,6 +490,25 @@ tipo `Serverless::Function`.
 - **Consultas**: como nos nós Terraform, `search` com `kind = "iac"`, `context` e `trace`.
 - **Não lidos**: `serverless.ts`, plugins e valores de outros arquivos.
 
+### Provisionadores Terraform
+
+Um `resource` `aws_sqs_queue` provisiona `channel::sqs::<nome>` pelo argumento `name`;
+um `aws_s3_bucket` provisiona `resource::s3::<nome>` pelo argumento `bucket`. A tabela de tipos
+em `src/iac/types.toml`, embutida no binário, também lê nomes em ARNs e URLs. Um `[[resource]]`
+com `kind = "s3"` e o mesmo `id` participa desse contrato, mantendo o nível `declared`.
+
+Cada produtor, consumidor, escritor e leitor se liga a cada provisionador, identificado pelo
+endereço e pelo módulo raiz. Duas raízes como `envs/dev` e `envs/prod` não são ambíguas entre si.
+Nomes escritos dão `exact`; nomes que passam por valores sobrescrevíveis dão `inferred`, com
+as variáveis e suas origens no motivo. `context` no bloco lista os lados do contrato; no produtor,
+lista os provisionadores. `trace` segue do bloco para o código com `down` e do código para a
+infraestrutura com `up`. O export mantém `format: 1` e acrescenta `iac_nodes`, `provisioners` e
+`provisions`, omitidos quando vazios. Tipos não listados e blocos `data` não provisionam contratos.
+Um padrão
+com pelo menos três caracteres literais e curingas nos limites de segmentos (`-`, `_`, `.`, `/`)
+se liga a um nome literal em `inferred`, ou `ambiguous` quando vários nomes correspondem. Padrões
+nunca se ligam a padrões. O grafo da console lista os provisionadores e suas ligações próprias.
+
 ## 4. `meada.toml`: referência
 
 Cada repositório pode ter um `meada.toml` na raiz, versionado no git, que diz com quem ele

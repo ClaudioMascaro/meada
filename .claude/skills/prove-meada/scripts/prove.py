@@ -45,10 +45,13 @@ KEYED = {
     "calls": ("id",),
     "packages": ("ecosystem", "directory", "name"),
     "links": ("consumer", "provider", "contract"),
+    "iac_nodes": ("identity", "root"),
+    "provisioners": ("contract", "node", "root"),
+    "provisions": ("side", "provisioner", "root", "contract"),
     "providers": ("contract", "site"),
     "consumers": ("contract", "site"),
 }
-WATCHED = {"calls": ("level", "target", "candidates"), "links": ("level",), "packages": ("version",), "consumers": ("via",)}
+WATCHED = {"calls": ("level", "target", "candidates"), "links": ("level",), "provisions": ("level", "reason"), "packages": ("version",), "consumers": ("via",)}
 OTHER = ("files", "imports", "documents", "bindings", "publishes", "dependencies", "communities", "processes")
 FIXED_GIT = {
     "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1",

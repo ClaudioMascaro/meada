@@ -1,0 +1,48 @@
+# The type table (ADR 0025, ADR 0026, #656): what an IaC type provisions. Embedded in the binary
+# (`iac::types`), versioned with the code; a type it does not list is still an IaC node, with its
+# references and config values, and holds no contract side.
+#
+# One `[[entry]]` per type:
+#
+# - `format`: the IaC format the type belongs to: `terraform` (a `resource` block of a `.tf` or
+#   `.tofu` file; OpenTofu shares the types).
+# - `type`: the type as the format writes it (`aws_sqs_queue`).
+# - `contract`: `channel` (a queue, topic, bus or stream) or `resource` (a bucket, table,
+#   database, cache or secret), the contract kind of ADR 0026.
+# - `kind`: the broker of the channel or the kind of the resource, a name of ADR 0026's tables;
+#   the contract is `channel::<kind>::<name>` or `resource::<kind>::<name>`.
+# - `name`: the argument that holds the physical name, evaluated as ADR 0025 says.
+# - `forms`: how to read a name out of an ARN or a URL that the argument (or, later, a config
+#   value) holds, each a template where `{name}` is the name and `*` any other part; both match
+#   one or more characters other than `:` and `/`. A text fits a form when it is the form, or the
+#   form followed by `/` and anything (an object key under a bucket). A text that fits no form is
+#   the name as it is.
+#
+# Every entry has a fixture case: a block of its type in `tests/fixtures/provision-infra/`
+# (`types::tests::every_entry_has_a_fixture_case`).
+
+[[entry]]
+format = "terraform"
+type = "aws_sqs_queue"
+contract = "channel"
+kind = "sqs"
+name = "name"
+forms = [
+  "arn:*:sqs:*:*:{name}",
+  "https://sqs.*.amazonaws.com/*/{name}",
+  "https://*.queue.amazonaws.com/*/{name}",
+]
+
+[[entry]]
+format = "terraform"
+type = "aws_s3_bucket"
+contract = "resource"
+kind = "s3"
+name = "bucket"
+forms = [
+  "arn:*:s3:::{name}",
+  "s3://{name}",
+  "https://{name}.s3.amazonaws.com",
+  "https://{name}.s3.*.amazonaws.com",
+  "https://s3.*.amazonaws.com/{name}",
+]

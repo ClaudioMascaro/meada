@@ -44,6 +44,8 @@ type Call<'a> = (usize, &'a CallSite);
 /// The workspace as one graph of symbols, calls and links.
 pub(crate) struct Graph<'a> {
     workspace: &'a Workspace,
+    exports: &'a [Export],
+    provisions: Vec<meada_core::export::Provision>,
     symbols: HashMap<&'a str, (usize, &'a Symbol)>,
     calls: HashMap<&'a str, Call<'a>>,
     /// The calls each symbol (or file, for top-level calls) makes, in source order.
@@ -76,6 +78,8 @@ impl<'a> Graph<'a> {
     pub(crate) fn new(workspace: &'a Workspace, exports: &'a [Export], links: &'a [Link]) -> Self {
         let mut graph = Self {
             workspace,
+            exports,
+            provisions: crate::iac::provision::links(exports),
             symbols: HashMap::new(),
             calls: HashMap::new(),
             callees: HashMap::new(),
@@ -193,6 +197,74 @@ impl<'a> Graph<'a> {
         walk.finish(budget)
     }
 
+    /// Continue a provisioning hop into the ordinary code walk, without a second footer.
+    pub(crate) fn provisioned_rows(
+        &self,
+        repository: usize,
+        node: &crate::iac::Node,
+        depth: usize,
+    ) -> Vec<Row> {
+        let identity = format!(
+            "{}::{}::{}",
+            self.exports[repository].repository, node.path, node.address
+        );
+        let mut walk = Walk {
+            graph: self,
+            direction: Direction::Down,
+            files: self
+                .workspace
+                .repos
+                .iter()
+                .map(|r| Files::new(&r.root))
+                .collect(),
+            rows: Vec::new(),
+            ancestors: Vec::new(),
+            expanded: HashSet::new(),
+        };
+        for link in self
+            .provisions
+            .iter()
+            .filter(|l| l.provisioner == identity && l.root == node.root)
+        {
+            let id = link.side.as_str();
+            // The link is owned by this graph; find the same site in its borrowed exports.
+            let call = self.calls.get(id).copied();
+            let Some(site) = self
+                .exports
+                .iter()
+                .flat_map(crate::iac::provision::uses)
+                .map(|(site, _)| site)
+                .find(|s| *s == id)
+            else {
+                continue;
+            };
+            let (n, text) = match call {
+                Some(c) => (c.0, format!("{} {}", walk.site(c), walk.caller(c))),
+                None => walk.node(site),
+            };
+            let mut row = Row::call(
+                format!(
+                    "provisions {} [{}: {}] {text}",
+                    link.contract,
+                    link.level.name(),
+                    link.reason
+                ),
+                n,
+                Some(link.level),
+            );
+            row.link = true;
+            match call {
+                Some(c) => {
+                    walk.push(depth, row);
+                    walk.call_down(c, depth + 1, &mut HashSet::new());
+                }
+                None if self.ends(site) => walk.push(depth, row),
+                None => walk.enter(site, depth, row),
+            }
+        }
+        walk.rows
+    }
+
     /// The starts `from` names: the providers of a route, else one symbol, else one call site.
     /// A name that fits several symbols or call sites lists them instead of guessing.
     fn find(&self, from: &str, walk: &mut Walk) -> Lookup<'a> {
@@ -223,6 +295,15 @@ impl<'a> Graph<'a> {
         sites.dedup();
         if !sites.is_empty() {
             return Lookup::Nodes(sites);
+        }
+        if self.is_repo(from) && self.provisions.iter().any(|l| l.side == from) {
+            let id = self
+                .workspace
+                .repos
+                .iter()
+                .find(|r| r.identity == from)
+                .unwrap();
+            return Lookup::Nodes(vec![&id.identity]);
         }
         let suffix = format!("::{from}");
         let fits = |id: &str| id == from || id.ends_with(&suffix);
@@ -364,6 +445,13 @@ pub(crate) fn starts(
     if !sites.is_empty() {
         return Ok(sites);
     }
+    if partial.exports.iter().any(|e| e.repository == from)
+        && crate::iac::provision::links(&partial.exports)
+            .iter()
+            .any(|l| l.side == from)
+    {
+        return Ok(vec![from.to_string()]);
+    }
     let mut symbols = HashSet::new();
     for n in 0..partial.exports.len() {
         let found = crate::index::symbols_named(partial.db(n), from)?;
@@ -439,6 +527,8 @@ pub(crate) fn read(
                 }
             }
             Direction::Up => {
+                // Provisioning sides at producing calls belong to their enclosing symbol.
+                partial.callees(None, &new)?;
                 let mut calls = sites;
                 calls.extend(partial.callers(None, &new, candidates)?);
                 next.extend(calls.into_iter().map(|(_, c)| c.caller));
@@ -567,6 +657,10 @@ impl<'a> Walk<'_, 'a> {
                 }
             }
             Direction::Up => {
+                self.provisioners_up(id, depth + 1);
+                for &(_, c) in graph.callees.get(id).into_iter().flatten() {
+                    self.provisioners_up(&c.id, depth + 1);
+                }
                 for &call @ (n, c) in graph.callers.get(id).into_iter().flatten() {
                     if !shown.insert((c.caller.as_str(), false)) {
                         continue;
@@ -617,6 +711,25 @@ impl<'a> Walk<'_, 'a> {
             }
         }
         self.ancestors.pop();
+    }
+
+    /// Upstream of a contract side is every root that provisions it.
+    fn provisioners_up(&mut self, site: &str, depth: usize) {
+        let graph = self.graph;
+        for link in graph.provisions.iter().filter(|l| l.side == site) {
+            if let Some((n, p)) = crate::iac::provision::target(graph.exports, link) {
+                let text = format!(
+                    "provisions {} [{}: {}] {}",
+                    link.contract,
+                    link.level.name(),
+                    link.reason,
+                    p.place(&graph.exports[n].repository)
+                );
+                let mut row = Row::call(text, n, Some(link.level));
+                row.link = true;
+                self.push(depth, row);
+            }
+        }
     }
 
     /// What one call reaches: its targets in its repository, and, when it consumes a

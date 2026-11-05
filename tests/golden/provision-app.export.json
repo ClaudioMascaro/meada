@@ -1,0 +1,373 @@
+{
+  "format": 1,
+  "repository": "example.com/provision/app",
+  "files": [
+    {
+      "path": "src/consumer.ts",
+      "hash": "b48689d3c9287140033809c132a2de9f499c1b9dbb76184425992243d5933fab"
+    },
+    {
+      "path": "src/producer.ts",
+      "hash": "2c16f17f7cb7a48a5efce4db4bca40e36d511ff51f4ed50f6c331f0909cda159"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/provision/app::src/consumer.ts::drain",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 224,
+        "end": 401
+      },
+      "hash": "e43924e203534bf94bf0adef5ca8ace4130a4cb5b220e73ebe951bbd2c4769a0"
+    },
+    {
+      "id": "example.com/provision/app::src/consumer.ts::handleRefund",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 586,
+        "end": 653
+      },
+      "hash": "99de1433e41a53d911d587d6b9c25b29028dd6a026bd0fe59dcb1e2a0271a6c6"
+    },
+    {
+      "id": "example.com/provision/app::src/consumer.ts::startRefunds",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 410,
+        "end": 577
+      },
+      "hash": "6de8e3fec0e0e69f98c7b75ca6b7b66d5358a5cf96d2746a728ad5f34f8aaf0d"
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::enqueue",
+      "span": {
+        "path": "src/producer.ts",
+        "start": 449,
+        "end": 590
+      },
+      "hash": "c1f147615f9728336c051548effa0c80da0b232d82b80342b9c2b38a709a37c5"
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::enqueueOrder",
+      "span": {
+        "path": "src/producer.ts",
+        "start": 230,
+        "end": 380
+      },
+      "hash": "48b1460c581fa8232c192d24f2c12034bbacf517db88674d08c33c69b9ac26c9"
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::enqueueRefund",
+      "span": {
+        "path": "src/producer.ts",
+        "start": 599,
+        "end": 711
+      },
+      "hash": "645877609c403524c9ad802c49106e04cc6e19c83be47fab917d3387c0af8e59"
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/provision/app::src/consumer.ts::SQSClient#0",
+      "caller": "example.com/provision/app::src/consumer.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 129,
+        "end": 146
+      }
+    },
+    {
+      "id": "example.com/provision/app::src/consumer.ts::drain::ReceiveMessageCommand#0",
+      "caller": "example.com/provision/app::src/consumer.ts::drain",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 286,
+        "end": 370
+      }
+    },
+    {
+      "id": "example.com/provision/app::src/consumer.ts::drain::client.send#0",
+      "caller": "example.com/provision/app::src/consumer.ts::drain",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 269,
+        "end": 375
+      }
+    },
+    {
+      "id": "example.com/provision/app::src/consumer.ts::startRefunds::Consumer.create#0",
+      "caller": "example.com/provision/app::src/consumer.ts::startRefunds",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 445,
+        "end": 574
+      }
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::SQSClient#0",
+      "caller": "example.com/provision/app::src/producer.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/producer.ts",
+        "start": 85,
+        "end": 102
+      }
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::enqueue::SendMessageCommand#0",
+      "caller": "example.com/provision/app::src/producer.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/producer.ts",
+        "start": 521,
+        "end": 586
+      }
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::enqueue::client.send#0",
+      "caller": "example.com/provision/app::src/producer.ts::enqueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/producer.ts",
+        "start": 509,
+        "end": 587
+      }
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::enqueueOrder::SendMessageCommand#0",
+      "caller": "example.com/provision/app::src/producer.ts::enqueueOrder",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/producer.ts",
+        "start": 299,
+        "end": 372
+      }
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::enqueueOrder::client.send#0",
+      "caller": "example.com/provision/app::src/producer.ts::enqueueOrder",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/producer.ts",
+        "start": 282,
+        "end": 377
+      }
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::enqueueRefund::enqueue#0",
+      "caller": "example.com/provision/app::src/producer.ts::enqueueRefund",
+      "target": "example.com/provision/app::src/producer.ts::enqueue",
+      "level": "exact",
+      "span": {
+        "path": "src/producer.ts",
+        "start": 635,
+        "end": 708
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::sqs::orders",
+      "site": "example.com/provision/app::src/producer.ts::enqueueOrder::SendMessageCommand#0"
+    },
+    {
+      "contract": "channel::sqs::refunds",
+      "site": "example.com/provision/app::src/producer.ts::enqueueRefund::enqueue#0"
+    },
+    {
+      "contract": "resource::s3::archive",
+      "site": "example.com/provision/app::src/producer.ts::enqueueOrder"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::postgres::archive",
+      "site": "example.com/provision/app",
+      "via": null
+    },
+    {
+      "contract": "resource::s3::archive",
+      "site": "example.com/provision/app",
+      "via": null
+    },
+    {
+      "contract": "channel::sqs::orders",
+      "site": "example.com/provision/app::src/consumer.ts::drain",
+      "via": null
+    },
+    {
+      "contract": "channel::sqs::refunds",
+      "site": "example.com/provision/app::src/consumer.ts::handleRefund",
+      "via": null
+    }
+  ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/provision/app::src/producer.ts::enqueue",
+        "example.com/provision/app::src/producer.ts::enqueueRefund"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/provision/app::src/consumer.ts::drain",
+      "provider": "example.com/provision/app::src/producer.ts::enqueueOrder::SendMessageCommand#0",
+      "contract": "channel::sqs::orders",
+      "level": "exact",
+      "reason": "channel::sqs::orders"
+    },
+    {
+      "consumer": "example.com/provision/app::src/consumer.ts::handleRefund",
+      "provider": "example.com/provision/app::src/producer.ts::enqueueRefund::enqueue#0",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    }
+  ],
+  "provisions": [
+    {
+      "side": "example.com/provision/app",
+      "provisioner": "example.com/provision/infra::envs/dev/main.tf::aws_s3_bucket.archive",
+      "root": "envs/dev",
+      "contract": "resource::s3::archive",
+      "level": "declared",
+      "reason": "resource::s3::archive"
+    },
+    {
+      "side": "example.com/provision/app",
+      "provisioner": "example.com/provision/infra::envs/prod/main.tf::aws_s3_bucket.archive",
+      "root": "envs/prod",
+      "contract": "resource::s3::archive",
+      "level": "inferred",
+      "reason": "resource::s3::archive; overridable: example.com/provision/infra envs/prod/main.tf:2 var.bucket (default)"
+    },
+    {
+      "side": "example.com/provision/app::src/consumer.ts::drain",
+      "provisioner": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.orders",
+      "root": "envs/dev",
+      "contract": "channel::sqs::orders",
+      "level": "exact",
+      "reason": "channel::sqs::orders"
+    },
+    {
+      "side": "example.com/provision/app::src/consumer.ts::drain",
+      "provisioner": "example.com/provision/infra::envs/prod/main.tf::aws_sqs_queue.orders",
+      "root": "envs/prod",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; overridable: example.com/provision/infra envs/prod/terraform.tfvars:1 var.queue (tfvars)"
+    },
+    {
+      "side": "example.com/provision/app::src/consumer.ts::handleRefund",
+      "provisioner": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.arn",
+      "root": "envs/dev",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/app::src/consumer.ts::handleRefund",
+      "provisioner": "example.com/provision/infra::envs/prod/main.tf::aws_sqs_queue.url",
+      "root": "envs/prod",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/app::src/consumer.ts::handleRefund",
+      "provisioner": "example.com/provision/infra::modules/queue/main.tf::module.shared.aws_sqs_queue.this",
+      "root": "envs/dev",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/app::src/consumer.ts::handleRefund",
+      "provisioner": "example.com/provision/infra::modules/queue/main.tf::module.shared.aws_sqs_queue.this",
+      "root": "envs/prod",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueOrder",
+      "provisioner": "example.com/provision/infra::envs/dev/main.tf::aws_s3_bucket.archive",
+      "root": "envs/dev",
+      "contract": "resource::s3::archive",
+      "level": "declared",
+      "reason": "resource::s3::archive"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueOrder",
+      "provisioner": "example.com/provision/infra::envs/prod/main.tf::aws_s3_bucket.archive",
+      "root": "envs/prod",
+      "contract": "resource::s3::archive",
+      "level": "inferred",
+      "reason": "resource::s3::archive; overridable: example.com/provision/infra envs/prod/main.tf:2 var.bucket (default)"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueOrder::SendMessageCommand#0",
+      "provisioner": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.orders",
+      "root": "envs/dev",
+      "contract": "channel::sqs::orders",
+      "level": "exact",
+      "reason": "channel::sqs::orders"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueOrder::SendMessageCommand#0",
+      "provisioner": "example.com/provision/infra::envs/prod/main.tf::aws_sqs_queue.orders",
+      "root": "envs/prod",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; overridable: example.com/provision/infra envs/prod/terraform.tfvars:1 var.queue (tfvars)"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueRefund::enqueue#0",
+      "provisioner": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.arn",
+      "root": "envs/dev",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueRefund::enqueue#0",
+      "provisioner": "example.com/provision/infra::envs/prod/main.tf::aws_sqs_queue.url",
+      "root": "envs/prod",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueRefund::enqueue#0",
+      "provisioner": "example.com/provision/infra::modules/queue/main.tf::module.shared.aws_sqs_queue.this",
+      "root": "envs/dev",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueRefund::enqueue#0",
+      "provisioner": "example.com/provision/infra::modules/queue/main.tf::module.shared.aws_sqs_queue.this",
+      "root": "envs/prod",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    }
+  ]
+}

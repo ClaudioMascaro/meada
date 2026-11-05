@@ -145,6 +145,11 @@ this file, and a change to these modules updates it.
   line (`Msg::ConfigFiles`), absent with no config file. `under(identity, db, path, block)`
   gives the rows of one file under a key path (`block`, `block.` or `block[`), as `hits` shows
   them: the `values:` of `context` on an IaC node.
+- `iac/provision.rs`, `iac/pattern.rs` (#656): `crate::iac::provision::read` derives provisioner
+  sides from stored
+  IaC names using the embedded `iac/types.toml` table; `crate::iac::provision::links` joins them
+  to every matching channel/resource side without entering consumer-link ambiguity or decisions.
+  The export keeps root labels alongside node identities; query-time links are never stored.
 - `iac.rs` (#649, ADR 0025): IaC nodes. `Repository::evaluate(pick, left) -> (Vec<Node>,
   Vec<Reference>)` is pure over the `.tf`, `.tofu` and var files (`is_input`) of one repository that
   `Repository::read` read: `read` parses each with `hcl-edit` (skipping one

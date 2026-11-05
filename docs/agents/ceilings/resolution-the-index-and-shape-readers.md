@@ -518,6 +518,14 @@
   `iac` scans every node of every repository (a `ponytail:` in `iac::hits`); an indexed lookup waits
   for a workspace that makes it slow. A module call has no physical name: its `name` is one of its
   inputs.
+- `iac/types.rs` (#656): `FORM_TEXT_MAX` (1,024 bytes); longer identifiers keep their whole
+  text as the name, bounding the form matcher. The table covers SQS queues and S3 buckets in
+  `.tf` and `.tofu` resource blocks only. Data blocks and unlisted types make no provisioner.
+  `iac/pattern.rs`: `PATTERN_LITERAL_MIN` (3 literal characters), `PATTERN_SEGMENTS` (`-_./`)
+  and `PATTERN_TEXT_MAX` (1,024 bytes for either name): a pattern outside these bounds matches
+  nothing. These bounds keep the evidence meaningful and the matching work bounded.
+  `crate::iac::provision::links` scans contract sides for each provisioner;
+  IaC traces hydrate all provisioned sides before following the selected node's references.
 - `iac.rs` static evaluation (#650, ADR 0025): `EVAL_VALUE_MAX` (64 KiB of one evaluated value,
   as `iac::size` counts it; past it, the value is unresolved, and a template past it is `*`
   whole), `EVAL_COST_MAX` (1 MiB that one expression could make, `iac::cost`'s upper bound; past
@@ -526,8 +534,8 @@
   `WIDTH_MAX` (`iac/functions.rs`: a `format` width of 256; past it the call is unresolved). `cost`
   bounds a `for` by the size of what it iterates, so a `for` over a value it cannot size (a
   function's result) is costed as its square and may stay unresolved below the real ceiling.
-  Only the `name` argument is a physical name (no `bucket`, `function_name` or `name_prefix`
-  yet: the type table's ticket names them). A resource's attribute is never evaluated, even an
+  The type table selects `bucket` for S3 and `name` for SQS; unlisted types still read
+  `name` (no `function_name` or `name_prefix`). A resource's attribute is never evaluated, even an
   argument its configuration sets, so an output of `aws_sqs_queue.this.name` is `*`. A `count`
   or `for_each` that reads a module output does not resolve (module instances are made before
   outputs are read). Only the var files Terraform loads by itself give values

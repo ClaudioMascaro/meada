@@ -2893,6 +2893,8 @@ mod tests {
                 .collect(),
             imports: Vec::new(),
             links: Vec::new(),
+            provisioners: Vec::new(),
+            provisions: Vec::new(),
             stale_decisions: Vec::new(),
             unmounted: Vec::new(),
             unfollowed: Vec::new(),

@@ -54,7 +54,10 @@ use meada_core::trace::{Chain, Row};
 pub(crate) mod cloudformation;
 mod compose;
 mod functions;
+mod pattern;
+pub(crate) mod provision;
 pub(crate) mod serverless;
+pub(crate) mod types;
 
 /// The instances one `count` or `for_each` gives; past it the block is one node with no key.
 // ponytail: a fleet of a few hundred instances is real; past a thousand the keys come from data.
@@ -573,8 +576,9 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
             line: line(span.start),
             end_line: line(span.end.saturating_sub(1).max(span.start)),
             // A module call's `name` is one of its inputs, not the name of something it creates.
+            // A resource the type table lists (#656) is named by the argument the table names.
             named: (kind != Kind::Module)
-                .then(|| attr("name").cloned())
+                .then(|| attr(name_argument(kind, ty)).cloned())
                 .flatten(),
             count: attr("count").cloned(),
             for_each: attr("for_each").cloned(),
@@ -582,6 +586,15 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
             source,
             args,
         });
+    }
+}
+
+/// The argument that holds the physical name of a block of `kind` and `ty`: the one the type
+/// table names for a resource it lists (`bucket` for `aws_s3_bucket`), else `name`.
+fn name_argument(kind: Kind, ty: &str) -> &'static str {
+    match kind {
+        Kind::Resource => types::entry("terraform", ty).map_or("name", |e| e.name.as_str()),
+        _ => "name",
     }
 }
 
@@ -949,6 +962,14 @@ impl<'m> Eval<'m> {
                 Val::Known(Value::Null | Value::Array(_) | Value::Object(_)) => (None, false),
                 _ => {
                     let (text, pattern) = found.text();
+                    // An ARN or a URL in a type the table lists holds the name (#656).
+                    let entry = (block.kind == Kind::Resource)
+                        .then(|| types::entry("terraform", &block.ty))
+                        .flatten();
+                    let text = match entry {
+                        Some(e) if !pattern => e.read(&text).to_string(),
+                        _ => text,
+                    };
                     (Some(text), pattern)
                 }
             };
@@ -1898,7 +1919,7 @@ fn named(identity: &str, db: &Connection, text: &str) -> Result<Vec<Node>> {
 
 /// The nodes of the workspace `text` names (`named`), with the position of their repository;
 /// `repos` holds each repository's identity and index.
-fn found(repos: &[(&str, &Connection)], text: &str) -> Result<Vec<(usize, Node)>> {
+pub(crate) fn found(repos: &[(&str, &Connection)], text: &str) -> Result<Vec<(usize, Node)>> {
     let mut found = Vec::new();
     for (n, (identity, db)) in repos.iter().enumerate() {
         found.extend(named(identity, db, text)?.into_iter().map(|node| (n, node)));
@@ -2045,6 +2066,7 @@ pub(crate) fn trace(
     text: &str,
     direction: Direction,
     budget: Option<usize>,
+    mut provisioned: impl FnMut(usize, &Node, usize) -> Vec<Row>,
 ) -> Result<Option<String>> {
     let found = found(repos, text)?;
     let [(r, start)] = &found[..] else {
@@ -2073,6 +2095,9 @@ pub(crate) fn trace(
         rows.push(Row::call(text, *r, level));
         if !mark.is_empty() {
             continue;
+        }
+        if direction == Direction::Down {
+            rows.extend(provisioned(*r, &n, depth + 1));
         }
         expanded.insert(n.address.clone());
         path.push(n.address.clone());
