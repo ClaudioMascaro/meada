@@ -303,6 +303,8 @@ words:
 | iac role | `role: <text>` | What a Kubernetes object is to Crossplane: `crossplane composite resource definition`, `crossplane composition`, `crossplane claim`, `crossplane composite resource`, `crossplane managed resource` or `crossplane composed resource`. |
 | iac image | `image: <text><iac-mark?>` | A Compose service's image, quoted as JSON. |
 | iac build | `build: <text><iac-mark?>` | A Compose service's build context, a path inside the repository, quoted as JSON. |
+| iac handler | `handler: <text><iac-mark?>` | A Serverless function's handler, quoted as JSON. |
+| iac event | `event: <text><iac-mark?>` | One event of a Serverless function, in file order: its type and what identifies it, quoted as JSON (`"http GET /orders"`, `"sqs Queue.Arn"`). |
 | iac section | `<iac-section>:<none?>` | The lines that follow belong to the section, or ` none` when it has none. |
 | iac reference | `<repository> <place> <address><via?>` | A node the node references, or that references it, at its block. |
 | iac overridable | `<repository> <place> <variable> (<overridable-from>)` | A root module's variable the node's name went through, where its value comes from. |
@@ -325,9 +327,9 @@ words:
 | `<iac-section>` | `values` | The config values of its block. |
 | `<none>` | ` none` | The section has no line. |
 | `<variable>` | `var.<word>` | A root module's variable. |
-| `<overridable-from>` | `default` | Its value is its default, at the variable's block (a CloudFormation `Parameters.<name>`, at its `Default`). |
+| `<overridable-from>` | `default` | Its value is its default, at the variable's block (a CloudFormation `Parameters.<name>`, at its `Default`; a Serverless `opt:name, 'default'`, at the line that writes it). |
 | `<overridable-from>` | `tfvars` | Its value comes from a var file (`terraform.tfvars`, `*.auto.tfvars`), at the value's line. |
-| `<via>` | ` via <text>` | What the reference went through: a variable, local or module output (`var.queue_arn`, `local.topic`, `module.orders.queue_arn`), or for a Kubernetes object how it names the other (`selector app=api`, `env DATABASE_URL`, `envFrom`, `volume settings`, `serviceAccountName`, `backend shop.example.com/api`, `defaultBackend`), or for a Crossplane object how it names the other (`composite <Kind>.<group>`, `kind <Kind>.<group>`, `compositionRef`, `defaultCompositionRef`, `enforcedCompositionRef`, `compositeTypeRef <Kind>.<group>`, `resources`, `pipeline <step>`), or for a CloudFormation or SAM resource the intrinsic that names the other (`Ref`, `Fn::GetAtt.Arn`, `Fn::Sub`, `DependsOn`). |
+| `<via>` | ` via <text>` | What the reference went through: a variable, local or module output (`var.queue_arn`, `local.topic`, `module.orders.queue_arn`), or for a Kubernetes object how it names the other (`selector app=api`, `env DATABASE_URL`, `envFrom`, `volume settings`, `serviceAccountName`, `backend shop.example.com/api`, `defaultBackend`), or for a Crossplane object how it names the other (`composite <Kind>.<group>`, `kind <Kind>.<group>`, `compositionRef`, `defaultCompositionRef`, `enforcedCompositionRef`, `compositeTypeRef <Kind>.<group>`, `resources`, `pipeline <step>`), or for a CloudFormation or SAM resource the intrinsic that names the other (`Ref`, `Fn::GetAtt.Arn`, `Fn::Sub`, `DependsOn`), which a Serverless function's references use too. |
 | `<iac-mark>` | ` (overridable)` | A default (`${VAR:-default}`) gave the text. |
 | `<iac-mark>` | ` (unresolved)` | A variable with no default is still in the text, as `${VAR}`. |
 | `<iac-pass>` | `<address> (root <iac-root>)` | The node in its root module. |

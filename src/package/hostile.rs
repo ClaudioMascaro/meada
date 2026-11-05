@@ -7,7 +7,7 @@
 //! under the limit proves the reader.
 
 use std::collections::BTreeMap;
-use std::sync::mpsc;
+use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
 use super::maven::Maven;
@@ -21,8 +21,8 @@ use crate::lang::csharp::CSharp;
 use crate::lang::swift::Swift;
 use crate::lang::{Facts, LanguagePack, MAX_BYTES};
 
-/// The time of the whole table. A row takes about a second in debug; a reader that does work per
-/// pair of nodes, or per link of a chain, misses any bound.
+/// The time of one row, from its start. A row takes a few seconds at most in debug; a reader that
+/// does work per pair of nodes, or per link of a chain, misses any bound.
 const BUDGET: Duration = Duration::from_secs(30);
 
 /// What one reader may return for a file of `MAX_BYTES`: a few times its input, since a key is
@@ -139,6 +139,22 @@ fn template(text: String) -> usize {
     let (nodes, references) =
         crate::iac::evaluate(&[("template.yaml".into(), file(format!("{head}{text}")))]);
     let nodes = (nodes.iter()).map(|n| n.address.len() + n.name.as_ref().map_or(0, String::len));
+    let references = (references.iter())
+        .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
+    nodes.chain(references).sum()
+}
+
+/// The bytes of the addresses, names, handlers, events and references the IaC nodes of `text`, a
+/// lone `serverless.yml` (#654), store.
+fn service(text: String) -> usize {
+    let head = "service: s\nprovider:\n  stage: ${opt:stage, 'dev'}\n";
+    let (nodes, references) =
+        crate::iac::evaluate(&[("serverless.yml".into(), file(format!("{head}{text}")))]);
+    let nodes = nodes.iter().map(|n| {
+        let handler = n.handler.as_ref().map_or(0, |h| h.text.len());
+        let events: usize = n.events.iter().map(|e| e.text.len()).sum();
+        n.address.len() + n.name.as_ref().map_or(0, String::len) + handler + events
+    });
     let references = (references.iter())
         .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
     nodes.chain(references).sum()
@@ -1021,6 +1037,73 @@ fn probes() -> Vec<Probe> {
                 template(format!("{text}Resources: {{}}\n"))
             },
         ),
+        // Serverless (#654): what one service file's evaluation stores
+        ("serverless: functions with many events", || {
+            let events = "      - sqs: arn:aws:sqs:eu:1:queue-name\n".repeat(200);
+            let functions = fill(4, |i| {
+                format!("  f{i}:\n    handler: h.f\n    events:\n{events}")
+            });
+            service(format!("functions:\n{functions}"))
+        }),
+        ("serverless: a diamond of self variables", || {
+            let custom = fill(4, |i| {
+                format!(
+                    "  c{i}: ${{self:custom.c{}}}-${{self:custom.c{}}}\n",
+                    i + 1,
+                    i + 1
+                )
+            });
+            service(format!(
+                "custom:\n{custom}functions:\n  f:\n    name: ${{self:custom.c0}}\n"
+            ))
+        }),
+        (
+            "serverless: a chain past the depth limit with a wide fan-out",
+            || {
+                let fan = vec!["${self:custom.NEXT}"; 40].join("-");
+                let custom: String = (0..16)
+                    .map(|i| format!("  c{i}: {}\n", fan.replace("NEXT", &format!("c{}", i + 1))))
+                    .collect();
+                service(format!(
+                    "custom:\n{custom}  c16: end\nfunctions:\n  f:\n    name: ${{self:custom.c0}}\n"
+                ))
+            },
+        ),
+        (
+            "serverless: a chain past the stack cut with a wide fan-out",
+            || {
+                let fan = vec!["${self:custom.NEXT}"; 40].join("-");
+                let custom: String = (0..200)
+                    .map(|i| format!("  c{i}: {}\n", fan.replace("NEXT", &format!("c{}", i + 1))))
+                    .collect();
+                let functions: String = (0..200)
+                    .map(|i| format!("  f{i}:\n    name: ${{self:custom.c{i}}}\n"))
+                    .collect();
+                service(format!(
+                    "custom:\n{custom}  c200: end\nfunctions:\n{functions}"
+                ))
+            },
+        ),
+        ("serverless: variables in every resource", || {
+            let resources = fill(4, |i| {
+                format!(
+                    "    R{i}:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: ${{self:service}}-${{opt:stage, 'a'}}-${{env:X}}-${{ssm:/p}}\n"
+                )
+            });
+            service(format!("resources:\n  Resources:\n{resources}"))
+        }),
+        ("serverless: a function referencing many resources", || {
+            let env = (0..300)
+                .map(|i| format!("      E{i}: !Ref R{i}\n"))
+                .collect::<String>();
+            let resources = count(300, |i| format!("    R{i}:\n      Type: AWS::SQS::Queue\n"));
+            let functions = fill(4, |i| {
+                format!("  f{i}:\n    handler: h\n    environment:\n{env}")
+            });
+            service(format!(
+                "functions:\n{functions}resources:\n  Resources:\n{resources}"
+            ))
+        }),
         // Kubernetes and Kustomize (#651): what one repository's evaluation stores
         ("kustomize: a chain of bases", || {
             let mut files: Vec<(String, String)> = Vec::new();
@@ -1202,33 +1285,91 @@ fn swift_modules(text: String) -> usize {
         .sum()
 }
 
-/// Every reader, given a file built to explode, returns within `BUDGET` and gives back no more
-/// than `MAX_OUT`. The rows run side by side, each on a thread of its own, and the test names the
-/// ones that missed.
+/// Every reader, given a file built to explode, returns within `BUDGET` of its start and gives
+/// back no more than `MAX_OUT`. The rows run on a pool of as many threads as the machine has
+/// cores, so a row's time is its reader's, not the wait of a hundred rows started at once beside
+/// the rest of the suite (CI's `cloud` job missed the budget that way); the test names the rows
+/// that missed.
 #[test]
 fn every_reader_stays_bounded_on_a_file_built_to_explode() {
-    let started = Instant::now();
-    let runs: Vec<_> = (probes().into_iter())
-        .map(|(name, probe)| {
-            let (tx, rx) = mpsc::channel();
-            std::thread::spawn(move || {
+    let rows = probes();
+    let names: Vec<&str> = rows.iter().map(|(name, _)| *name).collect();
+    let workers = (std::thread::available_parallelism()).map_or(4, |n| n.get().min(names.len()));
+    let queue = Arc::new(Mutex::new(rows.into_iter().enumerate()));
+    let (tx, rx) = mpsc::channel();
+    for _ in 0..workers {
+        let (queue, tx) = (Arc::clone(&queue), tx.clone());
+        std::thread::spawn(move || {
+            loop {
+                let next = queue.lock().unwrap().next();
+                let Some((i, (_, probe))) = next else {
+                    break;
+                };
                 let start = Instant::now();
-                let _ = tx.send((probe(), start.elapsed()));
-            });
-            (name, rx)
-        })
-        .collect();
-    let mut failed = Vec::new();
-    for (name, rx) in runs {
-        match rx.recv_timeout(BUDGET.saturating_sub(started.elapsed())) {
-            Ok((size, took)) => {
-                eprintln!("hostile {name}: {took:?}, {size} bytes");
-                if size > MAX_OUT {
-                    failed.push(format!("{name}: {size} bytes"));
+                if tx.send(Run::Started(i, start)).is_err() {
+                    break;
+                }
+                let size = std::panic::catch_unwind(probe).ok();
+                let _ = tx.send(Run::Ended(i, size, start.elapsed()));
+            }
+        });
+    }
+    drop(tx);
+    // The start of each running row, the rows that ended or missed, and the threads a row past
+    // the budget still holds.
+    let (mut running, mut ended) = (BTreeMap::new(), vec![false; names.len()]);
+    let (mut late, mut failed) = (Vec::new(), Vec::new());
+    while ended.contains(&false) && late.len() < workers {
+        let wait = (running.values())
+            .map(|start: &Instant| BUDGET.saturating_sub(start.elapsed()))
+            .min()
+            .unwrap_or(BUDGET);
+        match rx.recv_timeout(wait) {
+            Ok(Run::Started(i, start)) => {
+                running.insert(i, start);
+            }
+            Ok(Run::Ended(i, size, took)) => {
+                running.remove(&i);
+                late.retain(|&j| j != i);
+                if ended[i] {
+                    continue;
+                }
+                ended[i] = true;
+                match size {
+                    Some(size) => {
+                        eprintln!("hostile {}: {took:?}, {size} bytes", names[i]);
+                        if took > BUDGET {
+                            failed.push(format!("{}: {took:?}", names[i]));
+                        } else if size > MAX_OUT {
+                            failed.push(format!("{}: {size} bytes", names[i]));
+                        }
+                    }
+                    None => failed.push(format!("{}: a panic", names[i])),
                 }
             }
-            Err(_) => failed.push(format!("{name}: no end within {BUDGET:?}, or a panic")),
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+        for (&i, start) in &running {
+            if !ended[i] && start.elapsed() >= BUDGET {
+                ended[i] = true;
+                late.push(i);
+                failed.push(format!("{}: no end within {BUDGET:?}", names[i]));
+            }
         }
     }
+    for (i, _) in ended.iter().enumerate().filter(|(_, ended)| !**ended) {
+        failed.push(format!(
+            "{}: not run, every thread held by a row past the budget",
+            names[i]
+        ));
+    }
     assert!(failed.is_empty(), "{failed:#?}");
+}
+
+/// What a thread of the pool says about a row: its index and when it started, then its index,
+/// the size it answered (none for a panic) and the time it took.
+enum Run {
+    Started(usize, Instant),
+    Ended(usize, Option<usize>, Duration),
 }

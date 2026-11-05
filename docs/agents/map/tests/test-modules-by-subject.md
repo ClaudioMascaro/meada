@@ -18,8 +18,9 @@
   passing a name down), and the walks
   `Maven::entries` and `Nuget::entries` over modules and projects that pass on to each other.
   Each row builds a file within `lang::MAX_BYTES` (many keys, deep nesting, wide fan-out), reads
-  it on a thread of its own and answers the size of what came back; the test holds every row to
-  30 s and four times `MAX_BYTES`, and names the rows that missed. A new reader adds its row.
+  it on a pool of one thread per core and answers the size of what came back; the test holds
+  every row to 30 s from its own start and four times `MAX_BYTES`, and names the rows that missed.
+  A new reader adds its row.
 - Test modules of `tests/it/` by subject: `config_values` (#639, the `config-values` fixture:
   Helm values with #638's alert labels, a multi-document Kubernetes file with a `Secret`, a
   workflow under `.github/`, a lockfile, a Helm template that does not parse, a hidden `.vscode/`
@@ -70,6 +71,12 @@
   a row rewritten by hand surviving the edit of another template, and template and Kubernetes
   nodes keeping each other's rows; the unit tests of `iac::cloudformation` for the intrinsic
   functions and the ceilings, those of `document::events` for the tagged reading),
+  `serverless` (#654, in `iac`: the `serverless-nodes` fixture, two services and a
+  `serverless.yml` with no `service`; `search` kind `iac`, `context` and `trace` against
+  `serverless-nodes.{search,context,trace}.txt`, a changed, no-longer-service and deleted file
+  equal to a cold index, a row rewritten by hand surviving the edit of another service, and the
+  size ceiling; the unit tests of `iac::serverless` for the variable sources, `opt:` defaults,
+  events and the ceilings),
   `decorations` (the `decorations` fixture: Java, Kotlin, C#,
   Python and Rust calls that decorate a definition carry `CallSite::decorates`, ordinary calls do
   not, and `context` lists them under `annotations:`), `docs` (the repository map against the code:

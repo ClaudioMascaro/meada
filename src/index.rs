@@ -187,7 +187,8 @@ CREATE TABLE iac_nodes (
     address TEXT NOT NULL, root TEXT NOT NULL, type TEXT NOT NULL, name TEXT,
     pattern INTEGER NOT NULL, overridable TEXT NOT NULL, path TEXT NOT NULL,
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
-    image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT
+    image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
+    handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -3798,6 +3799,13 @@ mod tests {
         actual.extend(
             (crate::http::IncludeReason::ALL.iter()).map(|reason| format!("{}\n", reason.name())),
         );
+
+        // The IaC nodes and references of a Serverless service (#654): a function with its handler
+        // and events, and a resource beside it.
+        let src = fs::read(tests.join("fixtures/schema/sample.serverless.yml")).unwrap();
+        actual += "\nsample.serverless.yml\n";
+        let files = [("api/serverless.yml".to_string(), src)];
+        actual += &format!("{:#?}\n", crate::iac::evaluate(&files));
 
         let golden = tests.join("golden/schema.txt");
         if std::env::var_os("MEADA_BLESS").is_some_and(|v| v == "1") {

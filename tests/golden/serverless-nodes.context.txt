@@ -1,0 +1,126 @@
+example.com/acme/infra api/serverless.yml:14-23 functions.createOrder
+type: Serverless::Function
+name: "shop-dev-createOrder"
+root: api/serverless.yml
+handler: "src/orders.create"
+event: "http POST /orders"
+event: "httpApi GET /orders/{id}"
+overridable:
+example.com/acme/infra api/serverless.yml:6 opt:stage, 'dev' (default)
+references:
+example.com/acme/infra api/serverless.yml:39 OrdersQueue via Ref
+referenced by: none
+values:
+example.com/acme/infra api/serverless.yml:15 functions.createOrder.handler = "src/orders.create"
+example.com/acme/infra api/serverless.yml:17 functions.createOrder.environment.QUEUE_URL = "OrdersQueue"
+example.com/acme/infra api/serverless.yml:18 functions.createOrder.environment.TABLE = "${self:custom.ordersTable}"
+example.com/acme/infra api/serverless.yml:21 functions.createOrder.events[0].http.path = "orders"
+example.com/acme/infra api/serverless.yml:22 functions.createOrder.events[0].http.method = "post"
+example.com/acme/infra api/serverless.yml:23 functions.createOrder.events[1].httpApi = "GET /orders/{id}"
+
+example.com/acme/infra api/serverless.yml:24-31 functions.processOrder
+type: Serverless::Function
+name: "shop-dev-processor"
+root: api/serverless.yml
+handler: "src/orders.process"
+event: "sqs OrdersQueue.Arn"
+event: "schedule rate(5 minutes)"
+overridable:
+example.com/acme/infra api/serverless.yml:6 opt:stage, 'dev' (default)
+references:
+example.com/acme/infra api/serverless.yml:39 OrdersQueue via Fn::GetAtt.Arn
+referenced by: none
+values:
+example.com/acme/infra api/serverless.yml:25 functions.processOrder.name = "${self:custom.prefix}-processor"
+example.com/acme/infra api/serverless.yml:26 functions.processOrder.handler = "src/orders.process"
+example.com/acme/infra api/serverless.yml:29 functions.processOrder.events[0].sqs.arn = "OrdersQueue.Arn"
+example.com/acme/infra api/serverless.yml:30 functions.processOrder.events[0].sqs.batchSize = 5
+example.com/acme/infra api/serverless.yml:31 functions.processOrder.events[1].schedule = "rate(5 minutes)"
+
+example.com/acme/infra api/serverless.yml:32-35 functions.audit
+type: Serverless::Function
+name: "shop-dev-audit"
+root: api/serverless.yml
+handler: "${env:AUDIT_HANDLER}" (unresolved)
+event: "sns shop-dev-alerts" (overridable)
+overridable:
+example.com/acme/infra api/serverless.yml:6 opt:stage, 'dev' (default)
+references: none
+referenced by: none
+values:
+example.com/acme/infra api/serverless.yml:33 functions.audit.handler = "${env:AUDIT_HANDLER}"
+example.com/acme/infra api/serverless.yml:35 functions.audit.events[0].sns = "${self:custom.prefix}-alerts"
+
+example.com/acme/infra worker/serverless.yml:9-13 functions.send
+type: Serverless::Function
+name: "mailer-prod-send"
+root: worker/serverless.yml
+handler: "handler.send"
+event: "http GET /mail/send"
+event: "sqs arn:aws:sqs:us-east-1:123456789012:mail-outbox"
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/acme/infra worker/serverless.yml:10 functions.send.handler = "handler.send"
+example.com/acme/infra worker/serverless.yml:12 functions.send.events[0].http = "GET mail/send"
+example.com/acme/infra worker/serverless.yml:13 functions.send.events[1].sqs = "arn:aws:sqs:us-east-1:123456789012:mail-outbox"
+
+example.com/acme/infra api/serverless.yml:39-42 OrdersQueue
+type: AWS::SQS::Queue
+name: "shop-dev-orders"
+root: api/serverless.yml
+overridable:
+example.com/acme/infra api/serverless.yml:6 opt:stage, 'dev' (default)
+references: none
+referenced by:
+example.com/acme/infra api/serverless.yml:14 functions.createOrder via Ref
+example.com/acme/infra api/serverless.yml:24 functions.processOrder via Fn::GetAtt.Arn
+values:
+example.com/acme/infra api/serverless.yml:40 resources.Resources.OrdersQueue.Type = "AWS::SQS::Queue"
+example.com/acme/infra api/serverless.yml:42 resources.Resources.OrdersQueue.Properties.QueueName = "${self:custom.prefix}-orders"
+
+example.com/acme/infra api/serverless.yml:43-46 OrdersTable
+type: AWS::DynamoDB::Table
+name: "shop-dev-orders"
+root: api/serverless.yml
+overridable:
+example.com/acme/infra api/serverless.yml:6 opt:stage, 'dev' (default)
+references: none
+referenced by: none
+values:
+example.com/acme/infra api/serverless.yml:44 resources.Resources.OrdersTable.Type = "AWS::DynamoDB::Table"
+example.com/acme/infra api/serverless.yml:46 resources.Resources.OrdersTable.Properties.TableName = "${self:custom.ordersTable}"
+
+example.com/acme/infra api/serverless.yml:47-50 DeadLetter
+type: AWS::SQS::Queue
+name: "*-dead" (pattern)
+root: api/serverless.yml
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/acme/infra api/serverless.yml:48 resources.Resources.DeadLetter.Type = "AWS::SQS::Queue"
+example.com/acme/infra api/serverless.yml:50 resources.Resources.DeadLetter.Properties.QueueName = "${env:DLQ_NAME}-dead"
+
+example.com/acme/infra api/serverless.yml:51-54 Assets
+type: AWS::S3::Bucket
+name: "*-shop-assets" (pattern)
+root: api/serverless.yml
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/acme/infra api/serverless.yml:52 resources.Resources.Assets.Type = "AWS::S3::Bucket"
+example.com/acme/infra api/serverless.yml:54 resources.Resources.Assets.Properties.BucketName = "${AWS::Region}-${self:service}-assets"
+
+example.com/acme/infra api/serverless.yml:55-58 Vault
+type: AWS::SecretsManager::Secret
+name: "*" (pattern)
+root: api/serverless.yml
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/acme/infra api/serverless.yml:56 resources.Resources.Vault.Type = "AWS::SecretsManager::Secret"
+example.com/acme/infra api/serverless.yml:58 resources.Resources.Vault.Properties.Name = "${ssm:/shop/vault-name}"

@@ -478,6 +478,25 @@ recurso es un nodo IaC direccionado por su id lógico, y su tipo (`AWS::SQS::Que
 - **Consultas**: como en los nodos Terraform, `search` con `kind = "iac"`, `context` y `trace`.
 - **No seguidos**: stacks anidados, macros, condiciones y mapeos.
 
+### Serverless Framework
+
+Un `serverless.yml`, `serverless.yaml` o `serverless.json` con un `service` se lee como una
+unidad de evaluación, con raíz en su ruta. Cada función es un nodo IaC `functions.<nombre>` de
+tipo `Serverless::Function`.
+
+- **Función**: el nombre físico es el `name` de la función o `<service>-<stage>-<función>` (el
+  `stage` es `provider.stage` o `dev`). `context` muestra `handler:` y `event:` (`"http GET
+  /orders"`, `"sqs Queue.Arn"`, `"schedule rate(5 minutes)"`) y las referencias a los recursos
+  que su cuerpo nombra con `Ref`, `Fn::GetAtt` o `Fn::Sub`.
+- **Recursos**: la sección `resources` se lee como CloudFormation (nodos en el id lógico, como
+  arriba).
+- **Variables**: `${self:custom.stage}` se resuelve al valor en esa ruta; el valor por defecto de
+  `${opt:stage, 'dev'}` se resuelve y `context` lo lista en `overridable:` y lo marca
+  `(overridable)`. `${env:...}`, `${ssm:...}`, `${sls:...}`, `${file(...)}` y las demás fuentes
+  son partes no resueltas: el nombre pasa a ser un patrón (`pattern "*-dead"`).
+- **Consultas**: como en los nodos Terraform, `search` con `kind = "iac"`, `context` y `trace`.
+- **No se leen**: `serverless.ts`, los plugins y los valores de otros archivos.
+
 ## 4. `meada.toml`: referencia
 
 Cada repositorio puede tener un `meada.toml` en la raíz, versionado en git, que dice con quién

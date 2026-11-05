@@ -355,6 +355,50 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   `REFERENCES_MAX` and `ROOT_STORED_MAX`, each fed an input past it by a unit test. The hostile
   probes hold the reader to a file of the size ceiling.
 
+### Serverless Framework nodes (#654)
+
+- **Unit.** A file named `serverless.yml`, `serverless.yaml` or `serverless.json` that holds a
+  `service` and a `provider`, `functions` or `resources` is one evaluation unit, its root labelled
+  by its path, rewritten with the CloudFormation rows it owns (a function's type holds a `::`, so
+  `iac::Owner::CloudFormation` covers it). `serverless.ts`, `.js` and the files `${file(...)}`
+  names are not read.
+- **Nodes.** Each entry of `functions` is a node `functions.<name>` of type
+  `Serverless::Function`, at the lines of its block, with its physical name (its `name`, else
+  `<service>-<stage>-<name>`, the stage `provider.stage` or `dev`), its `handler` and its `events`
+  recorded (`iac::Node::handler`, `events`; `iac_nodes` gains the columns). An event is its type,
+  then what identifies it: `http GET /users` (method upper-cased, path with its leading slash),
+  `httpApi ANY /v2`, `sqs Queue.Arn` (a `Fn::GetAtt` as `Resource.Attribute`, a `Ref` as the
+  name), `sns <topic>`, `schedule rate(5 minutes)`, `s3 <bucket>`, `websocket <route>`; an
+  intrinsic it cannot read is a `*`. The `resources.Resources` mapping is read as the
+  CloudFormation reader reads `Resources`, nodes at their logical ids, with the types and name
+  table of ADR 0025's CloudFormation section.
+- **Variables.** Over the file alone: `${self:a.b}` is the value at that path of the file, itself
+  expanded (a number or boolean as its text; a mapping or list is unresolved); `${opt:name,
+  default}` is the default and the name or text is overridable, its `Overridable` named by the
+  expression and placed at the line that writes it, since a deployer passes `--name`. The
+  alternatives of `${a, b, c}` are tried in order: a quoted or bare literal ends them, a `self:`
+  path the file lacks falls to the next, an `opt:` is passed over and marks the result
+  overridable. Any other source (`env`, `ssm`, `sls`, `aws`, `cf`, `file(...)`, `s3`) is an
+  unresolved part and ends the chain, whatever follows it: a `*` in a name, `${expr}` in a
+  recorded text. A variable inside a variable is expanded first, within its alternative, and must
+  give a text, read as one source (a comma in it is no alternative); `provider.stage` left out is
+  `dev` to `${self:provider.stage}` as to a name. A value that names itself, directly or around a
+  cycle, is unresolved whole, whichever value of the cycle is met first. `${...}` with no source,
+  or with `::` (`${AWS::Region}`), is CloudFormation's and stays.
+- **Resources.** The section's strings are expanded before the CloudFormation reader sees them: a
+  string that resolves is that text; one with an `opt:` default becomes a `Ref` to a synthetic
+  parameter holding it (shown as the `opt:` expression), one with an unresolved part an
+  `Fn::ImportValue`, joined with its literal text (inside an `Fn::Sub`, the same two as
+  variables), so the one evaluator gives names, patterns and overridable values.
+- **References.** A function references the resources of the section its body names with `Ref`,
+  `Fn::GetAtt` and `Fn::Sub`, each `exact` with its `via`, as a resource does. Serverless's own
+  logical ids for functions (`HelloLambdaFunction`) are not followed.
+- **Limits.** `VARIABLE_DEPTH_MAX` (the height of a chain of `self:` values), `STACK_MAX` (the
+  walk's depth), `VARIABLE_BYTES_MAX` (the bytes one file's expansions produce), `EVENTS_MAX` (per
+  function), the CloudFormation reader's `PHYSICAL_NAME_MAX` (a longer text is unresolved), and the
+  shared `NODES_MAX` (functions and resources together), `REFERENCES_MAX` and `ROOT_STORED_MAX`,
+  each fed an input past it by a unit test.
+
 ### IaC node
 
 An IaC node is a resource-like block of any format, with an address, a type, a file and a span.

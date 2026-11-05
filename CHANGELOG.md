@@ -93,6 +93,18 @@ All notable changes to Meada are recorded here. The format follows
   its default stored as `redacted` among the config values and used for no name. `search` kind
   `iac`, `context` and `trace` answer for them; a changed template is evaluated again alone. The
   index schema changes, so existing indexes are rebuilt; release level minor (#653).
+- Serverless Framework services as IaC nodes (ADR 0025): a `serverless.yml`, `serverless.yaml` or
+  `serverless.json` with a `service` is one evaluation unit, rooted at its path. Each function is
+  a node `functions.<name>` of type `Serverless::Function`, named by its `name` or
+  `<service>-<stage>-<function>`, with its handler and events (`http GET /orders`, `sqs
+  Queue.Arn`, `schedule rate(5 minutes)`) recorded and shown by `context`, and a reference to each
+  resource its body names with `Ref`, `Fn::GetAtt` or `Fn::Sub`. The `resources` section is read as
+  CloudFormation: each resource is a node at its logical id. `${self:...}` resolves to the value
+  at its path and the default of `${opt:...}` resolves and is marked overridable; `${env:...}`,
+  `${ssm:...}` and the other sources are unresolved parts, a `*` in a name and `${...}` in a
+  recorded text. `search` kind `iac`, `context` and `trace` answer for them; a changed service is
+  evaluated again alone. The index schema changes, so existing indexes are rebuilt; release level
+  minor (#654).
 - Kubernetes objects and Kustomize overlays as IaC nodes (ADR 0025): every YAML or JSON document
   with an `apiVersion`, a `kind` and a `metadata.name` is a node addressed
   `<Kind>[.<group>]/<namespace>/<name>` (no namespace for a cluster-scoped kind). Each directory

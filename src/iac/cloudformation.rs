@@ -39,7 +39,7 @@ const INTRINSIC_DEPTH_MAX: usize = 32;
 /// The longest physical name kept, in bytes; a name that grows past it is unresolved.
 // ponytail: names are 255 bytes at most (a Secrets Manager name 512); 1 KiB leaves room for a
 // pattern's wildcards, and stops a `Fn::Join` of joins from building megabytes.
-const PHYSICAL_NAME_MAX: usize = 1024;
+pub(super) const PHYSICAL_NAME_MAX: usize = 1024;
 
 /// What the physical name of a resource type is: the property that holds it, and whether `Ref`
 /// returns it (S3, DynamoDB, Lambda) rather than an ARN, a URL or an id.
@@ -189,7 +189,7 @@ fn named(ty: &str) -> Option<(&'static str, bool)> {
 }
 
 /// The text of a scalar a parameter's `Default` or a `Fn::Sub` takes: a string, number or boolean.
-fn scalar_text(v: &Value) -> Option<String> {
+pub(super) fn scalar_text(v: &Value) -> Option<String> {
     match v {
         Value::String(s) => Some(s.clone()),
         Value::Number(n) => Some(n.to_string()),
@@ -201,7 +201,7 @@ fn scalar_text(v: &Value) -> Option<String> {
 /// The resource and attribute `Fn::GetAtt` names: `[Resource, Attribute]` or `Resource.Attribute`
 /// (the attribute may hold dots). The attribute is `None` when it is computed (`[Resource, !Ref
 /// Param]`, the one function CloudFormation lets it use): the resource is still known.
-fn get_att(arg: &Value) -> Option<(&str, Option<String>)> {
+pub(super) fn get_att(arg: &Value) -> Option<(&str, Option<String>)> {
     match arg {
         Value::String(s) => s.split_once('.').map(|(r, a)| (r, Some(a.to_string()))),
         Value::Array(list) => match &list[..] {
@@ -388,14 +388,14 @@ impl Eval<'_> {
 
 /// The resources `body`'s intrinsic functions reference, with the `via` of each: `Ref`,
 /// `Fn::GetAtt.<attribute>`, `Fn::Sub` and `DependsOn`; only those `known` names, never `id`.
-fn referenced(
+pub(super) fn referenced(
     id: &str,
     body: &serde_json::Map<String, Value>,
-    known: &BTreeMap<String, Resource>,
+    known: impl Fn(&str) -> bool,
 ) -> BTreeSet<(String, String)> {
     let mut found = BTreeSet::new();
     let mut add = |target: &str, via: String| {
-        if target != id && known.contains_key(target) {
+        if target != id && known(target) {
             found.insert((target.to_string(), via));
         }
     };
@@ -480,6 +480,51 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
     let Some(doc) = documents.first().filter(|d| is_template(d)) else {
         return (Vec::new(), Vec::new());
     };
+    let text = String::from_utf8_lossy(src);
+    let lines: Vec<&str> = text.lines().collect();
+    let key_line = compose::KeyLines::new(&lines, "Resources", &key_lines);
+    let unit = Unit {
+        path,
+        doc,
+        spans: &spans,
+        defaults: &defaults,
+        key_line: &key_line,
+        block: vec![Step::Key("Resources".into())],
+        limit: NODES_MAX,
+        budget: ROOT_STORED_MAX,
+    };
+    nodes(&unit)
+}
+
+/// What the resources of one evaluation unit are read from: a template, or the `resources` section
+/// of a Serverless service (#654) rebuilt as one.
+pub(super) struct Unit<'a> {
+    pub path: &'a str,
+    /// The template's `Parameters` and `Resources`.
+    pub doc: &'a Value,
+    /// The first and last line of the scalars under each resource.
+    pub spans: &'a BTreeMap<String, (usize, usize)>,
+    /// The line of each parameter's default.
+    pub defaults: &'a BTreeMap<String, usize>,
+    pub key_line: &'a compose::KeyLines<'a>,
+    /// The key path of the `Resources` mapping in the file.
+    pub block: Vec<Step>,
+    /// How many resources become nodes at most.
+    pub limit: usize,
+    /// How many bytes of addresses and names the nodes and references may take.
+    pub budget: usize,
+}
+
+/// The nodes and references of the resources of `unit`.
+pub(super) fn nodes(unit: &Unit) -> (Vec<Node>, Vec<Reference>) {
+    let Unit {
+        path,
+        doc,
+        spans,
+        defaults,
+        key_line,
+        ..
+    } = *unit;
     let mut params = BTreeMap::new();
     if let Some(Value::Object(declared)) = doc.get("Parameters") {
         for (name, p) in declared {
@@ -499,12 +544,9 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
             );
         }
     }
-    let text = String::from_utf8_lossy(src);
-    let lines: Vec<&str> = text.lines().collect();
-    let key_line = compose::KeyLines::new(&lines, "Resources", &key_lines);
     let mut resources = BTreeMap::new();
     if let Some(Value::Object(declared)) = doc.get("Resources") {
-        for (id, r) in declared.iter().take(NODES_MAX) {
+        for (id, r) in declared.iter().take(unit.limit) {
             let Value::Object(body) = r else { continue };
             // A type is `Provider::Service::Resource` or a custom `Custom::Name`; the `::` also
             // tells these rows from the Kubernetes kinds.
@@ -538,7 +580,7 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
     };
     let ids: Vec<String> = eval.resources.keys().cloned().collect();
     let (mut nodes, mut references) = (Vec::new(), Vec::new());
-    let mut room = ROOT_STORED_MAX;
+    let mut room = unit.budget;
     let mut take = |bytes: usize| match room.checked_sub(bytes) {
         Some(r) => {
             room = r;
@@ -565,12 +607,16 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
             path: path.to_string(),
             line: r.line,
             end_line: r.end_line,
-            block: config_values::key_path(&[Step::Key("Resources".into()), Step::Key(id.clone())]),
+            block: config_values::key_path(
+                &[unit.block.clone(), vec![Step::Key(id.clone())]].concat(),
+            ),
             image: None,
             build: None,
             role: None,
+            handler: None,
+            events: Vec::new(),
         });
-        let targets = referenced(&id, &r.body, &eval.resources);
+        let targets = referenced(&id, &r.body, |t| eval.resources.contains_key(t));
         for (target, via) in targets.into_iter().take(REFERENCES_MAX) {
             if !take(id.len() + target.len() + via.len()) {
                 break;

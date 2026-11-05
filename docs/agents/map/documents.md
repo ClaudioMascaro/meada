@@ -232,6 +232,18 @@ this file, and a change to these modules updates it.
   (`iac::template_changed`, `iac::refresh_template`) as the closure reading its config file runs,
   and `iac::Owner` keeps each refresh to its own rows: Terraform and Compose by file name,
   Kubernetes by a type with no `::`, CloudFormation by one with it.
+- `iac/serverless.rs` (#654, ADR 0025): Serverless Framework services as IaC nodes, one unit per
+  `serverless.{yml,yaml,json}` (root: its path). `wanted`, `is_file` and `is_service` decide,
+  `evaluate(path, bytes)` reads it with `document::events::read_keyed`, expands the file's
+  variables (`Vars`: `self:` by path, an `opt:` default as `Seg::Opt`, any other source
+  `Seg::Unknown`), records each function as an `iac::Node` with `handler` and `events`
+  (`event_text`), takes the references of its body with `cloudformation::referenced`, and hands
+  `resources.Resources`, expanded by `substitute` into a template with synthetic `opt:N`
+  parameters, to `cloudformation::nodes` (`Unit`: the path, the document, the spans, the key
+  lines, the block prefix, the node and byte room left). `iac::template_wanted` and
+  `iac::template_evaluate` pick between a template and a service by file name, so
+  `iac::template_changed` and `iac::refresh_template` serve both. `iac::context` prints
+  `handler:` and `event:`.
 - `shape.rs` (in `meada-core`, reached as `crate::shape`; spec #21, ADR 0009): `Shape {source, fields, open, scalars, declared, optional,
   imports, guessed}`, the one form of what a
   contract carries, whatever it is read from, so shape drift (spec #23) compares shapes without

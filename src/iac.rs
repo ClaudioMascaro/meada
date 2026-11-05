@@ -54,6 +54,7 @@ use meada_core::trace::{Chain, Row};
 pub(crate) mod cloudformation;
 mod compose;
 mod functions;
+pub(crate) mod serverless;
 
 /// The instances one `count` or `for_each` gives; past it the block is one node with no key.
 // ponytail: a fleet of a few hundred instances is real; past a thousand the keys come from data.
@@ -112,10 +113,11 @@ pub(crate) fn is_source(path: &str) -> bool {
     path.ends_with(".tf") || path.ends_with(".tofu") || compose::is_file(path)
 }
 
-/// A text a node records (a Compose service's image or build context) after its variables were
-/// expanded: `${VAR:-default}` is the default, with `overridable` set, and a variable with no
-/// default stays in the text as `${VAR}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A text a node records (a Compose service's image or build context, a Serverless function's
+/// handler or event) after its variables were expanded: a default (Compose's `${VAR:-default}`,
+/// Serverless's `${opt:x, 'default'}`) is in the text, with `overridable` set, and a variable
+/// nothing resolves stays in the text as `${VAR}`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Resolved {
     pub text: String,
     pub overridable: bool,
@@ -174,6 +176,10 @@ pub(crate) struct Node {
     /// What a Kubernetes object is to Crossplane (#655): `crossplane claim`, `crossplane
     /// composition` and the like; `None` for any other node.
     pub role: Option<String>,
+    /// The handler of a Serverless function (#654).
+    pub handler: Option<Resolved>,
+    /// The events of a Serverless function, in file order.
+    pub events: Vec<Resolved>,
 }
 
 /// A root module's variable a name went through: by its default, or by the value a var file
@@ -1040,6 +1046,8 @@ impl<'m> Eval<'m> {
                     image: None,
                     build: None,
                     role: None,
+                    handler: None,
+                    events: Vec::new(),
                 });
                 let local = (block.source.as_deref())
                     .and_then(|s| local_source(dir, s))
@@ -1583,8 +1591,8 @@ impl Repository {
 #[cfg(test)]
 pub(crate) fn evaluate(files: &[(String, Vec<u8>)]) -> (Vec<Node>, Vec<Reference>) {
     let (mut nodes, mut references) = Repository::read(files).evaluate(|_| true, STORED_MAX);
-    for (path, src) in files.iter().filter(|(p, s)| cloudformation::wanted(p, s)) {
-        let (n, r) = cloudformation::evaluate(path, src);
+    for (path, src) in files.iter().filter(|(p, s)| template_wanted(p, s)) {
+        let (n, r) = template_evaluate(path, src);
         nodes.extend(n);
         references.extend(r);
     }
@@ -1700,13 +1708,28 @@ pub(crate) fn forget(tx: &Transaction, root: Option<&str>, owner: Owner) -> Resu
     Ok(())
 }
 
+/// Whether the file `path` with bytes `src` holds a template unit: a CloudFormation or SAM
+/// template, or a Serverless service (#654), whose `resources` section is one.
+fn template_wanted(path: &str, src: &[u8]) -> bool {
+    cloudformation::wanted(path, src) || serverless::wanted(path, src)
+}
+
+/// The nodes and references of a template unit: a Serverless service by its file name, else a
+/// template. A service file that is none yields nothing.
+pub(crate) fn template_evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
+    match serverless::is_file(path) {
+        true => serverless::evaluate(path, src),
+        false => cloudformation::evaluate(path, src),
+    }
+}
+
 /// Whether a refresh that read the file `path` again (`src`) or lost it (`None`) changes the
 /// CloudFormation nodes: it says it is a template, or it held nodes.
 pub(crate) fn template_changed(tx: &Transaction, path: &str, src: Option<&[u8]>) -> Result<bool> {
     if !cloudformation::is_source(path) {
         return Ok(false);
     }
-    if src.is_some_and(|src| cloudformation::wanted(path, src)) {
+    if src.is_some_and(|src| template_wanted(path, src)) {
         return Ok(true);
     }
     let held = format!(
@@ -1721,9 +1744,9 @@ pub(crate) fn template_changed(tx: &Transaction, path: &str, src: Option<&[u8]>)
 pub(crate) fn refresh_template(tx: &Transaction, path: &str, src: Option<&[u8]>) -> Result<()> {
     forget(tx, Some(path), Owner::CloudFormation)?;
     // ponytail: a file past `MAX_BYTES` is no template, as config values count it unreadable.
-    let readable = |s: &&[u8]| s.len() <= MAX_BYTES && cloudformation::wanted(path, s);
+    let readable = |s: &&[u8]| s.len() <= MAX_BYTES && template_wanted(path, s);
     if let Some(src) = src.filter(readable) {
-        let (nodes, references) = cloudformation::evaluate(path, src);
+        let (nodes, references) = template_evaluate(path, src);
         insert(tx, &nodes, &references)?;
     }
     Ok(())
@@ -1732,11 +1755,12 @@ pub(crate) fn refresh_template(tx: &Transaction, path: &str, src: Option<&[u8]>)
 /// Stores `nodes` and `references`.
 pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference]) -> Result<()> {
     let mut insert = tx
-        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)")?;
+        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)")?;
     for n in nodes {
         let (line, end) = (n.line as i64, n.end_line as i64);
         let overridable = serde_json::to_string(&n.overridable)?;
         let (image, build) = (n.image.as_ref(), n.build.as_ref());
+        let events = serde_json::to_string(&n.events)?;
         insert.execute(params![
             n.address,
             n.root,
@@ -1753,6 +1777,9 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
             build.map(|b| &b.text),
             build.map(|b| b.overridable),
             n.role,
+            n.handler.as_ref().map(|h| &h.text),
+            n.handler.as_ref().map(|h| h.overridable),
+            events,
         ])?;
     }
     let mut insert = tx.prepare_cached("INSERT INTO iac_references VALUES (?1, ?2, ?3, ?4)")?;
@@ -1764,7 +1791,8 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
 
 /// The columns of a node, in `row`'s order.
 const COLUMNS: &str = "address, root, type, name, pattern, overridable, path, line, end_line, \
-                       block, image, image_overridable, build, build_overridable, role";
+                       block, image, image_overridable, build, build_overridable, role, \
+                       handler, handler_overridable, events";
 
 /// The text at column `at` and its overridable flag at the next one, when there is a text.
 fn resolved(r: &rusqlite::Row, at: usize) -> rusqlite::Result<Option<Resolved>> {
@@ -1792,6 +1820,8 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Node> {
         image: resolved(r, 10)?,
         build: resolved(r, 12)?,
         role: r.get(14)?,
+        handler: resolved(r, 15)?,
+        events: serde_json::from_str(&r.get::<_, String>(17)?).unwrap_or_default(),
     })
 }
 
@@ -1918,7 +1948,7 @@ fn references(
     let mut statement = db.prepare(&sql)?;
     let mut found: Vec<(Node, Option<String>)> = statement
         .query_map(params![node.root, node.address], |r| {
-            Ok((row(r)?, r.get(15)?))
+            Ok((row(r)?, r.get(18)?))
         })?
         .collect::<rusqlite::Result<_>>()?;
     found.sort_by(|(a, va), (b, vb)| {
@@ -1972,10 +2002,17 @@ pub(crate) fn context(repos: &[(&str, &Connection)], text: &str) -> Result<Optio
         format!("root: {}", n.root),
     ];
     lines.extend(n.role.as_ref().map(|r| format!("role: {r}")));
-    for (title, field) in [("image", &n.image), ("build", &n.build)] {
+    for (title, field) in [
+        ("image", &n.image),
+        ("build", &n.build),
+        ("handler", &n.handler),
+    ] {
         if let Some(f) = field {
             lines.push(format!("{title}: {}", resolved_shown(f)));
         }
+    }
+    for event in &n.events {
+        lines.push(format!("event: {}", resolved_shown(event)));
     }
     let overridable = (n.overridable.iter()).map(|o| {
         let from = if o.tfvars { "tfvars" } else { "default" };

@@ -636,3 +636,121 @@ fn a_template_past_the_size_ceiling_adds_no_node() {
             .contains("sam/template.yaml")
     );
 }
+
+/// Serverless Framework (#654): the fixture `serverless-nodes` holds two services and a
+/// `serverless.yml` that is none. Each function is a node `functions.<name>` with its handler and
+/// events, its name `<service>-<stage>-<function>` or its own, and the `resources` section is read
+/// as CloudFormation: `${self:...}` resolves, the default of `${opt:...}` resolves and is
+/// overridable, `${env:...}` and `${ssm:...}` are unresolved parts.
+#[test]
+fn serverless_functions_are_nodes_with_handler_events_and_resources_beside_them() {
+    let repo = fixture_repo("iac_sls", "serverless-nodes", ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let search = answers(
+        &[
+            "Serverless::Function",
+            "shop-dev",
+            "mailer",
+            "AWS::SQS::Queue",
+            "ignored",
+            "nothing-here",
+        ],
+        |q| engine.search(q, Some("iac"), None).unwrap(),
+    );
+    assert_golden("serverless-nodes.search.txt", &search);
+    let questions = [
+        "functions.createOrder",
+        "functions.processOrder",
+        "functions.audit",
+        "functions.send",
+        "OrdersQueue",
+        "OrdersTable",
+        "DeadLetter",
+        "Assets",
+        "Vault",
+    ];
+    let context = answers(&questions, |q| engine.context(q, None).unwrap());
+    assert_golden("serverless-nodes.context.txt", &context);
+    let down = |q: &str| engine.trace(Start::From(q), Direction::Down, None).unwrap();
+    let up = |q: &str| engine.trace(Start::From(q), Direction::Up, None).unwrap();
+    let trace = [
+        answers(&["functions.createOrder", "functions.processOrder"], down),
+        answers(&["OrdersQueue", "OrdersTable"], up),
+    ];
+    assert_golden("serverless-nodes.trace.txt", &trace.join("\n"));
+    // A `serverless.yml` with no `service` is no service.
+    let none = engine.search("ignored", Some("iac"), None).unwrap();
+    assert!(!none.contains("misc/"), "{none}");
+}
+
+/// A change to a service file changes its nodes at the next query, as a cold index gives them; a
+/// service that stops being one, and one that leaves, do the same, and a service no change
+/// reached keeps its stored rows (one rewritten by hand survives).
+#[test]
+fn a_changed_service_is_evaluated_again_alone() {
+    let repo = fixture_repo("iac_sls_edit", "serverless-nodes", ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let ask = |e: &Engine| {
+        let names = ["functions.createOrder", "functions.send", "OrdersQueue"];
+        answers(&names, |q| e.context(q, None).unwrap())
+    };
+    assert!(ask(&engine).contains("name: \"shop-dev-createOrder\""));
+    let db = rusqlite::Connection::open(repo.join(".meada/index.db")).unwrap();
+    db.execute(
+        "UPDATE iac_nodes SET type = 'Serverless::Kept' WHERE address = 'functions.send'",
+        [],
+    )
+    .unwrap();
+    let api = repo.join("api/serverless.yml");
+    let text = fs::read_to_string(&api).unwrap();
+    fs::write(&api, text.replace("opt:stage, 'dev'", "opt:stage, 'qa'")).unwrap();
+    let edited = ask(&engine);
+    assert!(edited.contains("name: \"shop-qa-createOrder\""), "{edited}");
+    assert!(edited.contains("shop-qa-orders"), "{edited}");
+    assert!(edited.contains("type: Serverless::Kept"), "{edited}");
+    fs::remove_dir_all(repo.join(".meada")).unwrap();
+    let cold = Engine::open(&repo).unwrap();
+    assert_eq!(
+        edited.replace("Serverless::Kept", "Serverless::Function"),
+        ask(&cold)
+    );
+    // The file stops being a service, then leaves.
+    fs::write(&api, text.replace("service: shop", "other: shop")).unwrap();
+    let stopped = cold.search("createOrder", Some("iac"), None).unwrap();
+    assert!(!stopped.contains("api/serverless.yml"), "{stopped}");
+    fs::write(&api, &text).unwrap();
+    assert!(
+        cold.search("createOrder", Some("iac"), None)
+            .unwrap()
+            .contains("api/serverless.yml")
+    );
+    fs::remove_file(&api).unwrap();
+    let gone = cold.search("createOrder", Some("iac"), None).unwrap();
+    assert!(!gone.contains("api/serverless.yml"), "{gone}");
+}
+
+/// A service file past the per-file size ceiling is no service: its nodes are not stored, and a
+/// small one in the same repository is.
+#[test]
+fn a_service_past_the_size_ceiling_adds_no_node() {
+    let repo = fixture_repo("iac_sls_big", "serverless-nodes", ORIGIN);
+    let padding = "#".repeat(2 << 20);
+    let big = format!(
+        "service: huge\nprovider:\n  name: aws\nfunctions:\n  giant:\n    handler: a.b\n{padding}\n"
+    );
+    fs::create_dir_all(repo.join("big")).unwrap();
+    fs::write(repo.join("big/serverless.yml"), big).unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    assert!(
+        engine
+            .search("giant", Some("iac"), None)
+            .unwrap()
+            .contains("no matches")
+    );
+    assert!(
+        engine
+            .search("createOrder", Some("iac"), None)
+            .unwrap()
+            .contains("api/serverless.yml")
+    );
+}

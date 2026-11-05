@@ -98,9 +98,9 @@ _Avoid_: glob, wildcard name, template
 **Overridable value**:
 A value a deployer can replace without editing the repository that a name went through: a
 Terraform root module's variable, by its default or by the value a `terraform.tfvars` or
-`*.auto.tfvars` file gives it (a CloudFormation or SAM parameter's default and a Compose
-`${VAR:-default}` are overridable too; later a Serverless default, a Helm value). `context` lists
-those of an IaC node's name under `overridable:`; a name that went
+`*.auto.tfvars` file gives it (a CloudFormation or SAM parameter's default, a Compose
+`${VAR:-default}` and the default of a Serverless `${opt:...}` are overridable too; later a Helm
+value). `context` lists those of an IaC node's name under `overridable:`; a name that went
 through one links `inferred`.
 _Avoid_: default (one kind of it), variable, input
 

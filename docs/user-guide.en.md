@@ -472,6 +472,25 @@ is an IaC node addressed by its logical id, its type (`AWS::SQS::Queue`,
 - **Queries**: as for Terraform nodes, `search` with `kind = "iac"`, `context` and `trace`.
 - **Not followed**: nested stacks, macros, conditions and mappings.
 
+### Serverless Framework
+
+A `serverless.yml`, `serverless.yaml` or `serverless.json` with a `service` is read as an
+evaluation unit, rooted at its path. Each function is an IaC node `functions.<name>` of type
+`Serverless::Function`.
+
+- **Function**: the physical name is the function's `name` or `<service>-<stage>-<function>` (the
+  stage is `provider.stage` or `dev`). `context` shows `handler:` and `event:` (`"http GET
+  /orders"`, `"sqs Queue.Arn"`, `"schedule rate(5 minutes)"`) and the references to the resources
+  its body names with `Ref`, `Fn::GetAtt` or `Fn::Sub`.
+- **Resources**: the `resources` section is read as CloudFormation (nodes at the logical id, as
+  above).
+- **Variables**: `${self:custom.stage}` resolves to the value at that path; the default of
+  `${opt:stage, 'dev'}` resolves, and `context` lists it under `overridable:` and marks it
+  `(overridable)`. `${env:...}`, `${ssm:...}`, `${sls:...}`, `${file(...)}` and the other sources
+  are unresolved parts: the name becomes a pattern (`pattern "*-dead"`).
+- **Queries**: as for Terraform nodes, `search` with `kind = "iac"`, `context` and `trace`.
+- **Not read**: `serverless.ts`, plugins and values from other files.
+
 ## 4. `meada.toml`: reference
 
 Each repository may have a `meada.toml` at its root, versioned in git, that says who it talks to.

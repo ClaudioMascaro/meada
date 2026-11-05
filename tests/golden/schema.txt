@@ -58,7 +58,8 @@ CREATE TABLE iac_nodes (
     address TEXT NOT NULL, root TEXT NOT NULL, type TEXT NOT NULL, name TEXT,
     pattern INTEGER NOT NULL, overridable TEXT NOT NULL, path TEXT NOT NULL,
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
-    image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT
+    image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
+    handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -3298,6 +3299,8 @@ Output {
             image: None,
             build: None,
             role: None,
+            handler: None,
+            events: [],
         },
         Node {
             address: "Deployment.apps/shop/dev-web",
@@ -3315,6 +3318,8 @@ Output {
             image: None,
             build: None,
             role: None,
+            handler: None,
+            events: [],
         },
         Node {
             address: "Service/shop/dev-web",
@@ -3332,6 +3337,8 @@ Output {
             image: None,
             build: None,
             role: None,
+            handler: None,
+            events: [],
         },
         Node {
             address: "ServiceAccount/shop/dev-runner",
@@ -3349,6 +3356,8 @@ Output {
             image: None,
             build: None,
             role: None,
+            handler: None,
+            events: [],
         },
     ],
     references: [
@@ -3416,6 +3425,8 @@ Output {
             role: Some(
                 "crossplane managed resource",
             ),
+            handler: None,
+            events: [],
         },
         Node {
             address: "CompositeResourceDefinition.apiextensions.crossplane.io/xqueues.acme.io",
@@ -3435,6 +3446,8 @@ Output {
             role: Some(
                 "crossplane composite resource definition",
             ),
+            handler: None,
+            events: [],
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws",
@@ -3454,6 +3467,8 @@ Output {
             role: Some(
                 "crossplane composition",
             ),
+            handler: None,
+            events: [],
         },
         Node {
             address: "Queue.acme.io/shop/orders",
@@ -3473,6 +3488,8 @@ Output {
             role: Some(
                 "crossplane claim",
             ),
+            handler: None,
+            events: [],
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws/queue",
@@ -3492,6 +3509,8 @@ Output {
             role: Some(
                 "crossplane composed resource",
             ),
+            handler: None,
+            events: [],
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws/topic",
@@ -3511,6 +3530,8 @@ Output {
             role: Some(
                 "crossplane composed resource",
             ),
+            handler: None,
+            events: [],
         },
     ],
     references: [
@@ -3577,6 +3598,8 @@ sample.cloudformation.yaml
             image: None,
             build: None,
             role: None,
+            handler: None,
+            events: [],
         },
         Node {
             address: "Worker",
@@ -3601,6 +3624,8 @@ sample.cloudformation.yaml
             image: None,
             build: None,
             role: None,
+            handler: None,
+            events: [],
         },
     ],
     [
@@ -3663,3 +3688,85 @@ cycle
 depth
 count
 size
+
+sample.serverless.yml
+(
+    [
+        Node {
+            address: "functions.hello",
+            root: "api/serverless.yml",
+            ty: "Serverless::Function",
+            name: Some(
+                "sample-dev-hello",
+            ),
+            pattern: false,
+            overridable: [
+                Overridable {
+                    path: "api/serverless.yml",
+                    line: 4,
+                    variable: "opt:stage, 'dev'",
+                    tfvars: false,
+                },
+            ],
+            path: "api/serverless.yml",
+            line: 6,
+            end_line: 13,
+            block: "functions.hello",
+            image: None,
+            build: None,
+            role: None,
+            handler: Some(
+                Resolved {
+                    text: "src/hello.handler",
+                    overridable: false,
+                },
+            ),
+            events: [
+                Resolved {
+                    text: "http GET /hello",
+                    overridable: false,
+                },
+                Resolved {
+                    text: "sqs Queue.Arn",
+                    overridable: false,
+                },
+            ],
+        },
+        Node {
+            address: "Queue",
+            root: "api/serverless.yml",
+            ty: "AWS::SQS::Queue",
+            name: Some(
+                "sample-dev-jobs",
+            ),
+            pattern: false,
+            overridable: [
+                Overridable {
+                    path: "api/serverless.yml",
+                    line: 19,
+                    variable: "opt:stage, 'dev'",
+                    tfvars: false,
+                },
+            ],
+            path: "api/serverless.yml",
+            line: 16,
+            end_line: 19,
+            block: "resources.Resources.Queue",
+            image: None,
+            build: None,
+            role: None,
+            handler: None,
+            events: [],
+        },
+    ],
+    [
+        Reference {
+            root: "api/serverless.yml",
+            source: "functions.hello",
+            target: "Queue",
+            via: Some(
+                "Fn::GetAtt.Arn",
+            ),
+        },
+    ],
+)

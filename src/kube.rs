@@ -710,6 +710,8 @@ impl<'m> Eval<'m> {
                 image: None,
                 build: None,
                 role: roles[kept - 1].map(|r| r.text().into()),
+                handler: None,
+                events: Vec::new(),
             });
         }
         let (objs, addresses, roles) = (&objs[..kept], &addresses[..kept], &roles[..kept]);
@@ -739,6 +741,8 @@ impl<'m> Eval<'m> {
                     image: None,
                     build: None,
                     role: Some(crossplane::Role::Composed.text().into()),
+                    handler: None,
+                    events: Vec::new(),
                 });
                 held.entry(i).or_default().push(composed.len());
                 composed.push((i, address, b));

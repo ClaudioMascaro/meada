@@ -569,6 +569,38 @@
   (the `ponytail:` in `index::refresh_keeping`), reading every YAML or JSON file that says
   `apiVersion`. The Kustomize `images` transformer matches the name before the tag, as written
   (a `newTag` such as `1.20` read by YAML as a number loses its zero).
+- `iac/serverless.rs` (#654, ADR 0025): a service reuses `NODES_MAX` (functions first, in name
+  order, then the resources of its `resources` section, together), `REFERENCES_MAX` (per node) and
+  `ROOT_STORED_MAX` (per file, the functions' names, handlers and events counting against it before
+  the resources) and adds `VARIABLE_DEPTH_MAX` (8 `self:` values or nested variables inside one
+  another, counted as the height of a value, 1 plus that of the tallest `self:` value it uses: a
+  value taller than that is unresolved, wherever it is met, and so is each value above it; each
+  value is expanded once and memoized, so a diamond or a wide fan-out costs one expansion per path,
+  and each value of a cycle is unresolved whole), `STACK_MAX` (64 `self:` values followed from one
+  another before the walk stops; a value met there is not expanded, and a value within
+  `VARIABLE_DEPTH_MAX` above it is memoized only for a reach at its depth or deeper, so it is
+  expanded again when met nearer the top, at most 65 times, and answers the same in any order),
+  `VARIABLE_BYTES_MAX` (the bytes one file's expansions may produce, `ROOT_STORED_MAX`; past it a
+  variable is unresolved, so which ones depends on the order of the file) and `EVENTS_MAX` (64
+  events recorded per function, the rest left out); a text past `cloudformation::PHYSICAL_NAME_MAX`
+  is unresolved, and its expansion stops there. A `resources` section given as a list (`- Resources:
+  ...`, often of `${file(...)}` parts) is not read: only the mapping `resources.Resources` gives
+  nodes. Only `serverless.yml`, `.yaml` and `.json` are read: `serverless.ts`, `serverless.js`,
+  `${file(...)}` values, `serverless.*.yml` variants, values from other files, `provider` defaults
+  (`environment`, `iam`), plugins and a `functions` list (the v1 form) are not, and a function given
+  by `${file(...)}` is a node with no handler or events. `--stage` is not modelled over a literal or
+  absent `provider.stage` (the name keeps `dev` or the literal, not overridable); only an `opt:` in
+  the file marks a value overridable, and an `opt:` whose fallback is anything but one text is
+  unresolved. Serverless's own logical ids for functions and its generated resources (roles, API
+  gateway, log groups) are not nodes, so a `Ref` of `HelloLambdaFunction` references nothing. A
+  string with an unresolved part that sits where the CloudFormation reader needs plain text (`Type`,
+  a `Ref` target, a `DependsOn`) makes that field unread. An event's `arn` that is an `Fn::Join` or
+  `Fn::ImportValue` is recorded as `*` and gives no reference, and a resource's node starts at the
+  nearest line above its first scalar that starts with its logical id (the key-line fallback), since
+  the event reader gives key lines two levels deep only. A reference to a resource the node ceiling
+  or the byte room left out is dropped, and an `opt:` default that only a handler or an event went
+  through marks that text `(overridable)` but is not listed under the node's `overridable:`, which
+  holds the name's.
 - `kube/crossplane.rs` (#655, ADR 0025): `COMPOSED_MAX` (64 resources created per composition,
   the first in the order written, each one reference of the composition beside
   `OBJECT_REFERENCES_MAX`; a definition lookup takes the first `OBJECT_REFERENCES_MAX` matches).
