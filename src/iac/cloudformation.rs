@@ -568,6 +568,7 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
             block: config_values::key_path(&[Step::Key("Resources".into()), Step::Key(id.clone())]),
             image: None,
             build: None,
+            role: None,
         });
         let targets = referenced(&id, &r.body, &eval.resources);
         for (target, via) in targets.into_iter().take(REFERENCES_MAX) {

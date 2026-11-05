@@ -1,0 +1,52 @@
+# A Crossplane XRD, a composition creating one resource whose name a patch sets and one with a
+# literal external name, a claim and a managed resource (#655).
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xqueues.acme.io
+spec:
+  group: acme.io
+  names:
+    kind: XQueue
+  claimNames:
+    kind: Queue
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xqueues.aws
+spec:
+  compositeTypeRef:
+    apiVersion: acme.io/v1
+    kind: XQueue
+  resources:
+    - name: queue
+      base:
+        apiVersion: sqs.aws.upbound.io/v1beta1
+        kind: Queue
+      patches:
+        - fromFieldPath: spec.name
+          toFieldPath: metadata.annotations[crossplane.io/external-name]
+    - name: topic
+      base:
+        apiVersion: sns.aws.upbound.io/v1beta1
+        kind: Topic
+        metadata:
+          annotations:
+            crossplane.io/external-name: orders-topic
+---
+apiVersion: acme.io/v1
+kind: Queue
+metadata:
+  name: orders
+  namespace: shop
+---
+apiVersion: s3.aws.upbound.io/v1beta1
+kind: Bucket
+metadata:
+  name: assets
+  annotations:
+    crossplane.io/external-name: acme-assets
+spec:
+  forProvider:
+    region: eu-west-1

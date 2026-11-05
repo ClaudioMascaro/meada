@@ -405,6 +405,35 @@ endereço `<Kind>[.<grupo>]/<namespace>/<nome>` (`Deployment.apps/shop/api`,
   com o que cada contêiner roda depois que o overlay aplicou as `images`.
 - **Não lidos**: patches, geradores, `commonLabels`, templates Helm e `kind: List`.
 
+### Crossplane
+
+Objetos Crossplane são objetos Kubernetes, lidos como acima, e cada um é reconhecido pelo que é
+para o Crossplane, que o `context` mostra em `role:`.
+
+- **Papéis**: um `CompositeResourceDefinition` (XRD) e uma `Composition` (as duas de escopo de
+  cluster, sem namespace), um claim ou um recurso composto (um objeto do kind de claim ou
+  composto que um XRD do repositório define) e um recurso gerenciado (um objeto com um mapa
+  `spec.forProvider`).
+- **Recursos criados**: cada recurso que uma composition cria a partir de uma `base` literal (em
+  `spec.resources`, ou no `input.resources` de um passo de pipeline que roda a função
+  patch-and-transform) é um nó sob a composition, `<composition>/<nome do recurso>`
+  (`Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/instance`), do kind da
+  base. O nome dele é a anotação `crossplane.io/external-name` da base ou o `metadata.name`
+  como foi escrito; o nome de um recurso gerenciado também é o external name.
+- **Referências**: um claim para o XRD do kind composto dele (`via composite
+  XPostgreSQLInstance.database.acme.io`), um recurso composto para o XRD dele, um claim ou
+  recurso composto para a composition que o `compositionRef` nomeia, um XRD para o
+  `defaultCompositionRef` e o `enforcedCompositionRef`, uma composition para o XRD do
+  `compositeTypeRef` e para cada recurso que cria (`via resources`, `via pipeline <passo>`), e
+  um recurso criado ou gerenciado para a definição do kind dele (um XRD ou um
+  `CustomResourceDefinition`) quando há uma. Tudo numa unidade, como toda referência
+  Kubernetes: um claim numa pasta diferente da do XRD mantém o papel e não referencia nada.
+  Assim o `trace` a partir de um claim desce até o XRD, a composition padrão e os recursos que
+  ela cria.
+- **Não avaliados**: patches e funções. Um recurso cujo nome ou external name um patch (ou um
+  patch set) define, ou que não tem nenhum dos dois, tem o nome `*`, um padrão; um passo de
+  pipeline que roda qualquer outra função (Go templating, KCL) não cria nó.
+
 ### Compose
 
 Um arquivo Compose (`compose.yaml`, `compose.yml`, `docker-compose.yaml` ou

@@ -407,6 +407,34 @@ too, addressed `<Kind>[.<group>]/<namespace>/<name>` (`Deployment.apps/shop/api`
   overlay applied its `images`.
 - **Not read**: patches, generators, `commonLabels`, Helm templates and `kind: List`.
 
+### Crossplane
+
+Crossplane objects are Kubernetes objects, read as above, and each is recognized by what it is
+to Crossplane, which `context` shows as `role:`.
+
+- **Roles**: a `CompositeResourceDefinition` (XRD) and a `Composition` (both cluster-scoped, so
+  with no namespace), a claim or a composite resource (an object of the claim or composite kind
+  an XRD of the repository defines) and a managed resource (an object with a `spec.forProvider`
+  mapping).
+- **Created resources**: each resource a composition creates from a literal `base` (in
+  `spec.resources`, or in the `input.resources` of a pipeline step that runs function
+  patch-and-transform) is a node under the composition, `<composition>/<resource name>`
+  (`Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/instance`), of the base's
+  kind. Its name is the base's `crossplane.io/external-name` annotation or its `metadata.name`
+  as written; a managed resource's name is its external name too.
+- **References**: a claim to the XRD of its composite kind (`via composite
+  XPostgreSQLInstance.database.acme.io`), a composite resource to its XRD, a claim or composite
+  resource to the composition its `compositionRef` names, an XRD to its
+  `defaultCompositionRef` and `enforcedCompositionRef`, a composition to the XRD of its
+  `compositeTypeRef` and to each resource it creates (`via resources`, `via pipeline <step>`),
+  and a created or managed resource to the definition of its kind (an XRD or a
+  `CustomResourceDefinition`) when there is one. All in one unit, as every Kubernetes reference:
+  a claim in another directory than its XRD keeps its role and references nothing. So `trace`
+  from a claim walks down to its XRD, the default composition and the resources it creates.
+- **Not evaluated**: patches and functions. A resource whose name or external name a patch (or
+  a patch set) sets, or that has neither, has the name `*`, a pattern; a pipeline step that runs
+  any other function (Go templating, KCL) creates no node.
+
 ### Compose
 
 A Compose file (`compose.yaml`, `compose.yml`, `docker-compose.yaml` or `docker-compose.yml`)

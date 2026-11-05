@@ -94,6 +94,21 @@ All notable changes to Meada are recorded here. The format follows
   account, an Ingress to its backend Services, in one namespace and one unit. `search` with the
   kind `iac`, `context` (with the images of a workload) and `trace` answer for them as for
   Terraform's nodes. The index schema changes, so existing indexes are rebuilt (#651).
+- Crossplane compositions, claims and managed resources (ADR 0025): among the Kubernetes nodes,
+  `context` names what each object is to Crossplane on a new `role:` line (a composite resource
+  definition, a composition, a claim or a composite resource of a kind an XRD of the repository
+  defines, a managed resource with `spec.forProvider`, a composed resource), and Crossplane's own
+  kinds have no namespace. Each resource a composition creates from a literal `base`
+  (`spec.resources`, or a function patch-and-transform pipeline step) is a node
+  `<composition>/<resource>` of the base's kind, named by its `crossplane.io/external-name`
+  annotation or `metadata.name`; a managed resource is named by its external name. References,
+  in one unit: a claim to the XRD of its composite kind, a composite resource to its XRD, a
+  `compositionRef` to its composition, an XRD to its default and enforced composition, a
+  composition to the XRD it composes and to each resource it creates, and a created or managed
+  resource to the XRD or `CustomResourceDefinition` of its kind. Patches and functions are not
+  evaluated: a name a patch sets, or a base with no name, is the pattern `*`, and a step running
+  any other function creates no node. The index schema changes, so existing indexes are rebuilt;
+  release level minor (#655).
 - Static evaluation of Terraform names (ADR 0025): an IaC node's physical name (its `name` argument)
   and each `count` and `for_each` are evaluated with `hcl-rs`'s evaluator and Meada's pure functions
   (string, collection and conversion functions and `jsonencode`), from variable defaults, the root's

@@ -245,7 +245,7 @@ symbol, its name as `<path>::<name>` (or its identity when another repository ha
 each followed by the shape the side carries and, for a route's consumers, its drift.
 
 **An IaC node.** Its head (the node and the lines of its block), its `type:`, `name:` and
-`root:` lines (and `image:` and `build:` for a Compose service), then `overridable:` (the values a deployer can override that its name went
+`root:` lines (then `role:` for a Crossplane object, #655, and `image:` and `build:` for a Compose service), then `overridable:` (the values a deployer can override that its name went
 through), `references:` (the nodes it references), `referenced by:` (those that reference it),
 `images:` (a Kubernetes workload's images once its overlay's `images` applied; absent for any
 other node) and `values:` (the config values of its block), each followed by its lines or
@@ -300,6 +300,7 @@ words:
 | iac type | `type: <iac-type>` | The IaC node's type. |
 | iac name | `name: <physical-name>` | The IaC node's physical name. |
 | iac root | `root: <iac-root>` | The IaC node's root module. |
+| iac role | `role: <text>` | What a Kubernetes object is to Crossplane: `crossplane composite resource definition`, `crossplane composition`, `crossplane claim`, `crossplane composite resource`, `crossplane managed resource` or `crossplane composed resource`. |
 | iac image | `image: <text><iac-mark?>` | A Compose service's image, quoted as JSON. |
 | iac build | `build: <text><iac-mark?>` | A Compose service's build context, a path inside the repository, quoted as JSON. |
 | iac section | `<iac-section>:<none?>` | The lines that follow belong to the section, or ` none` when it has none. |
@@ -326,7 +327,7 @@ words:
 | `<variable>` | `var.<word>` | A root module's variable. |
 | `<overridable-from>` | `default` | Its value is its default, at the variable's block (a CloudFormation `Parameters.<name>`, at its `Default`). |
 | `<overridable-from>` | `tfvars` | Its value comes from a var file (`terraform.tfvars`, `*.auto.tfvars`), at the value's line. |
-| `<via>` | ` via <text>` | What the reference went through: a variable, local or module output (`var.queue_arn`, `local.topic`, `module.orders.queue_arn`), or for a Kubernetes object how it names the other (`selector app=api`, `env DATABASE_URL`, `envFrom`, `volume settings`, `serviceAccountName`, `backend shop.example.com/api`, `defaultBackend`), or for a CloudFormation or SAM resource the intrinsic that names the other (`Ref`, `Fn::GetAtt.Arn`, `Fn::Sub`, `DependsOn`). |
+| `<via>` | ` via <text>` | What the reference went through: a variable, local or module output (`var.queue_arn`, `local.topic`, `module.orders.queue_arn`), or for a Kubernetes object how it names the other (`selector app=api`, `env DATABASE_URL`, `envFrom`, `volume settings`, `serviceAccountName`, `backend shop.example.com/api`, `defaultBackend`), or for a Crossplane object how it names the other (`composite <Kind>.<group>`, `kind <Kind>.<group>`, `compositionRef`, `defaultCompositionRef`, `enforcedCompositionRef`, `compositeTypeRef <Kind>.<group>`, `resources`, `pipeline <step>`), or for a CloudFormation or SAM resource the intrinsic that names the other (`Ref`, `Fn::GetAtt.Arn`, `Fn::Sub`, `DependsOn`). |
 | `<iac-mark>` | ` (overridable)` | A default (`${VAR:-default}`) gave the text. |
 | `<iac-mark>` | ` (unresolved)` | A variable with no default is still in the text, as `${VAR}`. |
 | `<iac-pass>` | `<address> (root <iac-root>)` | The node in its root module. |

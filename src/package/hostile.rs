@@ -1055,6 +1055,39 @@ fn probes() -> Vec<Probe> {
                 .collect();
             objects(files.iter().map(|(p, t)| (p.as_str(), t.clone())).collect())
         }),
+        // Crossplane (#655): compositions, their patch sets, and the kinds XRDs define
+        ("crossplane: resources naming many patch sets", || {
+            let sets = fill(2, |i| {
+                format!(
+                    "    - name: p{i}\n      patches:\n        - fromFieldPath: a\n          \
+                     toFieldPath: metadata.name\n"
+                )
+            });
+            let resources = fill(2, |i| {
+                format!(
+                    "    - name: r{i}\n      base: {{apiVersion: s3.aws.upbound.io/v1, kind: B}}\n      \
+                     patches:\n        - {{type: PatchSet, patchSetName: p{i}}}\n"
+                )
+            });
+            let text = format!(
+                "apiVersion: apiextensions.crossplane.io/v1\nkind: Composition\nmetadata:\n  name: c\n\
+                 spec:\n  patchSets:\n{sets}  resources:\n{resources}"
+            );
+            objects(vec![("c.yaml", text)])
+        }),
+        ("crossplane: claims of a kind many XRDs define", || {
+            let pair = |i: usize| {
+                format!(
+                    "---\napiVersion: apiextensions.crossplane.io/v1\nkind: CompositeResourceDefinition\n\
+                     metadata:\n  name: x{i}\nspec:\n  group: acme.io\n  names: {{kind: X}}\n  \
+                     claimNames: {{kind: C}}\n---\napiVersion: acme.io/v1\nkind: C\nmetadata:\n  name: c{i}\n"
+                )
+            };
+            let files: Vec<(String, String)> = (0..9)
+                .map(|n| (format!("f{n}.yaml"), count(450, |i| pair(n * 450 + i))))
+                .collect();
+            objects(files.iter().map(|(p, t)| (p.as_str(), t.clone())).collect())
+        }),
         // .NET: `appsettings.json`
         ("appsettings: many keys", || {
             let keys = fill(1, |i| format!("\"Key{i}\": {{\"A\": \"v{i}\"}}, // c\n"));

@@ -275,6 +275,44 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   the root itself); an absolute path, a URL, a path that climbs out of the root or one with an
   unresolved part is not recorded. No file is touched, so no symlink is followed.
 
+### Crossplane objects (#655)
+
+- **Recognition.** Crossplane objects are Kubernetes objects, read and addressed by #651's
+  rules, and each node records what it is to Crossplane, its role: a `CompositeResourceDefinition`
+  (XRD) or a `Composition` of `apiextensions.crossplane.io`; a claim or a composite resource, an
+  object whose group and kind are the claim or composite kind an XRD anywhere in the repository
+  defines; a managed resource, any other object holding a `spec.forProvider` mapping (every
+  provider's managed resources have one, whatever their group); and a composed resource (below).
+  Every kind of `apiextensions.crossplane.io`, `ops.crossplane.io` and `pkg.crossplane.io` is
+  cluster-scoped: no namespace in its address, and no Kustomize `namespace` sets one.
+- **Composed resources.** Each resource a composition creates from a literal `base`, in
+  `spec.resources` or in the `input.resources` of a pipeline step whose input is function
+  patch-and-transform's (`pt.fn.crossplane.io`), is a node under the composition,
+  `<composition address>/<resource name>` (its index when it has no name), typed by the base's
+  kind, its span and block those of the resource. Its physical name is the base's
+  `crossplane.io/external-name` annotation, else its `metadata.name`, as written; a managed
+  resource's is its external name too, since that is its name in the provider's API.
+- **Never evaluated.** Patches, patch sets, transforms and composition functions. A resource
+  whose name or external name a patch writes (directly or through a patch set, a patch from a
+  field path with no `toFieldPath` writing the path it reads; a patch that writes the composite
+  or the environment does not count), or that has neither, has the name
+  `*`, a pattern (Crossplane generates or patches it at run time). A pipeline step that runs any
+  other function creates no node: its input is a template or a program.
+- **References.** Within one evaluation unit, as every Kubernetes reference, all `exact`: a
+  claim to the XRD of its composite kind (`composite <Kind>.<group>`), a composite resource to
+  its XRD (`kind ...`), a claim or composite resource to the composition its `compositionRef`
+  names, an XRD to its `defaultCompositionRef` and `enforcedCompositionRef`, a composition to the
+  XRD of its `compositeTypeRef` (`compositeTypeRef ...`) and to each resource it creates
+  (`resources`, `pipeline <step>`), and a composed or managed resource to the definition of its
+  kind in the unit, an XRD (a nested composite) or a `CustomResourceDefinition` (`kind ...`). A
+  kind is a node only through its definition, so a managed resource kind whose provider CRD the
+  repository does not hold is reached by nothing; the composed resource still carries it as its
+  type. The chain from a claim to its composite and to what its composition creates is the walk
+  claim, XRD, default composition (or the claim's `compositionRef`), composed resources.
+- **Storage.** The role is a column of `iac_nodes` (NULL for any other node), shown by `context`
+  as `role:`; the composed resources are rows of `iac_nodes` and `iac_references` like any
+  object's.
+
 ### CloudFormation and SAM nodes (#653)
 
 - **Unit.** A YAML or JSON file that says `AWSTemplateFormatVersion` or the SAM transform

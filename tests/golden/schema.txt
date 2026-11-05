@@ -58,7 +58,7 @@ CREATE TABLE iac_nodes (
     address TEXT NOT NULL, root TEXT NOT NULL, type TEXT NOT NULL, name TEXT,
     pattern INTEGER NOT NULL, overridable TEXT NOT NULL, path TEXT NOT NULL,
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
-    image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER
+    image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -3297,6 +3297,7 @@ Output {
             block: "[2]",
             image: None,
             build: None,
+            role: None,
         },
         Node {
             address: "Deployment.apps/shop/dev-web",
@@ -3313,6 +3314,7 @@ Output {
             block: "[0]",
             image: None,
             build: None,
+            role: None,
         },
         Node {
             address: "Service/shop/dev-web",
@@ -3329,6 +3331,7 @@ Output {
             block: "[1]",
             image: None,
             build: None,
+            role: None,
         },
         Node {
             address: "ServiceAccount/shop/dev-runner",
@@ -3345,6 +3348,7 @@ Output {
             block: "[3]",
             image: None,
             build: None,
+            role: None,
         },
     ],
     references: [
@@ -3391,6 +3395,162 @@ Output {
     ],
 }
 
+sample.crossplane.yaml
+Output {
+    nodes: [
+        Node {
+            address: "Bucket.s3.aws.upbound.io/assets",
+            root: "xp",
+            ty: "Bucket",
+            name: Some(
+                "acme-assets",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "xp/sample.crossplane.yaml",
+            line: 44,
+            end_line: 52,
+            block: "[3]",
+            image: None,
+            build: None,
+            role: Some(
+                "crossplane managed resource",
+            ),
+        },
+        Node {
+            address: "CompositeResourceDefinition.apiextensions.crossplane.io/xqueues.acme.io",
+            root: "xp",
+            ty: "CompositeResourceDefinition",
+            name: Some(
+                "xqueues.acme.io",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "xp/sample.crossplane.yaml",
+            line: 3,
+            end_line: 12,
+            block: "[0]",
+            image: None,
+            build: None,
+            role: Some(
+                "crossplane composite resource definition",
+            ),
+        },
+        Node {
+            address: "Composition.apiextensions.crossplane.io/xqueues.aws",
+            root: "xp",
+            ty: "Composition",
+            name: Some(
+                "xqueues.aws",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "xp/sample.crossplane.yaml",
+            line: 14,
+            end_line: 36,
+            block: "[1]",
+            image: None,
+            build: None,
+            role: Some(
+                "crossplane composition",
+            ),
+        },
+        Node {
+            address: "Queue.acme.io/shop/orders",
+            root: "xp",
+            ty: "Queue",
+            name: Some(
+                "orders",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "xp/sample.crossplane.yaml",
+            line: 38,
+            end_line: 42,
+            block: "[2]",
+            image: None,
+            build: None,
+            role: Some(
+                "crossplane claim",
+            ),
+        },
+        Node {
+            address: "Composition.apiextensions.crossplane.io/xqueues.aws/queue",
+            root: "xp",
+            ty: "Queue",
+            name: Some(
+                "*",
+            ),
+            pattern: true,
+            overridable: [],
+            path: "xp/sample.crossplane.yaml",
+            line: 23,
+            end_line: 29,
+            block: "[1].spec.resources[0]",
+            image: None,
+            build: None,
+            role: Some(
+                "crossplane composed resource",
+            ),
+        },
+        Node {
+            address: "Composition.apiextensions.crossplane.io/xqueues.aws/topic",
+            root: "xp",
+            ty: "Topic",
+            name: Some(
+                "orders-topic",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "xp/sample.crossplane.yaml",
+            line: 30,
+            end_line: 36,
+            block: "[1].spec.resources[1]",
+            image: None,
+            build: None,
+            role: Some(
+                "crossplane composed resource",
+            ),
+        },
+    ],
+    references: [
+        Reference {
+            root: "xp",
+            source: "Composition.apiextensions.crossplane.io/xqueues.aws",
+            target: "CompositeResourceDefinition.apiextensions.crossplane.io/xqueues.acme.io",
+            via: Some(
+                "compositeTypeRef XQueue.acme.io",
+            ),
+        },
+        Reference {
+            root: "xp",
+            source: "Composition.apiextensions.crossplane.io/xqueues.aws",
+            target: "Composition.apiextensions.crossplane.io/xqueues.aws/queue",
+            via: Some(
+                "resources",
+            ),
+        },
+        Reference {
+            root: "xp",
+            source: "Composition.apiextensions.crossplane.io/xqueues.aws",
+            target: "Composition.apiextensions.crossplane.io/xqueues.aws/topic",
+            via: Some(
+                "resources",
+            ),
+        },
+        Reference {
+            root: "xp",
+            source: "Queue.acme.io/shop/orders",
+            target: "CompositeResourceDefinition.apiextensions.crossplane.io/xqueues.acme.io",
+            via: Some(
+                "composite XQueue.acme.io",
+            ),
+        },
+    ],
+    images: [],
+    unresolved: [],
+}
+
 sample.cloudformation.yaml
 (
     [
@@ -3416,6 +3576,7 @@ sample.cloudformation.yaml
             block: "Resources.Queue",
             image: None,
             build: None,
+            role: None,
         },
         Node {
             address: "Worker",
@@ -3439,6 +3600,7 @@ sample.cloudformation.yaml
             block: "Resources.Worker",
             image: None,
             build: None,
+            role: None,
         },
     ],
     [

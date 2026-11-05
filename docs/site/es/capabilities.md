@@ -269,6 +269,22 @@ Una carpeta con `kustomization.yaml` que ningún otro kustomization nombra como 
 
 Una referencia queda en un namespace y una unidad, y nombra el objeto como se escribió, antes del prefijo y del sufijo del overlay, que el overlay aplica después a los dos lados. Toda referencia es `exact`. `search` con kind `iac` y `context` responden por estos nodos como por los de Terraform, y `context` en una carga de trabajo añade `images:`, lo que cada contenedor ejecuta tras las `images` del overlay (`web: registry.example.com/shop/api:1.4.0`). Los patches, los generadores, `commonLabels`, las plantillas Helm y `kind: List` no se aplican ni se leen, y los objetos quedan fuera de `meada export`.
 
+### Crossplane
+
+Los objetos Crossplane son objetos Kubernetes, y `context` dice qué es cada uno para Crossplane en una línea `role:`: una definición de recurso compuesto (XRD), una composition (las dos sin namespace), un claim o un recurso compuesto (un objeto del kind de claim o compuesto que un XRD del repositorio define), un recurso gestionado (un objeto con `spec.forProvider`) o un recurso que crea una composition. Cada recurso que una composition crea a partir de una `base` literal, en `spec.resources` o en el `input.resources` de un paso de pipeline que ejecuta la función patch-and-transform, es un nodo `<composition>/<recurso>` del kind de la base, con el nombre de su anotación `crossplane.io/external-name` o de su `metadata.name`; el nombre de un recurso gestionado también es su external name.
+
+| Referencia | Guardada como |
+| --- | --- |
+| Un claim al XRD de su kind compuesto | `via composite XPostgreSQLInstance.database.acme.io` |
+| Un recurso compuesto a su XRD | `via kind XNetwork.network.acme.io` |
+| Un claim o recurso compuesto a la composition que nombra su `compositionRef` | `via compositionRef` |
+| Un XRD a su composition por defecto y a la impuesta | `via defaultCompositionRef`, `via enforcedCompositionRef` |
+| Una composition al XRD de su `compositeTypeRef` | `via compositeTypeRef XPostgreSQLInstance.database.acme.io` |
+| Una composition a cada recurso que crea | `via resources`, `via pipeline <paso>` |
+| Un recurso creado o gestionado a la definición de su kind (un XRD o un `CustomResourceDefinition`) | `via kind Bucket.s3.aws.upbound.io` |
+
+Toda referencia es `exact` y queda en una unidad, como las de Kubernetes: un claim en otra carpeta que su XRD conserva su papel y no referencia nada. `trace` desde un claim baja hasta su XRD, la composition y los recursos que crea. Los patches y las funciones no se evalúan: un nombre que un patch (o un patch set) define, o una base sin nombre, es el patrón `*`, y un paso que ejecuta cualquier otra función (Go templating, KCL) no crea nodo.
+
 ### Compose
 
 Un archivo Compose (`compose.yaml`, `compose.yml`, `docker-compose.yaml` o `docker-compose.yml`) con su archivo de override en la misma carpeta es una unidad de evaluación, con raíz en la carpeta. Cada servicio es un nodo IaC `services.<nombre>` de tipo `service`. `depends_on`, `links` y las redes compartidas (`networks:`; un servicio sin ninguna está en `default`) son referencias, con `via depends_on`, `via links` o `via networks.<nombre>`. `${VAR:-valor}` se resuelve a su valor por defecto y `context` lo marca `(overridable)`; `${VAR}` queda en el texto como parte sin resolver, marcada `(unresolved)`. `context` muestra `image:` y `build:` del servicio, guardados para el contrato de imagen; un contexto de build solo se guarda como ruta dentro del repositorio (una ruta absoluta, una URL, una que sale de la raíz o una con una parte sin resolver no).

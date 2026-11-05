@@ -13,6 +13,7 @@ mod cli;
 mod community_queries;
 mod config_values;
 mod conformance;
+mod crossplane;
 mod decide;
 mod decider;
 mod decisions;

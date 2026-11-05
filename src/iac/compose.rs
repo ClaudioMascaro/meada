@@ -511,6 +511,7 @@ pub(super) fn evaluate(
                 ]),
                 image: s.image.clone(),
                 build: s.build.clone(),
+                role: None,
             });
             let mut targets: BTreeSet<(String, String)> = BTreeSet::new();
             for (list, via) in [(&s.depends_on, "depends_on"), (&s.links, "links")] {

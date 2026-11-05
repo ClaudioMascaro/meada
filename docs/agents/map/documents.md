@@ -195,6 +195,19 @@ this file, and a change to these modules updates it.
   written. `store` rewrites `iac_images` and `iac_unresolved`, `images` feeds `iac::context`,
   `status` is the `Msg::KustomizeUnresolved` line, and `changed` tells `index::refresh` that a
   file read again or left holds, or held, objects.
+- `kube/crossplane.rs` (#655, ADR 0025): Crossplane among the Kubernetes nodes. `facts` reads
+  each object's `crossplane::Facts` into `Obj::facts.xp` (the kind an XRD or a
+  `CustomResourceDefinition` defines, an XRD's claim kind and default and enforced composition, a
+  composition's `compositeTypeRef` and `bases`, a claim's or composite's `compositionRef`,
+  `spec.forProvider`, the external name); `bases` reads `spec.resources` and the
+  `input.resources` of a `pt.fn.crossplane.io` pipeline step into `Base`s, a name a patch or a
+  patch set writes (`renamed`) left `None`, with the span `kube::read` gathers per resource
+  (`kube::resource`). `Kinds::of` gathers the claim and composite kinds of the repository's XRDs
+  (`kube::Eval::kinds`) and `Kinds::role` gives an object's `Role` (`Role::text` is the
+  `role:` line); `kube::Eval::unit` adds a node
+  `<composition>/<resource>` per base (`Role::Composed`, name `*` and `pattern` when it has no
+  literal one) and asks `Targets::of` and `Targets::of_base` for the references. `cluster_scoped`
+  keeps Crossplane's own groups out of any namespace (`kube::cluster_scoped`).
 - `iac/compose.rs` (#652, ADR 0025): Compose services as IaC nodes. `is_file` names the Compose and
   override files (`iac::is_source` includes them, so a changed one is an input of `refresh`);
   `Repository::read` keeps them apart and `Repository::evaluate` hands a root's directory to

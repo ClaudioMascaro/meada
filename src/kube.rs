@@ -26,10 +26,12 @@ use serde_json::Value;
 
 use crate::Result;
 use crate::config_values::{self, DOCUMENTS_MAX};
-use crate::document::events::{self, Syntax};
+use crate::document::events::{self, Step, Syntax};
 use crate::iac::{Node, Reference, joined};
 use crate::lang::MAX_BYTES;
 use crate::msg::Msg;
+
+mod crossplane;
 
 /// How deep kustomizations name each other as bases; a base deeper is not followed and is
 /// counted as unresolved.
@@ -93,6 +95,12 @@ const CLUSTER_SCOPED: &[&str] = &[
     "VolumeAttachment",
 ];
 
+/// Whether objects of `kind` in `group` live outside any namespace: a kind of the fixed list, or
+/// one of Crossplane's own (#655).
+fn cluster_scoped(kind: &str, group: &str) -> bool {
+    CLUSTER_SCOPED.contains(&kind) || crossplane::cluster_scoped(group)
+}
+
 /// The kinds a `namePrefix` and a `nameSuffix` leave alone, as Kustomize does.
 const UNPREFIXED: &[&str] = &["APIService", "CustomResourceDefinition", "Namespace"];
 
@@ -130,6 +138,8 @@ struct Facts {
     backends: Vec<(String, String)>,
     /// Its containers' images: container name and image.
     images: Vec<(String, String)>,
+    /// What it offers Crossplane's roles and references (#655).
+    xp: crossplane::Facts,
 }
 
 /// One Kubernetes object, as read and as a kustomization on the way changed it.
@@ -319,9 +329,18 @@ fn facts(value: &Value, kind: &str, group: &str) -> Facts {
     facts
 }
 
+/// The lines of a resource of a composition: its step in the pipeline, if any, and its index.
+type Span<'a> = &'a dyn Fn(Option<usize>, usize) -> Option<(usize, usize)>;
+
 /// The object a document is, or `None` when it is no object (a kustomization, a fragment with no
-/// name, a Helm template's placeholder).
-fn object(path: &str, line: usize, end_line: usize, block: &str, value: &Value) -> Option<Obj> {
+/// name, a Helm template's placeholder). `span` gives the lines of a composition's resources.
+fn object(
+    path: &str,
+    (line, end_line): (usize, usize),
+    block: &str,
+    value: &Value,
+    span: Span,
+) -> Option<Obj> {
     let api = text(value, &["apiVersion"])?;
     let kind = text(value, &["kind"])?;
     let name = text(value, &["metadata", "name"]).filter(|n| plain(n))?;
@@ -335,8 +354,10 @@ fn object(path: &str, line: usize, end_line: usize, block: &str, value: &Value) 
         ns => ns,
     };
     let ns = ns
-        .filter(|_| !CLUSTER_SCOPED.contains(&kind))
+        .filter(|_| !cluster_scoped(kind, group))
         .map(String::from);
+    let mut facts = facts(value, kind, group);
+    facts.xp = crossplane::facts(value, kind, group, block, span);
     Some(Obj {
         group: group.into(),
         kind: kind.into(),
@@ -347,7 +368,7 @@ fn object(path: &str, line: usize, end_line: usize, block: &str, value: &Value) 
         line,
         end_line,
         block: block.into(),
-        facts: facts(value, kind, group),
+        facts,
     })
 }
 
@@ -398,6 +419,25 @@ struct Parsed {
     kustomization: Option<Kustomization>,
 }
 
+/// The resource of a composition the key path `path` lies under: its step in the pipeline (in
+/// `spec.pipeline[j].input.resources[i]`), if any, and its index `i`.
+fn resource(path: &[Step]) -> Option<(Option<usize>, usize)> {
+    use Step::{Index, Key};
+    let key = |s: &Step, k: &str| matches!(s, Key(x) if x == k);
+    match path {
+        [spec, res, Index(i), ..] if key(spec, "spec") && key(res, "resources") => Some((None, *i)),
+        [spec, pipe, Index(j), input, res, Index(i), ..]
+            if key(spec, "spec")
+                && key(pipe, "pipeline")
+                && key(input, "input")
+                && key(res, "resources") =>
+        {
+            Some((Some(*j), *i))
+        }
+        _ => None,
+    }
+}
+
 /// Reads the file at `path`. A file that does not parse, holds more than `DOCUMENTS_MAX`
 /// documents or is no UTF-8 holds nothing (config values count it unreadable); an empty `src` is
 /// a file that exists and holds nothing.
@@ -406,15 +446,23 @@ fn read(path: &str, src: &[u8]) -> Parsed {
     if src.is_empty() || std::str::from_utf8(src).is_err() {
         return parsed;
     }
-    // The first and last line of each document's scalars.
+    // The first and last line of each document's scalars, and of each resource a composition of
+    // the document may create (#655): its document, its step in the pipeline and its index.
     let mut spans: Vec<(usize, usize)> = Vec::new();
+    let mut resources: HashMap<(usize, Option<usize>, usize), (usize, usize)> = HashMap::new();
+    let widen = |span: &mut (usize, usize), line: usize| {
+        (span.0, span.1) = (span.0.min(line), span.1.max(line));
+    };
     let Ok(documents) = events::read(Syntax::of(path), src, |s| {
         if s.document < DOCUMENTS_MAX {
             if spans.len() <= s.document {
                 spans.resize(s.document + 1, (s.line, s.line));
             }
-            let span = &mut spans[s.document];
-            (span.0, span.1) = (span.0.min(s.line), span.1.max(s.line));
+            widen(&mut spans[s.document], s.line);
+            if let Some((step, i)) = resource(s.path) {
+                let span = resources.entry((s.document, step, i));
+                widen(span.or_insert((s.line, s.line)), s.line);
+            }
         }
     }) else {
         return parsed;
@@ -428,15 +476,16 @@ fn read(path: &str, src: &[u8]) -> Parsed {
     }
     let many = documents.len() > 1;
     for (n, value) in documents.iter().enumerate() {
-        let (line, end) = spans.get(n).copied().unwrap_or((1, 1));
+        let lines = spans.get(n).copied().unwrap_or((1, 1));
         let block = if many {
             format!("[{n}]")
         } else {
             String::new()
         };
+        let span = |step: Option<usize>, i: usize| resources.get(&(n, step, i)).copied();
         parsed
             .objects
-            .extend(object(path, line, end, &block, value));
+            .extend(object(path, lines, &block, value, &span));
     }
     parsed
 }
@@ -517,6 +566,8 @@ struct Eval<'m> {
     reached: HashSet<&'m str>,
     root_left: usize,
     left: usize,
+    /// The composite and claim kinds the repository's XRDs define (#655).
+    kinds: crossplane::Kinds,
     out: Output,
 }
 
@@ -613,7 +664,7 @@ impl<'m> Eval<'m> {
                 o.name = format!("{}{}{}", k.prefix, o.name, k.suffix);
             }
             if let Some(ns) = &k.namespace
-                && !CLUSTER_SCOPED.contains(&o.kind.as_str())
+                && !cluster_scoped(&o.kind, &o.group)
             {
                 o.ns = Some(ns.clone());
             }
@@ -630,6 +681,8 @@ impl<'m> Eval<'m> {
         objs.sort_by_cached_key(Obj::address);
         objs.dedup_by_key(|o| o.address());
         let addresses: Vec<String> = objs.iter().map(Obj::address).collect();
+        let roles: Vec<Option<crossplane::Role>> =
+            objs.iter().map(|o| self.kinds.role(o)).collect();
         let mut kept = 0;
         for (o, address) in objs.iter().zip(&addresses) {
             if !self.charge(address.len() + o.path.len()) {
@@ -640,7 +693,14 @@ impl<'m> Eval<'m> {
                 address: address.clone(),
                 root: self.root.clone(),
                 ty: o.kind.clone(),
-                name: Some(o.name.clone()),
+                // A managed resource's name in the provider's API is its external name.
+                name: Some(
+                    o.facts
+                        .xp
+                        .external
+                        .clone()
+                        .unwrap_or_else(|| o.name.clone()),
+                ),
                 pattern: false,
                 overridable: Vec::new(),
                 path: o.path.clone(),
@@ -649,9 +709,42 @@ impl<'m> Eval<'m> {
                 block: o.block.clone(),
                 image: None,
                 build: None,
+                role: roles[kept - 1].map(|r| r.text().into()),
             });
         }
-        let (objs, addresses) = (&objs[..kept], &addresses[..kept]);
+        let (objs, addresses, roles) = (&objs[..kept], &addresses[..kept], &roles[..kept]);
+        // The resources each composition creates, under its address: its index, the address, and
+        // the resource.
+        let mut composed: Vec<(usize, String, &crossplane::Base)> = Vec::new();
+        // The entries of `composed` each composition holds, by its index.
+        let mut held: HashMap<usize, Vec<usize>> = HashMap::new();
+        let mut seen: HashSet<String> = HashSet::new();
+        for (i, o) in objs.iter().enumerate() {
+            for b in &o.facts.xp.bases {
+                let address = format!("{}/{}", addresses[i], b.resource);
+                if !seen.insert(address.clone()) || !self.charge(address.len() + o.path.len()) {
+                    continue;
+                }
+                self.out.nodes.push(Node {
+                    address: address.clone(),
+                    root: self.root.clone(),
+                    ty: b.kind.1.clone(),
+                    name: Some(b.name.clone().unwrap_or_else(|| "*".into())),
+                    pattern: b.name.is_none(),
+                    overridable: Vec::new(),
+                    path: o.path.clone(),
+                    line: b.line,
+                    end_line: b.end_line,
+                    block: b.block.clone(),
+                    image: None,
+                    build: None,
+                    role: Some(crossplane::Role::Composed.text().into()),
+                });
+                held.entry(i).or_default().push(composed.len());
+                composed.push((i, address, b));
+            }
+        }
+        let crossplane = crossplane::Targets::new(objs);
         // What a reference names: kind, name as written, namespace.
         let mut named: HashMap<(&str, &str, Option<&str>), Vec<usize>> = HashMap::new();
         // The pod template owners that carry a label, by namespace.
@@ -716,10 +809,21 @@ impl<'m> Eval<'m> {
                     targets.insert((&addresses[j], via.clone()));
                 }
             }
+            let mut found = BTreeSet::new();
+            crossplane.of(o, roles[i], &mut found);
+            for (j, via) in found {
+                targets.insert((&addresses[j], via));
+            }
+            // Each resource a composition creates is one reference past the ceiling's.
+            let own = held.get(&i).map_or(&[][..], Vec::as_slice);
+            for &c in own {
+                let (_, address, b) = &composed[c];
+                targets.insert((address, b.via.clone()));
+            }
             for (target, via) in targets
                 .into_iter()
                 .filter(|(t, _)| *t != addresses[i])
-                .take(OBJECT_REFERENCES_MAX)
+                .take(OBJECT_REFERENCES_MAX + own.len())
             {
                 let size = addresses[i].len() + target.len() + via.len();
                 if !self.charge(size) {
@@ -741,6 +845,23 @@ impl<'m> Eval<'m> {
                     address: addresses[i].clone(),
                     container: container.clone(),
                     image: image.clone(),
+                });
+            }
+        }
+        for (_, address, b) in &composed {
+            for (j, via) in crossplane
+                .of_base(b)
+                .into_iter()
+                .take(OBJECT_REFERENCES_MAX)
+            {
+                if !self.charge(address.len() + addresses[j].len() + via.len()) {
+                    return;
+                }
+                self.out.references.push(Reference {
+                    root: self.root.clone(),
+                    source: address.clone(),
+                    target: addresses[j].clone(),
+                    via: Some(via),
                 });
             }
         }
@@ -778,6 +899,7 @@ pub(crate) fn evaluate(files: &[(String, Vec<u8>)]) -> Output {
         reached: HashSet::new(),
         root_left: 0,
         left: KUBE_STORED_MAX,
+        kinds: crossplane::Kinds::of(parsed.values().flat_map(|p| &p.objects)),
         out: Output::default(),
     };
     // The directories that are bases, and the files that patch, which no plain unit holds.

@@ -1,0 +1,255 @@
+example.com/acme/platform platform/definition.yaml:1-27 CompositeResourceDefinition.apiextensions.crossplane.io/xpostgresqlinstances.database.acme.io
+type: CompositeResourceDefinition
+name: "xpostgresqlinstances.database.acme.io"
+root: platform
+role: crossplane composite resource definition
+overridable: none
+references:
+example.com/acme/platform platform/composition.yaml:1 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws via defaultCompositionRef
+referenced by:
+example.com/acme/platform platform/claim.yaml:1 PostgreSQLInstance.database.acme.io/team-a/orders-db via composite XPostgreSQLInstance.database.acme.io
+example.com/acme/platform platform/composition.yaml:1 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws via compositeTypeRef XPostgreSQLInstance.database.acme.io
+example.com/acme/platform platform/pipeline.yaml:1 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws-pipeline via compositeTypeRef XPostgreSQLInstance.database.acme.io
+values:
+example.com/acme/platform platform/definition.yaml:1 apiVersion = "apiextensions.crossplane.io/v1"
+example.com/acme/platform platform/definition.yaml:2 kind = "CompositeResourceDefinition"
+example.com/acme/platform platform/definition.yaml:4 metadata.name = "xpostgresqlinstances.database.acme.io"
+example.com/acme/platform platform/definition.yaml:6 spec.group = "database.acme.io"
+example.com/acme/platform platform/definition.yaml:8 spec.names.kind = "XPostgreSQLInstance"
+example.com/acme/platform platform/definition.yaml:9 spec.names.plural = "xpostgresqlinstances"
+example.com/acme/platform platform/definition.yaml:11 spec.claimNames.kind = "PostgreSQLInstance"
+example.com/acme/platform platform/definition.yaml:12 spec.claimNames.plural = "postgresqlinstances"
+example.com/acme/platform platform/definition.yaml:14 spec.defaultCompositionRef.name = "xpostgresqlinstances.aws"
+example.com/acme/platform platform/definition.yaml:16 spec.versions[0].name = "v1alpha1"
+example.com/acme/platform platform/definition.yaml:17 spec.versions[0].served = true
+example.com/acme/platform platform/definition.yaml:18 spec.versions[0].referenceable = true
+example.com/acme/platform platform/definition.yaml:21 spec.versions[0].schema.openAPIV3Schema.type = "object"
+example.com/acme/platform platform/definition.yaml:24 spec.versions[0].schema.openAPIV3Schema.properties.spec.type = "object"
+example.com/acme/platform platform/definition.yaml:27 spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.storageGB.type = "integer"
+
+example.com/acme/platform platform/composition.yaml:1-61 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws
+type: Composition
+name: "xpostgresqlinstances.aws"
+root: platform
+role: crossplane composition
+overridable: none
+references:
+example.com/acme/platform platform/composition.yaml:17 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/subnets via resources
+example.com/acme/platform platform/composition.yaml:27 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/instance via resources
+example.com/acme/platform platform/composition.yaml:40 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/backups via resources
+example.com/acme/platform platform/composition.yaml:53 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/network via resources
+example.com/acme/platform platform/definition.yaml:1 CompositeResourceDefinition.apiextensions.crossplane.io/xpostgresqlinstances.database.acme.io via compositeTypeRef XPostgreSQLInstance.database.acme.io
+referenced by:
+example.com/acme/platform platform/definition.yaml:1 CompositeResourceDefinition.apiextensions.crossplane.io/xpostgresqlinstances.database.acme.io via defaultCompositionRef
+values:
+example.com/acme/platform platform/composition.yaml:1 apiVersion = "apiextensions.crossplane.io/v1"
+example.com/acme/platform platform/composition.yaml:2 kind = "Composition"
+example.com/acme/platform platform/composition.yaml:4 metadata.name = "xpostgresqlinstances.aws"
+example.com/acme/platform platform/composition.yaml:6 metadata.labels.provider = "aws"
+example.com/acme/platform platform/composition.yaml:9 spec.compositeTypeRef.apiVersion = "database.acme.io/v1alpha1"
+example.com/acme/platform platform/composition.yaml:10 spec.compositeTypeRef.kind = "XPostgreSQLInstance"
+example.com/acme/platform platform/composition.yaml:12 spec.patchSets[0].name = "named"
+example.com/acme/platform platform/composition.yaml:14 spec.patchSets[0].patches[0].fromFieldPath = "metadata.labels[crossplane.io/claim-name]"
+example.com/acme/platform platform/composition.yaml:15 spec.patchSets[0].patches[0].toFieldPath = "metadata.annotations[crossplane.io/external-name]"
+example.com/acme/platform platform/composition.yaml:17 spec.resources[0].name = "subnets"
+example.com/acme/platform platform/composition.yaml:19 spec.resources[0].base.apiVersion = "rds.aws.upbound.io/v1beta1"
+example.com/acme/platform platform/composition.yaml:20 spec.resources[0].base.kind = "SubnetGroup"
+example.com/acme/platform platform/composition.yaml:23 spec.resources[0].base.metadata.annotations["crossplane.io/external-name"] = "orders-db-subnets"
+example.com/acme/platform platform/composition.yaml:26 spec.resources[0].base.spec.forProvider.region = "us-east-1"
+example.com/acme/platform platform/composition.yaml:27 spec.resources[1].name = "instance"
+example.com/acme/platform platform/composition.yaml:29 spec.resources[1].base.apiVersion = "rds.aws.upbound.io/v1beta1"
+example.com/acme/platform platform/composition.yaml:30 spec.resources[1].base.kind = "Instance"
+example.com/acme/platform platform/composition.yaml:33 spec.resources[1].base.spec.forProvider.region = "us-east-1"
+example.com/acme/platform platform/composition.yaml:34 spec.resources[1].base.spec.forProvider.engine = "postgres"
+example.com/acme/platform platform/composition.yaml:36 spec.resources[1].patches[0].fromFieldPath = "spec.storageGB"
+example.com/acme/platform platform/composition.yaml:37 spec.resources[1].patches[0].toFieldPath = "spec.forProvider.allocatedStorage"
+example.com/acme/platform platform/composition.yaml:38 spec.resources[1].patches[1].type = "PatchSet"
+example.com/acme/platform platform/composition.yaml:39 spec.resources[1].patches[1].patchSetName = "named"
+example.com/acme/platform platform/composition.yaml:40 spec.resources[2].name = "backups"
+example.com/acme/platform platform/composition.yaml:42 spec.resources[2].base.apiVersion = "s3.aws.upbound.io/v1beta1"
+example.com/acme/platform platform/composition.yaml:43 spec.resources[2].base.kind = "Bucket"
+example.com/acme/platform platform/composition.yaml:45 spec.resources[2].base.metadata.name = "orders-db-backups"
+example.com/acme/platform platform/composition.yaml:48 spec.resources[2].base.spec.forProvider.region = "us-east-1"
+example.com/acme/platform platform/composition.yaml:50 spec.resources[2].patches[0].type = "ToCompositeFieldPath"
+example.com/acme/platform platform/composition.yaml:51 spec.resources[2].patches[0].fromFieldPath = "metadata.name"
+example.com/acme/platform platform/composition.yaml:52 spec.resources[2].patches[0].toFieldPath = "status.backupBucket"
+example.com/acme/platform platform/composition.yaml:53 spec.resources[3].name = "network"
+example.com/acme/platform platform/composition.yaml:55 spec.resources[3].base.apiVersion = "network.acme.io/v1alpha1"
+example.com/acme/platform platform/composition.yaml:56 spec.resources[3].base.kind = "XNetwork"
+example.com/acme/platform platform/composition.yaml:58 spec.resources[3].base.metadata.name = "orders-network"
+example.com/acme/platform platform/composition.yaml:60 spec.resources[3].patches[0].fromFieldPath = "metadata.uid"
+example.com/acme/platform platform/composition.yaml:61 spec.resources[3].patches[0].toFieldPath = "metadata.name"
+
+example.com/acme/platform platform/composition.yaml:17-26 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/subnets
+type: SubnetGroup
+name: "orders-db-subnets"
+root: platform
+role: crossplane composed resource
+overridable: none
+references: none
+referenced by:
+example.com/acme/platform platform/composition.yaml:1 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws via resources
+values:
+example.com/acme/platform platform/composition.yaml:17 spec.resources[0].name = "subnets"
+example.com/acme/platform platform/composition.yaml:19 spec.resources[0].base.apiVersion = "rds.aws.upbound.io/v1beta1"
+example.com/acme/platform platform/composition.yaml:20 spec.resources[0].base.kind = "SubnetGroup"
+example.com/acme/platform platform/composition.yaml:23 spec.resources[0].base.metadata.annotations["crossplane.io/external-name"] = "orders-db-subnets"
+example.com/acme/platform platform/composition.yaml:26 spec.resources[0].base.spec.forProvider.region = "us-east-1"
+
+example.com/acme/platform platform/composition.yaml:27-39 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/instance
+type: Instance
+name: "*" (pattern)
+root: platform
+role: crossplane composed resource
+overridable: none
+references: none
+referenced by:
+example.com/acme/platform platform/composition.yaml:1 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws via resources
+values:
+example.com/acme/platform platform/composition.yaml:27 spec.resources[1].name = "instance"
+example.com/acme/platform platform/composition.yaml:29 spec.resources[1].base.apiVersion = "rds.aws.upbound.io/v1beta1"
+example.com/acme/platform platform/composition.yaml:30 spec.resources[1].base.kind = "Instance"
+example.com/acme/platform platform/composition.yaml:33 spec.resources[1].base.spec.forProvider.region = "us-east-1"
+example.com/acme/platform platform/composition.yaml:34 spec.resources[1].base.spec.forProvider.engine = "postgres"
+example.com/acme/platform platform/composition.yaml:36 spec.resources[1].patches[0].fromFieldPath = "spec.storageGB"
+example.com/acme/platform platform/composition.yaml:37 spec.resources[1].patches[0].toFieldPath = "spec.forProvider.allocatedStorage"
+example.com/acme/platform platform/composition.yaml:38 spec.resources[1].patches[1].type = "PatchSet"
+example.com/acme/platform platform/composition.yaml:39 spec.resources[1].patches[1].patchSetName = "named"
+
+example.com/acme/platform platform/composition.yaml:40-52 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/backups
+type: Bucket
+name: "orders-db-backups"
+root: platform
+role: crossplane composed resource
+overridable: none
+references:
+example.com/acme/platform platform/bucket.yaml:13 CustomResourceDefinition.apiextensions.k8s.io/buckets.s3.aws.upbound.io via kind Bucket.s3.aws.upbound.io
+referenced by:
+example.com/acme/platform platform/composition.yaml:1 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws via resources
+values:
+example.com/acme/platform platform/composition.yaml:40 spec.resources[2].name = "backups"
+example.com/acme/platform platform/composition.yaml:42 spec.resources[2].base.apiVersion = "s3.aws.upbound.io/v1beta1"
+example.com/acme/platform platform/composition.yaml:43 spec.resources[2].base.kind = "Bucket"
+example.com/acme/platform platform/composition.yaml:45 spec.resources[2].base.metadata.name = "orders-db-backups"
+example.com/acme/platform platform/composition.yaml:48 spec.resources[2].base.spec.forProvider.region = "us-east-1"
+example.com/acme/platform platform/composition.yaml:50 spec.resources[2].patches[0].type = "ToCompositeFieldPath"
+example.com/acme/platform platform/composition.yaml:51 spec.resources[2].patches[0].fromFieldPath = "metadata.name"
+example.com/acme/platform platform/composition.yaml:52 spec.resources[2].patches[0].toFieldPath = "status.backupBucket"
+
+example.com/acme/platform platform/composition.yaml:53-61 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/network
+type: XNetwork
+name: "*" (pattern)
+root: platform
+role: crossplane composed resource
+overridable: none
+references:
+example.com/acme/platform platform/network.yaml:1 CompositeResourceDefinition.apiextensions.crossplane.io/xnetworks.network.acme.io via kind XNetwork.network.acme.io
+referenced by:
+example.com/acme/platform platform/composition.yaml:1 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws via resources
+values:
+example.com/acme/platform platform/composition.yaml:53 spec.resources[3].name = "network"
+example.com/acme/platform platform/composition.yaml:55 spec.resources[3].base.apiVersion = "network.acme.io/v1alpha1"
+example.com/acme/platform platform/composition.yaml:56 spec.resources[3].base.kind = "XNetwork"
+example.com/acme/platform platform/composition.yaml:58 spec.resources[3].base.metadata.name = "orders-network"
+example.com/acme/platform platform/composition.yaml:60 spec.resources[3].patches[0].fromFieldPath = "metadata.uid"
+example.com/acme/platform platform/composition.yaml:61 spec.resources[3].patches[0].toFieldPath = "metadata.name"
+
+example.com/acme/platform platform/pipeline.yaml:1-37 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws-pipeline
+type: Composition
+name: "xpostgresqlinstances.aws-pipeline"
+root: platform
+role: crossplane composition
+overridable: none
+references:
+example.com/acme/platform platform/definition.yaml:1 CompositeResourceDefinition.apiextensions.crossplane.io/xpostgresqlinstances.database.acme.io via compositeTypeRef XPostgreSQLInstance.database.acme.io
+example.com/acme/platform platform/pipeline.yaml:18 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws-pipeline/events via pipeline patch-and-transform
+referenced by:
+example.com/acme/platform platform/claim.yaml:1 PostgreSQLInstance.database.acme.io/team-a/orders-db via compositionRef
+values:
+example.com/acme/platform platform/pipeline.yaml:1 apiVersion = "apiextensions.crossplane.io/v1"
+example.com/acme/platform platform/pipeline.yaml:2 kind = "Composition"
+example.com/acme/platform platform/pipeline.yaml:4 metadata.name = "xpostgresqlinstances.aws-pipeline"
+example.com/acme/platform platform/pipeline.yaml:7 spec.compositeTypeRef.apiVersion = "database.acme.io/v1alpha1"
+example.com/acme/platform platform/pipeline.yaml:8 spec.compositeTypeRef.kind = "XPostgreSQLInstance"
+example.com/acme/platform platform/pipeline.yaml:9 spec.mode = "Pipeline"
+example.com/acme/platform platform/pipeline.yaml:11 spec.pipeline[0].step = "patch-and-transform"
+example.com/acme/platform platform/pipeline.yaml:13 spec.pipeline[0].functionRef.name = "function-patch-and-transform"
+example.com/acme/platform platform/pipeline.yaml:15 spec.pipeline[0].input.apiVersion = "pt.fn.crossplane.io/v1beta1"
+example.com/acme/platform platform/pipeline.yaml:16 spec.pipeline[0].input.kind = "Resources"
+example.com/acme/platform platform/pipeline.yaml:18 spec.pipeline[0].input.resources[0].name = "events"
+example.com/acme/platform platform/pipeline.yaml:20 spec.pipeline[0].input.resources[0].base.apiVersion = "sqs.aws.upbound.io/v1beta1"
+example.com/acme/platform platform/pipeline.yaml:21 spec.pipeline[0].input.resources[0].base.kind = "Queue"
+example.com/acme/platform platform/pipeline.yaml:24 spec.pipeline[0].input.resources[0].base.metadata.annotations["crossplane.io/external-name"] = "orders-events"
+example.com/acme/platform platform/pipeline.yaml:27 spec.pipeline[0].input.resources[0].base.spec.forProvider.region = "us-east-1"
+example.com/acme/platform platform/pipeline.yaml:28 spec.pipeline[1].step = "render-templates"
+example.com/acme/platform platform/pipeline.yaml:30 spec.pipeline[1].functionRef.name = "function-go-templating"
+example.com/acme/platform platform/pipeline.yaml:32 spec.pipeline[1].input.apiVersion = "gotemplating.fn.crossplane.io/v1beta1"
+example.com/acme/platform platform/pipeline.yaml:33 spec.pipeline[1].input.kind = "GoTemplate"
+example.com/acme/platform platform/pipeline.yaml:34 spec.pipeline[1].input.source = "Inline"
+example.com/acme/platform platform/pipeline.yaml:37 spec.pipeline[1].input.inline.template = "apiVersion: s3.aws.upbound.io/v1beta1\nkind: Bucket\nmetadata:\n  name: {{ .observed.composite.resource.metadata.name }}-logs\n"
+
+example.com/acme/platform platform/claim.yaml:1-11 PostgreSQLInstance.database.acme.io/team-a/orders-db
+type: PostgreSQLInstance
+name: "orders-db"
+root: platform
+role: crossplane claim
+overridable: none
+references:
+example.com/acme/platform platform/definition.yaml:1 CompositeResourceDefinition.apiextensions.crossplane.io/xpostgresqlinstances.database.acme.io via composite XPostgreSQLInstance.database.acme.io
+example.com/acme/platform platform/pipeline.yaml:1 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws-pipeline via compositionRef
+referenced by: none
+values:
+example.com/acme/platform platform/claim.yaml:1 apiVersion = "database.acme.io/v1alpha1"
+example.com/acme/platform platform/claim.yaml:2 kind = "PostgreSQLInstance"
+example.com/acme/platform platform/claim.yaml:4 metadata.name = "orders-db"
+example.com/acme/platform platform/claim.yaml:5 metadata.namespace = "team-a"
+example.com/acme/platform platform/claim.yaml:7 spec.storageGB = 20
+example.com/acme/platform platform/claim.yaml:9 spec.compositionRef.name = "xpostgresqlinstances.aws-pipeline"
+example.com/acme/platform platform/claim.yaml:11 spec.writeConnectionSecretToRef.name = "orders-db-conn"
+
+example.com/acme/platform examples/claim.yaml:1-7 PostgreSQLInstance.database.acme.io/team-b/reports-db
+type: PostgreSQLInstance
+name: "reports-db"
+root: examples
+role: crossplane claim
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/acme/platform examples/claim.yaml:1 apiVersion = "database.acme.io/v1alpha1"
+example.com/acme/platform examples/claim.yaml:2 kind = "PostgreSQLInstance"
+example.com/acme/platform examples/claim.yaml:4 metadata.name = "reports-db"
+example.com/acme/platform examples/claim.yaml:5 metadata.namespace = "team-b"
+example.com/acme/platform examples/claim.yaml:7 spec.storageGB = 10
+
+example.com/acme/platform platform/network.yaml:15-20 XNetwork.network.acme.io/shared
+type: XNetwork
+name: "shared"
+root: platform
+role: crossplane composite resource
+overridable: none
+references:
+example.com/acme/platform platform/network.yaml:1 CompositeResourceDefinition.apiextensions.crossplane.io/xnetworks.network.acme.io via kind XNetwork.network.acme.io
+referenced by: none
+values:
+example.com/acme/platform platform/network.yaml:15 [1].apiVersion = "network.acme.io/v1alpha1"
+example.com/acme/platform platform/network.yaml:16 [1].kind = "XNetwork"
+example.com/acme/platform platform/network.yaml:18 [1].metadata.name = "shared"
+example.com/acme/platform platform/network.yaml:20 [1].spec.cidr = "10.0.0.0/16"
+
+example.com/acme/platform platform/bucket.yaml:1-11 Bucket.s3.aws.upbound.io/shared-assets
+type: Bucket
+name: "acme-shared-assets"
+root: platform
+role: crossplane managed resource
+overridable: none
+references:
+example.com/acme/platform platform/bucket.yaml:13 CustomResourceDefinition.apiextensions.k8s.io/buckets.s3.aws.upbound.io via kind Bucket.s3.aws.upbound.io
+referenced by: none
+values:
+example.com/acme/platform platform/bucket.yaml:1 [0].apiVersion = "s3.aws.upbound.io/v1beta1"
+example.com/acme/platform platform/bucket.yaml:2 [0].kind = "Bucket"
+example.com/acme/platform platform/bucket.yaml:4 [0].metadata.name = "shared-assets"
+example.com/acme/platform platform/bucket.yaml:6 [0].metadata.annotations["crossplane.io/external-name"] = "acme-shared-assets"
+example.com/acme/platform platform/bucket.yaml:9 [0].spec.forProvider.region = "us-east-1"
+example.com/acme/platform platform/bucket.yaml:11 [0].spec.providerConfigRef.name = "default"

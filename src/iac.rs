@@ -171,6 +171,9 @@ pub(crate) struct Node {
     pub image: Option<Resolved>,
     /// The build context of a Compose service: a path inside the repository from its root.
     pub build: Option<Resolved>,
+    /// What a Kubernetes object is to Crossplane (#655): `crossplane claim`, `crossplane
+    /// composition` and the like; `None` for any other node.
+    pub role: Option<String>,
 }
 
 /// A root module's variable a name went through: by its default, or by the value a var file
@@ -1036,6 +1039,7 @@ impl<'m> Eval<'m> {
                     block: block.key_path(),
                     image: None,
                     build: None,
+                    role: None,
                 });
                 let local = (block.source.as_deref())
                     .and_then(|s| local_source(dir, s))
@@ -1728,7 +1732,7 @@ pub(crate) fn refresh_template(tx: &Transaction, path: &str, src: Option<&[u8]>)
 /// Stores `nodes` and `references`.
 pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference]) -> Result<()> {
     let mut insert = tx
-        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)")?;
+        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)")?;
     for n in nodes {
         let (line, end) = (n.line as i64, n.end_line as i64);
         let overridable = serde_json::to_string(&n.overridable)?;
@@ -1748,6 +1752,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
             image.map(|i| i.overridable),
             build.map(|b| &b.text),
             build.map(|b| b.overridable),
+            n.role,
         ])?;
     }
     let mut insert = tx.prepare_cached("INSERT INTO iac_references VALUES (?1, ?2, ?3, ?4)")?;
@@ -1759,7 +1764,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
 
 /// The columns of a node, in `row`'s order.
 const COLUMNS: &str = "address, root, type, name, pattern, overridable, path, line, end_line, \
-                       block, image, image_overridable, build, build_overridable";
+                       block, image, image_overridable, build, build_overridable, role";
 
 /// The text at column `at` and its overridable flag at the next one, when there is a text.
 fn resolved(r: &rusqlite::Row, at: usize) -> rusqlite::Result<Option<Resolved>> {
@@ -1786,6 +1791,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Node> {
         block: r.get(9)?,
         image: resolved(r, 10)?,
         build: resolved(r, 12)?,
+        role: r.get(14)?,
     })
 }
 
@@ -1912,7 +1918,7 @@ fn references(
     let mut statement = db.prepare(&sql)?;
     let mut found: Vec<(Node, Option<String>)> = statement
         .query_map(params![node.root, node.address], |r| {
-            Ok((row(r)?, r.get(14)?))
+            Ok((row(r)?, r.get(15)?))
         })?
         .collect::<rusqlite::Result<_>>()?;
     found.sort_by(|(a, va), (b, vb)| {
@@ -1943,9 +1949,9 @@ fn reached(identity: &str, n: &Node, via: &Option<String>) -> String {
 
 /// `context` on the IaC node `text` names, or `None` when it names none: its first line
 /// `<identity> <path>:<line>-<end> <address>`, then its type, its physical name (marked
-/// `(pattern)` when a part is unresolved), its root, the overridable values its name went
-/// through, the nodes it references, those that reference it and its config values. A text that
-/// fits several nodes lists them.
+/// `(pattern)` when a part is unresolved), its root, its Crossplane role when it has one (#655),
+/// the overridable values its name went through, the nodes it references, those that reference
+/// it and its config values. A text that fits several nodes lists them.
 pub(crate) fn context(repos: &[(&str, &Connection)], text: &str) -> Result<Option<Vec<String>>> {
     let found = found(repos, text)?;
     let [(r, n)] = &found[..] else {
@@ -1965,6 +1971,7 @@ pub(crate) fn context(repos: &[(&str, &Connection)], text: &str) -> Result<Optio
         format!("name: {name}"),
         format!("root: {}", n.root),
     ];
+    lines.extend(n.role.as_ref().map(|r| format!("role: {r}")));
     for (title, field) in [("image", &n.image), ("build", &n.build)] {
         if let Some(f) = field {
             lines.push(format!("{title}: {}", resolved_shown(f)));

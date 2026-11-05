@@ -1,0 +1,40 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xpostgresqlinstances.aws-pipeline
+spec:
+  compositeTypeRef:
+    apiVersion: database.acme.io/v1alpha1
+    kind: XPostgreSQLInstance
+  mode: Pipeline
+  pipeline:
+    - step: patch-and-transform
+      functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        resources:
+          - name: events
+            base:
+              apiVersion: sqs.aws.upbound.io/v1beta1
+              kind: Queue
+              metadata:
+                annotations:
+                  crossplane.io/external-name: orders-events
+              spec:
+                forProvider:
+                  region: us-east-1
+    - step: render-templates
+      functionRef:
+        name: function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            apiVersion: s3.aws.upbound.io/v1beta1
+            kind: Bucket
+            metadata:
+              name: {{ .observed.composite.resource.metadata.name }}-logs

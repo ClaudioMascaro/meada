@@ -42,7 +42,14 @@
   set and one over a variable, a local module's input and output, `terraform.workspace`, a data
   source and a registry module, and a root `envs/stage` calling the same module: `search` and
   `context` against `terraform-names.{search,context}.txt`, and a changed var file evaluating
-  its root again while a row rewritten by hand in the other root survives), `kubernetes` (#651,
+  its root again while a row rewritten by hand in the other root survives), `crossplane` (#655,
+  the `crossplane-nodes` fixture: two XRDs, a composition of four resources, a pipeline
+  composition, a claim beside them and one away from them, a composite resource and a managed
+  resource beside its CRD: `search` kind `iac`, `context` and `trace` against
+  `crossplane-nodes.{search,context,trace}.txt`, a patch added and an XRD deleted changing names
+  and roles at the next query, and no object in the export; the unit tests of
+  `kube::crossplane` for roles, references, patches, pipelines and `COMPOSED_MAX`),
+  `kubernetes` (#651,
   the `kubernetes-nodes` fixture: a base with a Deployment, a Service, a ConfigMap and a Secret
   in one file of two documents, an Ingress and a ServiceAccount, overlays `dev` (namespace,
   prefix, image tag) and `prod` (namespace, suffix, renamed image, a remote base), plain

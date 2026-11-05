@@ -569,6 +569,30 @@
   (the `ponytail:` in `index::refresh_keeping`), reading every YAML or JSON file that says
   `apiVersion`. The Kustomize `images` transformer matches the name before the tag, as written
   (a `newTag` such as `1.20` read by YAML as a number loses its zero).
+- `kube/crossplane.rs` (#655, ADR 0025): `COMPOSED_MAX` (64 resources created per composition,
+  the first in the order written, each one reference of the composition beside
+  `OBJECT_REFERENCES_MAX`; a definition lookup takes the first `OBJECT_REFERENCES_MAX` matches).
+  Patches, patch sets, transforms and functions are never evaluated: a name or external name a
+  patch writes, and a base with neither, are `*`, so a composed resource is never named from
+  its composite, and a patch that writes `metadata.name` with a transform (a fixed prefix) still
+  gives `*`. Only `spec.resources` and the `input.resources` of a `pt.fn.crossplane.io` step are
+  read; a step of any other function (Go templating, KCL, a custom function) creates no node,
+  and nor does an `EnvironmentConfig`'s or a `Usage`'s content. A claim or composite resource is
+  known only by an XRD of the same repository (one in another repository of the workspace leaves
+  it a plain object); a managed resource only by its `spec.forProvider` mapping. Every
+  reference stays in one unit, so a claim in another directory than its XRD and composition
+  (the usual layout of `apis/` beside `examples/`) references nothing. A resource kind is
+  reached only through a definition in the unit, so a provider's managed resource kind (whose
+  CRD the provider installs) is reached by nothing. Two resources of one name in a composition
+  keep the first; a v2 XRD's `spec.scope` is not read, so a composite resource keeps the
+  namespace it was written with; a `compositionSelector`, a `compositionRevisionRef` and
+  managed resource references (`*Ref`, `*Selector` under `spec.forProvider`) are not followed.
+  Only the groups `apiextensions.crossplane.io`, `ops.crossplane.io` and `pkg.crossplane.io` are
+  cluster-scoped by group: a v1 composite or managed resource takes a Kustomize `namespace` in
+  its address, as Kustomize gives it one without its CRD. A `compositionRef`,
+  `defaultCompositionRef` or `enforcedCompositionRef` is matched by the composition's name as
+  written, as every Kubernetes reference is, though Kustomize renames the composition under a
+  `namePrefix` and leaves those fields alone.
 - `iac/cloudformation.rs` (#653, ADR 0025): a template reuses `NODES_MAX` (resources past it in
   logical id order are left out), `REFERENCES_MAX` (per resource, in address order) and
   `ROOT_STORED_MAX` (per template: the cut is by the template's own budget, with no

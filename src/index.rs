@@ -112,7 +112,8 @@ pub(crate) fn schema_version() -> i32 {
 /// label of its root module, its type, physical name as static evaluation resolves it (#650),
 /// whether that is a `pattern`, the `overridable` values it went through as JSON, file, first and
 /// last line, the key path of its block and, for a Compose service (#652), its image and build
-/// context with a flag each for a default that gave it) and `iac_references` each reference
+/// context with a flag each for a default that gave it, and for a Kubernetes object what it is
+/// to Crossplane, its `role` (#655)) and `iac_references` each reference
 /// between two nodes of one root (`iac::Reference`). The Terraform ones are rewritten root by
 /// root (`iac::refresh`) for the roots whose evaluation unit holds a Terraform file, var file or
 /// Compose file that changed, the Kubernetes ones (#651, `kube::Node` rows of YAML and JSON
@@ -183,7 +184,7 @@ CREATE TABLE iac_nodes (
     address TEXT NOT NULL, root TEXT NOT NULL, type TEXT NOT NULL, name TEXT,
     pattern INTEGER NOT NULL, overridable TEXT NOT NULL, path TEXT NOT NULL,
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
-    image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER
+    image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -3675,6 +3676,11 @@ mod tests {
         actual += "\nsample.kustomization.yaml\n";
         actual += &format!("{:#?}\n", kube::evaluate(&files));
 
+        // The Crossplane roles, composed resources and references of a unit (#655).
+        let src = fs::read(tests.join("fixtures/schema/sample.crossplane.yaml")).unwrap();
+        let files = [("xp/sample.crossplane.yaml".to_string(), src)];
+        actual += "\nsample.crossplane.yaml\n";
+        actual += &format!("{:#?}\n", kube::evaluate(&files));
         // The IaC nodes and references of a CloudFormation template (#653), and its config values
         // with a `NoEcho` default redacted.
         let src = fs::read(tests.join("fixtures/schema/sample.cloudformation.yaml")).unwrap();
