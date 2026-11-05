@@ -219,12 +219,14 @@ page for a named workspace, the proposal server in the Compose and Helm recipes,
 binding to Postgres, CLI messages in Spanish, a generated first password for the console's
 default `admin` account instead of a published one (#579), a refresh that keeps the language
 groups no changed file touches (#391), Backstage and HTTP contract reading (tier d1, #613 to #621), and the fixes of tiers b6 to c5. The stored
-manifest summary changes, so existing indexes are rebuilt once on first use. `meada-core` 1.2.0 replaces `msg::pt()` with
-`msg::lang()` (`msg::lang() == msg::Lang::Pt`), types `effective::Diagnostic::code` as
-`DiagnosticCode` (the JSON is unchanged) and makes `named::message_problem("")` return `Some`; a
-crate that declares `meada-core = "1.1"` meets all three on `cargo update`, and `=1.1.0` stays on
-the old API. The tree, the `meada-core` pin, the Dockerfile, the compose defaults and the Helm
-chart declare `1.2.0`, and the `v1.2.0` tag follows this entry's merge on main. Publication
+manifest summary changes, so existing indexes are rebuilt once on first use. `meada-core` 1.2.0 deprecates `msg::pt()` in
+favour of `msg::lang()` (`msg::lang() == msg::Lang::Pt`), types `effective::Diagnostic::code` as
+`DiagnosticCode` (the JSON is unchanged) and makes `named::message_problem("")` return `Some`;
+the new `msg::Lang` and `effective::DiagnosticCode` are `#[non_exhaustive]`, so a match on
+either needs a wildcard arm. A crate that declares `meada-core = "1.1"` meets the last two
+changes on `cargo update`, and `=1.1.0` stays on the old API. The tree, the `meada-core` pin, the
+Dockerfile, the compose defaults and the Helm chart declare `1.2.0`, and the `v1.2.0` tag goes
+on the `release/1.2` branch, cut from this entry's merge on main. Publication
 (crates, the staged npm package, the GitHub draft release) belongs to the maintainer.
 Release notes are available in
 [pt-BR](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.2.0.md),

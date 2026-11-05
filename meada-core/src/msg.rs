@@ -5,8 +5,10 @@ use std::sync::atomic::{AtomicU8, Ordering};
 
 use crate::manifest::{ADDED_BY_MAX, OWNER_MAX};
 
-/// The language of the CLI's messages.
+/// The language of the CLI's messages. A later minor version may add a language, so a match
+/// from outside this crate needs a wildcard arm.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum Lang {
     En,
     Pt,
@@ -33,6 +35,12 @@ pub fn lang() -> Lang {
         x if x == Lang::Es as u8 => Lang::Es,
         _ => Lang::En,
     }
+}
+
+/// Whether messages are in pt-BR.
+#[deprecated(since = "1.2.0", note = "use `msg::lang() == msg::Lang::Pt`")]
+pub fn pt() -> bool {
+    lang() == Lang::Pt
 }
 
 /// The kind of value a key expects, worded without the value written under it.
