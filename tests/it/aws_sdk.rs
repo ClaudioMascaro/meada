@@ -1,6 +1,6 @@
 //! Constructor-backed AWS SDK use sides (#660).
 use crate::common::{assert_golden, fixture_repo};
-use meada::engine::Engine;
+use meada::engine::{Direction, Engine, Start};
 use serde_json::Value;
 
 #[test]
@@ -26,9 +26,9 @@ fn go_sdk_bucket_writes_reads_and_environment_provenance() {
     assert_eq!(writers.len(), 1, "{text}");
     assert_eq!(writers[0]["contract"], "resource::s3::uploads");
     assert_eq!(readers.len(), 2, "{text}");
-    assert_eq!(readers[0]["contract"], "resource::s3::uploads");
-    assert_eq!(readers[1]["contract"], "resource::s3");
-    assert_eq!(readers[1]["via"], "env:BUCKET");
+    assert_eq!(readers[0]["contract"], "resource::s3");
+    assert_eq!(readers[0]["via"], "env:BUCKET");
+    assert_eq!(readers[1]["contract"], "resource::s3::uploads");
     assert_export_golden("aws-sdk-go.export.json", &text);
 }
 
@@ -208,6 +208,32 @@ class Data {
             .context("resource::s3", Some(8000))
             .unwrap()
             .contains("unresolved")
+    );
+    let sdk = links.iter().find(|l| l["level"] == "exact").unwrap();
+    let reader = sdk["consumer"].as_str().unwrap();
+    let writer = sdk["provider"].as_str().unwrap();
+    let up = engine
+        .trace(Start::From(reader), Direction::Up, Some(8000))
+        .unwrap();
+    assert!(
+        up.contains("example.com/sdk/go main.go:12 useBucket"),
+        "{up}"
+    );
+    assert!(up.contains("[exact: resource::s3::uploads]"), "{up}");
+    let down = engine
+        .trace(Start::From(writer), Direction::Down, Some(8000))
+        .unwrap();
+    assert!(down.contains("example.com/sdk/dotnet Data.cs:"), "{down}");
+    assert!(!down.contains("(top level)"), "{down}");
+    let peer_export: Value =
+        serde_json::from_str(&Engine::open(&peer).unwrap().export().unwrap()).unwrap();
+    assert!(
+        peer_export["symbols"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["id"] == reader),
+        "resource readers are symbols: {reader}"
     );
 }
 

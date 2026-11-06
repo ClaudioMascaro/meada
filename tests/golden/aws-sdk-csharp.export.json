@@ -154,7 +154,7 @@
   "consumers": [
     {
       "contract": "resource::secretsmanager::orders/token",
-      "site": "local/aws-sdk-csharp::Sends.cs::Sends.Use()::secrets.GetSecretValueAsync#0",
+      "site": "local/aws-sdk-csharp::Sends.cs::Sends.Use()",
       "via": null
     }
   ],

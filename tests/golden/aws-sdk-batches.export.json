@@ -515,32 +515,32 @@
   "consumers": [
     {
       "contract": "resource::ssm",
-      "site": "local/aws-sdk-batches::Batches.cs::Batches.Read()::ssm.GetParametersAsync#0",
+      "site": "local/aws-sdk-batches::Batches.cs::Batches.Read()",
       "via": "env:PARAM"
     },
     {
       "contract": "resource::ssm::/orders/key",
-      "site": "local/aws-sdk-batches::Batches.cs::Batches.Read()::ssm.GetParametersAsync#0",
+      "site": "local/aws-sdk-batches::Batches.cs::Batches.Read()",
       "via": null
     },
     {
       "contract": "resource::dynamodb::customers",
-      "site": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::db.batchGetItem#0",
+      "site": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
       "via": null
     },
     {
       "contract": "resource::dynamodb::orders",
-      "site": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::db.batchGetItem#0",
+      "site": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
       "via": null
     },
     {
       "contract": "resource::ssm",
-      "site": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::parameters.getParameters#0",
+      "site": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
       "via": "env:JAVA_PARAMETER"
     },
     {
       "contract": "resource::ssm::/java/one",
-      "site": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::parameters.getParameters#0",
+      "site": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
       "via": null
     }
   ],

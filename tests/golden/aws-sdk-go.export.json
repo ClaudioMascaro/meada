@@ -149,14 +149,14 @@
   ],
   "consumers": [
     {
-      "contract": "resource::s3::uploads",
-      "site": "local/aws-sdk-go::main.go::useBucket::client.GetObject#0",
-      "via": null
+      "contract": "resource::s3",
+      "site": "local/aws-sdk-go::main.go::useBucket",
+      "via": "env:BUCKET"
     },
     {
-      "contract": "resource::s3",
-      "site": "local/aws-sdk-go::main.go::useBucket::client.GetObject#1",
-      "via": "env:BUCKET"
+      "contract": "resource::s3::uploads",
+      "site": "local/aws-sdk-go::main.go::useBucket",
+      "via": null
     }
   ],
   "links": []

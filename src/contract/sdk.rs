@@ -151,7 +151,7 @@ pub(crate) fn extract<'a>(
                         };
                         found.push(Found {
                             role: operation.role,
-                            site: if prefix == "channel" && operation.role == Role::Consumer {
+                            site: if operation.role == Role::Consumer {
                                 Site::Def {
                                     path: at.into(),
                                     name: code.files()[at].calls[index].scope.clone(),

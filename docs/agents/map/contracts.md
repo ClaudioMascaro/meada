@@ -18,8 +18,8 @@ this file, and a change to these modules updates it.
   unresolved environment variable in the export, as consumer `via` already does. `contracts.method`
   records a written SDK operation for both directions; `ContractKind::use_level` keeps SDK uses
   exact and declarations declared when linking each other or a provisioner. Unresolved resource
-  sides never link. Java SDK
-  request folding shares Spring annotation injection with the existing channel forms. Runtime
+  sides never link. Readers and channel handlers belong to their enclosing symbols; writers
+  remain operation calls. Java request folding shares Spring injection with channel forms. Runtime
   environment aliases keep verified provenance. C# selector writes are indexed lazily once
   across the group to invalidate named request objects even through another receiver alias;
   Go shares the existing field-write index. The folded Java name reader rejects a value-bound

@@ -689,38 +689,38 @@
   "consumers": [
     {
       "contract": "resource::s3",
-      "site": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()::client.GetObjectAsync#0",
+      "site": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()",
+      "via": null
+    },
+    {
+      "contract": "resource::s3",
+      "site": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()",
       "via": "env:CS_BUCKET"
     },
     {
-      "contract": "resource::s3",
-      "site": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()::client.GetObjectAsync#1",
+      "contract": "resource::dynamodb",
+      "site": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()",
       "via": null
     },
     {
       "contract": "resource::dynamodb",
-      "site": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()::client.batchGetItem#0",
+      "site": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)",
       "via": null
     },
     {
       "contract": "resource::dynamodb",
-      "site": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)::client.batchGetItem#0",
-      "via": null
-    },
-    {
-      "contract": "resource::dynamodb",
-      "site": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()::client.batchGetItem#0",
+      "site": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()",
       "via": null
     },
     {
       "contract": "resource::s3",
-      "site": "local/aws-sdk-alias-env::aliases.go::use::client.GetObject#0",
+      "site": "local/aws-sdk-alias-env::aliases.go::use",
+      "via": null
+    },
+    {
+      "contract": "resource::s3",
+      "site": "local/aws-sdk-alias-env::aliases.go::use",
       "via": "env:GO_BUCKET"
-    },
-    {
-      "contract": "resource::s3",
-      "site": "local/aws-sdk-alias-env::aliases.go::use::client.GetObject#1",
-      "via": null
     }
   ],
   "links": []
