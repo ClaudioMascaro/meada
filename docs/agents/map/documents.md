@@ -150,6 +150,13 @@ this file, and a change to these modules updates it.
   line (`Msg::ConfigFiles`), absent with no config file. `under(identity, db, path, block)`
   gives the rows of one file under a key path (`block`, `block.` or `block[`), as `hits` shows
   them: the `values:` of `context` on an IaC node.
+- `iac/config_uses.rs` (#661): derives directionless use sides from uncut, non-redacted stored
+  strings. AWS structured forms come from `iac/types.rs`; final typed keys map queue/topic/
+  bucket/table to SQS/SNS/S3/DynamoDB at inferred. A provisioner's defining name is excluded.
+  Internal key identities are `<repository>::<file>#<key path>`. The optional `uses` export
+  array keeps the repository-level site and its `at` locator; no scalar text is exported.
+  `provision::uses` shares
+  these sides with provisioning and orphan scope; directed kind matching never sees them.
 - `iac/provision.rs`, `iac/pattern.rs` (#656): `crate::iac::provision::read` derives provisioner
   sides from stored
   IaC names using the embedded `iac/types.toml` table; `crate::iac::provision::links` joins them

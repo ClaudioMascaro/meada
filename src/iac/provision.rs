@@ -91,12 +91,19 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
     Ok(sides)
 }
 
-/// The existing directed use sides: provisioning never invents a producer or consumer.
+/// Directed and directionless uses both reach provisioners; neither invents a direction.
 pub(crate) fn uses(export: &Export) -> impl Iterator<Item = (&str, &str)> {
-    uses_with_levels(export).map(|(site, contract, _)| (site, contract))
+    directed_uses(export)
+        .map(|(site, contract, _)| (site, contract))
+        .chain(
+            export
+                .config_uses
+                .iter()
+                .map(|u| (u.site.as_str(), u.contract.as_str())),
+        )
 }
 
-fn uses_with_levels(export: &Export) -> impl Iterator<Item = (&str, &str, Level)> {
+fn directed_uses(export: &Export) -> impl Iterator<Item = (&str, &str, Level)> {
     export
         .providers
         .iter()
@@ -104,7 +111,7 @@ fn uses_with_levels(export: &Export) -> impl Iterator<Item = (&str, &str, Level)
             (
                 p.site.as_str(),
                 p.contract.as_str(),
-                crate::contract::use_level(&p.contract, p.method.as_deref()),
+                crate::contract::use_level(&p.contract, p.via.as_deref(), p.method.as_deref()),
             )
         })
         .chain(export.consumers.iter().filter_map(|c| {
@@ -112,7 +119,7 @@ fn uses_with_levels(export: &Export) -> impl Iterator<Item = (&str, &str, Level)
             Some((
                 c.site.as_str(),
                 contract,
-                crate::contract::use_level(contract, c.method.as_deref()),
+                crate::contract::use_level(contract, c.via.as_deref(), c.method.as_deref()),
             ))
         }))
 }
@@ -122,8 +129,20 @@ fn uses_with_levels(export: &Export) -> impl Iterator<Item = (&str, &str, Level)
 pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
     let sides = exports
         .iter()
-        .flat_map(uses_with_levels)
+        .flat_map(|export| {
+            directed_uses(export).chain(
+                export
+                    .config_uses
+                    .iter()
+                    .map(|u| (u.site.as_str(), u.contract.as_str(), u.level)),
+            )
+        })
         .collect::<Vec<_>>();
+    let config = exports
+        .iter()
+        .flat_map(|e| &e.config_uses)
+        .map(|u| ((u.site.as_str(), u.contract.as_str()), u))
+        .collect::<std::collections::HashMap<_, _>>();
     let mut links = Vec::new();
     for export in exports {
         for p in &export.provisioners {
@@ -161,14 +180,22 @@ pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
             }
             for &(site, contract, use_level) in &sides {
                 if contracts.contains(contract) {
-                    links.push(Provision::new(
+                    let use_reason = match config.get(&(site, contract)) {
+                        Some(u) => format!("{reason}; config {}#{}", u.path, u.key),
+                        None => reason.clone(),
+                    };
+                    let mut link = Provision::new(
                         site.into(),
                         p.identity.clone(),
                         p.node.root.clone(),
                         contract.into(),
                         level.max(use_level),
-                        reason.clone(),
-                    ));
+                        use_reason,
+                    );
+                    if let Some(u) = config.get(&(site, contract)) {
+                        link.at = Some(format!("{}#{}", u.path, u.key));
+                    }
+                    links.push(link);
                 }
             }
         }
@@ -176,6 +203,16 @@ pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
     links.sort();
     links.dedup();
     links
+}
+
+/// A key is independently traceable; its repository-level site aggregates its config uses.
+pub(crate) fn at_site(link: &Provision, site: &str) -> bool {
+    link.side == site
+        || (link.at.is_some()
+            && link
+                .side
+                .split_once("::")
+                .is_some_and(|(repo, _)| repo == site))
 }
 
 pub(crate) fn target<'a>(exports: &'a [Export], link: &Provision) -> Option<(usize, &'a Side)> {

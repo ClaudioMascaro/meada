@@ -1,8 +1,8 @@
-//! Resources: shared things a repository reads or writes. Explicit `meada.toml` declarations
-//! use their `via` symbols, or the repository as a whole, at declared level. AWS SDK operations
-//! supply constructor-backed writer and reader call sites through `aws`, at exact level when
-//! both names are written. Every reader links to the same resource's writers in other
-//! repositories; an unresolved `resource::<kind>` side never links.
+//! Resources: shared things a repository reads or writes, such as a database table or bucket.
+//! Declarations in `meada.toml` (#19) name `via` symbols, else the repository as a whole, and
+//! link writers to readers in other repositories at `declared`. AWS SDK forms (#659) supply
+//! code sides through their client origins and name arguments; literal SDK writers and readers
+//! link at `exact`, in the same repository too. Both use `resource::<kind>::<id>` contracts.
 
 use std::collections::HashSet;
 
@@ -11,11 +11,18 @@ use crate::contract::{ContractKind, Found, Level, Link};
 use crate::index::{Consumer, Export, Indexed, Provider};
 use crate::msg::Msg;
 use crate::resolve::Code;
-use crate::workspace::Repository;
 
 mod aws;
+mod python;
+mod ts;
+use crate::workspace::Repository;
 
 pub struct Resource;
+
+/// Both reader families establish SDK origins, through stored provenance or an operation.
+fn sdk_use(via: Option<&str>, operation: Option<&str>) -> bool {
+    via == Some("sdk:aws") || operation.is_some()
+}
 
 /// The start of every resource contract identifier.
 const PREFIX: &str = "resource::";
@@ -87,7 +94,11 @@ impl ContractKind for Resource {
     }
 
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
-        aws::extract(code, indexed)
+        ts::sides(code)
+            .into_iter()
+            .chain(python::sides(code))
+            .chain(aws::extract(code, indexed))
+            .collect()
     }
 
     fn unresolved(&self, contract: &str) -> bool {
@@ -96,12 +107,37 @@ impl ContractKind for Resource {
             .is_some_and(|rest| !rest.contains("::"))
     }
 
-    fn use_level(&self, operation: Option<&str>) -> Level {
-        if operation.is_some() {
+    fn use_level(&self, via: Option<&str>, operation: Option<&str>) -> Level {
+        if sdk_use(via, operation) {
             Level::Exact
         } else {
             Level::Declared
         }
+    }
+
+    fn at_call(&self, _: &[Export], export: &Export, call: &str) -> Vec<String> {
+        let provided = export
+            .providers
+            .iter()
+            .filter(|p| p.site == call && p.contract.starts_with(PREFIX))
+            .filter_map(|p| p.via.as_deref());
+        let consumed = export
+            .consumers
+            .iter()
+            .filter(|c| {
+                c.site == call
+                    && c.contract
+                        .as_deref()
+                        .is_some_and(|contract| contract.starts_with(PREFIX))
+            })
+            .filter_map(|c| c.via.as_deref());
+        provided
+            .chain(consumed)
+            .filter_map(|via| {
+                via.strip_prefix("env:")
+                    .map(|name| format!("unresolved environment {name}"))
+            })
+            .collect()
     }
 
     fn parts<'c>(&self, contract: &'c str) -> (Option<&'c str>, Option<&'c str>) {
@@ -183,14 +219,19 @@ impl ContractKind for Resource {
         }
         providers
             .iter()
-            .filter(|(repo, p)| p.contract == *contract && repo.identity != from.identity)
+            .filter(|(repo, p)| {
+                p.contract == *contract
+                    && (repo.identity != from.identity
+                        || (sdk_use(consumer.via.as_deref(), consumer.method.as_deref())
+                            && sdk_use(p.via.as_deref(), p.method.as_deref())))
+            })
             .map(|(_, p)| {
                 Link::new(
                     consumer.site.clone(),
                     p.site.clone(),
                     contract.clone(),
-                    self.use_level(consumer.method.as_deref())
-                        .max(self.use_level(p.method.as_deref())),
+                    self.use_level(consumer.via.as_deref(), consumer.method.as_deref())
+                        .max(self.use_level(p.via.as_deref(), p.method.as_deref())),
                     contract.clone(),
                     None,
                     None,

@@ -1,0 +1,17 @@
+example.com/aws/python app.py:7-10 store
+community: none
+processes: 1 (1 export; 1 repository): store (example.com/aws/python)
+def store():
+    s3.put_object(Bucket='orders-bucket', Key='a', Body=b'b')
+    s3.get_object(Bucket='orders-bucket', Key='a')
+    s3.get_object(Bucket=os.environ['BUCKET'], Key='a')
+callers: none
+callees:
+example.com/aws/python app.py:9 (unresolved) s3.get_object
+example.com/aws/python app.py:10 (unresolved) s3.get_object
+example.com/aws/python app.py:8 (unresolved) s3.put_object
+contracts:
+example.com/aws/python app.py:10 unresolved environment BUCKET
+example.com/aws/python app.py:8 produces resource::s3::orders-bucket (no provisioner in the workspace)
+example.com/aws/python app.py:9 consumes resource::s3::orders-bucket (no provisioner in the workspace)
+example.com/aws/python app.py:10 consumes resource::s3 (unresolved)

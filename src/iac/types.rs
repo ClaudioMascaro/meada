@@ -80,6 +80,33 @@ pub(crate) fn format_of(path: &str) -> Option<&'static str> {
     (path.ends_with(".tf") || path.ends_with(".tofu")).then_some("terraform")
 }
 
+/// The unique contract named by an AWS structured identifier. Forms stay in the type table.
+pub(crate) fn identified(text: &str) -> Option<String> {
+    if !(text.starts_with("arn:") || text.starts_with("https://") || text.starts_with("s3://")) {
+        return None;
+    }
+    let service = text
+        .strip_prefix("arn:")
+        .and_then(|_| text.split(':').nth(2));
+    let mut contracts = ENTRIES
+        .iter()
+        // An ARN's service is explicit. Do not run unrelated service forms for every scalar.
+        .filter(|entry| {
+            service.is_none_or(|service| {
+                entry
+                    .forms
+                    .iter()
+                    .any(|form| form.starts_with("arn:") && form.split(':').nth(2) == Some(service))
+            })
+        })
+        .filter_map(|entry| {
+            let name = entry.read(text);
+            (name != text).then(|| entry.contract(name))
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    (contracts.len() == 1).then(|| contracts.pop_first().unwrap())
+}
+
 impl Entry {
     /// The contract a node of this type named `name` provisions.
     pub(crate) fn contract(&self, name: &str) -> String {

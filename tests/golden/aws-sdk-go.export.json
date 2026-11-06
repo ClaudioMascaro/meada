@@ -159,5 +159,13 @@
       "via": null
     }
   ],
-  "links": []
+  "links": [
+    {
+      "consumer": "local/aws-sdk-go::main.go::useBucket",
+      "provider": "local/aws-sdk-go::main.go::useBucket::client.PutObject#0",
+      "contract": "resource::s3::uploads",
+      "level": "exact",
+      "reason": "resource::s3::uploads"
+    }
+  ]
 }

@@ -150,6 +150,13 @@
       "root": "envs/prod"
     }
   ],
+  "uses": [
+    {
+      "contract": "channel::sqs::orders",
+      "site": "example.com/provision/infra",
+      "at": "envs/prod/terraform.tfvars#queue"
+    }
+  ],
   "links": [],
   "provisions": [
     {
@@ -279,6 +286,24 @@
       "contract": "channel::sqs::refunds",
       "level": "exact",
       "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/infra",
+      "provisioner": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.orders",
+      "root": "envs/dev",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; config envs/prod/terraform.tfvars#queue",
+      "at": "envs/prod/terraform.tfvars#queue"
+    },
+    {
+      "side": "example.com/provision/infra",
+      "provisioner": "example.com/provision/infra::envs/prod/main.tf::aws_sqs_queue.orders",
+      "root": "envs/prod",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; overridable: example.com/provision/infra envs/prod/terraform.tfvars:1 var.queue (tfvars); config envs/prod/terraform.tfvars#queue",
+      "at": "envs/prod/terraform.tfvars#queue"
     }
   ]
 }

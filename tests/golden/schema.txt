@@ -166,6 +166,16 @@ sample.ts
       },
       "params": [],
       "hash": "a8dcd98b64ed70e3783cb0e922c13cef23fdf485e138e2d7c1d274d56c21ec21"
+    },
+    {
+      "name": "publishAws",
+      "kind": "Function",
+      "range": {
+        "start": 1144,
+        "end": 1232
+      },
+      "params": [],
+      "hash": "b43725bd799c67fe1d55d935d0074e46ffb5a576dfeeae9bcccebcb32cd50fbb"
     }
   ],
   "imports": [
@@ -193,6 +203,20 @@ sample.ts
       "source": "./helper",
       "name": {
         "Name": "helper"
+      }
+    },
+    {
+      "local": "SNSClient",
+      "source": "@aws-sdk/client-sns",
+      "name": {
+        "Name": "SNSClient"
+      }
+    },
+    {
+      "local": "PublishCommand",
+      "source": "@aws-sdk/client-sns",
+      "name": {
+        "Name": "PublishCommand"
       }
     }
   ],
@@ -311,6 +335,30 @@ sample.ts
         "start": 1039,
         "end": 1047
       }
+    },
+    {
+      "scope": "",
+      "callee": "SNSClient",
+      "range": {
+        "start": 1125,
+        "end": 1142
+      }
+    },
+    {
+      "scope": "publishAws",
+      "callee": "sdk.send",
+      "range": {
+        "start": 1170,
+        "end": 1229
+      }
+    },
+    {
+      "scope": "publishAws",
+      "callee": "PublishCommand",
+      "range": {
+        "start": 1179,
+        "end": 1228
+      }
     }
   ],
   "consts": [
@@ -325,6 +373,9 @@ sample.ts
     },
     {
       "name": "Rows"
+    },
+    {
+      "name": "sdk"
     }
   ],
   "locals": [
@@ -462,6 +513,32 @@ sample.py
       },
       "params": [],
       "hash": "2c420469e96e5a133f3c28d89693ba5ecdfe3386b2e57d59bd9368a09283e62a"
+    },
+    {
+      "name": "maybe_client",
+      "kind": "Function",
+      "range": {
+        "start": 922,
+        "end": 993
+      },
+      "params": [
+        {
+          "name": "flag",
+          "binds": "Any"
+        }
+      ],
+      "hash": "95d4e130cecc70c231d27979b2ddec7c87b36c3de4706462e15cdf955434a510"
+    },
+    {
+      "name": "async_client",
+      "kind": "Function",
+      "range": {
+        "start": 996,
+        "end": 1055
+      },
+      "params": [],
+      "asynchronous": true,
+      "hash": "8f83f261b35ddaff0b278c2a2a4841f86717135464d787da6a7ef09408b95bfe"
     }
   ],
   "imports": [
@@ -507,6 +584,18 @@ sample.py
     }
   ],
   "exports": [
+    {
+      "Local": {
+        "exported": "async_client",
+        "local": "async_client"
+      }
+    },
+    {
+      "Local": {
+        "exported": "maybe_client",
+        "local": "maybe_client"
+      }
+    },
     {
       "All": {
         "source": ".extras"
@@ -651,6 +740,23 @@ sample.py
       "range": {
         "start": 795,
         "end": 806
+      }
+    },
+    {
+      "scope": "maybe_client",
+      "callee": "Client",
+      "range": {
+        "start": 974,
+        "end": 982
+      }
+    },
+    {
+      "scope": "async_client",
+      "callee": "helpers.client",
+      "awaited": true,
+      "range": {
+        "start": 1039,
+        "end": 1055
       }
     }
   ],

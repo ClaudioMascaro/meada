@@ -132,18 +132,19 @@ A contract identifier starts with its contract kind and `::`:
 | `<contract>` | `channel::<broker>::<channel>` | A queue, topic or subject of a broker: `channel::kafka::orders.created`. |
 | `<contract>` | `package::<ecosystem>::<package>` | A package: `package::npm::@example/kit`. |
 | `<contract>` | `image::<word>` | A normalized image name or an unresolved image pattern. |
-| `<contract>` | `resource::<resource-kind>::<resource-id>` | A resource declared in `meada.toml`: `resource::postgres::orders`. |
+| `<contract>` | `resource::<resource-kind>::<resource-id>` | A resource declared in `meada.toml` or used through an SDK: `resource::postgres::orders`, `resource::s3::orders-bucket`. |
 | `<method>` | `<word>` | An HTTP method in upper case, such as `GET` or `POST`. |
 | `<route>` | `<word>` | A route path; each parameter is `{}`. |
 | `<broker>` | `<word>` | The broker kind: `kafka`, `amqp`, `nats`, `sqs`, `servicebus` and the others the language packs read. |
 | `<channel>` | `<word>` | The channel's name; a pattern keeps its wildcards (`orders.>`). |
 | `<ecosystem>` | `<word>` | `npm`, `pypi`, `go`, `cargo`, `maven`, `nuget` or `swiftpm`. |
 | `<package>` | `<word>` | The package's name in its ecosystem: `@example/kit`, `example:models`, a Go module path. |
-| `<resource-kind>` | `<word>` | The resource's `kind` in `meada.toml`. |
-| `<resource-id>` | `<text>` | The resource's `id` in `meada.toml`. |
+| `<resource-kind>` | `<word>` | The declared or SDK resource kind. |
+| `<resource-id>` | `<text>` | The declared resource id or SDK physical name. |
 | `<shown-contract>` | `<contract>` | A contract as answers show it. |
 | `<shown-contract>` | `image::<word> (unresolved)` | An image pattern with insufficient literal or segment evidence. |
 | `<shown-contract>` | `channel::<broker> (unresolved)` | A channel side whose name Meada cannot read. |
+| `<shown-contract>` | `resource::<resource-kind> (unresolved)` | An SDK resource side whose physical name Meada cannot read. |
 | `<shown-contract>` | `(unresolved) <callee>` | In `search`: a consumer whose contract Meada cannot read (an open item), with the call it sits at. |
 
 ## `search`
@@ -154,10 +155,10 @@ substrings), and an optional `kind`:
 | `kind` | Lists |
 | --- | --- |
 | `symbol` | Symbols whose name matches. |
-| `contract` | Providers, consumers and provisioners whose contract identifier matches. |
+| `contract` | Providers, consumers, config uses and provisioners whose contract identifier matches. |
 | `route` | Providers and consumers of `http::` contracts. |
-| `resource` | Writers, readers and provisioners of `resource::` contracts. |
-| `channel` | Producers, consumers and provisioners of `channel::` contracts. |
+| `resource` | Writers, readers, config uses and provisioners of `resource::` contracts. |
+| `channel` | Producers, consumers, config uses and provisioners of `channel::` contracts. |
 | `image` | Builders and workload runners of `image::` contracts. |
 | `document` | OpenAPI and AsyncAPI documents, by path or title. |
 | `package` | Packages, by name. |
@@ -196,6 +197,8 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 | `<site>` | `(repository-level)` | A side declared with no `via`: the whole repository. |
 | `<site>` | `<path> (documented only)` | A side only a provider document lists. |
 | `<site>` | `<path> <manifest-field>` | A dependency entry of a manifest, such as `package.json dependencies`. |
+| `<site>` | `use <config-place> [<level>]` | A directionless config use, with its key locator and evidence level. |
+| `<config-place>` | `<path>#<key-path> (line <line>)` | A config key's repository-relative locator and 1-based line. |
 | `<manifest-field>` | `<word>` | The manifest's field holding the entry. |
 | `<summary>` | `openapi <version>, routes: <n>` | An OpenAPI document and how many routes it lists. |
 | `<summary>` | `asyncapi <version>, channels: <n>` | An AsyncAPI document and how many channels it lists. |
@@ -227,7 +230,10 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 ## `context`
 
 `context` takes a `symbol`: a name, `<path>::<name>`, an identity, or a contract identifier as
-`search` prints it. Its answer takes one of four forms.
+`search` prints it. A config use also accepts `<file>#<key path>` or
+`<repository>::<file>#<key path>`: its first line locates the key and names its contract and
+level, followed by `provisioners:` when it has provisioning links. Its answer takes the
+following forms.
 
 **A symbol.** Its head line, its community line, its processes line, its span text, then its
 sections:
@@ -273,7 +279,7 @@ words:
 | `annotations:` | callee, overload set, unresolved call |
 | `consumers:` | package consumer |
 | `provisioners:` | provisioner |
-| `contracts:` | provides, shape fields, shape open, produces, publishes, consumes, consumes decided, consumes unresolved |
+| `contracts:` | provides, shape fields, shape open, produces, publishes, consumes, consumes decided, consumes unresolved, environment |
 
 | Kind | Line | Meaning |
 | --- | --- | --- |
@@ -294,13 +300,15 @@ words:
 | provides | `<repository> <place> provides <contract><orphan-note?>` | The symbol provides the contract. |
 | shape fields | `<indent><repository> <shape-source> <carried> fields:<fields?>` | The field paths the shape carries. |
 | shape open | `<indent><repository> <shape-source> <carried> open: <paths>` | The parts of the shape that are open: any field may be under them. |
-| produces | `<repository> <place> produces <shown-contract><mark?><orphan-note?>` | A call of the symbol produces to the channel; after a publish, a queue its bindings route it to. |
+| produces | `<repository> <place> produces <shown-contract><mark?><orphan-note?>` | A call of the symbol produces to the channel or writes the resource; after a publish, a queue its bindings route it to. |
 | publishes | `<repository> <place> publishes <exchange> <key>` | A call of the symbol publishes to an exchange with a routing key. |
 | consumes | `<repository> <place> consumes <shown-contract><orphan-note?>` | The symbol, or a call of it, consumes the contract. |
 | consumes decided | `<repository> <place> consumes <contract> <arrow> <identity>` | A call of the symbol consumes the contract, linked by a decision to the provider `<identity>`. |
 | consumes unresolved | `<repository> <place> consumes (unresolved) <callee>` | A call of the symbol consumes a contract Meada cannot read. |
+| environment | `<repository> <place> unresolved environment <text>` | An SDK argument reads this environment variable; Meada retains its name and never reads its value. |
 | fits | ``` `<query>` fits <n> symbols; pass one of: ``` | The name fits several symbols, listed after it. |
 | no symbol | `` no symbol matches `<query>` `` | No symbol has the name. |
+| config use | `<repository> use <config-place> [<level>] <contract><orphan-note?>` | A directionless config use named by its key locator. |
 | contract head | `<shown-contract>` | The contract the sides below belong to. |
 | side | `  <repository> <role> <side><mark?><orphan-note?>` | A side of the contract; a side linked through another name carries its mark. |
 | drift | `    drift: missing <missing>` | Under a consumer: the field paths it reads that the provider lacks, each with its level. |
@@ -374,6 +382,7 @@ words:
 | `<paths>` | `<text>` | Field paths joined by `, `. |
 | `<exchange>` | `<word>` | An exchange. |
 | `<key>` | `<word>` | A routing key. |
+| `<role>` | `use` | Names the resource in config, with no direction; links only to provisioners. |
 | `<role>` | `builder` | The repository whose configuration publishes an image. |
 | `<role>` | `runner` | A workload that runs an image. |
 | `<role>` | `provisioner` | Creates the resource. |
@@ -387,6 +396,7 @@ words:
 | `<role>` | `dependent` | A dependency entry on the package, or a call that reaches it through an import. |
 | `<role>` | `binding <exchange> <binding-pattern>` | A binding that routes the exchange's messages to the queue. |
 | `<binding-pattern>` | `<word>` | The binding's routing pattern. |
+| `<side>` | `<config-place> [<level>]` | A directionless config use at its key, with its evidence level. |
 | `<side>` | `<place> <address> (root <iac-root>)` | A provisioner and its root. |
 | `<side>` | `<place> <caller>` | A side in code: the line and the symbol around it. |
 | `<side>` | `<path>` | A manifest. |
@@ -455,6 +465,7 @@ carries its level with no reason.
 
 | Field | Form | Meaning |
 | --- | --- | --- |
+| `<node>` | `<repository> use <config-place> [<level>]` | A config key; down ends here, up follows only provisioning links. |
 | `<node>` | `<repository> <place> <name>` | A symbol at its definition, or a call site and the name it calls. |
 | `<node>` | `<repository> <path> (top level)` | A file: the top level of a file making calls, or a route file serving with no function of its own. |
 | `<node>` | `<repository> (repository-level)` | A side declared with no `via`; the branch ends there. |

@@ -346,6 +346,8 @@ matches. They stay out of `meada export`.
   already does. List in `.meadaignore` the files that must stay out of the index (`secrets/`,
   `*.env.json`).
 
+An AWS ARN recognized by the type table, an SQS URL or `s3://archive/path` in config becomes an `exact` use side, located by `<file>#<key path>`. A plain name under the final key `queue`, `topic`, `bucket` or `table` becomes an `inferred` SQS, SNS, S3 or DynamoDB use, respectively. For example, `queue: orders` in Helm values uses `channel::sqs::orders`; `other: orders` links nothing. A use has no direction: it links only to provisioners and counts for orphans, without becoming a producer, consumer, writer or reader. `context` and contract search show these uses, and `trace` follows provisioning links to the key and back. Redacted, cut or unresolved values stay out; the attribute defining a provisioner's name does not use its own resource. Export includes the sides in `uses`, without value text, and the console shows them separately from directed sides.
+
 ### IaC nodes
 
 Each `resource`, `data` block and `module` call of the `*.tf` and `*.tofu` files is an **IaC
@@ -2039,3 +2041,37 @@ duplicates.
 - [Server mode](https://claudiomascaro.github.io/meada/en/server/): running Meada for a team.
 - A wrong result on Meada's own code is a bug: open an issue with the query, the answer and the
   expected one.
+
+## AWS SDK calls in code
+
+TypeScript and JavaScript recognize v3 commands sent with `client.send(new Command(...))`,
+with both client and command imported from the corresponding AWS package. Python recognizes
+methods on clients constructed by `boto3.client(...)` or a `Session`. Names can come from
+constants and arguments of exactly resolved wrappers. A client reached only by a name match,
+or hidden by a parameter, `catch`, destructuring or another binding, contributes no side.
+
+| Service | Produces or writes | Reads | Name argument |
+| --- | --- | --- | --- |
+| SNS | `Publish`, `PublishBatch` | | `TopicArn` |
+| EventBridge | `PutEvents` | | `Entries[].EventBusName`, `default` when omitted |
+| Kinesis | `PutRecord`, `PutRecords` | | `StreamARN` or `StreamName` |
+| S3 | `PutObject` | `GetObject` | `Bucket` |
+| DynamoDB | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem`, `TransactWriteItems` | `GetItem`, `Query`, `Scan`, `BatchGetItem`, `TransactGetItems` | `TableName`, `RequestItems` keys, or `TransactItems` tables |
+| SSM | | `GetParameter`, `GetParameters`, `GetParametersByPath` | `Name`, `Names`, `Path` |
+| Secrets Manager | | `GetSecretValue`, `BatchGetSecretValue` | `SecretId`, `SecretIdList` |
+
+In JavaScript each operation above has the `Command` suffix; boto3 uses snake case
+(`put_object`, `get_secret_value`). SNS, EventBridge and Kinesis are producers; S3 and DynamoDB
+use resource writer and reader sides. Literal names and supported ARNs join infrastructure by
+physical name, without account or region. Literal SDK sides link at `exact`, including other
+SDK sides in the same repository; a side declared in `meada.toml` keeps `declared`.
+Overridable infrastructure values still weaken a link to `inferred`.
+
+A read such as `process.env.BUCKET` or `os.getenv("BUCKET")` stays unresolved, with
+`via: "env:BUCKET"` in the export and the variable named in its function's context. An SDK
+producer or writer also has `via`, optional in format 1; a literal uses `sdk:aws`.
+Meada never reads the process environment. Constructing an unused command, SNS publishes to
+phone numbers or endpoints, high-level `boto3.resource` and `DynamoDBDocumentClient` clients,
+and operations outside this table are not recognized by these forms.
+
+`GetParametersByPath` queries a hierarchy, so its side stays unresolved; the path is not treated as a parameter name. A `ConditionCheck` in `TransactWriteItems` is a reader, even when the transaction also writes other tables. Computed `RequestItems` keys retain a literal or the environment variable name.

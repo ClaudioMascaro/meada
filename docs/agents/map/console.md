@@ -517,3 +517,8 @@ The frontend container stage copies the one shared validation fixture because Ty
 checks its tests; Rust/default stages gain no frontend input.
 Vitest exercises the built WASM and the public client, view-model and DOM
 seams, without a browser end-to-end suite.
+
+Config uses (#661) appear in the contracts view's separate optional uses column, as repository
+plus `at`; the graph never puts them in provider or consumer columns. Provisioning rows retain
+those uses' repository-level side and key locator, while existing directed links keep their
+own view. WASM `parseExport` retains the optional `uses` and provisioning `at` fields.

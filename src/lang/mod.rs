@@ -934,6 +934,9 @@ pub struct Def {
     /// A call fits the function only when written under `await` (Swift's `async`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub suspends: bool,
+    /// The call produces a coroutine; its written return values require an awaited call (Python).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub asynchronous: bool,
     /// The BLAKE3 of the exact bytes of `range`, in hex; empty until `hash_spans` fills it.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub hash: String,
@@ -957,6 +960,7 @@ impl Def {
             unwrapped: None,
             output: None,
             suspends: false,
+            asynchronous: false,
             hash: Default::default(),
         }
     }
@@ -1252,6 +1256,8 @@ pub struct Member {
 /// parameters whose arguments are not known remain as `Ref`s.
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Value {
+    /// The value obtained by awaiting an expression (Python), retained through aliases.
+    Await(Box<Value>),
     /// A string: literals, template literals and `+` concatenation, folded into parts.
     Str(Vec<Part>),
     /// An object literal's properties; a spread `...x` is the key `...` with the value of `x`.
@@ -1323,6 +1329,16 @@ pub fn property<'v>(
     for (k, value) in properties.iter().rev() {
         match (k.as_str(), value) {
             (k, value) if k == key => return Ok(Some(value)),
+            ("[]", Value::List(pair)) => match pair.as_slice() {
+                [Value::Str(parts), value] => match literal(parts) {
+                    Some(name) if name == key => return Ok(Some(value)),
+                    Some(_) => {}
+                    None if parts.iter().any(|p| matches!(p, Part::Ref(_))) => return Err(Depends),
+                    None => return Ok(Some(&UNKNOWN)),
+                },
+                [Value::Ref(_), _] => return Err(Depends),
+                _ => return Ok(Some(&UNKNOWN)),
+            },
             ("...", Value::Object(inner)) => {
                 if let Some(found) = property(inner, key)? {
                     return Ok(Some(found));

@@ -90,14 +90,15 @@ for the area a change touches.
 - `image.rs`, `image/config.rs`: image builders/runners, normalized names, checked-in build configuration, workload execution and two-role orphans. [contracts](map/contracts.md)
 - `channel.rs`, `channel/`: the channel kind (queues and topics), one module per language for message libraries. [contracts](map/contracts.md)
 - `package.rs`, `package/`: packages as contracts, one module per ecosystem behind the `Ecosystem` trait. [contracts](map/contracts.md)
-- `names.rs`: the questions the contract kinds ask of a name: what a library outside the repository is. [languages](map/languages.md)
+- `names.rs`, `names/`: external constructor origins shared by kind-owned language forms (`names/python/arguments.rs` checks complete factory evidence), and the questions the contract kinds ask of a name: what a library outside the repository is. [languages](map/languages.md)
 - `jvm/`: what the JVM ecosystems and kinds share: the Maven and Gradle readers, Spring configuration, file readers. [languages](map/languages.md), [seams](map/seams.md)
 - `dotnet/`: what the .NET pack and ecosystems share (spec #28): the MSBuild project reader and what builds on it. [seams](map/seams.md)
 - `xml.rs`: the bounds the XML build readers of `jvm/` and `dotnet/` share. [seams](map/seams.md)
 - `document/`: OpenAPI and AsyncAPI provider documents, read into a `Summary` (spec #21), and `events.rs`, the one YAML and JSON event reader every YAML or JSON reader goes through (#646). [documents](map/documents.md)
 - `config_values.rs`, `config_values/hcl.rs`: config values (#639, #640, ADR 0025): every scalar of the YAML, JSON and Terraform files the walk visits and of the hidden CI paths, with its key path, `search` kind `value` and the `meada status` counts. [documents](map/documents.md)
 - `iac.rs`, `iac/`: the embedded AWS type table, provisioning sides/links and subscription
-  summaries (`iac/subscription.rs`, #656, #658), and `iac/orphans.rs`, scope-aware orphan
+  summaries (`iac/subscription.rs`, #656, #658), directionless config uses
+  (`iac/config_uses.rs`, #661), and `iac/orphans.rs`, scope-aware orphan
   reports and side markers (#657); IaC nodes (#649,
   ADR 0025): the Terraform resources, data blocks and module calls with their address and root
   module, the references between them, the static evaluation of their names (#650,
@@ -292,6 +293,7 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
 
   | Question | The kind says |
   |---|---|
+  | `use_level` | the strength of a directed side before an evaluated provisioner name weakens it (resources distinguish SDK and declared sides) |
   | `entry` | which entry point kind a side of a contract makes (a pure function of the contract: entry points are stored) |
   | `declare` | the sides `meada.toml` declares, run at query time (a config edit needs no reindex) |
   | `symbols_read` | the symbols `declare`, `workspace_step`, `link` and `status` look up, which a partial export reads before declaring (resources: their `via` symbols; packages: every symbol of a repository with a named manifest) |

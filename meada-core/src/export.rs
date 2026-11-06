@@ -109,6 +109,9 @@ pub struct Export {
     /// The provisioner sides of the repository (ADR 0026, #656), by contract, node, root.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub provisioners: Vec<Provisioner>,
+    /// Directionless config uses (#661), by contract and key site. No config value text.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub uses: Vec<Use>,
     pub links: Vec<Link>,
     /// The provisioning links that touch the repository (ADR 0026, #656): from every other
     /// side of a contract to each of its provisioners, by side, provisioner, root, contract.
@@ -148,6 +151,7 @@ impl Default for Export {
             iac_nodes: Vec::new(),
             executions: Vec::new(),
             provisioners: Vec::new(),
+            uses: Vec::new(),
             links: Vec::new(),
             provisions: Vec::new(),
             subscriptions: Vec::new(),
@@ -216,7 +220,7 @@ pub struct CallSite {
 pub struct Provider {
     pub contract: String,
     pub site: String,
-    /// The environment variable an unresolved SDK operation reads, when known.
+    /// SDK origin (`sdk:aws`) or an unresolved environment read (`env:NAME`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub via: Option<String>,
     /// Configuration location of a repository-level side, `<file>#<key path>`.
@@ -494,6 +498,9 @@ pub struct Provision {
     pub contract: String,
     pub level: Level,
     pub reason: String,
+    /// The key locator of a directionless config use; absent for directed sides.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<String>,
 }
 
 impl Provision {
@@ -508,6 +515,7 @@ impl Provision {
         reason: String,
     ) -> Self {
         Self {
+            at: None,
             side,
             provisioner,
             root,
@@ -516,6 +524,15 @@ impl Provision {
             reason,
         }
     }
+}
+
+/// A config use has no direction. Its repository-level site is located by `at` (ADR 0026).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[non_exhaustive]
+pub struct Use {
+    pub contract: String,
+    pub site: String,
+    pub at: String,
 }
 
 /// A consumer linked to a provider through a contract. Each side is a call site, a symbol, a

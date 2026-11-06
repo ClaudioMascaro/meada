@@ -53,7 +53,7 @@
   node-redis client made as `await createClient().connect()` is not traced (the `connect` chain
   has no binding); a BullMQ processor given as a file path is not followed (the function that
   makes the `Worker` handles).
-- `channel/python.rs`: a client is traced to its constructor by `Code::origins` (a name its
+- `channel/python.rs`: a client needs complete constructor evidence in `names/python/arguments.rs` (a name its
   scope binds once, an attribute assigned a call once, a parameter every exact caller passes, a
   value a function returns, or a call written in place: `boto3.client("sqs").send_message(...)`,
   `pika.BlockingConnection(p).channel().basic_publish(...)`), with one level of `channel()` or
@@ -93,3 +93,9 @@
   the documented table do not. A hierarchy query (`GetParametersByPath`) has no physical
   parameter name and stays unresolved. RDS and ElastiCache control-plane clients establish
   no data uses. Kotlin keeps the earlier typed SQS reader.
+
+- Python complete factory evidence (#659/#660): `EVAL_DEPTH` (256) and `EVAL_BUDGET` (65,536)
+  bound each receiver question, including argument inventories. The memo keys constructor
+  evidence rather than full call routes; a 1 MiB parameter-return lattice with 128 operations
+  retains its whole side set. Opaque keyword/positional expansions supply no parameter evidence;
+  a second await applied to already-awaited evidence remains unknown.

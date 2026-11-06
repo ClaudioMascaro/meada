@@ -13,6 +13,7 @@ mod channels;
 mod channels_jobs;
 mod cli;
 mod community_queries;
+mod config_uses;
 mod config_values;
 mod conformance;
 mod crossplane;

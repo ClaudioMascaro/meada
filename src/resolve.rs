@@ -5379,6 +5379,12 @@ impl<'a> Code<'a> {
         out
     }
 
+    /// Whether calling this definition produces a coroutine before its return values.
+    pub fn coroutine(&self, function: Target<'a>) -> bool {
+        self.def(function.path, function.name)
+            .is_some_and(|d| d.asynchronous)
+    }
+
     /// The names `path` mentions (`Facts::mentions`); `None` where the pack does not tell.
     pub fn mentions(&self, path: &'a str) -> Option<&'a BTreeSet<String>> {
         self.full(path)?.mentions.as_ref()
@@ -5895,6 +5901,7 @@ impl<'a> Code<'a> {
 
     fn flow(&self, path: &'a str, scope: &'a str, value: &'a Value, trail: &mut Trail<'a>) {
         match value {
+            Value::Await(value) => self.flow(path, scope, value, trail),
             Value::Ref(name) => self.flow_name(path, scope, name, trail),
             Value::Call(call) => {
                 let calls = &self.resolver.files[path].calls;
@@ -6290,7 +6297,14 @@ impl<'a> Code<'a> {
         scope: &'a str,
         name: &'a str,
     ) -> Option<(&'a str, &'a str, &'a Value)> {
-        let Binding::Const(at, constant) = self.resolver.read_member(path, scope, name) else {
+        let binding = self.resolver.read_member(path, scope, name);
+        let binding = match binding {
+            Binding::Local(at, within, name) => self.resolver.consts[at]
+                .get(crate::qualify(within, name).as_str())
+                .map_or(binding, |&constant| Binding::Const(at, constant)),
+            binding => binding,
+        };
+        let Binding::Const(at, constant) = binding else {
             return None;
         };
         let (value, within) = self.held(at, constant)?;
@@ -6403,6 +6417,49 @@ impl<'a> Code<'a> {
             ))
         });
         args.collect()
+    }
+
+    /// Every argument an exact caller supplies, including a declared default when omitted.
+    /// A selected call frame binds this parameter alone; missing arguments stay unknown.
+    pub fn param_values(
+        &self,
+        function: Target<'a>,
+        n: usize,
+        frame: Option<(&'a str, usize)>,
+    ) -> Option<Vec<(&'a str, &'a str, &'a Value)>> {
+        let sites: Vec<_> = frame.map_or_else(
+            || {
+                self.resolver
+                    .callers
+                    .get(&function)
+                    .into_iter()
+                    .flatten()
+                    .map(|c| (c.path, c.index))
+                    .collect()
+            },
+            |site| vec![site],
+        );
+        if sites.is_empty() {
+            return None;
+        }
+        sites
+            .into_iter()
+            .map(|(path, index)| {
+                let call = self.call(path, index)?;
+                if call.keyword("...").is_some() || call.keyword("*").is_some() {
+                    return None;
+                }
+                if let Some(value) = self.arg(path, index, function, n) {
+                    Some((path, call.scope.as_str(), value))
+                } else {
+                    Some((
+                        function.path,
+                        crate::parent(function.name),
+                        self.param(function, n)?.default.as_ref()?,
+                    ))
+                }
+            })
+            .collect()
     }
 
     /// The function of the repository the value flow reaches through the call at `index` of
@@ -6812,6 +6869,7 @@ impl<'a> Code<'a> {
         }
         fold.nested += 1;
         let folded = match value {
+            Value::Await(value) => self.eval(path, scope, value, frames, depth, fold, wants),
             Value::Str(parts) => {
                 let mut out = Vec::new();
                 for part in parts {

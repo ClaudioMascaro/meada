@@ -15,6 +15,26 @@ All notable changes to Meada are recorded here. The format follows
   incomplete origins are rejected, and injected types alone create no SDK side. .NET named
   requests and its S3 metadata spelling are supported. SDK resource links are exact while
   declarations remain declared; hierarchy queries stay unresolved. Release level: minor, meada and meada-core 1.4.0 (#660).
+- AWS SDK use sides in TypeScript, JavaScript (SDK v3) and Python (boto3): SNS publishes,
+  EventBridge event entries and Kinesis record writes produce channel sides; S3 and DynamoDB
+  operations write or read resource sides; SSM and Secrets Manager operations read resources.
+  Batch and transaction inputs retain each named resource. Both client and operation origins
+  must be the SDK's; name-matched hops and hidden client names produce no side. Literal names
+  and supported ARNs join provisioners at `exact`; environment reads stay unresolved and name
+  their variable through `via: env:NAME`, without reading the process environment. SDK providers
+  gain an optional `via`, absent on existing providers; format remains 1. Existing declared
+  resource sides retain `declared`. Older indexes rebuild. Release level: minor, meada and
+  meada-core 1.4.0 (#659).
+  Complete Python factory evidence rejects opaque or missing returns and unawaited coroutine
+  or generator objects, preserves exact arguments, class fields and awaited aliases, and
+  shares bounded constructor traversal with existing message clients.
+- Config values naming AWS resources become directionless use sides (#661): recognized ARNs,
+  SQS queue URLs and S3 URIs are exact; plain names under final `queue`, `topic`, `bucket` and
+  `table` keys are inferred. Each key links only to provisioners and counts for scoped orphans;
+  bare equal values, redacted/cut values and provisioner name definitions create no use.
+  Search, context, trace, export's optional `uses` and the console retain key locations
+  without adding producer/consumer or writer/reader links. Release level: minor, meada and
+  meada-core 1.4.0.
 - Image contracts (#662): normalized `image::<registry>/<repository>` names connect builders
   in GitHub Actions, Compose, Skaffold, ko and Jib to Kubernetes, Compose and Helm runners,
   including Kustomize image overrides. Context shows builders, trace crosses into code and

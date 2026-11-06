@@ -1,0 +1,135 @@
+{
+  "format": 1,
+  "repository": "example.com/config-use/infra",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [],
+  "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/config-use/infra::main.tf::aws_dynamodb_table.orders",
+      "address": "aws_dynamodb_table.orders",
+      "type": "aws_dynamodb_table",
+      "root": ".",
+      "path": "main.tf",
+      "line": 4,
+      "end_line": 4
+    },
+    {
+      "identity": "example.com/config-use/infra::main.tf::aws_s3_bucket.archive",
+      "address": "aws_s3_bucket.archive",
+      "type": "aws_s3_bucket",
+      "root": ".",
+      "path": "main.tf",
+      "line": 3,
+      "end_line": 3
+    },
+    {
+      "identity": "example.com/config-use/infra::main.tf::aws_sns_topic.events",
+      "address": "aws_sns_topic.events",
+      "type": "aws_sns_topic",
+      "root": ".",
+      "path": "main.tf",
+      "line": 2,
+      "end_line": 2
+    },
+    {
+      "identity": "example.com/config-use/infra::main.tf::aws_sqs_queue.orders",
+      "address": "aws_sqs_queue.orders",
+      "type": "aws_sqs_queue",
+      "root": ".",
+      "path": "main.tf",
+      "line": 1,
+      "end_line": 1
+    }
+  ],
+  "provisioners": [
+    {
+      "contract": "channel::sns::events",
+      "node": "example.com/config-use/infra::main.tf::aws_sns_topic.events",
+      "root": "."
+    },
+    {
+      "contract": "channel::sqs::orders",
+      "node": "example.com/config-use/infra::main.tf::aws_sqs_queue.orders",
+      "root": "."
+    },
+    {
+      "contract": "resource::dynamodb::orders",
+      "node": "example.com/config-use/infra::main.tf::aws_dynamodb_table.orders",
+      "root": "."
+    },
+    {
+      "contract": "resource::s3::archive",
+      "node": "example.com/config-use/infra::main.tf::aws_s3_bucket.archive",
+      "root": "."
+    }
+  ],
+  "links": [],
+  "provisions": [
+    {
+      "side": "example.com/config-use/app",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_dynamodb_table.orders",
+      "root": ".",
+      "contract": "resource::dynamodb::orders",
+      "level": "inferred",
+      "reason": "resource::dynamodb::orders; config values.yaml#worker.table",
+      "at": "values.yaml#worker.table"
+    },
+    {
+      "side": "example.com/config-use/app",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_s3_bucket.archive",
+      "root": ".",
+      "contract": "resource::s3::archive",
+      "level": "exact",
+      "reason": "resource::s3::archive; config application.yml#spring.storage.location",
+      "at": "application.yml#spring.storage.location"
+    },
+    {
+      "side": "example.com/config-use/app",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_s3_bucket.archive",
+      "root": ".",
+      "contract": "resource::s3::archive",
+      "level": "inferred",
+      "reason": "resource::s3::archive; config values.yaml#worker.bucket",
+      "at": "values.yaml#worker.bucket"
+    },
+    {
+      "side": "example.com/config-use/app",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_sns_topic.events",
+      "root": ".",
+      "contract": "channel::sns::events",
+      "level": "exact",
+      "reason": "channel::sns::events; config application.yml#spring.messaging.destination",
+      "at": "application.yml#spring.messaging.destination"
+    },
+    {
+      "side": "example.com/config-use/app",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_sns_topic.events",
+      "root": ".",
+      "contract": "channel::sns::events",
+      "level": "inferred",
+      "reason": "channel::sns::events; config values.yaml#worker.topic",
+      "at": "values.yaml#worker.topic"
+    },
+    {
+      "side": "example.com/config-use/app",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_sqs_queue.orders",
+      "root": ".",
+      "contract": "channel::sqs::orders",
+      "level": "exact",
+      "reason": "channel::sqs::orders; config application.yml#spring.messaging.endpoint",
+      "at": "application.yml#spring.messaging.endpoint"
+    },
+    {
+      "side": "example.com/config-use/app",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_sqs_queue.orders",
+      "root": ".",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; config values.yaml#worker.queue",
+      "at": "values.yaml#worker.queue"
+    }
+  ]
+}

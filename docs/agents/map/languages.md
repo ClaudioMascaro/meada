@@ -554,3 +554,11 @@ environment reads; the architecture map keeps the lead of the first:
   parameters, which a call's argument names (`Value::Function`) and which folds into the
   symbol around it unless a kind claims it; `new[] { .. }`, `new T[] { .. }` and `[..]` are
   lists.
+
+
+Python records unknown return evidence for bare returns, possible fallthrough and generators.
+`Def::asynchronous` distinguishes coroutine-producing functions; `Call::awaited` and
+`Value::Await` retain await syntax, including through a named pending coroutine. The
+syntax-only `exits` check follows terminal return/raise and complete if/elif/else branches
+within `VALUE_DEPTH`. The generic complete factory reader in `names/python/arguments.rs`
+consumes this evidence; ordinary value expansion still unwraps await as before.

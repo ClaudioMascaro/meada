@@ -1,129 +1,109 @@
-# A7 AWS SDK forms in Java, Go and C# (#660)
+# A7 AWS SDK use sides (#659)
 
-This extends the permanent application proof through `/create-prove-it`. It adds flows to
-existing CLI/MCP surfaces. The CLI export and MCP stdio are primary; HTTP copies stdio.
-The answer keys are maintainer #660 and parent #642, the indexed neutral source, and ADR
-0025/0026 at the brief's exact base. Fetch those issues and base ADRs through connected
-GitHub reads before checking. Feature code, its fixtures, goldens and newly written docs
-are never answer keys.
+This extends the permanent app skill through `/create-prove-it`. CLI export/status and MCP
+stdio are primary; MCP HTTP copies stdio; the console query/export API copies MCP/CLI and its
+existing graph tables copy that export. No new UI representation is required. The answer keys
+are maintainer #659/#642 and ADR 0025/0026 at the brief's base for new flows, the exact base
+binary on identical code-only SQS inputs for existing flows, and parity for copied surfaces.
+Read the issues and comments at run time. Feature fixtures, feature tests, changed goldens and
+the implementation are never the answer key.
 
-The referenced ADR contains no operation inventory. The coordinating brief fixes the
-operation scope below. Record that distinction in the receipt: this probe cannot claim
-that an absent ADR operation table was checked. Client direction follows AWS request
-semantics and #642's use-side rules.
+The AFK dispatch already selects an independent checker and the app, rather than a migration.
+Use these methods without an additional confirmation round:
 
-| Service | Operations and direction |
-| --- | --- |
-| SQS | SendMessage, SendMessageBatch produce; ReceiveMessage consumes |
-| SNS | Publish, PublishBatch produce |
-| EventBridge | PutEvents entries produce |
-| Kinesis | PutRecord, PutRecords produce |
-| S3 | PutObject, DeleteObject write; GetObject, HeadObject, ListObjects, ListObjectsV2 read |
-| DynamoDB | PutItem, UpdateItem, DeleteItem, BatchWriteItem write; GetItem, Query, Scan, BatchGetItem read |
-| SSM | GetParameter, GetParameters read; GetParametersByPath is an unresolved hierarchy query; PutParameter, DeleteParameter, DeleteParameters write |
-| Secrets Manager | GetSecretValue, BatchGetSecretValue read; PutSecretValue, UpdateSecret, CreateSecret, DeleteSecret write |
-
-SDK spelling differs from logical operations: .NET S3 uses `BucketName` on all six request
-models, and `GetObjectMetadataAsync(GetObjectMetadataRequest)` for logical HeadObject.
-Java/Go retain Bucket/HeadObject. Java S3 PutObject includes a `RequestBody` argument.
-Java imports `EventBridgeClient` and `DynamoDbClient`; .NET imports
-`Amazon.EventBridge.AmazonEventBridgeClient` and `Amazon.DynamoDBv2.AmazonDynamoDBClient`.
-These spellings were checked against official AWS source before product proof.
-
-`GetParametersByPath` names a hierarchy prefix, not one physical parameter. Its literal
-case must stay unresolved and link to no same-spelled parameter provisioner; its environment
-case must also retain the variable. Modelling prefix candidates as inferred patterns would
-need a separately specified form. This is a source-semantics correction made before any
-product result was inspected.
-
-RDS and ElastiCache data operations are outside this scope. Their control-plane SDK clients
-do not stand for a data read/write. The AWS SDK service packages use Java 2.x, Go v2 and
-.NET spellings. The probe never calls AWS or downloads an SDK.
-
-## Methods and reachability
-
-| Method | Surface | Answer key | Catches | Misses | Setup / run |
-| --- | --- | --- | --- | --- | --- |
-| Neutral SDK repositories with independent Terraform provisioners | CLI export; MCP search/context/up trace | 4: #660/#642, base ADRs and source; explicit coordinating operation scope | Missing or extra sides, wrong direction or name, missing exact provisioning, unresolved environment provenance, batch forms reading only the first name | SDK overloads not represented; actual runtime cloud behavior | supplied local binary / minutes |
-| Type-only, hidden parameter, hidden constructor and name-matched factory controls | CLI export and call levels | 4: #660, coding standards at base | Clients accepted by type/name alone; outer constructor leaking through a hidden binding; inferred hops treated as exact | Unseeded binding forms | none / included |
-| Same-size SDK name edit and restore in a persistent MCP session | MCP and CLI | 4: edited source and original complete export | Stale extraction, stale query state, broken reverse | Other edit shapes | none / seconds |
-| HTTP transport parity | MCP HTTP | 1: all stdio answers from same binary, plus independent checks above | Transport omissions and tool/error differences | A bug both transports share | local loopback socket / included |
-| Existing corpus parity | CLI, MCP stdio and HTTP | 1: exact base binary on identical pinned inputs | Shared-code regressions across all packs | SDK shapes absent from corpus | existing corpus cache / minutes |
-| Console query/export and graph budgets | Console API and browser | 1: same-mode CLI and stdio; existing maintainer budgets | Launch/version regressions; missing browser-to-API behavior | Cloud permissions outside viewer mode | supplied UI binary and freshly built frontend / minutes |
-
-Use every row for #660's Cargo version change. Shared helpers in `src/contract/sdk/` and the additive `Provider::via` export field also require full-corpus base parity and golden review. Binaries and services being present do not
-prove reachability: start and drive them. Indexing uses generated local repositories only.
-Builds/tests share the coordinating agent's serial slot, `CARGO_BUILD_JOBS=2` and
-`RUST_TEST_THREADS=2`; reuse `/workspace/meada-setup/env.sh` and `services.env` when present.
-No Docker is needed for this probe.
+| Method | Surface | Answer key | Catches | Misses | Setup / run | Reachable |
+| --- | --- | --- | --- | --- | --- | --- |
+| Independently authored operation matrix and exact side/link sets | CLI export/status, MCP context/trace | 4: maintainer spec and base ADRs | Missing/wrong operations, direction, literal identities, provisioners, extra sides and links, unresolved environment names | Other language SDKs | none / seconds | supplied binaries |
+| Origin and hidden-name refusals | CLI export | 4: #659 | Name-matched factory hops, unknown constructors, TS/JS parameter/catch/destructuring and Python rebinding false positives | Every possible syntax spelling | none / seconds | supplied binary |
+| Existing SQS/code parity | CLI export/status, MCP | 1: exact authorized base binary | Shared-code regressions on existing forms | Other existing flows, covered by Scope's corpus | serial base build / seconds | supplied base |
+| Full query/error transport parity | MCP HTTP and console API | 1: head stdio, plus spec above | Missing server rows, partial answers, changed refusal protocol | Shared mistakes on both copies | loopback / seconds | supplied binaries |
+| Loaded graph table/export parity | Console browser | 1: complete CLI/API export | Missing contract, side, provisioning table or graph data; stale UI | New UI design, none requested | cached Chromium/Playwright / seconds | fresh UI binary and frontend |
+| Layout shift | Console graph | budget: CLS <= 0.1 | Unstable graph layout | Visual taste | same browser / seconds | same |
+| Load time | Console graph | budget: <= 2 s on loopback | Startup/page regression | WAN performance | same / seconds | same |
+| Accessibility | Console graph | budget: zero serious/critical axe violations | Inaccessible loaded table | Manual assistive-device use | same / seconds | same |
+| Console errors | Console graph | budget: zero errors | Broken WASM/parser/page | Silently wrong data, checked by parity | same / seconds | same |
 
 ## Drive
 
-From the repository root, after coordinated builds and binary identity checks:
+Source the session's tool and service env, then use the coordinator's serially built binaries:
 
 ```bash
 source /workspace/meada-setup/env.sh
+source /workspace/meada-setup/services.env
 python3 .claude/skills/prove-meada/scripts/aws-sdk.py \
-  --head-bin "$RUN/bin/meada-head" --run "$RUN/aws-sdk" --http
+  --head-bin "$RUN/bin/meada-head" --base-bin "$RUN/bin/meada-base" \
+  --ui-bin "$RUN/bin/meada-head-ui" --ui-dir ui/dist --run "$RUN/aws-sdk"
 ```
 
-`--run` must be a new directory. `--seed-only --run DIR` authors and hashes the neutral
-inputs without driving a product binary; that mode is preparation, never product proof.
-A receipt names the supplied binaries' commit/version, hash and `.from` identity. Never
-index the user's checkout. The script creates only staged, uncommitted repositories under
-its own run's `work/`; there are no pushes, commits or GitHub writes.
+The new run directory is required. `oracle.json` and its source-file SHA256 inventory are saved
+before any Meada answer. The script initializes isolated Git repositories, never indexes the
+checkout itself, and records raw CLI stdout/stderr/exits, stdio wire captures, HTTP/API answers,
+complete browser table captures, screenshots, build hashes and each check as it happens.
+Read the supplied binaries' `.from` files and preserve them beside the receipt. A setup binary
+may help establish the pre-existing wire shape but is never evidence for exact-base parity.
+Do not build concurrently with the implementation agent. No cloud SDK code is executed and
+no cloud API, credential or account is required.
 
-`oracle.json` and `inputs.sha256.json` precede the first product answer. Every operation has
-literal, environment and type-only cases in all three languages. Every service has an exact
-factory, an inferred factory, a parameter hiding a genuine outer constructor, and a local name
-hiding the SDK constructor. Java also has builder-construction cases. Collection arguments
-have two distinct literal names in dedicated cases, so accepting only the first fails.
-The environment variables are deliberately set to tempting concrete names in the process;
-their SDK sides must still stay unresolved and retain the variable, without a workload.
+## Done looks like
 
-Inspect `checks.json`, `sdk.md`, the complete exports, CLI stderr/exit captures and all raw
-stdio/HTTP answers. Each accepted literal name side must have exactly one provisioning link at
-`exact`; environment sides and hierarchy-prefix sides have none. Refusal controls have no side at all. Complete side
-and provisioning counts catch duplicates, extra contracts and direction swaps. An exact-hop
-positive must show an `exact` factory call in the public export. A name-hop control must
-actually show an `inferred` or `ambiguous` factory call: if its generated shape fails to
-exercise that seam, the control is unproved, never a pass because no side happened to appear.
+The complete literal matrix runs in TypeScript, JavaScript and Python, including import aliases:
+SNS Publish; EventBridge PutEvents; Kinesis PutRecord/PutRecords; S3 PutObject/GetObject;
+DynamoDB PutItem/UpdateItem/DeleteItem/BatchWriteItem/TransactWriteItems writers and
+GetItem/BatchGetItem/Query/Scan/TransactGetItems readers, with a separate
+TransactWriteItems ConditionCheck reader; SSM GetParameter/GetParameters readers,
+GetParametersByPath unresolved hierarchy readers and Secrets Manager
+GetSecretValue/BatchGetSecretValue readers. Nested entries, request maps and transaction entries
+carry the name in the SDK's low-level input shape. These are independent ordinary SDK cases,
+not a claim that #659's illustrative operation list limits support to these spellings.
 
-Every scripted new-flow context must show the literal contract or environment variable;
-contract search must find each literal name; upward trace must reach its neutral provisioner at
-`exact`. All queries, including missing search and invalid-kind refusal, must be byte-equal
-on HTTP and stdio, with equal tool lists. The same-size S3 edit must change the side and
-persistent MCP answer; restoring the bytes restores the entire export and original answer.
+Every expected side has its exact role, contract and `via` provenance: `sdk:aws` for a literal
+SDK origin and `env:<variable>` for each environment name. The complete provider, consumer and
+link arrays are checked, so an unexpected contract of any kind also fails. The side count, provisioning set,
+reader-to-writer set and levels agree. Every resolved literal joins one matching provisioner; every
+service has one unresolved environment side per language, whose context names its variable,
+with no provisioning link. All 21 variables are explicitly set to matching physical names in
+the indexer's process environment, making a forbidden runtime lookup observable. Every
+supported resolved contract appears in IaC context, downward trace and
+upward trace. Unknown constructors, factory results reached by a name match and every generated
+hidden binding contribute zero SDK side. The seven IaC provisioners have no orphan status row.
+The old SQS control's complete export/status and MCP answers equal the authorized base.
 
-Existing flows answer separately to the base binary:
+All queries, including the unknown-kind error, agree over stdio, HTTP and console API. Console
+exports equal CLI bytes on the same workspace/repository. The browser actually loads app,
+peer and infrastructure exports and compares every contracts/provisions/links table cell, including
+all list items, to those exports. Both provisioners and use-side links must survive the existing
+graph representation. The four existing page budgets pass. Servers stop by their own PIDs,
+and all evidence survives cleanup.
 
-```bash
-python3 .claude/skills/prove-meada/scripts/prove.py run \
-  --base-bin "$RUN/bin/meada-base" --head-bin "$RUN/bin/meada-head" \
-  --repos all --run "$RUN/corpus" --http
-```
+An SSM hierarchy Path is never an exact physical-parameter name: its literal contributes an
+unresolved reader without a provisioning link. ConditionCheck reads an item even though the
+enclosing operation is called TransactWriteItems. These semantic branches were added to the
+independent oracle before any head answer, with the original draft and a correction note
+retained in the first run's provenance. The 88 expected sides comprise 64 resolved literals,
+21 environment names and three unresolved hierarchy reads; 34 hidden/origin controls add none,
+including a real SDK client paired with an operation from another service in each language.
+The independent peer repository supplies an S3 SDK writer: all 64 provisioning links and 282
+reader/writer links must match, including three cross-repository S3 links. The browser's app
+links table must therefore be nonempty, and every row still has to match the CLI/API export.
+The name-matched-hop control calls a class method on an unknown receiver. The exact base
+must first demonstrate inferred/ambiguous resolution; an exact local factory call does not
+exercise this refusal rule and must not be labelled a name-only hop.
 
-Then drive console viewer query/export parity for each corpus entry and browser budgets,
-including `/graph`, using [console.md](console.md). Use the frontend freshly built from this
-tree. Keep full captures; a page heading alone proves no graph data. New-form graph content
-requires a feature workspace shown in the browser and compared with its same-mode export.
-The generic page checks only prove the existing graph page's launch and budgets.
+Exports are scoped to repository endpoints. In this neutral workspace, infra owns all 64
+provisioning links and app owns all 282 reader/writer links; the script checks these complete
+global arrays, then every exact app/peer/infra projection, preserving duplicate counts. It must
+not assume every repository exports identical arrays. The dense DynamoDB downward trace needs
+32000 tokens to include all 33 expected sides; an explicitly truncated response cannot prove
+absence. The graph view picker is `.graph-view-picker select`, since a separate language picker
+also uses `select`. Preserve raw failed attempts when correcting transport/selector mechanics.
 
-## Verdict and limits
+## Judgment and failure handling
 
-A script's `checks passed` is input to the independent checker's verdict. Write the actual
-receipt under `.prove-it/runs/`, using the permanent skill's template. A verifier crash,
-missing binary or unreachable surface is BLOCKED with the raw error. A mismatch with an
-answer key is BROKEN; the builder fixes the app. A missing answer key is UNPROVEN. Do not
-relax an assertion to match the app; rerun the same flows after fixes, at most three rounds.
-
-Constructor hidden-name controls do not enumerate every Java/C#/Go scope form. They prove
-the seeded forms. Most positive methods use a local alias of a constructed client, and an
-exact local factory adds one value-flow hop; field/constructor injection and every possible
-chain are not covered by this neutral probe. Typed clients without a constructor are refused,
-even when older SQS forms accepted them. Kotlin and non-AWS clients answer to base parity.
-The console graph's new data check remains distinct from its generic page budget check.
-
-After inspection, stop any run-owned HTTP process still named by a pid file and remove only
-this run's generated `work/` and server-index directories. Preserve oracle, raw outputs,
-summary and receipt. Report leftover test data and any inadequate probe under Not covered.
+Exit 0 means checks passed, never an automatic PROVED verdict. The independent checker reads
+raw evidence and writes a receipt with Scope, Sort, answer-key authors, surface-by-surface
+verdicts, failed/retried steps, commands, limitations and cleanup. A mismatch is BROKEN; a
+checker/runtime failure is BLOCKED; an unavailable required surface is not silently omitted.
+Return findings to the implementation agent and rerun the same inputs after a product fix,
+at most three rounds. Preserve every prior run and never revise an assertion to agree with
+the product. Shared-code corpus proof, release/docs and required repository gates remain the
+coordinator's responsibility when Scope reaches them.

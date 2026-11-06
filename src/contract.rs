@@ -310,7 +310,7 @@ pub trait ContractKind {
 
     /// Evidence of a directed use when joining a provisioner. Some kinds have both written
     /// operations and explicit declarations, which retain their declared level.
-    fn use_level(&self, _operation: Option<&str>) -> Level {
+    fn use_level(&self, _via: Option<&str>, _operation: Option<&str>) -> Level {
         Level::Exact
     }
 
@@ -492,8 +492,8 @@ pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {
 }
 
 /// The kind's evidence level for a directed use; unknown kinds cannot establish exact uses.
-pub(crate) fn use_level(contract: &str, operation: Option<&str>) -> Level {
-    kind_of(contract).map_or(Level::Declared, |kind| kind.use_level(operation))
+pub(crate) fn use_level(contract: &str, via: Option<&str>, operation: Option<&str>) -> Level {
+    kind_of(contract).map_or(Level::Declared, |kind| kind.use_level(via, operation))
 }
 
 /// Preserve each kind's export scope, including repository-level builders where supported.

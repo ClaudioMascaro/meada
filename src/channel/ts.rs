@@ -10,7 +10,8 @@ use std::collections::BTreeMap;
 
 use super::message::{Handler, Message, Side, bind, channel_name as name, publish, queue_name};
 use crate::lang::{Value, literal, property};
-use crate::resolve::{Code, Expand, Expanded, Follow, Form, Of};
+use crate::names::ts::{Factory, factory};
+use crate::resolve::{Code, Expand, Expanded};
 
 const KAFKAJS: &str = "kafkajs";
 const KAFKA_PRODUCER: &str = "new Kafka().producer()";
@@ -35,44 +36,47 @@ const AMQP_CHANNELS: [&str; 4] = [
     "connect().createConfirmChannel()",
 ];
 
-/// A client's factory: the package it is imported from, the factory as JavaScript would write it
-/// (`new Kafka().producer()`), and the constant the client is bound to (its file and qualified
-/// name).
-struct Factory<'a> {
-    package: &'a str,
-    expr: String,
-    binding: Option<(&'a str, &'a str)>,
-}
-
-/// The `Factory` of `chain`, from its `Constants` origin: `None` unless it comes from an import
-/// of something outside the repository.
-fn factory<'a>(
-    code: &Code<'a>,
-    path: &'a str,
-    scope: &'a str,
-    chain: &'a str,
-) -> Option<Factory<'a>> {
-    let found = code.origins(path, scope, Of::Name(chain), Follow::Constants);
-    let origin = found.into_iter().next()?;
-    let (package, name) = origin.outside?.imported?;
-    let route = origin.routes.into_iter().next()?;
-    let mut expr = match origin.form {
-        Form::New => format!("new {name}()"),
-        Form::Call => format!("{name}()"),
-        Form::Type | Form::Name => name,
-    };
-    for step in &route.steps {
-        expr += &format!(".{step}()");
-    }
-    Some(Factory {
-        package,
-        expr,
-        binding: route.held,
-    })
-}
-
 /// What a form reads of a call's arguments: the channel names, see `names`.
 type Read<'a> = &'a dyn Fn(&[Value]) -> Option<Vec<Option<String>>>;
+
+/// SDK commands sent through their matching AWS client.
+pub(super) fn aws(code: &Code) -> Vec<crate::contract::Found> {
+    if !code.pack().extensions().contains(&"js") {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for (&path, facts) in code.files() {
+        for (n, call) in facts.calls.iter().enumerate() {
+            if !call.callee.ends_with(".send") {
+                continue;
+            }
+            let Some((client, package, command)) =
+                crate::names::ts::constructor_argument(code, path, n)
+            else {
+                continue;
+            };
+            if package != client.package {
+                continue;
+            }
+            let Some(operation) = super::aws::OPERATIONS.iter().find(|op| {
+                op.js == command && op.client == client.expr && client.package == op.package()
+            }) else {
+                continue;
+            };
+            for found in crate::names::ts::constructor_options(code, path, n, &|fields| {
+                operation.read(fields)
+            }) {
+                out.extend(
+                    found
+                        .found
+                        .into_iter()
+                        .map(|name| operation.found(name, found.site)),
+                );
+            }
+        }
+    }
+    out
+}
 
 pub(super) fn messages(code: &Code) -> Vec<Message> {
     if !code.pack().extensions().contains(&"js") {

@@ -1294,11 +1294,16 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
             let properties = named(node).filter_map(|property| match property.kind() {
                 "pair" => {
                     let key = property.child_by_field_name("key")?;
+                    let value = property.child_by_field_name("value")?;
+                    if key.kind() == "computed_property_name" {
+                        let key = named(key).next().map_or(Value::Unknown, deeper);
+                        return Some(("[]".into(), Value::List(vec![key, deeper(value)])));
+                    }
                     let key = match key.kind() {
                         "string" => unquote(key, src),
                         _ => text(key, src).to_string(),
                     };
-                    let value = deeper(property.child_by_field_name("value")?);
+                    let value = deeper(value);
                     Some((key, value))
                 }
                 "shorthand_property_identifier" => {

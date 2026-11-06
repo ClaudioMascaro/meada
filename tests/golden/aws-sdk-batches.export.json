@@ -544,5 +544,20 @@
       "via": null
     }
   ],
-  "links": []
+  "links": [
+    {
+      "consumer": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "provider": "local/aws-sdk-batches::batches.go::writeTables::db.BatchWriteItem#0",
+      "contract": "resource::dynamodb::customers",
+      "level": "exact",
+      "reason": "resource::dynamodb::customers"
+    },
+    {
+      "consumer": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "provider": "local/aws-sdk-batches::batches.go::writeTables::db.BatchWriteItem#0",
+      "contract": "resource::dynamodb::orders",
+      "level": "exact",
+      "reason": "resource::dynamodb::orders"
+    }
+  ]
 }

@@ -28,7 +28,8 @@ const DEFINITION_DEPTH: usize = 128;
 // ponytail: real code unpacks a few levels; the recursion must stay shallow, whatever the file.
 const TARGET_DEPTH: usize = 64;
 
-/// How many levels of lists, tuples, dict literals, parentheses and `await`s `value` reads;
+/// How many levels of lists, tuples, dict literals, parentheses and `await`s `value` reads,
+/// and how deeply `exits` checks terminal control branches;
 /// deeper is `Unknown`. A value is read again by every call around it, and the recursion must
 /// stay shallow, whatever the file.
 // ponytail: real code nests a few levels of options; 64 is far past any.
@@ -76,12 +77,14 @@ impl LanguagePack for Python {
             scope: String::new(),
             in_class: false,
             flat: false,
+            awaited: false,
         }];
         while let Some(Visit {
             node,
             scope,
             in_class,
             flat,
+            awaited,
         }) = stack.pop()
         {
             let mut inner = scope.clone();
@@ -145,6 +148,17 @@ impl LanguagePack for Python {
                                 params: params(node, !is_class && in_class, src),
                                 bases: bases(node, src),
                                 decorators: bare_names.remove(&inner).unwrap_or_default(),
+                                asynchronous: !is_class
+                                    && children(node).any(|n| n.kind() == "async"),
+                                return_values: if !is_class
+                                    && !node
+                                        .child_by_field_name("body")
+                                        .is_some_and(|body| exits(body, 0))
+                                {
+                                    vec![Value::Unknown]
+                                } else {
+                                    Vec::new()
+                                },
                                 ..Def::new(inner.clone(), kind, span(node))
                             });
                         }
@@ -185,7 +199,7 @@ impl LanguagePack for Python {
                         let (args, kwargs) = arguments(node, src);
                         facts.calls.push(Call {
                             arity: None,
-                            awaited: false,
+                            awaited,
                             labels: None,
                             constructs: false,
                             scope: scope.clone(),
@@ -206,9 +220,14 @@ impl LanguagePack for Python {
                     }
                 }
                 "return_statement" if !flat => {
-                    if let (Some(&at), Some(returned)) = (functions.get(&scope), named(node).next())
-                    {
-                        facts.defs[at].return_values.push(value(returned, src));
+                    if let Some(&at) = functions.get(&scope) {
+                        let returned = named(node).next().map_or(Value::Unknown, |n| value(n, src));
+                        facts.defs[at].return_values.push(returned);
+                    }
+                }
+                "yield" if !flat => {
+                    if let Some(&at) = functions.get(&scope) {
+                        facts.defs[at].return_values.push(Value::Unknown);
                     }
                 }
                 // ponytail: an import binds its names for the whole file, wherever it sits; a
@@ -335,6 +354,8 @@ impl LanguagePack for Python {
                 },
                 in_class: inner_class,
                 flat: inner_flat,
+                awaited: node.kind() == "await"
+                    || (node.kind() == "parenthesized_expression" && awaited),
             }));
         }
         // A function's `global x` may run at any time after the module's own bindings: it is
@@ -423,6 +444,8 @@ struct Visit<'t> {
     /// Whether the node sits in a function or class past `DEFINITION_DEPTH`, which is no
     /// definition: a `return` there is not the enclosing definition's.
     flat: bool,
+    /// This node is an await's operand, through parentheses only.
+    awaited: bool,
 }
 
 /// What a module binds at its top level, which makes up its exports.
@@ -608,6 +631,39 @@ pub(crate) fn files(base: &str, name: &str) -> Vec<String> {
         vec![init]
     } else {
         vec![init, format!("{path}.py")]
+    }
+}
+
+/// Whether every branch of the final statement exits. Unrecognized control constructs
+/// may fall through, so complete value readers receive unknown return evidence.
+fn exits(node: Node, depth: usize) -> bool {
+    if depth >= VALUE_DEPTH {
+        return false;
+    }
+    match node.kind() {
+        "return_statement" | "raise_statement" => true,
+        "block" => named(node)
+            .filter(|n| n.kind() != "comment")
+            .last()
+            .is_some_and(|n| exits(n, depth + 1)),
+        "if_statement" => {
+            let alternatives: Vec<_> = named(node)
+                .filter(|n| matches!(n.kind(), "elif_clause" | "else_clause"))
+                .collect();
+            node.child_by_field_name("consequence")
+                .is_some_and(|n| exits(n, depth + 1))
+                && alternatives
+                    .last()
+                    .is_some_and(|n| n.kind() == "else_clause")
+                && alternatives.into_iter().all(|n| exits(n, depth + 1))
+        }
+        "elif_clause" => node
+            .child_by_field_name("consequence")
+            .is_some_and(|n| exits(n, depth + 1)),
+        "else_clause" => node
+            .child_by_field_name("body")
+            .is_some_and(|n| exits(n, depth + 1)),
+        _ => false,
     }
 }
 
@@ -1435,7 +1491,12 @@ fn arguments(node: Node, src: &[u8]) -> (Vec<Value>, Vec<(String, Value)>) {
                     kwargs.push((text(name, src).to_string(), value(v, src)));
                 }
             }
-            "comment" | "dictionary_splat" => {}
+            "dictionary_splat" => kwargs.push(("...".into(), Value::Unknown)),
+            "list_splat" => {
+                args.push(Value::Unknown);
+                kwargs.push(("*".into(), Value::Unknown));
+            }
+            "comment" => {}
             _ => args.push(value(arg, src)),
         }
     }
@@ -1479,7 +1540,10 @@ fn value_at(node: Node, src: &[u8], depth: usize) -> Value {
             let entries = named(node).filter_map(|entry| pair(entry, src, depth + 1));
             Value::Object(entries.collect())
         }
-        "await" | "parenthesized_expression" => named(node).next().map_or(Value::Unknown, deeper),
+        "await" => named(node)
+            .next()
+            .map_or(Value::Unknown, |n| Value::Await(Box::new(deeper(n)))),
+        "parenthesized_expression" => named(node).next().map_or(Value::Unknown, deeper),
         _ => parts(node, src).map_or(Value::Unknown, Value::Str),
     }
 }
@@ -1688,6 +1752,7 @@ mod tests {
     /// How many levels deep the first item of `value` goes.
     fn nesting(value: &Value) -> usize {
         match value {
+            Value::Await(value) => 1 + nesting(value),
             Value::List(items) => 1 + items.first().map_or(0, nesting),
             Value::Object(entries) => 1 + entries.first().map_or(0, |(_, v)| nesting(v)),
             _ => 0,
@@ -1805,7 +1870,10 @@ mod tests {
     fn an_await_is_the_value_it_awaits() {
         let consts = consts("async def f():\n    nc = await connect()\n");
 
-        let Value::Call(call) = held(&consts, "f.nc") else {
+        let Value::Await(value) = held(&consts, "f.nc") else {
+            unreachable!("await syntax is retained");
+        };
+        let Value::Call(call) = value.as_ref() else {
             unreachable!("not a call");
         };
 

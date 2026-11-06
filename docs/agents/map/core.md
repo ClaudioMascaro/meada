@@ -104,3 +104,7 @@ The crates are described in the [architecture map](../architecture.md#crates). T
   and `trace.rs` (`Row`, `Chain::answer` with the footer): the results of `search`, `context`
   and `trace` and their text answers. The engine walks the indexes and places each line (a
   `path:line` reads the file); these assemble and cut the answer.
+
+- Config use export (#661): `Use` and the optional `Export::uses` keep contract,
+  repository-level site and the `at` key locator, without scalar text. These are directionless sides,
+  independent of `providers`, `consumers` and `links`; provisioning reads them as uses.

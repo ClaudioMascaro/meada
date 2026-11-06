@@ -141,6 +141,15 @@ from ...", with the whole list. A value the index now stores joins it.
   packs that missed until none does. A contract kind that reads a
   value from a new place relies on this loop.
 
+AWS SDK directed sides (#659) retain their source marker in the existing `contracts.via`:
+`sdk:aws` for an SDK operation, `env:<name>` for an unresolved environment argument.
+Java, Go and .NET SDK sides (#660) instead record their operation in `contracts.method`;
+`via` is still available for their environment provenance. Both spellings distinguish exact
+SDK resource links from declarations, including same-repository SDK links.
+The marker contains no environment value or payload. Providers read and export this field
+as optional `via`; existing providers keep it absent. The SDK stored-format sample changes
+the schema key so indexes produced before these extraction forms rebuild.
+
 The stamped `contract_configs` table (#662) stores each contract kind's configuration summary,
 keyed by its prefix, with path, hash, mtime and size. The image summary contains normalized
 builder names (patterns included), their config locations and overridable flags, Helm runner
@@ -152,3 +161,10 @@ facts, stored IaC nodes and evaluated Kubernetes images, including in server mod
 `iac_nodes.build_image` records whether a Compose service configures a build, independently
 of whether `build` is a safe local context. This retains remote-context publishing evidence
 without permitting a direct code path through it. The flag follows Compose override semantics.
+
+
+Python's stored `Def::asynchronous` marks a coroutine-producing definition, and stored
+`Call::awaited` retains a direct awaited call. Its valued facts also retain `Value::Await`
+through aliases and opaque argument expansions as `...`/`*` keyword markers. Complete
+factory readers reject those expansions before selecting a default. The syntax sample
+changes the schema key so prior constructor rows rebuild.

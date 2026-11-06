@@ -1,0 +1,7 @@
+worker:
+  queue: orders
+  topic: events
+  bucket: archive
+  table: orders
+other: orders
+not_queue: orders

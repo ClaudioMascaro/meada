@@ -1,0 +1,34 @@
+import { SNSClient, PublishCommand, PublishBatchCommand } from '@aws-sdk/client-sns';
+import { EventBridgeClient, PutEventsCommand } from '@aws-sdk/client-eventbridge';
+import { KinesisClient, PutRecordCommand, PutRecordsCommand } from '@aws-sdk/client-kinesis';
+import { DynamoDBClient, PutItemCommand, UpdateItemCommand, DeleteItemCommand, GetItemCommand, QueryCommand, ScanCommand, BatchWriteItemCommand, BatchGetItemCommand, TransactWriteItemsCommand, TransactGetItemsCommand } from '@aws-sdk/client-dynamodb';
+import { SSMClient, GetParameterCommand, GetParametersCommand, GetParametersByPathCommand } from '@aws-sdk/client-ssm';
+import { SecretsManagerClient, GetSecretValueCommand, BatchGetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+const sns = new SNSClient({});
+const bus = new EventBridgeClient({});
+const stream = new KinesisClient({});
+const db = new DynamoDBClient({});
+const ssm = new SSMClient({});
+const secrets = new SecretsManagerClient({});
+export async function run() {
+  await sns.send(new PublishCommand({ TopicArn: 'arn:aws:sns:us-east-1:123456789012:alerts' }));
+  await sns.send(new PublishBatchCommand({ TopicArn: 'arn:aws:sns:us-east-1:123456789012:alerts' }));
+  await bus.send(new PutEventsCommand({ Entries: [{ EventBusName: 'events' }, {}] }));
+  await stream.send(new PutRecordCommand({ StreamName: 'records' }));
+  await stream.send(new PutRecordsCommand({ StreamARN: 'arn:aws:kinesis:us-east-1:123456789012:stream/records' }));
+  await db.send(new PutItemCommand({ TableName: 'orders' }));
+  await db.send(new UpdateItemCommand({ TableName: 'orders' }));
+  await db.send(new DeleteItemCommand({ TableName: 'orders' }));
+  await db.send(new BatchWriteItemCommand({ RequestItems: { orders: [] } }));
+  await db.send(new TransactWriteItemsCommand({ TransactItems: [{ Put: { TableName: 'orders' } }, { Delete: { TableName: 'archive' } }] }));
+  await db.send(new GetItemCommand({ TableName: 'orders' }));
+  await db.send(new QueryCommand({ TableName: 'orders' }));
+  await db.send(new ScanCommand({ TableName: 'orders' }));
+  await db.send(new BatchGetItemCommand({ RequestItems: { orders: {} } }));
+  await db.send(new TransactGetItemsCommand({ TransactItems: [{ Get: { TableName: 'orders' } }] }));
+  await ssm.send(new GetParameterCommand({ Name: '/orders/token' }));
+  await ssm.send(new GetParametersCommand({ Names: ['/orders/a', process.env.PARAMETER] }));
+  await ssm.send(new GetParametersByPathCommand({ Path: '/orders/' }));
+  await secrets.send(new GetSecretValueCommand({ SecretId: 'arn:aws:secretsmanager:us-east-1:123456789012:secret:orders/token-AbCd12' }));
+  await secrets.send(new BatchGetSecretValueCommand({ SecretIdList: ['orders/a', 'orders/b'] }));
+}

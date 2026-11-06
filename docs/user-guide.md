@@ -345,6 +345,8 @@ mais casa. Eles não entram no `meada export`.
   guarda o que o checkout já tem. Ponha no `.meadaignore` os arquivos que não devem entrar no
   índice (`secrets/`, `*.env.json`).
 
+Um ARN AWS reconhecido pela tabela de tipos, uma URL SQS ou `s3://archive/caminho` em configuração vira um lado de uso `exact`, localizado por `<arquivo>#<caminho da chave>`. Um nome simples sob a última chave `queue`, `topic`, `bucket` ou `table` vira, respectivamente, um uso SQS, SNS, S3 ou DynamoDB `inferred`. Por exemplo, `queue: orders` em valores Helm usa `channel::sqs::orders`; `other: orders` não liga nada. O uso não tem direção: liga somente aos provisionadores e conta para órfãos, sem virar produtor, consumidor, escritor ou leitor. `context` e a busca de contratos mostram esses usos, e `trace` segue a ligação de provisionamento até a chave e de volta. Valores ocultados, cortados ou não resolvidos ficam de fora; o atributo que define o nome de um provisionador não usa o próprio recurso. O export inclui os lados em `uses`, sem o texto dos valores, e o console os mostra separados dos lados com direção.
+
 ### Nós IaC
 
 Cada `resource`, bloco `data` e chamada `module` dos arquivos `*.tf` e `*.tofu` é um **nó IaC**,
@@ -2039,3 +2041,37 @@ branco) não são duplicatas.
   equipe.
 - Um resultado errado no código do próprio Meada é um bug: abra uma issue com a consulta, a
   resposta e a esperada.
+
+## AWS SDK em código
+
+TypeScript e JavaScript reconhecem comandos v3 enviados com `cliente.send(new Comando(...))`,
+com cliente e comando importados do pacote AWS correspondente. Python reconhece métodos de
+clientes criados por `boto3.client(...)` ou por uma `Session`. Os nomes podem vir de constantes
+e dos argumentos de wrappers chamados exatamente. Um cliente recebido só por correspondência
+de nome, ou escondido por um parâmetro, `catch`, desestruturação ou outro binding, não cria lado.
+
+| Serviço | Produz ou escreve | Lê | Argumento do nome |
+| --- | --- | --- | --- |
+| SNS | `Publish`, `PublishBatch` | | `TopicArn` |
+| EventBridge | `PutEvents` | | `Entries[].EventBusName`, `default` quando omitido |
+| Kinesis | `PutRecord`, `PutRecords` | | `StreamARN` ou `StreamName` |
+| S3 | `PutObject` | `GetObject` | `Bucket` |
+| DynamoDB | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem`, `TransactWriteItems` | `GetItem`, `Query`, `Scan`, `BatchGetItem`, `TransactGetItems` | `TableName`, chaves de `RequestItems`, ou tabelas de `TransactItems` |
+| SSM | | `GetParameter`, `GetParameters`, `GetParametersByPath` | `Name`, `Names`, `Path` |
+| Secrets Manager | | `GetSecretValue`, `BatchGetSecretValue` | `SecretId`, `SecretIdList` |
+
+Em JavaScript, cada operação acima tem o sufixo `Command`; em boto3, usa snake case
+(`put_object`, `get_secret_value`). SNS, EventBridge e Kinesis são produtores; S3 e DynamoDB
+usam os lados escritor e leitor de recursos. Os nomes literais e ARNs compatíveis se ligam à
+infraestrutura pelo nome físico, sem conta ou região. Lados de SDK literais se ligam em
+`exact`, inclusive a outros lados de SDK do mesmo repositório; um lado declarado em
+`meada.toml` conserva `declared`. Valores de infraestrutura substituíveis continuam `inferred`.
+
+Uma leitura como `process.env.BUCKET` ou `os.getenv("BUCKET")` fica não resolvida, com
+`via: "env:BUCKET"` no export e o nome da variável no contexto da função. Um produtor ou
+escritor de SDK também tem `via`, opcional no formato 1; para um literal é `sdk:aws`.
+Meada não lê o ambiente do processo. A construção isolada de um comando, um publish SNS para
+telefone ou endpoint, os clientes de alto nível `boto3.resource` e `DynamoDBDocumentClient`
+e operações fora da tabela não são reconhecidos por estas formas.
+
+`GetParametersByPath` consulta uma hierarquia, por isso seu lado fica não resolvido; o caminho não é tratado como nome de um parâmetro. Um `ConditionCheck` de `TransactWriteItems` é leitor, mesmo quando a transação também escreve outras tabelas. Chaves computadas de `RequestItems` preservam o literal ou o nome da variável de ambiente.

@@ -71,14 +71,15 @@ export function GraphPage({ api, locale }: { api: Api; locale: Language }) {
       }}>{views.filter(view => (view !== 'provisions' || graph.provisions.length > 0) && (view !== 'executions' || graph.executions.length > 0)).map(view => <option value={view} key={view}>{t[view]}</option>)}</select></label>
       {view === 'communities' && table(t.communities, [t.community, t.members], graph.communities.map(row => [row.name, <List values={row.members} />]))}
       {view === 'contracts' && table(t.contracts,
-        [t.contract, t.providers, t.consumers, ...(graph.contracts.some(row => row.provisioners) ? [t.provisioners] : [])],
+        [t.contract, t.providers, t.consumers, ...(graph.contracts.some(row => row.provisioners) ? [t.provisioners] : []), ...(graph.contracts.some(row => row.uses) ? [t.uses] : [])],
         graph.contracts.map(row => [<code>{row.contract}</code>, <List values={row.providers} />,
           <List values={row.consumers} />,
           ...(graph.contracts.some(row => row.provisioners) ? [<List values={row.provisioners ?? []} />] : []),
+          ...(graph.contracts.some(row => row.uses) ? [<List values={row.uses ?? []} />] : []),
         ]))}
       {view === 'provisions' && table(t.provisions,
         [t.contract, t.side, t.provisioner, t.level, t.reason], graph.provisions.map(row => [
-          <code>{row.contract}</code>, <code>{row.side}</code>,
+          <code>{row.contract}</code>, <code>{row.side}{row.at ? ` ${row.at}` : ''}</code>,
           <code>{row.provisioner} (root {row.root})</code>, row.level, row.reason,
         ]))}
       {view === 'links' && table(t.links, [t.contract, t.consumer, t.provider, t.level], graph.links.map(row => [<code>{row.contract}</code>, <code>{row.consumer}</code>, <code>{row.provider}</code>, row.level]))}

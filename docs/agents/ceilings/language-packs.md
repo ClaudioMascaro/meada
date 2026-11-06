@@ -301,7 +301,8 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   the resolver keeps no list of a class's subclasses.
 - `lang/python.rs`: `VALUE_DEPTH` (64): a list, tuple, dict literal, parenthesized expression or
   `await` nested deeper in a value is `Value::Unknown`, so a hostile file cannot overflow the
-  stack. `FOLD_DEPTH` (256): a `+` or `or` chain, a chain of string methods or `getenv`
+  stack. The syntax-only terminal-exit check stops at the same depth and records possible
+  fallthrough as unknown. `FOLD_DEPTH` (256): a `+` or `or` chain, a chain of string methods or `getenv`
   defaults and nested f-strings fold only that deep (the rest is a hole), and an attribute
   chain in a callee is cut to the node kind; each call's arguments are folded again, so a file
   of nested calls costs up to `FOLD_DEPTH` steps per call. `DEFINITION_DEPTH` (128): a

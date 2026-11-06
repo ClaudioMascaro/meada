@@ -1,0 +1,2 @@
+channel::sns::orders
+  example.com/aws/app producer app.ts:4 publish (no provisioner in the workspace)

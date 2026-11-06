@@ -153,7 +153,9 @@ Cada produtor se liga ao handler dos consumidores, inclusive no mesmo repositór
 | Kafka | `kafkajs` | `confluent-kafka`, `kafka-python` | `rdkafka` | `segmentio/kafka-go`, `confluent-kafka-go`, `sarama` | Spring Kafka | Spring Kafka | `Confluent.Kafka` |
 | RabbitMQ | `amqplib` | `pika` | `lapin` | `amqp091-go` | Spring AMQP | Spring AMQP | `RabbitMQ.Client` |
 | Amazon SQS | AWS SDK v3, `sqs-consumer` | `boto3` | `aws-sdk-sqs` | `aws-sdk-go-v2` | AWS SDK v2 | AWS SDK v2 | `AWSSDK.SQS` |
-| SNS, EventBridge, Kinesis | | | | AWS SDK v2 | AWS SDK 2.x | | AWS SDK .NET |
+| Amazon SNS | AWS SDK v3 `PublishCommand`, `PublishBatchCommand` | `boto3` `publish`, `publish_batch` | | AWS SDK v2 | AWS SDK 2.x | | AWS SDK .NET |
+| Amazon EventBridge | AWS SDK v3 `PutEventsCommand` | `boto3` `put_events` | | AWS SDK v2 | AWS SDK 2.x | | AWS SDK .NET |
+| Amazon Kinesis | AWS SDK v3 `PutRecordCommand`, `PutRecordsCommand` | `boto3` `put_record`, `put_records` | | AWS SDK v2 | AWS SDK 2.x | | AWS SDK .NET |
 | NATS | `nats` | `nats-py` | `async-nats` | `nats.go` | jnats | jnats | `NATS.Client` |
 | Redis streams | `ioredis`, `node-redis` | `redis-py` | crate `redis` | `go-redis` | Jedis, Lettuce | Jedis, Lettuce | `StackExchange.Redis` |
 | JMS | | | | | Spring JMS | Spring JMS | |
@@ -246,7 +248,9 @@ Os arquivos Terraform e OpenTofu também são valores de configuração (`*.tf`,
 | `search` sem kind | Valores só quando nenhum símbolo e nenhum contrato casa |
 | `meada status` | Arquivos de configuração lidos e ignorados (lockfiles, arquivos que não são lidos) e os valores ocultados |
 
-Um valor acima de 1 KiB é guardado cortado, marcado `(cut)`. Os `data` e `stringData` de um `Secret` do Kubernetes ficam guardados como `redacted`, com caminho da chave, tipo e linha, assim como o `default` de uma `variable` do Terraform com `sensitive = true` e todo valor que um arquivo `.tfvars` dá a uma variável desse nome (todos, quando um arquivo Terraform na mesma pasta ou acima dela não é lido) e o `value` de um recurso `aws_ssm_parameter` com `type = "SecureString"` literal, em HCL ou Terraform JSON; nada mais é filtrado, então os arquivos que não devem entrar no índice vão no `.meadaignore`. Lockfiles (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `packages.lock.json`), templates Helm (que não são YAML até serem renderizados), arquivos acima de 1 MiB e arquivos de mais de 1.000 documentos ficam de fora. Valores nunca entram no `meada export` e não ligam nada.
+Um valor acima de 1 KiB é guardado cortado, marcado `(cut)`. Os `data` e `stringData` de um `Secret` do Kubernetes ficam guardados como `redacted`, com caminho da chave, tipo e linha, assim como o `default` de uma `variable` do Terraform com `sensitive = true` e todo valor que um arquivo `.tfvars` dá a uma variável desse nome (todos, quando um arquivo Terraform na mesma pasta ou acima dela não é lido) e o `value` de um recurso `aws_ssm_parameter` com `type = "SecureString"` literal, em HCL ou Terraform JSON; nada mais é filtrado, então os arquivos que não devem entrar no índice vão no `.meadaignore`. Lockfiles (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `packages.lock.json`), templates Helm (que não são YAML até serem renderizados), arquivos acima de 1 MiB e arquivos de mais de 1.000 documentos ficam de fora. O texto dos valores nunca entra no `meada export`.
+
+Um ARN AWS reconhecido pela tabela de tipos, uma URL SQS ou `s3://archive/caminho` em configuração vira um lado de uso `exact`, localizado por `<arquivo>#<caminho da chave>`. Um nome simples sob a última chave `queue`, `topic`, `bucket` ou `table` vira, respectivamente, um uso SQS, SNS, S3 ou DynamoDB `inferred`. Por exemplo, `queue: orders` em valores Helm usa `channel::sqs::orders`; `other: orders` não liga nada. O uso não tem direção: liga somente aos provisionadores e conta para órfãos, sem virar produtor, consumidor, escritor ou leitor. `context` e a busca de contratos mostram esses usos, e `trace` segue a ligação de provisionamento até a chave e de volta. Valores ocultados, cortados ou não resolvidos ficam de fora; o atributo que define o nome de um provisionador não usa o próprio recurso. O export inclui os lados em `uses`, sem o texto dos valores, e o console os mostra separados dos lados com direção.
 
 ## Nós IaC
 
@@ -430,6 +434,40 @@ Um processo é a árvore de chamadas iniciada por um ponto de entrada, atravessa
 ## Limites e próximos passos
 
 Linguagens e clientes HTTP ou de mensagens fora das listas acima ainda não têm suporte. O [ADR 0003](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0003-v1-scope-and-roadmap.md) define o escopo e a ordem do trabalho. Consulte o [roadmap](roadmap.md), as [decisões](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr) e o [CHANGELOG](https://github.com/ClaudioMascaro/meada/blob/main/CHANGELOG.md).
+
+## AWS SDK em código
+
+TypeScript e JavaScript reconhecem comandos v3 enviados com `cliente.send(new Comando(...))`,
+com cliente e comando importados do pacote AWS correspondente. Python reconhece métodos de
+clientes criados por `boto3.client(...)` ou por uma `Session`. Os nomes podem vir de constantes
+e dos argumentos de wrappers chamados exatamente. Um cliente recebido só por correspondência
+de nome, ou escondido por um parâmetro, `catch`, desestruturação ou outro binding, não cria lado.
+
+| Serviço | Produz ou escreve | Lê | Argumento do nome |
+| --- | --- | --- | --- |
+| SNS | `Publish`, `PublishBatch` | | `TopicArn` |
+| EventBridge | `PutEvents` | | `Entries[].EventBusName`, `default` quando omitido |
+| Kinesis | `PutRecord`, `PutRecords` | | `StreamARN` ou `StreamName` |
+| S3 | `PutObject` | `GetObject` | `Bucket` |
+| DynamoDB | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem`, `TransactWriteItems` | `GetItem`, `Query`, `Scan`, `BatchGetItem`, `TransactGetItems` | `TableName`, chaves de `RequestItems`, ou tabelas de `TransactItems` |
+| SSM | | `GetParameter`, `GetParameters`, `GetParametersByPath` | `Name`, `Names`, `Path` |
+| Secrets Manager | | `GetSecretValue`, `BatchGetSecretValue` | `SecretId`, `SecretIdList` |
+
+Em JavaScript, cada operação acima tem o sufixo `Command`; em boto3, usa snake case
+(`put_object`, `get_secret_value`). SNS, EventBridge e Kinesis são produtores; S3 e DynamoDB
+usam os lados escritor e leitor de recursos. Os nomes literais e ARNs compatíveis se ligam à
+infraestrutura pelo nome físico, sem conta ou região. Lados de SDK literais se ligam em
+`exact`, inclusive a outros lados de SDK do mesmo repositório; um lado declarado em
+`meada.toml` conserva `declared`. Valores de infraestrutura substituíveis continuam `inferred`.
+
+Uma leitura como `process.env.BUCKET` ou `os.getenv("BUCKET")` fica não resolvida, com
+`via: "env:BUCKET"` no export e o nome da variável no contexto da função. Um produtor ou
+escritor de SDK também tem `via`, opcional no formato 1; para um literal é `sdk:aws`.
+Meada não lê o ambiente do processo. A construção isolada de um comando, um publish SNS para
+telefone ou endpoint, os clientes de alto nível `boto3.resource` e `DynamoDBDocumentClient`
+e operações fora da tabela não são reconhecidos por estas formas.
+
+`GetParametersByPath` consulta uma hierarquia, por isso seu lado fica não resolvido; o caminho não é tratado como nome de um parâmetro. Um `ConditionCheck` de `TransactWriteItems` é leitor, mesmo quando a transação também escreve outras tabelas. Chaves computadas de `RequestItems` preservam o literal ou o nome da variável de ambiente.
 
 ## Imagens e código das cargas de trabalho
 

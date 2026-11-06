@@ -2902,6 +2902,7 @@ mod tests {
             imports: Vec::new(),
             links: Vec::new(),
             provisioners: Vec::new(),
+            config_uses: Vec::new(),
             subscriptions: Vec::new(),
             provisions: Vec::new(),
             stale_decisions: Vec::new(),

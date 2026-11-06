@@ -53,6 +53,7 @@ use meada_core::trace::{Chain, Row};
 
 pub(crate) mod cloudformation;
 pub(crate) mod compose;
+pub(crate) mod config_uses;
 mod functions;
 pub(crate) mod orphans;
 pub(crate) mod pattern;

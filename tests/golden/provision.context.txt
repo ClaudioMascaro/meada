@@ -10,6 +10,7 @@ example.com/provision/infra envs/dev/main.tf:1 resource.aws_sqs_queue.orders.nam
 channel::sqs::orders
   example.com/provision/app producer src/producer.ts:9 enqueueOrder
   example.com/provision/app consumer src/consumer.ts:7 drain
+  example.com/provision/infra use envs/prod/terraform.tfvars#queue (line 1) [inferred]
   example.com/provision/infra provisioner envs/dev/main.tf:1 aws_sqs_queue.orders (root envs/dev)
   example.com/provision/infra provisioner envs/prod/main.tf:3 aws_sqs_queue.orders (root envs/prod)
 
@@ -53,6 +54,7 @@ example.com/provision/app src/producer.ts:9 produces channel::sqs::orders
 channel::sqs::orders
   example.com/provision/app producer src/producer.ts:9 enqueueOrder
   example.com/provision/app consumer src/consumer.ts:7 drain
+  example.com/provision/infra use envs/prod/terraform.tfvars#queue (line 1) [inferred]
   example.com/provision/infra provisioner envs/dev/main.tf:1 aws_sqs_queue.orders (root envs/dev)
   example.com/provision/infra provisioner envs/prod/main.tf:3 aws_sqs_queue.orders (root envs/prod)
 

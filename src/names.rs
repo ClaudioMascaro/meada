@@ -3,8 +3,32 @@
 //! so a kind accepts a name when exactly one of its spellings is in the kind's own table
 //! (`one`). The JVM and C# kinds share them.
 
+pub(crate) mod python;
+pub(crate) mod ts;
+
 use crate::lang::{Call, Facts, Kind};
 use crate::resolve::{Code, Follow, Form, Of, Outside};
+
+/// The readable part of a contract name argument, after value expansion.
+pub(crate) enum Argument {
+    Literal(String),
+    Environment(String),
+    Unresolved,
+}
+
+/// A parameter asks expansion to climb its exact callers; runtime names stay unresolved.
+pub(crate) fn argument(value: &crate::lang::Value) -> Option<Argument> {
+    use crate::lang::{Part, Value, literal};
+    Some(match value {
+        Value::Ref(_) => return None,
+        Value::Str(parts) if parts.iter().any(|p| matches!(p, Part::Ref(_))) => return None,
+        Value::Str(parts) => match &parts[..] {
+            [Part::Env(name) | Part::EnvOr(name, _)] => Argument::Environment(name.clone()),
+            _ => literal(parts).map_or(Argument::Unresolved, Argument::Literal),
+        },
+        _ => Argument::Unresolved,
+    })
+}
 
 /// Whether `target`, what an annotation of `facts` decorates, is a method of the file: a
 /// method's annotation, not a class's or a field's.
