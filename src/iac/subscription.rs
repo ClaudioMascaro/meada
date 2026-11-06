@@ -126,7 +126,7 @@ impl<'m> Eval<'m> {
                 return None;
             }
             return Some(Endpoint {
-                name: name.into(),
+                name,
                 through: found.through,
             });
         }

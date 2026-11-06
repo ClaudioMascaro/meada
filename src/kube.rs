@@ -712,12 +712,12 @@ impl<'m> Eval<'m> {
         objs.sort_by_cached_key(Obj::address);
         let duplicate_services = objs
             .windows(2)
-            .filter_map(|pair| {
-                (pair[0].kind == "Service"
+            .filter(|pair| {
+                pair[0].kind == "Service"
                     && pair[0].group.is_empty()
-                    && pair[0].address() == pair[1].address())
-                .then(|| pair[0].address())
+                    && pair[0].address() == pair[1].address()
             })
+            .map(|pair| pair[0].address())
             .collect::<HashSet<_>>();
         objs.dedup_by_key(|o| o.address());
         let addresses: Vec<String> = objs.iter().map(Obj::address).collect();
