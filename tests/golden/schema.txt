@@ -4084,6 +4084,7 @@ sample.alert.yaml
     "routes": [
       {
         "any": false,
+        "barrier": false,
         "continuing": false,
         "document": 1,
         "end_line": 11,
@@ -4102,10 +4103,12 @@ sample.alert.yaml
         "receiver": "fallback",
         "set": "",
         "stream": "Labels",
+        "unknown_scope": false,
         "valid": true
       },
       {
         "any": false,
+        "barrier": false,
         "continuing": false,
         "document": 1,
         "end_line": 14,
@@ -4133,6 +4136,7 @@ sample.alert.yaml
         "receiver": "team-b",
         "set": "",
         "stream": "Labels",
+        "unknown_scope": false,
         "valid": true
       }
     ],
@@ -4171,6 +4175,7 @@ sample.incident.tf
     "routes": [
       {
         "any": false,
+        "barrier": false,
         "continuing": false,
         "document": 0,
         "end_line": 16,
@@ -4196,10 +4201,12 @@ sample.incident.tf
         "receiver": "platform-id",
         "set": "",
         "stream": "Opsgenie",
+        "unknown_scope": false,
         "valid": true
       },
       {
         "any": false,
+        "barrier": false,
         "continuing": false,
         "document": 0,
         "end_line": 24,
@@ -4229,6 +4236,7 @@ sample.incident.tf
         "receiver": "checkout-id",
         "set": "start",
         "stream": "Pagerduty",
+        "unknown_scope": false,
         "valid": true
       }
     ],

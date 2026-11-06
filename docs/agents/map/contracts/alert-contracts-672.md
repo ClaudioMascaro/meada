@@ -57,6 +57,9 @@ not actual delivery, final escalation, inhibition or time restrictions.
 The shared tri-state condition evaluator handles conjunction and disjunction, regex, prefix
 and containment. An unread condition cannot make a conjunction true or let a possibly consumed
 event fall through to a later non-continuing rule. Native rule ordering is applied within its
-written scope. Stored and workspace budgets charge forwarding expansion as well as emitted
+written scope. Unexpanded OpsGenie instances and missing criteria remain internal ordering
+barriers, without projected base sites. Dynamic criteria remain unknown; an unread team
+scope cannot prove a destination in another team group of the same module. Stored and
+workspace budgets charge forwarding expansion as well as emitted
 links. The original public #638 rule tests `service:app`; the trace from a monitor with both
 service and support tags preserves that distinction.

@@ -198,6 +198,10 @@ pub(super) struct Route {
     pub logic: Vec<super::pcl::Test>,
     #[serde(default)]
     pub opaque: bool,
+    #[serde(default)]
+    pub barrier: bool,
+    #[serde(default)]
+    pub unknown_scope: bool,
 }
 
 pub(super) type Spans = BTreeMap<(usize, String), (usize, usize)>;
@@ -484,6 +488,8 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
                     next: None,
                     logic: Vec::new(),
                     opaque: false,
+                    barrier: false,
+                    unknown_scope: false,
                 };
                 if !charge(&item, &mut bytes) || !charge_route(&item, path, &out.routes, &mut bytes)
                 {

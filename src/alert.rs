@@ -95,6 +95,9 @@ impl ContractKind for Alert {
                 }
             }
             for (i, route) in summary.routes.iter().enumerate() {
+                if route.barrier {
+                    continue;
+                }
                 let node = node(
                     &path,
                     &route.key,
@@ -754,10 +757,9 @@ fn summaries(export: &Export) -> Vec<(String, config::Summary)> {
 }
 fn route_at(export: &Export, site: &str) -> Option<(Vec<Route>, usize)> {
     summaries(export).into_iter().find_map(|(path, s)| {
-        let index = s
-            .routes
-            .iter()
-            .position(|r| site == format!("{}::{path}::{}", export.repository, r.key))?;
+        let index = s.routes.iter().position(|r| {
+            !r.barrier && site == format!("{}::{path}::{}", export.repository, r.key)
+        })?;
         Some((s.routes, index))
     })
 }
@@ -846,6 +848,11 @@ impl<'a> Routing<'a> {
         let mut roots = Vec::new();
         let mut groups: BTreeMap<(String, String), Vec<usize>> = BTreeMap::new();
         let mut sets: BTreeMap<(&str, &str), Vec<usize>> = BTreeMap::new();
+        let unknown_scopes = routes
+            .iter()
+            .filter(|r| r.stream == Stream::Opsgenie && r.unknown_scope)
+            .map(|r| r.group.as_str())
+            .collect::<BTreeSet<_>>();
         for (i, route) in routes.iter().enumerate() {
             if route.stream == Stream::Pagerduty {
                 sets.entry((&route.group, &route.set)).or_default().push(i);
@@ -890,6 +897,13 @@ impl<'a> Routing<'a> {
             }
         }
         for mut group in groups.into_values() {
+            // An unread team expression might name any scope in this module. Its absence
+            // from another team's ordered list cannot prove that list receives the event.
+            if routes[group[0]].stream == Stream::Opsgenie
+                && unknown_scopes.contains(routes[group[0]].group.as_str())
+            {
+                continue;
+            }
             if group.len() > 1 && routes[group[0]].stream == Stream::Opsgenie {
                 let order = group
                     .iter()

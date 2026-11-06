@@ -1527,3 +1527,190 @@ fn incident_json_block_forms_keep_native_spans_and_opentofu_shadowing() {
         std::fs::remove_file(repo.join("native.tofu.json")).unwrap();
     }
 }
+
+#[test]
+fn dynamic_opsgenie_conjunctions_are_unknown_and_true_disjunctions_remain_proven() {
+    let repo = fixture_repo(
+        "alerts_dynamic_criteria",
+        "alert-forwarding",
+        Some("https://example.com/acme/dynamic.git"),
+    );
+    for path in ["rules.yaml", "alertmanager.yaml", "main.tf"] {
+        std::fs::remove_file(repo.join(path)).unwrap();
+    }
+    let source = r#"resource "datadog_monitor" "cedar" {
+  name = "Neutral dynamic-criteria control"
+  type = "query alert"
+  query = "sum(last_5m):sum:neutral.metric{*} > 1"
+  message = "Neutral"
+  tags = ["support:squad-elm"]
+}
+resource "opsgenie_team_routing_rule" "guarded" {
+  team_id = "team-elm-id"
+  criteria {
+    type = "match-all-conditions"
+    conditions {
+      field = "tags"
+      operation = "equals"
+      expected_value = "support:squad-elm"
+    }
+    dynamic "conditions" {
+      for_each = [1]
+      content {
+        field = "tags"
+        operation = "equals"
+        expected_value = "gate:closed"
+      }
+    }
+  }
+  notify { type = "none" }
+}
+"#;
+    let engine = Engine::open(&repo).unwrap();
+    for (source, matches) in [
+        (source.to_string(), false),
+        (
+            source.replace("match-all-conditions", "match-any-condition"),
+            true,
+        ),
+    ] {
+        std::fs::write(repo.join("main.tf"), source).unwrap();
+        let text = engine.export().unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(v["providers"].as_array().unwrap().len(), 1, "{text}");
+        assert_eq!(v["consumers"].as_array().unwrap().len(), 1, "{text}");
+        let actual = v["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|l| {
+                (
+                    l["contract"].as_str().unwrap(),
+                    l["level"].as_str().unwrap(),
+                    l["provider"].as_str().unwrap(),
+                    l["consumer"].as_str().unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let expected = if matches {
+            vec![(
+                "alert::support::squad-elm",
+                "exact",
+                "example.com/acme/dynamic::main.tf::datadog_monitor.cedar",
+                "example.com/acme/dynamic::main.tf::opsgenie_team_routing_rule.guarded",
+            )]
+        } else {
+            Vec::new()
+        };
+        assert_eq!(actual, expected, "{text}");
+    }
+}
+
+#[test]
+fn unexpanded_opsgenie_rules_preserve_order_without_projecting_a_phantom_base() {
+    let repo = fixture_repo(
+        "alerts_order_barriers",
+        "alert-forwarding",
+        Some("https://example.com/acme/barriers.git"),
+    );
+    for path in ["rules.yaml", "alertmanager.yaml", "main.tf"] {
+        std::fs::remove_file(repo.join(path)).unwrap();
+    }
+    std::fs::write(
+        repo.join("monitors.tf"),
+        r#"resource "datadog_monitor" "source" {
+ name = "Order control"
+ tags = ["support:squad-ash"]
+}
+"#,
+    )
+    .unwrap();
+    let criteria = "criteria {\n type = \"match-all-conditions\"\n conditions {\n field = \"tags\"\n operation = \"equals\"\n expected_value = \"support:squad-ash\"\n }\n}\n";
+    let route = |name: &str, meta: &str, team: &str, order: usize, criteria: &str| {
+        format!(
+            "resource \"opsgenie_team_routing_rule\" {name:?} {{\n {meta}\n team_id = {team}\n order = {order}\n {criteria}\n notify {{ type = \"none\" }}\n}}\n"
+        )
+    };
+    std::fs::write(
+        repo.join("second.tf"),
+        route("second", "", "\"team-ash-id\"", 1, criteria),
+    )
+    .unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    for (meta, team, first_criteria, projected, expected_name) in [
+        ("count = 1", "\"team-ash-id\"", criteria, false, None),
+        (
+            "for_each = {neutral = 1}",
+            "\"team-ash-id\"",
+            criteria,
+            false,
+            None,
+        ),
+        ("", "\"team-ash-id\"", "", false, None),
+        ("", "var.team.id", criteria, true, None),
+        (
+            "count = 1",
+            "\"another-team-id\"",
+            criteria,
+            false,
+            Some("second"),
+        ),
+        ("", "\"team-ash-id\"", criteria, true, Some("first")),
+    ] {
+        std::fs::write(
+            repo.join("first.tf"),
+            route("first", meta, team, 0, first_criteria),
+        )
+        .unwrap();
+        let text = engine.export().unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let first = "example.com/acme/barriers::first.tf::opsgenie_team_routing_rule.first";
+        assert_eq!(
+            v["consumers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|c| c["site"] == first),
+            projected,
+            "{text}"
+        );
+        assert!(
+            !v["iac_nodes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|n| n["identity"] == first
+                    && n["type"] == "OpsgenieRoutingRule"
+                    && !projected),
+            "{text}"
+        );
+        let actual = v["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|l| {
+                (
+                    l["contract"].as_str().unwrap(),
+                    l["level"].as_str().unwrap(),
+                    l["provider"].as_str().unwrap(),
+                    l["consumer"].as_str().unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let site = expected_name.map(|name| {
+            format!("example.com/acme/barriers::{name}.tf::opsgenie_team_routing_rule.{name}")
+        });
+        let expected = site
+            .as_deref()
+            .map(|site| {
+                vec![(
+                    "alert::support::squad-ash",
+                    "exact",
+                    "example.com/acme/barriers::monitors.tf::datadog_monitor.source",
+                    site,
+                )]
+            })
+            .unwrap_or_default();
+        assert_eq!(actual, expected, "{meta}: {text}");
+    }
+}

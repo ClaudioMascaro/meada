@@ -265,7 +265,8 @@ fn read(
     out: &mut Summary,
     bytes: &mut usize,
 ) {
-    if value.get("count").is_some() || value.get("for_each").is_some() {
+    let repeated = value.get("count").is_some() || value.get("for_each").is_some();
+    if repeated && ty != "opsgenie_team_routing_rule" {
         return;
     }
     let key = format!("{ty}.{name}");
@@ -311,19 +312,19 @@ fn read(
         return;
     }
     let receiver = scope(value, "team_id");
-    let Some(criteria) = block(value, "criteria") else {
-        return;
-    };
-    let mode = text(criteria, "type");
-    let mut opaque = false;
-    let mut valid = receiver.is_some()
+    let criteria = block(value, "criteria");
+    let mode = criteria.and_then(|c| text(c, "type"));
+    let barrier = repeated || criteria.is_none();
+    let mut opaque = criteria.is_some_and(|c| c.get("dynamic").is_some());
+    let mut valid = !barrier
+        && receiver.is_some()
         && !value.get("dynamic").is_some()
         && matches!(
             mode.as_deref(),
             Some("match-all" | "match-all-conditions" | "match-any-condition")
         );
     let mut matchers = Vec::new();
-    for condition in blocks(criteria.get("conditions")) {
+    for condition in blocks(criteria.and_then(|c| c.get("conditions"))) {
         let matcher = (|| {
             if text(condition, "field")?.as_str() != "tags" {
                 return None;
@@ -361,6 +362,7 @@ fn read(
     valid &= !matchers.is_empty() || mode.as_deref() == Some("match-all");
     let route = Route {
         key,
+        unknown_scope: receiver.is_none(),
         receiver: receiver.unwrap_or_else(|| "unresolved incident scope".into()),
         line,
         end_line,
@@ -384,6 +386,7 @@ fn read(
         next: None,
         logic: Vec::new(),
         opaque,
+        barrier,
     };
     if config::charge(&route, bytes) && config::charge_route(&route, path, &out.routes, bytes) {
         out.routes.push(route);
@@ -498,6 +501,8 @@ fn pagerduty(
                 next,
                 logic,
                 opaque: false,
+                barrier: false,
+                unknown_scope: false,
             };
             if config::charge(&item, bytes) && config::charge_route(&item, path, &out.routes, bytes)
             {
