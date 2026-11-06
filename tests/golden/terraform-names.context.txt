@@ -63,6 +63,10 @@ referenced by: none
 values:
 example.com/acme/infra envs/prod/main.tf:38 resource.aws_sqs_queue.workspace.name = "${local.service}-${terraform.workspace}"
 channel::sqs::orders-*
+  example.com/acme/infra provisioner envs/prod/main.tf:27 aws_sqs_queue.regional["eu"] (root envs/prod) (no use in the workspace)
+  example.com/acme/infra provisioner envs/prod/main.tf:27 aws_sqs_queue.regional["us"] (root envs/prod) (no use in the workspace)
+  example.com/acme/infra provisioner envs/prod/main.tf:32 aws_sqs_queue.replica["eu"] (root envs/prod) (no use in the workspace)
+  example.com/acme/infra provisioner envs/prod/main.tf:32 aws_sqs_queue.replica["us"] (root envs/prod) (no use in the workspace)
   example.com/acme/infra provisioner envs/prod/main.tf:37 aws_sqs_queue.workspace (root envs/prod) (no use in the workspace)
 
 example.com/acme/infra envs/prod/main.tf:43-45 aws_sns_topic.account
@@ -118,4 +122,5 @@ referenced by: none
 values:
 example.com/acme/infra envs/prod/main.tf:62 resource.aws_sqs_queue.audit_dlq.name = "${module.audit.queue_name}-dlq"
 channel::sqs::*-dlq
+  example.com/acme/infra provisioner envs/prod/main.tf:52 aws_sqs_queue.billing_dlq (root envs/prod) (no use in the workspace)
   example.com/acme/infra provisioner envs/prod/main.tf:61 aws_sqs_queue.audit_dlq (root envs/prod) (no use in the workspace)
