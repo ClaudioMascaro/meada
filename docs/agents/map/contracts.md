@@ -26,6 +26,8 @@ topic leaves within 24 KiB; the code wins over these entries.
 - [Image contracts (#662)](contracts/image-contracts-662.md)
 - [AWS workloads and shared cloud facts (#664)](contracts/aws-workloads-664.md)
 
+- [GCP infrastructure and Cloud Run (#667)](contracts/gcp-infrastructure-667.md)
+
 <a id="workload-environment-resolution-663"></a>
 
 - [Workload environment resolution (#663)](contracts/image-contracts-662.md#workload-environment-resolution-663)

@@ -24,6 +24,13 @@ All notable changes to Meada are recorded here. The format follows
   carry public URLs to their Services; rewrites remain unread mounts. Links are inferred and
   name the Service, with workload environment provenance when applicable. Included in the
   minor development release of meada and meada-core 1.4.0 (#665).
+- GCP infrastructure contracts (#667): Terraform/OpenTofu Pub/Sub topics and distinct
+  subscription targets, Cloud Storage buckets, Cloud SQL instances and instance-qualified
+  databases, and Secret Manager secrets. Structured GCP configuration identifiers are exact;
+  provider-specific typed keys remain inferred. Cloud Run v1/v2 services and v2 jobs retain
+  container images and scoped environment targets. Provisioning, subscriptions, context,
+  trace, scope-aware orphans and export include these kinds and runners. Release level: minor,
+  included in meada and meada-core 1.4.0.
 - Declared resource `via` locations now accept IaC addresses in every indexed format and
   `<file>#<key path>` with list selectors (`[key=value]`). Sides retain their precise node or
   key for context and trace; removed locations produce the existing stale status diagnostics.

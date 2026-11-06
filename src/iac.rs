@@ -57,6 +57,7 @@ pub(crate) mod compose;
 pub(crate) mod config_uses;
 pub(crate) mod environment;
 mod functions;
+mod gcp;
 pub(crate) mod json;
 pub(crate) mod orphans;
 pub(crate) mod pattern;
@@ -681,7 +682,11 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
         refs.visit_body(&b.body);
         let mut args = BTreeMap::new();
         let workload = types::workload("terraform", ty).is_some();
-        if kind == Kind::Module || subscription::reads(ty) || workload || ty == "archive_file" {
+        if kind == Kind::Module
+            || subscription::reads(ty)
+            || workload
+            || matches!(ty, "archive_file" | "google_sql_database")
+        {
             for a in b.body.attributes() {
                 args.insert(a.key.as_str().to_string(), Named::new(&a.value));
             }
@@ -1089,6 +1094,16 @@ impl<'m> Eval<'m> {
         self.evaluating.clear();
         self.outputs = true;
         let pending = std::mem::take(&mut self.pending);
+        // Even if a later budget stops projection, a GCP multi-field identity must not
+        // fall back to a short physical name and impersonate another contract.
+        for &(node, _, block, _) in &pending {
+            if block.kind == Kind::Resource
+                && block.ty.starts_with("google_")
+                && types::entry("terraform", &block.ty).is_some()
+            {
+                self.nodes[node].provisioned = Some(Projection::default());
+            }
+        }
         for &(node, instance, block, ref each) in &pending {
             let Some(named) = &block.named else { continue };
             let found = self.value(instance, each.as_ref(), named, 0);
@@ -1101,11 +1116,22 @@ impl<'m> Eval<'m> {
                     let entry = (block.kind == Kind::Resource)
                         .then(|| types::entry("terraform", &block.ty))
                         .flatten();
-                    let text = match entry {
-                        Some(e) if !pattern => e.read(&text).to_string(),
-                        _ => text,
+                    let name = match entry {
+                        Some(e) if !pattern && e.ty.starts_with("google_") => {
+                            // Context keeps the physical name. A separate projection below
+                            // carries the canonical target and explicit unresolved state.
+                            e.project(&text)
+                                .map(|name| {
+                                    name.strip_prefix("subscriptions/")
+                                        .unwrap_or(&name)
+                                        .to_string()
+                                })
+                                .or(Some(text))
+                        }
+                        Some(e) if !pattern => e.project(&text),
+                        _ => Some(text),
                     };
-                    (Some(text), pattern)
+                    (name, pattern)
                 }
             };
             if !self.charge(name.as_ref().map_or(0, String::len)) {
@@ -1116,6 +1142,15 @@ impl<'m> Eval<'m> {
             node.overridable = found.through.into_iter().collect();
         }
         self.prepare_subscriptions(&pending);
+        for &(node, _, block, _) in &pending {
+            self.gcp_projection(node, block);
+        }
+        for &(node, instance, block, ref each) in &pending {
+            self.gcp_database(node, instance, each.as_ref(), block);
+        }
+        for &(node, instance, block, ref each) in &pending {
+            self.gcp_workload(node, instance, each.as_ref(), block);
+        }
         for &(node, instance, block, ref each) in &pending {
             self.workload(node, instance, each.as_ref(), block);
         }

@@ -31,6 +31,7 @@ mod duplicates;
 mod environment;
 mod freshness;
 mod gateway;
+mod gcp;
 mod generations;
 mod github_app;
 mod gopkg;

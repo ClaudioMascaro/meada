@@ -104,8 +104,11 @@ pub(crate) fn format_of(path: &str) -> Option<&'static str> {
     }
 }
 
-/// The unique contract named by an AWS structured identifier. Forms stay in the type table.
+/// The unique contract named by a structured cloud identifier. AWS forms stay in the table.
 pub(crate) fn identified(text: &str) -> Option<String> {
+    if text.starts_with("gs://") || text.starts_with("projects/") {
+        return crate::contract::gcp::identified(text);
+    }
     if !(text.starts_with("arn:") || text.starts_with("https://") || text.starts_with("s3://")) {
         return None;
     }
@@ -137,6 +140,21 @@ impl Entry {
             format!("{block}.Properties.{}", self.name)
         } else {
             format!("{block}.{}", self.name)
+        }
+    }
+
+    /// Project a supported physical name, preserving disjoint subscription identities.
+    pub(crate) fn project(&self, text: &str) -> Option<String> {
+        use crate::contract::gcp;
+        match self.ty.as_str() {
+            "google_pubsub_topic" => gcp::pubsub(text, false),
+            "google_pubsub_subscription" => gcp::pubsub(text, true),
+            "google_storage_bucket" => gcp::bucket(text),
+            "google_sql_database_instance" => gcp::instance(text),
+            // The evaluator qualifies a database with its instance after names are known.
+            "google_sql_database" => gcp::database_name(text).then(|| text.into()),
+            "google_secret_manager_secret" => gcp::secret(text),
+            _ => Some(self.read(text).into()),
         }
     }
     /// The contract a node of this type named `name` provisions.
@@ -294,6 +312,7 @@ mod tests {
                 "/tests/fixtures/aws-infra"
             )),
             fixtures.join("aws-workload-aliases"),
+            fixtures.join("gcp-infra"),
         ];
         while let Some(dir) = dirs.pop() {
             for e in std::fs::read_dir(&dir).unwrap() {

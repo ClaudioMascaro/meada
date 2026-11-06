@@ -1,0 +1,730 @@
+{
+  "format": 1,
+  "repository": "example.com/gcp/app",
+  "files": [
+    {
+      "path": "worker.ts",
+      "hash": "0d544f5814a311014c1cb7112939e867382ba98eee3f91115981a1f27d3fcea2"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/gcp/app::worker.ts::batch",
+      "span": {
+        "path": "worker.ts",
+        "start": 326,
+        "end": 425
+      },
+      "hash": "789020317feaf9827a694ba8ecb69994283ff09a3bef7c9a5749560834c09369"
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::current",
+      "span": {
+        "path": "worker.ts",
+        "start": 218,
+        "end": 318
+      },
+      "hash": "2fce09071b8def0ddaa7e29f7966bcd2cbd1f0ba074f84a5e74878f92b3da8e2"
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::duplicate",
+      "span": {
+        "path": "worker.ts",
+        "start": 994,
+        "end": 1097
+      },
+      "hash": "81f62e0e6df23722d9ff8a08d0bc49e78d6e81e3c4596b390cce0d080ed503d9"
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::legacy",
+      "span": {
+        "path": "worker.ts",
+        "start": 110,
+        "end": 210
+      },
+      "hash": "b96430c122210db5c24400edecfaca2111c69d681d1165add324562a402274fa"
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::secret",
+      "span": {
+        "path": "worker.ts",
+        "start": 433,
+        "end": 536
+      },
+      "hash": "151a31928b89005f3fc057f0543cefe971d39ce0383e32b551cc71fbf7ec210d"
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::sidecar",
+      "span": {
+        "path": "worker.ts",
+        "start": 767,
+        "end": 869
+      },
+      "hash": "b45b85487fee167075eb9e037ec7d31303c9df6c1112dd6ff2fb86a3b85e9335"
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::unknown",
+      "span": {
+        "path": "worker.ts",
+        "start": 654,
+        "end": 759
+      },
+      "hash": "d525bfb25bd99d870e1a91a80b21114aaff7dd41a7a4346ca99051c455ff602d"
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::v2secret",
+      "span": {
+        "path": "worker.ts",
+        "start": 544,
+        "end": 646
+      },
+      "hash": "c65720f21d9d2011900c4c445ee08974370595b2031014abf00395ab108d4082"
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::wrongKind",
+      "span": {
+        "path": "worker.ts",
+        "start": 877,
+        "end": 986
+      },
+      "hash": "3644c3c4ec336d1b23651306977dfdf81d80ba3fdba487c2c76cec481e3a983a"
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/gcp/app::worker.ts::SQSClient#0",
+      "caller": "example.com/gcp/app::worker.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 84,
+        "end": 101
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::batch::SendMessageCommand#0",
+      "caller": "example.com/gcp/app::worker.ts::batch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 364,
+        "end": 421
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::batch::client.send#0",
+      "caller": "example.com/gcp/app::worker.ts::batch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 352,
+        "end": 422
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::current::SendMessageCommand#0",
+      "caller": "example.com/gcp/app::worker.ts::current",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 258,
+        "end": 314
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::current::client.send#0",
+      "caller": "example.com/gcp/app::worker.ts::current",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 246,
+        "end": 315
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::duplicate::SendMessageCommand#0",
+      "caller": "example.com/gcp/app::worker.ts::duplicate",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1036,
+        "end": 1093
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::duplicate::client.send#0",
+      "caller": "example.com/gcp/app::worker.ts::duplicate",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1024,
+        "end": 1094
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::legacy::SendMessageCommand#0",
+      "caller": "example.com/gcp/app::worker.ts::legacy",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 149,
+        "end": 206
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::legacy::client.send#0",
+      "caller": "example.com/gcp/app::worker.ts::legacy",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 137,
+        "end": 207
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::secret::SendMessageCommand#0",
+      "caller": "example.com/gcp/app::worker.ts::secret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 472,
+        "end": 532
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::secret::client.send#0",
+      "caller": "example.com/gcp/app::worker.ts::secret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 460,
+        "end": 533
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::sidecar::SendMessageCommand#0",
+      "caller": "example.com/gcp/app::worker.ts::sidecar",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 807,
+        "end": 865
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::sidecar::client.send#0",
+      "caller": "example.com/gcp/app::worker.ts::sidecar",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 795,
+        "end": 866
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::unknown::SendMessageCommand#0",
+      "caller": "example.com/gcp/app::worker.ts::unknown",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 694,
+        "end": 755
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::unknown::client.send#0",
+      "caller": "example.com/gcp/app::worker.ts::unknown",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 682,
+        "end": 756
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::v2secret::SendMessageCommand#0",
+      "caller": "example.com/gcp/app::worker.ts::v2secret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 585,
+        "end": 642
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::v2secret::client.send#0",
+      "caller": "example.com/gcp/app::worker.ts::v2secret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 573,
+        "end": 643
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::wrongKind::SendMessageCommand#0",
+      "caller": "example.com/gcp/app::worker.ts::wrongKind",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 919,
+        "end": 982
+      }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::wrongKind::client.send#0",
+      "caller": "example.com/gcp/app::worker.ts::wrongKind",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 907,
+        "end": 983
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::sqs",
+      "site": "example.com/gcp/app::worker.ts::duplicate::SendMessageCommand#0"
+    },
+    {
+      "contract": "channel::sqs",
+      "site": "example.com/gcp/app::worker.ts::secret::SendMessageCommand#0"
+    },
+    {
+      "contract": "channel::sqs",
+      "site": "example.com/gcp/app::worker.ts::sidecar::SendMessageCommand#0"
+    },
+    {
+      "contract": "channel::sqs",
+      "site": "example.com/gcp/app::worker.ts::unknown::SendMessageCommand#0"
+    },
+    {
+      "contract": "channel::sqs",
+      "site": "example.com/gcp/app::worker.ts::v2secret::SendMessageCommand#0"
+    },
+    {
+      "contract": "channel::sqs",
+      "site": "example.com/gcp/app::worker.ts::wrongKind::SendMessageCommand#0"
+    },
+    {
+      "contract": "channel::sqs::tasks-job",
+      "site": "example.com/gcp/app::worker.ts::batch::SendMessageCommand#0",
+      "via": "workload:example.com/gcp/infra::run.tf::google_cloud_run_v2_job.batch (root .), env:JOB_QUEUE"
+    },
+    {
+      "contract": "channel::sqs::tasks-v1",
+      "site": "example.com/gcp/app::worker.ts::legacy::SendMessageCommand#0",
+      "via": "workload:example.com/gcp/infra::run.tf::google_cloud_run_service.v1 (root .), env:QUEUE_URL"
+    },
+    {
+      "contract": "channel::sqs::tasks-v2",
+      "site": "example.com/gcp/app::worker.ts::current::SendMessageCommand#0",
+      "via": "workload:example.com/gcp/infra::run.tf::google_cloud_run_v2_service.v2 (root .), env:V2_QUEUE"
+    },
+    {
+      "contract": "image::ghcr.io/acme/gcp-worker",
+      "site": "example.com/gcp/app",
+      "at": ".github/workflows/build.yml#jobs.image.steps[0].with.tags"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::cloudsql::audit-db/orders",
+      "site": "example.com/gcp/app",
+      "via": null
+    },
+    {
+      "contract": "resource::cloudsql::orders-db/orders",
+      "site": "example.com/gcp/app",
+      "via": null
+    }
+  ],
+  "uses": [
+    {
+      "contract": "channel::pubsub::orders",
+      "site": "example.com/gcp/app",
+      "at": "settings.yaml#exact.topic"
+    },
+    {
+      "contract": "channel::pubsub::orders",
+      "site": "example.com/gcp/app",
+      "at": "settings.yaml#typed.pubsub_topic"
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders",
+      "site": "example.com/gcp/app",
+      "at": "settings.yaml#exact.subscription"
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders",
+      "site": "example.com/gcp/app",
+      "at": "settings.yaml#typed.pubsub_subscription"
+    },
+    {
+      "contract": "resource::cloudsql::orders-db",
+      "site": "example.com/gcp/app",
+      "at": "settings.yaml#typed.cloudsql_instance"
+    },
+    {
+      "contract": "resource::cloudsql::orders-db/orders",
+      "site": "example.com/gcp/app",
+      "at": "settings.yaml#typed.cloudsql_database"
+    },
+    {
+      "contract": "resource::gcpsecretmanager::api-key",
+      "site": "example.com/gcp/app",
+      "at": "settings.yaml#exact.secret"
+    },
+    {
+      "contract": "resource::gcpsecretmanager::api-key",
+      "site": "example.com/gcp/app",
+      "at": "settings.yaml#typed.gcpsecretmanager_secret"
+    },
+    {
+      "contract": "resource::gcs::assets",
+      "site": "example.com/gcp/app",
+      "at": "settings.yaml#exact.bucket"
+    },
+    {
+      "contract": "resource::gcs::assets",
+      "site": "example.com/gcp/app",
+      "at": "settings.yaml#typed.gcs_bucket"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/gcp/infra::run.tf::google_cloud_run_service.v1",
+      "provider": "example.com/gcp/app",
+      "contract": "image::ghcr.io/acme/gcp-worker",
+      "level": "exact",
+      "reason": "image::ghcr.io/acme/gcp-worker",
+      "root": "."
+    },
+    {
+      "consumer": "example.com/gcp/infra::run.tf::google_cloud_run_v2_job.batch",
+      "provider": "example.com/gcp/app",
+      "contract": "image::ghcr.io/acme/gcp-worker",
+      "level": "exact",
+      "reason": "image::ghcr.io/acme/gcp-worker",
+      "root": "."
+    },
+    {
+      "consumer": "example.com/gcp/infra::run.tf::google_cloud_run_v2_service.v2",
+      "provider": "example.com/gcp/app",
+      "contract": "image::ghcr.io/acme/gcp-worker",
+      "level": "inferred",
+      "reason": "image::ghcr.io/acme/gcp-worker; image: run.tf#resource.google_cloud_run_v2_service.v2 (var.image run.tf:1)",
+      "root": "."
+    }
+  ],
+  "provisions": [
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_pubsub_subscription.orders",
+      "root": ".",
+      "contract": "channel::pubsub::subscriptions/orders",
+      "level": "exact",
+      "reason": "channel::pubsub::subscriptions/orders; config settings.yaml#exact.subscription",
+      "at": "settings.yaml#exact.subscription"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_pubsub_subscription.orders",
+      "root": ".",
+      "contract": "channel::pubsub::subscriptions/orders",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders; config settings.yaml#typed.pubsub_subscription",
+      "at": "settings.yaml#typed.pubsub_subscription"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_pubsub_topic.orders",
+      "root": ".",
+      "contract": "channel::pubsub::orders",
+      "level": "exact",
+      "reason": "channel::pubsub::orders; config settings.yaml#exact.topic",
+      "at": "settings.yaml#exact.topic"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_pubsub_topic.orders",
+      "root": ".",
+      "contract": "channel::pubsub::orders",
+      "level": "inferred",
+      "reason": "channel::pubsub::orders; config settings.yaml#typed.pubsub_topic",
+      "at": "settings.yaml#typed.pubsub_topic"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_secret_manager_secret.token",
+      "root": ".",
+      "contract": "resource::gcpsecretmanager::api-key",
+      "level": "exact",
+      "reason": "resource::gcpsecretmanager::api-key; config settings.yaml#exact.secret",
+      "at": "settings.yaml#exact.secret"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_secret_manager_secret.token",
+      "root": ".",
+      "contract": "resource::gcpsecretmanager::api-key",
+      "level": "inferred",
+      "reason": "resource::gcpsecretmanager::api-key; config settings.yaml#typed.gcpsecretmanager_secret",
+      "at": "settings.yaml#typed.gcpsecretmanager_secret"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_sql_database.audit",
+      "root": ".",
+      "contract": "resource::cloudsql::audit-db/orders",
+      "level": "declared",
+      "reason": "resource::cloudsql::audit-db/orders"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_sql_database.orders",
+      "root": ".",
+      "contract": "resource::cloudsql::orders-db/orders",
+      "level": "declared",
+      "reason": "resource::cloudsql::orders-db/orders"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_sql_database.orders",
+      "root": ".",
+      "contract": "resource::cloudsql::orders-db/orders",
+      "level": "inferred",
+      "reason": "resource::cloudsql::orders-db/orders; config settings.yaml#typed.cloudsql_database",
+      "at": "settings.yaml#typed.cloudsql_database"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_sql_database_instance.primary",
+      "root": ".",
+      "contract": "resource::cloudsql::orders-db",
+      "level": "inferred",
+      "reason": "resource::cloudsql::orders-db; config settings.yaml#typed.cloudsql_instance",
+      "at": "settings.yaml#typed.cloudsql_instance"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_storage_bucket.assets",
+      "root": ".",
+      "contract": "resource::gcs::assets",
+      "level": "exact",
+      "reason": "resource::gcs::assets; config settings.yaml#exact.bucket",
+      "at": "settings.yaml#exact.bucket"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_storage_bucket.assets",
+      "root": ".",
+      "contract": "resource::gcs::assets",
+      "level": "inferred",
+      "reason": "resource::gcs::assets; config settings.yaml#typed.gcs_bucket",
+      "at": "settings.yaml#typed.gcs_bucket"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/gcp/app::worker.ts::batch",
+      "kind": "export",
+      "label": "batch",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/gcp/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/gcp/app::worker.ts::batch"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/gcp/app::worker.ts::current",
+      "kind": "export",
+      "label": "current",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/gcp/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/gcp/app::worker.ts::current"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/gcp/app::worker.ts::duplicate",
+      "kind": "export",
+      "label": "duplicate",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/gcp/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/gcp/app::worker.ts::duplicate"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/gcp/app",
+          "level": null,
+          "via": "call",
+          "node": "example.com/gcp/app::worker.ts::duplicate::SendMessageCommand#0",
+          "mark": "produces",
+          "contract": "channel::sqs"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/gcp/app::worker.ts::legacy",
+      "kind": "export",
+      "label": "legacy",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/gcp/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/gcp/app::worker.ts::legacy"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/gcp/app::worker.ts::secret",
+      "kind": "export",
+      "label": "secret",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/gcp/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/gcp/app::worker.ts::secret"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/gcp/app",
+          "level": null,
+          "via": "call",
+          "node": "example.com/gcp/app::worker.ts::secret::SendMessageCommand#0",
+          "mark": "produces",
+          "contract": "channel::sqs"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/gcp/app::worker.ts::sidecar",
+      "kind": "export",
+      "label": "sidecar",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/gcp/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/gcp/app::worker.ts::sidecar"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/gcp/app",
+          "level": null,
+          "via": "call",
+          "node": "example.com/gcp/app::worker.ts::sidecar::SendMessageCommand#0",
+          "mark": "produces",
+          "contract": "channel::sqs"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/gcp/app::worker.ts::unknown",
+      "kind": "export",
+      "label": "unknown",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/gcp/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/gcp/app::worker.ts::unknown"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/gcp/app",
+          "level": null,
+          "via": "call",
+          "node": "example.com/gcp/app::worker.ts::unknown::SendMessageCommand#0",
+          "mark": "produces",
+          "contract": "channel::sqs"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/gcp/app::worker.ts::v2secret",
+      "kind": "export",
+      "label": "v2secret",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/gcp/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/gcp/app::worker.ts::v2secret"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/gcp/app",
+          "level": null,
+          "via": "call",
+          "node": "example.com/gcp/app::worker.ts::v2secret::SendMessageCommand#0",
+          "mark": "produces",
+          "contract": "channel::sqs"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/gcp/app::worker.ts::wrongKind",
+      "kind": "export",
+      "label": "wrongKind",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/gcp/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/gcp/app::worker.ts::wrongKind"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/gcp/app",
+          "level": null,
+          "via": "call",
+          "node": "example.com/gcp/app::worker.ts::wrongKind::SendMessageCommand#0",
+          "mark": "produces",
+          "contract": "channel::sqs"
+        }
+      ]
+    }
+  ]
+}

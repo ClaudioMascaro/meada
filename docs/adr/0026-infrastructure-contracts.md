@@ -42,6 +42,7 @@ brokers `amqp`, `jms`, `kafka`, `nats`, `redis`, `servicebus` and `sqs` today; `
 | `eventbridge` | an EventBridge event bus | the bus name |
 | `kinesis` | a Kinesis data stream | the stream name |
 | `pubsub` | a GCP Pub/Sub topic | the topic id |
+| `pubsub` | a GCP Pub/Sub subscription | `subscriptions/<subscription id>` |
 | `servicebus` | an Azure Service Bus queue or topic | the queue or topic name |
 | `eventhubs` | an Azure Event Hub | the event hub name |
 | `kafka` | a Strimzi `KafkaTopic` | `spec.topicName`, else `metadata.name` |
@@ -61,6 +62,7 @@ curated kinds:
 | `dynamodb` | a DynamoDB table | the table name |
 | `rds` | an RDS instance or cluster | the instance or cluster identifier |
 | `cloudsql` | a Cloud SQL instance | the instance name |
+| `cloudsql` | a Cloud SQL database | `<instance>/<database>` |
 | `elasticache` | an ElastiCache cluster or replication group | its id |
 | `ssm` | an SSM Parameter Store parameter | the parameter name, leading `/` kept |
 | `secretsmanager` | an AWS Secrets Manager secret | the secret name |
@@ -91,6 +93,34 @@ amends these tables.
   subscriptions and Service Bus subscriptions are read from IaC and followed like a RabbitMQ
   binding: a consumer of the target links to the producers of the source, `exact` for an
   unfiltered subscription and `inferred` with a filter, the reason naming the subscription.
+
+### GCP identities and workloads (#667, 2026-11-06)
+
+Pub/Sub subscriptions use `channel::pubsub::subscriptions/<id>`. A topic id cannot contain
+`/`, so a topic and subscription with the same short id cannot acquire a direct exact link
+that overrides filtered delivery. The source is only the configured `topic`, resolved from a
+literal or a known topic reference through the bounded evaluator. An unresolved source never
+creates a topic from the subscription id. A missing or empty filter is exact; a nonempty or
+unresolved filter weakens delivery to inferred.
+
+Cloud SQL database identities are `resource::cloudsql::<instance>/<database>`; instances keep
+`resource::cloudsql::<instance>`. Complete literal or evaluated instance evidence is required,
+and both names contribute overridable provenance. A database never provisions its instance.
+
+The shared GCP kind policy validates complete structured identifiers before omitting projects:
+`gs://<bucket>` (object paths are opaque), `projects/<project>/topics/<id>`,
+`projects/<project>/subscriptions/<id>`, and Secret Manager names with an optional
+`/versions/<version>`. These config uses are exact. The final keys `pubsub_topic`,
+`pubsub_subscription`, `gcs_bucket`, `cloudsql_instance`, `cloudsql_database` and
+`gcpsecretmanager_secret` give inferred uses; the database key requires `<instance>/<database>`.
+Generic `topic` and `bucket` retain their AWS meanings. Malformed and wrong-kind identifiers
+cannot fall back to a plain exact name.
+
+Cloud Run v1 services, v2 services and v2 jobs retain each container's image and environment,
+evaluated in the node's root and instance. Image defaults preserve their overridable evidence.
+Secret references retain their readable target with no resolved value; they do not expose
+contents or infer a resource hidden inside those contents. These rows use the existing image,
+execution, context, trace, orphan and export seams and the shared 1.4.0 minor release.
 
 ### Levels
 

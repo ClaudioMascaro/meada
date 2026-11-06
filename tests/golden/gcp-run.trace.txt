@@ -1,0 +1,23 @@
+example.com/gcp/infra run.tf:73 google_cloud_run_v2_job.batch
+  runs code example.com/gcp/app . [exact: image::ghcr.io/acme/gcp-worker]
+    example.com/gcp/app worker.ts:5 batch
+    example.com/gcp/app worker.ts:4 current
+    example.com/gcp/app worker.ts:11 duplicate
+      example.com/gcp/app worker.ts:11 produces channel::sqs (unresolved)
+    example.com/gcp/app worker.ts:3 legacy
+    example.com/gcp/app worker.ts:6 secret
+      example.com/gcp/app worker.ts:6 produces channel::sqs (unresolved)
+    example.com/gcp/app worker.ts:9 sidecar
+      example.com/gcp/app worker.ts:9 produces channel::sqs (unresolved)
+    example.com/gcp/app worker.ts:8 unknown
+      example.com/gcp/app worker.ts:8 produces channel::sqs (unresolved)
+    example.com/gcp/app worker.ts:7 v2secret
+      example.com/gcp/app worker.ts:7 produces channel::sqs (unresolved)
+    example.com/gcp/app worker.ts:10 wrongKind
+      example.com/gcp/app worker.ts:10 produces channel::sqs (unresolved)
+chain: exact · 1 hops · 2 repos · 256 tokens
+example.com/gcp/app worker.ts:5 batch
+  runs code [exact: image::ghcr.io/acme/gcp-worker] example.com/gcp/infra run.tf:5 google_cloud_run_service.v1 (root .)
+  runs code [exact: image::ghcr.io/acme/gcp-worker] example.com/gcp/infra run.tf:73 google_cloud_run_v2_job.batch (root .)
+  runs code [inferred: image::ghcr.io/acme/gcp-worker; image: run.tf#resource.google_cloud_run_v2_service.v2 (var.image run.tf:1)] example.com/gcp/infra run.tf:50 google_cloud_run_v2_service.v2 (root .)
+chain: inferred · 3 hops · 2 repos · 134 tokens

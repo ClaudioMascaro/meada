@@ -140,7 +140,7 @@ impl Read<'_> {
                 let all_args = kind == Kind::Module
                     || subscription::reads(ty)
                     || workload
-                    || ty == "archive_file";
+                    || matches!(ty, "archive_file" | "google_sql_database");
                 let named_arg = name_argument(kind, ty);
                 let mut attrs = BTreeMap::new();
                 let mut refs = Vec::new();
