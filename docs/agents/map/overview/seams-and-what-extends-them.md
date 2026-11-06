@@ -101,6 +101,11 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   new host one more entry in `Provider::hosts`. A payload schema becomes a shape through
   `schema::read`; a new kind of shape source is a `shape::Source` variant, never a new shape
   type.
+- **Configuration and IaC source locations** use `document::events::read_located` (JSON alone:
+  `json_spanned`) when a scalar's location is insufficient. The shared reader lends completed
+  collections beside their key/end lines before a repeated property replaces one. Format
+  interpretation stays with the caller (`iac/json.rs`); retained location or marker metadata
+  carries paths and lines, with its budget charged before copying, never values.
 - New **shape source** (spec #23): a provider's is a `shape::Source` variant, never a new shape
   type, with an arm in `Source::at` and `Source::declared`, in the order `http::ts::provider_shape`
   and `Http::declare` apply (a document, then a zod schema, `zod.rs`, then the returned

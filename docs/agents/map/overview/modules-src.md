@@ -43,7 +43,7 @@ for the area a change touches.
   reports and side markers (#657); IaC nodes (#649,
   ADR 0025): the Terraform resources, data blocks and module calls with their address and root
   module, the references between them, the static evaluation of their names (#650,
-  `iac/functions.rs` the pure functions), `search` kind `iac`, and `context` and `trace` on an
+  `iac/functions.rs` the pure functions, `iac/json.rs` the Terraform JSON adapter), `search` kind `iac`, and `context` and `trace` on an
   address; Compose, CloudFormation and Serverless services (#652 to #654) are nodes of the same
   shape. [documents](../documents.md)
 - `kube.rs`: Kubernetes objects and Kustomize overlays as IaC nodes (#651, ADR 0025): address `<Kind>[.<group>]/<namespace>/<name>`, an overlay as the root of its evaluation with prefix, suffix, namespace and images applied, the references between objects, and the `meada status` count of the entries not followed; `kube/crossplane.rs`, Crossplane's roles, composed resources and references (#655). [documents](../documents.md)

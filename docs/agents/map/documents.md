@@ -92,7 +92,10 @@ this file, and a change to these modules updates it.
   `MAX_NESTING` (128, as `serde_json`) collections deep, an alias's node counted at the depth
   it lands (deeper, the stream is unreadable at that line), and every node built and every
   document, aliases included, is charged to a budget of 4 times the source length plus 64 KiB
-  (over it, the stream is unreadable). Readers only see `serde_json::Value`.
+  (over it, the stream is unreadable). `read_located` also lends each completed collection and
+  its key/end lines; `json_spanned` uses that seam for JSON alone. A repeated JSON property is
+  handed out before it replaces the earlier value. Source-location metadata holds no values.
+  Format readers interpret `serde_json::Value`, never lexer tokens.
 - `config_values.rs` (#639, ADR 0025): config values. `is_config(path)` (`*.yaml`, `*.yml`,
   `*.json`) picks them from the walk and from `index::hidden_ci`, the second walk of the hidden
   root entries `HIDDEN_CI` (`.github`, `.gitlab-ci.yml`, `.gitlab`, `.circleci`, `.buildkite`,
@@ -163,8 +166,15 @@ this file, and a change to these modules updates it.
   to every matching channel/resource side without entering consumer-link ambiguity or decisions.
   The export keeps root labels alongside node identities; query-time links are never stored.
 - `iac.rs` (#649, ADR 0025): IaC nodes. `Repository::evaluate(pick, left) -> (Vec<Node>,
-  Vec<Reference>)` is pure over the `.tf`, `.tofu` and var files (`is_input`) of one repository that
-  `Repository::read` read: `read` parses each with `hcl-edit` (skipping one
+  Vec<Reference>)` is pure over the `.tf`, `.tf.json`, `.tofu`, `.tofu.json` and var files
+  (`is_input`) of one repository that `Repository::read` read: `read` dispatches JSON to
+  `iac/json.rs`, which maps JSON templates,
+  literal variable defaults, static dependencies and block arrays into the same model, retaining
+  actual JSON key paths. Its `body_path` also supplies array-aware secret/default recognition
+  to config reading; `config_values/sites` shares its key-path parser with sensitive-name
+  discovery. `events::json_spanned`/`read_located` supply collection key/end lines and borrowed
+  completed bodies before repeated section properties replace them, without allocating source
+  paths; native syntax parses with `hcl-edit` (skipping one
   `config_values::nested_past` or the parser refuses) into its directory's `Module` (the `resource`,
   `data` and `module` blocks with their span, literal `name` expression, `count` and `for_each`, the
   `Ref`s their expressions make, found by the `Refs` visitor, a module's literal `source` and each

@@ -244,12 +244,17 @@ impl<'a> Sensitive<'a> {
 /// The name of the variable whose `sensitive` attribute the key path `key` is
 /// (`variable.db_password.sensitive`, `variable["db-password"].sensitive`).
 fn variable(key: &str) -> Option<String> {
-    let rest = key.strip_prefix("variable")?.strip_suffix(".sensitive")?;
-    if let Some(name) = rest.strip_prefix('.') {
-        return plain(name).then(|| name.to_string());
+    let path = sites::parts_without_selectors(key)?;
+    let body = crate::iac::json::body_path(&path, 1)?;
+    if !matches!(path.first(), Some(Step::Key(section)) if section == "variable")
+        || !matches!(&path[body.len()..], [Step::Key(attr)] if attr == "sensitive")
+    {
+        return None;
     }
-    let quoted = rest.strip_prefix('[')?.strip_suffix(']')?;
-    serde_json::from_str(quoted).ok()
+    body.iter().rev().find_map(|step| match step {
+        Step::Key(name) => Some(name.clone()),
+        Step::Index(_) => None,
+    })
 }
 
 /// Whether a hidden entry the walk meets at the root, named `name`, is read anyway.
@@ -275,7 +280,7 @@ enum SecretPlace {
     Item(usize),
     /// Under `variable.<name>.default` of a Terraform JSON file: secret when the variable says
     /// `"sensitive": true`.
-    Variable(String),
+    Variable(Vec<Step>),
     /// Under the top-level key `<name>` of a `.tfvars.json` file: secret when the variable is
     /// sensitive.
     Tfvars(String),
@@ -283,34 +288,46 @@ enum SecretPlace {
     /// the parameter says `NoEcho`.
     Parameter(String),
     /// An SSM parameter value in Terraform/OpenTofu JSON; its type controls redaction.
-    SsmParameter(String),
+    SsmParameter(Vec<Step>),
 }
 
 impl SecretPlace {
-    fn of(path: &[Step], file: &str) -> SecretPlace {
+    fn of(path: &[Step], file: &str, left: &mut usize) -> Option<SecretPlace> {
+        if terraform_json(file) {
+            let section = path.first();
+            let variable = matches!(section, Some(Step::Key(s)) if s == "variable");
+            let resource = matches!(section, Some(Step::Key(s)) if s == "resource");
+            if (variable || resource)
+                && let Some(body) = crate::iac::json::body_path(path, if variable { 1 } else { 2 })
+                && let Some(Step::Key(attr)) = path.get(body.len())
+                && ((variable && attr == "default")
+                    || (resource
+                        && attr == "value"
+                        && body
+                            .iter()
+                            .filter_map(|s| match s {
+                                Step::Key(k) => Some(k.as_str()),
+                                _ => None,
+                            })
+                            .nth(1)
+                            == Some("aws_ssm_parameter")))
+            {
+                // Pending redaction metadata holds paths only, charged before cloning them.
+                let cost = crate::iac::json::path_cost(body)
+                    .saturating_add(body.len().saturating_mul(std::mem::size_of::<Step>()));
+                *left = left.checked_sub(cost)?;
+                return Some(if variable {
+                    SecretPlace::Variable(body.to_vec())
+                } else {
+                    SecretPlace::SsmParameter(body.to_vec())
+                });
+            }
+        }
         let held =
             |s: Option<&Step>| matches!(s, Some(Step::Key(k)) if k == "data" || k == "stringData");
-        match path {
+        Some(match path {
             [Step::Key(name), ..] if file.ends_with(".tfvars.json") => {
                 SecretPlace::Tfvars(name.clone())
-            }
-            [Step::Key(v), Step::Key(name), Step::Key(d), ..]
-                if v == "variable" && d == "default" && terraform_json(file) =>
-            {
-                SecretPlace::Variable(name.clone())
-            }
-            [
-                Step::Key(r),
-                Step::Key(t),
-                Step::Key(name),
-                Step::Key(v),
-                ..,
-            ] if r == "resource"
-                && t == "aws_ssm_parameter"
-                && v == "value"
-                && terraform_json(file) =>
-            {
-                SecretPlace::SsmParameter(name.clone())
             }
             [Step::Key(p), Step::Key(name), Step::Key(d), ..]
                 if p == "Parameters" && d == "Default" =>
@@ -324,7 +341,7 @@ impl SecretPlace {
                 SecretPlace::Item(*n)
             }
             _ => SecretPlace::No,
-        }
+        })
     }
 }
 
@@ -332,6 +349,35 @@ impl SecretPlace {
 /// conservatively secret in both HCL and JSON; absence is handled by their attribute readers.
 fn ssm_value_is_secret(kind: Option<&str>) -> bool {
     !matches!(kind, Some("String" | "StringList"))
+}
+
+/// A completed Terraform JSON body that marks one of its attributes private. Consumed at
+/// collection close, so repeated section properties cannot erase an earlier marker.
+fn json_secret_body(path: &[Step], body: &Value) -> bool {
+    let Some(Step::Key(section)) = path.first() else {
+        return false;
+    };
+    let labels = match section.as_str() {
+        "variable" => 1,
+        "resource" => 2,
+        _ => return false,
+    };
+    if crate::iac::json::body_path(path, labels) != Some(path) {
+        return false;
+    }
+    if section == "variable" {
+        return body.get("sensitive") == Some(&Value::Bool(true));
+    }
+    path.iter()
+        .filter_map(|step| match step {
+            Step::Key(key) => Some(key.as_str()),
+            Step::Index(_) => None,
+        })
+        .nth(1)
+        == Some("aws_ssm_parameter")
+        && body
+            .get("type")
+            .is_some_and(|t| ssm_value_is_secret(t.as_str()))
 }
 
 /// Whether `file` is a Terraform or OpenTofu JSON file (`*.tf.json`, `*.tofu.json`).
@@ -370,8 +416,10 @@ fn json_kind(s: &str) -> &'static str {
 /// is a template (`json_kind`), stored as the quoted JSON string when it is not a plain one, and
 /// with its escapes (`$${`) undone when it is; a variable's `default` is a literal.
 fn json_string(file: &str, path: &[Step], s: &str) -> (&'static str, String) {
-    let literal =
-        matches!(path, [Step::Key(v), _, Step::Key(d), ..] if v == "variable" && d == "default");
+    let literal = matches!(path.first(), Some(Step::Key(v)) if v == "variable")
+        && crate::iac::json::body_path(path, 1).is_some_and(
+            |body| matches!(path.get(body.len()), Some(Step::Key(d)) if d == "default"),
+        );
     if !terraform_json(file) || literal {
         return ("string", s.to_string());
     }
@@ -429,52 +477,77 @@ pub(crate) fn read_with(
         .saturating_add(STORED_SLACK);
     let mut left = budget;
     let mut past: Option<(usize, String)> = None;
-    let read = events::read(Syntax::of(path), src, |scalar| {
-        if past.is_some() {
-            return;
-        }
-        if scalar.document >= DOCUMENTS_MAX {
-            past = Some((scalar.line, format!("more than {DOCUMENTS_MAX} documents")));
-            return;
-        }
-        let (kind, mut value) = match scalar.value {
-            Value::String(s) => json_string(path, scalar.path, s),
-            Value::Number(n) => ("number", n.to_string()),
-            Value::Bool(b) => ("boolean", b.to_string()),
-            _ => return,
-        };
-        let cut = value.len() > VALUE_MAX;
-        if cut {
-            value.truncate(value.floor_char_boundary(VALUE_MAX));
-        }
-        let key = key_path(scalar.path);
-        match left.checked_sub(key.len() + value.len()) {
-            Some(rest) => left = rest,
-            None => {
-                past = Some((scalar.line, format!("values past {budget} bytes")));
+    let mut markers = HashSet::new();
+    let mut marker_left = budget;
+    let mut marker_past = None;
+    let read = events::read_located(
+        Syntax::of(path),
+        src,
+        |scalar| {
+            if past.is_some() {
                 return;
             }
-        }
-        let secret = SecretPlace::of(scalar.path, path);
-        let row = Row {
-            key,
-            value: Some(value),
-            kind,
-            line: scalar.line,
-            cut,
-        };
-        pending.push(Pending {
-            document: scalar.document,
-            secret,
-            row,
-        });
-    });
+            if scalar.document >= DOCUMENTS_MAX {
+                past = Some((scalar.line, format!("more than {DOCUMENTS_MAX} documents")));
+                return;
+            }
+            let (kind, mut value) = match scalar.value {
+                Value::String(s) => json_string(path, scalar.path, s),
+                Value::Number(n) => ("number", n.to_string()),
+                Value::Bool(b) => ("boolean", b.to_string()),
+                _ => return,
+            };
+            let cut = value.len() > VALUE_MAX;
+            if cut {
+                value.truncate(value.floor_char_boundary(VALUE_MAX));
+            }
+            let key = key_path(scalar.path);
+            match left.checked_sub(key.len() + value.len()) {
+                Some(rest) => left = rest,
+                None => {
+                    past = Some((scalar.line, format!("values past {budget} bytes")));
+                    return;
+                }
+            }
+            let Some(secret) = SecretPlace::of(scalar.path, path, &mut left) else {
+                past = Some((scalar.line, format!("values past {budget} bytes")));
+                return;
+            };
+            let row = Row {
+                key,
+                value: Some(value),
+                kind,
+                line: scalar.line,
+                cut,
+            };
+            pending.push(Pending {
+                document: scalar.document,
+                secret,
+                row,
+            });
+        },
+        |span, body| {
+            if !terraform_json(path) || marker_past.is_some() || !json_secret_body(span.path, body)
+            {
+                return;
+            }
+            let Some(left) = marker_left.checked_sub(crate::iac::json::path_cost(span.path)) else {
+                marker_past = Some(span.line);
+                return;
+            };
+            marker_left = left;
+            markers.insert(key_path(span.path));
+        },
+    );
     let documents = match read {
         Ok(documents) => documents,
         Err((line, reason)) => return unreadable(line, reason),
     };
     if let Some((line, reason)) = past {
         return unreadable(line, reason);
+    }
+    if let Some(line) = marker_past {
+        return unreadable(line, format!("secret marker paths past {budget} bytes"));
     }
     if documents.len() > DOCUMENTS_MAX {
         return unreadable(1, format!("more than {DOCUMENTS_MAX} documents"));
@@ -493,17 +566,13 @@ pub(crate) fn read_with(
                     SecretPlace::No => false,
                     SecretPlace::Root => is_secret(doc),
                     SecretPlace::Item(n) => doc["items"].get(n).is_some_and(is_secret),
-                    SecretPlace::Variable(name) => {
-                        doc["variable"][name.as_str()]["sensitive"] == Value::Bool(true)
+                    SecretPlace::Variable(body) | SecretPlace::SsmParameter(body) => {
+                        markers.contains(&key_path(&body))
                     }
                     SecretPlace::Tfvars(name) => {
                         sensitive.contains(&name) || sensitive.contains(ANY_VARIABLE)
                     }
                     SecretPlace::Parameter(name) => crate::iac::cloudformation::no_echo(doc, &name),
-                    SecretPlace::SsmParameter(name) => doc["resource"]["aws_ssm_parameter"]
-                        [name.as_str()]
-                    .get("type")
-                    .is_some_and(|t| ssm_value_is_secret(t.as_str())),
                 };
                 if hidden {
                     row.value = None;

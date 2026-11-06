@@ -355,11 +355,13 @@ Un ARN AWS reconocido por la tabla de tipos, una URL SQS o `s3://archive/ruta` e
 
 ### Nodos IaC
 
-Cada `resource`, bloque `data` y llamada `module` de los archivos `*.tf` y `*.tofu` es un **nodo
+Cada `resource`, bloque `data` y llamada `module` de los archivos `*.tf`, `*.tf.json`, `*.tofu` y `*.tofu.json` es un **nodo
 IaC**, con dirección, tipo, archivo, líneas y el módulo raíz que empieza su evaluación. Una
 carpeta de archivos Terraform es un módulo; una carpeta que ninguna otra llama como módulo local
 (un `source` `./` o `../` que queda dentro del repositorio) es un módulo raíz, etiquetado por su
 ruta (`.` en la raíz).
+
+El JSON Terraform usa las mismas reglas de evaluación y referencia. Las cadenas comunes son plantillas; una interpolación sola conserva el tipo del resultado, por lo que `${var.items}` puede proporcionar una colección. Los defaults de variables y las fuentes de módulos son literales. Las cadenas estáticas de `depends_on` nombran referencias. Los arrays de bloques conservan sus índices en las rutas de configuración. Las dos extensiones JSON admiten direcciones de nodos en las ubicaciones `via` de recursos declarados.
 
 - **Direcciones**: `<tipo>.<nombre>`, `data.<tipo>.<nombre>` y `module.<nombre>`. Cada llamada de
   un módulo local instancia sus bloques con la dirección de la llamada delante
@@ -595,7 +597,7 @@ Los enlaces entran en `links`,
 conservando aparte los de aprovisionamiento en `provisions`. `meada status` muestra contratos
 aprovisionados sin uso y usos sin aprovisionador, por kind y broker, solo cuando el workspace
 contiene al menos un aprovisionador y un uso del grupo. Los otros formatos IaC siguen como
-nodos y referencias; esta tabla de contratos cubre archivos `.tf` y `.tofu`.
+nodos y referencias; esta tabla de contratos cubre archivos `.tf`, `.tf.json`, `.tofu` y `.tofu.json`.
 
 ### Uso de los SDK de AWS en Java, Go y C#
 

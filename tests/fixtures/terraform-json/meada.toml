@@ -1,0 +1,11 @@
+[[resource]]
+kind = "proofvia"
+id = "tf-json"
+role = "write"
+via = ["main.tf.json::null_resource.tf_anchor"]
+
+[[resource]]
+kind = "proofvia"
+id = "tofu-json"
+role = "write"
+via = ["open.tofu.json::null_resource.tofu_anchor"]

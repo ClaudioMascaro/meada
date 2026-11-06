@@ -1,9 +1,10 @@
 //! IaC nodes (#649, ADR 0025): every Terraform and OpenTofu resource, data block and module call
-//! of the `.tf` and `.tofu` files a repository holds, with an address, a type, a file, a span and
-//! the root module that roots its evaluation, and the static references between them, stored like
-//! calls. A Compose project (#652, `compose`) and a CloudFormation or SAM template (#653,
-//! `cloudformation`) give nodes of the same shape. `search` finds a node with the kind `iac`,
-//! `context` explains it and `trace` walks its references both ways. Never exported.
+//! of the `.tf`, `.tf.json`, `.tofu` and `.tofu.json` files a repository holds, with an address,
+//! a type, a file, a span and the root module that roots its evaluation, and the static references
+//! between them, stored like calls. A Compose project (#652, `compose`) and a CloudFormation or
+//! SAM template (#653, `cloudformation`) give nodes of the same shape. `search` finds a node with
+//! the kind `iac`, `context` explains it and `trace` walks its references both ways. Nodes holding
+//! a contract side enter the export.
 //!
 //! A directory of Terraform files is a module. A module block whose `source` is a local path
 //! (`./` or `../`, staying inside the repository) calls the module of that directory; a directory
@@ -56,6 +57,7 @@ pub(crate) mod compose;
 pub(crate) mod config_uses;
 pub(crate) mod environment;
 mod functions;
+pub(crate) mod json;
 pub(crate) mod orphans;
 pub(crate) mod pattern;
 pub(crate) mod provision;
@@ -114,10 +116,13 @@ const ROOT_STORED_MAX: usize = 4 * MAX_BYTES;
 // calling one exploding module would pass it.
 const STORED_MAX: usize = 16 * MAX_BYTES;
 
-/// Whether the file at `path` holds IaC nodes: a `.tf` or `.tofu` file (HCL), or a Compose file
-/// or its override by name (#652).
+/// Whether `path` holds IaC nodes: Terraform/OpenTofu in native or JSON syntax, or a Compose
+/// file or its override by name (#652).
 pub(crate) fn is_source(path: &str) -> bool {
-    path.ends_with(".tf") || path.ends_with(".tofu") || compose::is_file(path)
+    path.ends_with(".tf")
+        || path.ends_with(".tofu")
+        || json::is_file(path)
+        || compose::is_file(path)
 }
 
 /// A text a node records (a Compose service's image or build context, a Serverless function's
@@ -154,6 +159,13 @@ fn var_file_rank(path: &str) -> Option<(u8, &str)> {
 /// Whether the file at `path` is read by the evaluation: a source or a var file.
 pub(crate) fn is_input(path: &str) -> bool {
     is_source(path) || is_var_file(path)
+}
+
+/// A resource block's stored key path, in native syntax or JSON label/body array form.
+pub(super) fn is_resource_block(block: &str) -> bool {
+    block
+        .strip_prefix("resource")
+        .is_some_and(|rest| rest.starts_with('.') || rest.starts_with('['))
 }
 
 /// One IaC node as stored.
@@ -304,6 +316,8 @@ struct Block {
     path: String,
     line: usize,
     end_line: usize,
+    /// JSON's actual block path, including array steps; native blocks derive it from labels.
+    json_path: Option<String>,
     /// Its `name` argument, which static evaluation resolves into its physical name; `None` for a
     /// module call, whose `name` is one of its inputs.
     named: Option<Expression>,
@@ -359,6 +373,9 @@ impl Block {
 
     /// The key path of the block (ADR 0025), which its config values start with.
     fn key_path(&self) -> String {
+        if let Some(path) = &self.json_path {
+            return path.clone();
+        }
         let steps: Vec<&str> = match self.kind {
             Kind::Resource => vec!["resource", &self.ty, &self.name],
             Kind::Data => vec!["data", &self.ty, &self.name],
@@ -547,6 +564,9 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
     if is_var_file(path) {
         return read_var_file(path, src, module);
     }
+    if json::is_file(path) {
+        return json::read(path, src, module);
+    }
     let Some(text) = text(src) else {
         return;
     };
@@ -607,6 +627,7 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
             path: path.to_string(),
             line: line(span.start),
             end_line: line(span.end.saturating_sub(1).max(span.start)),
+            json_path: None,
             // A module call's `name` is one of its inputs, not the name of something it creates.
             // A resource the type table lists (#656) is named by the argument the table names.
             named: (kind != Kind::Module)
@@ -1722,6 +1743,8 @@ fn terraform_path(column: &str) -> String {
     let mut any = vec![
         format!("{column} LIKE '%.tf'"),
         format!("{column} LIKE '%.tofu'"),
+        format!("{column} LIKE '%.tf.json'"),
+        format!("{column} LIKE '%.tofu.json'"),
     ];
     for name in compose::NAMES {
         any.push(format!("{column} = '{name}' OR {column} LIKE '%/{name}'"));
@@ -2627,6 +2650,142 @@ mod tests {
                 format!("{}{name}{through}", n.address)
             })
             .collect()
+    }
+
+    /// JSON expression mapping keeps sole interpolations typed, defaults literal, and module
+    /// inputs/outputs on the same evaluator as native HCL (OpenTofu JSON syntax specification).
+    #[test]
+    fn terraform_json_evaluates_typed_templates_literals_and_local_modules() {
+        let main = serde_json::json!({
+            "variable": {
+                "env": {"default": "dev"},
+                "literal": {"default": "${terraform.workspace}"},
+                "n": {"default": 2},
+                "queues": {"default": {"a": "north", "b": "south"}},
+                "secret": {"sensitive": true, "default": "never-repeat-this"}
+            },
+            "locals": {"prefix": "${upper(var.env)}", "map": "${var.queues}"},
+            "resource": {"a": {
+                "child": {"name": "${module.child.full}"},
+                "counted": {"count": "${var.n}", "name": "${lower(local.prefix)}-${count.index}"},
+                "each": {"for_each": "${local.map}", "name": "${each.key}-${each.value}"},
+                "escaped": {"name": "$${var.env}-%%{literal}"},
+                "literal": {"name": "${var.literal}"},
+                "partial": {"name": "orders-${data.a.lookup.id}"},
+                "plain": {"name": "var.env"},
+                "sensitive": {"name": "q-${var.secret}"}
+            }},
+            "data": {"a": {"lookup": {}}},
+            "module": {"child": {"source": "./child", "name": "${local.prefix}"}}
+        })
+        .to_string();
+        let child = serde_json::json!({
+            "variable": {"name": {}},
+            "resource": {"b": {"inner": {"name": "${var.name}"}}},
+            "output": {"full": {"value": "${lower(var.name)}-child"}}
+        })
+        .to_string();
+        assert_eq!(
+            names(&[("main.tf.json", &main), ("child/main.tofu.json", &child)]),
+            [
+                // serde_json writes section keys in lexical order; HCL JSON visits them in
+                // source order, including their complete node and name results.
+                "data.a.lookup",
+                "module.child",
+                "module.child.b.inner = \"DEV\" [var.env main.tf.json:1]",
+                "a.child = \"dev-child\" [var.env main.tf.json:1]",
+                "a.counted[0] = \"dev-0\" [var.env main.tf.json:1] [var.n main.tf.json:1]",
+                "a.counted[1] = \"dev-1\" [var.env main.tf.json:1] [var.n main.tf.json:1]",
+                "a.each[\"a\"] = \"a-north\" [var.queues main.tf.json:1]",
+                "a.each[\"b\"] = \"b-south\" [var.queues main.tf.json:1]",
+                "a.escaped = \"${var.env}-%{literal}\"",
+                "a.literal = \"${terraform.workspace}\" [var.literal main.tf.json:1]",
+                "a.partial ~ \"orders-*\"",
+                "a.plain = \"var.env\"",
+                "a.sensitive ~ \"q-*\"",
+            ]
+        );
+    }
+
+    /// A JSON object just past JSON_EXPR_WORK_MAX's quadratic construction charge stays
+    /// unknown before HCL's insertion loop, preserving the readable part of a physical name.
+    #[test]
+    fn terraform_json_expression_construction_work_bounds_wide_objects() {
+        let wide: serde_json::Map<String, serde_json::Value> = (0..1025)
+            .map(|n| (format!("k{n:04}"), serde_json::Value::Bool(true)))
+            .collect();
+        let source = serde_json::json!({
+            "locals": {"wide": wide},
+            "resource": {"a": {"limited": {"name": "bounded-${join(\"\", keys(local.wide))}"}}}
+        })
+        .to_string();
+        assert_eq!(
+            names(&[("main.tf.json", &source)]),
+            ["a.limited ~ \"bounded-*\""]
+        );
+    }
+
+    /// A template whose AST would pass ROOT_STORED_MAX stays unknown, even when its evaluated
+    /// text would fit. Plain strings and a long literal prefix still resolve within that room.
+    #[test]
+    fn terraform_json_ast_room_bounds_templates_without_cutting_literal_strings() {
+        let literal = "1".repeat(4096);
+        let prefix = "p".repeat(4096);
+        let source = serde_json::json!({"resource": {"a": {
+            "limited": {"name": "${1}".repeat(4096)},
+            "literal": {"name": literal},
+            "prefixed": {"name": format!("{prefix}${{1}}")}
+        }}})
+        .to_string();
+        assert_eq!(
+            names(&[("main.tf.json", &source)]),
+            [
+                "a.limited ~ \"*\"".to_string(),
+                format!("a.literal = \"{literal}\""),
+                format!("a.prefixed = \"{prefix}1\""),
+            ]
+        );
+    }
+
+    /// Static dependency strings charge traversal AST room before the array is allocated.
+    /// Passing that room leaves only that attribute unknown, preserving ordinary references.
+    #[test]
+    fn terraform_json_dependency_room_leaves_other_references_resolvable() {
+        let source = serde_json::json!({"resource": {
+            "a": {"target": {}},
+            "b": {
+                "limited": {"depends_on": vec!["a.target"; 4096]},
+                "ordinary": {"depends_on": ["a.target"]}
+            }
+        }})
+        .to_string();
+        let (nodes, references) = evaluate(&files(&[("main.tf.json", &source)]));
+        assert_eq!(nodes.len(), 3);
+        let actual: Vec<_> = references
+            .iter()
+            .map(|r| (r.source.as_str(), r.target.as_str()))
+            .collect();
+        assert_eq!(actual, [("b.ordinary", "a.target")]);
+    }
+
+    /// The shared evaluator applies REFERENCES_MAX in address order, even when JSON lists its
+    /// dependencies in reverse order. Adapter construction must not cut references first.
+    #[test]
+    fn terraform_json_references_keep_the_first_in_address_order() {
+        let names: Vec<_> = (0..REFERENCES_MAX + 5)
+            .map(|i| format!("a.r{i:03}"))
+            .collect();
+        let resources: serde_json::Map<String, serde_json::Value> = (0..names.len())
+            .map(|i| (format!("r{i:03}"), serde_json::json!({})))
+            .collect();
+        let source = serde_json::json!({"resource": {
+            "a": resources,
+            "b": {"all": {"depends_on": names.iter().rev().collect::<Vec<_>>()}}
+        }})
+        .to_string();
+        let (_, references) = evaluate(&files(&[("main.tf.json", &source)]));
+        let actual: Vec<_> = references.iter().map(|r| &r.target).collect();
+        assert_eq!(actual, names[..REFERENCES_MAX].iter().collect::<Vec<_>>());
     }
 
     #[test]

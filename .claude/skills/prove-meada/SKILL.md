@@ -206,6 +206,8 @@ For #663 workload environment resolution, run `python3 $S/environment.py --head-
 
 **Drive**: `prove.py values --http` over the A7 entries (and `prove.py iac --http` for the IaC nodes), beside `prove.py run --http` on the corpus entries Scope names: the command, the pinned repositories, the story-by-story map and what could fool it are in [references/config-iac.md](references/config-iac.md).
 
+For Terraform/OpenTofu JSON, run `python3 $S/terraform-json.py --head-bin "$RUN/bin/meada-head" --run "$RUN/terraform-json" --http`. Judge the complete node/provisioner/subscription sets, marker privacy, source spans/references, warm/cold refresh and source-deletion behavior against #642, #649 and HCL JSON syntax; HTTP copies restored stdio. [references/terraform-json.md](references/terraform-json.md) fixes the neutral input inventory and limitations.
+
 For #660's Java, Go and C# AWS SDK use sides, run `python3 $S/aws-sdk-jvm-go-dotnet.py --head-bin "$RUN/bin/meada-head" --run "$RUN/aws-sdk" --http`; inspect whole side/provision sets, controls, environment provenance and every raw transport answer. [references/aws-sdk-jvm-go-dotnet.md](references/aws-sdk-jvm-go-dotnet.md) fixes the neutral input inventory and limits; all-corpus base parity and console viewer checks also apply to the Cargo version bump.
 
 For #657's orphans, run `python3 $S/orphans.py --base-bin "$RUN/bin/meada-base" --head-bin "$RUN/bin/meada-head" --run "$RUN/orphans" --http`; judge `orphans.md`, every whole status capture and both transport captures against #657 and base ADR 0026. Preserve declared-resource writer/reader diagnostics separately. Shared query changes also require all corpus entries and console API parity.

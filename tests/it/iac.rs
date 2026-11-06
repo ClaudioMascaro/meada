@@ -10,6 +10,162 @@ use crate::common::{assert_golden, fixture_repo};
 
 const ORIGIN: Option<&str> = Some("https://example.com/acme/infra.git");
 
+/// Terraform JSON and OpenTofu JSON keep unknown resource types visible and locate declared
+/// sides at their nodes, just as the corresponding native syntax does (independent #641 proof).
+#[test]
+fn terraform_json_nodes_locate_declared_resource_vias() {
+    let repo = fixture_repo("iac_json_via", "terraform-json", ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let search = engine.search("null_resource", Some("iac"), None).unwrap();
+    assert_eq!(search.lines().count(), 2, "{search}");
+    for (path, address) in [
+        ("main.tf.json", "null_resource.tf_anchor"),
+        ("open.tofu.json", "null_resource.tofu_anchor"),
+    ] {
+        assert!(search.contains(&format!("{path}:1 {address}")), "{search}");
+        let locator = format!("{path}::{address}");
+        let context = engine.context(&locator, None).unwrap();
+        assert!(context.contains("type: null_resource"), "{context}");
+        let trace = engine
+            .trace(Start::From(&locator), Direction::Down, None)
+            .unwrap();
+        assert!(trace.contains(&format!("{path}:1 {address}")), "{trace}");
+    }
+    let export: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let sites: Vec<_> = export["providers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["site"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        sites,
+        [
+            "example.com/acme/infra::main.tf.json::null_resource.tf_anchor",
+            "example.com/acme/infra::open.tofu.json::null_resource.tofu_anchor",
+        ]
+    );
+    let status = meada::engine::status(&repo).unwrap();
+    assert!(!status.contains("`via`"), "{status}");
+}
+
+/// JSON uses the same Terraform type table as native syntax. Unknown types and data blocks
+/// remain nodes without sides, and defining a physical name does not use its own contract.
+#[test]
+fn terraform_json_resources_keep_their_provisioner_roles() {
+    let repo = fixture_repo("iac_json_contracts", "terraform-json-contracts", ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let export: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    assert_eq!(
+        export["provisioners"],
+        serde_json::json!([
+            {"contract":"channel::sqs::json-orders", "node":"example.com/acme/infra::main.tf.json::aws_sqs_queue.orders", "root":"."},
+            {"contract":"resource::s3::json-archive", "node":"example.com/acme/infra::open.tofu.json::aws_s3_bucket.archive", "root":"."},
+            {"contract":"resource::s3::native-control", "node":"example.com/acme/infra::native.tf::aws_s3_bucket.control", "root":"."}
+        ])
+    );
+    let mut nodes: Vec<_> = export["iac_nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| n["address"].as_str().unwrap())
+        .collect();
+    nodes.sort_unstable();
+    assert_eq!(
+        nodes,
+        [
+            "aws_s3_bucket.archive",
+            "aws_s3_bucket.control",
+            "aws_sqs_queue.orders"
+        ]
+    );
+    assert!(export.get("uses").is_none(), "{export}");
+    for address in ["data.aws_sqs_queue.outside", "null_resource.unlisted"] {
+        let result = engine.search(address, Some("iac"), None).unwrap();
+        assert_eq!(result.lines().count(), 1, "{result}");
+        assert!(result.contains(address), "{result}");
+    }
+}
+
+/// HCL JSON allows repeated section properties and array bodies. Each block keeps its own
+/// source span and references; a later section cannot erase an earlier sensitive marker.
+#[test]
+fn terraform_json_repeated_sections_preserve_blocks_spans_and_privacy() {
+    let repo = fixture_repo("iac_json_repeated", "terraform-json-repeated", ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let search = engine.search("null_resource", Some("iac"), None).unwrap();
+    assert_eq!(search.lines().count(), 4, "{search}");
+    for (path, line, name) in [
+        ("main.tf.json", 4, "first"),
+        ("main.tf.json", 5, "second"),
+        ("main.tf.json", 5, "third"),
+        ("native.tf", 1, "native"),
+    ] {
+        assert!(
+            search.contains(&format!("{path}:{line} null_resource.{name} ")),
+            "{search}"
+        );
+        let context = engine
+            .context(&format!("{path}::null_resource.{name}"), None)
+            .unwrap();
+        assert!(
+            context.starts_with(&format!(
+                "example.com/acme/infra {path}:{line}-{line} null_resource.{name}\n"
+            )),
+            "{context}"
+        );
+    }
+    let down = engine
+        .trace(Start::From("null_resource.first"), Direction::Down, None)
+        .unwrap();
+    assert_eq!(down.lines().count(), 3, "{down}");
+    assert!(down.contains("null_resource.second"), "{down}");
+    let up = engine
+        .trace(Start::From("null_resource.second"), Direction::Up, None)
+        .unwrap();
+    assert_eq!(up.lines().count(), 3, "{up}");
+    assert!(up.contains("null_resource.first"), "{up}");
+    let literal = engine
+        .trace(Start::From("null_resource.third"), Direction::Down, None)
+        .unwrap();
+    assert_eq!(literal.lines().count(), 2, "{literal}");
+    assert!(!literal.contains("null_resource.second"), "{literal}");
+    let secret = "repeated-block-secret-canary";
+    assert_eq!(
+        engine.search(secret, Some("value"), None).unwrap(),
+        format!("no matches for `{secret}`\n")
+    );
+    let index = fs::read(repo.join(".meada/index.db")).unwrap();
+    assert!(!index.windows(secret.len()).any(|w| w == secret.as_bytes()));
+}
+
+/// JSON nodes and their provisioning/value rows must answer the same way through the query's
+/// partial index and through a whole export, including bodies with array selectors.
+#[test]
+fn terraform_json_partial_answers_equal_all_index_rows() {
+    let repo = fixture_repo("iac_json_partial", "terraform-json-contracts", ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let ask = || {
+        let mut out = Vec::new();
+        for (query, kind) in [(".", "iac"), ("json", "value"), ("native", "value")] {
+            out.push(engine.search(query, Some(kind), None).unwrap());
+        }
+        for address in [
+            "aws_sqs_queue.orders",
+            "open.tofu.json::aws_s3_bucket.archive",
+            "aws_s3_bucket.control",
+            "null_resource.unlisted",
+        ] {
+            out.push(engine.context(address, None).unwrap());
+            for direction in [Direction::Up, Direction::Down] {
+                out.push(engine.trace(Start::From(address), direction, None).unwrap());
+            }
+        }
+        out
+    };
+    assert_eq!(ask(), meada::engine::with_every_row(ask));
+}
+
 /// Each answer of `ask` over `questions`, in order, a blank line between two.
 fn answers(questions: &[&str], ask: impl Fn(&str) -> String) -> String {
     (questions.iter())

@@ -126,6 +126,43 @@ pub fn read_keyed(
     Ok((documents, std::mem::take(&mut reader.builder.keys)))
 }
 
+/// A collection's source location. `path` is borrowed from the reader, and a mapping value
+/// starts at its key, including when the opening bracket is on a later line.
+pub(crate) struct Collection<'a> {
+    pub path: &'a [Step],
+    pub line: usize,
+    pub end_line: usize,
+}
+
+/// Reads JSON through the shared bounded reader, handing each collection's location to
+/// `each` when it closes. No source paths or locations are allocated by this callback seam.
+pub(crate) fn json_spanned(
+    src: &[u8],
+    each: impl FnMut(Collection<'_>, &Value),
+) -> Result<Value, Error> {
+    Ok(read_located(Syntax::Json, src, |_| {}, each)?
+        .into_iter()
+        .next()
+        .unwrap_or(Value::Null))
+}
+
+/// `read` with a borrowed completed collection beside its span. The callback sees repeated
+/// JSON properties before a later property replaces one in the generic value tree.
+pub(crate) fn read_located(
+    syntax: Syntax,
+    src: &[u8],
+    mut scalar: impl FnMut(Scalar<'_>),
+    mut collection: impl FnMut(Collection<'_>, &Value),
+) -> Result<Vec<Value>, Error> {
+    let mut reader = Reader::new(syntax, src, &mut scalar)?;
+    reader.builder.collections = Some(&mut collection);
+    let mut documents = Vec::new();
+    while let Some(document) = reader.document()? {
+        documents.push(document);
+    }
+    Ok(documents)
+}
+
 /// The first document of `src`, null when the stream has none. Nothing past it is read, so a
 /// later document that cannot be read changes nothing.
 pub fn first(syntax: Syntax, src: &[u8]) -> Result<Value, Error> {
@@ -187,6 +224,7 @@ impl<'s, 'f> Reader<'s, 'f> {
             tags: false,
             keyed: false,
             keys: Vec::new(),
+            collections: None,
         };
         Ok(Reader { source, builder })
     }
@@ -301,6 +339,8 @@ struct Open {
     cost: usize,
     depth: usize,
     in_key: bool,
+    line: usize,
+    key_line: Option<usize>,
     /// The key the node is wrapped in when it closes: its tag's, under `read_keyed` with `tags`.
     wrap: Option<String>,
 }
@@ -336,6 +376,7 @@ struct Builder<'f> {
     /// Whether the second-level keys of the first document are recorded (`read_keyed`).
     keyed: bool,
     keys: Vec<KeyLine>,
+    collections: Option<&'f mut dyn FnMut(Collection<'_>, &Value)>,
 }
 
 impl Builder<'_> {
@@ -457,6 +498,7 @@ impl Builder<'_> {
             return;
         }
         self.begin();
+        let start = self.stack.last().and_then(|o| o.key_line).unwrap_or(line);
         let in_key = self.at_key() || self.stack.last().is_some_and(|open| open.in_key);
         let node = if sequence {
             Node::Sequence(Vec::new())
@@ -469,6 +511,8 @@ impl Builder<'_> {
             cost: 1,
             depth: 1,
             in_key,
+            line: start,
+            key_line: None,
             wrap,
         });
         self.path.push(Step::Index(0));
@@ -483,6 +527,18 @@ impl Builder<'_> {
             Node::Sequence(items) => Value::Array(items),
             Node::Mapping(map, _) => Value::Object(map),
         };
+        if !open.in_key
+            && let Some(each) = &mut self.collections
+        {
+            each(
+                Collection {
+                    path: &self.path,
+                    line: open.line,
+                    end_line: line,
+                },
+                &value,
+            );
+        }
         let (value, cost, depth) = self.wrapped(value, open.wrap, open.cost, open.depth, line);
         self.remember(open.anchor, &value, cost, depth);
         self.place(value, cost, depth, line);
@@ -537,6 +593,7 @@ impl Builder<'_> {
             }
             Node::Mapping(_, key @ None) => match value {
                 Value::String(text) => {
+                    open.key_line = Some(line);
                     if let Some(step) = self.path.last_mut() {
                         *step = Step::Key(text.clone());
                     }

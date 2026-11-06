@@ -8,6 +8,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Terraform/OpenTofu JSON (`.tf.json`, `.tofu.json`) now creates IaC nodes with source spans,
+  references, evaluated names and local module instances. JSON expression and literal rules
+  share the HCL evaluator, provisioners and subscriptions; declared resource `via` addresses
+  resolve to JSON nodes and refresh when sources change. Sensitive defaults, tfvars and SSM
+  SecureString values also stay redacted in JSON block arrays (#642, #649).
+
 - Declared resource `via` locations now accept IaC addresses in every indexed format and
   `<file>#<key path>` with list selectors (`[key=value]`). Sides retain their precise node or
   key for context and trace; removed locations produce the existing stale status diagnostics.

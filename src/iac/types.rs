@@ -75,9 +75,10 @@ pub(crate) fn entry(format: &str, ty: &str) -> Option<&'static Entry> {
 }
 
 /// The format of the IaC file at `path` as the table names it: `terraform` for a `.tf` or
-/// `.tofu` file, `None` for a format no entry has yet.
+/// `.tofu` file or its JSON equivalent, `None` for a format no entry has yet.
 pub(crate) fn format_of(path: &str) -> Option<&'static str> {
-    (path.ends_with(".tf") || path.ends_with(".tofu")).then_some("terraform")
+    (path.ends_with(".tf") || path.ends_with(".tofu") || super::json::is_file(path))
+        .then_some("terraform")
 }
 
 /// The unique contract named by an AWS structured identifier. Forms stay in the type table.

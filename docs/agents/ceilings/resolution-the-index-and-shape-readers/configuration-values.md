@@ -33,10 +33,14 @@
   var-file, whichever module it goes to), and wholly when a Terraform file at or above its
   directory is unreadable (`config_values::ANY_VARIABLE`); a variable marked sensitive by an
   expression keeps its values, and `sensitive` is read as the literal `true` of a top-level
-  `variable` (JSON: the object form of `variable`, not the array form).
+  `variable`, including JSON arrays at label or body levels. Pending JSON redaction paths
+  carry no values and charge the stored budget before they are copied. Completed marker paths
+  have a separate budget of the same size, charged before rendering; a later repeated section
+  cannot erase a marker. Past either budget the file is unreadable and keeps no value rows.
   An `aws_ssm_parameter` resource with literal
   `type = "SecureString"` redacts its `value`, regardless of attribute order, in HCL and the
-  object form of Terraform JSON. An unresolved type expression is no secret marker. A `//` comment
+  object and array forms of Terraform JSON. When a `type` is present, only the explicit public
+  types `String` and `StringList` permit its value; an unresolved type stays redacted. A `//` comment
   property of a Terraform JSON file is a value, and a block written as an array of one is
   indexed `[0]` there. A number is stored as
   written. A block repeated in one body is indexed from its second occurrence on, so adding a

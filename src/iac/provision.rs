@@ -75,7 +75,7 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
         let Some(entry) = types::entry(format, &node.ty) else {
             continue;
         };
-        if !node.block.starts_with("resource.") {
+        if !super::is_resource_block(&node.block) {
             continue;
         }
         let Some(name) = node.name.as_deref().filter(|n| !n.is_empty()) else {

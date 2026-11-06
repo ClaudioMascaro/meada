@@ -135,7 +135,7 @@ fn parts(mut text: &str, selectors: bool) -> Option<Vec<Part>> {
     (!parts.is_empty()).then_some(parts)
 }
 
-fn parts_without_selectors(text: &str) -> Option<Vec<Step>> {
+pub(super) fn parts_without_selectors(text: &str) -> Option<Vec<Step>> {
     parts(text, false)?
         .into_iter()
         .map(|p| match p {

@@ -350,11 +350,13 @@ An AWS ARN recognized by the type table, an SQS URL or `s3://archive/path` in co
 
 ### IaC nodes
 
-Each `resource`, `data` block and `module` call of the `*.tf` and `*.tofu` files is an **IaC
+Each `resource`, `data` block and `module` call of the `*.tf`, `*.tf.json`, `*.tofu` and `*.tofu.json` files is an **IaC
 node**, with an address, a type, a file, its lines and the root module its evaluation starts
 from. A directory of Terraform files is a module; a directory no other one calls as a local
 module (a `./` or `../` `source` that stays inside the repository) is a root module, labelled
 by its path (`.` at the root).
+
+Terraform JSON uses the same evaluation and reference rules. Ordinary strings are templates; a sole interpolation keeps its result type, so `${var.items}` can supply a collection. Variable defaults and module sources are literal. Static `depends_on` strings name references. Block arrays retain their indexes in config key paths. Both JSON extensions support node addresses in declared resource `via` locations.
 
 - **Addresses**: `<type>.<name>`, `data.<type>.<name>` and `module.<name>`. Each call of a local
   module instantiates its blocks with the call's address in front
@@ -382,8 +384,8 @@ by its path (`.` at the root).
   or the output names, and shows what it went through (`via var.queue_arn`). A registry module
   stays as the call's node, with nothing inside.
 - **Queries**: `search` with `kind = "iac"` finds the nodes, `context` explains one and `trace`
-  follows its references both ways. Nodes stay out of search with no `kind` and out of `meada
-  export`.
+  follows its references both ways. Nodes stay out of search with no `kind`; only nodes
+  holding a contract side enter `meada export`.
 
 ### Kubernetes objects and Kustomize overlays
 
@@ -586,7 +588,7 @@ root. Their links enter `links`, keeping
 provisioning links separate in `provisions`. `meada status` lists provisioned contracts without
 use and uses without a provisioner, per kind and broker, only when the workspace contains at
 least one provisioner and one use of that group. Other IaC formats remain nodes and references;
-this contract table covers `.tf` and `.tofu` files.
+this contract table covers `.tf`, `.tf.json`, `.tofu` and `.tofu.json` files.
 
 ### AWS SDK use in Java, Go and C#
 

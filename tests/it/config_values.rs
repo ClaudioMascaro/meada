@@ -9,6 +9,49 @@ use crate::common::{self, assert_golden, fixture_repo};
 
 const ORIGIN: Option<&str> = Some("https://example.com/acme/app.git");
 
+/// HCL JSON permits arrays around label maps and block bodies. The format's sensitive
+/// markers hide defaults and tfvars in those forms, while ordinary values stay searchable.
+#[test]
+fn terraform_json_arrays_keep_marked_values_private() {
+    let repo = fixture_repo(
+        "config_json_secret_arrays",
+        "terraform-json-secrets",
+        ORIGIN,
+    );
+    let engine = Engine::open(&repo).unwrap();
+    for secret in [
+        "json-array-default-canary",
+        "json-array-tfvars-canary",
+        "json-array-ssm-canary",
+    ] {
+        assert_eq!(
+            engine.search(secret, Some("value"), None).unwrap(),
+            format!("no matches for `{secret}`\n")
+        );
+        assert!(!engine.export().unwrap().contains(secret));
+    }
+    let values = engine.search("default", Some("value"), None).unwrap();
+    assert!(
+        values.contains("variable[0][\"db-password\"][0].default = redacted"),
+        "{values}"
+    );
+    for public in ["json-array-public", "json-array-ssm-public"] {
+        let answer = engine.search(public, Some("value"), None).unwrap();
+        assert!(answer.contains(&format!("= \"{public}\"")), "{answer}");
+    }
+    let index = fs::read(repo.join(".meada/index.db")).unwrap();
+    for secret in [
+        "json-array-default-canary",
+        "json-array-tfvars-canary",
+        "json-array-ssm-canary",
+    ] {
+        assert!(
+            !index.windows(secret.len()).any(|w| w == secret.as_bytes()),
+            "{secret} in the stored index"
+        );
+    }
+}
+
 /// ADR 0025's SecureString marker hides the resource's value in both Terraform syntaxes,
 /// even when the marker follows it. Ordinary String parameters remain searchable.
 #[test]

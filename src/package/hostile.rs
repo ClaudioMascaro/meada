@@ -947,6 +947,39 @@ fn probes() -> Vec<Probe> {
             stored("a.tfvars", fill(1, |i| format!("v{i} = \"x\"\n")))
         }),
         // IaC nodes (#649): what the evaluation of one root module stores
+        ("iac json: many repeated blocks with long labels", || {
+            let label = "a".repeat(1000);
+            let blocks = fill(1, |i| {
+                format!("\"resource\":{{\"{label}\":{{\"r{i}\":{{}}}}}},")
+            });
+            tree(vec![(
+                "main.tf.json".into(),
+                format!("{{{blocks}\"//\":\"end\"}}"),
+            )])
+        }),
+        ("iac json: wide expression objects", || {
+            let keys = fill(1, |i| format!("\"k{i}\":true,"));
+            tree(vec![(
+                "main.tofu.json".into(),
+                format!(
+                    "{{\"locals\":{{\"wide\":{{{keys}\"z\":true}}}},\"resource\":{{\"a\":{{\"r\":{{\"name\":\"${{join(\\\"\\\", keys(local.wide))}}\"}}}}}}}}"
+                ),
+            )])
+        }),
+        ("iac json: dependencies of tiny non-traversals", || {
+            let items = "0,".repeat(400_000);
+            tree(vec![(
+                "main.tf.json".into(),
+                format!("{{\"resource\":{{\"a\":{{\"r\":{{\"depends_on\":[{items}0]}}}}}}}}"),
+            )])
+        }),
+        ("iac json: many template interpolations", || {
+            let template = "${a}".repeat(240_000);
+            tree(vec![(
+                "main.tf.json".into(),
+                format!("{{\"resource\":{{\"a\":{{\"r\":{{\"name\":\"{template}\"}}}}}}}}"),
+            )])
+        }),
         (
             "iac: AWS subscriptions with repeated references and filters",
             || {

@@ -256,7 +256,9 @@ Um ARN AWS reconhecido pela tabela de tipos, uma URL SQS ou `s3://archive/caminh
 
 ## Nós IaC
 
-Cada `resource`, bloco `data` e chamada `module` dos arquivos `*.tf` e `*.tofu` é um nó IaC, com endereço (`<tipo>.<nome>`, `data.<tipo>.<nome>`, `module.<nome>`), tipo, arquivo, linhas e o módulo raiz que começa a sua avaliação: uma pasta que nenhuma outra chama como módulo local, rotulada pelo caminho (`.` na raiz). Cada chamada de um módulo local (um `source` `./` ou `../` que fica dentro do repositório) instancia os blocos dele com o endereço da chamada na frente (`module.orders.aws_sqs_queue.this`), e um `count` ou um `for_each` sobre valores que se resolvem em literais dá um nó por instância, com `[chave]` no fim (`aws_sqs_queue.dlq[0]`). Uma expressão que nomeia um resource, um bloco data ou um módulo é uma referência, guardada como uma chamada; uma que passa por `var.<nome>`, `local.<nome>` ou a saída de um módulo é seguida até o que ela nomeia, e guarda o nome por onde passou.
+Cada `resource`, bloco `data` e chamada `module` dos arquivos `*.tf`, `*.tf.json`, `*.tofu` e `*.tofu.json` é um nó IaC, com endereço (`<tipo>.<nome>`, `data.<tipo>.<nome>`, `module.<nome>`), tipo, arquivo, linhas e o módulo raiz que começa a sua avaliação: uma pasta que nenhuma outra chama como módulo local, rotulada pelo caminho (`.` na raiz). Cada chamada de um módulo local (um `source` `./` ou `../` que fica dentro do repositório) instancia os blocos dele com o endereço da chamada na frente (`module.orders.aws_sqs_queue.this`), e um `count` ou um `for_each` sobre valores que se resolvem em literais dá um nó por instância, com `[chave]` no fim (`aws_sqs_queue.dlq[0]`). Uma expressão que nomeia um resource, um bloco data ou um módulo é uma referência, guardada como uma chamada; uma que passa por `var.<nome>`, `local.<nome>` ou a saída de um módulo é seguida até o que ela nomeia, e guarda o nome por onde passou.
+
+O JSON Terraform usa as mesmas regras de avaliação e referência. Strings comuns são templates; uma interpolação sozinha mantém o tipo do resultado, então `${var.items}` pode fornecer uma coleção. Defaults de variáveis e fontes de módulos são literais. Strings estáticas de `depends_on` nomeiam referências. Arrays de blocos mantêm os índices nos caminhos de configuração. As duas extensões JSON aceitam endereços de nós nas localizações `via` de recursos declarados.
 
 | Consulta | Resultado |
 | --- | --- |
@@ -279,8 +281,7 @@ variáveis, a registra, já que quem faz o deploy pode trocá-la. Um valor acima
 expressão cuja avaliação poderia passar de 1 MiB e o que uma raiz avalia além de 64 MiB ficam sem
 resolver. Um arquivo Terraform ou de variáveis alterado avalia de novo só os módulos raiz cuja
 unidade (a raiz e os módulos locais que ela chama) o contém. Um `count` ou um `for_each` que não se
-resolve dá um nó só, sem chave; um módulo do registro ou remoto é só o nó da chamada; arquivos
-`.tf.json` e `.tofu.json` ainda não dão nós. Só os nós com um lado de contrato entram no `meada
+resolve dá um nó só, sem chave; um módulo do registro ou remoto é só o nó da chamada. Só os nós com um lado de contrato entram no `meada
 export`.
 
 ### Contratos órfãos
@@ -371,7 +372,7 @@ As ligações entram em `links`, mantendo
 as ligações de provisionamento separadas em `provisions`. `meada status` lista contratos
 provisionados sem uso e usos sem provisionador, por kind e broker, somente quando o workspace
 contém ao menos um provisionador e um uso daquele grupo. Os outros formatos IaC continuam
-como nós e referências; esta tabela de contratos cobre arquivos `.tf` e `.tofu`.
+como nós e referências; esta tabela de contratos cobre arquivos `.tf`, `.tf.json`, `.tofu` e `.tofu.json`.
 
 ## Kubernetes e Kustomize
 

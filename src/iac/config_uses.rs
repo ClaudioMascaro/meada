@@ -48,7 +48,7 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
             Ok((path, block, ty)) => {
                 let entry = types::format_of(&path).and_then(|f| types::entry(f, &ty));
                 entry
-                    .filter(|_| block.starts_with("resource."))
+                    .filter(|_| super::is_resource_block(&block))
                     .map(|entry| Ok((path, format!("{block}.{}", entry.name))))
             }
             Err(error) => Some(Err(error)),

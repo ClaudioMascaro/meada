@@ -256,7 +256,9 @@ An AWS ARN recognized by the type table, an SQS URL or `s3://archive/path` in co
 
 ## IaC nodes
 
-Every `resource`, `data` block and `module` call of the `*.tf` and `*.tofu` files is an IaC node, with an address (`<type>.<name>`, `data.<type>.<name>`, `module.<name>`), a type, a file, its lines and the root module its evaluation starts from: a directory no other one calls as a local module, labelled by its path (`.` at the root). Each call of a local module (a `./` or `../` `source` that stays inside the repository) instantiates its blocks with the call's address in front (`module.orders.aws_sqs_queue.this`), and a `count` or a `for_each` over values that resolve to literals gives one node per instance, with `[key]` at the end (`aws_sqs_queue.dlq[0]`). An expression that names a resource, a data block or a module is a reference, stored like a call; one that goes through `var.<name>`, `local.<name>` or a module's output is followed to what it names, and keeps the name it went through.
+Every `resource`, `data` block and `module` call of the `*.tf`, `*.tf.json`, `*.tofu` and `*.tofu.json` files is an IaC node, with an address (`<type>.<name>`, `data.<type>.<name>`, `module.<name>`), a type, a file, its lines and the root module its evaluation starts from: a directory no other one calls as a local module, labelled by its path (`.` at the root). Each call of a local module (a `./` or `../` `source` that stays inside the repository) instantiates its blocks with the call's address in front (`module.orders.aws_sqs_queue.this`), and a `count` or a `for_each` over values that resolve to literals gives one node per instance, with `[key]` at the end (`aws_sqs_queue.dlq[0]`). An expression that names a resource, a data block or a module is a reference, stored like a call; one that goes through `var.<name>`, `local.<name>` or a module's output is followed to what it names, and keeps the name it went through.
+
+Terraform JSON uses the same evaluation and reference rules. Ordinary strings are templates; a sole interpolation keeps its result type, so `${var.items}` can supply a collection. Variable defaults and module sources are literal. Static `depends_on` strings name references. Block arrays retain their indexes in config key paths. Both JSON extensions support node addresses in declared resource `via` locations.
 
 | Query | Result |
 | --- | --- |
@@ -278,8 +280,8 @@ root module's variable, by its default or a var file, records it, since a deploy
 A value over 64 KiB, an expression whose evaluation could make over 1 MiB and what a root evaluates
 past 64 MiB stay unresolved. A changed Terraform file or var file evaluates again only the root
 modules whose unit (the root and the local modules it calls) holds it. A `count` or `for_each` that
-does not resolve gives one node with no key; a registry or remote module is only the call's node;
-`.tf.json` and `.tofu.json` files give no nodes yet. Only nodes holding a contract side enter `meada
+does not resolve gives one node with no key; a registry or remote module is only the call's node.
+Only nodes holding a contract side enter `meada
 export`.
 
 ### Orphan contracts
@@ -369,7 +371,7 @@ root. Their links enter `links`, keeping
 provisioning links separate in `provisions`. `meada status` lists provisioned contracts without
 use and uses without a provisioner, per kind and broker, only when the workspace contains at
 least one provisioner and one use of that group. Other IaC formats remain nodes and references;
-this contract table covers `.tf` and `.tofu` files.
+this contract table covers `.tf`, `.tf.json`, `.tofu` and `.tofu.json` files.
 
 ## Kubernetes and Kustomize
 

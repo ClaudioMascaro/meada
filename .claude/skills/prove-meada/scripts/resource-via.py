@@ -21,6 +21,8 @@ KEY = 'settings.yaml#groups[0].rules[0].labels.support'
 SELECTOR = 'settings.yaml#groups[name=availability].rules[alert=ProbeDown].labels.support'
 ADDRESSES = [
     ('main.tf::opsgenie_team_routing_rule.team_z', 'opsgenie_team_routing_rule.team_z'),
+    ('generated.tf.json::null_resource.tf_json', 'null_resource.tf_json'),
+    ('open.tofu.json::null_resource.tofu_json', 'null_resource.tofu_json'),
     ('object.yaml::ConfigMap/proof/routing', 'ConfigMap/proof/routing'),
     ('managed.yaml::Bucket.s3.aws.upbound.io/archive', 'Bucket.s3.aws.upbound.io/archive'),
     ('compose.yaml::services.router', 'services.router'),
@@ -52,6 +54,8 @@ def seed(root):
     vias = ', '.join(json.dumps(via) for _, via in ADDRESSES)
     write(infra, 'meada.toml', f'[[peer]]\nrepo = "{PREFIX}app"\n\n[[resource]]\nkind = "routing"\nid = "team-z"\nrole = "read"\nvia = [{vias}, "template.yaml::Deleted", "Routing"]\n')
     write(infra, 'main.tf', 'resource "opsgenie_team_routing_rule" "team_z" { name = "team-z" }\n')
+    write(infra, 'generated.tf.json', json.dumps({'resource': {'null_resource': {'tf_json': {'triggers': {'marker': 'terraform-json'}}}}}) + '\n')
+    write(infra, 'open.tofu.json', json.dumps({'resource': {'null_resource': {'tofu_json': {'triggers': {'marker': 'opentofu-json'}}}}}) + '\n')
     write(infra, 'object.yaml', 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: routing\n  namespace: proof\ndata:\n  team: team-z\n')
     write(infra, 'managed.yaml', 'apiVersion: s3.aws.upbound.io/v1beta1\nkind: Bucket\nmetadata:\n  name: archive\nspec:\n  forProvider:\n    region: eu-west-2\n')
     write(infra, 'compose.yaml', 'services:\n  router:\n    command: route\n')

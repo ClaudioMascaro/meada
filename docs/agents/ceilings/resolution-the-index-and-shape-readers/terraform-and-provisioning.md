@@ -9,8 +9,8 @@
   result cut that way is memoized for the instance); `NODES_MAX` (10,000 nodes per root module, the
   rest left out); `REFERENCES_MAX` (64 references per node and targets per name, the first in
   address order); `ROOT_STORED_MAX` (4 MiB of addresses per root) and `STORED_MAX` (16 MiB for the
-  repository), past which the rest is left out. Only `.tf` and `.tofu` files give nodes (a
-  `.tf.json` or `.tofu.json` file gives config values only), only `resource`, `data` and `module`
+  repository), past which the rest is left out. Both native (`.tf`, `.tofu`) and JSON
+  (`.tf.json`, `.tofu.json`) syntax give nodes, only `resource`, `data` and `module`
   blocks are nodes (no `ephemeral`, `import` or `moved`), and only a local `source` is followed (a
   registry, Git or absolute source is the call's node alone). `count.index`, `each.key` and any
   index that is not a literal name every instance; a literal key no instance has names every
@@ -27,6 +27,25 @@
   for a workspace that makes it slow. A module call has no physical name: its `name` is one of its
   inputs.
 
+- Terraform/OpenTofu JSON (`iac/json.rs`) shares the event reader's `MAX_NESTING` and
+  per-file `MAX_BYTES`, plus the ordinary evaluator's limits. Each completed block body is
+  consumed with its borrowed source location before a repeated property replaces an earlier
+  one. Its retained labels and rendered paths charge `ROOT_STORED_MAX` before allocation;
+  source-location metadata holds no values. `JSON_EXPR_WORK_MAX` (1,048,576 construction work
+  units per file) charges expression visits, string bytes and the square of object widths or
+  template separators before constructing HCL ASTs, since HCL's object insertion compares keys
+  linearly. AST room is also
+  charged before allocation against `ROOT_STORED_MAX`, allowing for retained copies, object key
+  nodes and raw dependency traversals. From a possible template marker onward, each text byte
+  reserves an expression and template element conservatively, even for escaped markers or
+  literal suffixes; a long plain prefix stays proportional to its bytes. Retained local and
+  argument entries charge their metadata before cloning, including unknown fallbacks. An
+  expression beyond either budget stays unknown; its resource remains a node. Variable defaults
+  and module sources are literal; ordinary strings and object keys are templates, with a sole
+  interpolation retaining its result type. Static `depends_on` strings are traversals. Array
+  block forms retain source indexes in their config key paths. Provider-specific computed block
+  schemas are not executed or fetched; unsupported expressions stay unresolved.
+
 - AWS subscriptions (#658) share `EVAL_DEPTH_MAX`, `EVAL_WORK_MAX`, `ROOT_STORED_MAX` and
   `STORED_MAX`: alias/module traversal is bounded by evaluation depth/work and every stored
   summary is charged to the existing per-root and repository byte budgets. The hostile probe
@@ -34,7 +53,8 @@
 
 - `iac/types.rs` (#656): `FORM_TEXT_MAX` (1,024 bytes); longer identifiers keep their whole
   text as the name, bounding the form matcher. The table covers SQS queues and S3 buckets in
-  `.tf` and `.tofu` resource blocks only. Data blocks and unlisted types make no provisioner.
+  `.tf`, `.tf.json`, `.tofu` and `.tofu.json` resource blocks. Data blocks and unlisted types
+  make no provisioner.
   `iac/pattern.rs`: `PATTERN_LITERAL_MIN` (3 literal characters), `PATTERN_SEGMENTS` (`-_./`)
   and `PATTERN_TEXT_MAX` (1,024 bytes for either name): a pattern outside these bounds matches
   nothing. Literal characters include written separators. Tests reject anchors below three

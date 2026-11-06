@@ -18,7 +18,8 @@ from `prove.py`; its neutral source declarations are independent of feature test
 No service credentials, cloud calls, package installation or source checkout mutation is used.
 Loopback sockets are required for HTTP. Its manifest has precisely the two source repositories.
 
-Done looks like: one writer at the selector's actual config key, every Terraform, Kubernetes,
+Done looks like: one writer at the selector's actual config key, every Terraform/OpenTofu
+(including distinct `.tf.json` and `.tofu.json` unknown resource types), Kubernetes,
 Crossplane, Compose, template-qualified CloudFormation/SAM and Serverless reader at its own
 node, every link `declared`, and only the deliberately deleted and ambiguous locations stale. Context reaches
 both ends; traces cross both directions. All responses copy over HTTP byte for byte. Changing

@@ -349,11 +349,13 @@ Um ARN AWS reconhecido pela tabela de tipos, uma URL SQS ou `s3://archive/caminh
 
 ### Nós IaC
 
-Cada `resource`, bloco `data` e chamada `module` dos arquivos `*.tf` e `*.tofu` é um **nó IaC**,
+Cada `resource`, bloco `data` e chamada `module` dos arquivos `*.tf`, `*.tf.json`, `*.tofu` e `*.tofu.json` é um **nó IaC**,
 com endereço, tipo, arquivo, linhas e o módulo raiz que começa a sua avaliação. Uma pasta de
 arquivos Terraform é um módulo; uma pasta que nenhuma outra chama como módulo local (um `source`
 `./` ou `../` que fica dentro do repositório) é um módulo raiz, rotulado pelo caminho (`.` na
 raiz).
+
+O JSON Terraform usa as mesmas regras de avaliação e referência. Strings comuns são templates; uma interpolação sozinha mantém o tipo do resultado, então `${var.items}` pode fornecer uma coleção. Defaults de variáveis e fontes de módulos são literais. Strings estáticas de `depends_on` nomeiam referências. Arrays de blocos mantêm os índices nos caminhos de configuração. As duas extensões JSON aceitam endereços de nós nas localizações `via` de recursos declarados.
 
 - **Endereços**: `<tipo>.<nome>`, `data.<tipo>.<nome>` e `module.<nome>`. Cada chamada de um
   módulo local instancia os blocos dele com o endereço da chamada na frente
@@ -382,7 +384,8 @@ raiz).
   o local ou a saída nomeia, e mostra por onde passou (`via var.queue_arn`). Um módulo do
   registro fica como o nó da chamada, sem nada dentro.
 - **Consultas**: `search` com `kind = "iac"` acha os nós, `context` explica um e `trace` segue as
-  referências dele nos dois sentidos. Os nós ficam fora da busca sem `kind` e do `meada export`.
+  referências dele nos dois sentidos. Os nós ficam fora da busca sem `kind`; só os nós com um
+  lado de contrato entram no `meada export`.
 
 ### Objetos Kubernetes e overlays do Kustomize
 
@@ -587,7 +590,7 @@ As ligações entram em `links`, mantendo
 as ligações de provisionamento separadas em `provisions`. `meada status` lista contratos
 provisionados sem uso e usos sem provisionador, por kind e broker, somente quando o workspace
 contém ao menos um provisionador e um uso daquele grupo. Os outros formatos IaC continuam
-como nós e referências; esta tabela de contratos cobre arquivos `.tf` e `.tofu`.
+como nós e referências; esta tabela de contratos cobre arquivos `.tf`, `.tf.json`, `.tofu` e `.tofu.json`.
 
 ### Uso dos SDKs AWS em Java, Go e C#
 

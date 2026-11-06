@@ -1,0 +1,23 @@
+{
+  "variable": [
+    {
+      "db-password": [
+        {
+          "default": "json-array-default-canary",
+          "sensitive": true
+        }
+      ],
+      "ordinary": [{ "default": "json-array-public" }]
+    }
+  ],
+  "resource": [
+    {
+      "aws_ssm_parameter": [
+        {
+          "private": [{ "name": "private", "value": "json-array-ssm-canary", "type": "SecureString" }],
+          "public": [{ "name": "public", "value": "json-array-ssm-public", "type": "String" }]
+        }
+      ]
+    }
+  ]
+}
