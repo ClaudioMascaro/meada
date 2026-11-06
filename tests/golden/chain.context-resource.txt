@@ -1,4 +1,4 @@
 resource::postgres::orders
-  example.com/chain/gateway writer src/orders.ts:10 cancelOrder
-  example.com/chain/catalog reader (repository-level)
-  example.com/chain/worker reader src/jobs.ts:4 settleOrders
+  example.com/chain/gateway writer src/orders.ts:10 cancelOrder (no provisioner in the workspace)
+  example.com/chain/catalog reader (repository-level) (no provisioner in the workspace)
+  example.com/chain/worker reader src/jobs.ts:4 settleOrders (no provisioner in the workspace)

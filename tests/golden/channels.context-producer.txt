@@ -8,4 +8,4 @@ callers: none
 callees:
 example.com/channels/api src/orders.ts:6 (unresolved) producer.send
 contracts:
-example.com/channels/api src/orders.ts:6 produces channel::kafka::orders.created
+example.com/channels/api src/orders.ts:6 produces channel::kafka::orders.created (no provisioner in the workspace)

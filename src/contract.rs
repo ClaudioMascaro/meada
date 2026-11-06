@@ -284,6 +284,12 @@ pub trait ContractKind {
         (None, last(contract))
     }
 
+    /// The broker or resource kind whose provisioners and uses share an orphan report.
+    /// No group for a kind without provisioners, or for an unresolved side.
+    fn provisioned_group<'c>(&self, _contract: &'c str) -> Option<&'c str> {
+        None
+    }
+
     /// Where `site` of `repository` sits when it is neither a symbol, a call, the repository
     /// nor a document's: `None` when this kind does not place it (packages: a manifest or one
     /// of its dependency entries).

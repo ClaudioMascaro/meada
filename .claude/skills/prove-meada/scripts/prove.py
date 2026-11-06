@@ -22,11 +22,13 @@ import argparse
 import difflib
 import json
 import os
+import queue
 import re
 import shutil
 import socket
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -138,24 +140,52 @@ class Stdio:
         self.p = subprocess.Popen([bin, "mcp"], cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                   stderr=open(log, "wb"), text=True, bufsize=1)
         self.id = 0
+        self.wire = open(Path(log).with_suffix('.wire.jsonl'), 'w')
+        self.responses = queue.Queue()
+        def read_lines():
+            for line in self.p.stdout:
+                self.responses.put(line)
+            self.responses.put(None)
+        threading.Thread(target=read_lines, daemon=True).start()
         self.info = self.call("initialize", {"protocolVersion": "2025-11-25", "capabilities": {},
                                              "clientInfo": {"name": "prove-meada", "version": "1"}})
         self.p.stdin.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n")
+        self.p.stdin.flush()
 
     def call(self, method, params):
         self.id += 1
-        self.p.stdin.write(json.dumps({"jsonrpc": "2.0", "id": self.id, "method": method, "params": params}) + "\n")
+        request = {"jsonrpc": "2.0", "id": self.id, "method": method, "params": params}
+        self.wire.write(json.dumps({'direction': 'send', 'message': request}) + '\n')
+        self.wire.flush()
+        self.p.stdin.write(json.dumps(request) + "\n")
+        self.p.stdin.flush()
+        deadline = time.monotonic() + 120
+        def timeout():
+            self.wire.write(json.dumps({'timeout': method, 'id': self.id}) + '\n')
+            self.wire.flush()
+            self.p.kill()
+            self.p.wait(timeout=10)
+            raise TimeoutError(f'MCP {method} id {self.id} exceeded 120 seconds; see {self.wire.name}')
         while True:
-            line = self.p.stdout.readline()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                timeout()
+            try:
+                line = self.responses.get(timeout=remaining)
+            except queue.Empty:
+                timeout()
             if not line:
                 raise RuntimeError(f"meada mcp closed stdout during {method}")
             msg = json.loads(line)
+            self.wire.write(json.dumps({'direction': 'receive', 'message': msg}) + '\n')
+            self.wire.flush()
             if msg.get("id") == self.id and "method" not in msg:
                 return msg
 
     def close(self):
         self.p.stdin.close()
         self.p.wait(timeout=30)
+        self.wire.close()
 
 
 class Http:
@@ -315,14 +345,32 @@ def drive(bin, repo, out, queries_file):
     if not queries_file.exists():
         queries_file.write_text("".join(json.dumps(q) + "\n" for q in auto_queries(export)))
     queries = [json.loads(line) for line in queries_file.read_text().splitlines() if line.strip()]
+    rec['phase'] = 'mcp'
+    (out / 'record.json').write_text(json.dumps(rec, indent=1, sort_keys=True))
+    return drive_queries(bin, repo, out, queries, rec)
+
+
+def drive_queries(bin, repo, out, queries, rec):
+    """Checkpoint before MCP, so an interrupted client need not repeat completed indexing."""
+    if (out / 'mcp.err').exists() or (out / 'mcp.wire.jsonl').exists():
+        previous = out / 'mcp-attempts' / str(time.time_ns())
+        previous.mkdir(parents=True)
+        for path in [out / 'mcp.err', out / 'mcp.wire.jsonl']:
+            if path.exists():
+                shutil.copy2(path, previous / path.name)
+        (previous / 'record.json').write_text(json.dumps(rec, indent=1, sort_keys=True))
     try:
         mcp = Stdio(bin, repo, out / "mcp.err")
         rec["tools"] = mcp.call("tools/list", {}).get("result", {}).get("tools")
-        rec["answers"] = [answer(mcp.call("tools/call", {"name": q["tool"], "arguments": q["arguments"]})) for q in queries]
+        rec['answers'] = []
+        for q in queries:
+            rec['answers'].append(answer(mcp.call('tools/call', {'name': q['tool'], 'arguments': q['arguments']})))
+            (out / 'record.json').write_text(json.dumps(rec, indent=1, sort_keys=True))
         mcp.close()
     except Exception as e:  # a crashed server is BLOCKED, never an empty answer
         rec["failed"] = f"mcp stdio: {e!r}, see {out}/mcp.err"
     rec["queries"] = queries
+    rec['phase'] = 'complete'
     (out / "record.json").write_text(json.dumps(rec, indent=1, sort_keys=True))
     return rec
 

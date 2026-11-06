@@ -54,6 +54,7 @@ use meada_core::trace::{Chain, Row};
 pub(crate) mod cloudformation;
 mod compose;
 mod functions;
+pub(crate) mod orphans;
 mod pattern;
 pub(crate) mod provision;
 pub(crate) mod serverless;
@@ -1855,7 +1856,12 @@ fn at(identity: &str, n: &Node) -> String {
 /// `needle`, lowercased, as `search` hits: `<identity> <path>:<line> <address> (<type>[, name
 /// "<name>"], root <root>)`, `pattern` in place of `name` for a pattern, ordered by rank, then
 /// repository, path, line, address and root.
-pub(crate) fn hits(identity: &str, db: &Connection, needle: &str) -> Result<Vec<Hit>> {
+pub(crate) fn hits(
+    identity: &str,
+    db: &Connection,
+    needle: &str,
+    note: impl Fn(&Node) -> &'static str,
+) -> Result<Vec<Hit>> {
     // ponytail: scans every node of every repository; an indexed lookup waits for a workspace
     // that makes it slow.
     let mut statement = db.prepare(&format!("SELECT {COLUMNS} FROM iac_nodes"))?;
@@ -1873,7 +1879,13 @@ pub(crate) fn hits(identity: &str, db: &Connection, needle: &str) -> Result<Vec<
         let name = (n.name.as_ref()).map_or(String::new(), |s| {
             format!(", {word} {}", serde_json::to_string(s).unwrap_or_default())
         });
-        let text = format!("{} ({}{name}, root {})", at(identity, &n), n.ty, n.root);
+        let text = format!(
+            "{} ({}{name}, root {}){}",
+            at(identity, &n),
+            n.ty,
+            n.root,
+            note(&n)
+        );
         let key = format!(
             "{identity} {} {:010} {} {}",
             n.path, n.line, n.address, n.root

@@ -269,6 +269,18 @@ does not resolve gives one node with no key; a registry or remote module is only
 `.tf.json` and `.tofu.json` files give no nodes yet. Only nodes holding a contract side enter `meada
 export`.
 
+### Orphan contracts
+
+Default `search`, and `search` with `kind = "contract"`, `channel` or `resource`, also find provisioner sides by contract.
+
+`meada status` lists orphan contracts per kind and broker (or resource kind): provisioners
+with no use and uses with no provisioner. Orphan lines appear only when the queried repository
+or workspace contains at least one provisioner and one use of that group. A code-only or
+IaC-only repository produces no such lines; `search` and `context` mark the side itself with
+`no provisioner in the workspace` or `no use in the workspace`. Provisioning links, including
+patterns and independent root modules, determine whether a counterpart exists. Existing
+warnings about declared resources without writers and readers remain separate.
+
 ### Terraform provisioners
 
 An `aws_sqs_queue` resource provisions `channel::sqs::<name>` through its `name` argument;

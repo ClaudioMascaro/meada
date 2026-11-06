@@ -417,3 +417,9 @@
   schema-to-shape reader (`schema.rs`) and the YAML reader are unit tests in `src/document/`,
   with the hostile inputs each limit stops (server variables naming each other, 200,000 nested
   block sequences, a 10,000-long reference chain, one wide schema read for many routes).
+
+- `provision` also covers orphan reporting (#657) over `orphan-app` and `orphan-infra`:
+  complete status output in mixed and one-sided scopes, search/context side markers,
+  broker/resource-kind isolation, unresolved sides, same-repository uses, pattern matching,
+  independent roots and a changed IaC name. `orphan*.status.txt` and `orphan*.context.txt`
+  hold the whole answers.

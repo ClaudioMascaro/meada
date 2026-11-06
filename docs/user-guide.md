@@ -494,6 +494,18 @@ tipo `Serverless::Function`.
 - **Consultas**: como nos nós Terraform, `search` com `kind = "iac"`, `context` e `trace`.
 - **Não lidos**: `serverless.ts`, plugins e valores de outros arquivos.
 
+### Contratos órfãos
+
+`search` sem filtro, com `kind = "contract"`, `channel` ou `resource`, também encontra os lados provisionadores pelo contrato.
+
+`meada status` lista contratos órfãos por tipo e broker (ou tipo de recurso): provisionadores
+sem uso e usos sem provisionador. Só há linhas de órfãos quando o repositório ou workspace
+consultado contém pelo menos um provisionador e um uso daquele grupo. Um repositório só de
+código ou só de IaC não gera essas linhas; `search` e `context` marcam o próprio lado com
+`no provisioner in the workspace` ou `no use in the workspace`. As ligações de provisionamento,
+inclusive padrões e módulos raiz independentes, determinam se há contraparte. Os avisos
+existentes de recursos declarados sem escritor e leitor continuam separados.
+
 ### Provisionadores Terraform
 
 Um `resource` `aws_sqs_queue` provisiona `channel::sqs::<nome>` pelo argumento `name`;

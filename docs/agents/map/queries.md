@@ -6,6 +6,13 @@ this file, and a change to these modules updates it.
 
 ## Modules in brief
 
+- Orphans (#657): `iac::orphans::Scope` groups provisioners and uses by
+  `ContractKind::provisioned_group` (contract kind plus broker or resource kind). Status lists
+  unmatched sides only in groups with both roles in the visible exports, using provisioning
+  links to preserve pattern and root semantics. Search and context mark sides when their
+  group's other role is absent. Unresolved sides have no group; existing resource diagnostics
+  are unchanged. The scope is the engine's already filtered workspace, never another index.
+
 - Provisioning (#656): `crate::iac::provision::context` lists a symbol's provisioners from its
   own sides and its calls. `crate::engine::Engine::context_fresh` hydrates every side of a
   selected IaC node before listing contracts; `crate::trace::Graph::provisioned_rows` continues

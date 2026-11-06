@@ -94,6 +94,11 @@ impl ContractKind for Resource {
         rest.and_then(|rest| rest.split_once("::")).unzip()
     }
 
+    fn provisioned_group<'c>(&self, contract: &'c str) -> Option<&'c str> {
+        let (kind, name) = self.parts(contract);
+        name.filter(|n| !n.is_empty()).and(kind)
+    }
+
     /// One side per `via` symbol the repository has; a `via` entry that names no symbol is
     /// ignored. An entry with no `via`, or none that names a symbol, makes the repository as a
     /// whole its side: the site is the repository identity.

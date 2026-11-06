@@ -115,6 +115,14 @@ pub enum Msg<'a> {
     },
     ViaFallback(&'a str),
     UnlinkedResource(&'a str),
+    OrphanProvisioner {
+        contract: &'a str,
+        place: &'a str,
+    },
+    OrphanUse {
+        contract: &'a str,
+        place: &'a str,
+    },
     /// The missing reads of the repository's consumers against the routes they call (spec #23).
     Drift(usize),
     /// The config files of a repository (#639): read, skipped as lockfiles or as unreadable,
@@ -1791,6 +1799,16 @@ impl Msg<'_> {
                 format!("{contract} is unlinked: no writer and reader in different repositories"),
                 format!("{contract} sem ligação: nenhum escritor e leitor em repositórios diferentes"),
                 format!("{contract} sin vínculo: ningún escritor y lector en repositorios diferentes"),
+            ),
+            Msg::OrphanProvisioner { contract, place } => pick(
+                format!("orphan {contract}: no use; {place}"),
+                format!("órfão {contract}: nenhum uso; {place}"),
+                format!("huérfano {contract}: ningún uso; {place}"),
+            ),
+            Msg::OrphanUse { contract, place } => pick(
+                format!("orphan {contract}: no provisioner; {place}"),
+                format!("órfão {contract}: nenhum provisionador; {place}"),
+                format!("huérfano {contract}: ningún provisionador; {place}"),
             ),
             Msg::Drift(n) => pick(
                 format!("shape drift, missing reads: {n}"),

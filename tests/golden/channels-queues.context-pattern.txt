@@ -1,4 +1,4 @@
 channel::nats::orders.>
-  example.com/queues/api producer src/nats.ts:7 orderCreated [inferred: channel::nats::orders.created wildcard orders.>]
-  example.com/queues/api producer src/nats.ts:8 orderCreated [inferred: channel::nats::orders.eu.created wildcard orders.>]
-  example.com/queues/worker consumer src/nats.ts:29 onOrder
+  example.com/queues/api producer src/nats.ts:7 orderCreated [inferred: channel::nats::orders.created wildcard orders.>] (no provisioner in the workspace)
+  example.com/queues/api producer src/nats.ts:8 orderCreated [inferred: channel::nats::orders.eu.created wildcard orders.>] (no provisioner in the workspace)
+  example.com/queues/worker consumer src/nats.ts:29 onOrder (no provisioner in the workspace)

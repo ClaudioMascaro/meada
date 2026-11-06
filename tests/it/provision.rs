@@ -240,3 +240,251 @@ resource "aws_s3_bucket" "inside" { bucket = "arch${terraform.workspace}ive" }
         "{trace}"
     );
 }
+
+#[test]
+fn status_lists_orphans_only_where_both_sides_of_the_group_exist() {
+    let app = fixture_repo(
+        "orphan_status",
+        "orphan-app",
+        Some("https://example.com/orphan/app.git"),
+    );
+    let infra = fixture_repo(
+        "orphan_status",
+        "orphan-infra",
+        Some("https://example.com/orphan/infra.git"),
+    );
+    Engine::open(&app).unwrap().export().unwrap();
+    let status = meada::engine::status(&app).unwrap();
+    assert_eq!(
+        status,
+        "example.com/orphan/app (.) indexed, 1 files
+  resource::s3::archive is unlinked: no writer and reader in different repositories
+  resource::s3::unmanaged is unlinked: no writer and reader in different repositories
+  orphan channel::sqs::unmanaged: no provisioner; app.ts::sendUnmanaged::SendMessageCommand#0
+  orphan resource::s3::unmanaged: no provisioner; (repository-level)
+example.com/orphan/infra (../orphan-infra) indexed, 0 files
+  orphan channel::sqs::unused: no use; main.tf:2 aws_sqs_queue.unused (root .)
+  orphan resource::s3::unused: no use; main.tf:4 aws_s3_bucket.unused (root .)
+  config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 4, redacted: 0
+"
+    );
+    assert_golden("orphan.status.txt", &status);
+    // The same scope works when the infrastructure repository is the entry point.
+    let status = meada::engine::status(&infra).unwrap();
+    assert_golden("orphan-infra.status.txt", &status);
+}
+
+#[test]
+fn code_only_scope_marks_uses_in_search_and_context_without_orphan_status() {
+    let app = fixture_repo(
+        "orphan_code_only",
+        "orphan-app",
+        Some("https://example.com/orphan/app.git"),
+    );
+    let config = fs::read_to_string(app.join("meada.toml")).unwrap();
+    fs::write(
+        app.join("meada.toml"),
+        config
+            .split_once("[[resource]]")
+            .map(|(_, rest)| format!("[[resource]]{rest}"))
+            .unwrap(),
+    )
+    .unwrap();
+    let engine = Engine::open(&app).unwrap();
+    let search = engine.search("unmanaged", Some("channel"), None).unwrap();
+    assert_eq!(
+        search,
+        "example.com/orphan/app app.ts:10 channel::sqs::unmanaged (no provisioner in the workspace)\n"
+    );
+    let context = engine.context("channel::sqs::unmanaged", None).unwrap();
+    assert_eq!(
+        context,
+        "channel::sqs::unmanaged\n  example.com/orphan/app producer app.ts:10 sendUnmanaged (no provisioner in the workspace)\n"
+    );
+    let symbol = engine.context("sendUnmanaged", None).unwrap();
+    assert!(
+        symbol.contains("produces channel::sqs::unmanaged (no provisioner in the workspace)"),
+        "{symbol}"
+    );
+    assert_eq!(
+        meada::engine::status(&app).unwrap(),
+        "example.com/orphan/app (.) indexed, 1 files\n  resource::s3::archive is unlinked: no writer and reader in different repositories\n  resource::s3::unmanaged is unlinked: no writer and reader in different repositories\n"
+    );
+    assert_golden("orphan-code.context.txt", &(context + "\n" + &symbol));
+}
+
+#[test]
+fn iac_only_scope_marks_provisioners_without_orphan_status() {
+    let infra = fixture_repo(
+        "orphan_iac_only",
+        "orphan-infra",
+        Some("https://example.com/orphan/infra.git"),
+    );
+    fs::write(infra.join("meada.toml"), "").unwrap();
+    let engine = Engine::open(&infra).unwrap();
+    let search = engine
+        .search("aws_sqs_queue.orders", Some("iac"), None)
+        .unwrap();
+    assert_eq!(
+        search,
+        "example.com/orphan/infra main.tf:1 aws_sqs_queue.orders (aws_sqs_queue, name \"orders\", root .) (no use in the workspace)\n"
+    );
+    let context = engine.context("channel::sqs::orders", None).unwrap();
+    assert_eq!(
+        context,
+        "channel::sqs::orders\n  example.com/orphan/infra provisioner main.tf:1 aws_sqs_queue.orders (root .) (no use in the workspace)\n"
+    );
+    let node = engine.context("aws_sqs_queue.orders", None).unwrap();
+    assert!(
+        node.contains("aws_sqs_queue.orders (root .) (no use in the workspace)"),
+        "{node}"
+    );
+    assert_eq!(
+        meada::engine::status(&infra).unwrap(),
+        "example.com/orphan/infra (.) indexed, 0 files\n  config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 4, redacted: 0\n"
+    );
+    assert_golden("orphan-iac.context.txt", &(context + "\n" + &node));
+}
+
+#[test]
+fn orphan_groups_do_not_borrow_another_broker_or_resource_kind() {
+    let app = fixture_repo(
+        "orphan_groups",
+        "orphan-app",
+        Some("https://example.com/orphan/app.git"),
+    );
+    let infra = fixture_repo(
+        "orphan_groups",
+        "orphan-infra",
+        Some("https://example.com/orphan/infra.git"),
+    );
+    fs::write(app.join("meada.toml"), "[[peer]]\nrepo = \"example.com/orphan/infra\"\n[[resource]]\nkind = \"postgres\"\nid = \"archive\"\nrole = \"read\"\n").unwrap();
+    fs::write(
+        app.join("app.ts"),
+        r#"import { Kafka } from "kafkajs";
+import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
+const kafka = new Kafka({ brokers: ["kafka:9092"] });
+const producer = kafka.producer();
+const client = new SQSClient({});
+export async function send() {
+  await producer.send({ topic: "orders", messages: [{ value: "x" }] });
+  await client.send(new SendMessageCommand({ QueueUrl: process.env.QUEUE_URL, MessageBody: "x" }));
+}
+"#,
+    )
+    .unwrap();
+    let engine = Engine::open(&app).unwrap();
+    let status = meada::engine::status(&app).unwrap();
+    assert_eq!(
+        status,
+        "example.com/orphan/app (.) indexed, 1 files\n  resource::postgres::archive is unlinked: no writer and reader in different repositories\nexample.com/orphan/infra (../orphan-infra) indexed, 0 files\n  config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 4, redacted: 0\n"
+    );
+    assert_eq!(
+        engine.search("orders", Some("channel"), None).unwrap(),
+        "example.com/orphan/app app.ts:7 channel::kafka::orders (no provisioner in the workspace)\nexample.com/orphan/infra main.tf:1 aws_sqs_queue.orders (root .) provisioner channel::sqs::orders (no use in the workspace)\n"
+    );
+    assert_eq!(
+        engine
+            .search("channel::sqs", Some("channel"), None)
+            .unwrap(),
+        "example.com/orphan/app app.ts:8 channel::sqs (unresolved)\nexample.com/orphan/infra main.tf:1 aws_sqs_queue.orders (root .) provisioner channel::sqs::orders (no use in the workspace)\nexample.com/orphan/infra main.tf:2 aws_sqs_queue.unused (root .) provisioner channel::sqs::unused (no use in the workspace)\n"
+    );
+    assert!(
+        engine
+            .context("channel::sqs::orders", None)
+            .unwrap()
+            .contains("(no use in the workspace)")
+    );
+    assert!(
+        engine
+            .context("resource::s3::archive", None)
+            .unwrap()
+            .contains("(no use in the workspace)")
+    );
+    assert!(
+        engine
+            .context("resource::postgres::archive", None)
+            .unwrap()
+            .contains("(no provisioner in the workspace)")
+    );
+    assert_golden("orphan-groups.status.txt", &status);
+    // A use added inside the provisioner's repository enables just its group on refresh.
+    fs::write(infra.join("meada.toml"), "[[peer]]\nrepo = \"example.com/orphan/app\"\n[[resource]]\nkind = \"s3\"\nid = \"archive\"\nrole = \"read\"\n").unwrap();
+    let status = meada::engine::status(&app).unwrap();
+    assert_golden("orphan-local-use.status.txt", &status);
+    let engine = Engine::open(&app).unwrap();
+    assert_eq!(
+        engine.context("resource::s3::archive", None).unwrap(),
+        "resource::s3::archive\n  example.com/orphan/infra reader (repository-level)\n  example.com/orphan/infra provisioner main.tf:3 aws_s3_bucket.archive (root .)\n"
+    );
+}
+
+#[test]
+fn orphan_matching_retains_patterns_and_independent_roots_on_refresh() {
+    let app = fixture_repo(
+        "orphan_patterns",
+        "orphan-app",
+        Some("https://example.com/orphan/app.git"),
+    );
+    let infra = fixture_repo(
+        "orphan_patterns",
+        "orphan-infra",
+        Some("https://example.com/orphan/infra.git"),
+    );
+    fs::create_dir(infra.join("prod")).unwrap();
+    fs::write(infra.join("prod/main.tf"), "resource \"aws_s3_bucket\" \"pattern\" { bucket = \"unmanaged-${terraform.workspace}\" }\nresource \"aws_s3_bucket\" \"archive\" { bucket = \"archive\" }\n").unwrap();
+    let config = fs::read_to_string(app.join("meada.toml")).unwrap();
+    fs::write(
+        app.join("meada.toml"),
+        config.replace("id = \"unmanaged\"", "id = \"unmanaged-prod\""),
+    )
+    .unwrap();
+    let engine = Engine::open(&app).unwrap();
+    engine.export().unwrap();
+    let before = meada::engine::status(&app).unwrap();
+    assert_golden("orphan-patterns.status.txt", &before);
+    fs::write(infra.join("prod/main.tf"), "resource \"aws_s3_bucket\" \"pattern\" { bucket = \"different-${terraform.workspace}\" }\nresource \"aws_s3_bucket\" \"archive\" { bucket = \"archive\" }\n").unwrap();
+    let after = meada::engine::status(&app).unwrap();
+    assert_golden("orphan-patterns-edited.status.txt", &after);
+    assert!(
+        after.contains("orphan resource::s3::unmanaged-prod: no provisioner"),
+        "{after}"
+    );
+    assert!(
+        after.contains("orphan resource::s3::different-*: no use"),
+        "{after}"
+    );
+    assert!(
+        !before.contains("orphan resource::s3::unmanaged-prod"),
+        "{before}"
+    );
+}
+
+#[test]
+fn search_finds_provisioner_sides_as_contracts_without_uses() {
+    let infra = fixture_repo(
+        "orphan_search_provisioner",
+        "orphan-infra",
+        Some("https://example.com/orphan/infra.git"),
+    );
+    fs::write(infra.join("meada.toml"), "").unwrap();
+    let engine = Engine::open(&infra).unwrap();
+    let mut searches = String::new();
+    for kind in [None, Some("contract"), Some("channel")] {
+        searches += &engine.search("orders", kind, None).unwrap();
+        assert_eq!(
+            engine.search("orders", kind, None).unwrap(),
+            "example.com/orphan/infra main.tf:1 aws_sqs_queue.orders (root .) provisioner channel::sqs::orders (no use in the workspace)\n",
+            "{kind:?}"
+        );
+    }
+    assert_golden("orphan-iac.search.txt", &searches);
+    assert_eq!(
+        engine.search("archive", Some("resource"), None).unwrap(),
+        "example.com/orphan/infra main.tf:3 aws_s3_bucket.archive (root .) provisioner resource::s3::archive (no use in the workspace)\n"
+    );
+    assert_eq!(
+        engine.search("orders", Some("resource"), None).unwrap(),
+        "no matches for `orders`\n"
+    );
+}

@@ -8,6 +8,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Orphan infrastructure contracts (#657): `meada status` lists provisioners without uses and
+  uses without provisioners only for a contract kind and broker or resource kind with both
+  sides in the visible scope. Otherwise `search` and `context` mark the side with
+  `no provisioner in the workspace` or `no use in the workspace`, without orphan status noise.
+  Matching follows provisioning links, including patterns and root labels. Release level:
+  minor for both meada and meada-core in the next release.
+
 - Terraform provisioners (ADR 0026): `aws_sqs_queue` and `aws_s3_bucket` join the SQS channel
   and S3 resource contracts by physical name, using an embedded, documented type table. Every
   producer, consumer, writer and reader links to each root's provisioner; overridable names

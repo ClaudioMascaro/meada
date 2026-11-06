@@ -365,18 +365,21 @@ impl Engine {
             .collect::<Result<_>>()?;
         let kubes: Vec<Option<String>> =
             (self.dbs.iter()).map(kube::status).collect::<Result<_>>()?;
+        let orphans = iac::orphans::Scope::new(&exports).reports();
         let lines = (repos
             .iter()
             .zip(&exports)
             .zip(drift)
             .zip(configs)
             .zip(kubes))
-        .map(|((((repo, export), drift), config), kube)| {
+        .zip(orphans)
+        .map(|(((((repo, export), drift), config), kube), orphans)| {
             let prefix = format!("{}::", repo.identity);
             let mut lines: Vec<String> = (contract::KINDS.iter())
                 .flat_map(|kind| kind.status(repo, export, &links))
                 .collect();
             lines.extend(document::report(repo, export));
+            lines.extend(orphans);
             lines.extend(config);
             lines.extend(kube);
             lines.extend(export.dropped.iter().map(|(path, limit)| match *limit {
@@ -573,9 +576,13 @@ impl Engine {
         }
         if kind == Some("iac") {
             self.refresh()?;
+            let exports = self.partial()?.exports;
+            let orphans = iac::orphans::Scope::new(&exports);
             let mut hits = Vec::new();
             for (identity, db) in self.indexes() {
-                hits.extend(iac::hits(identity, db, &query.to_lowercase())?);
+                hits.extend(iac::hits(identity, db, &query.to_lowercase(), |node| {
+                    orphans.node_note(identity, node)
+                })?);
             }
             return Ok(search::answer(query, hits, budget));
         }
@@ -597,6 +604,7 @@ impl Engine {
         let needle = query.to_lowercase();
         // (rank, identity to break ties, line)
         let mut hits: Vec<Hit> = Vec::new();
+        let orphans = iac::orphans::Scope::new(&exports);
         for ((export, repo), db) in exports.iter().zip(&self.workspace.repos).zip(&self.dbs) {
             let mut files = Files::new(&repo.root);
             if symbols {
@@ -632,16 +640,7 @@ impl Engine {
                 if !contract.starts_with(prefix) {
                     continue;
                 }
-                // The identifier ranks whole and by the parts its kind gives: `/users` is exact
-                // for `http::GET::/users`.
-                let lower = contract.to_lowercase();
-                let (kind, id) = contract::parts(&lower);
-                let Some(r) = [Some(lower.as_str()), kind, id]
-                    .into_iter()
-                    .flatten()
-                    .filter_map(|n| rank(n, &needle))
-                    .min()
-                else {
+                let Some(r) = contract_rank(&contract, &needle) else {
                     continue;
                 };
                 ranked.push((r, contract, site));
@@ -664,11 +663,30 @@ impl Engine {
                     },
                 };
                 let line = format!(
-                    "{} {location} {}",
+                    "{} {location} {}{}",
                     repo.identity,
-                    contract::shown(&contract)
+                    contract::shown(&contract),
+                    orphans.use_note(&contract)
                 );
                 hits.push((r, format!("{contract} {site}"), line));
+            }
+            for p in &export.provisioners {
+                if !p.contract.starts_with(prefix) {
+                    continue;
+                }
+                if let Some(r) = contract_rank(&p.contract, &needle) {
+                    let line = format!(
+                        "{} provisioner {}{}",
+                        p.place(&repo.identity),
+                        contract::shown(&p.contract),
+                        orphans.provisioner_note(&p.contract)
+                    );
+                    hits.push((
+                        r,
+                        format!("{} {} {}", p.contract, p.identity, p.node.root),
+                        line,
+                    ));
+                }
             }
         }
         // With no kind, config values answer only when no symbol and no contract does (ADR 0025).
@@ -906,6 +924,7 @@ impl Engine {
         kind: &dyn ContractKind,
     ) -> Vec<String> {
         let carried = view.carried;
+        let orphans = iac::orphans::Scope::new(exports);
         // Providers, then consumers, then the bindings that reach a queue; each with the lines
         // of the payload shape a document gives it.
         let mut sides: Vec<(u8, String, Vec<String>)> = Vec::new();
@@ -932,7 +951,11 @@ impl Engine {
                 };
                 let shape =
                     shape.map_or_else(Vec::new, |s| shape_lines(&repo.identity, s, carried));
-                let line = format!("{} {role} {place}{tag}", repo.identity);
+                let line = format!(
+                    "{} {role} {place}{tag}{}",
+                    repo.identity,
+                    orphans.use_note(contract)
+                );
                 sides.push((order, line, shape));
             }
         }
@@ -942,12 +965,13 @@ impl Engine {
                     sides.push((
                         3,
                         format!(
-                            "{} provisioner {}:{} {} (root {})",
+                            "{} provisioner {}:{} {} (root {}){}",
                             export.repository,
                             p.node.path,
                             p.node.line,
                             p.node.address,
-                            p.node.root
+                            p.node.root,
+                            orphans.provisioner_note(&p.contract)
                         ),
                         Vec::new(),
                     ));
@@ -1220,6 +1244,17 @@ fn sides_of<'e>(
     own.chain(related).collect()
 }
 
+/// A contract ranks whole and by its kind's parts: `/users` is exact for `http::GET::/users`.
+fn contract_rank(contract: &str, needle: &str) -> Option<u8> {
+    let lower = contract.to_lowercase();
+    let (kind, id) = contract::parts(&lower);
+    [Some(lower.as_str()), kind, id]
+        .into_iter()
+        .flatten()
+        .filter_map(|n| rank(n, needle))
+        .min()
+}
+
 /// `contracts:` with what `symbol` provides, what its calls produce (a provider at a call, then
 /// what the kinds add for the call) and the contracts its calls consume, unresolved ones
 /// included, each followed by its decided links; `exports` and `links` are the workspace's.
@@ -1232,12 +1267,13 @@ fn contracts(
     symbol: &Symbol,
 ) -> Vec<String> {
     let mut lines = Vec::new();
+    let orphans = iac::orphans::Scope::new(exports);
     for p in export.providers.iter().filter(|p| p.site == symbol.id) {
         lines.push(line(
             identity,
             files,
             symbol,
-            &format!("provides {}", p.contract),
+            &format!("provides {}{}", p.contract, orphans.use_note(&p.contract)),
         ));
         lines.extend(
             p.shape
@@ -1251,7 +1287,10 @@ fn contracts(
         let location = files.at(&call.span.path, call.span.start);
         for provider in export.providers.iter().filter(|p| p.site == call.id) {
             let contract = contract::shown(&provider.contract);
-            lines.push(format!("{identity} {location} produces {contract}"));
+            lines.push(format!(
+                "{identity} {location} produces {contract}{}",
+                orphans.use_note(&provider.contract)
+            ));
         }
         let added = KINDS
             .iter()
@@ -1261,12 +1300,12 @@ fn contracts(
     // A resource reader or a channel handler is a symbol, not a call site.
     let readers = export.consumers.iter().filter(|c| c.site == symbol.id);
     for contract in readers.filter_map(|c| c.contract.as_ref()) {
-        let contract = contract::shown(contract);
+        let shown = contract::shown(contract);
         lines.push(line(
             identity,
             files,
             symbol,
-            &format!("consumes {contract}"),
+            &format!("consumes {shown}{}", orphans.use_note(contract)),
         ));
     }
     for consumer in &export.consumers {
@@ -1296,7 +1335,10 @@ fn contracts(
         if !any {
             let contract = consumer.contract.clone();
             let contract = contract.unwrap_or_else(|| unresolved(&consumer.site));
-            lines.push(format!("{identity} {location} consumes {contract}"));
+            lines.push(format!(
+                "{identity} {location} consumes {contract}{}",
+                orphans.use_note(&contract)
+            ));
         }
     }
     if lines.is_empty() {

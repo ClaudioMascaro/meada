@@ -22,12 +22,89 @@ lands it writes the check.
 | IaC nodes, Serverless (#654): `search` kind `iac`, `context` and `trace` on `functions.<name>` and on the `resources` section's logical ids, handler and events, `${self:...}` and `${opt:...}` resolved, `${env:...}` and `${ssm:...}` as patterns | #654's criteria (of 18 to 31) | MCP stdio and HTTP | `a7-sls` | by hand against the probe's README (no oracle yet: a follow-up) | landed, unchecked by script (#654) |
 | IaC nodes of the other formats (Kubernetes, Kustomize, Compose, Crossplane) | 18 to 31 | MCP stdio and HTTP, CLI status | `boutique`, `crossplane-aws`, `kube-prometheus` | to write | pending |
 | Terraform SQS/S3 provisioners, bounded patterns, levels, root labels, context and trace | #656 | CLI export, MCP stdio and HTTP | neutral generated workspace | `provisions.py --head-bin BIN --run DIR` | landed (#656) |
-| Infrastructure contracts: SDK and config use sides, subscriptions, orphans | 32 to 43, 57 to 60 | CLI export and status, MCP | `terraform-sqs`, `sam-rust`, `crossplane-aws` | to write | pending |
+| Scope-aware orphans: status only when both sides of the contract kind plus broker/resource kind exist; otherwise side markers in search and context | #657; #642 stories 59, 60; ADR 0026 Orphans | CLI status/export, MCP stdio and HTTP; existing shared queries also console API | neutral independently generated repositories, hashed per run | `orphans.py --base-bin BASE --head-bin HEAD --run DIR --http`, plus all-corpus base parity and console API | landed (#657) |
+| Infrastructure contracts: SDK and config use sides, subscriptions | 32 to 43, 57, 58 | CLI export and status, MCP | `terraform-sqs`, `sam-rust`, `crossplane-aws` | to write | pending |
 | Workloads, image contract, environment entries | 44 to 49 | CLI export, MCP | `boutique`, `sam-rust` | to write | pending |
 | HTTP through IaC: Services, Ingress, IaC-declared routes | 50 to 52 | CLI export, MCP | `boutique`, `sam-rust` | to write | pending |
 | Alert routing | 53 to 56 | CLI export, MCP | `kube-prometheus` | to write | pending |
 | `via` to an IaC address or a key path | 61, 62 | CLI status | `a7-probe` with an overlay | to write (#641) | pending |
 | Export and console graph additions | 63, 64 | CLI export, console | every IaC entry | to write | pending |
+
+## `orphans.py`: #657
+
+```bash
+python3 $S/orphans.py --base-bin "$RUN/bin/meada-base" --head-bin "$RUN/bin/meada-head" \
+  --run "$RUN/orphans" --http
+```
+
+When the six scenarios were already completed and only the same-token cross-kind control
+needs adding, the same command with `--cross-kind-only` drives just that focused addendum in
+its own run directory, with its own input hashes and captures.
+
+Extend this existing A7 section through `/create-prove-it`, never a second prove skill. The
+answer key is the maintainer's #657 acceptance criteria and ADR 0026 at the required base,
+read before checking. #642 supplies the parent contract model. Neither feature tests, their
+fixtures, newly written docs nor the implementation are answer keys.
+
+The script generates a neutral input tree independently of feature fixtures, stages files
+without making commits, saves a SHA256 inventory, and copies exactly those bytes to the base
+and head drives. It saves every CLI stdout/stderr/exit status and query/answer, not just a
+summary. A script pass is input to the independent checker's verdict.
+
+| Method | Surface | Answer key | Catches | Misses | Cost |
+|---|---|---|---|---|---|
+| Whole status capture on mixed workspace, code-only and IaC-only repositories | CLI | #657 (4), unchanged lines against exact base (1) | extra/missing orphan lines; absent-side noise; changed legacy diagnostics | unseeded groups | under 1 minute after build |
+| New-flow queries and transport parity | MCP stdio and HTTP | #657/base ADR 0026 (4), HTTP equal to stdio (1) | missing markers on contract/default/IaC search, contract/node/symbol context; scope leaks | authenticated grants unless separately driven | under 1 minute |
+| Same-size name edit and reverse on persistent stdio server | MCP and CLI | #657 (4); before/after state | stale orphan computation and stale restored state | server-mode refresh, which is explicit reindexing | seconds |
+| Existing-flow base parity over every corpus entry | CLI export, MCP stdio and HTTP, console query API | exact base on same pinned input (1), console equals stdio/CLI (1) | regressions through shared engine/contract code | new constructs missing from the corpus | several minutes |
+| Layout shift at most 0.1 | Console viewer pages | existing maintainer budget | version/build changes disturbing layout | unvisited page states | seconds after frontend build |
+| Load time at most 2 seconds on loopback | Console viewer pages | existing maintainer budget | version/build changes delaying startup | production network conditions | seconds |
+| Zero serious or critical axe violations | Console viewer pages | existing maintainer budget | inaccessible rendered controls | accessibility concerns axe cannot detect | seconds |
+| Zero console errors, playground answer equal to stdio | Console viewer pages | existing maintainer budget and stdio parity (1) | swallowed query/render errors or broken browser-to-API path | unvisited interactions | seconds |
+
+Use all four contract methods. A launch/version change also runs all four existing console
+page budgets with a frontend built from this tree. The authorized independent checker can choose them without a new
+approval. Reachability is established only by real starts after the serial build slot; a
+present binary, frontend or configured service is not evidence of access.
+
+Check and explain these captures:
+
+1. `mixed-infra` plus `mixed-app`: one matched SQS queue, one unused provisioner, one
+   unmanaged use. Across the whole workspace there is exactly one orphan of each sort,
+   attributed to the repository holding that side. Neither absent-side marker appears.
+2. `code-only`, `iac-only`: no orphan status line anywhere. Search and context mark the
+   existing side with the issue's exact absent-side phrase. The full status remainder stays
+   at base, including separate declared-resource writer/reader diagnostics.
+3. `isolation`: same-spelled SQS/AMQP and S3/GCS names never combine their group presence;
+   a declared resource kind `sqs` also stays separate from a channel broker `sqs`.
+   Both sides remain one-sided, with markers and no orphan status lines. A manifest exposes
+   only its listed repositories even with other inputs beside it on disk.
+4. `patterns`: one S3 literal in two independent roots is used in each root, without
+   ambiguity among provisioners; a bounded `archive-*` links to two literal names and a
+   supported unused `reserve-*` is orphaned. Interior and too-short patterns stay outside
+   provisioner sides, as at the exact base, and never create orphan provisioner rows. The
+   unmatched literal uses remain orphans, separate from declared writer/reader diagnostics.
+5. `refresh.json`: edit `parcel-idle` to `parcel-lost` without changing file size, query the
+   same running stdio server, require the provisioner to appear and both status orphans to
+   disappear, restore bytes, then require the original query and whole status to return.
+
+For every base/head answer difference, retain raw captures and classify it line by line:
+only the intentional orphan lines/markers and provisioner search visibility predicted by
+#657 may differ. Exports must remain at base. Do not strip old writer/reader diagnostics to
+make parity pass. The base is the exact SHA in the brief, never a nearby release.
+
+Because the orphan hook reaches shared query code, run `prove.py run --repos all --http`,
+then the console API recipe in `references/console.md` over that same run. A minor version
+bump also reaches launch, so drive the viewer pages and existing budgets there. Preserve failed runs and cap product proof at
+three rounds. Report infrastructure/socket failures as BLOCKED with their captures;
+policy denial remains a failed step. Terminate only servers the run started, retain inputs,
+captures and receipt, and confirm its PIDs stopped.
+
+Could fool you: transport parity alone can agree on the same wrong marker; a generated
+case alone misses real corpus regressions; passing a single orphan line misses extra noise
+elsewhere in status. Inspect whole status and each independent issue-based expectation.
+This probe does not establish OIDC grants; add an authenticated scope probe if that path is
+changed and report the limit explicitly.
 
 ## Pinned infrastructure repositories (`scripts/infra.tsv`)
 
@@ -87,7 +164,7 @@ run failed (BLOCKED).
 ## `prove.py iac`
 
 ```bash
-python3 -m venv --system-site-packages "$RUN/venv" && "$RUN/venv/bin/pip" install -q python-hcl2==8.1.4
+python3 -m venv --system-site-packages "$RUN/venv" && "$RUN/venv/bin/pip" install -q python-hcl2==8.1.4 PyYAML==6.0.2
 "$RUN/venv/bin/python" $S/prove.py iac --base-bin "$RUN/bin/meada-base" --head-bin "$RUN/bin/meada-head" \
   --repos a7-iac,a7-names,terraform-sqs --run "$RUN/iac" --http
 ```

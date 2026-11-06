@@ -181,6 +181,11 @@ impl ContractKind for Channel {
         parse(contract).map_or((None, None), |(broker, name)| (Some(broker), name))
     }
 
+    fn provisioned_group<'c>(&self, contract: &'c str) -> Option<&'c str> {
+        let (broker, name) = parse(contract)?;
+        name.filter(|n| !n.is_empty()).map(|_| broker)
+    }
+
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
         // Each reader answers for its own pack only; the order is the order found.
         let messages: Vec<Message> = [

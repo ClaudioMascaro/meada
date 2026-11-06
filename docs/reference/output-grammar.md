@@ -76,6 +76,8 @@ file whose path holds a space reads as more fields than it has.
 | `<identity>` | `<repository>::<path>` | A file's identity: a route file, or the top level of a file. |
 | `<n>` | `<number>` | A count. |
 | `<query>` | `<text>` | What the call was given, echoed. |
+| `<orphan-note>` | ` (no provisioner in the workspace)` | The visible scope has uses but no provisioner of this contract kind and broker or resource kind. |
+| `<orphan-note>` | ` (no use in the workspace)` | The visible scope has provisioners but no use of this group. |
 
 ## Levels
 
@@ -148,10 +150,10 @@ substrings), and an optional `kind`:
 | `kind` | Lists |
 | --- | --- |
 | `symbol` | Symbols whose name matches. |
-| `contract` | Providers and consumers whose contract identifier matches. |
+| `contract` | Providers, consumers and provisioners whose contract identifier matches. |
 | `route` | Providers and consumers of `http::` contracts. |
-| `resource` | Writers and readers of `resource::` contracts. |
-| `channel` | Producers and consumers of `channel::` contracts. |
+| `resource` | Writers, readers and provisioners of `resource::` contracts. |
+| `channel` | Producers, consumers and provisioners of `channel::` contracts. |
 | `document` | OpenAPI and AsyncAPI documents, by path or title. |
 | `package` | Packages, by name. |
 | `drift` | Fields a consumer reads that its provider lacks, by route or field path. |
@@ -164,19 +166,20 @@ substrings), and an optional `kind`:
 | `unresolved` | Open items: calls whose target Meada cannot read. |
 
 With no `kind`, `search` lists symbols and contracts, and config values only when neither
-matches; it never lists IaC nodes. The answer is one line per match, or a `no matches` line:
+matches; it never lists standalone IaC nodes. Provisioner sides are contracts and appear here too. The answer is one line per match, or a `no matches` line:
 
 | Kind | Line | Meaning |
 | --- | --- | --- |
 | symbol | `<repository> <place> <name>` | A symbol, at its definition. |
-| contract | `<repository> <site> <shown-contract>` | A provider or consumer of a contract, at its site. |
+| contract | `<repository> <site> <shown-contract><orphan-note?>` | A provider or consumer of a contract, at its site. |
+| provisioned contract | `<repository> <place> <address> (root <iac-root>) provisioner <shown-contract><orphan-note?>` | A provisioner side of a contract. |
 | document | `<repository> <path> (<summary>)<title?>` | A provider document. |
 | package | `<repository> <directory> <package><at-version?><in-ecosystem?> (consumers: <n>)` | A package and the number of dependency entries that link to its manifest. |
 | drift | `<repository> <place> <caller> <contract> missing <field-path> (<level>)` | One field path a consumer reads that the provider's shape lacks, with the level of that report. |
 | community | `<repository> <community> (members: <n>)` | A community and its size. |
 | process | `<repository> <label> process::<entry-identity> (<entry-kind>)` | A process: `process::<entry-identity>` is what `trace` starts from. |
 | value | `<repository> <place> <key-path> = <shown-value>` | A config value, at its file and line. |
-| iac node | `<repository> <place> <address> (<iac-type><iac-name?>, root <iac-root>)` | An IaC node, at its block's first line, with its type, its physical name and its root module. |
+| iac node | `<repository> <place> <address> (<iac-type><iac-name?>, root <iac-root>)<orphan-note?>` | An IaC node, at its block's first line, with its type, its physical name and its root module. |
 | copies | `<n> copies` | A group of duplicates; one symbol line per copy follows. |
 | open item | `` <repository> <place> (<item-kind>) candidates: <n>; run `meada decide --item <call-site>` `` | An open item and the command that closes it. |
 | no matches | `` no matches for `<query?>` `` | Nothing matched. |
@@ -283,18 +286,18 @@ words:
 | overload set | `<repository> <place> <name> (one of <n> overloads)<mark?><on?>` | The overloads of one method a call may reach, at the first one's definition. |
 | unresolved call | `<repository> <place> (unresolved) <callee><on?>` | A call whose target Meada cannot read, at the call. |
 | package consumer | `<repository> <place> <caller><tags?>` | A call in any repository that reaches the symbol through a package import. |
-| provides | `<repository> <place> provides <contract>` | The symbol provides the contract. |
+| provides | `<repository> <place> provides <contract><orphan-note?>` | The symbol provides the contract. |
 | shape fields | `<indent><repository> <shape-source> <carried> fields:<fields?>` | The field paths the shape carries. |
 | shape open | `<indent><repository> <shape-source> <carried> open: <paths>` | The parts of the shape that are open: any field may be under them. |
-| produces | `<repository> <place> produces <shown-contract><mark?>` | A call of the symbol produces to the channel; after a publish, a queue its bindings route it to. |
+| produces | `<repository> <place> produces <shown-contract><mark?><orphan-note?>` | A call of the symbol produces to the channel; after a publish, a queue its bindings route it to. |
 | publishes | `<repository> <place> publishes <exchange> <key>` | A call of the symbol publishes to an exchange with a routing key. |
-| consumes | `<repository> <place> consumes <shown-contract>` | The symbol, or a call of it, consumes the contract. |
+| consumes | `<repository> <place> consumes <shown-contract><orphan-note?>` | The symbol, or a call of it, consumes the contract. |
 | consumes decided | `<repository> <place> consumes <contract> <arrow> <identity>` | A call of the symbol consumes the contract, linked by a decision to the provider `<identity>`. |
 | consumes unresolved | `<repository> <place> consumes (unresolved) <callee>` | A call of the symbol consumes a contract Meada cannot read. |
 | fits | ``` `<query>` fits <n> symbols; pass one of: ``` | The name fits several symbols, listed after it. |
 | no symbol | `` no symbol matches `<query>` `` | No symbol has the name. |
 | contract head | `<shown-contract>` | The contract the sides below belong to. |
-| side | `  <repository> <role> <side><mark?>` | A side of the contract; a side linked through another name carries its mark. |
+| side | `  <repository> <role> <side><mark?><orphan-note?>` | A side of the contract; a side linked through another name carries its mark. |
 | drift | `    drift: missing <missing>` | Under a consumer: the field paths it reads that the provider lacks, each with its level. |
 | not checked | `    not checked: <unchecked>` | Under a consumer: the field paths it reads under an open part of the shape. |
 | no contract | `` no <contract-kind> matches `<query>` `` | No side of the contract is in the workspace. |

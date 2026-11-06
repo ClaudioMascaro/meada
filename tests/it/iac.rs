@@ -80,10 +80,10 @@ fn trace_walks_the_references_of_a_node_both_ways() {
     assert_golden("terraform-nodes.trace.txt", &text.join("\n"));
 }
 
-/// The default search leaves IaC nodes out (ADR 0025): a node's address or physical name finds
-/// only the config values that hold it, as it did before nodes were read.
+/// Default search leaves standalone IaC nodes out (ADR 0025), but finds provisioner contract
+/// sides (#657). An unlisted node still falls back to config values.
 #[test]
-fn the_default_search_leaves_iac_nodes_out() {
+fn the_default_search_leaves_nodes_out_but_finds_provisioned_contracts() {
     let repo = fixture_repo("iac_default", "terraform-nodes", ORIGIN);
     let engine = Engine::open(&repo).unwrap();
     let address = engine.search("aws_sns_topic.orders", None, None).unwrap();
@@ -97,9 +97,13 @@ fn the_default_search_leaves_iac_nodes_out() {
     let name = engine.search("dead-letters", None, None).unwrap();
     assert_eq!(
         name,
-        engine.search("dead-letters", Some("value"), None).unwrap()
+        "example.com/acme/infra envs/prod/main.tf:35 aws_sqs_queue.dlq[0] (root envs/prod) provisioner channel::sqs::dead-letters (no use in the workspace)\nexample.com/acme/infra envs/prod/main.tf:35 aws_sqs_queue.dlq[1] (root envs/prod) provisioner channel::sqs::dead-letters (no use in the workspace)\n"
     );
-    assert!(name.contains("resource.aws_sqs_queue.dlq.name"), "{name}");
+    let values = engine.search("dead-letters", Some("value"), None).unwrap();
+    assert!(
+        values.contains("resource.aws_sqs_queue.dlq.name"),
+        "{values}"
+    );
     let iac = engine.search("dead-letters", Some("iac"), None).unwrap();
     assert!(iac.contains("aws_sqs_queue.dlq[0]"), "{iac}");
 }
