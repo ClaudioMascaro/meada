@@ -89,6 +89,8 @@ Os nomes resolvem primeiro no módulo do arquivo e depois nos módulos que ele i
 
 ## HTTP e documentos de contrato
 
+Rotas declaradas em IaC também são providers HTTP: API Gateway HTTP e REST no Terraform/OpenTofu (HCL e JSON), eventos SAM `Api`/`HttpApi` e Serverless `http`/`httpApi`. Métodos e caminhos literais usam a mesma normalização de parâmetros das rotas em código. O provider aponta para o símbolo do handler local quando ele resolve com certeza, ou para o repositório inteiro. Consumidores de outros repositórios usam as regras comuns de host e peers. Referências, métodos ou caminhos desconhecidos não inventam rotas; integrações que não sejam Lambda e rotas catch-all sem caminho finito não entram no mapa (#666).
+
 URLs base vindas da configuração ou do ambiente de um workload podem nomear um Service
 Kubernetes (`orders`, `orders.shop`, `orders.shop.svc` ou
 `orders.shop.svc.cluster.local`, com ou sem porta) ou um serviço Compose. O Meada segue

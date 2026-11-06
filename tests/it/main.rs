@@ -40,6 +40,7 @@ mod grammar;
 mod hostile;
 mod http_iac;
 mod iac;
+mod iac_http_routes;
 mod images;
 mod index;
 mod indexed_commit;

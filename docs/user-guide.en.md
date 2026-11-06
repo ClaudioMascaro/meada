@@ -1158,6 +1158,22 @@ it (the consumer, an HTTP client call). In every language, Meada normalizes the 
 `/users/:id`, `/users/{id}` and `/users/<int:id>` become the same `/users/{}`, and the method is
 uppercased. Path case and API versions are kept.
 
+Infrastructure can declare routes: API Gateway HTTP and REST in Terraform/OpenTofu, SAM
+`Api` and `HttpApi` events, and Serverless `http` and `httpApi` events. For example, a SAM
+event with `Method: GET` and `Path: /orders/{id}` provides `http::GET::/orders/{}`. Declare the
+public host in `[serve] hosts`, as for a code route. The target is the handler symbol in the
+same repository when it resolves with certainty, including an aliased export; otherwise it
+is the whole repository. Missing or ambiguous files, ZIP archives, remote or absolute paths,
+parent steps and symlinks never fabricate a handler.
+
+A REST API's public method comes from `http_method`, not the POST used to invoke Lambda.
+The integration must identify one Lambda in the same evaluation unit and instance;
+incidental references, mismatched APIs and unknown targets provide no route. Quick create
+requires an explicit method/path `route_key`. `ANY` (or Serverless `method: '*'`) serves any
+method at that path; `$default` or a catch-all without a finite path provides none. Overridable
+values retain `inferred` evidence. Evaluation and path validation happen during indexing,
+without network access; queries use stored facts.
+
 How the link is chosen, depending on what the URL shows:
 
 1. **Host.** The URL has a host (`https://api.example.com/orders`) that some repository lists in

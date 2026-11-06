@@ -272,7 +272,8 @@ pub trait ContractKind {
 
     /// Reads indexed locations needed by declarations before `declare` runs. Query-time
     /// configuration may change independently of the index; server-mode callers use the same
-    /// indexed rows and never open source through this hook.
+    /// indexed rows and never open source through this hook. This runs before `symbols_read`,
+    /// so a declaration may use exact indexed exports to name the symbols it needs.
     fn read_declarations(
         &self,
         _repo: &Repository,

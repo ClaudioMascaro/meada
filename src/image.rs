@@ -7,7 +7,7 @@ use crate::resolve::Code;
 use crate::workspace::Repository;
 use serde_json::Value;
 
-mod code;
+pub(crate) mod code;
 mod config;
 pub(crate) mod environment;
 mod jib;

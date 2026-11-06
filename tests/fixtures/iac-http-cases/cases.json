@@ -1,0 +1,305 @@
+[
+  {
+    "name": "rest-bare-lambda-arn",
+    "fixture": "terraform",
+    "file": "main.tf",
+    "providers": []
+  },
+  {
+    "name": "rest-nonproxy-lambda",
+    "fixture": "terraform",
+    "file": "main.tf",
+    "providers": [
+      {
+        "contract": "http::GET::/orbits/{}",
+        "site": "example.com/route-oracle/terraform::runtime/index.ts::handleOrbits"
+      }
+    ]
+  },
+  {
+    "name": "sam-websocket-api",
+    "fixture": "sam",
+    "file": "template.yaml",
+    "providers": [
+      {
+        "contract": "http::GET::/orchards/{}",
+        "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"
+      }
+    ]
+  },
+  {
+    "name": "sam-explicit-api-ids",
+    "fixture": "sam",
+    "file": "template.yaml",
+    "providers": [
+      {
+        "contract": "http::GET::/orchards/{}",
+        "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"
+      },
+      {
+        "contract": "http::POST::/orchards",
+        "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"
+      }
+    ]
+  },
+  {
+    "name": "serverless-explicit-spec-source",
+    "fixture": "serverless",
+    "file": "serverless.yml",
+    "providers": [
+      {
+        "contract": "http::PATCH::/inventory/{}",
+        "site": "example.com/route-oracle/serverless::runtime.spec.ts::inventory"
+      }
+    ]
+  },
+  {
+    "name": "terraform-source-file",
+    "fixture": "terraform",
+    "file": "main.tf",
+    "providers": [
+      {
+        "contract": "http::GET::/orbits/{}",
+        "site": "example.com/route-oracle/terraform::runtime/index.ts::handleOrbits"
+      }
+    ]
+  },
+  {
+    "name": "sam-unknown-api",
+    "fixture": "sam",
+    "file": "template.yaml",
+    "providers": [
+      {
+        "contract": "http::POST::/orchards",
+        "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"
+      }
+    ]
+  },
+  {
+    "name": "terraform-json",
+    "fixture": "terraform",
+    "file": "main.tf.json",
+    "providers": [
+      {
+        "contract": "http::GET::/orbits/{}",
+        "site": "example.com/route-oracle/terraform::runtime/index.ts::handleOrbits"
+      }
+    ]
+  },
+  {
+    "name": "sam-json",
+    "fixture": "sam",
+    "file": "template.json",
+    "providers": [
+      {
+        "contract": "http::GET::/orchards/{}",
+        "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"
+      },
+      {
+        "contract": "http::POST::/orchards",
+        "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"
+      }
+    ]
+  },
+  {
+    "name": "serverless-http",
+    "fixture": "serverless",
+    "file": "serverless.yml",
+    "providers": [
+      {
+        "contract": "http::ANY::/inventory/any/{}",
+        "site": "example.com/route-oracle/serverless::runtime.ts::inventory"
+      },
+      {
+        "contract": "http::GET::/inventory/{}",
+        "site": "example.com/route-oracle/serverless::runtime.ts::inventory"
+      },
+      {
+        "contract": "http::POST::/inventory",
+        "site": "example.com/route-oracle/serverless::runtime.ts::inventory"
+      }
+    ]
+  },
+  {
+    "name": "terraform-rest",
+    "fixture": "terraform",
+    "file": "main.tf",
+    "providers": [
+      {
+        "contract": "http::GET::/orbits/{}",
+        "site": "example.com/route-oracle/terraform::runtime/index.ts::handleOrbits"
+      }
+    ]
+  },
+  {
+    "name": "terraform-quick-create",
+    "fixture": "terraform",
+    "file": "main.tf",
+    "providers": [
+      {
+        "contract": "http::ANY::/quick-orbits/{}",
+        "site": "example.com/route-oracle/terraform::runtime/index.ts::handleOrbits"
+      }
+    ]
+  },
+  {
+    "name": "v2-nonlambda",
+    "fixture": "terraform",
+    "file": "main.tf",
+    "providers": []
+  },
+  {
+    "name": "v2-websocket",
+    "fixture": "terraform",
+    "file": "main.tf",
+    "providers": []
+  },
+  {
+    "name": "v2-unread-target",
+    "fixture": "terraform",
+    "file": "main.tf",
+    "providers": []
+  },
+  {
+    "name": "v2-unread-method",
+    "fixture": "terraform",
+    "file": "main.tf",
+    "providers": []
+  },
+  {
+    "name": "v2-unread-path",
+    "fixture": "terraform",
+    "file": "main.tf",
+    "providers": []
+  },
+  {
+    "name": "v2-default-route",
+    "fixture": "terraform",
+    "file": "main.tf",
+    "providers": []
+  },
+  {
+    "name": "v2-multilambda",
+    "fixture": "terraform",
+    "file": "main.tf",
+    "providers": []
+  },
+  {
+    "name": "v2-unrelated-lambda-reference",
+    "fixture": "terraform",
+    "file": "main.tf",
+    "providers": []
+  },
+  {
+    "name": "v2-api-mismatch",
+    "fixture": "terraform",
+    "file": "main.tf",
+    "providers": []
+  },
+  {
+    "name": "sls-unread-path",
+    "fixture": "serverless",
+    "file": "serverless.yml",
+    "providers": []
+  },
+  {
+    "name": "sls-missing-method",
+    "fixture": "serverless",
+    "file": "serverless.yml",
+    "providers": []
+  },
+  {
+    "name": "sls-default-route",
+    "fixture": "serverless",
+    "file": "serverless.yml",
+    "providers": []
+  },
+  {
+    "name": "sls-missing-handler",
+    "fixture": "serverless",
+    "file": "serverless.yml",
+    "providers": [
+      {
+        "contract": "http::PATCH::/inventory/{}",
+        "site": "example.com/route-oracle/serverless"
+      }
+    ]
+  },
+  {
+    "name": "sls-unknown-symbol",
+    "fixture": "serverless",
+    "file": "serverless.yml",
+    "providers": [
+      {
+        "contract": "http::PATCH::/inventory/{}",
+        "site": "example.com/route-oracle/serverless"
+      }
+    ]
+  },
+  {
+    "name": "sls-parent-handler",
+    "fixture": "serverless",
+    "file": "serverless.yml",
+    "providers": [
+      {
+        "contract": "http::PATCH::/inventory/{}",
+        "site": "example.com/route-oracle/serverless"
+      }
+    ]
+  },
+  {
+    "name": "sls-ambiguous-module",
+    "fixture": "serverless",
+    "file": "serverless.yml",
+    "providers": [
+      {
+        "contract": "http::PATCH::/inventory/{}",
+        "site": "example.com/route-oracle/serverless"
+      }
+    ]
+  },
+  {
+    "name": "sam-unread-path",
+    "fixture": "sam",
+    "file": "template.yaml",
+    "providers": [
+      {
+        "contract": "http::POST::/orchards",
+        "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"
+      }
+    ]
+  },
+  {
+    "name": "sam-unread-method",
+    "fixture": "sam",
+    "file": "template.yaml",
+    "providers": [
+      {
+        "contract": "http::POST::/orchards",
+        "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"
+      }
+    ]
+  },
+  {
+    "name": "sam-missing-method",
+    "fixture": "sam",
+    "file": "template.yaml",
+    "providers": [
+      {
+        "contract": "http::POST::/orchards",
+        "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"
+      }
+    ]
+  },
+  {
+    "name": "sam-default-httpapi",
+    "fixture": "sam",
+    "file": "template.yaml",
+    "providers": [
+      {
+        "contract": "http::GET::/orchards/{}",
+        "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"
+      }
+    ]
+  }
+]

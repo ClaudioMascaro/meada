@@ -16,6 +16,7 @@ use crate::workspace::Repository;
 
 mod csharp;
 mod go;
+mod iac;
 mod infrastructure;
 mod java;
 mod join;
@@ -624,6 +625,41 @@ impl ContractKind for Http {
         Search::Filter("route")
     }
 
+    fn config_file(&self, path: &str) -> bool {
+        iac::is_file(path)
+    }
+
+    fn config_reads_paths(&self, path: &str) -> bool {
+        iac::is_file(path)
+    }
+
+    fn config_summary(
+        &self,
+        path: &str,
+        src: &[u8],
+        root: &std::path::Path,
+        facts: &crate::contract::ConfigFacts<'_>,
+    ) -> serde_json::Value {
+        iac::summary(path, src, root, facts)
+    }
+
+    fn symbols_read(&self, repo: &Repository, export: &IndexExport) -> Option<Vec<String>> {
+        Some(iac::symbols(repo, export))
+    }
+
+    fn read_declarations(
+        &self,
+        _: &Repository,
+        db: &rusqlite::Connection,
+        export: &mut IndexExport,
+    ) -> crate::Result<()> {
+        iac::read(db, export)
+    }
+
+    fn exports_repository_links(&self) -> bool {
+        true
+    }
+
     /// A route is listed by its providers alone: its consumers are calls. Its shape is a
     /// `response`.
     fn view(&self, contract: &str) -> Option<View> {
@@ -719,6 +755,8 @@ impl ContractKind for Http {
         if !repo.config.test_routes {
             drop_test_providers(repo, export);
         }
+        // IaC is an explicit serving declaration, including a handler in a test-named file.
+        iac::declare(repo, export);
         let serve = &repo.config.serve;
         let code: HashSet<String> = (export.providers.iter())
             .map(|p| p.contract.clone())
@@ -888,9 +926,14 @@ impl ContractKind for Http {
                 if route(&provider.contract).is_some_and(|(method, _)| method == ANY) {
                     reason.push_str("; any method");
                 }
+                if let Some(evidence) = &provider.evidence {
+                    reason.push_str("; ");
+                    reason.push_str(evidence);
+                }
                 let level = match (ambiguous, gateway) {
                     (true, _) => Level::Ambiguous,
                     (_, Some(_)) => Level::Inferred,
+                    _ if provider.evidence.is_some() => Level::Inferred,
                     _ => level,
                 };
                 Link::new(

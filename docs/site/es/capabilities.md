@@ -89,6 +89,8 @@ Los nombres se resuelven primero en el módulo del archivo y después en los mó
 
 ## HTTP y documentos de contrato
 
+Las declaraciones IaC también ofrecen rutas HTTP: API Gateway HTTP y REST en Terraform/OpenTofu (HCL y JSON), eventos SAM `Api`/`HttpApi` y Serverless `http`/`httpApi`. Los métodos y rutas literales usan la misma normalización de parámetros que las rutas en código. El provider apunta al símbolo del handler local cuando se resuelve con certeza, o al repositorio completo. Los consumidores de otros repositorios usan las reglas comunes de host y peers. Las referencias, métodos o rutas desconocidos no inventan rutas; las integraciones que no sean Lambda y las rutas catch-all sin una ruta finita quedan fuera del mapa (#666).
+
 Las URLs base de la configuración o del entorno de un workload pueden nombrar un Service
 Kubernetes (`orders`, `orders.shop`, `orders.shop.svc` o
 `orders.shop.svc.cluster.local`, con o sin puerto) o un servicio Compose. Meada sigue

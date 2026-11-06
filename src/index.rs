@@ -162,6 +162,7 @@ CREATE TABLE manifests (
     summary TEXT NOT NULL
 );
 CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
+CREATE INDEX exports_path ON exports (path);
 CREATE TABLE families (path TEXT NOT NULL, class TEXT NOT NULL, ancestors TEXT);
 CREATE TABLE flexible (path TEXT NOT NULL, name TEXT NOT NULL, least INTEGER NOT NULL, most INTEGER);
 CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL, site TEXT NOT NULL);
@@ -194,7 +195,7 @@ CREATE TABLE iac_nodes (
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
     handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
     subscription TEXT, environment TEXT NOT NULL, images TEXT NOT NULL, provisioned TEXT,
-    ingress TEXT NOT NULL
+    ingress TEXT NOT NULL, routes TEXT NOT NULL
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -1699,6 +1700,27 @@ fn stored_exports(db: &Connection) -> Result<Vec<Exported>> {
         })
     })?;
     Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+/// Stored exact exports of the requested modules, including repositories with no package.
+pub(crate) fn exports_of(db: &Connection, paths: &[String]) -> Result<Vec<Exported>> {
+    if paths.is_empty() {
+        return Ok(Vec::new());
+    }
+    Ok(db
+        .prepare(
+            "SELECT path, name, file, target FROM exports WHERE path IN \
+         (SELECT value FROM json_each(?1)) ORDER BY path, name, file, target",
+        )?
+        .query_map(params![serde_json::to_string(paths)?], |r| {
+            Ok(Exported {
+                path: r.get(0)?,
+                name: r.get(1)?,
+                file: r.get(2)?,
+                target: r.get(3)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?)
 }
 
 /// Deletes the rows of `table` (`flexible`, `families`) of every file but the kept ones.

@@ -314,6 +314,44 @@ type Probe = (&'static str, fn() -> usize);
 
 fn probes() -> Vec<Probe> {
     vec![
+        (
+            "http iac: a full file repeating wide routes through count",
+            || {
+                use crate::contract::ContractKind;
+                let mut text = format!(
+                    r#"
+resource "aws_lambda_function" "target" {{ function_name = "wide" }}
+resource "aws_apigatewayv2_api" "api" {{ protocol_type = "HTTP" }}
+resource "aws_apigatewayv2_integration" "target" {{
+ api_id = aws_apigatewayv2_api.api.id
+ integration_type = "AWS_PROXY"
+ integration_uri = aws_lambda_function.target.invoke_arn
+}}
+resource "aws_apigatewayv2_route" "wide" {{
+ count = 1000
+ api_id = aws_apigatewayv2_api.api.id
+ route_key = "GET /{}"
+ target = "integrations/${{aws_apigatewayv2_integration.target.id}}"
+}}
+"#,
+                    "x".repeat(32 << 10)
+                );
+                text.extend(std::iter::repeat_n(' ', MAX_BYTES - text.len()));
+                let src = file(text);
+                let (nodes, _) = crate::iac::evaluate(&[("main.tf".into(), src.clone())]);
+                crate::http::Http
+                    .config_summary(
+                        "main.tf",
+                        &src,
+                        std::path::Path::new("/missing-http-iac-source"),
+                        &crate::contract::ConfigFacts {
+                            nodes: &nodes.iter().collect::<Vec<_>>(),
+                        },
+                    )
+                    .to_string()
+                    .len()
+            },
+        ),
         ("alert: inherited labels across many rules", || {
             use crate::contract::ContractKind;
             let rules = fill(2, |i| format!("      - {{alert: A{i}, expr: up}}\n"));
@@ -1650,6 +1688,20 @@ fn azure_reader_stays_bounded_on_a_full_file() {
     let elapsed = start.elapsed();
     eprintln!("Azure IaC hostile probe: {elapsed:?}, {size} stored bytes");
     assert!(size > 1000 && size <= MAX_OUT, "{size}");
+    assert!(elapsed < BUDGET, "{elapsed:?}");
+}
+
+#[test]
+fn http_iac_route_reader_stays_bounded_on_a_full_file() {
+    let (_, probe) = probes()
+        .into_iter()
+        .find(|(name, _)| name.starts_with("http iac:"))
+        .unwrap();
+    let start = Instant::now();
+    let size = probe();
+    let elapsed = start.elapsed();
+    eprintln!("HTTP IaC hostile probe: {elapsed:?}, {size} stored bytes");
+    assert!(size <= MAX_OUT, "{size}");
     assert!(elapsed < BUDGET, "{elapsed:?}");
 }
 

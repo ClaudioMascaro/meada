@@ -8,6 +8,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- IaC HTTP route providers (#666): Terraform/OpenTofu API Gateway HTTP/REST and explicit quick
+  create, SAM Api/HttpApi and Serverless http/httpApi events resolve to local handler symbols
+  or the repository, with normalized parameters, cross-repository HTTP links and stored
+  path/target evidence. Included in the meada/meada-core 1.4.0 minor release.
+
 - The console graph has image builder-to-runner and alert emitter-to-matcher views, including
   links within a repository, alongside provisioner sides and provisioning links with roots,
   levels and reasons. A bilingual legend explains each role and keyboard navigation. The

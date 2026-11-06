@@ -1162,6 +1162,22 @@ consumidor, uma chamada de cliente HTTP). Em todas as linguagens, o Meada normal
 `/users/:id`, `/users/{id}` e `/users/<int:id>` viram o mesmo `/users/{}`, e o método fica
 em maiúsculas. Maiúsculas e minúsculas do caminho e versões de API são mantidas.
 
+Rotas podem vir da infraestrutura: API Gateway HTTP e REST em Terraform/OpenTofu, eventos
+SAM `Api` e `HttpApi`, e eventos Serverless `http` e `httpApi`. Por exemplo, um evento SAM
+com `Method: GET` e `Path: /orders/{id}` fornece `http::GET::/orders/{}`. Declare o host público
+em `[serve] hosts`, como para uma rota em código. O destino é o símbolo do handler no mesmo
+repositório quando ele resolve com certeza, inclusive por um export com alias; caso contrário,
+é o repositório inteiro. Um arquivo ausente ou ambíguo, um ZIP, um caminho remoto, absoluto,
+com `..` ou através de symlink nunca inventa um handler.
+
+O método público da API REST vem de `http_method`, não do POST usado para invocar Lambda.
+A integração precisa identificar uma única Lambda na mesma unidade e instância de avaliação;
+referências incidentais, APIs incompatíveis e alvos desconhecidos não fornecem rotas. O modo
+quick create exige `route_key` explícita com método e caminho. `ANY` (ou `method: '*'` no
+Serverless) serve qualquer método nesse caminho; `$default` ou um catch-all sem caminho
+finito não cria provider. Valores substituíveis mantêm a evidência `inferred`. A avaliação e
+a validação dos caminhos acontecem durante a indexação, sem rede; consultas usam os fatos guardados.
+
 Como a ligação é escolhida, conforme o que a URL mostra:
 
 1. **Host.** A URL tem um host (`https://api.example.com/orders`) que algum repositório lista em

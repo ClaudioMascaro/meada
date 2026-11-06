@@ -139,6 +139,7 @@ impl Read<'_> {
                 let workload = super::types::workload("terraform", ty).is_some();
                 let all_args = kind == Kind::Module
                     || subscription::reads(ty)
+                    || super::http::reads(ty)
                     || workload
                     || matches!(ty, "archive_file" | "google_sql_database");
                 let named_arg = name_argument(kind, ty);

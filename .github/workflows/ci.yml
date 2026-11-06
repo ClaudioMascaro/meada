@@ -91,6 +91,18 @@ jobs:
           path: .prove-it/runs/ci-http-iac
           include-hidden-files: true
           if-no-files-found: warn
+      - name: Prove HTTP routes declared in IaC
+        run: |
+          "$RUNNER_TEMP/http-iac-venv/bin/python" .claude/skills/prove-meada/scripts/iac-http-routes.py \
+            --head-bin target/debug/meada --run .prove-it/runs/ci-iac-http-routes
+      - name: Retain IaC HTTP route evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: iac-http-routes
+          path: .prove-it/runs/ci-iac-http-routes
+          include-hidden-files: true
+          if-no-files-found: warn
 
   benchmark:
     runs-on: ubuntu-24.04

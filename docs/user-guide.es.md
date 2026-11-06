@@ -1177,6 +1177,23 @@ Una ruta une a quien la **sirve** (el proveedor, el código que la trata) con qu
 `/users/:id`, `/users/{id}` y `/users/<int:id>` pasan a ser el mismo `/users/{}`, y el método
 queda en mayúsculas. Las mayúsculas y minúsculas de la ruta y las versiones de API se mantienen.
 
+La infraestructura puede declarar rutas: API Gateway HTTP y REST en Terraform/OpenTofu,
+eventos SAM `Api` y `HttpApi`, y eventos Serverless `http` y `httpApi`. Por ejemplo, un evento
+SAM con `Method: GET` y `Path: /orders/{id}` ofrece `http::GET::/orders/{}`. Declare el host
+público en `[serve] hosts`, como para una ruta en código. El destino es el símbolo del handler
+en el mismo repositorio cuando se resuelve con certeza, incluso mediante un export con alias;
+en otro caso es el repositorio completo. Archivos ausentes o ambiguos, archivos ZIP, rutas
+remotas o absolutas, pasos `..` y symlinks nunca inventan un handler.
+
+El método público de una API REST viene de `http_method`, no del POST usado para invocar
+Lambda. La integración debe identificar una única Lambda en la misma unidad e instancia de
+evaluación; referencias incidentales, APIs incompatibles y destinos desconocidos no ofrecen
+rutas. Quick create requiere una `route_key` explícita con método y ruta. `ANY` (o
+`method: '*'` en Serverless) sirve cualquier método en esa ruta; `$default` o un catch-all sin
+una ruta finita no crea provider. Los valores sustituibles conservan evidencia `inferred`.
+La evaluación y validación de rutas ocurre durante la indexación, sin red; las consultas usan
+los hechos guardados.
+
 Cómo se elige el enlace, según lo que muestra la URL:
 
 1. **Host.** La URL tiene un host (`https://api.example.com/orders`) que algún repositorio lista
