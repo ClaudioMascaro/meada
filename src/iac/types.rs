@@ -55,6 +55,31 @@ struct Table {
     entry: Vec<Entry>,
     #[serde(default)]
     workload: Vec<Workload>,
+    #[serde(default)]
+    module: Vec<Registry>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Registry {
+    pub source: String,
+    pub entry: String,
+    pub input: String,
+    pub create: Vec<String>,
+    #[serde(default)]
+    pub disable: Vec<String>,
+    pub fifo: Option<String>,
+    pub prefix: Option<String>,
+}
+
+static REGISTRY: LazyLock<Vec<Registry>> =
+    LazyLock::new(|| toml::from_str::<Table>(TABLE).map_or_else(|_| Vec::new(), |t| t.module));
+
+pub(crate) fn registry(source: &str) -> Option<&'static Registry> {
+    let source = source
+        .strip_prefix("registry.terraform.io/")
+        .unwrap_or(source);
+    REGISTRY.iter().find(|m| m.source == source)
 }
 
 /// A type that runs code, with the image and code paths its format reads.
@@ -82,6 +107,13 @@ pub(crate) fn workload(format: &str, ty: &str) -> Option<&'static Workload> {
 pub(crate) fn named_workload(id: &str) -> Option<&'static Workload> {
     let (format, ty) = id.split_once(':')?;
     workload(format, ty)
+}
+
+pub(crate) fn workload_of(node: &super::Node) -> Option<&'static Workload> {
+    if let Some(id) = node.provisioned.as_ref().and_then(|p| p.entry.as_deref()) {
+        return named_workload(id);
+    }
+    workload(format_of(&node.path)?, &node.ty)
 }
 
 static ENTRIES: LazyLock<Vec<Entry>> = LazyLock::new(|| {
@@ -436,6 +468,33 @@ mod tests {
                 "no evaluated fixture case for {} {}",
                 e.format,
                 e.ty
+            );
+        }
+    }
+
+    #[test]
+    fn every_registry_source_has_a_named_evaluated_fixture_case() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/custom-registry/main.tf");
+        let files = vec![("main.tf".into(), std::fs::read(path).unwrap())];
+        let repository = crate::iac::Repository::read(&files);
+        let (nodes, _) = repository.evaluate(|_| true, super::super::STORED_MAX);
+        for row in REGISTRY.iter() {
+            let blocks = repository
+                .modules
+                .values()
+                .flat_map(|m| &m.blocks)
+                .filter(|b| b.source.as_deref() == Some(row.source.as_str()));
+            assert!(
+                blocks.into_iter().any(|b| nodes.iter().any(|n| {
+                    n.address == format!("module.{}", b.name)
+                        && n.provisioned.as_ref().is_some_and(|p| {
+                            p.entry.as_deref() == Some(row.entry.as_str())
+                                && (p.name.is_some() || !n.images.is_empty())
+                        })
+                })),
+                "no evaluated registry fixture for {}",
+                row.source
             );
         }
     }

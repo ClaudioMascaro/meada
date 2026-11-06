@@ -171,6 +171,8 @@ pub(crate) struct Projection {
     /// Defining input key paths, excluded from directionless uses of their own resource.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub defining: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<mapping::Code>,
 }
 
 /// Literal routing evidence after a Kubernetes overlay has renamed its Service.
@@ -186,6 +188,7 @@ impl Projection {
         self.name.as_ref().map_or(0, String::len)
             + self.entry.as_ref().map_or(0, String::len)
             + self.defining.iter().map(String::len).sum::<usize>()
+            + self.code.as_ref().map_or(0, |c| c.key.len() + 24)
             + self
                 .through
                 .iter()
@@ -1173,6 +1176,7 @@ impl<'m> Eval<'m> {
             self.gcp_workload(node, instance, each.as_ref(), block);
             self.azure_workload(node, instance, each.as_ref(), block);
             self.workload(node, instance, each.as_ref(), block);
+            self.module_workload(node, instance, each.as_ref(), block);
         }
         for &(node, instance, block, ref each) in &pending {
             let Some(subscription) = self.subscription(node, instance, each.as_ref(), block) else {

@@ -44,6 +44,13 @@ pub(crate) struct Custom {
     pub key_path: String,
 }
 
+/// A declared module code input, checked on disk only by the image kind during indexing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Code {
+    pub key: String,
+    pub file: bool,
+}
+
 fn text(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= crate::config_values::VALUE_MAX

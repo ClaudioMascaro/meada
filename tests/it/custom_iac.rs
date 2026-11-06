@@ -228,3 +228,196 @@ fn private_mapping_inventory_and_key_paths_are_bounded_and_validated() {
         assert!(error.contains(wanted), "{error}");
     }
 }
+
+#[test]
+fn registry_modules_create_the_named_resources_and_workloads_and_honor_disabled_inputs() {
+    let root = fixture_repo(
+        "custom_registry",
+        "custom-registry",
+        Some("https://example.com/custom-671-registry/infra.git"),
+    );
+    let engine = Engine::open(&root).unwrap();
+    let value: Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    assert_eq!(
+        provisions(&value),
+        [
+            (
+                "channel::sns::registered-notices".into(),
+                "example.com/custom-671-registry/infra::main.tf::module.topic".into(),
+                ".".into()
+            ),
+            (
+                "channel::sqs::registered-parcels".into(),
+                "example.com/custom-671-registry/infra::main.tf::module.queue".into(),
+                ".".into()
+            ),
+            (
+                "resource::dynamodb::registered-ledger".into(),
+                "example.com/custom-671-registry/infra::main.tf::module.table".into(),
+                ".".into()
+            ),
+            (
+                "resource::s3::registered-assets".into(),
+                "example.com/custom-671-registry/infra::main.tf::module.bucket".into(),
+                ".".into()
+            ),
+        ]
+    );
+    let consumers = value["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), 2, "{value}");
+    assert_eq!(
+        value["consumers"],
+        serde_json::json!([
+            {"contract": "image::registry.example.com/registry/worker", "site": "example.com/custom-671-registry/infra::main.tf::module.function", "via": null, "root": "."},
+            {"contract": "image::registry.example.com/registry/service", "site": "example.com/custom-671-registry/infra::main.tf::module.service", "via": null, "root": "."}
+        ])
+    );
+    for (query, name) in [
+        ("module.function", "registered-worker"),
+        ("module.service", "registered-service"),
+    ] {
+        let context = engine.context(query, Some(12000)).unwrap();
+        assert!(context.contains(name), "{context}");
+        assert!(
+            context.contains("image::registry.example.com/registry/"),
+            "{context}"
+        );
+    }
+}
+
+#[test]
+fn registry_lambda_source_and_package_inputs_use_checked_paths_and_shared_environment_resolution() {
+    let root = fixture_repo(
+        "custom_module_code",
+        "custom-module-code",
+        Some("https://example.com/custom-671-code/infra.git"),
+    );
+    let engine = Engine::open(&root).unwrap();
+    let asks = || serde_json::from_str::<Value>(&engine.export().unwrap()).unwrap();
+    let executions = |value: &Value| {
+        let mut rows = value["executions"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|row| {
+                assert_eq!(row["level"], "exact", "{row}");
+                (
+                    row["workload"]
+                        .as_str()
+                        .unwrap()
+                        .rsplit_once("::")
+                        .unwrap()
+                        .1
+                        .to_string(),
+                    row["path"].as_str().unwrap().to_string(),
+                )
+            })
+            .collect::<Vec<_>>();
+        rows.sort();
+        rows
+    };
+    let value = asks();
+    assert_eq!(
+        executions(&value),
+        [
+            ("module.local_function".into(), "worker".into()),
+            (
+                "module.package_function".into(),
+                "deploy/function.zip".into()
+            )
+        ]
+    );
+    let providers = value["providers"].as_array().unwrap();
+    assert_eq!(providers.len(), 1, "{value}");
+    assert_eq!(providers[0]["contract"], "channel::sqs::module-tasks");
+    let provisions = value["provisions"].as_array().unwrap();
+    assert_eq!(provisions.len(), 1, "{value}");
+    assert_eq!(provisions[0]["level"], "inferred");
+    let context = engine
+        .context("module.local_function", Some(12000))
+        .unwrap();
+    assert!(context.contains("source_path"), "{context}");
+    assert!(context.contains("worker"), "{context}");
+
+    std::fs::remove_dir_all(root.join("worker")).unwrap();
+    assert_eq!(
+        executions(&asks()),
+        [(
+            "module.package_function".into(),
+            "deploy/function.zip".into()
+        )]
+    );
+    #[cfg(unix)]
+    {
+        let outside = root.parent().unwrap().join("outside-source");
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(
+            outside.join("send.ts"),
+            include_str!("../fixtures/custom-module-code/worker/send.ts"),
+        )
+        .unwrap();
+        std::os::unix::fs::symlink(&outside, root.join("worker")).unwrap();
+        assert_eq!(
+            executions(&asks()),
+            [(
+                "module.package_function".into(),
+                "deploy/function.zip".into()
+            )]
+        );
+        std::fs::remove_file(root.join("worker")).unwrap();
+    }
+    std::fs::create_dir_all(root.join("worker")).unwrap();
+    std::fs::write(
+        root.join("worker/send.ts"),
+        include_str!("../fixtures/custom-module-code/worker/send.ts"),
+    )
+    .unwrap();
+    assert_eq!(executions(&asks()), executions(&value));
+}
+
+#[test]
+fn registry_lambda_and_ecs_environments_follow_their_own_image_and_container() {
+    let case = "custom_registry_environments";
+    let root = fixture_repo(
+        case,
+        "custom-registry",
+        Some("https://example.com/custom-671-env/infra.git"),
+    );
+    let function = fixture_repo(
+        case,
+        "custom-registry-function-app",
+        Some("https://example.com/custom-671-env/function-app.git"),
+    );
+    let service = fixture_repo(
+        case,
+        "custom-registry-service-app",
+        Some("https://example.com/custom-671-env/service-app.git"),
+    );
+    std::fs::write(root.join("meada.toml"), "[[peer]]\nrepo = \"example.com/custom-671-env/function-app\"\n[[peer]]\nrepo = \"example.com/custom-671-env/service-app\"\n").unwrap();
+    let path = root.join("main.tf");
+    let source = std::fs::read_to_string(&path).unwrap()
+        .replace("  package_type = \"Image\"", "  environment_variables = { QUEUE_NAME = \"function-target\" }\n  package_type = \"Image\"")
+        .replace("worker = { image = \"registry.example.com/registry/service:1\" }", "worker = { image = \"registry.example.com/registry/service:1\", environment = [{ name = \"QUEUE_NAME\", value = \"service-target\" }] }\n    disabled = { create = false, image = \"registry.example.com/registry/service:1\", environment = [{ name = \"QUEUE_NAME\", value = \"wrong-disabled\" }] }");
+    std::fs::write(path, source).unwrap();
+    for (repo, target) in [
+        (&function, "channel::sqs::function-target"),
+        (&service, "channel::sqs::service-target"),
+    ] {
+        let value: Value =
+            serde_json::from_str(&Engine::open(repo).unwrap().export().unwrap()).unwrap();
+        let providers = value["providers"].as_array().unwrap();
+        assert_eq!(providers.len(), 2, "{value}");
+        let channels = providers
+            .iter()
+            .filter(|side| side["contract"].as_str().unwrap().starts_with("channel::"))
+            .collect::<Vec<_>>();
+        assert_eq!(channels.len(), 1, "{value}");
+        assert_eq!(channels[0]["contract"], target, "{value}");
+        assert!(
+            channels[0]["via"]
+                .as_str()
+                .is_some_and(|via| via.contains("QUEUE_NAME")),
+            "{value}"
+        );
+    }
+}

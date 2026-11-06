@@ -70,12 +70,7 @@ pub(super) fn checked(root: &Path, node: &crate::iac::Node, room: usize) -> Opti
             ".handler",
         ),
         _ => {
-            let format = crate::iac::types::format_of(&node.path)?;
-            if node.ty == "service"
-                || crate::iac::types::workload(format, &node.ty)?
-                    .code
-                    .is_none()
-            {
+            if node.ty == "service" || crate::iac::types::workload_of(node)?.code.is_none() {
                 return None;
             }
             (
@@ -85,14 +80,18 @@ pub(super) fn checked(root: &Path, node: &crate::iac::Node, room: usize) -> Opti
             )
         }
     };
+    let code = node.provisioned.as_ref().and_then(|p| p.code.as_ref());
+    let suffix = code.map_or_else(
+        || Cow::Borrowed(suffix),
+        |code| Cow::Owned(format!(".{}", code.key)),
+    );
     let reason_bytes = source.len() + 1 + node.path.len() + 1 + node.block.len() + suffix.len();
     if node.address.len() + node.root.len() + path.len() + reason_bytes > room || !safe(root, &path)
     {
         return None;
     }
-    let file_only = crate::iac::types::format_of(&node.path)
-        .and_then(|format| crate::iac::types::workload(format, &node.ty))
-        .is_some_and(|workload| workload.code_file);
+    let file_only = code.is_some_and(|code| code.file)
+        || crate::iac::types::workload_of(node).is_some_and(|workload| workload.code_file);
     if file_only && !root.join(path.as_ref()).is_file() {
         return None;
     }

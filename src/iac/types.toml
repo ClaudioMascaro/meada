@@ -791,3 +791,45 @@ contract = "resource"
 kind = "keyvault"
 name = "metadata.annotations[\"crossplane.io/external-name\"]"
 basis = "terraform:azurerm_key_vault_secret"
+
+# Registry sources read only these declared inputs; no module is downloaded or evaluated.
+[[module]]
+source = "terraform-aws-modules/sqs/aws"
+entry = "terraform:aws_sqs_queue"
+input = "name"
+create = ["create"]
+fifo = "fifo_queue"
+prefix = "use_name_prefix"
+
+[[module]]
+source = "terraform-aws-modules/sns/aws"
+entry = "terraform:aws_sns_topic"
+input = "name"
+create = ["create"]
+fifo = "fifo_topic"
+prefix = "use_name_prefix"
+
+[[module]]
+source = "terraform-aws-modules/s3-bucket/aws"
+entry = "terraform:aws_s3_bucket"
+input = "bucket"
+create = ["create", "create_bucket"]
+
+[[module]]
+source = "terraform-aws-modules/dynamodb-table/aws"
+entry = "terraform:aws_dynamodb_table"
+input = "name"
+create = ["create", "create_table"]
+
+[[module]]
+source = "terraform-aws-modules/lambda/aws"
+entry = "terraform:aws_lambda_function"
+input = "function_name"
+create = ["create", "create_function", "putin_khuylo"]
+disable = ["create_layer"]
+
+[[module]]
+source = "terraform-aws-modules/ecs/aws//modules/service"
+entry = "terraform:aws_ecs_task_definition"
+input = "name"
+create = ["create", "create_service", "create_task_definition"]
