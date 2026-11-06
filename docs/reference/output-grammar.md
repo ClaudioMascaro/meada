@@ -279,7 +279,7 @@ words:
 | `annotations:` | callee, overload set, unresolved call |
 | `consumers:` | package consumer |
 | `provisioners:` | provisioner |
-| `contracts:` | provides, shape fields, shape open, produces, publishes, consumes, consumes decided, consumes unresolved, environment |
+| `contracts:` | provides, shape fields, shape open, produces, publishes, consumes, consumes linked, consumes unresolved, environment |
 
 | Kind | Line | Meaning |
 | --- | --- | --- |
@@ -303,7 +303,7 @@ words:
 | produces | `<repository> <place> produces <shown-contract><mark?><orphan-note?>` | A call of the symbol produces to the channel or writes the resource; after a publish, a queue its bindings route it to. |
 | publishes | `<repository> <place> publishes <exchange> <key>` | A call of the symbol publishes to an exchange with a routing key. |
 | consumes | `<repository> <place> consumes <shown-contract><orphan-note?>` | The symbol, or a call of it, consumes the contract. |
-| consumes decided | `<repository> <place> consumes <contract> <arrow> <identity>` | A call of the symbol consumes the contract, linked by a decision to the provider `<identity>`. |
+| consumes linked | `<repository> <place> consumes <contract><orphan-note?> <arrow> <identity>` | A call of the symbol consumes the contract, linked at `inferred` or `decided` to the provider `<identity>`, with its level and reason. |
 | consumes unresolved | `<repository> <place> consumes (unresolved) <callee>` | A call of the symbol consumes a contract Meada cannot read. |
 | environment | `<repository> <place> unresolved environment <text>` | An SDK argument reads this environment variable; Meada retains its name and never reads its value. |
 | fits | ``` `<query>` fits <n> symbols; pass one of: ``` | The name fits several symbols, listed after it. |

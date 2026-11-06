@@ -134,7 +134,11 @@ this file, and a change to these modules updates it.
   `Routes::reached`). `context` on a symbol adds
   `produces <channel>` (at the producing call), `publishes <exchange> <key>` followed by
   `produces <queue> [<level>: <reason>]` for each queue the bindings route it to, or `consumes
-  <channel>` (the handler) to its `contracts:`. Which contracts `context` lists by side, and
+  <channel>` (the handler) to its `contracts:`. A call's inferred or decided consumer link
+  includes its level, reason and provider identity; inferred base URLs therefore name the
+  variable and selected peer, also after a field or included config value is refreshed (#683).
+  Exact and ambiguous call consumers keep the plain contract line.
+  Which contracts `context` lists by side, and
   the words for them, is `ContractKind::sides` (`writer`/`reader`, `producer`/`consumer`). After
   a `provides <route>` line with a shape come `<repository> <document> response fields: <paths>`
   and, when some are open, `<repository> <document> response open: <paths>`

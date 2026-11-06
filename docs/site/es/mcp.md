@@ -53,7 +53,9 @@ Son tres herramientas, siempre en inglés, y ninguna escribe:
   con el tipo `ambiguous` o `unresolved`, lista los ítems
   abiertos (ver Decisiones);
 - `context` describe un símbolo: su código leído del disco, quién lo llama, a quién llama y los
-  contratos que toca; las anotaciones, atributos y decoradores escritos sobre una definición
+  contratos que toca; un vínculo `inferred` o `decided` de una llamada muestra el nivel,
+  el motivo y el proveedor, incluida la variable de la URL base y el par elegido;
+  las anotaciones, atributos y decoradores escritos sobre una definición
   (`@Override`, `[Fact]`, `@app.get("/x")`) son llamadas del ámbito que la envuelve, por eso
   `context` las lista aparte, en la sección `annotations:`, cada una con la definición que
   decora (el sitio de llamada del export lo trae en `decorates`); en un recurso (`resource::postgres::orders`), lista quién lo escribe y

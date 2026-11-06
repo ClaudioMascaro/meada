@@ -1352,7 +1352,8 @@ fn contract_rank(contract: &str, needle: &str) -> Option<u8> {
 
 /// `contracts:` with what `symbol` provides, what its calls produce (a provider at a call, then
 /// what the kinds add for the call) and the contracts its calls consume, unresolved ones
-/// included, each followed by its decided links; `exports` and `links` are the workspace's.
+/// included, each followed by its inferred or decided links; `exports` and `links` are the
+/// workspace's.
 /// Nothing when it has none.
 fn contracts(
     identity: &str,
@@ -1412,16 +1413,19 @@ fn contracts(
             continue;
         };
         let location = files.at(&call.span.path, call.span.start);
-        let decided = links
+        let explained = links
             .iter()
-            .filter(|l| l.consumer == consumer.site && l.level == Level::Decided)
+            .filter(|l| {
+                l.consumer == consumer.site && matches!(l.level, Level::Inferred | Level::Decided)
+            })
             .filter(|l| consumer.contract.as_ref().is_none_or(|c| *c == l.contract));
         let mut any = false;
-        for link in decided {
+        for link in explained {
             any = true;
             lines.push(format!(
-                "{identity} {location} consumes {} →[{}: {}] {}",
+                "{identity} {location} consumes {}{} →[{}: {}] {}",
                 link.contract,
+                orphans.use_note(&link.contract),
                 link.level.name(),
                 link.reason,
                 link.provider

@@ -242,6 +242,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A symbol's `context` shows the level, reason and provider of inferred links on its calls,
+  including the base URL variable and the peer it selects through fields and Backstage config
+  partials. Editing only a partial refreshes that explanation (#683).
 - Resource SDK reader call sites retain their identities while traces follow writer-to-reader
   data flow and its reverse, show the actual function/location, and continue through the
   reader's body. Shared partial reads and process membership use the same direction; HTTP

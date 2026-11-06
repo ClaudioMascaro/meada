@@ -1091,6 +1091,122 @@ fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
     assert_eq!(links, [link; 4]);
 }
 
+/// A method's context explains the inferred peer through its readonly field and an included
+/// config value (#683, story 16), and refreshes that reason when only the partial changes.
+#[test]
+fn context_names_the_base_url_and_selected_peer_after_a_partial_edit_and_restore() {
+    let case = "xlang_backstage_context_reason";
+    let web = common::fixture_repo(
+        case,
+        "ts-backstage-web",
+        Some("https://example.com/backstage/web.git"),
+    );
+    for (fixture, origin) in [
+        ("ts-backstage-api", "https://example.com/backstage/api.git"),
+        (
+            "ts-backstage-other",
+            "https://example.com/backstage/other.git",
+        ),
+    ] {
+        common::fixture_repo(case, fixture, Some(origin));
+    }
+    let config = web.join("meada.toml");
+    fs::write(
+        &config,
+        fs::read_to_string(&config).unwrap() + "base_url_env = [\"ALT_URL\"]\n",
+    )
+    .unwrap();
+    fs::write(
+        web.join("src/partial-client.ts"),
+        "import { Config } from '@backstage/config';\n\
+         export class PartialClient {\n\
+           private readonly baseUrl: string;\n\
+           constructor(config: Config) {\n\
+             this.baseUrl = config.getString('included.keyed.baseUrl');\n\
+           }\n\
+           orders() {\n\
+             return fetch(`${this.baseUrl}/orders`);\n\
+           }\n\
+         }\n",
+    )
+    .unwrap();
+    common::age(&web);
+    let engine = Engine::open(&web).unwrap();
+    let control = engine.context("PublicClient.list", None).unwrap();
+    assert_eq!(
+        control
+            .lines()
+            .filter(|line| line.contains(" consumes "))
+            .collect::<Vec<_>>(),
+        ["example.com/backstage/web src/clients.ts:25 consumes http::GET::/orders"]
+    );
+    let partial = web.join("config/partials/acme.yaml");
+    let original = fs::read_to_string(&partial).unwrap();
+    let mut answers = Vec::new();
+    for (variable, peer) in [("API_URL", "api"), ("ALT_URL", "other"), ("API_URL", "api")] {
+        fs::write(&partial, original.replace("API_URL", variable)).unwrap();
+        // Context is the first query after the edit, so it must refresh its own evidence.
+        let context = engine.context("PartialClient.orders", None).unwrap();
+        let trace = engine
+            .trace(Start::From("PartialClient.orders"), Direction::Down, None)
+            .unwrap();
+        let reason = format!(
+            "base URL from {variable}, a base_url_env of peer example.com/backstage/{peer}"
+        );
+        let provider = format!("example.com/backstage/{peer}::src/server.ts::GET /orders");
+        let export: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+        let site =
+            "example.com/backstage/web::src/partial-client.ts::PartialClient.orders::fetch#0";
+        let links: Vec<_> = export["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|link| link["consumer"] == site)
+            .map(|link| {
+                (
+                    link["contract"].as_str().unwrap(),
+                    link["provider"].as_str().unwrap(),
+                    link["level"].as_str().unwrap(),
+                    link["reason"].as_str().unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            links,
+            [(
+                "http::GET::/orders",
+                provider.as_str(),
+                "inferred",
+                reason.as_str()
+            )]
+        );
+        let consumer = export["consumers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|consumer| consumer["site"] == site)
+            .unwrap();
+        assert_eq!(consumer["via"], format!("env:{variable}"));
+        assert!(trace.contains(&format!("→[inferred: {reason}]")), "{trace}");
+        let consumed: Vec<_> = context
+            .lines()
+            .filter(|line| line.contains(" consumes "))
+            .collect();
+        assert_eq!(
+            consumed,
+            [format!(
+                "example.com/backstage/web src/partial-client.ts:8 consumes http::GET::/orders →[inferred: {reason}] {provider}"
+            )],
+            "{context}"
+        );
+        assert_golden(&format!("backstage.context-partial-{peer}.txt"), &context);
+        assert_eq!(engine.context("PublicClient.list", None).unwrap(), control);
+        answers.push((context, trace));
+    }
+    assert_ne!(answers[0], answers[1]);
+    assert_eq!(answers[0], answers[2]);
+}
+
 /// A Python service reads a base URL from a pydantic-settings field (#619): the read is
 /// `<env_prefix><FIELD>`, or the field's `alias`, which the peer's `base_url_env` maps, so two
 /// providers of the route no longer leave the link `ambiguous`. A class that is not a

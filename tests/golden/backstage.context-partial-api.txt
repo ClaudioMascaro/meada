@@ -1,0 +1,11 @@
+example.com/backstage/web src/partial-client.ts:7-9 PartialClient.orders
+community: none
+processes: 1 (1 export; 1 repository): PartialClient.orders (example.com/backstage/web)
+orders() {
+return fetch(`${this.baseUrl}/orders`);
+}
+callers: none
+callees:
+example.com/backstage/web src/partial-client.ts:8 (unresolved) fetch
+contracts:
+example.com/backstage/web src/partial-client.ts:8 consumes http::GET::/orders →[inferred: base URL from API_URL, a base_url_env of peer example.com/backstage/api] example.com/backstage/api::src/server.ts::GET /orders
