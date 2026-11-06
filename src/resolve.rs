@@ -6290,7 +6290,9 @@ impl<'a> Code<'a> {
         scope: &'a str,
         name: &'a str,
     ) -> Option<(&'a str, &'a str, &'a Value)> {
-        let ((at, constant), _) = self.constant(path, scope, name)?;
+        let Binding::Const(at, constant) = self.resolver.read_member(path, scope, name) else {
+            return None;
+        };
         let (value, within) = self.held(at, constant)?;
         Some((at, within, value))
     }

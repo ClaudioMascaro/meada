@@ -12,7 +12,6 @@ use crate::index::Export;
 pub(crate) struct Side {
     pub identity: String,
     pub contract: String,
-    level: Level,
     pub node: Node,
 }
 
@@ -83,10 +82,6 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
         sides.push(Side {
             identity: format!("{repository}::{}::{}", node.path, node.address),
             contract: entry.contract(name),
-            level: match entry.contract {
-                types::Contract::Channel => Level::Exact,
-                types::Contract::Resource => Level::Declared,
-            },
             node,
         });
     }
@@ -98,29 +93,44 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
 
 /// The existing directed use sides: provisioning never invents a producer or consumer.
 pub(crate) fn uses(export: &Export) -> impl Iterator<Item = (&str, &str)> {
+    uses_with_levels(export).map(|(site, contract, _)| (site, contract))
+}
+
+fn uses_with_levels(export: &Export) -> impl Iterator<Item = (&str, &str, Level)> {
     export
         .providers
         .iter()
-        .map(|p| (p.site.as_str(), p.contract.as_str()))
-        .chain(
-            export
-                .consumers
-                .iter()
-                .filter_map(|c| Some((c.site.as_str(), c.contract.as_deref()?))),
-        )
+        .map(|p| {
+            (
+                p.site.as_str(),
+                p.contract.as_str(),
+                crate::contract::use_level(&p.contract, p.method.as_deref()),
+            )
+        })
+        .chain(export.consumers.iter().filter_map(|c| {
+            let contract = c.contract.as_deref()?;
+            Some((
+                c.site.as_str(),
+                contract,
+                crate::contract::use_level(contract, c.method.as_deref()),
+            ))
+        }))
 }
 
 /// Every use of the same contract reaches every provisioner, including one in its repository.
 /// Several roots are independent sides, never ambiguous candidates of one another.
 pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
-    let sides = exports.iter().flat_map(uses).collect::<Vec<_>>();
+    let sides = exports
+        .iter()
+        .flat_map(uses_with_levels)
+        .collect::<Vec<_>>();
     let mut links = Vec::new();
     for export in exports {
         for p in &export.provisioners {
-            let mut level = p.level;
+            let mut level = Level::Exact;
             let contracts = sides
                 .iter()
-                .map(|(_, c)| *c)
+                .map(|(_, c, _)| *c)
                 .filter(|c| p.matches(c))
                 .collect::<std::collections::BTreeSet<_>>();
             let mut reason = p.contract.clone();
@@ -149,14 +159,14 @@ pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
                     .join(", ");
                 reason += &format!("; overridable: {values}");
             }
-            for &(site, contract) in &sides {
+            for &(site, contract, use_level) in &sides {
                 if contracts.contains(contract) {
                     links.push(Provision::new(
                         site.into(),
                         p.identity.clone(),
                         p.node.root.clone(),
                         contract.into(),
-                        level,
+                        level.max(use_level),
                         reason.clone(),
                     ));
                 }

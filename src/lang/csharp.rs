@@ -2077,8 +2077,24 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                     .filter_map(|a| {
                         let left = a.child_by_field_name("left")?;
                         let right = a.child_by_field_name("right")?;
-                        (left.kind() == "identifier")
-                            .then(|| (text(left, src).to_string(), value(right, src, depth + 1)))
+                        match left.kind() {
+                            "identifier" => {
+                                Some((text(left, src).to_string(), value(right, src, depth + 1)))
+                            }
+                            "element_binding_expression" => {
+                                let mut keys = arguments(Some(left), src, depth).0;
+                                (keys.len() == 1).then(|| {
+                                    (
+                                        "[]".to_string(),
+                                        Value::List(vec![
+                                            keys.remove(0),
+                                            value(right, src, depth + 1),
+                                        ]),
+                                    )
+                                })
+                            }
+                            _ => Some(("...".to_string(), Value::Unknown)),
+                        }
                     })
                     .collect();
                 let has_fields = named(set_node).any(|n| n.kind() == "assignment_expression");
@@ -2093,6 +2109,9 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             Value::New(ty, args)
         }
         // `new[] { a, b }`, `new T[] { a, b }` and `[a, b]`.
+        "initializer_expression" => {
+            Value::List(named(node).map(|n| value(n, src, depth + 1)).collect())
+        }
         "implicit_array_creation_expression" | "array_creation_expression" => {
             match named(node).find(|n| n.kind() == "initializer_expression") {
                 Some(items) => {

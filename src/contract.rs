@@ -274,6 +274,12 @@ pub trait ContractKind {
         false
     }
 
+    /// Evidence of a directed use when joining a provisioner. Some kinds have both written
+    /// operations and explicit declarations, which retain their declared level.
+    fn use_level(&self, _operation: Option<&str>) -> Level {
+        Level::Exact
+    }
+
     /// How the identifier is labelled in candidates and entry points. It is a function of the
     /// identifier alone, since entry points are stored when the index is written.
     fn label(&self, contract: &str) -> String {
@@ -405,6 +411,11 @@ pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel, &Packages]
 pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {
     let (prefix, _) = contract.split_once("::")?;
     KINDS.iter().copied().find(|k| k.prefix() == prefix)
+}
+
+/// The kind's evidence level for a directed use; unknown kinds cannot establish exact uses.
+pub(crate) fn use_level(contract: &str, operation: Option<&str>) -> Level {
+    kind_of(contract).map_or(Level::Declared, |kind| kind.use_level(operation))
 }
 
 /// Whether a consumer at a definition calls the provider it links to, by the rule of its kind

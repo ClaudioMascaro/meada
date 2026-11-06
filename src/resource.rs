@@ -1,9 +1,8 @@
-//! Resources (spec #19): shared things a repository reads or writes, such as a database table
-//! or a bucket, declared in `meada.toml` as `[[resource]]`. No code names them, so this kind
-//! reads no code: its sides are the `via` symbols of each entry, or the repository as a whole
-//! when it names none, writers as providers and
-//! readers as consumers of the contract `resource::<kind>::<id>`. Every writer links to every
-//! reader of the same resource in another repository, at the level `declared`.
+//! Resources: shared things a repository reads or writes. Explicit `meada.toml` declarations
+//! use their `via` symbols, or the repository as a whole, at declared level. AWS SDK operations
+//! supply constructor-backed writer and reader call sites through `aws`, at exact level when
+//! both names are written. Every reader links to the same resource's writers in other
+//! repositories; an unresolved `resource::<kind>` side never links.
 
 use std::collections::HashSet;
 
@@ -91,6 +90,20 @@ impl ContractKind for Resource {
         aws::extract(code, indexed)
     }
 
+    fn unresolved(&self, contract: &str) -> bool {
+        contract
+            .strip_prefix(PREFIX)
+            .is_some_and(|rest| !rest.contains("::"))
+    }
+
+    fn use_level(&self, operation: Option<&str>) -> Level {
+        if operation.is_some() {
+            Level::Exact
+        } else {
+            Level::Declared
+        }
+    }
+
     fn parts<'c>(&self, contract: &'c str) -> (Option<&'c str>, Option<&'c str>) {
         let rest = contract.strip_prefix(PREFIX);
         rest.and_then(|rest| rest.split_once("::")).unzip()
@@ -164,6 +177,9 @@ impl ContractKind for Resource {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
         };
+        if self.unresolved(contract) {
+            return Vec::new();
+        }
         providers
             .iter()
             .filter(|(repo, p)| p.contract == *contract && repo.identity != from.identity)
@@ -172,7 +188,8 @@ impl ContractKind for Resource {
                     consumer.site.clone(),
                     p.site.clone(),
                     contract.clone(),
-                    Level::Declared,
+                    self.use_level(consumer.method.as_deref())
+                        .max(self.use_level(p.method.as_deref())),
                     contract.clone(),
                     None,
                     None,

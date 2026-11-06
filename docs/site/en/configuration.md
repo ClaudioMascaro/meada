@@ -36,6 +36,8 @@ via = ["src/orders.ts::cancelOrder"]     # optional: the symbols that do the acc
 Every writer links to every reader of the same resource in another repository, at the level
 `declared`. Without `via`, or when no `via` matches a symbol, the side is the whole repository.
 
+Java 2.x, Go v2 and .NET AWS SDKs also name resources directly in code: for example, `PutObject` on `uploads` writes `resource::s3::uploads`, and `GetObject` on that bucket reads the same contract. Written SDK uses link at `exact`; an explicit declaration remains `declared`. A same-named Terraform `aws_s3_bucket` links to all those uses as their provisioner. The uses need no repeated `[[resource]]` entries. Construct the client in code or pass it through exact calls; an injected interface type alone is insufficient. Environment names remain unresolved, with the variable in the export. See the [recognized operations](capabilities.md#aws-sdks-in-java-go-and-c).
+
 A route only a test file registers (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`,
 `*_test.py`, a `tests` or `__tests__` directory, `src/test` in JVM) is no provider of the
 repository: a test's router or fake upstream serves nothing, and counting it would make the

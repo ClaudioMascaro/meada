@@ -77,8 +77,18 @@ pub(super) fn field_of<'v>(value: &'v Value, field: &str) -> Option<Vec<Option<&
 }
 
 fn of(call: &Invocation, classes: &[&str], method: &str) -> bool {
-    crate::resolve::method(&call.callee) == method
-        && matches!(call.receiver.as_deref(), Some(Value::External(names)) if crate::names::one(names, |s| classes.contains(&s)).is_some())
+    let Some(Value::External(names)) = call.receiver.as_deref() else {
+        return false;
+    };
+    if crate::resolve::method(&call.callee) != method {
+        return false;
+    }
+    crate::names::one(names, |s| classes.contains(&s)).is_some()
+        // A full package spelling whose head is unbound has only on-demand candidates in
+        // the folded value. As names::known does, accept its written standard-library name.
+        // A local, type or explicit import hiding `java` has no such implicit candidate.
+        || classes.iter().any(|class| call.callee == format!("{class}.{method}")
+            && names.contains(&format!("java.lang.{class}")))
 }
 
 pub(super) fn sequence(call: &Invocation) -> bool {

@@ -38,6 +38,8 @@ via = ["src/orders.ts::cancelOrder"]     # opcional: os símbolos que fazem o ac
 Cada escritor liga a cada leitor do mesmo recurso em outro repositório, no nível `declared`.
 Sem `via`, ou se nenhum `via` corresponde a um símbolo, o lado é o repositório inteiro.
 
+Os SDKs AWS de Java 2.x, Go v2 e .NET também nomeiam recursos diretamente pelo código: por exemplo, `PutObject` em `uploads` escreve `resource::s3::uploads`, e `GetObject` no mesmo bucket lê esse contrato. A ligação entre usos escritos é `exact`; uma declaração explícita continua `declared`. O bloco Terraform `aws_s3_bucket` do mesmo nome liga a todos esses usos como provisionador. Não é preciso repetir os usos como `[[resource]]`. Construa o cliente no código ou passe-o por chamadas exatas; o tipo de uma interface injetada sozinho não basta. Nomes lidos do ambiente ficam sem resolução, com a variável no export. Consulte as [operações reconhecidas](capabilities.md#sdks-aws-em-java-go-e-c).
+
 Uma rota que só um arquivo de teste registra (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`,
 `*_test.py`, um diretório `tests` ou `__tests__`, `src/test` em JVM) não é provedora do
 repositório: um roteador ou um upstream falso de teste não serve nada, e deixá-lo contar faria

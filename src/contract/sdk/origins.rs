@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use super::{Client, Language, go, java};
 use crate::lang::Value;
-use crate::resolve::{Code, Follow, Form, Of};
+use crate::resolve::{Code, Of};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 enum Node<'a> {
@@ -86,31 +86,6 @@ impl<'c, 'a> Origins<'c, 'a> {
         client: &Client,
         depth: usize,
     ) -> bool {
-        // A constant follows one written expression, never a declared type or a factory's
-        // promised result. This also respects the constructor scope of a final/readonly field.
-        if self
-            .code
-            .origins(path, scope, of, Follow::Constants)
-            .into_iter()
-            .any(|origin| {
-                let Some(outside) = origin.outside else {
-                    return false;
-                };
-                let spellings = outside.spellings();
-                crate::names::one(&spellings, |name| match self.language {
-                    Language::Java => java::constructor(name, &origin.routes[0].steps, client.java),
-                    Language::Go => go::constructor(name, &origin.routes[0].steps, client.go),
-                    Language::Csharp => {
-                        origin.form == Form::New
-                            && name == client.csharp
-                            && origin.routes.iter().all(|r| r.steps.is_empty())
-                    }
-                })
-                .is_some()
-            })
-        {
-            return true;
-        }
         match of {
             Of::Name(written) => {
                 // `this.field` is the instance field even when a local/parameter has its name.

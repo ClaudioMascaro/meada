@@ -1,0 +1,548 @@
+{
+  "format": 1,
+  "repository": "local/aws-sdk-batches",
+  "files": [
+    {
+      "path": "Batches.cs",
+      "hash": "27d7a688816d55826efa1e0327a733b60910a7aad185438bfe4f6977122e5718"
+    },
+    {
+      "path": "Batches.java",
+      "hash": "06bc1370f0cdf848a148349e1c575e2980016b1e98db3b08ce9279361c027f77"
+    },
+    {
+      "path": "JavaCollections.java",
+      "hash": "07b64cb2eda808931c3b2a449839ba5320ed5a23b945da9b487bda2fbd2cf2b0"
+    },
+    {
+      "path": "batches.go",
+      "hash": "00576089164a0fb2d8a2ba210429fb294cb1a77ca82ec8f0fac0506dc3dd564a"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/aws-sdk-batches::Batches.cs::Batches",
+      "span": {
+        "path": "Batches.cs",
+        "start": 131,
+        "end": 415
+      },
+      "hash": "8e19ad6d22b5d2b9c70f98c36a74e7545685c9b452ed16ddba66d6c38eaf6403"
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.cs::Batches.Read()",
+      "span": {
+        "path": "Batches.cs",
+        "start": 151,
+        "end": 413
+      },
+      "hash": "e6de85f203219a2318a03108790fad475e1385ce871399fb62bc79f1c9ca014a"
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.java::Batches",
+      "span": {
+        "path": "Batches.java",
+        "start": 226,
+        "end": 560
+      },
+      "hash": "637d7dbc8860fc55c49962737e45aed734023295094066940c7bd1254c974eb8"
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.java::Batches.send()",
+      "span": {
+        "path": "Batches.java",
+        "start": 246,
+        "end": 558
+      },
+      "hash": "e27124758cba94739a54b693cf56d0798b9bd615489b3e82c3ce02d2fd0e604d"
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections",
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 338,
+        "end": 867
+      },
+      "hash": "a2e9a2545c155090fbc592f8d706d4a6b4a90170882dc5544d1bbe92589fa788"
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 366,
+        "end": 865
+      },
+      "hash": "86a01e4de6ca40b1a4ed16e968b73478138ce39f7bce162db94e8851916f0933"
+    },
+    {
+      "id": "local/aws-sdk-batches::batches.go::writeTables",
+      "span": {
+        "path": "batches.go",
+        "start": 157,
+        "end": 414
+      },
+      "hash": "c21ce5b98fa0c78b5a4f170209d1ef9f0076a24e00babbdb606bfca5c1f122a4"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/aws-sdk-batches::Batches.cs::Batches.Read()::AmazonSimpleSystemsManagementClient#0",
+      "caller": "local/aws-sdk-batches::Batches.cs::Batches.Read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.cs",
+        "start": 189,
+        "end": 230
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.cs::Batches.Read()::Environment.GetEnvironmentVariable#0",
+      "caller": "local/aws-sdk-batches::Batches.cs::Batches.Read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.cs",
+        "start": 350,
+        "end": 393
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.cs::Batches.Read()::GetParametersRequest#0",
+      "caller": "local/aws-sdk-batches::Batches.cs::Batches.Read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.cs",
+        "start": 269,
+        "end": 405
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.cs::Batches.Read()::List#0",
+      "caller": "local/aws-sdk-batches::Batches.cs::Batches.Read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.cs",
+        "start": 316,
+        "end": 395
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.cs::Batches.Read()::ssm.GetParametersAsync#0",
+      "caller": "local/aws-sdk-batches::Batches.cs::Batches.Read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.cs",
+        "start": 246,
+        "end": 406
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.java::Batches.send()::(method_invocation).build#0",
+      "caller": "local/aws-sdk-batches::Batches.java::Batches.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.java",
+        "start": 334,
+        "end": 550
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.java::Batches.send()::(method_invocation).build#1",
+      "caller": "local/aws-sdk-batches::Batches.java::Batches.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.java",
+        "start": 382,
+        "end": 444
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.java::Batches.send()::(method_invocation).build#2",
+      "caller": "local/aws-sdk-batches::Batches.java::Batches.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.java",
+        "start": 458,
+        "end": 532
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.java::Batches.send()::(method_invocation).entries#0",
+      "caller": "local/aws-sdk-batches::Batches.java::Batches.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.java",
+        "start": 334,
+        "end": 542
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.java::Batches.send()::(method_invocation).eventBusName#0",
+      "caller": "local/aws-sdk-batches::Batches.java::Batches.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.java",
+        "start": 382,
+        "end": 436
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.java::Batches.send()::(method_invocation).eventBusName#1",
+      "caller": "local/aws-sdk-batches::Batches.java::Batches.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.java",
+        "start": 458,
+        "end": 524
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.java::Batches.send()::EventBridgeClient.create#0",
+      "caller": "local/aws-sdk-batches::Batches.java::Batches.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.java",
+        "start": 281,
+        "end": 307
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.java::Batches.send()::PutEventsRequest.builder#0",
+      "caller": "local/aws-sdk-batches::Batches.java::Batches.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.java",
+        "start": 334,
+        "end": 360
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.java::Batches.send()::PutEventsRequestEntry.builder#0",
+      "caller": "local/aws-sdk-batches::Batches.java::Batches.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.java",
+        "start": 382,
+        "end": 413
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.java::Batches.send()::PutEventsRequestEntry.builder#1",
+      "caller": "local/aws-sdk-batches::Batches.java::Batches.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.java",
+        "start": 458,
+        "end": 489
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.java::Batches.send()::System.getenv#0",
+      "caller": "local/aws-sdk-batches::Batches.java::Batches.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.java",
+        "start": 503,
+        "end": 523
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::Batches.java::Batches.send()::events.putEvents#0",
+      "caller": "local/aws-sdk-batches::Batches.java::Batches.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Batches.java",
+        "start": 317,
+        "end": 551
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::(method_invocation).build#0",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 446,
+        "end": 645
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::(method_invocation).build#1",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 529,
+        "end": 564
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::(method_invocation).build#2",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 591,
+        "end": 626
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::(method_invocation).build#3",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 726,
+        "end": 857
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::(method_invocation).names#0",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 726,
+        "end": 849
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::(method_invocation).requestItems#0",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 446,
+        "end": 637
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::BatchGetItemRequest.builder#0",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 446,
+        "end": 475
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::DynamoDbClient.create#0",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 397,
+        "end": 420
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::GetParametersRequest.builder#0",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 726,
+        "end": 756
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::KeysAndAttributes.builder#0",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 529,
+        "end": 556
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::KeysAndAttributes.builder#1",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 591,
+        "end": 618
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::SsmClient.create#0",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 673,
+        "end": 691
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::System.getenv#0",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 807,
+        "end": 838
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::db.batchGetItem#0",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 430,
+        "end": 646
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::java.util.List.of#0",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 763,
+        "end": 848
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::java.util.Map.of#0",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 489,
+        "end": 636
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::parameters.getParameters#0",
+      "caller": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "JavaCollections.java",
+        "start": 701,
+        "end": 858
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::batches.go::writeTables::context.TODO#0",
+      "caller": "local/aws-sdk-batches::batches.go::writeTables",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "batches.go",
+        "start": 238,
+        "end": 252
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::batches.go::writeTables::db.BatchWriteItem#0",
+      "caller": "local/aws-sdk-batches::batches.go::writeTables",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "batches.go",
+        "start": 220,
+        "end": 412
+      }
+    },
+    {
+      "id": "local/aws-sdk-batches::batches.go::writeTables::dynamodb.NewFromConfig#0",
+      "caller": "local/aws-sdk-batches::batches.go::writeTables",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "batches.go",
+        "start": 188,
+        "end": 215
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::eventbridge",
+      "site": "local/aws-sdk-batches::Batches.java::Batches.send()::events.putEvents#0",
+      "via": "env:BUS"
+    },
+    {
+      "contract": "channel::eventbridge::orders",
+      "site": "local/aws-sdk-batches::Batches.java::Batches.send()::events.putEvents#0"
+    },
+    {
+      "contract": "resource::dynamodb::customers",
+      "site": "local/aws-sdk-batches::batches.go::writeTables::db.BatchWriteItem#0"
+    },
+    {
+      "contract": "resource::dynamodb::orders",
+      "site": "local/aws-sdk-batches::batches.go::writeTables::db.BatchWriteItem#0"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::ssm",
+      "site": "local/aws-sdk-batches::Batches.cs::Batches.Read()::ssm.GetParametersAsync#0",
+      "via": "env:PARAM"
+    },
+    {
+      "contract": "resource::ssm::/orders/key",
+      "site": "local/aws-sdk-batches::Batches.cs::Batches.Read()::ssm.GetParametersAsync#0",
+      "via": null
+    },
+    {
+      "contract": "resource::dynamodb::customers",
+      "site": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::db.batchGetItem#0",
+      "via": null
+    },
+    {
+      "contract": "resource::dynamodb::orders",
+      "site": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::db.batchGetItem#0",
+      "via": null
+    },
+    {
+      "contract": "resource::ssm",
+      "site": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::parameters.getParameters#0",
+      "via": "env:JAVA_PARAMETER"
+    },
+    {
+      "contract": "resource::ssm::/java/one",
+      "site": "local/aws-sdk-batches::JavaCollections.java::JavaCollections.read()::parameters.getParameters#0",
+      "via": null
+    }
+  ],
+  "links": []
+}

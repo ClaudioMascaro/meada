@@ -25,7 +25,9 @@ from ...", with the whole list. A value the index now stores joins it.
   passed (`Facts::usings`, set by a join and stamped into the stored facts after it, which
   `meada status` names), whether the grammar misread a Kotlin file (`Facts::misparsed`, which
   `meada status` names), the literal URL path fragments and the
-  method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the field paths
+  method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the SDK operation
+  of a code use (`contracts.method`, #660) and its unresolved environment variable (`contracts.via`,
+  also carried by providers in the export), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP
   consumer reads from the parsed response, and those of the zod schema or object literals a
   route handler returns, spec #23, with the parts a package import gives as the specifier, the

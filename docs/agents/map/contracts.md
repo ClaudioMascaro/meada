@@ -15,7 +15,10 @@ this file, and a change to these modules updates it.
   final/readonly field's constructor scope. The SDK readers replace Java, Go and C#'s earlier
   typed SQS forms; Kotlin retains its existing form. Java returns, Go maps and C# collection
   initializers are pack syntax, with no service table in a pack. Producer `via` retains an
-  unresolved environment variable in the export, as consumer `via` already does. Java SDK
+  unresolved environment variable in the export, as consumer `via` already does. `contracts.method`
+  records a written SDK operation for both directions; `ContractKind::use_level` keeps SDK uses
+  exact and declarations declared when linking each other or a provisioner. Unresolved resource
+  sides never link. Java SDK
   request folding shares Spring annotation injection with the existing channel forms.
 
 - `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs` and its `channel/` submodules

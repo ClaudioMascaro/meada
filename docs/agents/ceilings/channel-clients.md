@@ -81,3 +81,14 @@
 - `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
   across the workspace), and an exchange's type is not read: every binding pattern follows
   topic-exchange rules.
+
+- AWS SDKs in Java 2.x, Go v2 and .NET (#660): operation tables live in `channel/aws.rs` and
+  `resource/aws.rs`; the mechanical readers and complete constructor evidence live in
+  `contract/sdk/`. A type-only injected client, a name-matched factory, an opaque return branch,
+  a reassigned local and a hidden constructor yield no side. Existing `EVAL_DEPTH` and
+  `EVAL_BUDGET` bound the memoized walk; the SDK lattice test drives a full 1 MiB source file
+  in each language. Java builder requests, Go input literals, .NET request initializers,
+  lists, table-keyed maps and supported named/string overloads name sides. Operations not in
+  the documented table do not. A hierarchy query (`GetParametersByPath`) has no physical
+  parameter name and stays unresolved. RDS and ElastiCache control-plane clients establish
+  no data uses. Kotlin keeps the earlier typed SQS reader.

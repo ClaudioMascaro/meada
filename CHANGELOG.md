@@ -8,6 +8,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Constructor-backed AWS SDK sides in Java 2.x, Go v2 and .NET: SQS, SNS, EventBridge,
+  Kinesis, S3, DynamoDB, SSM Parameter Store and Secrets Manager. Literal names and ARNs join
+  infrastructure contracts; environment reads retain their variable without a guessed name.
+  Every batch name is kept. Exact factories and aliases are followed, hidden bindings and
+  incomplete origins are rejected, and injected types alone create no SDK side. .NET named
+  requests and its S3 metadata spelling are supported. SDK resource links are exact while
+  declarations remain declared; hierarchy queries stay unresolved. Release level: minor, meada and meada-core 1.4.0 (#660).
+
 - AWS infrastructure contracts: Terraform/OpenTofu SNS, EventBridge and Kinesis channels;
   DynamoDB, RDS instances and clusters, ElastiCache clusters and replication groups, SSM and
   Secrets Manager resources, including ARN name extraction. SNS-to-SQS subscriptions and

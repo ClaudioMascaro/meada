@@ -145,7 +145,7 @@ pub(crate) fn extract<'a>(
                             },
                             contract: Some(contract),
                             via: name.env.map(|v| format!("env:{v}")),
-                            method: None,
+                            method: Some(operation.method.into()),
                             fragments: Vec::new(),
                             shape: None,
                         });
@@ -220,6 +220,13 @@ fn sequence(value: &Value) -> Option<Vec<&Value>> {
 }
 
 fn map_keys(value: &Value) -> Option<Vec<Value>> {
+    let value = match value {
+        Value::New(_, args) => match args.as_slice() {
+            [value] => value,
+            _ => return Some(vec![Value::Unknown]),
+        },
+        other => other,
+    };
     match value {
         Value::Ref(_) => None,
         Value::Object(fields) => Some(
@@ -232,10 +239,15 @@ fn map_keys(value: &Value) -> Option<Vec<Value>> {
                 })
                 .collect(),
         ),
-        Value::New(_, args) => match args.as_slice() {
-            [value] => map_keys(value),
-            _ => Some(vec![Value::Unknown]),
-        },
+        Value::List(entries) => Some(
+            entries
+                .iter()
+                .map(|entry| match entry {
+                    Value::List(pair) if pair.len() == 2 => pair[0].clone(),
+                    _ => Value::Unknown,
+                })
+                .collect(),
+        ),
         Value::Call(call) if java::map(call) => {
             Some(call.args.iter().step_by(2).cloned().collect())
         }

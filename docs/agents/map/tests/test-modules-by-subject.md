@@ -423,3 +423,10 @@
   broker/resource-kind isolation, unresolved sides, same-repository uses, pattern matching,
   independent roots and a changed IaC name. `orphan*.status.txt` and `orphan*.context.txt`
   hold the whole answers.
+
+- `aws_sdk` (#660): the `aws-sdk-{java,go,csharp,batches,origins}` fixtures prove SDK
+  constructor evidence, exact and opaque factory alternatives, hidden constructors and
+  constructor-scoped fields, named arguments, batch names, ARN normalization and environment
+  provenance through the engine export. Sibling Go/.NET repositories assert the whole set of
+  data/provisioning links and exact versus declared evidence, and reject unresolved links.
+  Generated full-file-ceiling Java/Go/C# factory lattices must retain both uses within 30 s.

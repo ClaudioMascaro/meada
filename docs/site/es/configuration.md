@@ -39,6 +39,8 @@ Cada escritor enlaza con cada lector del mismo recurso en otro repositorio, en e
 `declared`. Sin `via`, o si ningún `via` corresponde a un símbolo, el lado es el repositorio
 entero.
 
+Los SDK AWS de Java 2.x, Go v2 y .NET también nombran recursos directamente desde el código: por ejemplo, `PutObject` en `uploads` escribe `resource::s3::uploads`, y `GetObject` en ese bucket lee el mismo contrato. Los usos escritos enlazan en `exact`; una declaración explícita conserva `declared`. Un bloque Terraform `aws_s3_bucket` del mismo nombre enlaza a todos estos usos como aprovisionador. No hace falta repetir los usos como `[[resource]]`. Construya el cliente en código o páselo mediante llamadas exactas; el tipo de una interfaz inyectada por sí solo no basta. Los nombres del entorno quedan sin resolver, con la variable en el export. Consulte las [operaciones reconocidas](capabilities.md#sdk-aws-en-java-go-y-c).
+
 Una ruta que solo registra un archivo de prueba (`*_test.go`, `*.test.*`, `*.spec.*`,
 `test_*.py`, `*_test.py`, un directorio `tests` o `__tests__`, `src/test` en JVM) no es
 proveedora del repositorio: un enrutador o un upstream falso de prueba no sirve nada, y contarlo
