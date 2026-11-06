@@ -1,0 +1,199 @@
+{
+  "format": 1,
+  "repository": "example.com/http-iac/client",
+  "commit": "4eafd3c778f9f9bb0c06a9f60c4525b3541a28d0",
+  "dirty": false,
+  "files": [
+    {
+      "path": "client.ts",
+      "hash": "cb8c181ed43a376b710939e121b415f84c7e0cab9c46a749eb327f31994e42fe"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/http-iac/client::client.ts::directOrders",
+      "span": {
+        "path": "client.ts",
+        "start": 190,
+        "end": 270
+      },
+      "hash": "d75d9b48f87431abda51cb460828c3b8a932cd15982cce99d1435b731f0a3e4d"
+    },
+    {
+      "id": "example.com/http-iac/client::client.ts::publicOrders",
+      "span": {
+        "path": "client.ts",
+        "start": 97,
+        "end": 181
+      },
+      "hash": "1da01576dda4548ea2d5e1649e03266c3368afdd3169b7c3c39625da4d5da7a7"
+    },
+    {
+      "id": "example.com/http-iac/client::client.ts::workloadOrders",
+      "span": {
+        "path": "client.ts",
+        "start": 7,
+        "end": 88
+      },
+      "hash": "1ce331de2703d59ef919aee431909d6cfe73ed9510771993135cdcf444ab9f35"
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/http-iac/client::client.ts::directOrders::fetch#0",
+      "caller": "example.com/http-iac/client::client.ts::directOrders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client.ts",
+        "start": 225,
+        "end": 267
+      }
+    },
+    {
+      "id": "example.com/http-iac/client::client.ts::publicOrders::fetch#0",
+      "caller": "example.com/http-iac/client::client.ts::publicOrders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client.ts",
+        "start": 132,
+        "end": 178
+      }
+    },
+    {
+      "id": "example.com/http-iac/client::client.ts::workloadOrders::fetch#0",
+      "caller": "example.com/http-iac/client::client.ts::workloadOrders",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client.ts",
+        "start": 44,
+        "end": 85
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "image::ghcr.io/http-iac/client",
+      "site": "example.com/http-iac/client",
+      "at": ".github/workflows/build.yml#jobs.image.steps[0].with.tags"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/http-iac/client::client.ts::directOrders::fetch#0",
+      "via": "host:orders.example.com"
+    },
+    {
+      "contract": "http::GET::/store/orders",
+      "site": "example.com/http-iac/client::client.ts::publicOrders::fetch#0",
+      "via": "host:shop.example.com"
+    },
+    {
+      "contract": "http::GET::/orders",
+      "site": "example.com/http-iac/client::client.ts::workloadOrders::fetch#0",
+      "via": "env:ORDERS_URL"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/http-iac/client::client.ts::directOrders::fetch#0",
+      "provider": "example.com/http-iac/server::app/orders/route.ts::GET",
+      "contract": "http::GET::/orders",
+      "level": "exact",
+      "reason": "host orders.example.com is served by example.com/http-iac/server"
+    },
+    {
+      "consumer": "example.com/http-iac/client::client.ts::publicOrders::fetch#0",
+      "provider": "example.com/http-iac/server::app/orders/route.ts::GET",
+      "contract": "http::GET::/store/orders",
+      "level": "inferred",
+      "reason": "Ingress example.com/http-iac/deploy::workloads.yaml::Ingress.networking.k8s.io/shop/orders (root .) prefix /store through Service example.com/http-iac/deploy::workloads.yaml::Service/shop/orders (root .)"
+    },
+    {
+      "consumer": "example.com/http-iac/client::client.ts::workloadOrders::fetch#0",
+      "provider": "example.com/http-iac/server::app/orders/route.ts::GET",
+      "contract": "http::GET::/orders",
+      "level": "inferred",
+      "reason": "Service example.com/http-iac/deploy::workloads.yaml::Service/shop/orders (root .); workload:example.com/http-iac/deploy::workloads.yaml::Deployment.apps/shop/client (root .), env:ORDERS_URL"
+    },
+    {
+      "consumer": "example.com/http-iac/deploy::workloads.yaml::Deployment.apps/shop/client",
+      "provider": "example.com/http-iac/client",
+      "contract": "image::ghcr.io/http-iac/client",
+      "level": "exact",
+      "reason": "image::ghcr.io/http-iac/client",
+      "root": "."
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/http-iac/client::client.ts::directOrders",
+      "kind": "export",
+      "label": "directOrders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/http-iac/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/http-iac/client::client.ts::directOrders"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/http-iac/server",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/http-iac/server::app/orders/route.ts::GET",
+          "reason": "host orders.example.com is served by example.com/http-iac/server"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/http-iac/client::client.ts::publicOrders",
+      "kind": "export",
+      "label": "publicOrders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/http-iac/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/http-iac/client::client.ts::publicOrders"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/http-iac/server",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/http-iac/server::app/orders/route.ts::GET",
+          "reason": "Ingress example.com/http-iac/deploy::workloads.yaml::Ingress.networking.k8s.io/shop/orders (root .) prefix /store through Service example.com/http-iac/deploy::workloads.yaml::Service/shop/orders (root .)"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/http-iac/client::client.ts::workloadOrders",
+      "kind": "export",
+      "label": "workloadOrders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/http-iac/client",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/http-iac/client::client.ts::workloadOrders"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/http-iac/server",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/http-iac/server::app/orders/route.ts::GET",
+          "reason": "Service example.com/http-iac/deploy::workloads.yaml::Service/shop/orders (root .); workload:example.com/http-iac/deploy::workloads.yaml::Deployment.apps/shop/client (root .), env:ORDERS_URL"
+        }
+      ]
+    }
+  ]
+}

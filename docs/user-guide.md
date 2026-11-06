@@ -1162,7 +1162,7 @@ Como a ligação é escolhida, conforme o que a URL mostra:
 1. **Host.** A URL tem um host (`https://api.example.com/orders`) que algum repositório lista em
    `[serve] hosts`. O elo é `exact`. Se nenhum repositório serve esse host, não há elo.
 2. **Variável de ambiente.** A URL começa por uma leitura de ambiente (`API_URL`) que um par
-   declara em `base_url_env`. O elo é `inferred`, e o Meada nunca lê o valor da variável.
+   declara em `base_url_env`. O elo é `inferred`; o valor no ambiente do processo nunca é lido.
 3. **Host desconhecido.** A URL não diz de onde vem (um caminho relativo, por exemplo) e só um
    repositório do workspace serve esse método e esse caminho. O elo é `inferred`, com o motivo
    `the only repository serving it is`.
@@ -1184,6 +1184,22 @@ Por que um elo pode faltar:
   no meio da URL vira um parâmetro `{}` e ainda liga.)
 - O framework ou o cliente não está na lista da linguagem (seção 9).
 - O repositório que serve a rota não está entre os pares, e o workspace não o tem.
+
+Uma URL base literal da configuração ou de uma entrada do workload também pode apontar para
+um Service Kubernetes: `http://orders:8080`, `orders.shop`, `orders.shop.svc` ou
+`orders.shop.svc.cluster.local`, sempre com ou sem porta. O Meada segue o selector, o workload
+selecionado e sua imagem até o repositório que serve a rota. Nomes Compose seguem o serviço
+e sua imagem ou seu contexto de build local. O vínculo é `inferred`, com o Service no motivo;
+para uma variável de ambiente, o motivo também identifica o workload e a variável. A leitura
+usa somente entradas indexadas do workload que executa o código, respeitando container,
+namespace, raiz de avaliação e caminho local. Candidatos distintos ficam `ambiguous`.
+
+Um Ingress com host `shop.example.com`, prefixo `/store` e backend `orders` permite que
+`https://shop.example.com/store/orders` alcance a rota `/orders` desse Service. O prefixo
+mais específico prevalece, como um prefixo de gateway. Anotações de rewrite, backends não
+resolvidos e `pathType` diferente de `Prefix` não criam vínculos; formas antigas sem
+`pathType` são aceitas. Hosts com curinga e caminhos específicos de controller não são
+interpretados. A resolução usa os fatos indexados, sem consultar um cluster.
 
 ### 8.2 Recursos declarados e prefixos de gateway
 
@@ -2202,6 +2218,28 @@ Regras Grafana também são lidas de exports JSON e de blocos `rule` de `grafana
 Uma rota raiz sem matchers não cria um lado de alerta: não há chave e valor para o contrato. O grafo descreve os matchers escritos, sem calcular notificações finais, inibições ou horários.
 
 Prometheus e Loki também emitem o `alertname` literal do nome da regra, sobrescrevendo um rótulo com esse nome. Rótulos que possam vir da expressão permanecem desconhecidos, não vazios. Arquivos sob `templates/` não são renderizados nem tratados como emissores de alertas.
+
+### OpsGenie e PagerDuty em Terraform
+
+Tags literais `chave:valor` de `datadog_monitor` são emissores. Condições de tags em
+`opsgenie_team_routing_rule` e condições PCL de
+orquestrações PagerDuty, são matchers. Igualdade é `exact`; regex, prefixo e
+contenção são `inferred`. As condições e a ordem das regras são avaliadas juntas;
+valores desconhecidos ou operações não lidas não escolhem um destino por palpite.
+
+Tags do Datadog chegam ao OpsGenie. Rótulos de regras só chegam a tags por um receiver
+OpsGenie selecionado no Alertmanager que configure `tags` explicitamente. Templates
+simples de `.CommonLabels.<chave>` ou `.GroupLabels.<chave>` usam rótulos fixados pelo
+`group_by` efetivo. Um receiver PagerDuty v2 pode encaminhar esses rótulos por `details`,
+que vira `event.custom_details.<chave>`; não há encaminhamento implícito de tags ao
+PagerDuty. Templates não lidos e encaminhamentos ausentes não geram links.
+
+`context` mostra o escopo escrito da regra, e `trace` mantém o caminho até o bloco de
+roteamento. Um matcher compatível não comprova entrega nem uma notificação final a
+uma equipe. No exemplo público #638, a regra testa `service:app`: o monitor também
+emite `support:team-b`, mas não existe ali um matcher para `support`. O YAML de
+monitor não padronizado e os valores Helm originais continuam apenas configuração.
+
 ## Infraestrutura Azure
 
 Terraform e OpenTofu provisionam canais Service Bus (filas, tópicos e assinaturas) e Event

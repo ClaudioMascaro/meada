@@ -29,7 +29,7 @@ relevant topic. The [full catalogue](map/overview/modules-src.md) retains each m
 
 - `engine.rs`, `items.rs`, `trace.rs`, `partial.rs`, `drift_view.rs`, `render.rs`, `mcp.rs`, `main.rs`, `msg.rs`, `lib.rs`: queries, rendering, MCP and CLI. [queries](map/queries.md).
 - `workspace.rs`, `config.rs`, `repo.rs`, `index.rs`, `lang/`, `resolve.rs`, `community.rs`, `entry.rs`: workspace discovery, storage, packs and resolution. [indexing](map/indexing.md).
-- `contract.rs`, `contract/`, `http.rs`, `http/`, `resource.rs`, `resource/`, `resource/via.rs`, `image.rs`, `image/config.rs`, `image/code.rs`, `image/patterns.rs`, `image/environment.rs`, `alert.rs`, `alert/`, `channel.rs`, `channel/`, `package.rs`, `package/`: contract kinds, library forms and SDK extraction. [contracts](map/contracts.md).
+- `contract.rs`, `contract/`, `http.rs`, `http/`, `resource.rs`, `resource/`, `resource/via.rs`, `image.rs`, `image/config.rs`, `image/code.rs`, `image/patterns.rs`, `image/environment.rs`, `alert.rs`, `alert/` (labels, incident routing and explicit receiver forwarding), `channel.rs`, `channel/`, `package.rs`, `package/`: contract kinds, library forms and SDK extraction. [contracts](map/contracts.md).
 - `names.rs`, `names/`: external names and shared language readers. [languages](map/languages.md).
 - `jvm/`: external names and shared language readers. [languages](map/languages.md), [seams](map/seams.md).
 - `dotnet/`, `xml.rs`: shared build readers and extension rules. [seams](map/seams.md).
@@ -53,6 +53,9 @@ relevant topic. The [full catalogue](map/overview/modules-src.md) retains each m
 [Repository, symbol, call, contract and export identities](map/overview/identities-and-formats.md).
 
 ## Seams and what extends them
+
+HTTP routing through evaluated Services, Compose and Ingress:
+[prepared routing and presentation](map/contracts/http-infrastructure-665.md).
 
 [Extension steps](map/overview/seams-and-what-extends-them.md) for kinds, packs, ecosystems,
 documents, shapes, entry points, levels, config, MCP and CLI; [library and shared-reader

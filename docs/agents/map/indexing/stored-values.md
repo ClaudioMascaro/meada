@@ -3,6 +3,12 @@
 The invariant of the architecture map, "The index holds no source text and no values, apart
 from ...", with the whole list. A value the index now stores joins it.
 
+Ingress routing evidence (#665) is stored as `iac_nodes.ingress`: literal hosts and path
+prefixes plus transformed Service addresses. An empty Service address retains an unread
+mount, including rewrites and unknown backends. Selectors reuse `iac_references`; no
+additional source text or evaluated process environment enters the index. HTTP's prepared
+links and structured inference explanations are transient query values, never stored.
+
 - The index holds no source text and no values, apart from the BLAKE3 of each symbol's span
   (`symbols.hash`, `Def::hash`), the argument count, the argument
   labels and constructor form of an overloaded call (`Call::arity`, `Call::labels`,
@@ -181,8 +187,9 @@ pending workload marker. The workspace resolution step replaces a matched marker
 evidence and removes an unmatched one before every query output. Existing SDK `env:` provenance
 keeps its earlier storage and output behavior.
 
-The `alert` entry of `contract_configs` (#672) stores rule names, explicit label maps,
-route conditions and receivers, key paths and line spans. It stores neither PromQL/LogQL
+The `alert` entry of `contract_configs` (#672, #673) stores rule names, explicit label
+maps and monitor tags, route conditions, native event-field paths, receivers, explicit
+receiver tag/detail templates and grouping/scope facts, key paths and line spans. It stores neither PromQL/LogQL
 expressions nor notification credentials. Rule and route nodes and their contract sides are
 derived at query time. A stored-format sample participates in the schema fingerprint.
 

@@ -1,0 +1,5 @@
+[[peer]]
+repo = "example.com/http-iac/deploy"
+
+[[peer]]
+repo = "example.com/http-iac/server"

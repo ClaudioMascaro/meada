@@ -9,6 +9,7 @@ topic leaves within 24 KiB; the code wins over these entries.
 - [Library forms and query declarations](contracts/library-forms-and-query-declarations.md)
 - [Contract kind interface](contracts/contract-kind-interface.md)
 - [HTTP extraction and linking](contracts/http-extraction-and-linking.md)
+- [HTTP through Services, Compose and Ingress (#665)](contracts/http-infrastructure-665.md)
 - [Resource declarations](contracts/resource-declarations.md)
 - [Azure contracts and Functions (#669)](contracts/azure-iac-669.md)
 - [Channel extraction and linking](contracts/channel-extraction-and-linking.md)

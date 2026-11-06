@@ -1178,8 +1178,7 @@ Cómo se elige el enlace, según lo que muestra la URL:
    en `[serve] hosts`. El enlace es `exact`. Si ningún repositorio sirve ese host, no hay
    enlace.
 2. **Variable de entorno.** La URL empieza por una lectura de entorno (`API_URL`) que un par
-   declara en `base_url_env`. El enlace es `inferred`, y Meada nunca lee el valor de la
-   variable.
+   declara en `base_url_env`. El enlace es `inferred`; nunca se lee el valor del entorno del proceso.
 3. **Host desconocido.** La URL no dice de dónde viene (una ruta relativa, por ejemplo) y solo un
    repositorio del workspace sirve ese método y esa ruta. El enlace es `inferred`, con el motivo
    `the only repository serving it is`.
@@ -1202,6 +1201,23 @@ Por qué puede faltar un enlace:
   hueco en medio de la URL pasa a ser un parámetro `{}` y aún enlaza.)
 - El framework o el cliente no está en la lista del lenguaje (sección 9).
 - El repositorio que sirve la ruta no está entre los pares, y el workspace no lo tiene.
+
+Una URL base literal de la configuración o de una entrada del workload también puede nombrar
+un Service Kubernetes: `http://orders:8080`, `orders.shop`, `orders.shop.svc` o
+`orders.shop.svc.cluster.local`, con o sin puerto en cada forma. Meada sigue el selector,
+el workload seleccionado y su imagen hasta el repositorio que atiende la ruta. Los nombres
+Compose siguen el servicio y su imagen o contexto de build local. El enlace es `inferred`,
+con el Service en el motivo; si usa una variable de entorno, también nombra el workload y
+la variable. Solo se leen las entradas indexadas del workload que ejecuta ese código,
+respetando container, namespace, raíz de evaluación y ruta local. Los candidatos distintos
+quedan `ambiguous`.
+
+Un Ingress con host `shop.example.com`, prefijo `/store` y backend `orders` permite que
+`https://shop.example.com/store/orders` alcance la ruta `/orders` de ese Service. Prevalece
+el prefijo más específico, como un prefijo de gateway. Las anotaciones de rewrite, los
+backends sin resolver y un `pathType` distinto de `Prefix` no crean enlaces; se aceptan
+formas antiguas sin `pathType`. No se interpretan hosts con comodines ni rutas específicas
+del controller. La resolución usa los hechos indexados, sin consultar un cluster.
 
 ### 8.2 Recursos declarados y prefijos de gateway
 
@@ -2235,6 +2251,28 @@ Las reglas Grafana también se leen de exports JSON y bloques `rule` de recursos
 Una ruta raíz sin matchers no crea un lado de alerta: no hay clave y valor para el contrato. El grafo describe los matchers escritos, sin predecir notificaciones finales, inhibiciones ni horarios.
 
 Prometheus y Loki también emiten el `alertname` literal del nombre de la regla, sobrescribiendo una etiqueta con ese nombre. Las etiquetas que puedan venir de la expresión permanecen desconocidas, no vacías. Los archivos bajo `templates/` no se renderizan ni se tratan como emisores de alertas.
+
+### OpsGenie y PagerDuty en Terraform
+
+Las tags literales `clave:valor` de `datadog_monitor` son emisores. Las condiciones de
+tags en `opsgenie_team_routing_rule` y las condiciones
+PCL de orquestaciones PagerDuty, son matchers. La igualdad es `exact`; regex, prefijo y
+contención son `inferred`. Las condiciones y el orden de las reglas se evalúan juntos;
+valores desconocidos u operaciones no leídas no eligen un destino por conjetura.
+
+Las tags de Datadog llegan a OpsGenie. Las etiquetas de reglas llegan a tags sólo mediante
+un receiver OpsGenie seleccionado en Alertmanager que configure `tags` explícitamente.
+Los templates simples de `.CommonLabels.<clave>` o `.GroupLabels.<clave>` usan etiquetas
+fijadas por el `group_by` efectivo. Un receiver PagerDuty v2 puede reenviarlas por
+`details`, que se convierte en `event.custom_details.<clave>`; no hay reenvío implícito
+de tags a PagerDuty. Templates no leídos y reenvíos ausentes no generan links.
+
+`context` muestra el ámbito escrito de la regla, y `trace` conserva el camino hasta el
+bloque de enrutamiento. Un matcher compatible no demuestra entrega ni una notificación
+final a un equipo. En el ejemplo público #638 la regla prueba `service:app`: el mismo
+monitor también emite `support:team-b`, pero no hay allí un matcher para `support`.
+El YAML de monitor no estándar y los valores Helm originales siguen siendo configuración.
+
 ## Infraestructura Azure
 
 Terraform/OpenTofu aprovisionan colas, temas y suscripciones Service Bus, Event Hubs,

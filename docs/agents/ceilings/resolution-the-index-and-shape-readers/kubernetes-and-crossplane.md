@@ -1,5 +1,15 @@
 # Kubernetes and Crossplane
 
+Ingress HTTP summaries (#665) share `OBJECT_REFERENCES_MAX` (64 literal host/prefix rules)
+and `UNIT_STORED_MAX` (4 MiB of borrowed route text before copying, then charged to the unit
+again with its other facts). Passing either leaves only unread host mounts, preventing a
+partial prefix table from choosing a shorter route. Rewrite annotations, unknown/duplicated
+backends, wildcard hosts, nonliteral/controller paths and a `pathType` other than `Prefix`
+produce no route; legacy rules with no `pathType` are accepted. `http/infrastructure.rs`
+charges internal provider forms before path/reason expansion to `ALIAS_BYTES_MAX` (16 MiB per
+query); overflow makes every Ingress mount unread for that query, preserving Service/Compose
+routing. No partial alias table may select a shorter mount.
+
 - `kube.rs` (#651, ADR 0025): `OVERLAY_DEPTH_MAX` (16 kustomizations as bases inside each other;
   past it the entry is unresolved, as a base already on the stack is, `cycle`); `WALK_MAX`
   (50,000 kustomization entries one overlay walks, which bounds bases reaching one another

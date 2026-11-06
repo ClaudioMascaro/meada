@@ -1,5 +1,8 @@
 # HTTP extraction and linking
 
+Infrastructure routing and its shared inference explanation:
+[Services, Compose and Ingress](http-infrastructure-665.md).
+
 `http/ts/clients.rs`: `fetch` consumers (also a call to a parameter defaulting to
   `fetch`; only in a pack whose `globals` has it; each with `Found::shape` from `response_reads`, spec #23: over the frames
   `Code::expand` climbed, the field paths read from the `.json()` of the response in the

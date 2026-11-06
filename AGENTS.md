@@ -32,9 +32,10 @@ write tools; one index per repository; determinism) live in
 - Conventional Commits.
 - Before every local commit: `cargo fmt --check`, `cargo check --locked` and only the focused
   regression tests relevant to the change.
-- GitHub Actions owns the full test suites, all-target Clippy feature matrix (ADR 0012), UI,
-  documentation and deployment checks. CI for the exact PR head must be green before marking
-  the PR ready for review or merging into main.
+- Before handing off integration, also run `cargo clippy --locked --all-targets -- -D warnings`
+  and `scripts/clippy-features` locally. The script reads the feature matrix from CI (ADR 0012).
+- GitHub Actions owns the full test suites, UI, documentation and deployment checks. CI for the
+  exact PR head must be green before marking the PR ready for review or merging into main.
 - Before a change is called done, `/prove-meada` runs on it and the PR body's Evidence section
   names its receipt (`.prove-it/runs/`, kept out of git); a change whose diff reaches a surface of
   the skill's Scope table is not done on a BROKEN verdict.

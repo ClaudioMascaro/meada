@@ -1,19 +1,25 @@
 # Contract kind interface
 
+`contract::workspace_steps` shares phase order between full and answer-sized queries: every
+`workspace_step`, then every `workspace_ready`. The latter prepares views that depend on other
+kinds' completed steps (HTTP routing depends on the image kind's pattern decisions).
+`explain_inferred` also receives the link and visible exports so a kind can reuse its prepared
+evidence for presentation.
+
 - `contract.rs`: `ContractKind` trait, the whole interface of a kind: `prefix`, `extract` and
   `link` are required, every other question (see [New contract kind](../overview/seams-and-what-extends-them.md))
   has a default body. The engine fixes the phase order (every `declare`, every `workspace_step`,
-  `link`, the decisions replay, every `after_links`) and asks the kinds in `KINDS` order; a new
+  every `workspace_ready`, `link`, the decisions replay, every `after_links`) and asks the kinds in `KINDS` order; a new
   kind appends to the list. A side is unresolved when its contract is absent (an unresolved
   consumer) or when `unresolved` says so of the identifier (an unresolved side). The seam's free
   functions (`kind_of`, `unresolved`, `shown`, `typed`, `label`, `parts`, `place`, `serves`,
   `consumer_item`, `link_candidate`, `entry`, `searched`, `explain_inferred`) are what the rest
   of the crate calls. The
-  `explain_inferred` display policy defaults to false and receives the consumer's repository.
-  HTTP enables it only when the recorded `env:` base selects a peer declared by `base_url_env`,
-  using the same `Config::peers_reading` lookup as its links after stripping a proxy endpoint
-  suffix. It changes no links. A kind's helpers are private to its
-  file; the few that stay `pub` are named under their kind (`http::contract`,
+  `explain_inferred` display policy defaults to false and receives the consumer, repository,
+  link and visible exports. HTTP enables it when the recorded `env:` base selects a peer
+  declared by `base_url_env`, or its prepared routing supplies structured infrastructure or
+  workload evidence. Proxy suffixes preserve the peer lookup. It changes no links. A kind's
+  helpers are private to its file; the few that stay `pub` are named under their kind (`http::contract`,
   `normalize_path` and `PARAM` for the config and the documents, both `meada_core::http`'s,
   re-exported; `channel::contract` for
   the documents; the `package` readers the index writer calls). `KINDS`, `Level`, `Link`, `Names`, `Role`. A `Found` carries its `role` (`Provider`,

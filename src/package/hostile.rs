@@ -192,6 +192,10 @@ fn objects(files: Vec<(&str, String)>) -> usize {
                 .iter()
                 .map(crate::iac::environment::Entry::size)
                 .sum::<usize>()
+            + n.ingress
+                .iter()
+                .map(|r| r.host.len() + r.prefix.len() + r.service.len())
+                .sum::<usize>()
     });
     let references = (out.references.iter())
         .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
@@ -202,6 +206,29 @@ fn objects(files: Vec<(&str, String)>) -> usize {
         .chain(images)
         .chain(unresolved)
         .sum()
+}
+
+/// A large shared host must not expand once for every path before its budget is checked.
+fn ingress_fanout() -> usize {
+    let paths = fill(2, |i| {
+        format!(
+            "          - {{path: /p{i}, pathType: Prefix, backend: {{service: {{name: api}}}}}}\n"
+        )
+    });
+    let text = format!(
+        "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata: {{name: api}}\nspec:\n  rules:\n    - host: {}\n      http:\n        paths:\n{paths}",
+        "h".repeat(70_000)
+    );
+    objects(vec![("ingress.yaml", text)])
+}
+
+#[test]
+fn ingress_host_path_fanout_stays_bounded() {
+    let start = Instant::now();
+    let size = ingress_fanout();
+    eprintln!("hostile Ingress: {:?}, {size} bytes", start.elapsed());
+    assert!(start.elapsed() < BUDGET);
+    assert!(size <= MAX_OUT);
 }
 
 /// A kustomization file naming `entries`.
@@ -335,6 +362,62 @@ fn probes() -> Vec<Probe> {
                     &file(text),
                     std::path::Path::new("."),
                     &Default::default(),
+                )
+                .to_string()
+                .len()
+        }),
+        ("alert: many Datadog monitor tags", || {
+            use crate::contract::ContractKind;
+            let tags = fill(1, |i| format!("\"key{i}:team-b\",\n"));
+            let text = file(format!(
+                "resource \"datadog_monitor\" \"wide\" {{\n name = \"Wide\"\n tags = [{tags}]\n}}\n"
+            ));
+            crate::alert::Alert
+                .config_summary(
+                    "monitors.tf",
+                    &text,
+                    std::path::Path::new("."),
+                    &crate::contract::ConfigFacts::default(),
+                )
+                .to_string()
+                .len()
+        }),
+        ("alert: wide OpsGenie criteria", || {
+            use crate::contract::ContractKind;
+            let conditions = fill(1, |i| {
+                format!(
+                    "conditions {{\n field = \"tags\"\n operation = \"equals\"\n expected_value = \"key{i}:team-b\"\n}}\n"
+                )
+            });
+            let text = file(format!(
+                "resource \"opsgenie_team_routing_rule\" \"wide\" {{\n team_id = \"team\"\n criteria {{\n type = \"match-all-conditions\"\n{conditions} }}\n}}\n"
+            ));
+            crate::alert::Alert
+                .config_summary(
+                    "routes.tf",
+                    &text,
+                    std::path::Path::new("."),
+                    &crate::contract::ConfigFacts::default(),
+                )
+                .to_string()
+                .len()
+        }),
+        ("alert: deeply nested PagerDuty condition", || {
+            use crate::contract::ContractKind;
+            let expression = format!(
+                "{}event.custom_details.support matches 'team-b'{}",
+                "(".repeat(MAX_BYTES / 4),
+                ")".repeat(MAX_BYTES / 4)
+            );
+            let text = file(format!(
+                "resource \"pagerduty_event_orchestration_service\" \"wide\" {{\n service = \"wide\"\n set {{\n id = \"start\"\n rule {{\n condition {{ expression = \"{expression}\" }}\n actions {{}}\n }}\n }}\n}}\n"
+            ));
+            crate::alert::Alert
+                .config_summary(
+                    "pagerduty.tf",
+                    &text,
+                    std::path::Path::new("."),
+                    &crate::contract::ConfigFacts::default(),
                 )
                 .to_string()
                 .len()
@@ -1436,6 +1519,7 @@ fn probes() -> Vec<Probe> {
                 objects(vec![("env.yaml", text)])
             },
         ),
+        ("kubernetes: ingress host/path fan-out", ingress_fanout),
         ("kubernetes: services selecting many workloads", || {
             let pair = |i: usize| {
                 format!(
@@ -1656,4 +1740,20 @@ fn every_reader_stays_bounded_on_a_file_built_to_explode() {
 enum Run {
     Started(usize, Instant),
     Ended(usize, Option<usize>, Duration),
+}
+
+#[test]
+fn incident_readers_stay_bounded_on_their_hostile_inputs() {
+    for (name, probe) in probes().into_iter().filter(|(name, _)| {
+        name.starts_with("alert: many Datadog")
+            || name.starts_with("alert: wide OpsGenie")
+            || name.starts_with("alert: deeply nested PagerDuty")
+    }) {
+        let started = Instant::now();
+        let size = probe();
+        let elapsed = started.elapsed();
+        eprintln!("hostile {name}: {elapsed:?}, {size} bytes");
+        assert!(size <= MAX_OUT, "{name}: {size} bytes");
+        assert!(elapsed <= BUDGET, "{name}: {elapsed:?}");
+    }
 }

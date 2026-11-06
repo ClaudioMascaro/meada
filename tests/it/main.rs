@@ -38,6 +38,7 @@ mod github_app;
 mod gopkg;
 mod grammar;
 mod hostile;
+mod http_iac;
 mod iac;
 mod images;
 mod index;

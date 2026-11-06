@@ -89,6 +89,20 @@ Names resolve within the file's module first, then within the modules it imports
 
 ## HTTP and contract documents
 
+Base URLs from configuration or a workload environment can name a Kubernetes Service
+(`orders`, `orders.shop`, `orders.shop.svc` or `orders.shop.svc.cluster.local`, with or
+without a port) or a Compose service. Meada follows the Service selector and the workload's
+image or local code path to the repository serving the route. These links are `inferred`,
+with the Service in the reason. Short names use the known workload's namespace and evaluation
+root; distinct candidates remain `ambiguous`. Environment values come only from indexed
+entries of the workload running that code.
+
+An Ingress joins its host and literal prefix to the Service's route, like a gateway prefix.
+The most specific prefix wins. Rules with a rewrite annotation, an unknown backend or a
+`pathType` other than `Prefix` remain unlinked (older forms without `pathType` are accepted).
+Controller-specific paths, regular expressions and wildcard hosts are not interpreted.
+No cluster is queried.
+
 Meada connects consumers and providers across languages, including behind gateways. A route whose handler is in a test file (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`, a `tests` directory or `src/test`) is no provider unless `meada.toml` sets `test_routes = true` (see [Configuration](configuration.md)):
 
 | Language | HTTP consumers | HTTP providers |
@@ -616,6 +630,28 @@ Grafana rules also come from JSON exports and `rule` blocks of Terraform/OpenTof
 A root route without matchers creates no alert side: there is no key and value for a contract. The graph describes written matchers, without predicting final notifications, inhibition or schedules.
 
 Prometheus and Loki also emit the literal `alertname` from the rule name, overriding a label of that name. Labels that may come from the expression remain unknown, not empty. Files under `templates/` are not rendered or treated as alert emitters.
+
+### OpsGenie and PagerDuty in Terraform
+
+Literal `key:value` tags on `datadog_monitor` are emitters. Tag conditions in
+`opsgenie_team_routing_rule` and PagerDuty
+orchestration PCL conditions, are matchers. Equality is `exact`; regex, prefix and
+containment are `inferred`. Conditions and rule order are evaluated together; unknown
+values or unread operations do not choose a destination by guess.
+
+Datadog tags reach OpsGenie. Rule labels reach tags only through a selected Alertmanager
+OpsGenie receiver that sets `tags` explicitly. Simple `.CommonLabels.<key>` or
+`.GroupLabels.<key>` templates use labels fixed by the effective `group_by`. A PagerDuty
+v2 receiver can forward these labels through `details`, which becomes
+`event.custom_details.<key>`; there is no implicit tag forwarding to PagerDuty. Unread
+templates and missing forwardings create no links.
+
+`context` shows the rule's written scope, and `trace` retains the path to its routing
+block. A compatible matcher does not establish delivery or a final team notification.
+In public example #638 the rule tests `service:app`: the same monitor also emits
+`support:team-b`, but there is no `support` matcher there. The original nonstandard
+monitor YAML and Helm values remain configuration only.
+
 ## Azure contracts and Functions
 
 The Terraform/OpenTofu table reads `azurerm_servicebus_queue`, `azurerm_servicebus_topic`

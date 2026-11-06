@@ -1,4 +1,4 @@
-//! Alert emitters and Alertmanager matchers (#672).
+//! Alert emitters, receiver forwarding and native incident matchers (#672, #673).
 
 use crate::common::{assert_golden, fixture_repo};
 use meada::engine::Engine;
@@ -758,5 +758,962 @@ fn distinct_route_regexes_share_one_automaton_budget() {
             expected,
             "{text}"
         );
+    }
+}
+
+#[test]
+fn public_638_monitor_tags_reach_the_original_service_matcher() {
+    use meada::engine::{Direction, Start};
+    let app = fixture_repo(
+        "alerts_638",
+        "alert-638-app",
+        Some("https://example.com/acme/app.git"),
+    );
+    fixture_repo(
+        "alerts_638",
+        "alert-638-routing",
+        Some("https://example.com/acme/routing.git"),
+    );
+    let monitors = fixture_repo(
+        "alerts_638",
+        "alert-638-monitors",
+        Some("https://example.com/acme/monitors.git"),
+    );
+    let engine = Engine::open(&monitors).unwrap();
+    let text = engine.export().unwrap();
+    let export: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(export["providers"].as_array().unwrap().len(), 2, "{text}");
+    assert!(export["consumers"].as_array().unwrap().is_empty(), "{text}");
+    let routing_text = Engine::open(&monitors.parent().unwrap().join("alert-638-routing"))
+        .unwrap()
+        .export()
+        .unwrap();
+    let routing: serde_json::Value = serde_json::from_str(&routing_text).unwrap();
+    assert_eq!(
+        routing["consumers"].as_array().unwrap().len(),
+        1,
+        "{routing_text}"
+    );
+    let links = export["links"].as_array().unwrap();
+    assert_eq!(links.len(), 1, "{text}");
+    assert_eq!(links[0]["contract"], "alert::service::app");
+    assert_eq!(links[0]["level"], "inferred");
+    assert_eq!(
+        links[0]["provider"],
+        "example.com/acme/monitors::main.tf::datadog_monitor.app"
+    );
+    assert_eq!(
+        links[0]["consumer"],
+        "example.com/acme/routing::teams/platform/routing-rules.tf::opsgenie_team_routing_rule.app"
+    );
+    assert_golden("alerts.638.export.json", &text);
+    let support = engine.context("alert::support::team-b", None).unwrap();
+    assert_golden("alerts.638.support.context.txt", &support);
+    let trace = engine
+        .trace(Start::From("alert::support::team-b"), Direction::Down, None)
+        .unwrap();
+    assert!(
+        trace.contains("alert::service::app") && trace.contains("opsgenie_team_routing_rule.app"),
+        "{trace}"
+    );
+    assert_golden("alerts.638.trace.txt", &trace);
+    let app_text = Engine::open(&app).unwrap().export().unwrap();
+    let app_export: serde_json::Value = serde_json::from_str(&app_text).unwrap();
+    assert!(
+        app_export["providers"].as_array().unwrap().is_empty(),
+        "{app_text}"
+    );
+}
+
+#[test]
+fn selected_receivers_transform_grouped_labels_into_explicit_incident_fields() {
+    let repo = fixture_repo(
+        "alerts_forwarding",
+        "alert-forwarding",
+        Some("https://example.com/acme/forwarding.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+    let text = engine.export().unwrap();
+    let export: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(export["providers"].as_array().unwrap().len(), 6, "{text}");
+    assert_eq!(export["consumers"].as_array().unwrap().len(), 3, "{text}");
+    let actual = export["links"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|l| {
+            (
+                l["contract"].as_str().unwrap(),
+                l["level"].as_str().unwrap(),
+                l["provider"].as_str().unwrap(),
+                l["consumer"].as_str().unwrap(),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        actual,
+        [
+            (
+                "alert::support::team-b",
+                "exact",
+                "example.com/acme/forwarding::rules.yaml::groups[0].rules[0]",
+                "example.com/acme/forwarding::alertmanager.yaml::route.routes[0]"
+            ),
+            (
+                "alert::target::team-c",
+                "exact",
+                "example.com/acme/forwarding::rules.yaml::groups[0].rules[0]",
+                "example.com/acme/forwarding::main.tf::opsgenie_team_routing_rule.transformed"
+            ),
+            (
+                "alert::support::team-b",
+                "exact",
+                "example.com/acme/forwarding::rules.yaml::groups[0].rules[0]",
+                "example.com/acme/forwarding::main.tf::pagerduty_event_orchestration_service.checkout.set[0].rule[0]"
+            ),
+        ],
+        "{text}"
+    );
+    assert_golden("alerts.forwarding.export.json", &text);
+    let transformed = engine.context("alert::target::team-c", None).unwrap();
+    assert!(
+        transformed.contains("emitter rules.yaml:4 groups[0].rules[0]"),
+        "{transformed}"
+    );
+    assert_golden("alerts.forwarding.target.context.txt", &transformed);
+    let context = engine
+        .context(
+            "pagerduty_event_orchestration_service.checkout.set[0].rule[0]",
+            None,
+        )
+        .unwrap();
+    assert!(context.contains("receiver: checkout-id"), "{context}");
+    assert_golden("alerts.forwarding.context.txt", &context);
+    use meada::engine::{Direction, Start};
+    let trace = engine
+        .trace(
+            Start::From("rules.yaml::groups[0].rules[0]"),
+            Direction::Down,
+            None,
+        )
+        .unwrap();
+    assert!(
+        trace.contains("forwarding:")
+            && trace.contains("opsgenie_team_routing_rule.transformed")
+            && trace.contains("pagerduty_event_orchestration_service.checkout"),
+        "{trace}"
+    );
+    assert_golden("alerts.forwarding.trace.txt", &trace);
+}
+
+#[test]
+fn incident_receiver_filters_templates_grouping_and_team_scope_never_invent_forwarding() {
+    let repo = fixture_repo(
+        "alerts_receiver_controls",
+        "alert-forwarding",
+        Some("https://example.com/acme/forwarding.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+    let original = std::fs::read_to_string(repo.join("alertmanager.yaml")).unwrap();
+    let rows = |text: String| {
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        v["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|l| {
+                (
+                    l["contract"].as_str().unwrap().to_string(),
+                    l["consumer"].as_str().unwrap().to_string(),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    let am = (
+        "alert::support::team-b".to_string(),
+        "example.com/acme/forwarding::alertmanager.yaml::route.routes[0]".to_string(),
+    );
+    let og = (
+        "alert::target::team-c".to_string(),
+        "example.com/acme/forwarding::main.tf::opsgenie_team_routing_rule.transformed".to_string(),
+    );
+    let pd = ("alert::support::team-b".to_string(), "example.com/acme/forwarding::main.tf::pagerduty_event_orchestration_service.checkout.set[0].rule[0]".to_string());
+    assert_eq!(
+        rows(engine.export().unwrap()),
+        [am.clone(), og.clone(), pd.clone()]
+    );
+    for (source, expected) in [
+        (
+            original.replace("match: {support: team-b}", "match: {support: team-z}"),
+            Vec::new(),
+        ),
+        (
+            original.replace(
+                "    opsgenie_configs:\n      - tags: 'target:{{ .CommonLabels.owner }}'\n",
+                "",
+            ),
+            vec![am.clone(), pd.clone()],
+        ),
+        (
+            original.replace(".CommonLabels.owner", ".Labels.owner"),
+            vec![am.clone(), pd.clone()],
+        ),
+        (
+            original.replace(".CommonLabels.owner", ".CommonLabels.absent"),
+            vec![am.clone(), pd.clone()],
+        ),
+        (
+            original.replace("[support, owner]", "[support]"),
+            vec![am.clone(), pd.clone()],
+        ),
+        (original.replace("[support, owner]", "[]"), vec![am.clone()]),
+        (
+            original.replace(
+                "      - tags:",
+                "      - responders: [{type: team, id: another-team-id}]\n        tags:",
+            ),
+            vec![am.clone(), pd.clone()],
+        ),
+        (
+            original.replace("routing_key:", "service_key:"),
+            vec![am.clone(), og.clone()],
+        ),
+    ] {
+        std::fs::write(repo.join("alertmanager.yaml"), &source).unwrap();
+        assert_eq!(rows(engine.export().unwrap()), expected, "{source}");
+    }
+    let scoped = original.replace(
+        "      - tags:",
+        "      - responders: [{type: team, id: team-c-id}]\n        tags:",
+    );
+    std::fs::write(repo.join("alertmanager.yaml"), scoped).unwrap();
+    assert_eq!(
+        rows(engine.export().unwrap()),
+        [am.clone(), og.clone(), pd.clone()]
+    );
+    std::fs::write(repo.join(".meadaignore"), "main.tf\n").unwrap();
+    assert_eq!(
+        rows(engine.export().unwrap()).as_slice(),
+        std::slice::from_ref(&am)
+    );
+    std::fs::remove_file(repo.join(".meadaignore")).unwrap();
+    std::fs::write(repo.join("alertmanager.yaml"), &original).unwrap();
+    assert_eq!(
+        rows(engine.export().unwrap()),
+        [am.clone(), og.clone(), pd.clone()]
+    );
+    let native = std::fs::read_to_string(repo.join("main.tf")).unwrap();
+    for scope in [
+        "var.team_id",
+        "var.team.id",
+        "{ reference = \"team-c-id\" }",
+    ] {
+        std::fs::write(repo.join("main.tf"), native.replace("\"team-c-id\"", scope)).unwrap();
+        assert_eq!(rows(engine.export().unwrap()), [am.clone(), pd.clone()]);
+    }
+    for scope in ["var.service.id", "{ reference = \"checkout-id\" }"] {
+        std::fs::write(
+            repo.join("main.tf"),
+            native.replace("\"checkout-id\"", scope),
+        )
+        .unwrap();
+        assert_eq!(rows(engine.export().unwrap()), [am.clone(), og.clone()]);
+    }
+    let references = native
+        .replace("\"team-c-id\"", "opsgenie_team.delivery.id")
+        .replace("\"checkout-id\"", "pagerduty_service.checkout.id");
+    std::fs::write(repo.join("main.tf"), references).unwrap();
+    assert_eq!(
+        rows(engine.export().unwrap()),
+        [am.clone(), og.clone(), pd.clone()]
+    );
+    let conjunction = native.replace("    conditions {", "    conditions {\n      field = \"tags\"\n      operation = \"equals\"\n      expected_value = \"urgent\"\n    }\n    conditions {");
+    std::fs::write(repo.join("main.tf"), conjunction).unwrap();
+    std::fs::write(
+        repo.join("alertmanager.yaml"),
+        original.replace("tags: 'target:", "tags: 'urgent,target:"),
+    )
+    .unwrap();
+    let plain = ("alert::tags::urgent".to_string(), og.1.clone());
+    assert_eq!(
+        rows(engine.export().unwrap()),
+        [am.clone(), plain, og.clone(), pd.clone()]
+    );
+    std::fs::write(repo.join("alertmanager.yaml"), &original).unwrap();
+    assert_eq!(rows(engine.export().unwrap()), [am.clone(), pd.clone()]);
+    std::fs::write(repo.join("main.tf"), &native).unwrap();
+    assert_eq!(rows(engine.export().unwrap()), [am, og, pd]);
+}
+
+#[test]
+fn native_opsgenie_conditions_test_complete_tags_at_their_written_levels() {
+    let repo = fixture_repo(
+        "alerts_ops_conditions",
+        "alert-forwarding",
+        Some("https://example.com/acme/ops.git"),
+    );
+    for path in ["rules.yaml", "alertmanager.yaml", "main.tf"] {
+        std::fs::remove_file(repo.join(path)).unwrap();
+    }
+    std::fs::write(
+        repo.join("monitors.tf"),
+        r#"resource "datadog_monitor" "literal" {
+  name = "Literal"
+  tags = ["support:team-b", "region:eu", "urgent"]
+}
+resource "datadog_monitor" "lookalike" {
+  name = "Lookalike"
+  tags = ["support:otherteam-b"]
+}
+resource "datadog_monitor" "unknown" {
+  name = "Unknown"
+  tags = ["support:team-b", var.dynamic_tag]
+}
+"#,
+    )
+    .unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    for (operation, expected, contract, level, names) in [
+        (
+            "equals",
+            "urgent",
+            "alert::tags::urgent",
+            "exact",
+            vec!["literal"],
+        ),
+        (
+            "equals",
+            "support:team-b",
+            "alert::support::team-b",
+            "exact",
+            vec!["literal", "unknown"],
+        ),
+        (
+            "matches",
+            "support:team-.*",
+            "alert::support::team-.*",
+            "inferred",
+            vec!["literal", "unknown"],
+        ),
+        (
+            "matches",
+            ".upport:team-b",
+            "alert::.upport::team-b",
+            "inferred",
+            vec!["literal", "unknown"],
+        ),
+        (
+            "contains",
+            "port:team-b",
+            "alert::port::team-b",
+            "inferred",
+            vec!["literal", "unknown"],
+        ),
+        (
+            "starts-with",
+            "support:team-",
+            "alert::support::team-",
+            "inferred",
+            vec!["literal", "unknown"],
+        ),
+        (
+            "contains",
+            "support:team-b",
+            "alert::support::team-b",
+            "inferred",
+            vec!["literal", "unknown"],
+        ),
+        (
+            "contains",
+            "team-b",
+            "alert::tags::team-b",
+            "inferred",
+            vec!["literal", "lookalike", "unknown"],
+        ),
+        (
+            "ends-with",
+            "team-b",
+            "alert::tags::team-b",
+            "inferred",
+            vec!["literal", "lookalike", "unknown"],
+        ),
+    ] {
+        let source = format!(
+            "resource \"opsgenie_team_routing_rule\" \"test\" {{\n team_id = \"team\"\n criteria {{\n type = \"match-all-conditions\"\n conditions {{\n field = \"tags\"\n operation = \"{operation}\"\n expected_value = \"{expected}\"\n }}\n }}\n notify {{ type = \"none\" }}\n}}\n"
+        );
+        std::fs::write(repo.join("route.tf"), source).unwrap();
+        let text = engine.export().unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let actual = v["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|l| {
+                (
+                    l["contract"].as_str().unwrap(),
+                    l["level"].as_str().unwrap(),
+                    l["provider"].as_str().unwrap().rsplit('.').next().unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let expected = names
+            .into_iter()
+            .map(|name| (contract, level, name))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "{operation}: {text}");
+        assert!(
+            v["links"].as_array().unwrap().iter().all(|l| l["consumer"]
+                == "example.com/acme/ops::route.tf::opsgenie_team_routing_rule.test"),
+            "{text}"
+        );
+    }
+    let condition = |field: &str, operation: &str, value: &str| {
+        format!(
+            "conditions {{\n field = \"{field}\"\n operation = \"{operation}\"\n expected_value = {}\n}}\n",
+            serde_json::to_string(value).unwrap()
+        )
+    };
+    for extra in [
+        condition("tags", "matches", "["),
+        condition("priority", "equals", "P1"),
+        condition("tags", "contains-key", "support:team-b"),
+    ] {
+        let source = format!(
+            "resource \"opsgenie_team_routing_rule\" \"test\" {{\n team_id = \"team\"\n criteria {{\n type = \"match-all-conditions\"\n {}{extra}\n }}\n notify {{ type = \"none\" }}\n}}\n",
+            condition("tags", "equals", "support:team-b")
+        );
+        std::fs::write(repo.join("route.tf"), source).unwrap();
+        let text = engine.export().unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert!(v["links"].as_array().unwrap().is_empty(), "{text}");
+    }
+}
+
+#[test]
+fn pagerduty_conditions_keep_native_field_paths_boolean_groups_and_first_match_order() {
+    let repo = fixture_repo(
+        "alerts_pd_conditions",
+        "alert-forwarding",
+        Some("https://example.com/acme/pd.git"),
+    );
+    let receiver = std::fs::read_to_string(repo.join("alertmanager.yaml")).unwrap();
+    std::fs::write(
+        repo.join("alertmanager.yaml"),
+        receiver.replace(
+            "          support:",
+            "          owner: '{{ .CommonLabels.owner }}'\n          support:",
+        ),
+    )
+    .unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    for (expression, expected) in [
+        (
+            "event.custom_details.support matches 'team-b'",
+            vec![("alert::support::team-b", "exact")],
+        ),
+        (
+            "event.custom_details.owner matches regex 'team-.*'",
+            vec![("alert::owner::team-.*", "inferred")],
+        ),
+        (
+            "event.custom_details.owner matches part 'am-'",
+            vec![("alert::owner::am-", "inferred")],
+        ),
+        (
+            "event.custom_details.support matches 'team-b' and (event.custom_details.owner matches regex 'team-.*' or event.custom_details.absent matches 'x')",
+            vec![
+                ("alert::owner::team-.*", "inferred"),
+                ("alert::support::team-b", "exact"),
+            ],
+        ),
+        (
+            "event.custom_details.support matches 'team-a' or event.custom_details.owner matches 'team-c'",
+            vec![("alert::owner::team-c", "exact")],
+        ),
+        (
+            "not event.custom_details.owner matches 'team-z'",
+            vec![("alert::owner::team-z", "exact")],
+        ),
+        (
+            "not (event.custom_details.support matches 'team-a' or event.custom_details.owner matches 'team-z')",
+            vec![
+                ("alert::owner::team-z", "exact"),
+                ("alert::support::team-a", "exact"),
+            ],
+        ),
+        ("not event.custom_details.absent matches 'team-b'", vec![]),
+        ("event.severity matches 'team-b'", vec![]),
+        ("event.custom_details.tags matches 'support:team-b'", vec![]),
+        (
+            "event.custom_details.owner matches regex '(?P<a.b>team-c)'",
+            vec![],
+        ),
+        (
+            "event.custom_details.support matches 'team-b' and unknown()",
+            vec![],
+        ),
+    ] {
+        let source = format!(
+            "resource \"pagerduty_event_orchestration_service\" \"test\" {{\n service = \"pd-test\"\n set {{\n id = \"start\"\n rule {{\n condition {{ expression = {} }}\n actions {{}}\n }}\n }}\n catch_all {{\n actions {{}}\n }}\n}}\n",
+            serde_json::to_string(expression).unwrap()
+        );
+        std::fs::write(repo.join("main.tf"), source).unwrap();
+        let text = engine.export().unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let actual = v["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|l| {
+                (
+                    l["contract"].as_str().unwrap(),
+                    l["level"].as_str().unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let mut all = vec![("alert::support::team-b", "exact")];
+        all.extend(expected);
+        assert_eq!(actual, all, "{expression}: {text}");
+    }
+    let source = r#"resource "pagerduty_event_orchestration_service" "test" {
+  service = "pd-test"
+  set {
+    id = "start"
+    rule {
+      condition { expression = "event.custom_details.support matches 'team-b'" }
+      actions { route_to = "next" }
+    }
+  }
+  set {
+    id = "next"
+    rule {
+      condition { expression = "event.custom_details.owner matches 'team-c'" }
+      actions {}
+    }
+    rule {
+      condition { expression = "event.custom_details.support matches 'team-b'" }
+      actions {}
+    }
+  }
+  catch_all {
+    actions {}
+  }
+}
+
+"#;
+    std::fs::write(repo.join("main.tf"), source).unwrap();
+    let text = engine.export().unwrap();
+    let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(v["links"].as_array().unwrap().len(), 3, "{text}");
+    assert!(
+        v["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|l| !l["consumer"].as_str().unwrap().ends_with("set[1].rule[1]")),
+        "{text}"
+    );
+    let unknown_first = source.replace(
+        "event.custom_details.owner matches 'team-c'",
+        "event.custom_details.absent matches 'team-c'",
+    );
+    std::fs::write(repo.join("main.tf"), unknown_first).unwrap();
+    let text = engine.export().unwrap();
+    let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(v["links"].as_array().unwrap().len(), 2, "{text}");
+    assert!(
+        v["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|l| !l["consumer"].as_str().unwrap().contains("set[1]")),
+        "{text}"
+    );
+}
+
+#[test]
+fn opsgenie_native_order_and_three_valued_conjunctions_cross_files_in_one_scope() {
+    let repo = fixture_repo(
+        "alerts_og_order",
+        "alert-forwarding",
+        Some("https://example.com/acme/order.git"),
+    );
+    for path in ["rules.yaml", "alertmanager.yaml", "main.tf"] {
+        std::fs::remove_file(repo.join(path)).unwrap();
+    }
+    std::fs::write(
+        repo.join("monitors.tf"),
+        r#"resource "datadog_monitor" "known" {
+ name = "Known"
+ tags = ["support:team-b", "region:eu"]
+}
+resource "datadog_monitor" "unknown" {
+ name = "Unknown"
+ tags = ["support:team-b", var.tag]
+}
+"#,
+    )
+    .unwrap();
+    let condition = |field: &str, op: &str, value: &str| {
+        format!(
+            "conditions {{\n field = {field:?}\n operation = {op:?}\n expected_value = {value:?}\n}}\n"
+        )
+    };
+    let route = |name: &str, order: &str, mode: &str, conditions: String| {
+        format!(
+            "resource \"opsgenie_team_routing_rule\" {name:?} {{\n team_id = \"team\"\n {order}\n criteria {{\n type = {mode:?}\n {conditions}\n }}\n notify {{ type = \"none\" }}\n}}\n"
+        )
+    };
+    let second = route(
+        "second",
+        "order = 1",
+        "match-all-conditions",
+        condition("tags", "equals", "support:team-b"),
+    );
+    std::fs::write(repo.join("b.tf"), &second).unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    for (mode, first, expected) in [
+        (
+            "match-all-conditions",
+            condition("tags", "equals", "support:team-a"),
+            vec![("known", "second", "alert::support::team-b", "exact")],
+        ),
+        (
+            "match-all-conditions",
+            condition("tags", "equals", "support:team-a") + &condition("priority", "equals", "P1"),
+            vec![("known", "second", "alert::support::team-b", "exact")],
+        ),
+        (
+            "match-any-condition",
+            condition("tags", "equals", "support:team-b") + &condition("priority", "equals", "P1"),
+            vec![
+                ("known", "first", "alert::support::team-b", "exact"),
+                ("unknown", "first", "alert::support::team-b", "exact"),
+            ],
+        ),
+        (
+            "match-all-conditions",
+            condition("tags", "equals", "support:team-b")
+                + &condition("tags", "matches", "region:e.*"),
+            vec![
+                ("known", "first", "alert::region::e.*", "inferred"),
+                ("known", "first", "alert::support::team-b", "exact"),
+            ],
+        ),
+    ] {
+        std::fs::write(repo.join("a.tf"), route("first", "order = 0", mode, first)).unwrap();
+        let text = engine.export().unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let rows = v["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|l| {
+                (
+                    l["provider"].as_str().unwrap().rsplit('.').next().unwrap(),
+                    l["consumer"].as_str().unwrap().rsplit('.').next().unwrap(),
+                    l["contract"].as_str().unwrap(),
+                    l["level"].as_str().unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(rows, expected, "{text}");
+    }
+    for order in ["", "order = 1"] {
+        std::fs::write(
+            repo.join("a.tf"),
+            route(
+                "first",
+                order,
+                "match-all-conditions",
+                condition("tags", "equals", "support:team-b"),
+            ),
+        )
+        .unwrap();
+        let text = engine.export().unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert!(v["links"].as_array().unwrap().is_empty(), "{text}");
+    }
+}
+
+#[test]
+fn incident_json_block_forms_keep_native_spans_and_opentofu_shadowing() {
+    let repo = fixture_repo(
+        "alerts_incident_json",
+        "alert-forwarding",
+        Some("https://example.com/acme/json.git"),
+    );
+    std::fs::remove_file(repo.join("main.tf")).unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    for arrays in [false, true] {
+        let block = |v: serde_json::Value| if arrays { serde_json::json!([v]) } else { v };
+        let monitor = serde_json::json!({"name":"JSON monitor", "tags":["target:team-c"]});
+        let og = serde_json::json!({"team_id":"team-c-id", "criteria":block(serde_json::json!({"type":"match-all-conditions", "conditions":block(serde_json::json!({"field":"tags", "operation":"equals", "expected_value":"target:team-c"}))})), "notify":block(serde_json::json!({"type":"none"}))});
+        let pd = serde_json::json!({"service":"checkout-id", "set":block(serde_json::json!({"id":"start", "rule":block(serde_json::json!({"condition":block(serde_json::json!({"expression":"event.custom_details.support matches 'team-b'"})), "actions":block(serde_json::json!({}))}))})), "catch_all":block(serde_json::json!({"actions":block(serde_json::json!({}))}))});
+        let document = serde_json::json!({"resource":block(serde_json::json!({"datadog_monitor":block(serde_json::json!({"json":block(monitor)})), "opsgenie_team_routing_rule":block(serde_json::json!({"json":block(og)})), "pagerduty_event_orchestration_service":block(serde_json::json!({"json":block(pd)}))}))});
+        let source = serde_json::to_string_pretty(&document).unwrap();
+        std::fs::write(repo.join("native.tf.json"), &source).unwrap();
+        let text = engine.export().unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let rows = v["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|l| {
+                (
+                    l["contract"].as_str().unwrap(),
+                    l["level"].as_str().unwrap(),
+                    l["provider"].as_str().unwrap(),
+                    l["consumer"].as_str().unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            rows,
+            [
+                (
+                    "alert::support::team-b",
+                    "exact",
+                    "example.com/acme/json::rules.yaml::groups[0].rules[0]",
+                    "example.com/acme/json::alertmanager.yaml::route.routes[0]"
+                ),
+                (
+                    "alert::target::team-c",
+                    "exact",
+                    "example.com/acme/json::native.tf.json::datadog_monitor.json",
+                    "example.com/acme/json::native.tf.json::opsgenie_team_routing_rule.json"
+                ),
+                (
+                    "alert::target::team-c",
+                    "exact",
+                    "example.com/acme/json::rules.yaml::groups[0].rules[0]",
+                    "example.com/acme/json::native.tf.json::opsgenie_team_routing_rule.json"
+                ),
+                (
+                    "alert::support::team-b",
+                    "exact",
+                    "example.com/acme/json::rules.yaml::groups[0].rules[0]",
+                    "example.com/acme/json::native.tf.json::pagerduty_event_orchestration_service.json.set[0].rule[0]"
+                ),
+            ],
+            "{text}"
+        );
+        let rule = v["iac_nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|n| n["address"] == "pagerduty_event_orchestration_service.json.set[0].rule[0]")
+            .unwrap();
+        let line = source
+            .lines()
+            .position(|l| l.contains("\"expression\""))
+            .unwrap()
+            + 1;
+        assert_eq!(rule["line"], line, "{text}");
+        assert_eq!(rule["path"], "native.tf.json");
+        std::fs::write(
+            repo.join("native.tofu.json"),
+            source.replace("target:team-c", "target:other"),
+        )
+        .unwrap();
+        let text = engine.export().unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(v["links"].as_array().unwrap().len(), 3, "{text}");
+        assert!(
+            v["links"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|l| !l["consumer"].as_str().unwrap().contains("native.tf.json")),
+            "{text}"
+        );
+        std::fs::remove_file(repo.join("native.tofu.json")).unwrap();
+    }
+}
+
+#[test]
+fn dynamic_opsgenie_conjunctions_are_unknown_and_true_disjunctions_remain_proven() {
+    let repo = fixture_repo(
+        "alerts_dynamic_criteria",
+        "alert-forwarding",
+        Some("https://example.com/acme/dynamic.git"),
+    );
+    for path in ["rules.yaml", "alertmanager.yaml", "main.tf"] {
+        std::fs::remove_file(repo.join(path)).unwrap();
+    }
+    let source = r#"resource "datadog_monitor" "cedar" {
+  name = "Neutral dynamic-criteria control"
+  type = "query alert"
+  query = "sum(last_5m):sum:neutral.metric{*} > 1"
+  message = "Neutral"
+  tags = ["support:squad-elm"]
+}
+resource "opsgenie_team_routing_rule" "guarded" {
+  team_id = "team-elm-id"
+  criteria {
+    type = "match-all-conditions"
+    conditions {
+      field = "tags"
+      operation = "equals"
+      expected_value = "support:squad-elm"
+    }
+    dynamic "conditions" {
+      for_each = [1]
+      content {
+        field = "tags"
+        operation = "equals"
+        expected_value = "gate:closed"
+      }
+    }
+  }
+  notify { type = "none" }
+}
+"#;
+    let engine = Engine::open(&repo).unwrap();
+    for (source, matches) in [
+        (source.to_string(), false),
+        (
+            source.replace("match-all-conditions", "match-any-condition"),
+            true,
+        ),
+    ] {
+        std::fs::write(repo.join("main.tf"), source).unwrap();
+        let text = engine.export().unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(v["providers"].as_array().unwrap().len(), 1, "{text}");
+        assert_eq!(v["consumers"].as_array().unwrap().len(), 1, "{text}");
+        let actual = v["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|l| {
+                (
+                    l["contract"].as_str().unwrap(),
+                    l["level"].as_str().unwrap(),
+                    l["provider"].as_str().unwrap(),
+                    l["consumer"].as_str().unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let expected = if matches {
+            vec![(
+                "alert::support::squad-elm",
+                "exact",
+                "example.com/acme/dynamic::main.tf::datadog_monitor.cedar",
+                "example.com/acme/dynamic::main.tf::opsgenie_team_routing_rule.guarded",
+            )]
+        } else {
+            Vec::new()
+        };
+        assert_eq!(actual, expected, "{text}");
+    }
+}
+
+#[test]
+fn unexpanded_opsgenie_rules_preserve_order_without_projecting_a_phantom_base() {
+    let repo = fixture_repo(
+        "alerts_order_barriers",
+        "alert-forwarding",
+        Some("https://example.com/acme/barriers.git"),
+    );
+    for path in ["rules.yaml", "alertmanager.yaml", "main.tf"] {
+        std::fs::remove_file(repo.join(path)).unwrap();
+    }
+    std::fs::write(
+        repo.join("monitors.tf"),
+        r#"resource "datadog_monitor" "source" {
+ name = "Order control"
+ tags = ["support:squad-ash"]
+}
+"#,
+    )
+    .unwrap();
+    let criteria = "criteria {\n type = \"match-all-conditions\"\n conditions {\n field = \"tags\"\n operation = \"equals\"\n expected_value = \"support:squad-ash\"\n }\n}\n";
+    let route = |name: &str, meta: &str, team: &str, order: usize, criteria: &str| {
+        format!(
+            "resource \"opsgenie_team_routing_rule\" {name:?} {{\n {meta}\n team_id = {team}\n order = {order}\n {criteria}\n notify {{ type = \"none\" }}\n}}\n"
+        )
+    };
+    std::fs::write(
+        repo.join("second.tf"),
+        route("second", "", "\"team-ash-id\"", 1, criteria),
+    )
+    .unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    for (meta, team, first_criteria, projected, expected_name) in [
+        ("count = 1", "\"team-ash-id\"", criteria, false, None),
+        (
+            "for_each = {neutral = 1}",
+            "\"team-ash-id\"",
+            criteria,
+            false,
+            None,
+        ),
+        ("", "\"team-ash-id\"", "", false, None),
+        ("", "var.team.id", criteria, true, None),
+        (
+            "count = 1",
+            "\"another-team-id\"",
+            criteria,
+            false,
+            Some("second"),
+        ),
+        ("", "\"team-ash-id\"", criteria, true, Some("first")),
+    ] {
+        std::fs::write(
+            repo.join("first.tf"),
+            route("first", meta, team, 0, first_criteria),
+        )
+        .unwrap();
+        let text = engine.export().unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let first = "example.com/acme/barriers::first.tf::opsgenie_team_routing_rule.first";
+        assert_eq!(
+            v["consumers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|c| c["site"] == first),
+            projected,
+            "{text}"
+        );
+        assert!(
+            !v["iac_nodes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|n| n["identity"] == first
+                    && n["type"] == "OpsgenieRoutingRule"
+                    && !projected),
+            "{text}"
+        );
+        let actual = v["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|l| {
+                (
+                    l["contract"].as_str().unwrap(),
+                    l["level"].as_str().unwrap(),
+                    l["provider"].as_str().unwrap(),
+                    l["consumer"].as_str().unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let site = expected_name.map(|name| {
+            format!("example.com/acme/barriers::{name}.tf::opsgenie_team_routing_rule.{name}")
+        });
+        let expected = site
+            .as_deref()
+            .map(|site| {
+                vec![(
+                    "alert::support::squad-ash",
+                    "exact",
+                    "example.com/acme/barriers::monitors.tf::datadog_monitor.source",
+                    site,
+                )]
+            })
+            .unwrap_or_default();
+        assert_eq!(actual, expected, "{meta}: {text}");
     }
 }

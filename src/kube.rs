@@ -33,6 +33,7 @@ use crate::msg::Msg;
 
 mod crossplane;
 mod environment;
+mod routing;
 
 /// How deep kustomizations name each other as bases; a base deeper is not followed and is
 /// counted as unresolved.
@@ -137,6 +138,7 @@ struct Facts {
     account: Option<String>,
     /// An Ingress's backend Services: name as written and the rule that names it.
     backends: Vec<(String, String)>,
+    ingress: Vec<crate::iac::Ingress>,
     /// Its containers' images: container name and image.
     images: Vec<(String, String)>,
     /// What it offers Crossplane's roles and references (#655).
@@ -328,6 +330,9 @@ fn facts(value: &Value, kind: &str, group: &str) -> Facts {
         facts.selector = strings(at(value, &["spec", "selector"]));
     }
     if kind == "Ingress" {
+        if matches!(group, "networking.k8s.io" | "extensions") {
+            facts.ingress = routing::read(value);
+        }
         let service = |backend: &Value| {
             text(backend, &["service", "name"])
                 .or_else(|| text(backend, &["serviceName"]))
@@ -705,17 +710,58 @@ impl<'m> Eval<'m> {
         // Reject duplicate config targets before address deduplication can conceal them.
         environment::transform(&mut objs, "", "", None);
         objs.sort_by_cached_key(Obj::address);
+        let duplicate_services = objs
+            .windows(2)
+            .filter(|pair| {
+                pair[0].kind == "Service"
+                    && pair[0].group.is_empty()
+                    && pair[0].address() == pair[1].address()
+            })
+            .map(|pair| pair[0].address())
+            .collect::<HashSet<_>>();
         objs.dedup_by_key(|o| o.address());
         let addresses: Vec<String> = objs.iter().map(Obj::address).collect();
+        let mut service_names = HashMap::<_, Vec<_>>::new();
+        for (object, address) in objs.iter().zip(&addresses) {
+            if object.kind == "Service"
+                && object.group.is_empty()
+                && !duplicate_services.contains(address)
+            {
+                service_names
+                    .entry((object.ns.as_deref(), object.orig.as_str()))
+                    .or_default()
+                    .push(address.as_str());
+            }
+        }
         let roles: Vec<Option<crossplane::Role>> =
             objs.iter().map(|o| self.kinds.role(o)).collect();
         let configs = environment::configs(&objs);
         let mut kept = 0;
         for (o, address) in objs.iter().zip(&addresses) {
             let environment = environment::resolve(o, &configs);
+            // Resolve before copying strings: an unknown or duplicated backend is no route.
+            let ingress = o
+                .facts
+                .ingress
+                .iter()
+                .map(|route| {
+                    let targets = service_names.get(&(o.ns.as_deref(), route.service.as_str()));
+                    (
+                        route,
+                        match targets.map(Vec::as_slice) {
+                            Some([service]) => *service,
+                            _ => "",
+                        },
+                    )
+                })
+                .collect::<Vec<_>>();
             if !self.charge(
                 address.len()
                     + o.path.len()
+                    + ingress
+                        .iter()
+                        .map(|(r, s)| r.host.len() + r.prefix.len() + s.len())
+                        .sum::<usize>()
                     + environment
                         .iter()
                         .map(crate::iac::environment::Entry::size)
@@ -752,7 +798,14 @@ impl<'m> Eval<'m> {
                 environment,
                 images: Vec::new(),
                 provisioned: None,
-                ingress: Vec::new(),
+                ingress: ingress
+                    .into_iter()
+                    .map(|(route, service)| crate::iac::Ingress {
+                        host: route.host.clone(),
+                        prefix: route.prefix.clone(),
+                        service: service.into(),
+                    })
+                    .collect(),
             });
         }
         let (objs, addresses, roles) = (&objs[..kept], &addresses[..kept], &roles[..kept]);
@@ -830,7 +883,9 @@ impl<'m> Eval<'m> {
                     .copied()
                     .collect::<Vec<_>>()
             };
-            if let Some((k, v)) = o.facts.selector.iter().next() {
+            if !duplicate_services.contains(&addresses[i])
+                && let Some((k, v)) = o.facts.selector.iter().next()
+            {
                 let selector = (o.facts.selector.iter())
                     .map(|(k, v)| format!("{k}={v}"))
                     .collect::<Vec<_>>()

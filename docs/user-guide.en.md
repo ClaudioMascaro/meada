@@ -1158,7 +1158,7 @@ How the link is chosen, depending on what the URL shows:
 1. **Host.** The URL has a host (`https://api.example.com/orders`) that some repository lists in
    `[serve] hosts`. The link is `exact`. If no repository serves that host, there is no link.
 2. **Environment variable.** The URL starts with an environment read (`API_URL`) that a peer
-   declares in `base_url_env`. The link is `inferred`, and Meada never reads the variable's value.
+   declares in `base_url_env`. The link is `inferred`; the process environment value is never read.
 3. **Unknown host.** The URL does not say which host it targets (a relative path, for example)
    and only one repository in the workspace serves that method and that path. The link is
    `inferred`, with the reason `the only repository serving it is`.
@@ -1180,6 +1180,22 @@ Why a link may be missing:
   consumer side, a hole in the middle of the URL becomes a `{}` parameter and still links.)
 - The framework or the client is not on the language's list (section 9).
 - The repository that serves the route is not among the peers, and the workspace does not have it.
+
+A literal base URL from configuration or a workload entry can also name a Kubernetes Service:
+`http://orders:8080`, `orders.shop`, `orders.shop.svc` or `orders.shop.svc.cluster.local`,
+with or without a port in every form. Meada follows the selector, the selected workload and its
+image to the repository serving the route. Compose names follow the service and its image or
+local build context. The link is `inferred`, naming the Service; an environment-based link
+also names its workload and variable. Only indexed entries of the workload running that code
+are read, preserving container, namespace, evaluation root and local code path scope.
+Distinct candidates remain `ambiguous`.
+
+An Ingress with host `shop.example.com`, prefix `/store` and backend `orders` lets
+`https://shop.example.com/store/orders` reach that Service's `/orders` route. The most specific
+prefix wins, like a gateway prefix. Rewrite annotations, unresolved backends and a `pathType`
+other than `Prefix` create no links; older forms without `pathType` are accepted. Wildcard
+hosts and controller-specific paths are not interpreted. Resolution uses indexed facts and
+never queries a cluster.
 
 ### 8.2 Declared resources and gateway prefixes
 
@@ -2197,6 +2213,28 @@ Grafana rules also come from JSON exports and `rule` blocks of Terraform/OpenTof
 A root route without matchers creates no alert side: there is no key and value for a contract. The graph describes written matchers, without predicting final notifications, inhibition or schedules.
 
 Prometheus and Loki also emit the literal `alertname` from the rule name, overriding a label of that name. Labels that may come from the expression remain unknown, not empty. Files under `templates/` are not rendered or treated as alert emitters.
+
+### OpsGenie and PagerDuty in Terraform
+
+Literal `key:value` tags on `datadog_monitor` are emitters. Tag conditions in
+`opsgenie_team_routing_rule` and PagerDuty
+orchestration PCL conditions, are matchers. Equality is `exact`; regex, prefix and
+containment are `inferred`. Conditions and rule order are evaluated together; unknown
+values or unread operations do not choose a destination by guess.
+
+Datadog tags reach OpsGenie. Rule labels reach tags only through a selected Alertmanager
+OpsGenie receiver that sets `tags` explicitly. Simple `.CommonLabels.<key>` or
+`.GroupLabels.<key>` templates use labels fixed by the effective `group_by`. A PagerDuty
+v2 receiver can forward these labels through `details`, which becomes
+`event.custom_details.<key>`; there is no implicit tag forwarding to PagerDuty. Unread
+templates and missing forwardings create no links.
+
+`context` shows the rule's written scope, and `trace` retains the path to its routing
+block. A compatible matcher does not establish delivery or a final team notification.
+In public example #638 the rule tests `service:app`: the same monitor also emits
+`support:team-b`, but there is no `support` matcher there. The original nonstandard
+monitor YAML and Helm values remain configuration only.
+
 ## Azure infrastructure
 
 Terraform/OpenTofu provision Service Bus queues, topics and subscriptions, Event Hubs,
