@@ -17,6 +17,7 @@ use crate::resolve::Code;
 use crate::shape::Shape;
 use crate::workspace::Repository;
 
+mod aws;
 mod csharp;
 mod go;
 mod java;
@@ -232,7 +233,7 @@ impl ContractKind for Channel {
                 }
             }
         }
-        messages
+        let mut found: Vec<_> = messages
             .iter()
             .map(|m| {
                 let mut contract = Some(contract(m.broker, m.name.as_deref()));
@@ -278,7 +279,9 @@ impl ContractKind for Channel {
                     shape: None,
                 }
             })
-            .collect()
+            .collect();
+        found.extend(aws::extract(code, Some(indexed)));
+        found
     }
 
     /// Adds the channel sides of the repository's AsyncAPI documents (spec #21). A document side

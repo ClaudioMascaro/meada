@@ -19,7 +19,7 @@ public class Delivery {
 
     public Delivery(JmsTemplate jms, SqsClient sqs, Connection nats) {
         this.jms = jms;
-        this.sqs = sqs;
+        this.sqs = SqsClient.create();
         this.nats = nats;
     }
 

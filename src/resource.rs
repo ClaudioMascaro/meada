@@ -14,6 +14,8 @@ use crate::msg::Msg;
 use crate::resolve::Code;
 use crate::workspace::Repository;
 
+mod aws;
+
 pub struct Resource;
 
 /// The start of every resource contract identifier.
@@ -85,8 +87,8 @@ impl ContractKind for Resource {
         Some(("writer", "reader"))
     }
 
-    fn extract(&self, _code: &Code, _: &Indexed) -> Vec<Found> {
-        Vec::new()
+    fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
+        aws::extract(code, indexed)
     }
 
     fn parts<'c>(&self, contract: &'c str) -> (Option<&'c str>, Option<&'c str>) {

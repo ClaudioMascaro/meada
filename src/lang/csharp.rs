@@ -2072,8 +2072,8 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 .or_else(|| named(node).find(|n| n.kind() == "argument_list"));
             let mut args = arguments(list, src, depth).0;
             let initializer = named(node).find(|n| n.kind() == "initializer_expression");
-            if let Some(set) = initializer {
-                let set = (named(set).filter(|n| n.kind() == "assignment_expression"))
+            if let Some(set_node) = initializer {
+                let set = (named(set_node).filter(|n| n.kind() == "assignment_expression"))
                     .filter_map(|a| {
                         let left = a.child_by_field_name("left")?;
                         let right = a.child_by_field_name("right")?;
@@ -2081,7 +2081,14 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                             .then(|| (text(left, src).to_string(), value(right, src, depth + 1)))
                     })
                     .collect();
-                args.push(Value::Object(set));
+                let has_fields = named(set_node).any(|n| n.kind() == "assignment_expression");
+                if has_fields || named(set_node).next().is_none() {
+                    args.push(Value::Object(set));
+                } else {
+                    args.push(Value::List(
+                        named(set_node).map(|n| value(n, src, depth + 1)).collect(),
+                    ));
+                }
             }
             Value::New(ty, args)
         }

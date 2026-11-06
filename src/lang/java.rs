@@ -168,6 +168,7 @@ struct Visit<'t> {
     interface: bool,
     visible: bool,
     definitions: bool,
+    returning: bool,
     depth: usize,
     /// The type parameters declared around the node: a type they name is no class.
     generics: Rc<Vec<String>>,
@@ -201,12 +202,14 @@ fn parse(src: &[u8]) -> Result<Facts> {
         interface: false,
         visible: true,
         definitions: true,
+        returning: false,
         depth: 0,
         generics: Rc::new(Vec::new()),
     }];
     // The fields by declaring scope: a local is hidden by those of its class or an enclosing one.
     let mut fields: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut locals = Vec::new();
+    let mut returned: BTreeMap<String, Vec<Value>> = BTreeMap::new();
     // The types declared so far: a local whose scope is one sits in an initializer.
     let mut classes = BTreeSet::new();
     // Initializer calls of `var` locals (by `Class::Result` place) and chained calls (by place
@@ -234,6 +237,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         interface,
         visible,
         definitions,
+        mut returning,
         depth,
         mut generics,
     }) = stack.pop()
@@ -253,6 +257,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 matches!(p.kind(), "object_creation_expression" | "enum_constant")
             });
         let defining = definitions && !anonymous && depth < DEFINITION_DEPTH;
+        if anonymous || node.kind() == "lambda_expression" {
+            returning = false;
+        }
         let kind = match node.kind() {
             "class_declaration"
             | "interface_declaration"
@@ -265,6 +272,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
             _ => None,
         };
         if let Some(kind) = kind.filter(|_| defining) {
+            returning = kind == Kind::Method;
             let Some(name) = node.child_by_field_name("name") else {
                 continue;
             };
@@ -458,6 +466,14 @@ fn parse(src: &[u8]) -> Result<Facts> {
             }
         }
         match node.kind() {
+            "return_statement" if returning && definitions => {
+                if let Some(expression) = named(node).next() {
+                    returned
+                        .entry(scope.as_ref().clone())
+                        .or_default()
+                        .push(value(expression, src, 0));
+                }
+            }
             "method_invocation" => {
                 let mut at = call(&scope, callee(node, src), node.byte_range());
                 if !definitions && at.callee.starts_with("this.") {
@@ -730,10 +746,14 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 interface: in_interface,
                 visible: public,
                 definitions: definitions && !anonymous && (kind.is_none() || defining),
+                returning,
                 depth: nested,
                 generics: generics.clone(),
             });
         }
+    }
+    for def in &mut facts.defs {
+        def.return_values = returned.remove(&def.name).unwrap_or_default();
     }
     // A `final` field holds the one value its initializer or a constructor gives it: a constant
     // of the class, which no static context reads (it is no `statics`). Two values give none.

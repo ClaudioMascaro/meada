@@ -212,6 +212,9 @@ pub struct CallSite {
 pub struct Provider {
     pub contract: String,
     pub site: String,
+    /// The environment variable an unresolved SDK operation reads, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub via: Option<String>,
     /// The path a gateway serves the route at, when `[serve]` rewrites it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gateway: Option<String>,

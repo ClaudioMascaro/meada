@@ -169,6 +169,11 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
             let Some(client) = client(code, path, stored) else {
                 continue;
             };
+            // Kotlin keeps its existing typed SQS form. Java's AWS form is constructor-backed
+            // and shared with the other services in `aws`.
+            if client == Client::Sqs && !kotlin(path) {
+                continue;
+            }
             let call = || Expand::Call(path, n);
             let chain = || Expand::Chain(path, n);
             let inject = Some(&inject as &Inject<'a, '_>);
@@ -761,7 +766,9 @@ mod tests {
             configs: &configs,
             symlinks: &[],
         };
-        let lines = crate::channel::message::lines(messages(&code, &indexed));
+        let mut messages = messages(&code, &indexed);
+        messages.extend(super::super::aws::test_messages(&code, Some(&indexed)));
+        let lines = crate::channel::message::lines(messages);
         let module = format!("{module}::");
         lines.into_iter().map(|l| l.replace(&module, "")).collect()
     }
@@ -1124,7 +1131,7 @@ mod tests {
     #[test]
     fn an_sqs_client_sends_and_receives_on_the_queue_its_url_names() {
         let body = "static final String URL = \"https://sqs.us-east-1.amazonaws.com/123/orders\";\n\
-            SqsClient sqs;\n\
+            final SqsClient sqs = SqsClient.create();\n\
             @Value(\"${app.queue-url}\") String configured;\n\
             void send() {\n\
             sqs.sendMessage(SendMessageRequest.builder().queueUrl(URL).messageBody(\"b\").build());\n\
@@ -1241,7 +1248,7 @@ mod tests {
     /// A request a wrapper takes as its parameter is read at each caller.
     #[test]
     fn an_sqs_request_a_wrapper_takes_is_read_at_each_caller() {
-        let body = "SqsClient sqs;\n\
+        let body = "final SqsClient sqs = SqsClient.create();\n\
             void send(SendMessageRequest request) { sqs.sendMessage(request); }\n\
             void ship() { send(SendMessageRequest.builder().queueUrl(\"https://sqs/1/shipments\").build()); }";
         assert_eq!(read(SQS, body), ["sqs shipments producer"]);

@@ -2467,6 +2467,7 @@ impl Export {
                 let mut provider = written::Provider::default();
                 provider.contract = p.contract;
                 provider.site = p.site;
+                provider.via = p.via;
                 provider.gateway = p.gateway;
                 provider.shape = p.shape;
                 provider
@@ -2555,6 +2556,8 @@ pub(crate) struct Document {
 pub(crate) struct Provider {
     pub(crate) contract: String,
     pub(crate) site: String,
+    /// The provenance of an SDK use (`contracts.via`), including an environment read.
+    pub(crate) via: Option<String>,
     /// The path a gateway serves the route at, when `[serve]` rewrites it (`meada export`).
     pub(crate) gateway: Option<String>,
     /// What the route's response or the channel's messages carry: from the first document by
@@ -2669,7 +2672,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         .collect();
     let providers = db
         .prepare(
-            "SELECT contract, site, shape FROM contracts WHERE role = 'provider' \
+            "SELECT contract, site, shape, via FROM contracts WHERE role = 'provider' \
              ORDER BY contract, site",
         )?
         .query_map([], |r| {
@@ -2677,6 +2680,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
                 contract: r.get(0)?,
                 site: r.get(1)?,
                 shape: stored_shape(r.get(2)?),
+                via: r.get(3)?,
                 ..Provider::default()
             })
         })?

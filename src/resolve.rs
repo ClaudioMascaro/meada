@@ -6282,6 +6282,19 @@ impl<'a> Code<'a> {
         }
     }
 
+    /// The constant's expression and the scope where it was written. A constructor may bind
+    /// a final/readonly field from a parameter that hides a name of the field's class.
+    pub fn constant_value(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Option<(&'a str, &'a str, &'a Value)> {
+        let ((at, constant), _) = self.constant(path, scope, name)?;
+        let (value, within) = self.held(at, constant)?;
+        Some((at, within, value))
+    }
+
     /// The value the `const` `constant` of `path` holds, as written, and the scope it is
     /// written in.
     fn held(&self, path: &'a str, constant: &'a str) -> Option<(&'a Value, &'a str)> {

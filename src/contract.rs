@@ -18,6 +18,8 @@ use crate::workspace::Repository;
 
 pub use meada_core::export::{Level, Link};
 
+pub(crate) mod sdk;
+
 /// A contract the repository holds, before the index gives its site an identity.
 pub struct Found {
     pub role: Role,

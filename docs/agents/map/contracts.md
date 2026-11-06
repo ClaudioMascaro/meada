@@ -6,6 +6,18 @@ this file, and a change to these modules updates it.
 
 ## Modules in brief
 
+- `channel/aws.rs` and `resource/aws.rs` (#660) own the AWS SDK operation tables for Java 2.x,
+  Go v2 and .NET. `contract/sdk.rs` and `contract/sdk/{java,go,csharp}.rs` share request syntax,
+  field selection, name normalization and site construction; `contract/sdk/origins.rs` accepts
+  constructed clients through complete exact factory/caller evidence, memoized with cycle
+  detection under the existing evaluation depth and per-file work budgets. A declared type or
+  an opaque alternative supplies no constructor evidence. `Code::constant_value` preserves a
+  final/readonly field's constructor scope. The SDK readers replace Java, Go and C#'s earlier
+  typed SQS forms; Kotlin retains its existing form. Java returns, Go maps and C# collection
+  initializers are pack syntax, with no service table in a pack. Producer `via` retains an
+  unresolved environment variable in the export, as consumer `via` already does. Java SDK
+  request folding shares Spring annotation injection with the existing channel forms.
+
 - `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs` and its `channel/` submodules
   (`channel/message.rs`: the message types and broker helpers; `channel/{ts,python,rust,go,java,csharp}.rs`:
   the message libraries of each language): the

@@ -26,10 +26,9 @@
 //! When that argument is a parameter, each caller of the method around it is a producer.
 
 use super::message::{
-    Handler, Message, Side, bind, channel_name as name, consume, produce, publish, queue_name,
-    topics,
+    Handler, Message, Side, bind, channel_name as name, consume, produce, publish, topics,
 };
-use crate::lang::{Bound, Invocation, Value, property};
+use crate::lang::{Bound, Invocation, Value};
 use crate::names::{in_full, is_type, one, spellings};
 use crate::resolve::{Code, Keywords, method as member};
 use std::cell::OnceCell;
@@ -52,7 +51,6 @@ enum Obj {
     RabbitConnection,
     RabbitChannel,
     RabbitConsumer,
-    SqsClient,
     NatsFactory,
     NatsConnection,
     RedisMultiplexer,
@@ -80,8 +78,6 @@ const TYPES: &[(&str, Obj)] = &[
         "RabbitMQ.Client.Events.AsyncEventingBasicConsumer",
         Obj::RabbitConsumer,
     ),
-    ("Amazon.SQS.IAmazonSQS", Obj::SqsClient),
-    ("Amazon.SQS.AmazonSQSClient", Obj::SqsClient),
     ("NATS.Client.ConnectionFactory", Obj::NatsFactory),
     ("NATS.Client.IConnection", Obj::NatsConnection),
     ("NATS.Client.Connection", Obj::NatsConnection),
@@ -265,12 +261,6 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                         out.extend(consume(code, path, n, "amqp", &read, handler));
                     }
                 }
-                (Obj::SqsClient, "SendMessageAsync") => {
-                    out.extend(produce(code, path, n, "sqs", &queue));
-                }
-                (Obj::SqsClient, "ReceiveMessageAsync") => {
-                    out.extend(consume(code, path, n, "sqs", &queue, None));
-                }
                 (Obj::NatsConnection, "Publish") => {
                     out.extend(produce(code, path, n, "nats", &first));
                 }
@@ -338,21 +328,6 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
         }
     }
     out
-}
-
-/// The queue the URL an SQS call is given ends in: the URL as the first argument, or the
-/// `QueueUrl` of the request it is given (`new SendMessageRequest { QueueUrl = url }`, in place
-/// or in a local). A request without one names no queue.
-fn queue(args: &[Value], named: &Keywords) -> Option<Vec<Option<String>>> {
-    let first = arg(args, named, 0, &["queueUrl", "request"]);
-    let url = match first {
-        Value::New(_, parts) => (parts.iter()).find_map(|p| match p {
-            Value::Object(set) => property(set, "QueueUrl").ok().flatten(),
-            _ => None,
-        }),
-        url => Some(url),
-    };
-    Some(vec![queue_name(url)?])
 }
 
 /// The handlers of the consumer the `BasicConsume` at `n` of `path` is given: each one attached
@@ -605,7 +580,9 @@ mod tests {
         let layout = CSharp.layout(&[], &files).unwrap();
         let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &CSharp);
         let code = Code::new(&resolver, &files, &CSharp);
-        crate::channel::message::lines(messages(&code))
+        let mut messages = messages(&code);
+        messages.extend(super::super::aws::test_messages(&code, None));
+        crate::channel::message::lines(messages)
     }
 
     fn lines(usings: &str, body: &str) -> Vec<String> {
@@ -701,7 +678,7 @@ mod tests {
 
     #[test]
     fn an_sqs_client_sends_to_and_receives_from_the_queue_its_url_ends_in() {
-        let body = "IAmazonSQS _sqs;\n\
+        let body = "IAmazonSQS _sqs = new AmazonSQSClient();\n\
             const string Base = \"https://sqs.us-east-1.amazonaws.com/123/\";\n\
             async Task Send(string dynamicUrl) {\n\
               await _sqs.SendMessageAsync(\"https://sqs.us-east-1.amazonaws.com/123/orders\", \"body\");\n\
