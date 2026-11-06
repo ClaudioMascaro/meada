@@ -420,6 +420,66 @@ fn compose_and_kubernetes_nodes_keep_each_other_when_one_changes() {
     );
 }
 
+/// A template's resource type owns its rows even when its filename is a Compose name. Cold
+/// indexing and either reader's warm refresh preserve the other reader's nodes and references.
+#[test]
+fn a_cloudformation_template_named_compose_keeps_its_nodes_and_references() {
+    let repo = fixture_repo("iac_cfn_compose_name", "compose-nodes", ORIGIN);
+    fs::create_dir(repo.join("cfn")).unwrap();
+    let template = repo.join("cfn/compose.yaml");
+    let text = "AWSTemplateFormatVersion: '2010-09-09'\nResources:\n  Queue:\n    Type: AWS::SQS::Queue\n    Properties:\n      QueueName: dispatch-before\n  Consumer:\n    Type: AWS::SNS::Topic\n    DependsOn: Queue\n";
+    fs::write(&template, text).unwrap();
+    let terraform = repo.join("cfn/main.tf");
+    fs::write(&terraform, "resource \"aws_sqs_queue\" \"control\" {}\n").unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    let consumer = || engine.context("cfn/compose.yaml::Consumer", None).unwrap();
+    let before = consumer();
+    assert!(before.contains("type: AWS::SNS::Topic"), "{before}");
+    assert!(before.contains("Queue via DependsOn"), "{before}");
+    let compose = engine.context("services.web", None).unwrap();
+    assert!(compose.contains("type: service"), "{compose}");
+
+    fs::write(&template, text.replace("dispatch-before", "dispatch-after")).unwrap();
+    let queue = engine.context("cfn/compose.yaml::Queue", None).unwrap();
+    assert!(queue.contains("name: \"dispatch-after\""), "{queue}");
+    assert!(queue.contains("Consumer via DependsOn"), "{queue}");
+    assert_eq!(consumer(), before);
+    assert_eq!(engine.context("services.web", None).unwrap(), compose);
+
+    fs::write(&terraform, "resource \"aws_sqs_queue\" \"changed\" {}\n").unwrap();
+    assert!(
+        engine
+            .context("aws_sqs_queue.changed", None)
+            .unwrap()
+            .contains("aws_sqs_queue")
+    );
+    assert_eq!(consumer(), before);
+    assert_eq!(
+        engine.context("cfn/compose.yaml::Queue", None).unwrap(),
+        queue
+    );
+
+    let over = repo.join("stack/compose.override.yaml");
+    fs::write(
+        &over,
+        fs::read_to_string(&over)
+            .unwrap()
+            .replace("redis:7", "redis:8"),
+    )
+    .unwrap();
+    assert!(
+        engine
+            .context("services.cache", None)
+            .unwrap()
+            .contains("redis:8")
+    );
+    assert_eq!(consumer(), before);
+    assert_eq!(
+        engine.context("cfn/compose.yaml::Queue", None).unwrap(),
+        queue
+    );
+}
+
 /// CloudFormation and SAM (#653): the fixture `cloudformation-nodes` holds a SAM application
 /// (`sam/template.yaml`), a plain template with parameters (`cfn/stack.yaml`), a JSON template
 /// and a file with `Resources` but no version or transform, which is no template. Each resource

@@ -1,0 +1,4 @@
+# A whole `proxy` behind an include Meada does not follow (an absolute path) may hold
+# `endpoints`, so the legacy keys of the other file are no endpoints.
+proxy:
+  $include: /etc/backstage/proxy.yaml

@@ -9,6 +9,48 @@ use crate::common::{self, assert_golden, fixture_repo};
 
 const ORIGIN: Option<&str> = Some("https://example.com/acme/app.git");
 
+/// ADR 0025's SecureString marker hides the resource's value in both Terraform syntaxes,
+/// even when the marker follows it. Ordinary String parameters remain searchable.
+#[test]
+fn secure_string_parameters_keep_their_values_out_of_storage_and_search() {
+    let repo = fixture_repo("config_values_ssm", "terraform-ssm-values", ORIGIN);
+    let engine = Engine::open(&repo).unwrap();
+    let values = engine
+        .search("resource.aws_ssm_parameter", Some("value"), None)
+        .unwrap();
+    for file in ["main.tf", "main.tf.json"] {
+        for name in ["before", "after"] {
+            assert!(
+                values.lines().any(|line| line.contains(&format!("{file}:"))
+                    && line.ends_with(&format!(
+                        "resource.aws_ssm_parameter.{name}.value = redacted"
+                    ))),
+                "{file}: {values}"
+            );
+        }
+    }
+    for public in ["ssm-hcl-public-value", "ssm-json-public-value"] {
+        let answer = engine.search(public, Some("value"), None).unwrap();
+        assert!(answer.contains(&format!("= \"{public}\"")), "{answer}");
+    }
+    let index = fs::read(repo.join(".meada/index.db")).unwrap();
+    for secret in [
+        "ssm-hcl-before-canary",
+        "ssm-hcl-after-canary",
+        "ssm-json-before-canary",
+        "ssm-json-after-canary",
+    ] {
+        assert_eq!(
+            engine.search(secret, Some("value"), None).unwrap(),
+            format!("no matches for `{secret}`\n")
+        );
+        assert!(
+            !index.windows(secret.len()).any(|w| w == secret.as_bytes()),
+            "{secret} in the stored index"
+        );
+    }
+}
+
 /// The `search` answers of `queries` with the kind `value`, in order, a blank line between two.
 fn searched(engine: &Engine, queries: &[&str]) -> String {
     (queries.iter())
@@ -212,5 +254,36 @@ fn a_tfvars_file_follows_the_sensitive_variables_of_the_files_around_it() {
     assert_eq!(
         value("tofu-queue-name"),
         "no matches for `tofu-queue-name`\n"
+    );
+}
+
+/// A Terraform file under a hidden CI path is read like any other (#640): its `sensitive`
+/// variable redacts the value a var file anywhere gives it, as ADR 0025 asks of "any Terraform
+/// file of the repository" (#709, judging #639's second deviation: a filter of the hidden CI files
+/// to YAML and JSON lost that redaction).
+#[test]
+fn a_sensitive_variable_under_a_hidden_ci_path_redacts_a_var_file_elsewhere() {
+    let repo = fixture_repo("config_values_hidden_ci_sensitive", "config-values", ORIGIN);
+    fs::create_dir_all(repo.join(".github/infra")).unwrap();
+    fs::create_dir_all(repo.join("infra")).unwrap();
+    fs::write(
+        repo.join(".github/infra/variables.tf"),
+        "variable \"gh_token\" {\n  sensitive = true\n}\n",
+    )
+    .unwrap();
+    fs::write(
+        repo.join("infra/terraform.tfvars"),
+        "gh_token = \"hidden-ci-declared-secret\"\n",
+    )
+    .unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    let found = engine
+        .search("hidden-ci-declared-secret", Some("value"), None)
+        .unwrap();
+    assert_eq!(found, "no matches for `hidden-ci-declared-secret`\n");
+    let redacted = engine.search("gh_token", Some("value"), None).unwrap();
+    assert!(
+        redacted.contains("infra/terraform.tfvars:1 gh_token = redacted"),
+        "{redacted}"
     );
 }

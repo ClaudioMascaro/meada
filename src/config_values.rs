@@ -270,6 +270,8 @@ enum SecretPlace {
     /// Under `variable.<name>.default` of a Terraform JSON file: secret when the variable says
     /// `"sensitive": true`.
     Variable(String),
+    /// Under `resource.aws_ssm_parameter.<name>.value`: secret for a SecureString parameter.
+    SsmParameter(String),
     /// Under the top-level key `<name>` of a `.tfvars.json` file: secret when the variable is
     /// sensitive.
     Tfvars(String),
@@ -290,6 +292,19 @@ impl SecretPlace {
                 if v == "variable" && d == "default" && terraform_json(file) =>
             {
                 SecretPlace::Variable(name.clone())
+            }
+            [
+                Step::Key(r),
+                Step::Key(t),
+                Step::Key(name),
+                Step::Key(v),
+                ..,
+            ] if r == "resource"
+                && t == "aws_ssm_parameter"
+                && v == "value"
+                && terraform_json(file) =>
+            {
+                SecretPlace::SsmParameter(name.clone())
             }
             [Step::Key(p), Step::Key(name), Step::Key(d), ..]
                 if p == "Parameters" && d == "Default" =>
@@ -469,6 +484,10 @@ pub(crate) fn read_with(
                     SecretPlace::Item(n) => doc["items"].get(n).is_some_and(is_secret),
                     SecretPlace::Variable(name) => {
                         doc["variable"][name.as_str()]["sensitive"] == Value::Bool(true)
+                    }
+                    SecretPlace::SsmParameter(name) => {
+                        doc["resource"]["aws_ssm_parameter"][name.as_str()]["type"].as_str()
+                            == Some("SecureString")
                     }
                     SecretPlace::Tfvars(name) => {
                         sensitive.contains(&name) || sensitive.contains(ANY_VARIABLE)

@@ -1684,11 +1684,11 @@ fn terraform_path(column: &str) -> String {
 /// refresh, so each touches the rows it owns only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Owner {
-    /// A node of a Terraform, OpenTofu or Compose file, told apart by the name of its file.
+    /// A node without `::` in its type, in a Terraform, OpenTofu or Compose file.
     Terraform,
-    /// A node of any other file whose type has no `::`: a Kubernetes kind.
+    /// A node whose type has no `::`, in any other file: a Kubernetes kind.
     Kubernetes,
-    /// A node of any other file whose type has a `::`: `AWS::SQS::Queue`, `Custom::Name`.
+    /// A node whose type has a `::`, regardless of filename: `AWS::SQS::Queue`, `Custom::Name`.
     CloudFormation,
 }
 
@@ -1698,9 +1698,9 @@ impl Owner {
         let own = terraform_path("path");
         let typed = "type LIKE '%::%'";
         match self {
-            Owner::Terraform => own,
+            Owner::Terraform => format!("({own} AND NOT {typed})"),
             Owner::Kubernetes => format!("(NOT {own} AND NOT {typed})"),
-            Owner::CloudFormation => format!("(NOT {own} AND {typed})"),
+            Owner::CloudFormation => typed.to_string(),
         }
     }
 }

@@ -417,9 +417,14 @@
   shape (`config::expand`, before the flattening), and the options another file gives the same
   endpoint apply to it. A `|` in an endpoint name is not read. An endpoint whose name has a `.`
   and a key named `target` below it are told apart only by the `.target` suffix, so a string
-  endpoint named `/a.target` reads as the endpoint `/a`. A `proxy.endpoints` behind an include
-  that is not followed is no key (an empty `endpoints` object is one, and hides the legacy
-  keys), so the legacy keys beside it are read as endpoints (`meada status` names the include). A target that is exactly `${VAR}` is the variable, one that is
+  endpoint named `/a.target` reads as the endpoint `/a`. A `proxy.endpoints`, a whole `proxy` or
+  a root behind an include that is not followed counts as the table, as an empty `endpoints`
+  object does, so it hides the legacy keys of every file and no endpoint is read from it (#709;
+  `meada status` names the include); an include whose `#` key path ends at a key alone absent
+  does not, since Backstage leaves that key out. An `$env` beside another key at one of
+  `TABLE_PATHS` (the root, `proxy`, `proxy.endpoints`) hides them too, and `meada status` names
+  nothing there. A target that is exactly `${VAR}` is
+  the variable, one that is
   a literal `http(s)://` URL is the host (a trailing `/` dropped, its path kept); any other
   target (`${VAR}/v2`, `${VAR:-default}`, a URL with a placeholder) leaves the URL as written, with a
   `client:` `via` the link's reason shows, and `meada status` names the endpoint and its calls.
@@ -444,21 +449,26 @@
   `DEPTH` (8) deep, one root follows at most `INCLUDES` (64) includes (every file it reaches
   counted, refused ones past the path checks included) and grafts at most `GRAFTED_MAX`
   (`lang::MAX_BYTES`, 1 MiB) of included files, each include counting its file again; the include
-  past a bound, a cycle (a file already on the way from the root), an absolute path, a path that
-  leaves the repository, a `${` in it, an extension other than `.json`, `.yaml` and `.yml`
+  past a bound, a cycle (a file and key path whose children are being read), an absolute path, a
+  path that leaves the repository, a `${` in it, an extension other than `.json`, `.yaml` and `.yml`
   (case-sensitive, as Backstage's), a symbolic link on the way, a file the walk does not see
   (absent, ignored or hidden, all `missing`), a file past `lang::MAX_BYTES` or that does not
   parse, a missing key path, a sibling key and a value that is not text are not followed: the
   subtree is null, so a read under it stays a hole, and `meada status` names the include with its
-  reason. A root past `lang::MAX_BYTES` is dropped. Not read at all, and not named: an include
-  inside a list (lists are not flattened), `$include` at the root of a document and as the value
-  an include gives (Backstage applies neither), `$env` beside another key (the object is unread)
-  and `$file` (its object stays as written, so no read reaches the file). The rows `meada status`
+  reason. A root past `lang::MAX_BYTES` is dropped, and a root or a partial of more than one YAML
+  document is unreadable, as Backstage's `yaml.parse` refuses it (#709). A root that is one
+  `$include` is followed, as Backstage transforms the root too (#709). Not read at all, and not
+  named: an include inside a list (lists are not flattened), `$include` as the value an include
+  gives (Backstage does not apply it), `$env` beside another key (the object is unread) and
+  `$file` (its object stays as written, so no read reaches the file). The rows `meada status`
   reads (`Role::Unfollowed`) have no code site and sit in the TS and JavaScript group's first
   file, so a repository without TS or JavaScript files names none. Backstage roots no longer
   drop a document holding Spring's profile keys (`spring.profiles`), which only `read_yaml` checks.
-  The cycle check compares files, not key paths: a partial that includes another key path of
-  itself is a `cycle`. A grafted root is flattened under `spring::flatten`'s `YAML_KEY_BUDGET`
+  The cycle check compares a file and its key path with those whose children are being read
+  (#709): Backstage never transforms the value an include gives, only its children, so a file
+  that includes itself at the root, or another key path of itself, keeps the include as written,
+  and only a child that names one of them again is a `cycle`. A grafted root is flattened under
+  `spring::flatten`'s `YAML_KEY_BUDGET`
   whole, so grafts that push its joined keys past it drop the root's keys, inline ones included,
   with no status line. The includes refused before the count (absolute, outside, `${`, extension,
   sibling, not a path) are each named, as many as the root writes (linear in its bytes). The graft

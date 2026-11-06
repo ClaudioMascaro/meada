@@ -259,15 +259,18 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   `u` is a name or a `new URL(..)`, also inside a template string (`${u}` folds through the name).
   They follow the WHATWG URL Standard (the constructor parses its argument, `toString()` is
   `href`), so a URL that `searchParams`, `search` or `hash` changes keeps its path. `new URL`
-  stays a call when the file declares a `URL` (class, function, variable) or imports one from a
-  relative path; an import from a package, or from an alias the tsconfig maps, is read as the
-  global. Member writes (`u.p = ..`, `u.p += ..`, `u["p"] = ..` for any `p` but `search` and
+  stays a call when the file binds or reassigns `URL`, except for the named `URL` export of
+  `url` or `node:url` through an import or a destructured, unshadowed `require`. Unknown packages,
+  repository aliases, default and namespace imports and other exports stay opaque. The guard
+  applies across the whole file, so a local binding can suppress unrelated global uses too.
+  Member writes (`u.p = ..`, `u.p += ..`, `u["p"] = ..` for any `p` but `search` and
   `hash`) are tracked per name across the whole file, whichever function writes them: a `const`
   built by `new URL` whose name is written holds an unknown value, and the pass-through forms of
   that name are not read, so two functions that use the same name for different URLs lose both.
   A mutation inside a function the URL is passed to is not seen, so a wrapper called with the
   URL folds to the string it was built from. A parameter, a `catch` binding or a variable named
-  `URL` (but not a destructured `require` of a package) also stops the fold. `new URL(x, base)`
+  `URL` also stops the fold. A shadowed or reassigned `require` stops folding its destructured
+  `URL` across the whole file. `new URL(x, base)`
   of the global is a `Value::New` named `GLOBAL_URL` (#686, joined by the HTTP kind, below), so
   `.href`, `toString()` and `String(u)` on a two-argument `new URL` are not read. A `toString` or
   `href` that a repository class defines on a name is read as a pass-through of that name, not

@@ -1,0 +1,9 @@
+{
+  "resource": {
+    "aws_ssm_parameter": {
+      "before": {"value": "ssm-json-before-canary", "type": "SecureString"},
+      "after": {"type": "SecureString", "value": "ssm-json-after-canary"},
+      "plain": {"type": "String", "value": "ssm-json-public-value"}
+    }
+  }
+}

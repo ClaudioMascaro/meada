@@ -193,8 +193,30 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Terraform and OpenTofu config values redact an `aws_ssm_parameter` resource's `value` when
+  its literal `type` is `SecureString`, in HCL and Terraform JSON, regardless of attribute order.
+  Ordinary `String` parameters keep their values (#709).
+- TypeScript and JavaScript URL folding requires the runtime global or the named `URL` export
+  of `url` or `node:url`. Unknown imports, repository aliases, other exports and shadowed
+  CommonJS loaders no longer invent HTTP consumers or links (#709).
+- CloudFormation nodes and references survive cold indexing and warm refreshes when a qualifying
+  template is named `compose.yaml`: its resource types decide ownership before its filename,
+  without changing real Compose ownership (#709).
 - A YAML document whose anchors and aliases expand past the nesting limit (128 levels) is
   reported unreadable and skipped, where it could abort meada (#646).
+- Backstage proxy: a `proxy.endpoints`, a whole `proxy` or a root behind an `$include` Meada
+  does not follow counts as the endpoints table, as Backstage reads (or refuses) whatever the
+  include gives, so the legacy `proxy['/<ep>']` keys beside it or in another file no longer link
+  a call; an include whose `#` key path's last key is absent does not, since Backstage leaves that
+  key out (#709).
+- Backstage `$include`: an `app-config*.yaml` that is one `$include` is the file it names, a root
+  or a partial of more than one YAML document is unreadable, and an include of the file and key
+  path being read keeps its `$include` as written rather than being a cycle, all as Backstage's
+  config loader reads them (#709).
+- Serverless: a function with no `name` is named after `--stage` first, so `context` lists its
+  name as overridable through `opt:stage` (at `provider.stage`'s line, or the function's when the
+  file has no stage) and the name links `inferred`; `${self:provider.stage}` still reads the file
+  and is no override (#709).
 - Authorization: an `added_by` a team operator wrote while no GitHub grant provider was
   configured no longer decides eligibility once `[oidc.github]` is enabled. Under the provider the
   console stamps each `added_by` it writes with `added_by_time` (its own clock, never the
