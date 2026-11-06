@@ -278,20 +278,22 @@ mod tests {
         assert_eq!(table.entry.len(), ENTRIES.len());
     }
 
-    /// Every entry has a fixture case: a block of its type in the provisioning fixture.
+    /// Every format's entry has an evaluated, named resource in the provisioning fixtures.
     #[test]
     fn every_entry_has_a_fixture_case() {
         let root = concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/provision-infra"
         );
-        let mut text = String::new();
+        let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+        let mut files = Vec::new();
         let mut dirs = vec![
             std::path::PathBuf::from(root),
             std::path::PathBuf::from(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/tests/fixtures/aws-infra"
             )),
+            fixtures.join("aws-workload-aliases"),
         ];
         while let Some(dir) = dirs.pop() {
             for e in std::fs::read_dir(&dir).unwrap() {
@@ -299,14 +301,25 @@ mod tests {
                 if path.is_dir() {
                     dirs.push(path);
                 } else if format_of(&path.to_string_lossy()).is_some() {
-                    text += &std::fs::read_to_string(&path).unwrap();
+                    files.push((
+                        path.strip_prefix(&fixtures)
+                            .unwrap()
+                            .to_string_lossy()
+                            .to_string(),
+                        std::fs::read(&path).unwrap(),
+                    ));
                 }
             }
         }
+        let (nodes, _) = crate::iac::evaluate(&files);
         for e in ENTRIES.iter() {
             assert!(
-                text.contains(&format!("resource \"{}\"", e.ty)),
-                "no fixture case for {}",
+                nodes.iter().any(|n| n.ty == e.ty
+                    && format_of(&n.path) == Some(e.format.as_str())
+                    && provision_entry(&n.path, &n.block, &n.ty).is_some()
+                    && n.name.as_deref().is_some_and(|name| !name.is_empty())),
+                "no evaluated fixture case for {} {}",
+                e.format,
                 e.ty
             );
         }

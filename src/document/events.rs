@@ -359,6 +359,8 @@ struct Anchored {
     depth: usize,
 }
 
+type CollectionCallback<'f> = &'f mut dyn FnMut(Collection<'_>, &Value);
+
 struct Builder<'f> {
     stack: Vec<Open>,
     /// The position of the node being read: for each open collection, the step to the node
@@ -376,7 +378,7 @@ struct Builder<'f> {
     /// Whether the second-level keys of the first document are recorded (`read_keyed`).
     keyed: bool,
     keys: Vec<KeyLine>,
-    collections: Option<&'f mut dyn FnMut(Collection<'_>, &Value)>,
+    collections: Option<CollectionCallback<'f>>,
 }
 
 impl Builder<'_> {
