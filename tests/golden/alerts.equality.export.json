@@ -1,0 +1,55 @@
+{
+  "format": 1,
+  "repository": "example.com/acme/monitoring",
+  "commit": "c40bfebba16c189d925429f43480b8568c446166",
+  "dirty": false,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "alert::alertname::ApiDown",
+      "site": "example.com/acme/monitoring::rules.yaml::groups[0].rules[0]"
+    },
+    {
+      "contract": "alert::support::team-b",
+      "site": "example.com/acme/monitoring::rules.yaml::groups[0].rules[0]"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "alert::support::team-b",
+      "site": "example.com/acme/monitoring::alertmanager.yaml::route.routes[0]",
+      "via": "alert matcher ="
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "example.com/acme/monitoring::alertmanager.yaml::route.routes[0]",
+      "address": "route.routes[0]",
+      "type": "AlertmanagerRoute",
+      "root": "alertmanager.yaml",
+      "path": "alertmanager.yaml",
+      "line": 4,
+      "end_line": 6
+    },
+    {
+      "identity": "example.com/acme/monitoring::rules.yaml::groups[0].rules[0]",
+      "address": "groups[0].rules[0]",
+      "type": "AlertRule",
+      "root": "rules.yaml",
+      "path": "rules.yaml",
+      "line": 4,
+      "end_line": 7
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/monitoring::alertmanager.yaml::route.routes[0]",
+      "provider": "example.com/acme/monitoring::rules.yaml::groups[0].rules[0]",
+      "contract": "alert::support::team-b",
+      "level": "exact",
+      "reason": "alert::support::team-b; matchers \"support\"=\"team-b\"; receiver: team-b"
+    }
+  ]
+}

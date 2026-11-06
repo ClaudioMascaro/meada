@@ -286,6 +286,43 @@ type Probe = (&'static str, fn() -> usize);
 
 fn probes() -> Vec<Probe> {
     vec![
+        ("alert: inherited labels across many rules", || {
+            use crate::contract::ContractKind;
+            let rules = fill(2, |i| format!("      - {{alert: A{i}, expr: up}}\n"));
+            let text = format!(
+                "groups:\n  - name: g\n    labels: {{support: \"{}\"}}\n    rules:\n{rules}",
+                "x".repeat(MAX_BYTES / 4)
+            );
+            crate::alert::Alert
+                .config_summary("rules.yaml", &file(text), std::path::Path::new("."))
+                .to_string()
+                .len()
+        }),
+        ("alert: deeply nested routes", || {
+            use crate::contract::ContractKind;
+            let text = format!(
+                "route: {}0{}\nreceivers: []\n",
+                "[".repeat(NESTING),
+                "]".repeat(NESTING)
+            );
+            crate::alert::Alert
+                .config_summary("alertmanager.yaml", &file(text), std::path::Path::new("."))
+                .to_string()
+                .len()
+        }),
+        ("alert: many Terraform Grafana rules", || {
+            use crate::contract::ContractKind;
+            let rules = fill(1, |i| {
+                format!(
+                    "  rule {{\n    name = \"a{i}\"\n    labels = {{ support = \"ops\" }}\n  }}\n"
+                )
+            });
+            let text = format!("resource \"grafana_rule_group\" \"ops\" {{\n{rules}}}\n");
+            crate::alert::Alert
+                .config_summary("grafana.tf", &file(text), std::path::Path::new("."))
+                .to_string()
+                .len()
+        }),
         ("image: repeated workflow keys", || {
             use crate::contract::ContractKind;
             let key = "j".repeat(900);

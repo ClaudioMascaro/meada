@@ -6,6 +6,7 @@
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 
+use crate::alert::Alert;
 use crate::channel::Channel;
 use crate::entry::EntryKind;
 use crate::http::Http;
@@ -297,6 +298,16 @@ pub trait ContractKind {
         exports: &[Export],
     ) -> Vec<Link>;
 
+    /// A kind may derive all its links once when its consumers share a routing tree.
+    /// `None` keeps the ordinary per-consumer hook and its order unchanged.
+    fn workspace_links(
+        &self,
+        _exports: &[Export],
+        _providers: &[(&Repository, &Provider)],
+    ) -> Option<Vec<Link>> {
+        None
+    }
+
     /// Runs once over the links of the whole workspace, after the decisions replay, so it sees
     /// the decided links: a pass that sets something on them, such as the drift of a link.
     fn after_links(&self, _links: &mut [Link], _exports: &[Export]) {}
@@ -399,6 +410,17 @@ pub trait ContractKind {
         Vec::new()
     }
 
+    /// Optionally group related sides once in workspace order, using links already prepared
+    /// for this query. None preserves the ordinary per-repository hook and its order.
+    fn workspace_related_sides<'e>(
+        &self,
+        _exports: &'e [Export],
+        _links: &[Link],
+        _contract: &str,
+    ) -> Option<Vec<Vec<Related<'e>>>> {
+        None
+    }
+
     /// The lines that a symbol's `contracts:` gets for the call `call` of `export`, after the
     /// line of each provider sitting at it: none by default (channels: the publish and the
     /// queues its bindings route it to, a publish having no contract of its own). `exports` are
@@ -469,6 +491,17 @@ pub trait ContractKind {
         self.status(repository, export, links)
     }
 
+    /// Optionally prepare status rows once in workspace order. None preserves the ordinary
+    /// per-repository status hooks and their call order.
+    fn workspace_status(
+        &self,
+        _repositories: &[Repository],
+        _exports: &[Export],
+        _links: &[Link],
+    ) -> Option<Vec<Vec<String>>> {
+        None
+    }
+
     /// A missing counterpart note, when the kind has a two-role orphan rule.
     fn side_note(&self, _exports: &[Export], _contract: &str, _role: Role) -> &'static str {
         ""
@@ -492,7 +525,7 @@ pub trait ContractKind {
 }
 
 /// Every contract kind of this release.
-pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel, &Packages, &Image];
+pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel, &Packages, &Image, &Alert];
 
 /// Contract configurations are read once at indexing time; queries use their stored summaries.
 pub(crate) fn config_file(path: &str) -> bool {
@@ -615,9 +648,9 @@ pub fn parts(contract: &str) -> (Option<&str>, Option<&str>) {
     kind_of(contract).map_or_else(|| (None, last(contract)), |k| k.parts(contract))
 }
 
-/// Where `site` of `repository` sits, as the first kind that places it says.
-pub fn place(repository: &str, site: &str) -> Option<String> {
-    KINDS.iter().find_map(|k| k.place(repository, site))
+/// Where this contract's kind places `site` of `repository`.
+pub fn place(contract: &str, repository: &str, site: &str) -> Option<String> {
+    kind_of(contract)?.place(repository, site)
 }
 
 /// Whether `provider` serves `contract`, by the rule of the contract's kind, else by equality.
@@ -829,6 +862,7 @@ mod tests {
                 Search::Filter("channel"),
                 Search::Own("package"),
                 Search::Filter("image"),
+                Search::Filter("alert"),
             ]
         );
         let (kind, search) = searched("package").unwrap();
@@ -879,14 +913,14 @@ mod tests {
         }
     }
 
-    /// The seam places a site as the first kind that answers does, and not at all otherwise.
+    /// The seam asks the contract's kind to place its site, leaving unrelated sites alone.
     #[test]
     fn the_seam_places_a_manifest_site_and_leaves_any_other_alone() {
         assert_eq!(
-            place("r", "r::kit/package.json"),
+            place("package::npm::kit", "r", "r::kit/package.json"),
             Some("kit/package.json".into())
         );
-        assert_eq!(place("r", "r::src/app.ts::main"), None);
+        assert_eq!(place("http::GET::/", "r", "r::src/app.ts::main"), None);
     }
 
     /// The HTTP pass after links sets nothing on a link with no shapes; a kind with no pass

@@ -331,15 +331,26 @@ impl Engine {
             .zip(repos)
             .flat_map(|(e, m)| e.providers.iter().map(move |p| (m, p)))
             .collect();
+        let prepared = contract::KINDS
+            .iter()
+            .filter_map(|kind| {
+                kind.workspace_links(exports, &providers)
+                    .map(|links| (kind.prefix(), links))
+            })
+            .collect::<Vec<_>>();
         let mut links = Vec::new();
         for (export, from) in exports.iter().zip(repos) {
             for consumer in &export.consumers {
                 let Some(kind) = consumer.contract.as_deref().and_then(contract::kind_of) else {
                     continue;
                 };
+                if prepared.iter().any(|(prefix, _)| *prefix == kind.prefix()) {
+                    continue;
+                }
                 links.extend(kind.link(consumer, from, &providers, exports));
             }
         }
+        links.extend(prepared.into_iter().flat_map(|(_, links)| links));
         links
     }
 
@@ -367,6 +378,13 @@ impl Engine {
         let kubes: Vec<Option<String>> =
             (self.dbs.iter()).map(kube::status).collect::<Result<_>>()?;
         let orphans = iac::orphans::Scope::new(&exports).reports();
+        let mut prepared_status = contract::KINDS
+            .iter()
+            .filter_map(|kind| {
+                kind.workspace_status(repos, &exports, &links)
+                    .map(|rows| (kind.prefix(), rows))
+            })
+            .collect::<Vec<_>>();
         let lines = (repos
             .iter()
             .zip(&exports)
@@ -374,30 +392,41 @@ impl Engine {
             .zip(configs)
             .zip(kubes))
         .zip(orphans)
-        .map(|(((((repo, export), drift), config), kube), orphans)| {
-            let prefix = format!("{}::", repo.identity);
-            let mut lines: Vec<String> = (contract::KINDS.iter())
-                .flat_map(|kind| kind.scope_status(repo, export, &exports, &links))
-                .collect();
-            lines.extend(document::report(repo, export));
-            lines.extend(orphans);
-            lines.extend(config);
-            lines.extend(kube);
-            lines.extend(export.dropped.iter().map(|(path, limit)| match *limit {
-                Dropped::Bytes(limit) => Msg::FileTooBroad { path, limit }.text(),
-                Dropped::Usings(limit) => Msg::FileTooManyUsings { path, limit }.text(),
-                Dropped::Misparsed => Msg::FileMisparsed { path }.text(),
-            }));
-            if drift > 0 {
-                lines.push(Msg::Drift(drift).text());
-            }
-            let inferred = (links.iter())
-                .any(|l| l.level == Level::Inferred && l.consumer.starts_with(&prefix));
-            if drift > 0 || inferred {
-                lines.push(Msg::ReportHint.text());
-            }
-            lines
-        })
+        .enumerate()
+        .map(
+            |(n, (((((repo, export), drift), config), kube), orphans))| {
+                let prefix = format!("{}::", repo.identity);
+                let mut lines: Vec<String> = (contract::KINDS.iter())
+                    .flat_map(|kind| {
+                        match prepared_status
+                            .iter_mut()
+                            .find(|(prefix, _)| *prefix == kind.prefix())
+                        {
+                            Some((_, rows)) => std::mem::take(&mut rows[n]),
+                            None => kind.scope_status(repo, export, &exports, &links),
+                        }
+                    })
+                    .collect();
+                lines.extend(document::report(repo, export));
+                lines.extend(orphans);
+                lines.extend(config);
+                lines.extend(kube);
+                lines.extend(export.dropped.iter().map(|(path, limit)| match *limit {
+                    Dropped::Bytes(limit) => Msg::FileTooBroad { path, limit }.text(),
+                    Dropped::Usings(limit) => Msg::FileTooManyUsings { path, limit }.text(),
+                    Dropped::Misparsed => Msg::FileMisparsed { path }.text(),
+                }));
+                if drift > 0 {
+                    lines.push(Msg::Drift(drift).text());
+                }
+                let inferred = (links.iter())
+                    .any(|l| l.level == Level::Inferred && l.consumer.starts_with(&prefix));
+                if drift > 0 || inferred {
+                    lines.push(Msg::ReportHint.text());
+                }
+                lines
+            },
+        )
         .collect();
         Ok((evaluations, lines))
     }
@@ -693,12 +722,14 @@ impl Engine {
                     None => match export.document_of(site) {
                         // A route or channel side only a document lists.
                         Some(doc) => format!("{doc} {DOCUMENTED_ONLY}"),
-                        None => contract::place(&repo.identity, site).unwrap_or_else(|| {
-                            // A route file that serves the contract with no function of its own.
-                            site.rsplit_once("::")
-                                .map_or(site.as_str(), |(_, p)| p)
-                                .to_string()
-                        }),
+                        None => {
+                            contract::place(&contract, &repo.identity, site).unwrap_or_else(|| {
+                                // A route file that serves the contract with no function of its own.
+                                site.rsplit_once("::")
+                                    .map_or(site.as_str(), |(_, p)| p)
+                                    .to_string()
+                            })
+                        }
                     },
                 };
                 let line = format!(
@@ -963,6 +994,7 @@ impl Engine {
     fn contract_sides(
         &self,
         exports: &[Export],
+        links: &[Link],
         contract: &str,
         view: View,
         kind: &dyn ContractKind,
@@ -972,9 +1004,13 @@ impl Engine {
         // Providers, then consumers, then the bindings that reach a queue; each with the lines
         // of the payload shape a document gives it.
         let mut sides: Vec<(u8, String, Vec<String>)> = Vec::new();
-        for (export, repo) in exports.iter().zip(&self.workspace.repos) {
+        let mut prepared = kind.workspace_related_sides(exports, links, contract);
+        for (n, (export, repo)) in exports.iter().zip(&self.workspace.repos).enumerate() {
             let mut files = Files::new(&repo.root);
-            for (site, order, role, tag, shape) in sides_of(exports, export, contract, view, kind) {
+            let related = prepared.as_mut().map(|rows| std::mem::take(&mut rows[n]));
+            for (site, order, role, tag, shape) in
+                sides_of(exports, export, contract, view, kind, related)
+            {
                 let place = if let Some(s) = export.symbols.iter().find(|s| s.id == site) {
                     let at = files.at(&s.span.path, s.span.start);
                     format!("{at} {}", label(&s.id))
@@ -995,7 +1031,7 @@ impl Engine {
                 } else if let Some(doc) = export.document_of(site) {
                     // A side only a document lists.
                     format!("{doc} {DOCUMENTED_ONLY}")
-                } else if let Some(place) = contract::place(&repo.identity, site) {
+                } else if let Some(place) = contract::place(contract, &repo.identity, site) {
                     // A dependency entry of a manifest.
                     place
                 } else {
@@ -1099,7 +1135,16 @@ impl Engine {
         if let Some(kind) = contract::kind_of(contract)
             && let Some(view) = kind.view(contract)
         {
-            let sites = side_sites(&partial.exports, contract, view, kind);
+            let providers = partial
+                .exports
+                .iter()
+                .zip(repos)
+                .flat_map(|(e, repo)| e.providers.iter().map(move |p| (repo, p)))
+                .collect::<Vec<_>>();
+            let prepared_links = kind
+                .workspace_links(&partial.exports, &providers)
+                .unwrap_or_default();
+            let sites = side_sites(&partial.exports, &prepared_links, contract, view, kind);
             partial.sites(sites)?;
             let links = match view.follows_drift() {
                 true => {
@@ -1107,10 +1152,10 @@ impl Engine {
                     partial.drift(&links)?;
                     links
                 }
-                false => Vec::new(),
+                false => prepared_links,
             };
             let exports = partial.exports;
-            let mut lines = self.contract_sides(&exports, contract, view, kind);
+            let mut lines = self.contract_sides(&exports, &links, contract, view, kind);
             if view.follows_drift() {
                 let entries = drift_view::entries(repos, &exports, &links);
                 lines.extend(drift_view::consumers(&entries, contract));
@@ -1178,11 +1223,12 @@ impl Engine {
                     let nodes = iac::found(&partial.exports, symbol);
                     if let [(n, node)] = &nodes[..] {
                         let identity = node.identity(&repos[*n].identity);
+                        let links = self.links(&partial.exports);
                         for kind in KINDS {
                             lines.extend(kind.context_at(
                                 &partial.exports,
                                 repos,
-                                &self.links(&partial.exports),
+                                &links,
                                 &identity,
                                 Some(&node.root),
                             ));
@@ -1209,7 +1255,13 @@ impl Engine {
                             if let Some(kind) = contract::kind_of(contract)
                                 && let Some(view) = kind.view(contract)
                             {
-                                sites.extend(side_sites(&partial.exports, contract, view, kind));
+                                sites.extend(side_sites(
+                                    &partial.exports,
+                                    &links,
+                                    contract,
+                                    view,
+                                    kind,
+                                ));
                             }
                         }
                         partial.sites(sites)?;
@@ -1219,6 +1271,7 @@ impl Engine {
                             {
                                 lines.extend(self.contract_sides(
                                     &partial.exports,
+                                    &links,
                                     &contract,
                                     view,
                                     kind,
@@ -1339,15 +1392,18 @@ impl Engine {
 /// (`ContractKind::related_sides`).
 fn side_sites(
     exports: &[Export],
+    links: &[Link],
     contract: &str,
     view: View,
     kind: &dyn ContractKind,
 ) -> Vec<(usize, String)> {
+    let mut prepared = kind.workspace_related_sides(exports, links, contract);
     exports
         .iter()
         .enumerate()
         .flat_map(|(n, e)| {
-            sides_of(exports, e, contract, view, kind)
+            let related = prepared.as_mut().map(|rows| std::mem::take(&mut rows[n]));
+            sides_of(exports, e, contract, view, kind, related)
                 .into_iter()
                 .map(move |s| (n, s.0.to_string()))
         })
@@ -1362,6 +1418,7 @@ fn sides_of<'e>(
         provider, consumer, ..
     }: View,
     kind: &dyn ContractKind,
+    related: Option<Vec<contract::Related<'e>>>,
 ) -> Vec<(&'e str, u8, String, String, Option<&'e crate::shape::Shape>)> {
     let provided = export.providers.iter().filter(|p| p.contract == contract);
     let provided = provided.map(|p| (p.site.as_str(), 0, provider.into(), p.shape.as_ref()));
@@ -1372,7 +1429,7 @@ fn sides_of<'e>(
     let own = provided
         .chain(consumed)
         .map(|(site, order, role, shape)| (site, order, role, String::new(), shape));
-    let related = kind.related_sides(exports, export, contract);
+    let related = related.unwrap_or_else(|| kind.related_sides(exports, export, contract));
     let related = related.into_iter().map(|r| {
         let tag = r.matched.map_or_else(String::new, |(level, reason)| {
             format!(" [{}: {reason}]", level.name())

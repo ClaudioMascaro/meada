@@ -1556,6 +1556,8 @@ dependencies = [
  "password-hash",
  "percent-encoding",
  "redis",
+ "regex",
+ "regex-syntax",
  "reqwest",
  "ring",
  "rmcp",

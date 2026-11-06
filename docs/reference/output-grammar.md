@@ -82,6 +82,8 @@ file whose path holds a space reads as more fields than it has.
 | `<orphan-note>` | ` (no use in the workspace)` | The visible scope has provisioners but no use of this group. |
 | `<orphan-note>` | ` (no builder in the workspace)` | The visible image scope has runners but no builder. |
 | `<orphan-note>` | ` (no runner in the workspace)` | The visible image scope has builders but no runner. |
+| `<orphan-note>` | ` (no matcher in the workspace)` | The visible alert scope has emitters but no matcher. |
+| `<orphan-note>` | ` (no emitter in the workspace)` | The visible alert scope has matchers but no emitter. |
 
 ## Levels
 
@@ -134,6 +136,7 @@ A contract identifier starts with its contract kind and `::`:
 | `<contract>` | `channel::<broker>::<channel>` | A queue, topic or subject of a broker: `channel::kafka::orders.created`. |
 | `<contract>` | `package::<ecosystem>::<package>` | A package: `package::npm::@example/kit`. |
 | `<contract>` | `image::<word>` | A normalized image name or an unresolved image pattern. |
+| `<contract>` | `alert::<text>::<text>` | A label key and value (or matcher pattern) on an alert rule or Alertmanager route. |
 | `<contract>` | `resource::<resource-kind>::<resource-id>` | A resource declared in `meada.toml` or used through an SDK: `resource::postgres::orders`, `resource::s3::orders-bucket`. |
 | `<method>` | `<word>` | An HTTP method in upper case, such as `GET` or `POST`. |
 | `<route>` | `<word>` | A route path; each parameter is `{}`. |
@@ -162,6 +165,7 @@ substrings), and an optional `kind`:
 | `resource` | Writers, readers, config uses and provisioners of `resource::` contracts. |
 | `channel` | Producers, consumers, config uses and provisioners of `channel::` contracts. |
 | `image` | Builders and workload runners of `image::` contracts. |
+| `alert` | Alert rule emitters and Alertmanager route matchers of `alert::` contracts. |
 | `document` | OpenAPI and AsyncAPI documents, by path or title. |
 | `package` | Packages, by name. |
 | `drift` | Fields a consumer reads that its provider lacks, by route or field path. |
@@ -339,6 +343,9 @@ words:
 | image builder | `  builder: <repository> [<level>: <reason>]` | A workload's image builder, with its evaluated evidence. |
 | workload code | `code: <repository> <path> [exact]` | A safe same-repository Compose code path. |
 | workload environment | `env <container> <environment-name> -> <environment-target>: <environment-value?>` | One environment entry of the workload, with its checked-in source and available value. |
+| alert emitter | `emitter: <contract><orphan-note?>` | A rule's known label. |
+| alert matcher | `matcher: <contract><orphan-note?>` | A route's effective label condition. |
+| alert receiver | `receiver: <text>` | A route's explicit or inherited receiver. |
 | iac build | `build: <text><iac-mark?>` | A Compose service's build context, a path inside the repository, quoted as JSON. |
 | iac handler | `handler: <text><iac-mark?>` | A Serverless function's handler, quoted as JSON. |
 | iac event | `event: <text><iac-mark?>` | One event of a Serverless function, in file order: its type and what identifies it, quoted as JSON (`"http GET /orders"`, `"sqs Queue.Arn"`). |
@@ -405,6 +412,8 @@ words:
 | `<role>` | `use` | Names the resource in config, with no direction; links only to provisioners. |
 | `<role>` | `builder` | The repository whose configuration publishes an image. |
 | `<role>` | `runner` | A workload that runs an image. |
+| `<role>` | `emitter` | An alert rule that attaches a known label. |
+| `<role>` | `matcher` | An Alertmanager route that tests a label. |
 | `<role>` | `provisioner` | Creates the resource. |
 | `<role>` | `writer` | Writes the resource. |
 | `<role>` | `reader` | Reads the resource. |
@@ -421,6 +430,7 @@ words:
 | `<side>` | `<place> <address> (root <iac-root>)` | A provisioner and its root. |
 | `<side>` | `<place> <caller>` | A side in code or IaC: the line and the symbol or source address. |
 | `<side>` | `<path>` | A manifest. |
+| `<side>` | `<path>#<key-path>` | A monitoring rule or route at its configuration key. |
 | `<side>` | `<path> (top level)` | A route file serving with no function of its own. |
 | `<side>` | `(repository-level)` | A side declared with no `via`. |
 | `<side>` | `<path> (documented only)` | A side only a provider document lists. |
@@ -432,6 +442,7 @@ words:
 | `<contract-kind>` | `resource` | A resource. |
 | `<contract-kind>` | `package` | A package. |
 | `<contract-kind>` | `image` | An image. |
+| `<contract-kind>` | `alert` | An alert label or route matcher. |
 
 ## `trace`
 
@@ -523,6 +534,7 @@ carries its level with no reason.
 | `<sides>` | `producers and consumers` | A channel's sides. |
 | `<sides>` | `packages and dependents` | A package's sides. |
 | `<sides>` | `builders and runners` | An image's sides. |
+| `<sides>` | `emitters and matchers` | An alert contract's sides. |
 | `<call-site>` | `<identity>::<callee>#<n>` | A call site's identity: its caller's (a symbol, or a file for a call at its top level), what it calls, and its ordinal among the caller's calls of that name. |
 
 ## Every tool

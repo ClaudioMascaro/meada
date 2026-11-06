@@ -12,3 +12,4 @@ Read the topic whose limit this change touches; the other limit families are in
 - [Terraform and provisioning](resolution-the-index-and-shape-readers/terraform-and-provisioning.md)
 - [Kubernetes and Crossplane](resolution-the-index-and-shape-readers/kubernetes-and-crossplane.md)
 - [Compose, CloudFormation, Serverless and images](resolution-the-index-and-shape-readers/compose-cloudformation-serverless-and-images.md)
+- [Alert monitoring readers and routing](resolution-the-index-and-shape-readers/alerts.md)

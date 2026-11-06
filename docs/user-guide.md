@@ -2128,3 +2128,28 @@ o Compose fornece entradas em mapa ou lista e defaults como `${QUEUE_URL:-orders
 `redacted`, e uma referência ausente ou um valor não resolvido não cria vínculo. Nomes só
 coincidem dentro do escopo do workload: os valores vêm do IaC e da configuração dos
 repositórios, nunca do ambiente de um processo.
+
+## Alertas e rotas do Alertmanager
+
+O contrato `alert::<chave>::<valor>` liga os rótulos de regras Prometheus e Loki
+(inclusive `PrometheusRule`) e Grafana aos matchers de rotas do Alertmanager, em arquivos
+de configuração e objetos `AlertmanagerConfig`. Igualdade gera um link `exact`; uma
+expressão regular gera `inferred`. As condições de uma rota são verificadas em conjunto.
+
+`search` com kind `alert` encontra o contrato; `context` na rota mostra seu receiver,
+e `trace` percorre da regra à rota e de volta. `meada export` inclui emissores, matchers
+e links. `meada status` só lista órfãos quando o escopo visível tem os dois lados;
+sem isso, `search` e `context` indicam o lado ausente. Valores Helm que ainda dependem
+de templates não são emissores: Meada não renderiza templates.
+
+```json
+{"tool":"search","arguments":{"query":"alert::support::team-b","kind":"alert"}}
+{"tool":"context","arguments":{"symbol":"alertmanager.yaml::route.routes[0]"}}
+{"tool":"trace","arguments":{"from":"rules.yaml::groups[0].rules[0]","direction":"down"}}
+```
+
+Regras Grafana também são lidas de exports JSON e de blocos `rule` de `grafana_rule_group` em Terraform/OpenTofu, com rótulos literais.
+
+Uma rota raiz sem matchers não cria um lado de alerta: não há chave e valor para o contrato. O grafo descreve os matchers escritos, sem calcular notificações finais, inibições ou horários.
+
+Prometheus e Loki também emitem o `alertname` literal do nome da regra, sobrescrevendo um rótulo com esse nome. Rótulos que possam vir da expressão permanecem desconhecidos, não vazios. Arquivos sob `templates/` não são renderizados nem tratados como emissores de alertas.

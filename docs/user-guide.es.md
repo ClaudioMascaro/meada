@@ -2159,3 +2159,28 @@ aporta entradas en mapa o lista y valores predeterminados como `${QUEUE_URL:-ord
 `redacted`, y una referencia ausente o un valor no resuelto no crea vínculos. Los nombres solo
 coinciden dentro del ámbito del workload: los valores vienen del IaC y la configuración de
 los repositorios, nunca del entorno de un proceso.
+
+## Alertas y rutas de Alertmanager
+
+El contrato `alert::<clave>::<valor>` une las etiquetas de reglas Prometheus y Loki
+(incluido `PrometheusRule`) y Grafana con los matchers de rutas de Alertmanager, en
+archivos de configuración y objetos `AlertmanagerConfig`. La igualdad crea un enlace
+`exact`; una expresión regular crea `inferred`. Las condiciones de una ruta se comprueban juntas.
+
+`search` con kind `alert` encuentra el contrato; `context` en la ruta muestra su receiver,
+y `trace` recorre de la regla a la ruta y de vuelta. `meada export` incluye emisores,
+matchers y enlaces. `meada status` solo lista huérfanos cuando el ámbito visible contiene
+ambos lados; de lo contrario, `search` y `context` indican el lado ausente. Los valores Helm
+que dependen de templates no son emisores: Meada no renderiza templates.
+
+```json
+{"tool":"search","arguments":{"query":"alert::support::team-b","kind":"alert"}}
+{"tool":"context","arguments":{"symbol":"alertmanager.yaml::route.routes[0]"}}
+{"tool":"trace","arguments":{"from":"rules.yaml::groups[0].rules[0]","direction":"down"}}
+```
+
+Las reglas Grafana también se leen de exports JSON y bloques `rule` de recursos `grafana_rule_group` en Terraform/OpenTofu, con etiquetas literales.
+
+Una ruta raíz sin matchers no crea un lado de alerta: no hay clave y valor para el contrato. El grafo describe los matchers escritos, sin predecir notificaciones finales, inhibiciones ni horarios.
+
+Prometheus y Loki también emiten el `alertname` literal del nombre de la regla, sobrescribiendo una etiqueta con ese nombre. Las etiquetas que puedan venir de la expresión permanecen desconocidas, no vacías. Los archivos bajo `templates/` no se renderizan ni se tratan como emisores de alertas.

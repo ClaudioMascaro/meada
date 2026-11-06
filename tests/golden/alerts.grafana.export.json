@@ -1,0 +1,126 @@
+{
+  "format": 1,
+  "repository": "example.com/acme/monitoring",
+  "commit": "c40bfebba16c189d925429f43480b8568c446166",
+  "dirty": true,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "alert::support::team-d",
+      "site": "example.com/acme/monitoring::group.tofu::resource.grafana_rule_group.ops.rule"
+    },
+    {
+      "contract": "alert::support::team-d",
+      "site": "example.com/acme/monitoring::other.tofu.json::resource.grafana_rule_group.ops.rule[0]"
+    },
+    {
+      "contract": "alert::support::team-d",
+      "site": "example.com/acme/monitoring::standalone.json::rule"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "alert::support::team-e",
+      "site": "example.com/acme/monitoring::alertmanager.yaml::route.routes[0]",
+      "via": "alert matcher !="
+    },
+    {
+      "contract": "alert::support::team-(e|f)",
+      "site": "example.com/acme/monitoring::alertmanager.yaml::route.routes[1]",
+      "via": "alert matcher !~"
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "example.com/acme/monitoring::alertmanager.yaml::route.routes[0]",
+      "address": "route.routes[0]",
+      "type": "AlertmanagerRoute",
+      "root": "alertmanager.yaml",
+      "path": "alertmanager.yaml",
+      "line": 4,
+      "end_line": 6
+    },
+    {
+      "identity": "example.com/acme/monitoring::alertmanager.yaml::route.routes[1]",
+      "address": "route.routes[1]",
+      "type": "AlertmanagerRoute",
+      "root": "alertmanager.yaml",
+      "path": "alertmanager.yaml",
+      "line": 7,
+      "end_line": 8
+    },
+    {
+      "identity": "example.com/acme/monitoring::group.tofu::resource.grafana_rule_group.ops.rule",
+      "address": "resource.grafana_rule_group.ops.rule",
+      "type": "AlertRule",
+      "root": "group.tofu",
+      "path": "group.tofu",
+      "line": 2,
+      "end_line": 5
+    },
+    {
+      "identity": "example.com/acme/monitoring::other.tofu.json::resource.grafana_rule_group.ops.rule[0]",
+      "address": "resource.grafana_rule_group.ops.rule[0]",
+      "type": "AlertRule",
+      "root": "other.tofu.json",
+      "path": "other.tofu.json",
+      "line": 8,
+      "end_line": 10
+    },
+    {
+      "identity": "example.com/acme/monitoring::standalone.json::rule",
+      "address": "rule",
+      "type": "AlertRule",
+      "root": "standalone.json",
+      "path": "standalone.json",
+      "line": 1,
+      "end_line": 1
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/monitoring::alertmanager.yaml::route.routes[0]",
+      "provider": "example.com/acme/monitoring::group.tofu::resource.grafana_rule_group.ops.rule",
+      "contract": "alert::support::team-e",
+      "level": "exact",
+      "reason": "alert::support::team-e; matchers \"support\"!=\"team-e\"; receiver: not-e"
+    },
+    {
+      "consumer": "example.com/acme/monitoring::alertmanager.yaml::route.routes[0]",
+      "provider": "example.com/acme/monitoring::other.tofu.json::resource.grafana_rule_group.ops.rule[0]",
+      "contract": "alert::support::team-e",
+      "level": "exact",
+      "reason": "alert::support::team-e; matchers \"support\"!=\"team-e\"; receiver: not-e"
+    },
+    {
+      "consumer": "example.com/acme/monitoring::alertmanager.yaml::route.routes[0]",
+      "provider": "example.com/acme/monitoring::standalone.json::rule",
+      "contract": "alert::support::team-e",
+      "level": "exact",
+      "reason": "alert::support::team-e; matchers \"support\"!=\"team-e\"; receiver: not-e"
+    },
+    {
+      "consumer": "example.com/acme/monitoring::alertmanager.yaml::route.routes[1]",
+      "provider": "example.com/acme/monitoring::group.tofu::resource.grafana_rule_group.ops.rule",
+      "contract": "alert::support::team-(e|f)",
+      "level": "inferred",
+      "reason": "alert::support::team-(e|f); matchers \"support\"!~\"team-(e|f)\"; receiver: not-ef"
+    },
+    {
+      "consumer": "example.com/acme/monitoring::alertmanager.yaml::route.routes[1]",
+      "provider": "example.com/acme/monitoring::other.tofu.json::resource.grafana_rule_group.ops.rule[0]",
+      "contract": "alert::support::team-(e|f)",
+      "level": "inferred",
+      "reason": "alert::support::team-(e|f); matchers \"support\"!~\"team-(e|f)\"; receiver: not-ef"
+    },
+    {
+      "consumer": "example.com/acme/monitoring::alertmanager.yaml::route.routes[1]",
+      "provider": "example.com/acme/monitoring::standalone.json::rule",
+      "contract": "alert::support::team-(e|f)",
+      "level": "inferred",
+      "reason": "alert::support::team-(e|f); matchers \"support\"!~\"team-(e|f)\"; receiver: not-ef"
+    }
+  ]
+}

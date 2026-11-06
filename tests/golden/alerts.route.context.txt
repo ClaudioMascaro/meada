@@ -1,0 +1,13 @@
+example.com/acme/monitoring alertmanager.yaml:4-6 [0].route.routes[0]
+type: AlertmanagerRoute
+name: "equality"
+root: alertmanager.yaml
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/acme/monitoring alertmanager.yaml:4 [0].route.routes[0].receiver = "equality"
+example.com/acme/monitoring alertmanager.yaml:5 [0].route.routes[0].continue = true
+example.com/acme/monitoring alertmanager.yaml:6 [0].route.routes[0].match.support = "team-b"
+matcher: alert::support::team-b
+receiver: equality

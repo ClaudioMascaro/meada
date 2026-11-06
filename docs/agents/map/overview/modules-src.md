@@ -27,6 +27,7 @@ for the area a change touches.
 - `contract.rs`, `contract/`: the `ContractKind` trait, `KINDS`, the free functions the engine asks, and shared SDK constructor/request mechanics in `contract/sdk/`. [contracts](../contracts.md)
 - `http.rs`, `http/`: the HTTP kind: the contract and path rules, mounts, and one submodule per language for providers and consumers. [contracts](../contracts.md)
 - `resource.rs`, `resource/`: the resource kind, declared in `meada.toml` at symbols, IaC addresses or indexed config keys (`resource/via.rs`, #641), or read from SDK calls; `resource/aws.rs` owns its AWS operation table. [contracts](../contracts.md)
+- `alert.rs`, `alert/`: alert labels as emitters, monitoring readers, bounded Go/RE2 matching, receiver context and two-role orphans. [contracts](../contracts.md)
 - `image.rs`, `image/config.rs`: image builders/runners, normalized names, checked-in build configuration, workload execution, scoped environment resolution (`image/environment.rs`, #663), and two-role orphans. [contracts](../contracts.md)
 - `channel.rs`, `channel/`: the channel kind (queues and topics), one module per language for message libraries. [contracts](../contracts.md)
 - `package.rs`, `package/`: packages as contracts, one module per ecosystem behind the `Ecosystem` trait. [contracts](../contracts.md)

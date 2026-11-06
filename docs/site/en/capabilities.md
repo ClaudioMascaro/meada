@@ -543,3 +543,22 @@ map or list entries and defaults such as `${QUEUE_URL:-orders}`. Workload `conte
 names, targets and available values. A Secret stays `redacted`, and a missing reference or
 unresolved value creates no link. Names match only within the workload's scope: values come
 from the repositories' IaC and configuration, never from a process environment.
+
+## Alerts and Alertmanager routes
+
+The `alert::<key>::<value>` contract joins labels on Prometheus and Loki rules
+(including `PrometheusRule`) and Grafana rules to Alertmanager route matchers, in
+configuration files and `AlertmanagerConfig` objects. Equality creates an `exact` link;
+a regular expression creates an `inferred` link. A route's conditions are checked together.
+
+`search` with kind `alert` finds the contract; `context` on a route shows its receiver,
+and `trace` walks from a rule to its route and back. `meada export` includes emitters,
+matchers and links. `meada status` lists orphans only when the visible scope has both
+sides; otherwise `search` and `context` mark the missing side. Helm values awaiting
+template rendering are not emitters: Meada does not render templates.
+
+Grafana rules also come from JSON exports and `rule` blocks of Terraform/OpenTofu `grafana_rule_group` resources with literal labels.
+
+A root route without matchers creates no alert side: there is no key and value for a contract. The graph describes written matchers, without predicting final notifications, inhibition or schedules.
+
+Prometheus and Loki also emit the literal `alertname` from the rule name, overriding a label of that name. Labels that may come from the expression remain unknown, not empty. Files under `templates/` are not rendered or treated as alert emitters.

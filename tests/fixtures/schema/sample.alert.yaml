@@ -1,0 +1,14 @@
+groups:
+  - name: availability
+    labels: {region: eu}
+    rules:
+      - alert: ApiDown
+        expr: up == 0
+        labels: {support: team-b}
+---
+route:
+  receiver: fallback
+  routes:
+    - receiver: team-b
+      matchers: ['support=~"team-.*"']
+receivers: [{name: fallback}, {name: team-b}]

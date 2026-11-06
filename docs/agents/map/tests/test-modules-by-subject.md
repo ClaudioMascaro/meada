@@ -445,3 +445,7 @@
   removal/restoration and read-only server manifest scope use the Engine seam and goldens.
   Controls reject null/empty locations and HCL expression/template selector equality, retain
   inferred matches alongside declared keys across repositories, and continue read-write keys.
+
+- `alerts.rs` (#672): alert labels and Alertmanager routes over sibling `alert-monitoring` and
+  `alert-app` fixtures, equality and regex levels, conjunctions, receiver context, bidirectional
+  traces, Helm negatives and scope-aware orphan refresh, with complete export goldens.

@@ -3995,3 +3995,52 @@ sample.provision.tf
     ],
     [],
 )
+
+sample.alert.yaml
+{
+  "alert": {
+    "routes": [
+      {
+        "continuing": false,
+        "end_line": 10,
+        "key": "[1].route",
+        "line": 10,
+        "matchers": [],
+        "parent": null,
+        "receiver": "fallback",
+        "valid": true
+      },
+      {
+        "continuing": false,
+        "end_line": 13,
+        "key": "[1].route.routes[0]",
+        "line": 12,
+        "matchers": [
+          {
+            "key": "support",
+            "op": "Regex",
+            "value": "team-.*"
+          }
+        ],
+        "parent": 0,
+        "receiver": "team-b",
+        "valid": true
+      }
+    ],
+    "rules": [
+      {
+        "end_line": 7,
+        "key": "[0].groups[0].rules[0]",
+        "labels": {
+          "alertname": "ApiDown",
+          "region": "eu",
+          "support": "team-b"
+        },
+        "line": 5,
+        "name": "ApiDown",
+        "unknown": []
+      }
+    ],
+    "truncated": false
+  }
+}

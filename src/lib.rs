@@ -3,6 +3,7 @@
 
 #[cfg(feature = "accounts")]
 mod accounts;
+mod alert;
 #[cfg(any(feature = "ui", feature = "generation-pointer"))]
 pub mod audit;
 #[cfg(feature = "workspaces")]

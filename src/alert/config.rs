@@ -1,0 +1,758 @@
+//! Monitoring configuration facts, stored once and read without checkout access by queries.
+
+use crate::document::events::{self, Step, Syntax};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::{BTreeMap, BTreeSet};
+
+// ponytail: repeated labels and long route paths must not amplify one file without bound.
+const ALERT_STORED_MAX: usize = 4 * crate::lang::MAX_BYTES;
+
+#[derive(Default, Serialize, Deserialize)]
+pub(super) struct Summary {
+    pub rules: Vec<Rule>,
+    pub routes: Vec<Route>,
+    pub truncated: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub(super) struct Rule {
+    pub key: String,
+    pub name: String,
+    pub line: usize,
+    pub end_line: usize,
+    pub labels: BTreeMap<String, String>,
+    pub unknown: BTreeSet<String>,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize)]
+pub(super) enum Op {
+    Equal,
+    NotEqual,
+    Regex,
+    NotRegex,
+}
+impl Op {
+    pub fn text(self) -> &'static str {
+        match self {
+            Self::Equal => "=",
+            Self::NotEqual => "!=",
+            Self::Regex => "=~",
+            Self::NotRegex => "!~",
+        }
+    }
+    pub fn regex(self) -> bool {
+        matches!(self, Self::Regex | Self::NotRegex)
+    }
+    fn read(text: &str) -> Option<Self> {
+        Some(match text {
+            "=" => Self::Equal,
+            "!=" => Self::NotEqual,
+            "=~" => Self::Regex,
+            "!~" => Self::NotRegex,
+            _ => return None,
+        })
+    }
+}
+#[derive(Clone, Serialize, Deserialize)]
+pub(super) struct Matcher {
+    pub key: String,
+    pub value: String,
+    pub op: Op,
+}
+impl Matcher {
+    pub fn expression(&self) -> String {
+        format!(
+            "{}{}{}",
+            serde_json::to_string(&self.key).unwrap_or_default(),
+            self.op.text(),
+            serde_json::to_string(&self.value).unwrap_or_default()
+        )
+    }
+    pub fn via(&self) -> String {
+        format!("alert matcher {}", self.op.text())
+    }
+    pub fn contract(&self) -> String {
+        super::contract(&self.key, &self.value)
+    }
+}
+#[derive(Serialize, Deserialize)]
+pub(super) struct Route {
+    pub key: String,
+    pub receiver: String,
+    pub line: usize,
+    pub end_line: usize,
+    pub matchers: Vec<Matcher>,
+    pub parent: Option<usize>,
+    pub continuing: bool,
+    pub valid: bool,
+}
+
+type Spans = BTreeMap<(usize, String), (usize, usize)>;
+
+pub(super) fn is_file(path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    !name.starts_with("values")
+        && !path.split('/').any(|part| part == "templates")
+        && !crate::config_values::lockfile(path)
+        && [".yaml", ".yml", ".json", ".tf", ".tofu"]
+            .iter()
+            .any(|s| path.ends_with(s))
+}
+fn literal(value: &str) -> bool {
+    !value.contains("{{") && !value.contains("${") && !value.contains("%{")
+}
+fn label_set(value: Option<&Value>) -> (BTreeMap<String, String>, BTreeSet<String>) {
+    let mut known = BTreeMap::new();
+    let mut unknown = BTreeSet::new();
+    let computed_key = value
+        .and_then(Value::as_object)
+        .is_some_and(|object| object.keys().any(|key| !literal(key)));
+    for (key, value) in value.and_then(Value::as_object).into_iter().flatten() {
+        if let Some(value) = value.as_str().filter(|v| literal(v)) {
+            known.insert(key.clone(), value.into());
+        } else {
+            unknown.insert(key.clone());
+        }
+    }
+    if computed_key {
+        unknown.extend(known.keys().cloned());
+        known.clear();
+    }
+    (known, unknown)
+}
+
+pub(super) fn read(path: &str, src: &[u8]) -> Summary {
+    let mut out = Summary::default();
+    if src.len() > crate::lang::MAX_BYTES || !is_file(path) {
+        return out;
+    }
+    if path.ends_with(".tf") || path.ends_with(".tofu") {
+        return terraform(path, src);
+    }
+    let mut spans = Spans::new();
+    let Ok(docs) = events::read(Syntax::of(path), src, |s| {
+        let end = s
+            .path
+            .windows(2)
+            .enumerate()
+            .filter_map(|(i, pair)| match pair {
+                [Step::Key(key), Step::Index(_)]
+                    if matches!(key.as_str(), "rules" | "routes" | "rule") =>
+                {
+                    Some(i + 2)
+                }
+                _ => None,
+            })
+            .next_back()
+            .or_else(|| {
+                s.path
+                    .iter()
+                    .position(|p| *p == Step::Key("route".into()))
+                    .map(|i| i + 1)
+            });
+        if let Some(end) = end {
+            let key = crate::config_values::key_path(&s.path[..end]);
+            let span = spans.entry((s.document, key)).or_insert((s.line, s.line));
+            span.0 = span.0.min(s.line);
+            span.1 = span.1.max(s.line);
+        }
+    }) else {
+        return out;
+    };
+    let mut bytes = 0;
+    for (d, doc) in docs.iter().enumerate() {
+        let prefix = if docs.len() > 1 {
+            format!("[{d}].")
+        } else {
+            String::new()
+        };
+        let object = doc.get("kind").and_then(Value::as_str);
+        let monitoring = doc
+            .get("apiVersion")
+            .and_then(Value::as_str)
+            .is_some_and(|v| v.starts_with("monitoring.coreos.com/"));
+        let (body, base) = if monitoring && object == Some("PrometheusRule") {
+            (&doc["spec"], "spec.")
+        } else {
+            (doc, "")
+        };
+        if object.is_none() || (monitoring && object == Some("PrometheusRule")) {
+            for (g, group) in body
+                .get("groups")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .enumerate()
+            {
+                for (r, rule) in group
+                    .get("rules")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .enumerate()
+                {
+                    let alert = rule
+                        .get("alert")
+                        .and_then(Value::as_str)
+                        .filter(|_| rule.get("expr").is_some());
+                    let name = alert.or_else(|| grafana_name(rule));
+                    let Some(name) = name.filter(|n| !n.is_empty() && literal(n)) else {
+                        continue;
+                    };
+                    if rule.get("labels").is_some_and(|v| !v.is_object()) {
+                        continue;
+                    }
+                    let key = format!("{base}groups[{g}].rules[{r}]");
+                    let (line, end_line) = spans.get(&(d, key.clone())).copied().unwrap_or((1, 1));
+                    let (mut labels, mut unknown) = label_set(group.get("labels"));
+                    let (own, unresolved) = label_set(rule.get("labels"));
+                    for key in &unresolved {
+                        labels.remove(key);
+                    }
+                    for key in own.keys() {
+                        unknown.remove(key);
+                    }
+                    labels.extend(own);
+                    unknown.extend(unresolved);
+                    if alert.is_some() {
+                        // Prometheus/Loki apply rule labels before setting the rule name.
+                        labels.insert("alertname".into(), name.into());
+                        unknown.remove("alertname");
+                    }
+                    let item = Rule {
+                        key: format!("{prefix}{key}"),
+                        name: name.into(),
+                        line,
+                        end_line,
+                        labels,
+                        unknown,
+                    };
+                    if charge_rule(&item, path, &mut bytes) {
+                        out.rules.push(item);
+                    } else {
+                        out.truncated = true;
+                        return bounded(out);
+                    }
+                }
+            }
+            for (key, value) in std::iter::once(("rule".to_string(), doc)).chain(
+                doc.as_array()
+                    .into_iter()
+                    .flatten()
+                    .enumerate()
+                    .map(|(i, rule)| (format!("[{i}]"), rule)),
+            ) {
+                if let Some(name) = grafana_name(value) {
+                    let (labels, unknown) = label_set(value.get("labels"));
+                    let item = Rule {
+                        key: format!("{prefix}{key}"),
+                        name: name.into(),
+                        line: 1,
+                        end_line: src.iter().filter(|b| **b == b'\n').count().max(1),
+                        labels,
+                        unknown,
+                    };
+                    if charge_rule(&item, path, &mut bytes) {
+                        out.rules.push(item);
+                    } else {
+                        out.truncated = true;
+                        return bounded(out);
+                    }
+                }
+            }
+        }
+        if path.ends_with(".tf.json") || path.ends_with(".tofu.json") {
+            terraform_json(path, doc, d, &spans, &mut out, &mut bytes);
+        }
+        let (body, base) = if monitoring && object == Some("AlertmanagerConfig") {
+            (&doc["spec"], "spec.")
+        } else {
+            (doc, "")
+        };
+        if (object.is_none() || (monitoring && object == Some("AlertmanagerConfig")))
+            && body.get("receivers").is_some_and(Value::is_array)
+            && let Some(route) = body.get("route")
+        {
+            // Queue only input references and indexes: copying a parent's long receiver or
+            // path across all children would allocate before the child's budget check.
+            let mut pending = vec![(route, None, 0)];
+            while let Some((value, parent, child_index)) = pending.pop() {
+                let (key, inherited) = match parent {
+                    Some(index) => {
+                        let ancestor: &Route = &out.routes[index];
+                        (
+                            format!("{}.routes[{child_index}]", ancestor.key),
+                            ancestor.receiver.as_str(),
+                        )
+                    }
+                    None => (format!("{prefix}{base}route"), ""),
+                };
+                let receiver = value
+                    .get("receiver")
+                    .and_then(Value::as_str)
+                    .unwrap_or(inherited)
+                    .to_string();
+                let conditions = matchers(value);
+                let valid = value.is_object()
+                    && value.get("routes").is_none_or(Value::is_array)
+                    && value.get("receiver").is_none_or(Value::is_string)
+                    && conditions.is_some()
+                    && !receiver.is_empty()
+                    && literal(&receiver)
+                    && value.get("continue").is_none_or(Value::is_boolean);
+                let span_key = key.strip_prefix(&prefix).unwrap_or(&key);
+                let (line, end_line) = spans
+                    .get(&(d, span_key.to_string()))
+                    .copied()
+                    .unwrap_or((1, 1));
+                let item = Route {
+                    key,
+                    receiver,
+                    line,
+                    end_line,
+                    matchers: conditions.unwrap_or_default(),
+                    parent,
+                    continuing: value
+                        .get("continue")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false),
+                    valid,
+                };
+                if !charge(&item, &mut bytes) || !charge_route(&item, path, &out.routes, &mut bytes)
+                {
+                    out.truncated = true;
+                    return bounded(out);
+                }
+                let parent = Some(out.routes.len());
+                out.routes.push(item);
+                for (i, child) in array(value.get("routes")).iter().enumerate().rev() {
+                    pending.push((child, parent, i));
+                }
+            }
+        }
+    }
+    bounded(out)
+}
+fn array(value: Option<&Value>) -> &[Value] {
+    value
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[])
+}
+fn grafana_name(rule: &Value) -> Option<&str> {
+    rule.get("uid")?.as_str()?;
+    rule.get("condition")?.as_str()?;
+    rule.get("data")?.as_array()?;
+    rule.get("title")?.as_str()
+}
+fn matchers(route: &Value) -> Option<Vec<Matcher>> {
+    let mut out = Vec::new();
+    for (field, op) in [("match", Op::Equal), ("match_re", Op::Regex)] {
+        if let Some(value) = route.get(field) {
+            for (key, value) in value.as_object()? {
+                out.push(Matcher {
+                    key: key.clone(),
+                    value: value.as_str()?.into(),
+                    op,
+                });
+            }
+        }
+    }
+    if let Some(value) = route.get("matchers") {
+        for value in value.as_array()? {
+            if let Some(text) = value.as_str() {
+                out.extend(expressions(text)?);
+            } else {
+                let op = if let Some(ty) = value.get("matchType") {
+                    Op::read(ty.as_str()?)?
+                } else if match value.get("regex") {
+                    Some(regex) => regex.as_bool()?,
+                    None => false,
+                } {
+                    Op::Regex
+                } else {
+                    Op::Equal
+                };
+                out.push(Matcher {
+                    key: value.get("name")?.as_str()?.into(),
+                    value: value.get("value")?.as_str()?.into(),
+                    op,
+                });
+            }
+        }
+    }
+    out.iter()
+        .all(|m| !m.key.is_empty() && literal(&m.value))
+        .then_some(out)
+}
+
+// A quoted key or value uses the same escapes as JSON. Commas inside strings are literal.
+fn expressions(text: &str) -> Option<Vec<Matcher>> {
+    let text = text.trim();
+    let text = if text.starts_with('{') {
+        text.strip_prefix('{')?.strip_suffix('}')?
+    } else {
+        text
+    };
+    let mut quoted = false;
+    let mut escaped = false;
+    let mut start = 0;
+    let mut out = Vec::new();
+    for (i, ch) in text
+        .char_indices()
+        .chain(std::iter::once((text.len(), ',')))
+    {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if quoted && ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if ch == '"' {
+            quoted = !quoted;
+        }
+        if ch == ',' && !quoted {
+            out.push(expression(text[start..i].trim())?);
+            start = i + 1;
+        }
+    }
+    (!quoted && !escaped).then_some(out)
+}
+fn expression(text: &str) -> Option<Matcher> {
+    let mut quoted = false;
+    let mut escaped = false;
+    for (i, ch) in text.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if quoted && ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if ch == '"' {
+            quoted = !quoted;
+        }
+        if !quoted && matches!(ch, '=' | '!') {
+            let suffix = &text[i..];
+            let op = ["!=", "=~", "!~", "="]
+                .into_iter()
+                .find(|op| suffix.starts_with(op))?;
+            let key = token(text[..i].trim())?;
+            let value = token(suffix[op.len()..].trim())?;
+            return Some(Matcher {
+                key,
+                value,
+                op: Op::read(op)?,
+            });
+        }
+    }
+    None
+}
+fn token(text: &str) -> Option<String> {
+    if text.starts_with('"') {
+        serde_json::from_str(text).ok()
+    } else {
+        (!text.is_empty()
+            && !text.contains(['"', '=', '!', '{', '}'])
+            && !text.chars().any(char::is_whitespace))
+        .then(|| text.into())
+    }
+}
+
+fn charge(item: &impl Serialize, bytes: &mut usize) -> bool {
+    let cost = serde_json::to_vec(item).map_or(ALERT_STORED_MAX, |v| v.len() + 1);
+    *bytes = bytes.saturating_add(cost);
+    *bytes <= ALERT_STORED_MAX.saturating_sub(64)
+}
+/// Charge the side fields a summary will materialize as well as its serialized bytes.
+/// Ancestors are stored once but can contribute a matcher to many descendant routes.
+fn fields(bytes: &mut usize, parts: &[usize]) -> bool {
+    for part in parts {
+        *bytes = bytes.saturating_add(*part);
+    }
+    *bytes <= ALERT_STORED_MAX.saturating_sub(64)
+}
+fn charge_rule(rule: &Rule, path: &str, bytes: &mut usize) -> bool {
+    charge(rule, bytes)
+        && charge_node(path, &rule.key, "AlertRule", &rule.name, bytes)
+        && rule.labels.iter().all(|(key, value)| {
+            fields(
+                bytes,
+                &[
+                    std::mem::size_of::<crate::index::Provider>(),
+                    path.len(),
+                    rule.key.len(),
+                    key.len(),
+                    value.len(),
+                    "::::alert::::".len(),
+                ],
+            )
+        })
+}
+fn charge_route(item: &Route, path: &str, routes: &[Route], bytes: &mut usize) -> bool {
+    if !charge_node(path, &item.key, "AlertmanagerRoute", &item.receiver, bytes) {
+        return false;
+    }
+    let mut current = item;
+    loop {
+        for matcher in &current.matchers {
+            if !fields(
+                bytes,
+                &[
+                    std::mem::size_of::<crate::index::Consumer>(),
+                    path.len(),
+                    item.key.len(),
+                    matcher.key.len(),
+                    matcher.value.len(),
+                    "::::alert::::alert matcher !~".len(),
+                ],
+            ) {
+                return false;
+            }
+        }
+        let Some(parent) = current.parent else {
+            return true;
+        };
+        current = &routes[parent];
+    }
+}
+
+fn charge_node(path: &str, key: &str, ty: &str, name: &str, bytes: &mut usize) -> bool {
+    fields(
+        bytes,
+        &[
+            std::mem::size_of::<crate::iac::Node>(),
+            path.len(),
+            path.len(),
+            key.len(),
+            key.len(),
+            ty.len(),
+            name.len(),
+        ],
+    )
+}
+
+fn bounded(out: Summary) -> Summary {
+    if out.truncated {
+        Summary {
+            truncated: true,
+            ..Default::default()
+        }
+    } else {
+        out
+    }
+}
+
+fn terraform(path: &str, src: &[u8]) -> Summary {
+    use hcl_edit::Span;
+    use hcl_edit::expr::{Expression, ObjectKey};
+    let mut out = Summary::default();
+    let Ok(text) = std::str::from_utf8(src) else {
+        return out;
+    };
+    if crate::config_values::nested_past(text).is_some() {
+        return out;
+    }
+    let Ok(body) = hcl_edit::parser::parse_body(text) else {
+        return out;
+    };
+    let newlines = text
+        .bytes()
+        .enumerate()
+        .filter(|(_, b)| *b == b'\n')
+        .map(|(i, _)| i)
+        .collect::<Vec<_>>();
+    let line = |offset| newlines.partition_point(|&n| n < offset) + 1;
+    let string = |expression: &Expression| match expression {
+        Expression::String(s) => Some(s.value().clone()),
+        _ => None,
+    };
+    let mut bytes = 0;
+    for group in body.blocks().filter(|b| {
+        b.ident.as_str() == "resource"
+            && b.labels.len() == 2
+            && b.labels[0].as_str() == "grafana_rule_group"
+    }) {
+        let rules = group
+            .body
+            .blocks()
+            .filter(|b| b.ident.as_str() == "rule")
+            .collect::<Vec<_>>();
+        for (i, rule) in rules.iter().enumerate() {
+            let Some(name) = rule
+                .body
+                .get_attribute("name")
+                .and_then(|a| string(&a.value))
+            else {
+                continue;
+            };
+            let Some(Expression::Object(labels)) =
+                rule.body.get_attribute("labels").map(|a| &a.value)
+            else {
+                continue;
+            };
+            let mut known = BTreeMap::new();
+            let mut unknown = BTreeSet::new();
+            let mut computed_key = false;
+            for (key, value) in labels {
+                let key = match key {
+                    ObjectKey::Ident(id) => Some(id.as_str().to_string()),
+                    ObjectKey::Expression(expr) => string(expr),
+                };
+                let Some(key) = key else {
+                    computed_key = true;
+                    continue;
+                };
+                if let Some(value) = string(value.expr()).filter(|v| literal(v)) {
+                    known.insert(key, value);
+                } else {
+                    unknown.insert(key);
+                }
+            }
+            if computed_key {
+                unknown.extend(known.keys().cloned());
+                known.clear();
+            }
+            let mut steps = vec![
+                Step::Key("resource".into()),
+                Step::Key("grafana_rule_group".into()),
+                Step::Key(group.labels[1].as_str().into()),
+                Step::Key("rule".into()),
+            ];
+            if rules.len() > 1 {
+                steps.push(Step::Index(i));
+            }
+            let span = rule.span().unwrap_or(0..0);
+            let item = Rule {
+                key: crate::config_values::key_path(&steps),
+                name,
+                line: line(span.start),
+                end_line: line(span.end.saturating_sub(1)),
+                labels: known,
+                unknown,
+            };
+            if charge_rule(&item, path, &mut bytes) {
+                out.rules.push(item);
+            } else {
+                out.truncated = true;
+                return bounded(out);
+            }
+        }
+    }
+    bounded(out)
+}
+fn terraform_json(
+    path: &str,
+    doc: &Value,
+    document: usize,
+    spans: &Spans,
+    out: &mut Summary,
+    bytes: &mut usize,
+) {
+    for (name, group) in doc
+        .pointer("/resource/grafana_rule_group")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+    {
+        for (i, rule) in array(group.get("rule")).iter().enumerate() {
+            let Some(title) = rule.get("name").and_then(Value::as_str) else {
+                continue;
+            };
+            let (labels, unknown) = label_set(rule.get("labels"));
+            let key = crate::config_values::key_path(&[
+                Step::Key("resource".into()),
+                Step::Key("grafana_rule_group".into()),
+                Step::Key(name.clone()),
+                Step::Key("rule".into()),
+                Step::Index(i),
+            ]);
+            let (line, end_line) = spans
+                .get(&(document, key.clone()))
+                .copied()
+                .unwrap_or((1, 1));
+            let item = Rule {
+                key,
+                name: title.into(),
+                line,
+                end_line,
+                labels,
+                unknown,
+            };
+            if charge_rule(&item, path, bytes) {
+                out.rules.push(item);
+            } else {
+                out.truncated = true;
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn inherited_receivers_stop_before_wide_route_queues_expand_them() {
+        let source = serde_json::json!({"route":{"receiver":"x".repeat(400_000), "routes":vec![serde_json::json!({}); 50_000]}, "receivers":[]}).to_string();
+        assert!(source.len() < crate::lang::MAX_BYTES);
+        let started = std::time::Instant::now();
+        let summary = read("alerts.json", source.as_bytes());
+        assert!(summary.truncated);
+        assert!(summary.rules.is_empty() && summary.routes.is_empty());
+        eprintln!("wide receiver inheritance: {:?}", started.elapsed());
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    }
+
+    #[test]
+    fn projected_nodes_count_long_paths_even_without_matcher_sides() {
+        let source = serde_json::json!({"route":{"receiver":"x", "routes":vec![serde_json::json!({}); 20000]}, "receivers":[]}).to_string();
+        let path = format!("{}alerts.json", "part/".repeat(600));
+        assert!(source.len() < crate::lang::MAX_BYTES);
+        let started = std::time::Instant::now();
+        let summary = read(&path, source.as_bytes());
+        assert!(summary.truncated);
+        assert!(summary.rules.is_empty() && summary.routes.is_empty());
+        eprintln!("projected nodes with a long path: {:?}", started.elapsed());
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    }
+
+    #[test]
+    fn inherited_route_conditions_charge_the_sides_they_will_materialize() {
+        let matchers = (0..2200)
+            .map(|i| (format!("key{i}"), Value::String("team-b".into())))
+            .collect::<serde_json::Map<_, _>>();
+        let routes = (0..100)
+            .map(|_| serde_json::json!({"receiver":"wide"}))
+            .collect::<Vec<_>>();
+        let source = serde_json::json!({"route":{"receiver":"wide", "match":matchers, "routes":routes}, "receivers":[{"name":"wide"}]}).to_string();
+        assert!(source.len() < crate::lang::MAX_BYTES);
+        let started = std::time::Instant::now();
+        let summary = read("alerts.json", source.as_bytes());
+        assert!(summary.truncated);
+        assert!(summary.rules.is_empty() && summary.routes.is_empty());
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    }
+
+    #[test]
+    fn inherited_labels_past_the_storage_ceiling_leave_no_partial_alert_facts() {
+        let rules = (0..1000)
+            .map(|i| format!("      - {{alert: A{i}, expr: up}}\n"))
+            .collect::<String>();
+        let text = format!(
+            "groups:\n  - name: large\n    labels: {{support: \"{}\"}}\n    rules:\n{rules}",
+            "x".repeat(8192)
+        );
+        assert!(text.len() < crate::lang::MAX_BYTES);
+        let started = std::time::Instant::now();
+        let summary = read("rules.yaml", text.as_bytes());
+        assert!(summary.truncated);
+        assert!(summary.rules.is_empty() && summary.routes.is_empty());
+        assert!(serde_json::to_vec(&summary).unwrap().len() < ALERT_STORED_MAX);
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    }
+}

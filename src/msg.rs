@@ -28,6 +28,14 @@ const REPORT_URL: &str =
     "https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml";
 
 pub enum Msg<'a> {
+    OrphanAlert {
+        contract: &'a str,
+        place: &'a str,
+        emitter: bool,
+    },
+    AlertSummaryLimit(&'a str),
+    AlertLinkLimit,
+    AlertMatchLimit,
     OrphanCounterpart {
         contract: &'a str,
         place: &'a str,
@@ -1814,6 +1822,25 @@ impl Msg<'_> {
                 format!("orphan {contract}: no provisioner; {place}"),
                 format!("órfão {contract}: nenhum provisionador; {place}"),
                 format!("huérfano {contract}: ningún provisionador; {place}"),
+            ),
+            Msg::OrphanAlert { contract, place, emitter } => {
+                let (en, pt, es) = if *emitter { ("emitter", "emissor", "emisor") } else { ("matcher", "matcher", "matcher") };
+                pick(format!("orphan {contract}: no {en}; {place}"), format!("órfão {contract}: nenhum {pt}; {place}"), format!("huérfano {contract}: ningún {es}; {place}"))
+            },
+            Msg::AlertMatchLimit => pick(
+                "alert routing skipped: evaluation limit".into(),
+                "roteamento de alertas ignorado: limite de avaliação".into(),
+                "enrutamiento de alertas omitido: límite de evaluación".into(),
+            ),
+            Msg::AlertLinkLimit => pick(
+                "alert routing skipped: link output limit".into(),
+                "roteamento de alertas ignorado: limite da saída de links".into(),
+                "enrutamiento de alertas omitido: límite de la salida de enlaces".into(),
+            ),
+            Msg::AlertSummaryLimit(path) => pick(
+                format!("alert file skipped: {path} (summary limit)"),
+                format!("arquivo de alertas ignorado: {path} (limite do resumo)"),
+                format!("archivo de alertas omitido: {path} (límite del resumen)"),
             ),
             Msg::OrphanCounterpart { contract, place, builder } => {
                 let (en, pt, es) = if *builder { ("builder", "construtor", "constructor") } else { ("runner", "executor", "ejecutor") };

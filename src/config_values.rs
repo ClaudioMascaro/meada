@@ -32,6 +32,11 @@ const LOCKFILES: [&str; 4] = [
     "packages.lock.json",
 ];
 
+/// A YAML/JSON dependency lockfile is not application configuration.
+pub(crate) fn lockfile(path: &str) -> bool {
+    LOCKFILES.contains(&path.rsplit('/').next().unwrap_or(path))
+}
+
 /// The hidden entries of the repository root read although hidden (ADR 0025): the CI
 /// directories, read whole, and the CI files.
 pub(crate) const HIDDEN_CI: [&str; 6] = [
@@ -398,8 +403,7 @@ pub(crate) fn read_with(
     sensitive: &BTreeSet<String>,
 ) -> (Outcome, Vec<Row>) {
     let unreadable = |line, reason: String| (Outcome::Unreadable { line, reason }, Vec::new());
-    let name = path.rsplit('/').next().unwrap_or(path);
-    if LOCKFILES.contains(&name) {
+    if lockfile(path) {
         return (Outcome::Lockfile, Vec::new());
     }
     if src.len() > lang::MAX_BYTES {

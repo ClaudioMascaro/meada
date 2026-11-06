@@ -31,3 +31,7 @@ topic leaves within 24 KiB; the code wins over these entries.
 <a id="declared-resource-locations-641"></a>
 
 - [Declared resource locations (#641)](contracts/resource-declarations.md#declared-resource-locations-641)
+
+<a id="alert-contracts-672"></a>
+
+- [Alert contracts (#672)](contracts/alert-contracts-672.md)

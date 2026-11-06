@@ -180,3 +180,8 @@ Legacy SQS forms retain their new environment variable name in `contracts.via` w
 pending workload marker. The workspace resolution step replaces a matched marker with workload
 evidence and removes an unmatched one before every query output. Existing SDK `env:` provenance
 keeps its earlier storage and output behavior.
+
+The `alert` entry of `contract_configs` (#672) stores rule names, explicit label maps,
+route conditions and receivers, key paths and line spans. It stores neither PromQL/LogQL
+expressions nor notification credentials. Rule and route nodes and their contract sides are
+derived at query time. A stored-format sample participates in the schema fingerprint.

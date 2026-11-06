@@ -3,6 +3,7 @@
 
 mod common;
 
+mod alerts;
 mod asyncapi;
 mod aws;
 mod aws_sdk;

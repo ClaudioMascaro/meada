@@ -28,18 +28,21 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   | `declare` | the sides `meada.toml` declares, run at query time (a config edit needs no reindex) |
   | `symbols_read` | the symbols `declare`, `workspace_step`, `link` and `status` look up, which a partial export reads before declaring (resources: their `via` symbols; packages: every symbol of a repository with a named manifest) |
   | `workspace_step` | a step over every repository after every `declare` (the package provider index, dependency entries, imports, shapes) |
+  | `workspace_links` | optional whole-workspace links instead of the kind's per-consumer hook, with `None` preserving its original order |
   | `after_links` | a pass over the links after the decisions replay (HTTP: drift) |
   | `unresolved`, `label`, `parts` | whether an identifier is an unresolved side, how it is labelled, the parts `search` ranks |
-  | `place` | where a site sits when it is neither a symbol nor a call (packages: manifest and field) |
+  | `place` | where this kind's site sits when it is neither a symbol nor a call (packages: manifest and field); dispatch uses only the contract's kind |
   | `search_word`, `own_search` | the word of `search`'s `kind` and, for an own renderer, its hits |
   | `sides`, `view`, `related_sides` | the role words and the carried word of `context` on a contract, and the sides that reach it by another name; a contract listed by its providers alone is followed by the linked consumers that read fields, with their drift (the engine's rule: `View::follows_drift`) |
+  | `workspace_related_sides` | optional workspace grouping using prepared links, replacing per-repository `related_sides` without repeating routing |
   | `at_call`, `context_sections` | the lines a call adds to a symbol's `contracts:`, and the sections `context` adds after the callees (packages: `consumers:`) |
   | `explain_inferred` | whether a symbol's `context` explains a call consumer's inferred link, given its repository (HTTP: an environment-derived base selecting a declared `base_url_env` peer); false by default |
   | `context_reads` | the call sites `context_sections` looks up, which `context` reads first (packages: the consumers of the links into the symbol) |
   | `starts` | the providers a `trace` start text names |
   | `calls_from_definition` | whether a consumer at a symbol (a Feign or Retrofit interface method) calls on its provider, so `trace` follows from the method to it (HTTP; a channel handler is where a link ends) |
   | `flows_to_consumer` | whether data travels provider to consumer (resource writes to reads, channel producers to handlers), including consumers at call sites |
-  | `status` | the lines `meada status` prints |
+  | `status`, `scope_status` | the lines `meada status` prints per repository, optionally considering the visible workspace |
+  | `workspace_status` | optional per-query status rows in repository order, with `None` preserving the ordinary status hooks and call order |
   | `decidable`, `serves`, `candidate` | whether an ambiguous link is an open item, whether a provider serves a contract (aliases included), whether a provider is a candidate for a consumer with no contract |
 
   The engine fixes the phase order: each kind's `read_declarations` then `declare`, followed by every `workspace_step`, then `link`,

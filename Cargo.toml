@@ -78,6 +78,9 @@ object_store = { version = "=0.14.2", optional = true, default-features = false,
     "ring",
 ] }
 percent-encoding = "2.3.2"
+# Alertmanager label matchers use bounded, anchored regular expressions.
+regex = "1.13.1"
+regex-syntax = "0.8.11"
 # The Valkey client of the cloud modules (ADR 0012), only behind the internal `valkey` feature.
 # Default features off: no native-tls, only rustls.
 redis = { version = "=1.7.1", optional = true, default-features = false, features = [

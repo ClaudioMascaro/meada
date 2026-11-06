@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "repository": "example.com/acme/app",
+  "commit": "d3d744b28ff1c7043e8031b6fe93048b603f6f0c",
+  "dirty": false,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [],
+  "consumers": [],
+  "links": []
+}

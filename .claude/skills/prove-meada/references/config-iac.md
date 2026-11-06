@@ -31,7 +31,7 @@ lands it writes the check.
 | Workloads and image contracts: normalized builders/runners, direct Compose code paths, evaluated names/patterns, scope-aware orphans | #662; 44 to 46, 57 to 60, 63, 64 | CLI export/status, MCP stdio/HTTP, console API and graph | neutral independently generated repositories and pinned `boutique` | `images.py --public --http` with UI options below | landed (#662) |
 | Workload environment entries | #663; 47 to 49 | CLI export, MCP stdio and HTTP | generated sibling workload/code/queue repositories | `environment.py --head-bin BIN --run DIR` ([environment.md](environment.md)) | #663 |
 | HTTP through IaC: Services, Ingress, IaC-declared routes | 50 to 52 | CLI export, MCP | `boutique`, `sam-rust` | to write | pending |
-| Alert routing | 53 to 56 | CLI export, MCP | `kube-prometheus` | to write | pending |
+| Alert labels and Alertmanager routes | #672; 53, 54, 57 to 60 | CLI export/status, MCP stdio/HTTP, console graph | neutral generated monitoring/routing/app repositories; pinned `kube-prometheus` | `alerts.py --head-bin BIN --run DIR --http`, then graph and public-source checks below | landed (#672) |
 | `via` to an IaC address or a key path | 61, 62 | CLI export/status, MCP stdio/HTTP | neutral sibling repositories in `resource-via.py` | #641/#642, exact declared sites, all formats, selectors, stale remove/restore; [recipe](resource-via.md) | `resource-via.py --http` |
 | Export and console graph additions | 63, 64 | CLI export, console | every IaC entry | to write | pending |
 
@@ -437,3 +437,18 @@ not an independent answer key. The script checks concrete and pattern names. The
 additionally loads this generated
 workspace: its contracts show both root labels and its provisioning table shows every link, level
 and reason. Orphan status behavior remains pending.
+
+## `alerts.py`: #672
+
+Run `python3 $S/alerts.py --head-bin "$RUN/bin/meada-head" --run "$RUN/alerts" --http`.
+The answer keys are #672, parent #642 and ADR 0026, obtained at run time. The script's
+neutral repositories are separate from feature fixtures and preserve every source file, hash,
+raw CLI response and MCP answer under the run directory. It drives full emitter/matcher/link
+sets, equality versus regex levels, conjunctive routing, receiver context, both trace
+directions, Helm exclusions, refresh, restoration and scope-aware orphan reporting.
+
+The fresh checker additionally reads the pinned `kube-prometheus` rule labels and compares
+them with its alert export, probes PrometheusRule, Loki, Grafana and AlertmanagerConfig, and
+loads the neutral exports through the console graph, checking alert contracts and links.
+Shared trace/schema changes require existing all-corpus parity and the console API checks.
+A driver pass alone leaves those independent public-source and graph checks unproved.

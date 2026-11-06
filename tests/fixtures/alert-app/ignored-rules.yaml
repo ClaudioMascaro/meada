@@ -1,0 +1,6 @@
+groups:
+  - name: excluded
+    rules:
+      - alert: Ignored
+        expr: up == 0
+        labels: {support: team-b}

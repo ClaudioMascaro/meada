@@ -746,12 +746,13 @@ fn refresh_keeping(
     // so those are stored first) and is read again when they change.
     let hidden = hidden_ci(root);
     let configs = configs_found(&all, &hidden);
-    let contract_configs = all
-        .iter()
-        .chain(&hidden)
-        .filter(|(p, _)| contract::config_file(p))
-        .cloned()
-        .collect::<Vec<_>>();
+    let contract_configs = config_values::unshadowed(
+        all.iter()
+            .chain(&hidden)
+            .filter(|(p, _)| contract::config_file(p))
+            .cloned()
+            .collect(),
+    );
     refresh_stamped(
         &tx,
         "contract_configs",
@@ -3958,6 +3959,17 @@ mod tests {
         let src = fs::read(tests.join("fixtures/schema/sample.provision.tf")).unwrap();
         actual += "\nsample.provision.tf\n";
         actual += &format!("{:#?}\n", crate::iac::evaluate(&[("main.tf".into(), src)]));
+
+        // Alert rule and route summaries (#672) invalidate indexes from earlier extractors.
+        let src = fs::read(tests.join("fixtures/schema/sample.alert.yaml")).unwrap();
+        actual += "\nsample.alert.yaml\n";
+        actual += &serde_json::to_string_pretty(&crate::contract::config_summary(
+            "sample.alert.yaml",
+            &src,
+            &tests.join("fixtures/schema"),
+        ))
+        .unwrap();
+        actual += "\n";
 
         let golden = tests.join("golden/schema.txt");
         if std::env::var_os("MEADA_BLESS").is_some_and(|v| v == "1") {
