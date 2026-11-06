@@ -1,0 +1,359 @@
+{
+  "format": 1,
+  "repository": "example.com/acme/serverless",
+  "commit": "d82d7673236199c78349b5c34af131d00eb752d2",
+  "dirty": false,
+  "files": [
+    {
+      "path": "other/send.ts",
+      "hash": "fad572b1c61ec654650bd12685ba1c81627fb256bd2cf2f1fc64e6e93c3a0d60"
+    },
+    {
+      "path": "outside.ts",
+      "hash": "fad572b1c61ec654650bd12685ba1c81627fb256bd2cf2f1fc64e6e93c3a0d60"
+    },
+    {
+      "path": "worker/send.ts",
+      "hash": "b376ed5ed32cf05c44b50812412d1ec272db2c12077b54f61472fd200d044b4a"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/serverless::other/send.ts::dispatch",
+      "span": {
+        "path": "other/send.ts",
+        "start": 110,
+        "end": 237
+      },
+      "hash": "db873b81c164ea9605fac2b0b0fab8a30012e7b9059b3aa1dbaa65b155c73722"
+    },
+    {
+      "id": "example.com/acme/serverless::outside.ts::dispatch",
+      "span": {
+        "path": "outside.ts",
+        "start": 110,
+        "end": 237
+      },
+      "hash": "db873b81c164ea9605fac2b0b0fab8a30012e7b9059b3aa1dbaa65b155c73722"
+    },
+    {
+      "id": "example.com/acme/serverless::worker/send.ts::dispatch",
+      "span": {
+        "path": "worker/send.ts",
+        "start": 110,
+        "end": 237
+      },
+      "hash": "db873b81c164ea9605fac2b0b0fab8a30012e7b9059b3aa1dbaa65b155c73722"
+    },
+    {
+      "id": "example.com/acme/serverless::worker/send.ts::typedDispatch",
+      "span": {
+        "path": "worker/send.ts",
+        "start": 246,
+        "end": 379
+      },
+      "hash": "4f6dea152ca6888d40fe525192fb317c472455c57582c193f7087107a18d7fe5"
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/serverless::other/send.ts::SQSClient#0",
+      "caller": "example.com/acme/serverless::other/send.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "other/send.ts",
+        "start": 84,
+        "end": 101
+      }
+    },
+    {
+      "id": "example.com/acme/serverless::other/send.ts::dispatch::SendMessageCommand#0",
+      "caller": "example.com/acme/serverless::other/send.ts::dispatch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "other/send.ts",
+        "start": 153,
+        "end": 233
+      }
+    },
+    {
+      "id": "example.com/acme/serverless::other/send.ts::dispatch::client.send#0",
+      "caller": "example.com/acme/serverless::other/send.ts::dispatch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "other/send.ts",
+        "start": 141,
+        "end": 234
+      }
+    },
+    {
+      "id": "example.com/acme/serverless::outside.ts::SQSClient#0",
+      "caller": "example.com/acme/serverless::outside.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "outside.ts",
+        "start": 84,
+        "end": 101
+      }
+    },
+    {
+      "id": "example.com/acme/serverless::outside.ts::dispatch::SendMessageCommand#0",
+      "caller": "example.com/acme/serverless::outside.ts::dispatch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "outside.ts",
+        "start": 153,
+        "end": 233
+      }
+    },
+    {
+      "id": "example.com/acme/serverless::outside.ts::dispatch::client.send#0",
+      "caller": "example.com/acme/serverless::outside.ts::dispatch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "outside.ts",
+        "start": 141,
+        "end": 234
+      }
+    },
+    {
+      "id": "example.com/acme/serverless::worker/send.ts::SQSClient#0",
+      "caller": "example.com/acme/serverless::worker/send.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker/send.ts",
+        "start": 84,
+        "end": 101
+      }
+    },
+    {
+      "id": "example.com/acme/serverless::worker/send.ts::dispatch::SendMessageCommand#0",
+      "caller": "example.com/acme/serverless::worker/send.ts::dispatch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker/send.ts",
+        "start": 153,
+        "end": 233
+      }
+    },
+    {
+      "id": "example.com/acme/serverless::worker/send.ts::dispatch::client.send#0",
+      "caller": "example.com/acme/serverless::worker/send.ts::dispatch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker/send.ts",
+        "start": 141,
+        "end": 234
+      }
+    },
+    {
+      "id": "example.com/acme/serverless::worker/send.ts::typedDispatch::SendMessageCommand#0",
+      "caller": "example.com/acme/serverless::worker/send.ts::typedDispatch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker/send.ts",
+        "start": 294,
+        "end": 375
+      }
+    },
+    {
+      "id": "example.com/acme/serverless::worker/send.ts::typedDispatch::client.send#0",
+      "caller": "example.com/acme/serverless::worker/send.ts::typedDispatch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker/send.ts",
+        "start": 282,
+        "end": 376
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::sqs",
+      "site": "example.com/acme/serverless::outside.ts::dispatch::SendMessageCommand#0"
+    },
+    {
+      "contract": "channel::sqs::orders",
+      "site": "example.com/acme/serverless::worker/send.ts::dispatch::SendMessageCommand#0",
+      "via": "workload:example.com/acme/serverless::serverless.yml::functions.worker (root serverless.yml), env:QUEUE_NAME"
+    },
+    {
+      "contract": "channel::sqs::orders",
+      "site": "example.com/acme/serverless::worker/send.ts::typedDispatch::SendMessageCommand#0",
+      "via": "workload:example.com/acme/serverless::serverless.yml::functions.worker (root serverless.yml), env:TYPED_QUEUE"
+    },
+    {
+      "contract": "channel::sqs::refunds",
+      "site": "example.com/acme/serverless::other/send.ts::dispatch::SendMessageCommand#0",
+      "via": "workload:example.com/acme/serverless::serverless.yml::functions.other (root serverless.yml), env:QUEUE_NAME"
+    }
+  ],
+  "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/acme/serverless::serverless.yml::Orders",
+      "address": "Orders",
+      "type": "AWS::SQS::Queue",
+      "root": "serverless.yml",
+      "path": "serverless.yml",
+      "line": 22,
+      "end_line": 25
+    },
+    {
+      "identity": "example.com/acme/serverless::serverless.yml::functions.other",
+      "address": "functions.other",
+      "type": "Serverless::Function",
+      "root": "serverless.yml",
+      "path": "serverless.yml",
+      "line": 16,
+      "end_line": 19
+    },
+    {
+      "identity": "example.com/acme/serverless::serverless.yml::functions.worker",
+      "address": "functions.worker",
+      "type": "Serverless::Function",
+      "root": "serverless.yml",
+      "path": "serverless.yml",
+      "line": 10,
+      "end_line": 15
+    }
+  ],
+  "executions": [
+    {
+      "workload": "example.com/acme/serverless::serverless.yml::functions.other",
+      "root": "serverless.yml",
+      "repository": "example.com/acme/serverless",
+      "path": "other/send.ts",
+      "level": "exact",
+      "reason": "Serverless handler serverless.yml#functions.other.handler"
+    },
+    {
+      "workload": "example.com/acme/serverless::serverless.yml::functions.worker",
+      "root": "serverless.yml",
+      "repository": "example.com/acme/serverless",
+      "path": "worker/send.ts",
+      "level": "exact",
+      "reason": "Serverless handler serverless.yml#functions.worker.handler"
+    }
+  ],
+  "provisioners": [
+    {
+      "contract": "channel::sqs::orders",
+      "node": "example.com/acme/serverless::serverless.yml::Orders",
+      "root": "serverless.yml"
+    }
+  ],
+  "uses": [
+    {
+      "contract": "channel::sqs::orders",
+      "site": "example.com/acme/serverless",
+      "at": "serverless.yml#custom.queue"
+    }
+  ],
+  "links": [],
+  "provisions": [
+    {
+      "side": "example.com/acme/serverless",
+      "provisioner": "example.com/acme/serverless::serverless.yml::Orders",
+      "root": "serverless.yml",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; config serverless.yml#custom.queue",
+      "at": "serverless.yml#custom.queue"
+    },
+    {
+      "side": "example.com/acme/serverless::worker/send.ts::dispatch::SendMessageCommand#0",
+      "provisioner": "example.com/acme/serverless::serverless.yml::Orders",
+      "root": "serverless.yml",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; workload:example.com/acme/serverless::serverless.yml::functions.worker (root serverless.yml), env:QUEUE_NAME"
+    },
+    {
+      "side": "example.com/acme/serverless::worker/send.ts::typedDispatch::SendMessageCommand#0",
+      "provisioner": "example.com/acme/serverless::serverless.yml::Orders",
+      "root": "serverless.yml",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; workload:example.com/acme/serverless::serverless.yml::functions.worker (root serverless.yml), env:TYPED_QUEUE"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/serverless::other/send.ts::dispatch",
+      "kind": "export",
+      "label": "dispatch",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/serverless",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/serverless::other/send.ts::dispatch"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/serverless::outside.ts::dispatch",
+      "kind": "export",
+      "label": "dispatch",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/serverless",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/serverless::outside.ts::dispatch"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/serverless",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/serverless::outside.ts::dispatch::SendMessageCommand#0",
+          "mark": "produces",
+          "contract": "channel::sqs"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/serverless::worker/send.ts::dispatch",
+      "kind": "export",
+      "label": "dispatch",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/serverless",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/serverless::worker/send.ts::dispatch"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/serverless::worker/send.ts::typedDispatch",
+      "kind": "export",
+      "label": "typedDispatch",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/serverless",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/serverless::worker/send.ts::typedDispatch"
+        }
+      ]
+    }
+  ]
+}

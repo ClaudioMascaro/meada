@@ -359,3 +359,9 @@ images = ["template.containers[].image"]
 format = "terraform"
 type = "google_cloud_run_v2_job"
 images = ["template.template.containers[].image"]
+
+[[workload]]
+format = "terraform"
+type = "aws_ecs_task_definition"
+images = ["container_definitions[].image"]
+name = "family"

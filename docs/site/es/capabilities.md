@@ -326,6 +326,11 @@ un `aws_s3_bucket` provisiona `resource::s3::<nombre>` por `bucket`. La tabla de
 `[[resource]]` declarado con `kind = "s3"` y el mismo `id` participa en ese contrato,
 conservando `declared`.
 
+CloudFormation y SAM usan los mismos contratos para SQS, SNS, EventBridge, Kinesis, S3,
+DynamoDB (Table, GlobalTable y SimpleTable), RDS (instancia o clúster), ElastiCache
+(clúster o grupo), SSM y Secrets Manager cuando se conoce el nombre físico. La propiedad
+que define ese nombre no usa su propio recurso; los secretos solo aportan su identidad.
+
 Cada productor, consumidor, escritor y lector se enlaza con cada provisionador, identificado
 por dirección y módulo raíz. Raíces como `envs/dev` y `envs/prod` no son ambiguas entre sí.
 Nombres escritos dan `exact`; nombres que pasan por valores reemplazables dan `inferred`, con
@@ -608,6 +613,32 @@ id = "team-b"
 role = "write"
 via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
 ```
+
+## Funciones y tareas AWS
+
+Lambda en Terraform/OpenTofu ejecuta `image_uri`; SAM ejecuta `ImageUri`, y las tareas ECS
+ejecutan la imagen de cada contenedor de `container_definitions`, incluso mediante `jsonencode`.
+Estos ejecutores participan en contratos de imagen, contexto, trazas y huérfanos. El entorno
+conserva su contenedor y raíz de evaluación, sin alcanzar código de otra imagen.
+
+Un `filename` local de Lambda o `CodeUri` de SAM conecta directamente el código del mismo
+repositorio. Una referencia exacta a `data.archive_file.<nombre>.output_path` puede seguir
+solo su entrada local explícita `source_dir` o `source_file`. Los archivos ZIP son ubicaciones
+opacas; su contenido no se extrae. Un handler Serverless como `worker/send.dispatch` selecciona
+un único archivo local existente (`.ts`, `.js`, `.mjs`, `.cjs` o `.py`); las extensiones ambiguas
+quedan sin resolver. Las rutas nuevas deben ser relativas, sin componentes `..` y sin
+atravesar enlaces simbólicos. S3, URL y código remoto no se convierten en rutas locales.
+
+SAM combina `Globals.Function.Environment.Variables` con el entorno de la función; Serverless
+combina `provider.environment` con `functions.<nombre>.environment`. La función prevalece,
+aunque su valor de reemplazo no pueda leerse. Terraform Lambda y ECS también aportan sus
+entornos. Las referencias conocidas a recursos pueden conservar la identidad del contrato
+sin inventar un ARN o URL del despliegue. Secretos, referencias dinámicas y valores externos
+siguen sin contenido. La lectura en código resuelve en `inferred`, con workload y variable
+en el motivo; `context` y `trace` muestran la ejecución por imagen y las rutas directas.
+
+Referencias como `aws_sqs_queue.orders.url` y `aws_s3_bucket.assets.bucket` identifican
+el contrato sin proporcionar una URL del despliegue; atributos de contenido como `value` siguen sin resolver.
 
 ## Entornos de los workloads
 

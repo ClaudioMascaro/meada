@@ -1,5 +1,7 @@
 //! Terraform workload inputs evaluated in their root/module/instance context.
 
+mod ecs;
+
 use super::environment::{self, Entry};
 use super::{Block, Each, Eval, Evaluated, Kind, Resolved, Val, WorkloadImage};
 use hcl::Value;
@@ -8,7 +10,8 @@ use std::collections::BTreeMap;
 
 /// New workload code paths reject parent steps before normalization, even if still in-root.
 pub(crate) fn local_path(base: &str, written: &str) -> Option<String> {
-    if written.starts_with(['/', '~'])
+    if written.is_empty()
+        || written.starts_with(['/', '~'])
         || written.contains(['\\', ':', '$', '*'])
         || written.split('/').any(|s| s == "..")
     {
@@ -111,10 +114,13 @@ impl<'m> Eval<'m> {
             {
                 return None;
             }
-            let input = archive
-                .args
-                .get("source_dir")
-                .or_else(|| archive.args.get("source_file"))?;
+            let input = match (
+                archive.args.get("source_dir"),
+                archive.args.get("source_file"),
+            ) {
+                (Some(input), None) | (None, Some(input)) => input,
+                _ => return None,
+            };
             found = self.value(instance, None, &input.expr, 0);
         }
         let Val::Known(Value::String(written)) = found.val else {
@@ -138,6 +144,10 @@ impl<'m> Eval<'m> {
         each: Option<&Each>,
         block: &'m Block,
     ) {
+        if block.kind == Kind::Resource && block.ty == "aws_ecs_task_definition" {
+            self.ecs_workload(node, instance, each, block);
+            return;
+        }
         if block.kind != Kind::Resource || block.ty != "aws_lambda_function" {
             return;
         }
@@ -166,12 +176,16 @@ impl<'m> Eval<'m> {
         }
         let image = candidate.images.first().map(|i| i.image.text.as_str());
         let mut entries = BTreeMap::new();
-        let mut room = environment::ENVIRONMENT_BYTES_MAX;
+        let mut room = environment::ENVIRONMENT_BYTES_MAX.min(
+            self.root_left
+                .min(self.left)
+                .saturating_sub(candidate.workload_size()),
+        );
         let mut put =
             |name: &str, (target, value, contract): (String, Option<String>, Option<String>)| {
                 let bytes = block.name.len()
                     + image.map_or(0, str::len)
-                    + name.len()
+                    + 2 * name.len()
                     + target.len()
                     + value.as_ref().map_or(0, String::len)
                     + contract.as_ref().map_or(0, String::len);

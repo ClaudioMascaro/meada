@@ -348,8 +348,8 @@ words:
 | alert emitter | `emitter: <contract><orphan-note?>` | A rule's known label. |
 | alert matcher | `matcher: <contract><orphan-note?>` | A route's effective label condition. |
 | alert receiver | `receiver: <text>` | A route's explicit or inherited receiver. |
-| iac build | `build: <text><iac-mark?>` | A Compose service's build context, a path inside the repository, quoted as JSON. |
-| iac handler | `handler: <text><iac-mark?>` | A Serverless function's handler, quoted as JSON. |
+| iac build | `build: <text><iac-mark?>` | A workload's local code input or Compose build context, inside the repository and quoted as JSON. |
+| iac handler | `handler: <text><iac-mark?>` | A Lambda, SAM or Serverless function's handler, quoted as JSON. |
 | iac event | `event: <text><iac-mark?>` | One event of a Serverless function, in file order: its type and what identifies it, quoted as JSON (`"http GET /orders"`, `"sqs Queue.Arn"`). |
 | iac section | `<iac-section>:<none?>` | The lines that follow belong to the section, or ` none` when it has none. |
 | iac reference | `<repository> <place> <address><via?>` | A node the node references, or that references it, at its block. |
@@ -366,7 +366,7 @@ words:
 | `<container>` | `<word>` | The name of a Kubernetes container or Compose service. |
 | `<environment-name>` | `<word>` | The environment entry's name, or a prefix followed by `*` for an unresolved `envFrom`. |
 | `<environment-target>` | `<text>` | A literal, Compose literal/default or unresolved source, or a ConfigMap/Secret address and key, optionally imported by `envFrom`; Secret targets carry `redacted`. |
-| `<environment-value>` | `<text>` | The available checked-in value, or `unresolved`; an empty literal leaves this field empty. |
+| `<environment-value>` | `<text>` | The available checked-in value or typed resource contract, or `unresolved`; an empty literal leaves this field empty. |
 | `<image-ref>` | `<text>` | An image as the overlay leaves it: `ghcr.io/acme/api:1.4.0`. |
 | `<physical-name>` | `<text> (pattern)` | The same name with an unresolved part, each such part a `*`. |
 | `<iac-section>` | `overridable` | The values a deployer can override that its name went through. |

@@ -1,0 +1,20 @@
+example.com/acme/serverless serverless.yml:10-15 functions.worker
+type: Serverless::Function
+name: "aws-worker-dev-worker"
+root: serverless.yml
+handler: "worker/send.dispatch"
+overridable:
+example.com/acme/serverless serverless.yml:10 opt:stage (default)
+references:
+example.com/acme/serverless serverless.yml:22 Orders via Ref
+referenced by: none
+values:
+example.com/acme/serverless serverless.yml:11 functions.worker.handler = "worker/send.dispatch"
+example.com/acme/serverless serverless.yml:13 functions.worker.environment.QUEUE_NAME = "${self:custom.queue}"
+example.com/acme/serverless serverless.yml:14 functions.worker.environment.TYPED_QUEUE = "Orders"
+example.com/acme/serverless serverless.yml:15 functions.worker.environment.SECRET_QUEUE = "${ssm:/hidden}"
+env worker INHERITED -> Serverless literal: inherited
+env worker QUEUE_NAME -> Serverless literal: orders
+env worker SECRET_QUEUE -> Serverless environment (unresolved): unresolved
+env worker TYPED_QUEUE -> Serverless resource Orders: channel::sqs::orders
+code: example.com/acme/serverless worker/send.ts [exact]

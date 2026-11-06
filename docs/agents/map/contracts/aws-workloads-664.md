@@ -1,12 +1,18 @@
 # AWS workloads (#664)
 
-`iac/workload.rs` evaluates Terraform Lambda inputs in the same root/module/instance as its
+`iac/workload.rs` and `iac/workload/ecs.rs` evaluate Terraform Lambda/task inputs in the same root/module/instance as its
 physical name. `Block.nested` retains workload blocks; `Eval::tf_environment(instance, each,
 expression)` returns the source description, optional literal and optional typed contract
-through the existing evaluator and endpoint walker. A precise archive-file output traversal
-follows only its declared local source directory/file input; literal ZIPs stay opaque paths.
+through the existing evaluator and endpoint walker. Identity attributes include the catalog's
+physical-name argument and SQS.url; secret value/SecretString attributes and GCP .arn stay
+unread. Explicit unresolved composite projections never fall back to a physical name. A precise archive-file output traversal
+follows exactly one declared local source directory/file input; empty or ambiguous inputs
+refuse execution, and literal ZIPs stay opaque paths.
 `iac/cloudformation.rs` retains SAM CodeUri, Handler, ImageUri and environment
-entries, merging Globals first and function entries last. Known resource references carry
+entries, merging Globals first and function entries last. Serverless merges provider entries
+before function entries, resolves one existing handler source and fills typed references from
+the existing CloudFormation resource-node evaluation. It reserves the bounded target before
+copying it, without evaluating resource names twice. Known resource references carry
 typed contract targets without inventing a deployment-time ARN or URL. The curated AWS
 CloudFormation/SAM aliases share `types::provision_entry` and `Entry::defining_key`, so a
 resource's defining property is its provisioner rather than an automatic config use.
@@ -16,6 +22,10 @@ projects it with legacy Compose and Kubernetes images through one runner invento
 stored environment associates each entry with its container image. `Environments::values`
 still returns literal values for HTTP; typed resource targets use the same scope index and
 resolve only a matching unresolved kind. Secret contents and unread targets stay absent.
+ECS reads literal jsonencode fields through the same evaluator; computed encoded JSON shares
+that evaluator's limits. Each container retains its own image and environment, including
+unread secret entries. A budget failure discards the workload's environment while preserving
+its independently known images; overwritten entries and temporary map keys consume room.
 
 `ContractKind::config_summary` receives neutral `ConfigFacts`, grouped by file once after IaC
 evaluation. `image/code.rs` checks evaluated direct paths during indexing, including existence

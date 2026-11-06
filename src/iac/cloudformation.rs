@@ -422,7 +422,7 @@ impl Eval<'_> {
         ))
     }
 
-    fn function(&mut self, id: &str, doc: &Value) -> Node {
+    fn function(&mut self, id: &str, doc: &Value, budget: usize) -> Node {
         let mut node = Node::default();
         if self.resources[id].ty != "AWS::Serverless::Function" {
             return node;
@@ -452,46 +452,54 @@ impl Eval<'_> {
         }
         if let Some(value) = props.get("ImageUri") {
             let part = self.eval(value, 0);
-            node.images.push(super::WorkloadImage {
-                container: id.into(),
-                image: super::Resolved {
-                    text: part.text,
-                    overridable: !part.through.is_empty(),
-                },
-                through: part.through.into_iter().collect(),
-            });
+            if part.text != "*" {
+                node.images.push(super::WorkloadImage {
+                    container: id.into(),
+                    image: super::Resolved {
+                        text: part.text,
+                        overridable: !part.through.is_empty(),
+                    },
+                    through: part.through.into_iter().collect(),
+                });
+            }
         }
         let mut entries = BTreeMap::new();
-        let mut room = super::environment::ENVIRONMENT_BYTES_MAX;
+        let mut room = super::environment::ENVIRONMENT_BYTES_MAX
+            .min(budget.saturating_sub(node.workload_size()));
+        let environment = props.get("Environment");
+        let function_variables = environment.and_then(|e| e.get("Variables"));
+        let unknown_override = environment.is_some_and(|e| environment_map(e).is_none())
+            || function_variables.is_some_and(|v| environment_map(v).is_none());
         for variables in [
             doc.pointer("/Globals/Function/Environment/Variables"),
-            props.pointer("/Environment/Variables"),
+            function_variables,
         ]
         .into_iter()
         .flatten()
-        .filter_map(Value::as_object)
+        .filter_map(environment_map)
         {
             for (name, raw) in variables {
-                let (target, value, contract) =
-                    if let Some((target, contract)) = self.environment_target(raw) {
-                        (target, None, Some(contract))
+                let (target, value, contract) = if unknown_override {
+                    ("SAM Environment (unresolved)".into(), None, None)
+                } else if let Some((target, contract)) = self.environment_target(raw) {
+                    (target, None, Some(contract))
+                } else {
+                    let part = self.eval(raw, 0);
+                    let target = if part.pattern {
+                        "SAM Environment (unresolved)"
+                    } else if !part.through.is_empty() {
+                        "SAM parameter default"
                     } else {
-                        let part = self.eval(raw, 0);
-                        let target = if part.pattern {
-                            "SAM Environment (unresolved)"
-                        } else if !part.through.is_empty() {
-                            "SAM parameter default"
-                        } else {
-                            "SAM literal"
-                        };
-                        let value = (!part.pattern && !part.text.contains("{{resolve:"))
-                            .then(|| super::environment::literal(&part.text))
-                            .flatten();
-                        (target.into(), value, None)
+                        "SAM literal"
                     };
+                    let value = (!part.pattern && !part.text.contains("{{resolve:"))
+                        .then(|| super::environment::literal(&part.text))
+                        .flatten();
+                    (target.into(), value, None)
+                };
                 let image = node.images.first().map(|i| i.image.text.as_str());
                 let bytes = id.len()
-                    + name.len()
+                    + 2 * name.len()
                     + target.len()
                     + value.as_ref().map_or(0, String::len)
                     + contract.as_ref().map_or(0, String::len)
@@ -517,6 +525,12 @@ impl Eval<'_> {
         node.environment = entries.into_values().collect();
         node
     }
+}
+
+/// An intrinsic returning a whole environment map does not expose any of its keys.
+fn environment_map(value: &Value) -> Option<&serde_json::Map<String, Value>> {
+    let map = value.as_object()?;
+    (!(map.len() == 1 && map.keys().any(|k| k == "Ref" || k.starts_with("Fn::")))).then_some(map)
 }
 
 /// The resources `body`'s intrinsic functions reference, with the `via` of each: `Ref`,
@@ -714,21 +728,16 @@ pub(super) fn nodes(unit: &Unit) -> (Vec<Node>, Vec<Reference>) {
     let ids: Vec<String> = eval.resources.keys().cloned().collect();
     let (mut nodes, mut references) = (Vec::new(), Vec::new());
     let mut room = unit.budget;
-    let mut take = |bytes: usize| match room.checked_sub(bytes) {
-        Some(r) => {
-            room = r;
-            true
-        }
-        None => false,
-    };
     for id in ids {
         let name = eval.name_of(&id, 0);
-        let function = eval.function(&id, doc);
+        let base = id.len() + name.as_ref().map_or(0, |n| n.text.len());
+        let function = eval.function(&id, doc, room.saturating_sub(base));
         let r = &eval.resources[&id];
-        let size = id.len() + name.as_ref().map_or(0, |n| n.text.len()) + function.workload_size();
-        if !take(size) {
+        let size = base + function.workload_size();
+        let Some(left) = room.checked_sub(size) else {
             break;
-        }
+        };
+        room = left;
         nodes.push(Node {
             address: id.clone(),
             root: path.to_string(),
@@ -748,9 +757,10 @@ pub(super) fn nodes(unit: &Unit) -> (Vec<Node>, Vec<Reference>) {
         });
         let targets = referenced(&id, &r.body, |t| eval.resources.contains_key(t));
         for (target, via) in targets.into_iter().take(REFERENCES_MAX) {
-            if !take(id.len() + target.len() + via.len()) {
+            let Some(left) = room.checked_sub(id.len() + target.len() + via.len()) else {
                 break;
-            }
+            };
+            room = left;
             references.push(Reference {
                 root: path.to_string(),
                 source: id.clone(),

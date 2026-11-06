@@ -98,3 +98,8 @@
   Unit/repository IaC budgets also charge these entries and multi-container images, typed
   targets, projected provisioned names and routing evidence. Lambda/SAM also charge repeated
   container/image strings before copying environment entries, including overridden entries.
+  Lambda/SAM cap environment room after fixed image/code facts; ECS can discard an unread or
+  oversized environment without discarding known images. Its direct JSON-encoder field scans
+  spend `EVAL_WORK_MAX`, and computed encoded values keep the evaluator's `EVAL_VALUE_MAX`.
+  Temporary owned map keys consume expansion room before cloning. Unknown SAM/Serverless
+  map overrides keep known inherited variable names unread, rather than retaining old values.

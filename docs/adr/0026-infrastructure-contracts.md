@@ -379,3 +379,24 @@ in its builder repository, identified as `image-builder::<repository>::<pattern 
 Its candidates name runner repositories and literal image contracts. Several runners of one
 literal image are one name, and choosing that name retains them all. This is independent of a
 runner's ambiguity among several builders, whose existing decision identity is unchanged.
+
+
+### AWS workload execution (#664)
+
+Lambda image_uri, SAM ImageUri and each ECS container image are image runners, independent
+of whether the container declares environment entries. The format readers keep evaluated
+container images and provenance in the same stored node facts; image contracts project those
+facts alongside Compose and Kubernetes through one runner inventory.
+
+Local Lambda filename inputs, SAM CodeUri and an unambiguous Serverless handler source can
+create direct same-repository executions. An exact archive_file output_path traversal may
+follow only an explicit source_dir/source_file input, with no general data-source evaluation
+and no extraction. New paths are relative, contain no raw parent component and traverse no
+symlink; indexing alone checks existence, with path-sensitive configuration invalidation.
+
+SAM Globals and Serverless provider environment entries are overridden by the function, even
+when its value is unreadable. Environments retain their workload, container image and root.
+A known IaC resource reference can carry an optional typed contract identity without a fake
+URL/ARN; it resolves only a matching unresolved contract kind through the same scope index
+as literals. Secret contents, dynamic references and external values remain unavailable.
+Environment-derived names stay inferred with workload and variable provenance.
