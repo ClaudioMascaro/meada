@@ -7,7 +7,7 @@ const PATTERN_SEGMENTS: &str = "-_./";
 // ponytail: cloud resource names are short; bound the backtracking on hostile input.
 const PATTERN_TEXT_MAX: usize = 1024;
 
-pub(super) fn supported(pattern: &str) -> bool {
+pub(crate) fn supported(pattern: &str) -> bool {
     if pattern.len() > PATTERN_TEXT_MAX
         || pattern.chars().filter(|&c| c != '*').count() < PATTERN_LITERAL_MIN
     {
@@ -21,7 +21,7 @@ pub(super) fn supported(pattern: &str) -> bool {
     })
 }
 
-pub(super) fn matches(pattern: &str, name: &str) -> bool {
+pub(crate) fn matches(pattern: &str, name: &str) -> bool {
     if !supported(pattern) || name.len() > PATTERN_TEXT_MAX || name.contains('*') {
         return false;
     }

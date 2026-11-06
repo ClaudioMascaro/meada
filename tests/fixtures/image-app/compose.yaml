@@ -1,0 +1,6 @@
+services:
+  orders:
+    build: .
+    image: ${IMAGE:-ghcr.io/acme/orders}:local
+  external:
+    image: redis:7

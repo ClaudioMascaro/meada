@@ -327,6 +327,7 @@ impl ContractKind for Channel {
                         method: None,
                         fragments: Vec::new(),
                         hops: Vec::new(),
+                        root: None,
                     }),
                 }
             }
@@ -565,6 +566,7 @@ mod tests {
             method: None,
             fragments: Vec::new(),
             hops: Vec::new(),
+            root: None,
         }
     }
 

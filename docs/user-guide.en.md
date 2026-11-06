@@ -452,6 +452,28 @@ of type `service`.
   path, a URL, one that climbs out of the root or one with an unresolved part is not.
 - **Queries**: as for Terraform nodes, `search` with `kind = "iac"`, `context` and `trace`.
 
+### Images and workload code
+
+The `image::<registry>/<repository>` contract connects a workload to the repository that builds
+its image. Docker Hub short names expand, names become lowercase, and tags and digests are
+removed. Builders come from docker/build-push-action tags, docker/metadata-action images,
+Compose with `build` and `image`, Skaffold artifacts, Jib destinations and simple ko commands
+with checked-in `KO_DOCKER_REPO` and `--bare`. Unread shell syntax in ko scripts declares no
+builder. The command accepts one `--bare`, at most one literal package and no other flags; an
+explicit shell must be `bash` or `sh`. Runners come from Kubernetes containers and init containers, Compose services,
+Helm values `image.repository` and images after Kustomize overrides.
+
+`search` with `kind = "image"` finds these contracts. Workload `context` shows its image and
+builder repository; `trace` goes down from the workload to code and up from code to workloads.
+Literal names link at `exact`; patterns and overridable values link at `inferred`, with a reason.
+Several candidates stay `ambiguous`. A safe local Compose build context connects the service
+directly to its code at `exact`, even without an image. Paths never cross symbolic links.
+
+`meada status` lists image orphans only when the scope contains both builder and runner. With
+one role, `search` and `context` show `no builder in the workspace` or `no runner in the workspace`.
+Export keeps `format: 1`, retains builder locations and workload roots, and includes `executions`
+for direct paths; the console graph shows the image contracts and workload code.
+
 ### CloudFormation and SAM
 
 A qualifying template named `compose.yaml` keeps its nodes and references through cold indexing and warm refreshes; its filename does not make it Compose.
@@ -563,6 +585,22 @@ provisioning links separate in `provisions`. `meada status` lists provisioned co
 use and uses without a provisioner, per kind and broker, only when the workspace contains at
 least one provisioner and one use of that group. Other IaC formats remain nodes and references;
 this contract table covers `.tf` and `.tofu` files.
+
+### AWS SDK use in Java, Go and C#
+
+The Java 2.x, Go v2 and .NET SDK forms recognize SQS, SNS, EventBridge and Kinesis as channels,
+and S3, DynamoDB, SSM Parameter Store and Secrets Manager as resources. The client must originate
+in an SDK constructor: Java `create()` or `builder().build()`, Go `New` or `NewFromConfig`,
+and C# `new Amazon...Client(...)`. Aliases and factories follow only `exact` hops; an injected
+type alone, a hidden name or a name-matched hop does not establish the client.
+
+Literal names and ARNs identify the contract; an environment read keeps an unresolved side
+and records its variable, including for producers. Batches retain every name. Readers belong
+to their enclosing function, writers to the operation call, and SDK links are `exact`;
+resource declarations remain `declared`. Unresolved sides never link, and
+`GetParametersByPath` does not identify a physical parameter. The
+[capabilities table](site/en/capabilities.md) lists operations and differences between SDKs.
+
 
 ## 4. `meada.toml`: reference
 
@@ -1669,7 +1707,7 @@ catalogs). See Maven and Gradle in section 8.5.
 | Redis streams | Jedis, Lettuce |
 | JMS | Spring JMS |
 
-The client counts by the type the code writes for it, and a listener by the Spring annotation
+Outside the AWS SDKs, the client counts by the type the code writes for it, and a listener by the Spring annotation
 (`@KafkaListener`, `@RabbitListener`, `@JmsListener`). The channel name folds like a URL, with the
 `${key}` of the annotations read from the Spring configuration.
 
@@ -1797,8 +1835,9 @@ secrets are not read.
 | Redis streams | `StackExchange.Redis` |
 | Azure Service Bus | `Azure.Messaging.ServiceBus` |
 
-The client counts by the type the code writes for it or by the construction that created it,
-resolved through the `using`s, never by the name alone.
+AWS clients require constructor origin, as described in the AWS SDK section. Other clients
+count by their written type or the construction that created them, resolved through the
+`using`s, never by the name alone.
 
 **Known limits.**
 

@@ -24,3 +24,21 @@ commit and when `HEAD` or the files change during the refresh. In server mode th
 Meada only writes inside `.meada/`, which ignores itself in git. Every query first refreshes
 the index with what changed in the files, including what is not committed yet. Command-line
 messages follow `LANG` (Portuguese, English or Spanish); MCP messages are always in English.
+
+### From a workload to code
+
+With the application and deployment repositories in one workspace, find the normalized image,
+read who builds it and trace the code the workload runs, using the MCP tools:
+
+```text
+search(query="ghcr.io/acme/orders", kind="image")
+context(symbol="image::ghcr.io/acme/orders")
+context(symbol="Deployment.apps/shop/orders")
+trace(from="Deployment.apps/shop/orders", direction="down")
+trace(from="orders.py::orders", direction="up")
+```
+
+Compose with `build: ./src` also reaches code without publishing an image. `status` uses the
+visible scope for orphans; an isolated builder gets `no runner in the workspace` in queries.
+In the console, contracts show images and their locations, and Workload code shows direct
+paths. See supported forms in [Capabilities](capabilities.md).

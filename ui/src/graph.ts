@@ -1,7 +1,8 @@
 import { parseExport } from './core';
 
 interface Community { name: string; members: string[] }
-interface Side { contract: string | null; site: string }
+interface Side { contract: string | null; site: string; at?: string; root?: string }
+interface Execution { workload: string; root: string; repository: string; path: string; level: string; reason: string }
 interface Link {
   consumer: string; provider: string; contract: string; level: string; reason: string;
   by?: string; p?: number; drift?: { missing?: Record<string, string>; unchecked?: Record<string, string> };
@@ -11,7 +12,7 @@ interface Provision {
   side: string; provisioner: string; root: string; contract: string; level: string; reason: string;
 }
 interface Stale { call: string; target: string; cause: string }
-interface Export { repository: string; communities?: Community[]; providers: Side[]; consumers: Side[]; links: Link[]; stale_decisions?: Stale[]; provisioners?: Provisioner[]; provisions?: Provision[] }
+interface Export { repository: string; communities?: Community[]; providers: Side[]; consumers: Side[]; links: Link[]; stale_decisions?: Stale[]; provisioners?: Provisioner[]; provisions?: Provision[]; executions?: Execution[] }
 interface Contract { contract: string; providers: string[]; consumers: string[]; provisioners?: string[] }
 
 /** parseExport checks every field with the release's Rust types before any model is built. */
@@ -26,7 +27,8 @@ export function graphModel(text: string) {
         row = { contract: entry.contract, providers: [], consumers: [] };
         contracts.set(entry.contract, row);
       }
-      row[side].push(entry.site);
+      const location = entry.at ? `${entry.site} (${entry.at})` : entry.site;
+      row[side].push(entry.root ? `${location} (root ${entry.root})` : location);
     }
   }
   for (const entry of data.provisioners ?? []) {
@@ -48,6 +50,7 @@ export function graphModel(text: string) {
     if (!provisioners.includes(place)) provisioners.push(place);
   }
   return {
+    executions: data.executions ?? [],
     provisions: data.provisions ?? [],
     repository: data.repository,
     communities: data.communities ?? [],

@@ -103,12 +103,13 @@ fn decidable(link: &Link) -> bool {
 /// The sites `list` places, each with the position of its repository: the unresolved
 /// consumers and those an ambiguous link of `links` leaves from (a call, or a definition).
 pub(crate) fn sites(exports: &[Export], links: &[Link]) -> Vec<(usize, String)> {
-    let ambiguous: HashSet<&str> = (links.iter())
+    let ambiguous: HashSet<String> = (links.iter())
         .filter(|l| decidable(l))
-        .map(|l| l.consumer.as_str())
+        .map(|l| l.item_site().into_owned())
         .collect();
     let items = exports.iter().enumerate().flat_map(|(n, e)| {
-        let open = |c: &&Consumer| c.contract.is_none() || ambiguous.contains(c.site.as_str());
+        let open =
+            |c: &&Consumer| c.contract.is_none() || ambiguous.contains(c.item_site().as_ref());
         (e.consumers.iter().filter(open)).map(move |c| (n, c.site.clone()))
     });
     items.collect()
@@ -120,9 +121,12 @@ pub(crate) fn sites(exports: &[Export], links: &[Link]) -> Vec<(usize, String)> 
 /// an unresolved consumer are the providers of the workspace that its kind's `candidate` leaves
 /// (HTTP: by method and literal URL fragments).
 pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> Vec<OpenItem> {
-    let mut ambiguous: HashMap<&str, Vec<&Link>> = HashMap::new();
+    let mut ambiguous: HashMap<String, Vec<&Link>> = HashMap::new();
     for link in links.iter().filter(|l| decidable(l)) {
-        ambiguous.entry(&link.consumer).or_default().push(link);
+        ambiguous
+            .entry(link.item_site().into_owned())
+            .or_default()
+            .push(link);
     }
     let providers: Vec<(&str, &Provider)> = exports
         .iter()
@@ -141,36 +145,50 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
             .collect();
         let mut files = Files::new(&repo.root);
         for consumer in &export.consumers {
-            let (kind, candidates) =
-                match (&consumer.contract, ambiguous.get(consumer.site.as_str())) {
-                    (None, _) => {
-                        let fitting = providers.iter().filter(|(_, p)| {
-                            kind_of(&p.contract).is_some_and(|k| k.candidate(consumer, p))
-                        });
-                        (
-                            ItemKind::Unresolved,
-                            fitting.map(candidate).collect::<Vec<_>>(),
-                        )
-                    }
-                    (Some(_), Some(links)) => {
-                        let listed = links.iter().filter_map(|l| {
-                            (providers.iter())
-                                .find(|(_, p)| {
-                                    p.site == l.provider && contract::serves(p, &l.contract)
-                                })
-                                .map(candidate)
-                        });
-                        (ItemKind::Ambiguous, listed.collect())
-                    }
-                    _ => continue,
-                };
+            let (kind, candidates) = match (
+                &consumer.contract,
+                ambiguous.get(consumer.item_site().as_ref()),
+            ) {
+                (None, _) => {
+                    let fitting = providers.iter().filter(|(_, p)| {
+                        kind_of(&p.contract).is_some_and(|k| k.candidate(consumer, p))
+                    });
+                    (
+                        ItemKind::Unresolved,
+                        fitting.map(candidate).collect::<Vec<_>>(),
+                    )
+                }
+                (Some(_), Some(links)) => {
+                    let listed = providers
+                        .iter()
+                        .filter(|(_, p)| {
+                            links
+                                .iter()
+                                .any(|l| p.site == l.provider && contract::serves(p, &l.contract))
+                        })
+                        .map(candidate);
+                    (ItemKind::Ambiguous, listed.collect())
+                }
+                _ => continue,
+            };
             // A consumer at a definition (a method of a declarative client, which has no call
             // of its own) is the definition: its lines are the excerpt (ADR 0006).
+            let infrastructure;
             let (span, caller) = match calls.get(consumer.site.as_str()) {
                 Some(call) => (&call.span, symbols.get(call.caller.as_str())),
                 None => match symbols.get(consumer.site.as_str()) {
                     Some(def) => (&def.span, Some(def)),
-                    None => continue,
+                    None => {
+                        let Some(node) = export
+                            .iac
+                            .iter()
+                            .find(|n| n.identity(&export.repository) == consumer.site)
+                        else {
+                            continue;
+                        };
+                        infrastructure = node.span(files.get(&node.path));
+                        (&infrastructure, None)
+                    }
                 },
             };
             let range = |start: i64, end: i64| start as usize..end as usize;
@@ -194,8 +212,11 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
             // The label of a route orders as its method then path: the space sorts before
             // every method letter and before the slash.
             candidates.sort_by_cached_key(|c| (c.repository.clone(), c.label(), c.site.clone()));
+            candidates.dedup_by(|a, b| {
+                a.repository == b.repository && a.contract == b.contract && a.site == b.site
+            });
             items.push(OpenItem {
-                id: consumer.site.clone(),
+                id: consumer.item_site().into_owned(),
                 kind,
                 repository: export.repository.clone(),
                 line: files

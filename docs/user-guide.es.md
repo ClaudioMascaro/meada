@@ -459,6 +459,28 @@ Cada servicio es un nodo IaC `services.<nombre>` de tipo `service`.
   raíz; una ruta absoluta, una URL, una que sale de la raíz o una con una parte sin resolver no.
 - **Consultas**: como en los nodos Terraform, `search` con `kind = "iac"`, `context` y `trace`.
 
+### Imágenes y código de workloads
+
+El contrato `image::<registry>/<repositorio>` conecta un workload con el repositorio que construye
+su imagen. Se expanden los nombres cortos de Docker Hub, los nombres pasan a minúsculas y se
+quitan tag y digest. Los builders vienen de tags de docker/build-push-action, imágenes de
+docker/metadata-action, Compose con `build` e `image`, artefactos Skaffold, destinos Jib y comandos
+ko simples con `KO_DOCKER_REPO` escrito en la configuración y `--bare`. La sintaxis de shell no
+leída en scripts ko no declara builder. El comando acepta un `--bare`, como máximo un paquete
+literal y ninguna otra opción; un shell explícito debe ser `bash` o `sh`. Los runners vienen de containers e init containers
+Kubernetes, servicios Compose, `image.repository` de values Helm e imágenes tras overrides Kustomize.
+
+`search` con `kind = "image"` encuentra estos contratos. `context` del workload muestra su imagen
+y el repositorio builder; `trace` baja del workload al código y sube del código a los workloads.
+Los nombres literales enlazan en `exact`; patrones y valores reemplazables en `inferred`, con
+su motivo. Varios candidatos quedan `ambiguous`. Un contexto Compose local seguro conecta el
+servicio directamente con su código en `exact`, incluso sin imagen. Las rutas no cruzan enlaces simbólicos.
+
+`meada status` solo lista imágenes huérfanas si el ámbito contiene builder y runner. Con un solo
+papel, `search` y `context` muestran `no builder in the workspace` o `no runner in the workspace`.
+El export conserva `format: 1`, guarda ubicaciones de builders y raíces de workloads e incluye
+`executions` para rutas directas; el grafo de la consola muestra contratos y código de workloads.
+
 ### CloudFormation y SAM
 
 Una plantilla válida llamada `compose.yaml` conserva sus nodos y referencias en el índice inicial y las actualizaciones; el nombre del archivo no la convierte en Compose.
@@ -572,6 +594,24 @@ conservando aparte los de aprovisionamiento en `provisions`. `meada status` mues
 aprovisionados sin uso y usos sin aprovisionador, por kind y broker, solo cuando el workspace
 contiene al menos un aprovisionador y un uso del grupo. Los otros formatos IaC siguen como
 nodos y referencias; esta tabla de contratos cubre archivos `.tf` y `.tofu`.
+
+### Uso de los SDK de AWS en Java, Go y C#
+
+Las formas de los SDK Java 2.x, Go v2 y .NET reconocen SQS, SNS, EventBridge y Kinesis como
+canales, y S3, DynamoDB, SSM Parameter Store y Secrets Manager como recursos. El cliente debe
+nacer en un constructor del SDK: `create()` o `builder().build()` en Java, `New` o
+`NewFromConfig` en Go y `new Amazon...Client(...)` en C#. Los alias y las fábricas siguen solo
+saltos `exact`; un tipo inyectado por sí solo, un nombre oculto o un salto por nombre no
+comprueba el cliente.
+
+Los nombres literales y los ARN identifican el contrato; una lectura del entorno mantiene el
+lado sin nombre resuelto y registra su variable, también en productores. Los lotes conservan
+todos los nombres. Los lectores pertenecen a su función contenedora, los escritores a la
+llamada de la operación, y los vínculos SDK son `exact`; las declaraciones de recursos siguen
+siendo `declared`. Los lados sin nombre resuelto no se vinculan y `GetParametersByPath` no
+identifica un parámetro físico. La [tabla de capacidades](site/es/capabilities.md) enumera las
+operaciones y las diferencias entre SDK.
+
 
 ## 4. `meada.toml`: referencia
 
@@ -1695,7 +1735,7 @@ llena es la variable `VAR`, que el `base_url_env` del par mapea. Los perfiles
 | Redis streams | Jedis, Lettuce |
 | JMS | Spring JMS |
 
-El cliente vale por el tipo que el código escribe para él, y un listener por la anotación de
+Fuera de los SDK de AWS, el cliente vale por el tipo que el código escribe para él, y un listener por la anotación de
 Spring (`@KafkaListener`, `@RabbitListener`, `@JmsListener`). El nombre del canal se pliega como
 una URL, con los `${clave}` de las anotaciones leídos de la configuración de Spring.
 
@@ -1824,8 +1864,9 @@ opciones y los user secrets no se leen.
 | Redis streams | `StackExchange.Redis` |
 | Azure Service Bus | `Azure.Messaging.ServiceBus` |
 
-El cliente vale por el tipo que el código escribe para él o por la construcción que lo creó,
-resuelto por los `using`, nunca solo por el nombre.
+Los clientes AWS requieren origen en constructor, como explica la sección de SDK de AWS. Los
+demás clientes valen por su tipo escrito o por la construcción que los creó, resueltos por
+los `using`, nunca solo por el nombre.
 
 **Límites conocidos.**
 

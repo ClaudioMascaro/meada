@@ -27,3 +27,21 @@ Meada solo escribe dentro de `.meada/`, que se ignora a sí mismo en git. Toda c
 actualiza el índice con lo que cambió en los archivos, incluso lo que aún no se hizo commit. Los
 mensajes de la línea de comandos siguen `LANG` (portugués, inglés o español); los del MCP son siempre en
 inglés.
+
+### De una carga de trabajo al código
+
+Con los repositorios de aplicación y despliegue en el mismo workspace, busque la imagen
+normalizada, lea quién la construye y recorra el código que ejecuta la carga con las herramientas MCP:
+
+```text
+search(query="ghcr.io/acme/orders", kind="image")
+context(symbol="image::ghcr.io/acme/orders")
+context(symbol="Deployment.apps/shop/orders")
+trace(from="Deployment.apps/shop/orders", direction="down")
+trace(from="orders.py::orders", direction="up")
+```
+
+Compose con `build: ./src` también llega al código sin publicar una imagen. `status` usa el
+ámbito visible para huérfanos; un constructor aislado recibe `no runner in the workspace` en
+las consultas. El console muestra las imágenes y sus ubicaciones en contratos, y las rutas
+directas en la vista del código de las cargas. Consulte [Capacidades](capabilities.md).

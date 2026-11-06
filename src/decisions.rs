@@ -267,9 +267,9 @@ fn evaluate(
     core: &[Link],
     missing: &[Missing],
 ) -> Fate {
-    let at = |l: &&Link| l.consumer == d.call && l.level == Level::Ambiguous;
+    let at = |l: &&Link| l.item_site() == d.call && l.level == Level::Ambiguous;
     if !(export.calls.iter().any(|c| c.id == d.call)
-        || export.consumers.iter().any(|c| c.site == d.call))
+        || export.consumers.iter().any(|c| c.item_site() == d.call))
     {
         return Fate::Stale(Cause::CallGone);
     }
@@ -283,7 +283,7 @@ fn evaluate(
     let open = match d.kind {
         Kind::AmbiguousLink => core.iter().any(|l| at(&l)),
         Kind::DynamicUrl => {
-            (export.consumers.iter()).any(|c| c.site == d.call && c.contract.is_none())
+            (export.consumers.iter()).any(|c| c.item_site() == d.call && c.contract.is_none())
         }
     };
     if !open {
@@ -349,8 +349,17 @@ pub(crate) fn replay(
         evaluations.push(evaluation);
     }
     for (d, provider, contract) in applied {
-        links.retain(|l| !(l.consumer == d.call && l.level == Level::Ambiguous));
-        links.push(d.link(&provider, &contract));
+        let source = links
+            .iter()
+            .find(|l| l.item_site() == d.call)
+            .map(|l| (l.consumer.clone(), l.root.clone()));
+        links.retain(|l| !(l.item_site() == d.call && l.level == Level::Ambiguous));
+        let mut decided = d.link(&provider, &contract);
+        if let Some((consumer, root)) = source {
+            decided.consumer = consumer;
+            decided.root = root;
+        }
+        links.push(decided);
     }
     links.sort_by(|a, b| (&a.consumer, &a.provider).cmp(&(&b.consumer, &b.provider)));
     (links, evaluations)

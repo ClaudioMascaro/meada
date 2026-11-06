@@ -1,0 +1,7 @@
+resources:
+  - ../../deployment.yaml
+namePrefix: prod-
+images:
+  - name: ghcr.io/acme/orders
+    newName: ghcr.io/acme/orders
+    newTag: v4

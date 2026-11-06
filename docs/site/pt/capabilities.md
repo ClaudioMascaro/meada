@@ -430,3 +430,30 @@ Um processo é a árvore de chamadas iniciada por um ponto de entrada, atravessa
 ## Limites e próximos passos
 
 Linguagens e clientes HTTP ou de mensagens fora das listas acima ainda não têm suporte. O [ADR 0003](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0003-v1-scope-and-roadmap.md) define o escopo e a ordem do trabalho. Consulte o [roadmap](roadmap.md), as [decisões](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr) e o [CHANGELOG](https://github.com/ClaudioMascaro/meada/blob/main/CHANGELOG.md).
+
+## Imagens e código das cargas de trabalho
+
+O contrato `image::<registry>/<repository>` liga a carga de trabalho ao repositório cuja
+configuração constrói a imagem (#662). `nginx:1.27` vira `image::docker.io/library/nginx`;
+`acme/api` vira `image::docker.io/acme/api`. Nomes ficam em minúsculas, sem tag nem digest.
+
+Os construtores vêm de `docker/build-push-action` (`tags`), `docker/metadata-action` (`images`),
+Compose com `build` e `image`, artefatos Skaffold (inclusive vários documentos YAML), destinos
+Jib literais em Maven/Gradle e comandos ko `build --bare` ou `publish --bare` com
+`KO_DOCKER_REPO` definido no workflow. Imagens-base não são destinos. Comandos ko com outro
+modo de nomeação e expressões Gradle não lidas não criam um construtor por suposição.
+
+Os executores são containers e init containers de cargas Kubernetes, com os overrides de
+imagem do Kustomize aplicados, serviços Compose e `image.repository` de arquivos de valores
+Helm. Templates Helm não são renderizados. `context` mostra a imagem e os repositórios
+construtores; `trace` percorre a relação nos dois sentidos, até as entradas do código.
+Um contexto Compose local executa diretamente o código do mesmo repositório em `exact`,
+mesmo sem `image`, dentro da raiz e sem atravessar links simbólicos.
+
+Literais ligam em `exact`; defaults Compose e valores Helm em `inferred`, com sua origem no
+motivo. Trechos não resolvidos permanecem padrões e só correspondem a nomes literais nos
+limites de segmentos; vários candidatos ficam `ambiguous` e podem receber uma decisão.
+`status` só lista imagens órfãs quando o escopo visível tem construtores e executores.
+Sem um desses lados, `search` e `context` marcam o lado sem contraparte. A exportação mantém
+formato 1, com `at` nos construtores e `executions` para os caminhos diretos; o grafo do console
+mostra os contratos de imagem, as ligações e o código das cargas de trabalho.

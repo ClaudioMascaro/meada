@@ -140,3 +140,15 @@ from ...", with the whole list. A value the index now stores joins it.
   extraction read (`valued`) before its first pass, then the missed ones, and extracts again the
   packs that missed until none does. A contract kind that reads a
   value from a new place relies on this loop.
+
+The stamped `contract_configs` table (#662) stores each contract kind's configuration summary,
+keyed by its prefix, with path, hash, mtime and size. The image summary contains normalized
+builder names (patterns included), their config locations and overridable flags, Helm runner
+names with key paths and lines, and the safe local Compose build paths. It holds no source
+text, commands, arbitrary environment values or base-image configuration. It follows the same
+walk, ignore rules and per-file byte ceiling as the other configurations. Queries read these
+facts, stored IaC nodes and evaluated Kubernetes images, including in server mode.
+
+`iac_nodes.build_image` records whether a Compose service configures a build, independently
+of whether `build` is a safe local context. This retains remote-context publishing evidence
+without permitting a direct code path through it. The flag follows Compose override semantics.

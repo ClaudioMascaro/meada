@@ -103,6 +103,9 @@ pub struct Export {
     /// identity, then root.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub iac_nodes: Vec<IacNode>,
+    /// Workloads that run code from a path in their own repository, without an image link.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub executions: Vec<Execution>,
     /// The provisioner sides of the repository (ADR 0026, #656), by contract, node, root.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub provisioners: Vec<Provisioner>,
@@ -143,6 +146,7 @@ impl Default for Export {
             imports: Vec::new(),
             communities: Vec::new(),
             iac_nodes: Vec::new(),
+            executions: Vec::new(),
             provisioners: Vec::new(),
             links: Vec::new(),
             provisions: Vec::new(),
@@ -215,6 +219,9 @@ pub struct Provider {
     /// The environment variable an unresolved SDK operation reads, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub via: Option<String>,
+    /// Configuration location of a repository-level side, `<file>#<key path>`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<String>,
     /// The path a gateway serves the route at, when `[serve]` rewrites it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gateway: Option<String>,
@@ -237,6 +244,9 @@ pub struct Consumer {
     /// reads from the parsed response (spec #23).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shape: Option<Shape>,
+    /// The evaluation root of a workload side. Earlier kinds have no root.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root: Option<String>,
 }
 
 /// A queue bound to an exchange by a pattern: the call `site` (a call site) that binds the
@@ -439,6 +449,18 @@ pub struct IacNode {
     pub end_line: usize,
 }
 
+/// A workload runs code in a repository. Image links derive this at query time; only direct
+/// same-repository paths are written in `executions`.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Execution {
+    pub workload: String,
+    pub root: String,
+    pub repository: String,
+    pub path: String,
+    pub level: Level,
+    pub reason: String,
+}
+
 /// A provisioner side (ADR 0026): the IaC node `node` (an [`IacNode`]'s identity) of the root
 /// `root` creates what the contract `contract` names.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
@@ -516,9 +538,23 @@ pub struct Link {
     /// The shape drift of an HTTP link with a shape on both sides (spec #23, ADR 0009).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drift: Option<Drift>,
+    /// The workload side's evaluation root, retained when a decision is replayed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root: Option<String>,
+}
+
+/// A workload's independent image sides share its location, but have separate decisions.
+pub fn side_id<'a>(site: &'a str, contract: &str, root: Option<&str>) -> std::borrow::Cow<'a, str> {
+    match root {
+        Some(root) => format!("{site}::{contract} (root {root})").into(),
+        None => site.into(),
+    }
 }
 
 impl Link {
+    pub fn item_site(&self) -> std::borrow::Cow<'_, str> {
+        side_id(&self.consumer, &self.contract, self.root.as_deref())
+    }
     /// Every current field, in declaration order. A field added later is optional: it starts
     /// empty and is set after `new`.
     #[expect(clippy::too_many_arguments)]
@@ -541,6 +577,7 @@ impl Link {
             by,
             p,
             drift,
+            root: None,
         }
     }
 }

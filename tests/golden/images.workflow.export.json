@@ -1,0 +1,39 @@
+{
+  "format": 1,
+  "repository": "example.com/acme/deploy",
+  "commit": "a5857e0beef90fbe460dfc79082e84dd0bb3f2dd",
+  "dirty": true,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "image::ghcr.io/acme/orders",
+      "site": "example.com/acme/deploy::deployment.yaml::Deployment.apps/shop/orders",
+      "via": null,
+      "root": "."
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "example.com/acme/deploy::deployment.yaml::Deployment.apps/shop/orders",
+      "address": "Deployment.apps/shop/orders",
+      "type": "Deployment",
+      "root": ".",
+      "path": "deployment.yaml",
+      "line": 1,
+      "end_line": 14
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/deploy::deployment.yaml::Deployment.apps/shop/orders",
+      "provider": "example.com/acme/app",
+      "contract": "image::ghcr.io/acme/orders",
+      "level": "exact",
+      "reason": "image::ghcr.io/acme/orders",
+      "root": "."
+    }
+  ]
+}

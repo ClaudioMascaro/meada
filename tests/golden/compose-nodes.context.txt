@@ -15,6 +15,8 @@ example.com/acme/infra stack/compose.yaml:3 services.web.image = "ghcr.io/acme/w
 example.com/acme/infra stack/compose.yaml:4 services.web.build = "./web"
 example.com/acme/infra stack/compose.yaml:6 services.web.depends_on[0] = "api"
 example.com/acme/infra stack/compose.yaml:8 services.web.networks[0] = "front"
+image: image::ghcr.io/acme/web
+  builder: example.com/acme/infra [inferred: image::ghcr.io/acme/web; image: stack/compose.yaml#services.web.image (Compose default); stack/compose.yaml#services.web.image]
 
 example.com/acme/infra stack/compose.yaml:9-21 services.api
 type: service
@@ -40,6 +42,8 @@ example.com/acme/infra stack/compose.yaml:16 services.api.depends_on.db.conditio
 example.com/acme/infra stack/compose.yaml:18 services.api.links[0] = "db:database"
 example.com/acme/infra stack/compose.yaml:20 services.api.networks[0] = "front"
 example.com/acme/infra stack/compose.yaml:21 services.api.networks[1] = "back"
+image: image::docker.io/acme/api
+  builder: example.com/acme/infra [exact: image::docker.io/acme/api]
 
 example.com/acme/infra stack/compose.override.yaml:8-11 services.cache
 type: service
@@ -53,6 +57,7 @@ referenced by: none
 values:
 example.com/acme/infra stack/compose.override.yaml:9 services.cache.image = "redis:7"
 example.com/acme/infra stack/compose.override.yaml:11 services.cache.depends_on[0] = "db"
+image: image::docker.io/library/redis
 
 example.com/acme/infra tools/docker-compose.yml:2-3 services.escape
 type: service

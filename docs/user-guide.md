@@ -453,6 +453,28 @@ na mesma pasta é lido como um projeto, enraizado na pasta. Cada serviço é um 
   resolvida não são.
 - **Consultas**: como nos nós Terraform, `search` com `kind = "iac"`, `context` e `trace`.
 
+### Imagens e código de workloads
+
+O contrato `image::<registry>/<repositório>` liga um workload ao repositório que constrói sua
+imagem. Nomes curtos do Docker Hub são expandidos, letras ficam minúsculas e tag e digest são
+removidos. O builder vem de tags do docker/build-push-action, imagens do docker/metadata-action,
+Compose com `build` e `image`, artefatos Skaffold, destinos Jib e comandos ko simples com
+`KO_DOCKER_REPO` escrito na configuração e `--bare`. Scripts ko com sintaxe de shell não lida
+não declaram builder. O comando aceita um `--bare`, no máximo um pacote literal e nenhuma outra
+opção; um shell explícito deve ser `bash` ou `sh`. Runners vêm de containers e init containers Kubernetes, serviços Compose,
+`image.repository` de values Helm e imagens após overrides Kustomize.
+
+`search` com `kind = "image"` encontra esses contratos. `context` no workload mostra sua imagem
+e o repositório builder; `trace` desce do workload ao código e sobe do código aos workloads.
+Nomes literais ligam em `exact`; padrões e valores sobrescrevíveis em `inferred`, com o motivo.
+Vários candidatos ficam `ambiguous`. Um contexto Compose local e seguro liga o serviço ao seu
+código diretamente em `exact`, mesmo sem imagem. Caminhos não atravessam links simbólicos.
+
+`meada status` só lista imagens órfãs quando o escopo contém builder e runner. Com apenas um
+papel, `search` e `context` mostram `no builder in the workspace` ou `no runner in the workspace`.
+O export conserva `format: 1`, guarda locais dos builders e raízes dos workloads e inclui
+`executions` para caminhos diretos; o grafo da console mostra contratos e código dos workloads.
+
 ### CloudFormation e SAM
 
 Um template qualificado chamado `compose.yaml` mantém seus nós e referências no índice inicial e nas atualizações; o nome do arquivo não o torna Compose.
@@ -564,6 +586,22 @@ as ligações de provisionamento separadas em `provisions`. `meada status` lista
 provisionados sem uso e usos sem provisionador, por kind e broker, somente quando o workspace
 contém ao menos um provisionador e um uso daquele grupo. Os outros formatos IaC continuam
 como nós e referências; esta tabela de contratos cobre arquivos `.tf` e `.tofu`.
+
+### Uso dos SDKs AWS em Java, Go e C#
+
+Os SDKs Java 2.x, Go v2 e .NET reconhecem SQS, SNS, EventBridge e Kinesis como canais,
+e S3, DynamoDB, SSM Parameter Store e Secrets Manager como recursos. O cliente precisa nascer
+num construtor do SDK: `create()` ou `builder().build()` em Java, `New` ou `NewFromConfig`
+em Go, e `new Amazon...Client(...)` em C#. Aliases e fábricas seguem apenas saltos `exact`;
+um tipo injetado sozinho, um nome oculto ou um salto por nome não comprova o cliente.
+
+Nomes literais e ARNs identificam o contrato; uma leitura do ambiente mantém o lado sem nome
+resolvido e registra a variável, inclusive em produtores. Lotes preservam todos os nomes.
+Leitores pertencem à função que os contém, escritores à chamada da operação, e os vínculos
+SDK são `exact`; declarações de recursos continuam `declared`. Lados sem nome resolvido não
+se vinculam, e `GetParametersByPath` não identifica um parâmetro físico. A tabela de
+[capacidades](site/pt/capabilities.md) lista as operações e diferenças entre os SDKs.
+
 
 ## 4. `meada.toml`: referência
 
@@ -1670,7 +1708,7 @@ em `src/main/resources` do módulo. Um placeholder `${VAR}` que nenhuma chave pr
 | Redis streams | Jedis, Lettuce |
 | JMS | Spring JMS |
 
-O cliente vale pelo tipo que o código escreve para ele, e um listener pela anotação do Spring
+Fora dos SDKs AWS, o cliente vale pelo tipo que o código escreve para ele, e um listener pela anotação do Spring
 (`@KafkaListener`, `@RabbitListener`, `@JmsListener`). O nome do canal se dobra como uma URL, com
 os `${chave}` das anotações lidos da configuração do Spring.
 
@@ -1796,7 +1834,8 @@ não são lidos.
 | Redis streams | `StackExchange.Redis` |
 | Azure Service Bus | `Azure.Messaging.ServiceBus` |
 
-O cliente vale pelo tipo que o código escreve para ele ou pela construção que o criou, resolvido
+Os clientes AWS exigem origem em construtor, como descrito na seção de SDKs AWS. Os demais
+clientes valem pelo tipo que o código escreve ou pela construção que os criou, resolvidos
 pelos `using`s, nunca só pelo nome.
 
 **Limites conhecidos.**

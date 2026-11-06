@@ -76,3 +76,14 @@ test('an invalid export is refused with the core parse error before building any
   expect(() => graphModel('{"repository":"x","files":[{"path":"a","hash":7}]}'))
     .toThrow('files[0].hash');
 });
+
+test('image builders retain their config locations and direct workloads retain their code paths', () => {
+  const data = JSON.parse(golden('chain-web'));
+  data.providers = [{ contract: 'image::ghcr.io/acme/orders', site: data.repository, at: '.github/workflows/build.yml#jobs.publish.steps[0].with.tags' }];
+  data.consumers = [];
+  data.links = [];
+  data.executions = [{ workload: `${data.repository}::compose.yaml::services.orders`, root: '.', repository: data.repository, path: 'src', level: 'exact', reason: 'Compose build compose.yaml#services.orders.build' }];
+  const graph = graphModel(JSON.stringify(data));
+  expect(graph.contracts).toEqual([{ contract: 'image::ghcr.io/acme/orders', providers: [`${data.repository} (.github/workflows/build.yml#jobs.publish.steps[0].with.tags)`], consumers: [] }]);
+  expect(graph.executions).toEqual(data.executions);
+});

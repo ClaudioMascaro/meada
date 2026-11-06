@@ -28,6 +28,11 @@ const REPORT_URL: &str =
     "https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml";
 
 pub enum Msg<'a> {
+    OrphanCounterpart {
+        contract: &'a str,
+        place: &'a str,
+        builder: bool,
+    },
     NotIndexed,
     OtherVersion,
     Indexed(i64),
@@ -1810,6 +1815,10 @@ impl Msg<'_> {
                 format!("órfão {contract}: nenhum provisionador; {place}"),
                 format!("huérfano {contract}: ningún provisionador; {place}"),
             ),
+            Msg::OrphanCounterpart { contract, place, builder } => {
+                let (en, pt, es) = if *builder { ("builder", "construtor", "constructor") } else { ("runner", "executor", "ejecutor") };
+                pick(format!("orphan {contract}: no {en}; {place}"), format!("órfão {contract}: nenhum {pt}; {place}"), format!("huérfano {contract}: ningún {es}; {place}"))
+            },
             Msg::Drift(n) => pick(
                 format!("shape drift, missing reads: {n}"),
                 format!("drift de formato, leituras ausentes: {n}"),

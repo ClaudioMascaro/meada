@@ -9,6 +9,7 @@ use std::collections::{HashMap, HashSet};
 use crate::channel::Channel;
 use crate::entry::EntryKind;
 use crate::http::Http;
+use crate::image::Image;
 use crate::index::{Consumer, Export, Indexed, Provider};
 use crate::package::Packages;
 use crate::resolve::Code;
@@ -218,6 +219,34 @@ pub trait ContractKind {
     /// say, the others ignore it.
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found>;
 
+    /// Whether this kind reads configuration independently of a language pack.
+    fn config_file(&self, _path: &str) -> bool {
+        false
+    }
+    /// A path dependency can change without the configuration file's bytes changing.
+    fn config_reads_paths(&self, _path: &str) -> bool {
+        false
+    }
+
+    /// Stored facts of one configuration file, bounded by the shared per-file ceiling.
+    fn config_summary(
+        &self,
+        _path: &str,
+        _src: &[u8],
+        _root: &std::path::Path,
+    ) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+
+    /// Workloads that run repository code, for the shared trace to cross into it.
+    fn executions(
+        &self,
+        _exports: &[Export],
+        _links: &[Link],
+    ) -> Vec<meada_core::export::Execution> {
+        Vec::new()
+    }
+
     /// Which entry point kind a `role` side of `contract` makes. It is a function of the
     /// contract alone, since entry points are stored when the index is written: changing an
     /// answer needs a reindex.
@@ -264,6 +293,11 @@ pub trait ContractKind {
     /// has no call of its own) calls on the provider it links to, so `trace` follows from the
     /// definition to it. A channel handler at a definition is where a link ends, not starts.
     fn calls_from_definition(&self) -> bool {
+        false
+    }
+
+    /// Whether repository-level sites participate in the kind's exported links.
+    fn exports_repository_links(&self) -> bool {
         false
     }
 
@@ -368,6 +402,18 @@ pub trait ContractKind {
         Vec::new()
     }
 
+    /// Root-qualified workload context; ordinary symbols have no evaluation root.
+    fn context_at(
+        &self,
+        exports: &[Export],
+        repos: &[Repository],
+        links: &[Link],
+        site: &str,
+        _root: Option<&str>,
+    ) -> Vec<String> {
+        self.context_sections(exports, repos, links, site)
+    }
+
     /// The call sites `context_sections` looks up for `symbol` among `links` (the
     /// workspace's): a query reads them, and the symbols making them, first (#396). None by
     /// default.
@@ -385,6 +431,22 @@ pub trait ContractKind {
     /// given the links of the workspace.
     fn status(&self, _repository: &Repository, _export: &Export, _links: &[Link]) -> Vec<String> {
         Vec::new()
+    }
+
+    /// Status whose counterpart rule depends on the whole visible workspace.
+    fn scope_status(
+        &self,
+        repository: &Repository,
+        export: &Export,
+        _exports: &[Export],
+        links: &[Link],
+    ) -> Vec<String> {
+        self.status(repository, export, links)
+    }
+
+    /// A missing counterpart note, when the kind has a two-role orphan rule.
+    fn side_note(&self, _exports: &[Export], _contract: &str, _role: Role) -> &'static str {
+        ""
     }
 
     /// Whether the kind's ambiguous links are open items: a call for a person to decide.
@@ -405,7 +467,23 @@ pub trait ContractKind {
 }
 
 /// Every contract kind of this release.
-pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel, &Packages];
+pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel, &Packages, &Image];
+
+/// Contract configurations are read once at indexing time; queries use their stored summaries.
+pub(crate) fn config_file(path: &str) -> bool {
+    KINDS.iter().any(|k| k.config_file(path))
+}
+pub(crate) fn config_reads_paths(path: &str) -> bool {
+    KINDS.iter().any(|k| k.config_reads_paths(path))
+}
+
+pub(crate) fn config_summary(path: &str, src: &[u8], root: &std::path::Path) -> serde_json::Value {
+    let mut summaries = serde_json::Map::new();
+    for kind in KINDS.iter().filter(|k| k.config_file(path)) {
+        summaries.insert(kind.prefix().into(), kind.config_summary(path, src, root));
+    }
+    summaries.into()
+}
 
 /// The kind of a contract identifier, from its prefix.
 pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {
@@ -416,6 +494,15 @@ pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {
 /// The kind's evidence level for a directed use; unknown kinds cannot establish exact uses.
 pub(crate) fn use_level(contract: &str, operation: Option<&str>) -> Level {
     kind_of(contract).map_or(Level::Declared, |kind| kind.use_level(operation))
+}
+
+/// Preserve each kind's export scope, including repository-level builders where supported.
+pub(crate) fn link_in_repository(link: &Link, repository: &str) -> bool {
+    let prefix = format!("{repository}::");
+    link.consumer.starts_with(&prefix)
+        || link.provider.starts_with(&prefix)
+        || (kind_of(&link.contract).is_some_and(|k| k.exports_repository_links())
+            && (link.consumer == repository || link.provider == repository))
 }
 
 /// Whether a consumer at a definition calls the provider it links to, by the rule of its kind
@@ -681,6 +768,7 @@ mod tests {
                 Search::Filter("resource"),
                 Search::Filter("channel"),
                 Search::Own("package"),
+                Search::Filter("image"),
             ]
         );
         let (kind, search) = searched("package").unwrap();

@@ -50,6 +50,48 @@ forms = [
   "https://s3.*.amazonaws.com/{name}",
 ]
 
+# Workloads (#662): image paths are read by their format reader; [] names every list item.
+[[workload]]
+format = "kubernetes"
+type = "Deployment"
+images = ["spec.template.spec.containers[].image", "spec.template.spec.initContainers[].image"]
+[[workload]]
+format = "kubernetes"
+type = "StatefulSet"
+images = ["spec.template.spec.containers[].image", "spec.template.spec.initContainers[].image"]
+[[workload]]
+format = "kubernetes"
+type = "DaemonSet"
+images = ["spec.template.spec.containers[].image", "spec.template.spec.initContainers[].image"]
+[[workload]]
+format = "kubernetes"
+type = "ReplicaSet"
+images = ["spec.template.spec.containers[].image", "spec.template.spec.initContainers[].image"]
+[[workload]]
+format = "kubernetes"
+type = "ReplicationController"
+images = ["spec.template.spec.containers[].image", "spec.template.spec.initContainers[].image"]
+[[workload]]
+format = "kubernetes"
+type = "Job"
+images = ["spec.template.spec.containers[].image", "spec.template.spec.initContainers[].image"]
+[[workload]]
+format = "kubernetes"
+type = "CronJob"
+images = ["spec.jobTemplate.spec.template.spec.containers[].image", "spec.jobTemplate.spec.template.spec.initContainers[].image"]
+[[workload]]
+format = "kubernetes"
+type = "Pod"
+images = ["spec.containers[].image", "spec.initContainers[].image"]
+[[workload]]
+format = "compose"
+type = "service"
+images = ["image"]
+code = "build.context"
+[[workload]]
+format = "helm"
+type = "HelmValues"
+images = ["image.repository"]
 [[entry]]
 format = "terraform"
 type = "aws_sns_topic"

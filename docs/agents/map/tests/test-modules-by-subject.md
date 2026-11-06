@@ -431,3 +431,8 @@
   provenance through the engine export. Sibling Go/.NET repositories assert the whole set of
   data/provisioning links and exact versus declared evidence, and reject unresolved links.
   Generated full-file-ceiling Java/Go/C# factory lattices must retain both uses within 30 s.
+
+- `images.rs` (#662): image normalization and builders/runners across sibling repositories,
+  Compose and Helm evidence, Kustomize image overrides, direct code paths without images,
+  trace in both directions, scope-aware orphans, segment-bounded patterns, ambiguous image
+  open items, safe-path and symlink refresh, plus export/context/trace goldens.

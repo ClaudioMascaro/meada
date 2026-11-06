@@ -688,3 +688,8 @@
   Dockerfile there. A service with a `network_mode` is on no `default` network. A YAML merge key
   (`<<: *anchor`) is followed at any depth and through chains of anchors. A service in an override file but no base file has the
   override's path. A changed Compose file evaluates again the root of its directory, with Terraform's.
+
+- `IMAGE_STORED_MAX` (`image/config.rs`): 4 times `lang::MAX_BYTES` per configuration file,
+  bounding the image facts when a long job key is repeated for many tags. Past it further
+  builder facts are left out. The reader shares the event/XML/Gradle depth and file ceilings;
+  unresolved image patterns share `PATTERN_LITERAL_MIN`, `PATTERN_SEGMENTS` and `PATTERN_TEXT_MAX`.

@@ -612,6 +612,7 @@ pub(super) fn nodes(unit: &Unit) -> (Vec<Node>, Vec<Reference>) {
             ),
             image: None,
             build: None,
+            build_image: false,
             role: None,
             handler: None,
             events: Vec::new(),

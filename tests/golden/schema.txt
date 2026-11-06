@@ -43,6 +43,10 @@ CREATE TABLE config_files (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL
 );
+CREATE TABLE contract_configs (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    summary TEXT NOT NULL
+);
 CREATE TABLE config_values (
     id INTEGER PRIMARY KEY, path TEXT NOT NULL, key TEXT NOT NULL, value TEXT, type TEXT NOT NULL, line INTEGER NOT NULL,
     cut INTEGER NOT NULL, folded_key TEXT NOT NULL, folded_value TEXT
@@ -59,7 +63,8 @@ CREATE TABLE iac_nodes (
     pattern INTEGER NOT NULL, overridable TEXT NOT NULL, path TEXT NOT NULL,
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
-    handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, subscription TEXT
+    handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
+    subscription TEXT
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -3298,6 +3303,7 @@ Output {
             block: "[2]",
             image: None,
             build: None,
+            build_image: false,
             role: None,
             handler: None,
             events: [],
@@ -3318,6 +3324,7 @@ Output {
             block: "[0]",
             image: None,
             build: None,
+            build_image: false,
             role: None,
             handler: None,
             events: [],
@@ -3338,6 +3345,7 @@ Output {
             block: "[1]",
             image: None,
             build: None,
+            build_image: false,
             role: None,
             handler: None,
             events: [],
@@ -3358,6 +3366,7 @@ Output {
             block: "[3]",
             image: None,
             build: None,
+            build_image: false,
             role: None,
             handler: None,
             events: [],
@@ -3426,6 +3435,7 @@ Output {
             block: "[3]",
             image: None,
             build: None,
+            build_image: false,
             role: Some(
                 "crossplane managed resource",
             ),
@@ -3448,6 +3458,7 @@ Output {
             block: "[0]",
             image: None,
             build: None,
+            build_image: false,
             role: Some(
                 "crossplane composite resource definition",
             ),
@@ -3470,6 +3481,7 @@ Output {
             block: "[1]",
             image: None,
             build: None,
+            build_image: false,
             role: Some(
                 "crossplane composition",
             ),
@@ -3492,6 +3504,7 @@ Output {
             block: "[2]",
             image: None,
             build: None,
+            build_image: false,
             role: Some(
                 "crossplane claim",
             ),
@@ -3514,6 +3527,7 @@ Output {
             block: "[1].spec.resources[0]",
             image: None,
             build: None,
+            build_image: false,
             role: Some(
                 "crossplane composed resource",
             ),
@@ -3536,6 +3550,7 @@ Output {
             block: "[1].spec.resources[1]",
             image: None,
             build: None,
+            build_image: false,
             role: Some(
                 "crossplane composed resource",
             ),
@@ -3607,6 +3622,7 @@ sample.cloudformation.yaml
             block: "Resources.Queue",
             image: None,
             build: None,
+            build_image: false,
             role: None,
             handler: None,
             events: [],
@@ -3634,6 +3650,7 @@ sample.cloudformation.yaml
             block: "Resources.Worker",
             image: None,
             build: None,
+            build_image: false,
             role: None,
             handler: None,
             events: [],
@@ -3726,6 +3743,7 @@ sample.serverless.yml
             block: "functions.hello",
             image: None,
             build: None,
+            build_image: false,
             role: None,
             handler: Some(
                 Resolved {
@@ -3767,6 +3785,7 @@ sample.serverless.yml
             block: "resources.Resources.Queue",
             image: None,
             build: None,
+            build_image: false,
             role: None,
             handler: None,
             events: [],
@@ -3803,6 +3822,7 @@ sample.provision.tf
             block: "resource.aws_s3_bucket.archive",
             image: None,
             build: None,
+            build_image: false,
             role: None,
             handler: None,
             events: [],
@@ -3823,6 +3843,7 @@ sample.provision.tf
             block: "resource.aws_sqs_queue.orders",
             image: None,
             build: None,
+            build_image: false,
             role: None,
             handler: None,
             events: [],

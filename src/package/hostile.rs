@@ -274,6 +274,58 @@ type Probe = (&'static str, fn() -> usize);
 
 fn probes() -> Vec<Probe> {
     vec![
+        ("image: repeated workflow keys", || {
+            use crate::contract::ContractKind;
+            let key = "j".repeat(900);
+            let tags = fill(2, |i| format!("            ghcr.io/acme/image-{i}\n"));
+            let text = file(format!(
+                "jobs:\n  {key}:\n    steps:\n      - uses: docker/build-push-action@v6\n        with:\n          tags: |\n{tags}"
+            ));
+            crate::image::Image
+                .config_summary(
+                    ".github/workflows/build.yml",
+                    &text,
+                    std::path::Path::new("."),
+                )
+                .to_string()
+                .len()
+        }),
+        ("image: many Skaffold artifacts", || {
+            use crate::contract::ContractKind;
+            let items = fill(1, |i| format!("    - image: ghcr.io/acme/image-{i}\n"));
+            crate::image::Image
+                .config_summary(
+                    "skaffold.yaml",
+                    &file(format!("build:\n  artifacts:\n{items}")),
+                    std::path::Path::new("."),
+                )
+                .to_string()
+                .len()
+        }),
+        ("image: deeply nested Maven Jib", || {
+            use crate::contract::ContractKind;
+            let text = file(format!(
+                "{}x{}",
+                "<plugin>".repeat(NESTING / 2),
+                "</plugin>".repeat(NESTING / 2)
+            ));
+            crate::image::Image
+                .config_summary("pom.xml", &text, std::path::Path::new("."))
+                .to_string()
+                .len()
+        }),
+        ("image: deeply nested Gradle Jib", || {
+            use crate::contract::ContractKind;
+            let text = file(format!(
+                "plugins {{ id(\"com.google.cloud.tools.jib\") }} {} image = \"ghcr.io/acme/x\" {}",
+                "jib {".repeat(NESTING),
+                "}".repeat(NESTING)
+            ));
+            crate::image::Image
+                .config_summary("build.gradle.kts", &text, std::path::Path::new("."))
+                .to_string()
+                .len()
+        }),
         // npm: `package.json`
         ("npm: many dependencies", || {
             let deps = fill(1, |i| format!("\"p{i}\":\"^1.0.{i}\","));

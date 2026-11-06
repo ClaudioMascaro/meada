@@ -7,7 +7,7 @@ use crate::lang::MAX_BYTES;
 use crate::package::{Entry, MAX_NAME, Summary};
 
 // ponytail: build scripts nest a few blocks; a deeper file reads as nothing.
-const GRADLE_DEPTH: usize = 64;
+pub(crate) const GRADLE_DEPTH: usize = 64;
 
 // ponytail: a project names a few source directories; the rest of a hostile file is dropped.
 const MAX_ROOTS: usize = 64;
@@ -20,7 +20,7 @@ const MAX_ENTRIES: usize = 8192;
 const MAX_CATALOGS: usize = 16;
 
 #[derive(Clone, Debug, PartialEq)]
-enum Token {
+pub(crate) enum Token {
     Word(String),
     String(String, bool),
     Mark(char),
@@ -28,7 +28,7 @@ enum Token {
 }
 
 impl Token {
-    fn word(&self) -> Option<&str> {
+    pub(crate) fn word(&self) -> Option<&str> {
         match self {
             Self::Word(s) => Some(s),
             _ => None,
@@ -37,7 +37,7 @@ impl Token {
 }
 
 /// Scans quoted strings before comments, so a comment or string never supplies build code.
-fn tokens(src: &str) -> Vec<Token> {
+pub(crate) fn tokens(src: &str) -> Vec<Token> {
     let mut out = Vec::new();
     let mut chars = src.chars().peekable();
     while let Some(c) = chars.next() {
