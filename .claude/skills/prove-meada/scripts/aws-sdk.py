@@ -98,7 +98,7 @@ def source(lang, service, operation, field, shape, mode, name, variable):
     marker = "probe_" + mode
     expr = json.dumps(identifier(service, name))
     expr2 = json.dumps(identifier(service, name + "-other"))
-    constructor_mode = mode not in ("type_only", "hidden", "name_hop")
+    constructor_mode = mode not in ("type_only", "hidden", "name_hop", "opaque_hop")
     if lang == "java":
         model = "software.amazon.awssdk.services." + service + ".model."
         if mode == "env":
@@ -125,9 +125,11 @@ def source(lang, service, operation, field, shape, mode, name, variable):
         if mode == "exact_hop":
             setup = jclient + " conduit = makeClient(); var alias = conduit;"
         if mode == "name_hop":
+            params, setup = "", jclient + " conduit = makeClient(); var alias = conduit;"
+        if mode == "opaque_hop":
             params, setup = "foreign.Factory opaque", jclient + " conduit = opaque.makeClient(); var alias = conduit;"
         extras = ""
-        if mode in ("exact_hop", "name_hop"):
+        if mode in ("exact_hop", "name_hop", "opaque_hop"):
             extras = "static " + jclient + " makeClient() { return " + ctor + "; }\n"
         if mode == "hidden_constructor":
             extras = "static class " + jclient + " { static " + jclient + " create() { return new " + jclient + "(); } void " + operation[0].lower()+operation[1:] + "(Object request) {} }\n"
@@ -136,7 +138,7 @@ def source(lang, service, operation, field, shape, mode, name, variable):
         body = ', software.amazon.awssdk.core.sync.RequestBody.fromString("neutral")' if service == "s3" and operation == "PutObject" else ""
         call = "alias." + operation[0].lower() + operation[1:] + "(" + request + body + ");"
         return ("import software.amazon.awssdk.services." + service + "." + jclient + ";\n"
-                + "class Case {\n" + extras + "void " + marker + "(" + params + ") { " + setup + " " + call + " }\n}\n"), marker
+                + ("class Case extends foreign.Parent {\n" if mode == "name_hop" else "class Case {\n") + extras + "void " + marker + "(" + params + ") { " + setup + " " + call + " }\n}\n"), marker
     if lang == "csharp":
         # .NET S3 uses SDK-specific names; preserve the logical operation in the oracle.
         if service == "s3":
@@ -164,16 +166,18 @@ def source(lang, service, operation, field, shape, mode, name, variable):
         if mode == "exact_hop":
             setup = "var conduit = MakeClient(); var alias = conduit;"
         if mode == "name_hop":
+            params, setup = "", "var conduit = MakeClient(); var alias = conduit;"
+        if mode == "opaque_hop":
             params, setup = "dynamic opaque", "var conduit = opaque.MakeClient(); var alias = conduit;"
         extras = ""
-        if mode in ("exact_hop", "name_hop"):
+        if mode in ("exact_hop", "name_hop", "opaque_hop"):
             extras = "static " + cclient + " MakeClient() { return new " + cclient + "(); }\n"
         if mode == "hidden_constructor":
             extras = "class " + cclient + " { public void " + operation + "Async(object r) {} }\n"
         if mode == "hidden":
             extras = "static " + cclient + " conduit = new " + cclient + "();\n"
         return ("using System;\nusing System.Collections.Generic;\nusing " + cnamespace + ";\nusing " + cnamespace + ".Model;\n"
-                + "class Case {\n" + extras + "void " + marker + "(" + params + ") { " + setup + " alias."
+                + ("class Case : ForeignParent {\n" if mode == "name_hop" else "class Case {\n") + extras + "void " + marker + "(" + params + ") { " + setup + " alias."
                 + operation + "Async(" + request + "); }\n}\n"), marker
     if mode == "env":
         expr = 'os.Getenv("' + variable + '")'
@@ -195,10 +199,14 @@ def source(lang, service, operation, field, shape, mode, name, variable):
     if mode == "exact_hop":
         setup = "conduit := makeClient(); alias := conduit;"
     if mode == "name_hop":
+        params, setup = "opaque Unknown", "conduit := opaque.makeClient(); alias := conduit;"
+    if mode == "opaque_hop":
         params, setup = "opaque foreign.Factory", "conduit := opaque.makeClient(); alias := conduit;"
     extras = ""
-    if mode in ("exact_hop", "name_hop"):
+    if mode in ("exact_hop", "name_hop", "opaque_hop"):
         extras = "func makeClient() *" + service + ".Client { return " + service + ".NewFromConfig(aws.Config{}) }\n"
+    if mode == "name_hop":
+        extras = "type knownFactory struct{}\nfunc (knownFactory) makeClient() *" + service + ".Client { return " + service + ".NewFromConfig(aws.Config{}) }\n"
     if mode == "hidden":
         extras = "var conduit = " + service + ".NewFromConfig(aws.Config{})\n"
     if mode == "hidden_constructor":
@@ -230,7 +238,7 @@ def seed(run):
             if shape != "one":
                 modes += ["multiple"]
             if not any(s == service for s, *_ in OPS[:i]):
-                modes += ["exact_hop", "name_hop", "hidden", "hidden_constructor"]
+                modes += ["exact_hop", "name_hop", "opaque_hop", "hidden", "hidden_constructor"]
                 if lang == "java":
                     modes += ["builder"]
             for mode in modes:
@@ -240,7 +248,7 @@ def seed(run):
                 code, marker = source(lang, service, operation, field, shape, mode, name, variable)
                 class_name = "Probe_" + service + "_" + operation + "_" + mode
                 if lang != "go":
-                    code = code.replace("class Case {", "class " + class_name + " {")
+                    code = code.replace("class Case", "class " + class_name)
                 extension = {"java": "java", "go": "go", "csharp": "cs"}[lang]
                 path = service + "/" + operation.lower() + "/" + mode + "/Case." + extension
                 if lang == "go":
@@ -343,7 +351,7 @@ def judge(probe, lang, data, oracle):
         if row["accepted"] and not row["unresolved"]:
             got = rows_for(data, row)
             for _, side in got:
-                links = [p for p in data.get("provisions", []) if p["side"] == side["site"]]
+                links = [p for p in data.get("provisions", []) if p["side"] == side["site"] and p["contract"] == side["contract"]]
                 probe.check(lang + " exact provisioning " + row["path"], len(links) == 1
                             and links[0]["contract"] == side["contract"] and links[0]["level"] == "exact"
                             and "infra-" + lang + "::neutral.tf::" in links[0]["provisioner"], links)
@@ -356,13 +364,16 @@ def judge(probe, lang, data, oracle):
     probe.check(lang + " export format stays 1", data.get("format") == 1, data.get("format"))
 
 
-def queries_for(lang, oracle):
+def queries_for(lang, oracle, data):
     queries = []
     for row in oracle:
-        # Qualified file plus function disambiguates the repeated local names.
-        symbol = REMOTE + lang + "::" + row["path"] + "::" + row["class_name"] + "." + row["marker"]
-        if lang == "go":
-            symbol = REMOTE + lang + "::" + row["path"] + "::" + row["marker"]
+        # The source path and authored marker pick the known function; its public
+        # export id supplies language-specific signature spelling, not an expected answer.
+        symbols = [s["id"] for s in data["symbols"] if s["span"]["path"] == row["path"]
+                   and row["marker"] in s["id"].rsplit("::", 1)[-1]]
+        if row["accepted"] and len(symbols) != 1:
+            raise RuntimeError("ambiguous/missing source symbol selector: " + row["path"] + " " + repr(symbols))
+        symbol = symbols[0] if symbols else "unqueried-control"
         if row["accepted"]:
             queries.append({"tool": "context", "arguments": {"symbol": symbol, "budget": 30000}})
         if row["mode"] == "literal" and not row["unresolved"]:
@@ -373,8 +384,8 @@ def queries_for(lang, oracle):
     return queries
 
 
-def transports(probe, binary, root, lang, oracle, http):
-    queries = queries_for(lang, oracle)
+def transports(probe, binary, root, lang, oracle, data, http):
+    queries = queries_for(lang, oracle, data)
     tools, texts, _ = mcp_answers(binary, root, queries, probe.run / (lang + ".stdio.err"))
     write(probe.run, lang + ".queries.json", json.dumps(queries, indent=2))
     write(probe.run, lang + ".stdio.json", json.dumps(dict(tools=tools, answers=texts), indent=2))
@@ -471,6 +482,7 @@ def main():
         parser.error("--head-bin required except with --seed-only")
     run = Path(args.run).resolve()
     run.mkdir(parents=True, exist_ok=False)
+    write(run, "checker-source.py", Path(__file__).read_text())
     probe = Probe(run)
     os.environ["LANG"] = "C.UTF-8"
     try:
@@ -491,7 +503,7 @@ def main():
             export = json.loads(probe.cli(binary, root, lang + ".export", "export"))
             judge(probe, lang, export, rows)
             probe.cli(binary, root, lang + ".status", "status")
-            transports(probe, binary, root, lang, rows, args.http)
+            transports(probe, binary, root, lang, rows, export, args.http)
             refresh_probe(probe, binary, root, lang, rows, export)
         failures = [c for c in probe.checks if not c["passed"]]
         result = "differences found" if failures else "checks passed; independent checker must judge"
