@@ -242,6 +242,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Resource SDK reader call sites retain their identities while traces follow writer-to-reader
+  data flow and its reverse, show the actual function/location, and continue through the
+  reader's body. Shared partial reads and process membership use the same direction; HTTP
+  and package calls keep their existing behavior (#659, #660).
+
+
 - Terraform and OpenTofu config values redact an `aws_ssm_parameter` resource's `value` when
   its literal `type` is `SecureString`, in HCL and Terraform JSON, regardless of attribute order.
   Ordinary `String` parameters keep their values (#709).

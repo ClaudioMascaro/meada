@@ -2044,6 +2044,8 @@ duplicates.
 
 ## AWS SDK calls in code
 
+For resource readers, tracing up reaches their writers; tracing down from a writer reaches the reader and continues through its function body. A call side keeps its identity while the answer shows its location and owning function. This also covers calls with no writer and process membership.
+
 TypeScript and JavaScript recognize v3 commands sent with `client.send(new Command(...))`,
 with both client and command imported from the corresponding AWS package. Python recognizes
 methods on clients constructed by `boto3.client(...)` or a `Session`. Names can come from

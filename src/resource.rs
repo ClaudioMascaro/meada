@@ -89,6 +89,10 @@ impl ContractKind for Resource {
         "resource"
     }
 
+    fn flows_to_consumer(&self) -> bool {
+        true
+    }
+
     fn sides(&self) -> Option<(&'static str, &'static str)> {
         Some(("writer", "reader"))
     }

@@ -75,6 +75,23 @@ pub(crate) struct Graph<'a> {
 }
 
 impl<'a> Graph<'a> {
+    /// A receiving operation keeps its call identity; its continuation is the owner's body.
+    fn reader_call(&self, id: &str) -> Option<Call<'a>> {
+        self.consumers
+            .get(id)?
+            .iter()
+            .any(|c| contract::flows_to_consumer(c.contract.as_deref()))
+            .then(|| self.calls.get(id).copied())
+            .flatten()
+    }
+
+    fn callees_at(&self, id: &str) -> &[Call<'a>] {
+        let owner = self
+            .reader_call(id)
+            .map_or(id, |(_, call)| call.caller.as_str());
+        self.callees.get(owner).map_or(&[], Vec::as_slice)
+    }
+
     /// `exports` in workspace order, and every link between them.
     pub(crate) fn new(workspace: &'a Workspace, exports: &'a [Export], links: &'a [Link]) -> Self {
         let mut graph = Self {
@@ -606,6 +623,13 @@ pub(crate) fn read(
     direction: Direction,
     candidates: bool,
 ) -> Result<HashSet<String>> {
+    let receiving: HashSet<String> = partial
+        .exports
+        .iter()
+        .flat_map(|export| &export.consumers)
+        .filter(|consumer| contract::flows_to_consumer(consumer.contract.as_deref()))
+        .map(|consumer| consumer.site.clone())
+        .collect();
     let mut by_consumer: HashMap<&str, Vec<&Link>> = HashMap::new();
     let mut by_provider: HashMap<&str, Vec<&Link>> = HashMap::new();
     for l in links {
@@ -627,12 +651,18 @@ pub(crate) fn read(
             .collect();
         partial.symbols(None, &new)?;
         let sites = partial.calls(None, &new)?;
+        partial.callers_of(&sites)?;
         let mut next = Vec::new();
         for id in &new {
             across(id, &mut next);
         }
         match direction {
             Direction::Down => {
+                for (_, call) in &sites {
+                    if receiving.contains(&call.id) {
+                        next.push(call.caller.clone());
+                    }
+                }
                 let mut calls = sites;
                 calls.extend(partial.callees(None, &new)?);
                 for (_, c) in &calls {
@@ -642,7 +672,16 @@ pub(crate) fn read(
             }
             Direction::Up => {
                 // Provisioning sides at producing calls belong to their enclosing symbol.
-                partial.callees(None, &new)?;
+                for (_, call) in partial.callees(None, &new)? {
+                    next.extend(
+                        by_consumer
+                            .get(call.id.as_str())
+                            .into_iter()
+                            .flatten()
+                            .filter(|link| contract::flows_to_consumer(Some(&link.contract)))
+                            .map(|link| link.provider.clone()),
+                    );
+                }
                 let mut calls = sites;
                 calls.extend(partial.callers(None, &new, candidates)?);
                 next.extend(calls.into_iter().map(|(_, c)| c.caller));
@@ -710,6 +749,10 @@ impl<'a> Walk<'_, 'a> {
     /// A call site as the start: the call, then what it reaches or where it sits.
     fn root_call(&mut self, call: Call<'a>) {
         let text = format!("{} {}", self.site(call), callee(&call.1.id));
+        if self.direction == Direction::Down && self.graph.reader_call(&call.1.id).is_some() {
+            self.enter(&call.1.id, 0, Row::call(text, call.0, None));
+            return;
+        }
         self.push(0, Row::call(text, call.0, None));
         match self.direction {
             Direction::Down => self.call_down(call, 1, &mut HashSet::new()),
@@ -750,7 +793,7 @@ impl<'a> Walk<'_, 'a> {
         let mut shown = HashSet::new();
         match self.direction {
             Direction::Down => {
-                for &call in graph.callees.get(id).into_iter().flatten() {
+                for &call in graph.callees_at(id) {
                     self.call_down(call, depth + 1, &mut shown);
                 }
                 // A method of a declarative client is a consumer with no call of its own.
@@ -764,7 +807,10 @@ impl<'a> Walk<'_, 'a> {
                 {
                     let reader = link.consumer.as_str();
                     let ends = graph.ends(reader);
-                    if (ends || graph.symbols.contains_key(reader)) && shown.insert((reader, true))
+                    if (ends
+                        || graph.symbols.contains_key(reader)
+                        || graph.reader_call(reader).is_some())
+                        && shown.insert((reader, true))
                     {
                         self.reach(reader, depth + 1, link);
                     }
@@ -775,6 +821,15 @@ impl<'a> Walk<'_, 'a> {
                 self.provisioners_up(id, depth + 1);
                 for &(_, c) in graph.callees.get(id).into_iter().flatten() {
                     self.provisioners_up(&c.id, depth + 1);
+                    for link in graph
+                        .out
+                        .get(c.id.as_str())
+                        .into_iter()
+                        .flatten()
+                        .filter(|link| contract::flows_to_consumer(Some(&link.contract)))
+                    {
+                        self.writer_up(link, depth + 1, &mut shown);
+                    }
                 }
                 for &call @ (n, c) in graph.callers.get(id).into_iter().flatten() {
                     if !shown.insert((c.caller.as_str(), false)) {
@@ -806,26 +861,23 @@ impl<'a> Walk<'_, 'a> {
                 // repository-level writer ends the branch.
                 for link in (graph.out.get(id).into_iter().flatten()).filter(|l| !calls_on_link(l))
                 {
-                    let writer = link.provider.as_str();
-                    if let Some(&call @ (n, c)) = graph.calls.get(writer) {
-                        if shown.insert((c.caller.as_str(), true)) {
-                            let text = format!(
-                                "{} {} {}",
-                                arrow(link),
-                                self.site(call),
-                                self.caller(call)
-                            );
-                            self.enter(&c.caller, depth + 1, Row::link(text, n, link));
-                        }
-                        continue;
-                    }
-                    if shown.insert((writer, true)) {
-                        self.reach(writer, depth + 1, link);
-                    }
+                    self.writer_up(link, depth + 1, &mut shown);
                 }
             }
         }
         self.ancestors.pop();
+    }
+
+    fn writer_up(&mut self, link: &'a Link, depth: usize, shown: &mut HashSet<(&'a str, bool)>) {
+        let writer = link.provider.as_str();
+        if let Some(&call @ (n, c)) = self.graph.calls.get(writer) {
+            if shown.insert((c.caller.as_str(), true)) {
+                let text = format!("{} {} {}", arrow(link), self.site(call), self.caller(call));
+                self.enter(&c.caller, depth, Row::link(text, n, link));
+            }
+        } else if shown.insert((writer, true)) {
+            self.reach(writer, depth, link);
+        }
     }
 
     /// Upstream of a contract side is every root that provisions it.
@@ -997,6 +1049,10 @@ impl<'a> Walk<'_, 'a> {
                 let at = self.files[n].at(&s.span.path, s.span.start);
                 format!("{identity} {at} {}", label(id))
             }
+            None if graph.calls.contains_key(id) => {
+                let call = graph.calls[id];
+                format!("{} {}", self.site(call), self.caller(call))
+            }
             None if graph.exports[n].config_uses.iter().any(|u| u.site == id) => {
                 let u = graph.exports[n]
                     .config_uses
@@ -1136,7 +1192,7 @@ impl<'a> Graph<'a> {
         let mut edges = Vec::new();
         self.sides_at(id, self.repo(id), &mut edges);
         let mut shown = HashSet::new();
-        for &call in self.callees.get(id).into_iter().flatten() {
+        for &call in self.callees_at(id) {
             self.call_edges(call, &mut shown, &mut edges);
         }
         // A method of a declarative client is a consumer with no call of its own.
@@ -1147,7 +1203,9 @@ impl<'a> Graph<'a> {
         // the branch.
         for link in (self.into.get(id).into_iter().flatten()).filter(|l| !calls_on_link(l)) {
             let reader = link.consumer.as_str();
-            let reaches = self.ends(reader) || self.symbols.contains_key(reader);
+            let reaches = self.ends(reader)
+                || self.symbols.contains_key(reader)
+                || self.reader_call(reader).is_some();
             if reaches && shown.insert((reader, true)) {
                 edges.push(Edge::Link { to: reader, link });
             }
@@ -1244,9 +1302,13 @@ impl<'a> Graph<'a> {
         at_definition: bool,
     ) -> Vec<(&'a Consumer, Vec<&'a Link>)> {
         let consumers = self.consumers.get(site).into_iter().flatten();
-        let consumers = consumers
-            .copied()
-            .filter(|c| !at_definition || contract::calls_from_definition(c.contract.as_deref()));
+        let consumers = consumers.copied().filter(|c| {
+            if at_definition {
+                contract::calls_from_definition(c.contract.as_deref())
+            } else {
+                !contract::flows_to_consumer(c.contract.as_deref())
+            }
+        });
         consumers
             .map(|consumer| {
                 let out = self.out.get(site).into_iter().flatten().copied();
@@ -1291,6 +1353,12 @@ impl<'a> Graph<'a> {
         let mut up: HashMap<&str, Vec<&str>> = HashMap::new();
         let nodes: HashSet<&str> = (self.symbols.keys().chain(self.callees.keys()))
             .copied()
+            .chain(
+                self.consumers
+                    .keys()
+                    .copied()
+                    .filter(|id| self.reader_call(id).is_some()),
+            )
             .collect();
         for from in nodes {
             for edge in self.edges(from) {
@@ -1300,7 +1368,15 @@ impl<'a> Graph<'a> {
             }
         }
         let mut reached = HashSet::from([id]);
-        let mut todo = vec![id];
+        reached.extend(
+            self.callees
+                .get(id)
+                .into_iter()
+                .flatten()
+                .filter(|(_, call)| self.reader_call(&call.id).is_some())
+                .map(|(_, call)| call.id.as_str()),
+        );
+        let mut todo: Vec<_> = reached.iter().copied().collect();
         while let Some(node) = todo.pop() {
             for &caller in up.get(node).into_iter().flatten() {
                 if reached.insert(caller) {

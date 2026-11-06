@@ -435,6 +435,8 @@ Languages and HTTP or messaging clients outside these lists are not yet supporte
 
 ## AWS SDK calls in code
 
+Resource reads retain each SDK call as a distinct side in JS, TS and Python. Tracing up reaches its writers; tracing down from a writer reaches the reader function and continues through its calls, with the actual location of each operation.
+
 TypeScript and JavaScript recognize v3 commands sent with `client.send(new Command(...))`,
 with both client and command imported from the corresponding AWS package. Python recognizes
 methods on clients constructed by `boto3.client(...)` or a `Session`. Names can come from

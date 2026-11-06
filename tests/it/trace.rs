@@ -344,3 +344,209 @@ fn a_trace_with_no_single_start_says_why() {
     let clean = engine.trace(Start::Uncommitted, Direction::Down, None);
     assert_golden("chain.trace-clean.txt", &clean.unwrap());
 }
+
+#[test]
+fn sdk_reader_calls_keep_their_identity_and_follow_data_in_both_directions() {
+    for extension in ["js", "ts", "py"] {
+        let group = format!("trace_sdk_calls_{extension}");
+        let writer_id = format!("example.com/sdk-call-flow/writer-{extension}");
+        let reader_id = format!("example.com/sdk-call-flow/reader-{extension}");
+        let writer = fixture_repo(
+            &group,
+            "aws-sdk-controls",
+            Some(&format!("https://{writer_id}.git")),
+        );
+        let writer_moved = writer.with_file_name("writer");
+        let _ = fs::remove_dir_all(&writer_moved);
+        fs::rename(&writer, &writer_moved).unwrap();
+        let writer = writer_moved;
+        let reader = fixture_repo(
+            &group,
+            "aws-sdk-controls",
+            Some(&format!("https://{reader_id}.git")),
+        );
+        fs::write(
+            writer.join("meada.toml"),
+            format!("[[peer]]\nrepo = \"{reader_id}\"\n"),
+        )
+        .unwrap();
+        fs::write(
+            reader.join("meada.toml"),
+            format!("[[peer]]\nrepo = \"{writer_id}\"\n"),
+        )
+        .unwrap();
+        let (write, read) = if extension == "py" {
+            (
+                r#"import boto3
+from fastapi import FastAPI
+app = FastAPI()
+client = boto3.client('s3')
+@app.post('/publish')
+def write():
+    client.put_object(Bucket='shared')
+"#,
+                r#"import boto3
+client = boto3.client('s3')
+def after_read():
+    pass
+def after_unlinked():
+    pass
+def unlinked():
+    client.get_object(Bucket='unmanaged')
+    after_unlinked()
+def read():
+    client.get_object(Bucket='shared')
+    client.get_object(Bucket='shared')
+    after_read()
+client.get_object(Bucket='shared')
+"#,
+            )
+        } else {
+            (
+                r#"import express from 'express';
+import {S3Client, PutObjectCommand} from '@aws-sdk/client-s3';
+const app = express();
+const client = new S3Client({});
+function write() { client.send(new PutObjectCommand({Bucket:'shared'})); }
+app.post('/publish', write);
+"#,
+                r#"import {S3Client, GetObjectCommand} from '@aws-sdk/client-s3';
+const client = new S3Client({});
+function after_read() {}
+function after_unlinked() {}
+function unlinked() { client.send(new GetObjectCommand({Bucket:'unmanaged'})); after_unlinked(); }
+function read() {
+    client.send(new GetObjectCommand({Bucket:'shared'}));
+    client.send(new GetObjectCommand({Bucket:'shared'}));
+    after_read();
+}
+client.send(new GetObjectCommand({Bucket:'shared'}));
+"#,
+            )
+        };
+        let file = format!("app.{extension}");
+        fs::write(writer.join(&file), write).unwrap();
+        fs::write(reader.join(&file), read).unwrap();
+        let writers = Engine::open(&writer).unwrap();
+        let readers = Engine::open(&reader).unwrap();
+        let export: serde_json::Value = serde_json::from_str(&readers.export().unwrap()).unwrap();
+        let consumers = export["consumers"].as_array().unwrap();
+        assert_eq!(consumers.len(), 4, "{extension}: {export}");
+        assert!(
+            consumers.iter().all(|c| matches!(
+                c["contract"].as_str(),
+                Some("resource::s3::shared" | "resource::s3::unmanaged")
+            ) && c["site"].as_str().unwrap().contains('#')),
+            "{extension}: {export}"
+        );
+        let ids: std::collections::BTreeSet<_> = consumers
+            .iter()
+            .map(|c| c["site"].as_str().unwrap())
+            .collect();
+        assert_eq!(ids.len(), 4, "{extension}: {export}");
+        let links = export["links"].as_array().unwrap();
+        assert_eq!(links.len(), 3, "{extension}: {export}");
+        assert!(
+            links
+                .iter()
+                .all(|l| l["contract"] == "resource::s3::shared" && l["level"] == "exact"),
+            "{extension}: {export}"
+        );
+        let linked: std::collections::BTreeSet<_> = links
+            .iter()
+            .map(|l| l["consumer"].as_str().unwrap())
+            .collect();
+        assert_eq!(linked.len(), 3, "{extension}: {export}");
+        assert!(
+            consumers
+                .iter()
+                .all(|c| linked.contains(c["site"].as_str().unwrap())
+                    == (c["contract"] == "resource::s3::shared")),
+            "{extension}: {export}"
+        );
+        let producer = links[0]["provider"].as_str().unwrap();
+        for id in &ids {
+            let up = readers
+                .trace(Start::From(id), Direction::Up, Some(8000))
+                .unwrap();
+            if linked.contains(id) {
+                assert!(
+                    up.contains(&writer_id) && up.contains("[exact: resource::s3::shared]"),
+                    "{extension} {id}: {up}"
+                );
+            } else {
+                assert!(!up.contains(&writer_id), "{extension} {id}: {up}");
+            }
+            let down = readers
+                .trace(Start::From(id), Direction::Down, Some(8000))
+                .unwrap();
+            assert!(!down.contains(&writer_id), "{extension} {id}: {down}");
+            if id.contains("::read::") {
+                assert!(down.contains("after_read"), "{extension} {id}: {down}");
+            }
+            if id.contains("::unlinked::") {
+                assert!(down.contains("after_unlinked"), "{extension} {id}: {down}");
+            }
+        }
+        let read_symbol = export["symbols"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find_map(|s| s["id"].as_str().filter(|id| id.ends_with("::read")))
+            .unwrap();
+        let up = readers
+            .trace(Start::From(read_symbol), Direction::Up, Some(8000))
+            .unwrap();
+        assert!(
+            up.contains(&writer_id) && up.contains("[exact: resource::s3::shared]"),
+            "{extension}: {up}"
+        );
+        let read_down = readers
+            .trace(Start::From(read_symbol), Direction::Down, Some(8000))
+            .unwrap();
+        assert!(!read_down.contains(&writer_id), "{extension}: {read_down}");
+        let context = readers.context(read_symbol, Some(8000)).unwrap();
+        assert!(context.contains("POST /publish"), "{extension}: {context}");
+        let down = writers
+            .trace(Start::From(producer), Direction::Down, Some(8000))
+            .unwrap();
+        assert!(
+            down.lines()
+                .any(|l| l.contains(&reader_id) && l.contains(&file) && l.ends_with(" read")),
+            "{extension}: {down}"
+        );
+        assert!(down.contains("after_read"), "{extension}: {down}");
+        assert!(
+            down.lines()
+                .any(|l| l.contains(&reader_id) && l.contains(&file) && l.ends_with("(top level)")),
+            "{extension}: {down}"
+        );
+        let writer_export: serde_json::Value =
+            serde_json::from_str(&writers.export().unwrap()).unwrap();
+        let nodes: std::collections::BTreeSet<_> = writer_export["processes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|p| p["steps"].as_array().unwrap())
+            .filter_map(|step| step["node"].as_str())
+            .collect();
+        assert!(
+            ids.iter()
+                .all(|id| nodes.contains(id) == linked.contains(id)),
+            "{extension}: {writer_export}"
+        );
+        assert!(
+            writer_export["processes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .flat_map(|p| p["steps"].as_array().unwrap())
+                .all(|step| step["mark"] != "cycle"),
+            "{extension}: {writer_export}"
+        );
+        assert!(
+            nodes.iter().any(|id| id.ends_with("::after_read")),
+            "{extension}: {writer_export}"
+        );
+    }
+}

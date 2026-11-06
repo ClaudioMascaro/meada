@@ -414,6 +414,14 @@ words:
 
 ## `trace`
 
+Resource and channel data flows from provider to consumer downstream and back upstream.
+A receiving call keeps its identity in links and process steps; its label gives the actual
+call location and owning function. Downstream traversal continues through that owner's body,
+including when the receiving call is the start and has no linked writer. Module-level reads
+retain their file/line and `(top level)` label. Reverse process membership includes the owner
+of a reached receiving operation.
+
+
 `trace` takes a start (`from`, or `changes: uncommitted`) and a `direction`, `down` (what the
 start reaches) or `up` (what reaches it). Its answer is a **chain** or a message.
 

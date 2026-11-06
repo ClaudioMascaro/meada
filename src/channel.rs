@@ -116,6 +116,10 @@ impl ContractKind for Channel {
         "channel"
     }
 
+    fn flows_to_consumer(&self) -> bool {
+        true
+    }
+
     fn sides(&self) -> Option<(&'static str, &'static str)> {
         Some(SIDES)
     }

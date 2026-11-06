@@ -307,6 +307,7 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   | `context_reads` | the call sites `context_sections` looks up, which `context` reads first (packages: the consumers of the links into the symbol) |
   | `starts` | the providers a `trace` start text names |
   | `calls_from_definition` | whether a consumer at a symbol (a Feign or Retrofit interface method) calls on its provider, so `trace` follows from the method to it (HTTP; a channel handler is where a link ends) |
+  | `flows_to_consumer` | whether data travels provider to consumer (resource writes to reads, channel producers to handlers), including consumers at call sites |
   | `status` | the lines `meada status` prints |
   | `decidable`, `serves`, `candidate` | whether an ambiguous link is an open item, whether a provider serves a contract (aliases included), whether a provider is a candidate for a consumer with no contract |
 

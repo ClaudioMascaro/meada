@@ -212,6 +212,35 @@ fn channels_packages_and_documents_answer_alike() {
     answers_alike(&fixture_repo(case, "asyncapi-services", Some(services)));
 }
 
+#[test]
+fn contract_trace_call_owners_answer_alike() {
+    for (fixture, contract, owner) in [
+        ("aws-sdk", "channel::sns::orders", "publish"),
+        ("aws-sdk-python", "channel::sns::orders", "publish"),
+        ("aws-sdk-matrix", "channel::eventbridge::default", "run"),
+        (
+            "aws-sdk-batches",
+            "channel::eventbridge::orders",
+            "Batches.send()",
+        ),
+    ] {
+        let repo = fixture_repo("partial_provider_owners", fixture, None);
+        let engine = Engine::open(&repo).unwrap();
+        let ask = || {
+            engine
+                .trace(Start::From(contract), Direction::Down, BUDGET)
+                .unwrap()
+        };
+        let answer = ask();
+        let whole = with_every_row(ask);
+        assert!(
+            whole.lines().any(|line| line.ends_with(owner)),
+            "{fixture}: {whole}"
+        );
+        assert_eq!(answer, whole, "{fixture}: contract-side call owners");
+    }
+}
+
 /// Every fixture alone, in four shards so they run side by side.
 fn every_fixture_alone(shard: usize) {
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");

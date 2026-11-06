@@ -296,6 +296,12 @@ pub trait ContractKind {
         false
     }
 
+    /// Whether data travels from the provider to its consumer: a write reaches its reader,
+    /// or a message its handler. A consumer at a call is then a receiving operation.
+    fn flows_to_consumer(&self) -> bool {
+        false
+    }
+
     /// Whether repository-level sites participate in the kind's exported links.
     fn exports_repository_links(&self) -> bool {
         false
@@ -510,6 +516,13 @@ pub(crate) fn link_in_repository(link: &Link, repository: &str) -> bool {
 /// as a route's, the only kind that leaves its contract out.
 pub fn calls_from_definition(contract: Option<&str>) -> bool {
     contract.is_none_or(|c| kind_of(c).is_some_and(|k| k.calls_from_definition()))
+}
+
+/// The direction of data through a known contract kind, independently of call ownership.
+pub fn flows_to_consumer(contract: Option<&str>) -> bool {
+    contract
+        .and_then(kind_of)
+        .is_some_and(|kind| kind.flows_to_consumer())
 }
 
 /// Whether `contract` is an unresolved side, by the rule of its kind.

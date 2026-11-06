@@ -437,6 +437,8 @@ Linguagens e clientes HTTP ou de mensagens fora das listas acima ainda não têm
 
 ## AWS SDK em código
 
+Leituras de recursos mantêm cada chamada SDK como lado distinto em JS, TS e Python. `trace` para cima alcança os escritores; a partir de um escritor, para baixo alcança a função leitora e continua pelas chamadas dela, com o local real de cada operação.
+
 TypeScript e JavaScript reconhecem comandos v3 enviados com `cliente.send(new Comando(...))`,
 com cliente e comando importados do pacote AWS correspondente. Python reconhece métodos de
 clientes criados por `boto3.client(...)` ou por uma `Session`. Os nomes podem vir de constantes

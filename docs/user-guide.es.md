@@ -2076,6 +2076,8 @@ diferencia de espacio en blanco) no son duplicados.
 
 ## Llamadas del AWS SDK en código
 
+Para los lectores de recursos, `trace` hacia arriba llega a sus escritores; desde un escritor, hacia abajo llega al lector y sigue el cuerpo de su función. Un lado de llamada conserva su identidad y la respuesta muestra su ubicación y función. Esto también cubre llamadas sin escritor y la participación en procesos.
+
 TypeScript y JavaScript reconocen comandos v3 enviados con `cliente.send(new Comando(...))`,
 con cliente y comando importados del paquete AWS correspondiente. Python reconoce métodos de
 clientes creados por `boto3.client(...)` o una `Session`. Los nombres pueden venir de constantes

@@ -260,8 +260,13 @@ this file, and a change to these modules updates it.
   `Walk`; `meada-core`'s `trace.rs`
   holds the result (`Row`, `Chain`) and its answer (`Chain::answer`: the rows that fit, the cut
   note, the chain footer, the missing peers), with `level_mark` and `arrow`. A link
-  whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
-  down and back going up; a call-site consumer the other way. A channel link (producer call,
+  follows its kind's direction: `ContractKind::flows_to_consumer` sends resource and channel
+  data from provider to consumer going down, and back going up, for both symbol and call sides.
+  A receiving call keeps its identity and actual span/owner label, and continues through its
+  owner's body. It never calls its writer going down. Up from the call or its owner reads the
+  data-use links on that owner's calls. Partial loading hydrates the same owner/callee rows;
+  `Graph::edges` uses the same continuation, and reverse process membership includes the
+  owning symbol of a reached receiving call. Package and HTTP call directions are unchanged. A channel link (producer call,
   handler symbol) goes down from the producing call (`call_down` reads `into[call]`) into the
   handler, and up from the handler (`out[handler]`, a provider that is a call) to the producing
   call and its caller (a publish to a named exchange is such a call, linked through the bindings).
