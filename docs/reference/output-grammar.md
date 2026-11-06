@@ -314,7 +314,7 @@ words:
 | produces | `<repository> <place> produces <shown-contract><mark?><orphan-note?>` | A call of the symbol produces to the channel or writes the resource; after a publish, a queue its bindings route it to. |
 | publishes | `<repository> <place> publishes <exchange> <key>` | A call of the symbol publishes to an exchange with a routing key. |
 | consumes | `<repository> <place> consumes <shown-contract><orphan-note?>` | The symbol, or a call of it, consumes the contract. |
-| consumes linked | `<repository> <place> consumes <contract><orphan-note?> <arrow> <identity>` | A call of the symbol consumes the contract, linked at `inferred` or `decided` to the provider `<identity>`, with its level and reason. |
+| consumes linked | `<repository> <place> consumes <contract><orphan-note?> <arrow> <identity>` | A call of the symbol consumes the contract through a `decided` link, or an `inferred` HTTP link selected by a declared peer's `base_url_env` mapping. The arrow gives its level, reason and provider `<identity>`. |
 | consumes unresolved | `<repository> <place> consumes (unresolved) <callee>` | A call of the symbol consumes a contract Meada cannot read. |
 | environment | `<repository> <place> unresolved environment <text>` | An SDK argument reads an environment variable without a matching workload value; Meada retains its name and never reads the process environment. |
 | fits | ``` `<query>` fits <n> symbols; pass one of: ``` | The name fits several symbols, listed after it. |

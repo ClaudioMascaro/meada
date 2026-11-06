@@ -1207,6 +1207,215 @@ fn context_names_the_base_url_and_selected_peer_after_a_partial_edit_and_restore
     assert_eq!(answers[0], answers[2]);
 }
 
+/// Ordinary inferred links keep their plain context contract (#683's existing controls): a
+/// sole provider or a gateway rewrite does not make an environment-derived base URL.
+#[test]
+fn context_keeps_non_environment_inferred_consumers_plain() {
+    let case = "xlang_backstage_context_controls";
+    let web = common::fixture_repo(
+        case,
+        "ts-backstage-web",
+        Some("https://example.com/backstage/web.git"),
+    );
+    let api = common::fixture_repo(
+        case,
+        "ts-backstage-api",
+        Some("https://example.com/backstage/api.git"),
+    );
+    fs::write(
+        web.join("meada.toml"),
+        "[[peer]]\nrepo = 'example.com/backstage/api'\nbase_url_env = ['API_URL']\n",
+    )
+    .unwrap();
+    fs::write(
+        api.join("meada.toml"),
+        "[serve]\nhosts = ['api.example.com']\nprefix = '/gateway'\n",
+    )
+    .unwrap();
+    fs::write(
+        web.join("src/controls.ts"),
+        "export function ordersTpl(base: string) { return fetch(`${base}/orders`); }\n\
+         export function ordersRelative() { return fetch('/orders'); }\n\
+         export function ordersHost() { return fetch('https://api.example.com/gateway/orders'); }\n",
+    )
+    .unwrap();
+    let engine = Engine::open(&web).unwrap();
+    let export: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let mut consumed = Vec::new();
+    for (method, path, via, reason) in [
+        (
+            "ordersTpl",
+            "/orders",
+            None,
+            "host unresolved; the only repository serving it is example.com/backstage/api",
+        ),
+        (
+            "ordersRelative",
+            "/orders",
+            None,
+            "host unresolved; the only repository serving it is example.com/backstage/api",
+        ),
+        (
+            "ordersHost",
+            "/gateway/orders",
+            Some("host:api.example.com"),
+            "gateway prefix /gateway",
+        ),
+    ] {
+        let site = format!("example.com/backstage/web::src/controls.ts::{method}::fetch#0");
+        let consumer = export["consumers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|consumer| consumer["site"] == site)
+            .unwrap();
+        assert_eq!(consumer["contract"], format!("http::GET::{path}"));
+        assert_eq!(consumer["via"].as_str(), via);
+        let links: Vec<_> = export["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|link| link["consumer"] == site)
+            .map(|link| {
+                (
+                    link["provider"].as_str().unwrap(),
+                    link["level"].as_str().unwrap(),
+                    link["reason"].as_str().unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            links,
+            [(
+                "example.com/backstage/api::src/server.ts::GET /orders",
+                "inferred",
+                reason
+            )]
+        );
+        let trace = engine
+            .trace(Start::From(method), Direction::Down, None)
+            .unwrap();
+        assert!(trace.contains(&format!("→[inferred: {reason}]")), "{trace}");
+        let context = engine.context(method, None).unwrap();
+        consumed.extend(
+            context
+                .lines()
+                .filter(|line| line.contains(" consumes "))
+                .map(str::to_string),
+        );
+    }
+    assert_eq!(
+        consumed,
+        [
+            "example.com/backstage/web src/controls.ts:1 consumes http::GET::/orders",
+            "example.com/backstage/web src/controls.ts:2 consumes http::GET::/orders",
+            "example.com/backstage/web src/controls.ts:3 consumes http::GET::/gateway/orders",
+        ]
+    );
+}
+
+/// An environment read alone does not select a peer: direct and proxy calls keep the plain
+/// contract until this repository declares that variable as the peer's base URL (#683).
+#[test]
+fn context_explains_only_a_base_url_that_selects_a_declared_peer() {
+    let case = "xlang_backstage_context_unmapped";
+    let web = common::fixture_repo(
+        case,
+        "ts-backstage-web",
+        Some("https://example.com/backstage/web.git"),
+    );
+    common::fixture_repo(
+        case,
+        "ts-backstage-api",
+        Some("https://example.com/backstage/api.git"),
+    );
+    fs::write(
+        web.join("src/unmapped.ts"),
+        "export function ordersUnknownEnv() { return fetch(`${process.env.UNKNOWN_URL}/orders`); }\n\
+         export function ordersProxy() { return fetch('/api/proxy/unknown/orders'); }\n",
+    )
+    .unwrap();
+    fs::write(
+        web.join("app-config.yaml"),
+        "proxy:\n  endpoints:\n    '/unknown':\n      target: ${UNKNOWN_URL}\n",
+    )
+    .unwrap();
+    let config = web.join("meada.toml");
+    let provider = "example.com/backstage/api::src/server.ts::GET /orders";
+    let mut answers = Vec::new();
+    for mapped in [false, true, false] {
+        let peer = "[[peer]]\nrepo = 'example.com/backstage/api'\n";
+        let mapping = if mapped {
+            "base_url_env = ['UNKNOWN_URL']\n"
+        } else {
+            ""
+        };
+        fs::write(&config, format!("{peer}{mapping}")).unwrap();
+        let engine = Engine::open(&web).unwrap();
+        let mut consumed = Vec::new();
+        let mut expected = Vec::new();
+        let mut contexts = Vec::new();
+        for (method, line, through) in [
+            ("ordersUnknownEnv", 1, ""),
+            ("ordersProxy", 2, " through the proxy endpoint /unknown"),
+        ] {
+            // Context gets the first query; export and trace must keep the existing link.
+            let context = engine.context(method, None).unwrap();
+            let trace = engine
+                .trace(Start::From(method), Direction::Down, None)
+                .unwrap();
+            let reason = match mapped {
+                true => format!(
+                    "base URL from UNKNOWN_URL{through}, a base_url_env of peer example.com/backstage/api"
+                ),
+                false => format!(
+                    "base URL from UNKNOWN_URL{through}, no peer's base_url_env; the only repository serving it is example.com/backstage/api"
+                ),
+            };
+            assert!(trace.contains(&format!("→[inferred: {reason}]")), "{trace}");
+            let export: serde_json::Value =
+                serde_json::from_str(&engine.export().unwrap()).unwrap();
+            let site = format!("example.com/backstage/web::src/unmapped.ts::{method}::fetch#0");
+            let links: Vec<_> = export["links"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|link| link["consumer"] == site)
+                .map(|link| {
+                    (
+                        link["contract"].as_str().unwrap(),
+                        link["provider"].as_str().unwrap(),
+                        link["level"].as_str().unwrap(),
+                        link["reason"].as_str().unwrap(),
+                    )
+                })
+                .collect();
+            assert_eq!(
+                links,
+                [("http::GET::/orders", provider, "inferred", reason.as_str())]
+            );
+            consumed.extend(
+                context
+                    .lines()
+                    .filter(|line| line.contains(" consumes "))
+                    .map(str::to_string),
+            );
+            let plain = format!(
+                "example.com/backstage/web src/unmapped.ts:{line} consumes http::GET::/orders"
+            );
+            expected.push(match mapped {
+                true => format!("{plain} →[inferred: {reason}] {provider}"),
+                false => plain,
+            });
+            contexts.push((context, trace));
+        }
+        assert_eq!(consumed, expected);
+        answers.push(contexts);
+    }
+    assert_ne!(answers[0], answers[1]);
+    assert_eq!(answers[0], answers[2]);
+}
+
 /// A Python service reads a base URL from a pydantic-settings field (#619): the read is
 /// `<env_prefix><FIELD>`, or the field's `alias`, which the peer's `base_url_env` maps, so two
 /// providers of the route no longer leave the link `ambiguous`. A class that is not a

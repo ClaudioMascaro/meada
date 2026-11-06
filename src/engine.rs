@@ -1311,13 +1311,7 @@ impl Engine {
         tail.extend(sections);
         tail.extend(iac::provision::context(&exports, &symbol_found.id));
         let workspace = (exports.as_slice(), links.as_slice());
-        tail.extend(contracts(
-            identity,
-            export,
-            workspace,
-            &mut files,
-            symbol_found,
-        ));
+        tail.extend(contracts(repo, export, workspace, &mut files, symbol_found));
         let graph = trace::Graph::new(&self.workspace, &exports, &links);
         let found = graph.processes_of(&symbol_found.id);
         let processes = (found.iter())
@@ -1410,12 +1404,13 @@ fn contract_rank(contract: &str, needle: &str) -> Option<u8> {
 /// workspace's.
 /// Nothing when it has none.
 fn contracts(
-    identity: &str,
+    repo: &Repository,
     export: &Export,
     (exports, links): (&[Export], &[Link]),
     files: &mut Files,
     symbol: &Symbol,
 ) -> Vec<String> {
+    let identity = repo.identity.as_str();
     let mut lines = Vec::new();
     let orphans = iac::orphans::Scope::new(exports);
     for p in export.providers.iter().filter(|p| p.site == symbol.id) {
@@ -1467,10 +1462,13 @@ fn contracts(
             continue;
         };
         let location = files.at(&call.span.path, call.span.start);
+        let explain_inferred = contract::explain_inferred(consumer, repo);
         let explained = links
             .iter()
             .filter(|l| {
-                l.consumer == consumer.site && matches!(l.level, Level::Inferred | Level::Decided)
+                l.consumer == consumer.site
+                    && (l.level == Level::Decided
+                        || (l.level == Level::Inferred && explain_inferred))
             })
             .filter(|l| consumer.contract.as_ref().is_none_or(|c| *c == l.contract));
         let mut any = false;

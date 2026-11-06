@@ -632,6 +632,13 @@ impl ContractKind for Http {
         })
     }
 
+    fn explain_inferred(&self, consumer: &Consumer, from: &Repository) -> bool {
+        let via = consumer.via.as_deref().unwrap_or_default();
+        let via = via.split_once(PROXY_VIA).map_or(via, |(via, _)| via);
+        via.strip_prefix("env:")
+            .is_some_and(|var| from.config.peers_reading(var).next().is_some())
+    }
+
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
         let mut found = Vec::new();
         // One reader of each shape source for the whole extraction: each budget per file once.

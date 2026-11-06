@@ -407,6 +407,13 @@ pub trait ContractKind {
         Vec::new()
     }
 
+    /// Whether a symbol's `context` explains an inferred link from this call consumer of
+    /// repository `from`.
+    /// This display policy changes no links; decided links are always explained.
+    fn explain_inferred(&self, _consumer: &Consumer, _from: &Repository) -> bool {
+        false
+    }
+
     /// The sections a symbol's `context` adds after its callees, as lines (packages:
     /// `consumers:`); none by default. `exports`, `repos` (in the same order) and `links` are
     /// the workspace's, and `symbol` the identity of a symbol of it.
@@ -554,6 +561,15 @@ pub fn flows_to_consumer(contract: Option<&str>) -> bool {
     contract
         .and_then(kind_of)
         .is_some_and(|kind| kind.flows_to_consumer())
+}
+
+/// Whether the consumer's kind shows its inferred link in a symbol's `context`.
+pub(crate) fn explain_inferred(consumer: &Consumer, from: &Repository) -> bool {
+    consumer
+        .contract
+        .as_deref()
+        .and_then(kind_of)
+        .is_some_and(|kind| kind.explain_inferred(consumer, from))
 }
 
 /// Whether `contract` is an unresolved side, by the rule of its kind.

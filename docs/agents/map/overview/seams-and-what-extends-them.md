@@ -34,6 +34,7 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   | `search_word`, `own_search` | the word of `search`'s `kind` and, for an own renderer, its hits |
   | `sides`, `view`, `related_sides` | the role words and the carried word of `context` on a contract, and the sides that reach it by another name; a contract listed by its providers alone is followed by the linked consumers that read fields, with their drift (the engine's rule: `View::follows_drift`) |
   | `at_call`, `context_sections` | the lines a call adds to a symbol's `contracts:`, and the sections `context` adds after the callees (packages: `consumers:`) |
+  | `explain_inferred` | whether a symbol's `context` explains a call consumer's inferred link, given its repository (HTTP: an environment-derived base selecting a declared `base_url_env` peer); false by default |
   | `context_reads` | the call sites `context_sections` looks up, which `context` reads first (packages: the consumers of the links into the symbol) |
   | `starts` | the providers a `trace` start text names |
   | `calls_from_definition` | whether a consumer at a symbol (a Feign or Retrofit interface method) calls on its provider, so `trace` follows from the method to it (HTTP; a channel handler is where a link ends) |
