@@ -51,6 +51,19 @@ pub(crate) struct Code {
     pub file: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Binding {
+    pub contract: String,
+    pub exchange: String,
+    pub pattern: String,
+}
+
+impl Binding {
+    pub(crate) fn size(&self) -> usize {
+        self.contract.len() + self.exchange.len() + self.pattern.len()
+    }
+}
+
 fn text(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= crate::config_values::VALUE_MAX
@@ -64,6 +77,9 @@ fn path(value: &str) -> bool {
 }
 
 fn known(entry: &str, workload: bool) -> Result<(), String> {
+    if !text(entry) {
+        return Err("an IaC type table entry must be a bounded literal string".into());
+    }
     if types::named(entry).is_some() || workload && types::named_workload(entry).is_some() {
         Ok(())
     } else {

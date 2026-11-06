@@ -173,6 +173,8 @@ pub(crate) struct Projection {
     pub defining: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code: Option<mapping::Code>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binding: Option<mapping::Binding>,
 }
 
 /// Literal routing evidence after a Kubernetes overlay has renamed its Service.
@@ -189,6 +191,7 @@ impl Projection {
             + self.entry.as_ref().map_or(0, String::len)
             + self.defining.iter().map(String::len).sum::<usize>()
             + self.code.as_ref().map_or(0, |c| c.key.len() + 24)
+            + self.binding.as_ref().map_or(0, mapping::Binding::size)
             + self
                 .through
                 .iter()

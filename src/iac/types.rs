@@ -57,6 +57,35 @@ struct Table {
     workload: Vec<Workload>,
     #[serde(default)]
     module: Vec<Registry>,
+    #[serde(default)]
+    topology: Vec<Topology>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum TopologyRole {
+    Queue,
+    Exchange,
+    Binding,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Topology {
+    pub format: String,
+    #[serde(rename = "type")]
+    pub ty: String,
+    pub role: TopologyRole,
+}
+
+static TOPOLOGY: LazyLock<Vec<Topology>> =
+    LazyLock::new(|| toml::from_str::<Table>(TABLE).map_or_else(|_| Vec::new(), |t| t.topology));
+
+pub(crate) fn topology(ty: &str) -> Option<TopologyRole> {
+    TOPOLOGY
+        .iter()
+        .find(|row| row.format == "kubernetes" && row.ty == ty)
+        .map(|row| row.role)
 }
 
 #[derive(Debug, Deserialize)]
@@ -218,6 +247,9 @@ impl Entry {
         if self.basis.is_some() {
             return self.canonical()?.mapped(text, pattern);
         }
+        if self.kind == "amqp" && !pattern {
+            return crate::channel::amqp_name(text).then(|| text.into());
+        }
         if pattern {
             if self.ty.starts_with("google_") {
                 return crate::contract::gcp::pattern(&self.ty, text);
@@ -244,6 +276,13 @@ impl Entry {
             && !target.contains(['$', '{', '}', '?', '#'])
             && !target.chars().any(char::is_whitespace))
         .then_some(target)
+    }
+
+    pub(crate) fn target_is_supported(&self, name: &str) -> bool {
+        if self.kind == "amqp" {
+            return crate::channel::amqp_name(name);
+        }
+        !name.starts_with("arn:") && !name.contains("://")
     }
     pub(crate) fn defining_key(&self, block: &str) -> String {
         if self.format == "cloudformation" {
@@ -495,6 +534,29 @@ mod tests {
                 })),
                 "no evaluated registry fixture for {}",
                 row.source
+            );
+        }
+    }
+
+    #[test]
+    fn every_topology_role_has_a_named_or_routed_evaluated_fixture_case() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/custom-rabbit/resources.yaml");
+        let out = crate::kube::evaluate(&[("resources.yaml".into(), std::fs::read(path).unwrap())]);
+        for row in TOPOLOGY.iter() {
+            assert!(
+                out.nodes.iter().any(|node| {
+                    node.address.starts_with(&format!("{}/", row.ty))
+                        && match row.role {
+                            TopologyRole::Binding => node
+                                .provisioned
+                                .as_ref()
+                                .is_some_and(|p| p.binding.is_some()),
+                            _ => node.name.as_deref().is_some_and(|name| !name.is_empty()),
+                        }
+                }),
+                "no evaluated topology fixture for {}",
+                row.ty
             );
         }
     }

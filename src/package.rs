@@ -2873,6 +2873,7 @@ mod tests {
             providers: Vec::new(),
             consumers: Vec::new(),
             bindings: Vec::new(),
+            provision_uses: Vec::new(),
             documents: Vec::new(),
             publishes: Vec::new(),
             entry_points: Vec::new(),

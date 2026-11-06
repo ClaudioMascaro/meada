@@ -83,6 +83,7 @@ pub(super) struct Base {
     /// How the composition holds it: `resources` or `pipeline <step>`.
     pub via: String,
     pub custom: Option<super::custom::Name>,
+    pub topology: Option<super::topology::Facts>,
     pub namespace: Option<String>,
 }
 
@@ -149,6 +150,43 @@ fn renamed(patches: &Value, renaming: &HashSet<&str>) -> bool {
     })
 }
 
+/// Unknown patch sets and nested sets cannot establish a literal identity. Index the sets
+/// once per composition; their fields are inspected without copying or expanding resources.
+fn patches_affect(
+    patches: &Value,
+    sets: &HashMap<&str, Option<&Value>>,
+    affected: impl Fn(&str) -> bool,
+) -> bool {
+    let writes = |patch: &Value| {
+        let ty = text(patch, &["type"]).unwrap_or("FromCompositeFieldPath");
+        if OUTWARD.contains(&ty) {
+            return false;
+        }
+        if !matches!(
+            ty,
+            "FromCompositeFieldPath"
+                | "FromEnvironmentFieldPath"
+                | "CombineFromComposite"
+                | "CombineFromEnvironment"
+        ) {
+            return true;
+        }
+        text(patch, &["toFieldPath"])
+            .or_else(|| text(patch, &["fromFieldPath"]))
+            .is_none_or(&affected)
+    };
+    (patches.as_array().into_iter().flatten()).any(|patch| {
+        if text(patch, &["type"]) != Some("PatchSet") {
+            return writes(patch);
+        }
+        let set = text(patch, &["patchSetName"])
+            .and_then(|name| sets.get(name))
+            .copied()
+            .flatten();
+        set.is_none_or(|set| list(set, &["patches"]).any(writes))
+    })
+}
+
 /// The resources of the composition `value` whose block starts its key paths with `block`, each
 /// with the lines `span` gives it (its step's index in the pipeline, if any, and its own).
 fn bases(
@@ -165,6 +203,15 @@ fn bases(
             None => format!("{block}{dot}spec.resources"),
         };
         let renaming = renaming(sets);
+        let mut named_sets = HashMap::new();
+        for set in sets.as_array().into_iter().flatten() {
+            if let Some(name) = text(set, &["name"]) {
+                named_sets
+                    .entry(name)
+                    .and_modify(|v| *v = None)
+                    .or_insert(Some(set));
+            }
+        }
         for (i, r) in (resources.as_array().into_iter().flatten()).enumerate() {
             if out.len() == COMPOSED_MAX {
                 return;
@@ -182,29 +229,14 @@ fn bases(
             };
             let mut custom = super::custom::read(base, kind, group_of(api), mappings);
             if let Some(custom) = &mut custom {
-                let writes = |patch: &Value| {
-                    let ty = text(patch, &["type"]).unwrap_or("FromCompositeFieldPath");
-                    if OUTWARD.contains(&ty) {
-                        return false;
-                    }
-                    text(patch, &["toFieldPath"])
-                        .or_else(|| text(patch, &["fromFieldPath"]))
-                        .is_none_or(|path| custom.affected(path))
-                };
-                let changes = list(r, &["patches"]).any(|patch| {
-                    if text(patch, &["type"]) != Some("PatchSet") {
-                        return writes(patch);
-                    }
-                    let name = text(patch, &["patchSetName"]);
-                    let set = sets
-                        .as_array()
-                        .into_iter()
-                        .flatten()
-                        .find(|set| text(set, &["name"]) == name);
-                    set.is_none_or(|set| list(set, &["patches"]).any(writes))
-                });
-                if changes {
+                if patches_affect(&r["patches"], &named_sets, |path| custom.affected(path)) {
                     custom.invalidate();
+                }
+            }
+            let mut topology = super::topology::read(base, kind, group_of(api));
+            if let Some(topology) = &mut topology {
+                if patches_affect(&r["patches"], &named_sets, |path| topology.affected(path)) {
+                    topology.invalidate();
                 }
             }
             let (line, end_line) = span(step, i).unwrap_or((1, 1));
@@ -217,6 +249,7 @@ fn bases(
                 block: format!("{at_key}[{i}]"),
                 via: via.clone(),
                 custom,
+                topology,
                 namespace: text(base, &["metadata", "namespace"]).map(String::from),
             });
         }

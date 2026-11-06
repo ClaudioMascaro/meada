@@ -37,7 +37,7 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
     // Other config attributes in the same IaC file can still name resources they use.
     let mut definitions = std::collections::HashSet::new();
     for node in super::nodes(db)? {
-        if let Some(mapped) = node.provisioned.as_ref().filter(|p| p.entry.is_some()) {
+        if let Some(mapped) = node.provisioned.as_ref().filter(|p| !p.defining.is_empty()) {
             definitions.extend(
                 mapped
                     .defining

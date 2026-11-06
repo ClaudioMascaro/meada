@@ -2448,6 +2448,8 @@ pub(crate) struct Export {
     pub(crate) consumers: Vec<Consumer>,
     /// The RabbitMQ bindings the repository declares (spec #20), neither side of a channel.
     pub(crate) bindings: Vec<Binding>,
+    /// Kind-prepared infrastructure uses; never stored or written as raw directed sides.
+    pub(crate) provision_uses: Vec<crate::contract::ProvisionUse>,
     /// The provider documents (spec #21), in path order; those read are exported, with
     /// their contracts.
     pub(crate) documents: Vec<Document>,
@@ -2586,6 +2588,7 @@ impl Export {
                 .iter()
                 .any(|c| c.site == identity && c.root.as_deref().is_none_or(|r| r == node.root))
                 || out.providers.iter().any(|p| p.site == identity)
+                || out.bindings.iter().any(|b| b.site == identity)
                 || self.executions.iter().any(|x| x.workload == identity)
             {
                 let mut written = written::IacNode::default();
@@ -3017,6 +3020,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         providers,
         consumers,
         bindings,
+        provision_uses: Vec::new(),
         publishes,
         manifests,
         tsconfigs,

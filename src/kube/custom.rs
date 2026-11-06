@@ -87,10 +87,10 @@ fn at<'a>(mut value: &'a Value, path: &str) -> Option<&'a Value> {
     Some(value)
 }
 
-fn literal(text: &str) -> bool {
+pub(super) fn literal(text: &str) -> bool {
     !text.is_empty()
         && text.len() <= crate::config_values::VALUE_MAX
-        && !text.contains(['$', '{', '}', '*', '\n', '\r'])
+        && !text.contains(['$', '{', '}', '\n', '\r'])
 }
 
 fn input(

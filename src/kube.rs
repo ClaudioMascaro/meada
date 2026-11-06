@@ -35,6 +35,7 @@ mod crossplane;
 mod custom;
 mod environment;
 mod routing;
+mod topology;
 
 /// How deep kustomizations name each other as bases; a base deeper is not followed and is
 /// counted as unresolved.
@@ -147,6 +148,7 @@ struct Facts {
     environment: Vec<environment::Input>,
     data: BTreeMap<String, Option<String>>,
     custom: Option<custom::Name>,
+    topology: Option<topology::Facts>,
 }
 
 /// One Kubernetes object, as read and as a kustomization on the way changed it.
@@ -390,6 +392,7 @@ fn object(
     let mut facts = facts(value, kind, group);
     facts.xp = crossplane::facts(value, kind, group, block, span, mappings);
     facts.custom = custom::read(value, kind, group, mappings);
+    facts.topology = topology::read(value, kind, group);
     Some(Obj {
         group: group.into(),
         kind: kind.into(),
@@ -714,6 +717,21 @@ impl<'m> Eval<'m> {
         // Reject duplicate config targets before address deduplication can conceal them.
         environment::transform(&mut objs, "", "", None);
         objs.sort_by_cached_key(Obj::address);
+        let duplicates = objs
+            .windows(2)
+            .filter(|pair| pair[0].address() == pair[1].address())
+            .map(|pair| pair[0].address())
+            .collect::<HashSet<_>>();
+        for object in &mut objs {
+            if duplicates.contains(&object.address()) {
+                if let Some(custom) = &mut object.facts.custom {
+                    custom.invalidate();
+                }
+                if let Some(topology) = &mut object.facts.topology {
+                    topology.invalidate();
+                }
+            }
+        }
         let duplicate_services = objs
             .windows(2)
             .filter(|pair| {
@@ -741,6 +759,7 @@ impl<'m> Eval<'m> {
             objs.iter().map(|o| self.kinds.role(o)).collect();
         let configs = environment::configs(&objs);
         let customs = custom::Targets::new(&objs);
+        let start = self.out.nodes.len();
         let mut kept = 0;
         for (o, address) in objs.iter().zip(&addresses) {
             let environment = environment::resolve(o, &configs);
@@ -766,6 +785,10 @@ impl<'m> Eval<'m> {
                     + o.facts.custom.as_ref().map_or(0, |c| {
                         c.size(&o.block, &o.name) + self.root.len() + address.len()
                     })
+                    + o.facts
+                        .topology
+                        .as_ref()
+                        .map_or(0, |t| t.size() + o.block.len() * 3)
                     + ingress
                         .iter()
                         .map(|(r, s)| r.host.len() + r.prefix.len() + s.len())
@@ -778,11 +801,17 @@ impl<'m> Eval<'m> {
                 break;
             }
             kept += 1;
-            let projection = o
+            let mut projection = o
                 .facts
                 .custom
                 .as_ref()
                 .map(|c| c.projection(&o.block, &o.name, o.ns.as_deref(), &customs));
+            if let Some(topology) = &o.facts.topology {
+                projection
+                    .get_or_insert_default()
+                    .defining
+                    .extend(topology.defining(&o.block));
+            }
             let subscription = o.facts.custom.as_ref().and_then(|c| {
                 c.subscription(
                     projection.as_ref()?,
@@ -802,6 +831,12 @@ impl<'m> Eval<'m> {
                         .custom
                         .as_ref()
                         .and_then(|custom| custom.physical(&o.name))
+                        .or_else(|| {
+                            o.facts
+                                .topology
+                                .as_ref()
+                                .and_then(topology::Facts::physical)
+                        })
                         .map(String::from)
                         .unwrap_or_else(|| {
                             o.facts
@@ -855,12 +890,15 @@ impl<'m> Eval<'m> {
                             + o.path.len()
                             + b.custom.as_ref().map_or(0, |c| {
                                 c.size(&b.block, base_name) + address.len() + self.root.len() + 5
-                            }),
+                            })
+                            + b.topology
+                                .as_ref()
+                                .map_or(0, |t| t.size() + b.block.len() * 3 + 15),
                     )
                 {
                     continue;
                 }
-                let projection = b.custom.as_ref().map(|c| {
+                let mut projection = b.custom.as_ref().map(|c| {
                     c.projection(
                         &format!("{}.base", b.block),
                         base_name,
@@ -868,6 +906,17 @@ impl<'m> Eval<'m> {
                         &customs,
                     )
                 });
+                if let Some(topology) = &b.topology {
+                    projection
+                        .get_or_insert_default()
+                        .defining
+                        .extend(topology.defining(&format!("{}.base", b.block)));
+                }
+                let declared_name = b
+                    .custom
+                    .as_ref()
+                    .and_then(|c| c.physical(base_name))
+                    .or_else(|| b.topology.as_ref().and_then(topology::Facts::physical));
                 let subscription = b.custom.as_ref().and_then(|c| {
                     c.subscription(
                         projection.as_ref()?,
@@ -881,14 +930,8 @@ impl<'m> Eval<'m> {
                     address: address.clone(),
                     root: self.root.clone(),
                     ty: b.kind.1.clone(),
-                    name: Some(
-                        b.custom
-                            .as_ref()
-                            .and_then(|c| c.physical(base_name))
-                            .unwrap_or(base_name)
-                            .into(),
-                    ),
-                    pattern: b.name.is_none(),
+                    name: Some(declared_name.unwrap_or(base_name).into()),
+                    pattern: declared_name.is_none() && b.name.is_none(),
                     overridable: Vec::new(),
                     path: o.path.clone(),
                     line: b.line,
@@ -1043,6 +1086,77 @@ impl<'m> Eval<'m> {
                     source: address.clone(),
                     target: addresses[j].clone(),
                     via: Some(via),
+                });
+            }
+        }
+        let views = objs
+            .iter()
+            .zip(addresses)
+            .enumerate()
+            .filter_map(|(i, (o, address))| {
+                Some(topology::View {
+                    slot: start + i,
+                    address,
+                    namespace: o.ns.as_deref(),
+                    facts: o.facts.topology.as_ref()?,
+                })
+            })
+            .chain(
+                composed
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, (_, address, base))| {
+                        Some(topology::View {
+                            slot: start + kept + i,
+                            address,
+                            namespace: base.namespace.as_deref(),
+                            facts: base.topology.as_ref()?,
+                        })
+                    }),
+            )
+            .collect::<Vec<_>>();
+        let topology = topology::Targets::new(&views);
+        let mut references = HashMap::<&str, usize>::new();
+        for reference in &self.out.references {
+            if reference.root == self.root {
+                *references.entry(&reference.source).or_default() += 1;
+            }
+        }
+        // Counts own their keys before the stored references grow.
+        let mut references = references
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect::<HashMap<_, _>>();
+        for (i, view) in views.iter().enumerate() {
+            let prepared = topology.of(i);
+            for (target, via) in prepared.references {
+                let count = references.entry(view.address.into()).or_default();
+                if *count >= OBJECT_REFERENCES_MAX {
+                    break;
+                }
+                let target = views[target].address;
+                if !self.charge(view.address.len() + target.len() + via.len()) {
+                    return;
+                }
+                *count += 1;
+                self.out.references.push(Reference {
+                    root: self.root.clone(),
+                    source: view.address.into(),
+                    target: target.into(),
+                    via: Some(via.into()),
+                });
+            }
+            if let Some((name, exchange, pattern)) = prepared.binding {
+                if !self.charge(name.len() + exchange.len() + pattern.len() + 16) {
+                    return;
+                }
+                self.out.nodes[view.slot]
+                    .provisioned
+                    .get_or_insert_default()
+                    .binding = Some(crate::iac::mapping::Binding {
+                    contract: crate::channel::contract("amqp", Some(name)),
+                    exchange: exchange.into(),
+                    pattern: pattern.into(),
                 });
             }
         }

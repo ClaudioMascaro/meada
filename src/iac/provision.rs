@@ -95,7 +95,7 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
         };
         // A structured identifier the entry could not read is not a physical AWS name.
         // It may name another service, so never invent a typed provisioner for it.
-        if name.starts_with("arn:") || name.contains("://") {
+        if !entry.target_is_supported(name) {
             continue;
         }
         if node
@@ -149,6 +149,12 @@ fn directed_uses(export: &Export) -> impl Iterator<Item = (&str, &str, Level)> {
                 crate::contract::use_level(contract, c.via.as_deref(), c.method.as_deref()),
             ))
         }))
+        .chain(
+            export
+                .provision_uses
+                .iter()
+                .map(|u| (u.site.as_str(), u.contract.as_str(), u.level)),
+        )
 }
 
 /// Every use of the same contract reaches every provisioner, including one in its repository.
@@ -215,6 +221,12 @@ fn raw_links(exports: &[Export]) -> Vec<Provision> {
         .filter_map(|(site, contract, via)| {
             crate::contract::environment_reason(via).map(|reason| ((site, contract), reason))
         })
+        .chain(
+            exports
+                .iter()
+                .flat_map(|e| &e.provision_uses)
+                .map(|u| ((u.site.as_str(), u.contract.as_str()), u.reason.as_str())),
+        )
         .collect::<std::collections::BTreeMap<_, _>>();
     let mut links = Vec::new();
     let mut pattern_names =

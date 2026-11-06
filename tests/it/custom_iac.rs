@@ -1,6 +1,6 @@
 //! Curated and repository-configured infrastructure abstractions (#671).
 
-use meada::engine::Engine;
+use meada::engine::{Direction, Engine, Start};
 use serde_json::Value;
 
 use crate::common::fixture_repo;
@@ -420,4 +420,99 @@ fn registry_lambda_and_ecs_environments_follow_their_own_image_and_container() {
             "{value}"
         );
     }
+}
+
+#[test]
+fn rabbitmq_operator_bindings_route_by_exchange_type_without_inventing_exchange_channels() {
+    let root = fixture_repo(
+        "custom_rabbit",
+        "custom-rabbit",
+        Some("https://example.com/custom-671-rabbit/infra.git"),
+    );
+    let engine = Engine::open(&root).unwrap();
+    let value: Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let actual = provisions(&value)
+        .into_iter()
+        .map(|(contract, _, _)| contract)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        actual,
+        [
+            "channel::amqp::broadcast",
+            "channel::amqp::composed-inbox",
+            "channel::amqp::direct-inbox",
+            "channel::amqp::events",
+            "channel::amqp::inbox"
+        ]
+    );
+    let bindings = value["bindings"].as_array().unwrap();
+    assert_eq!(bindings.len(), 4, "{value}");
+    let mut rows = bindings
+        .iter()
+        .map(|b| {
+            (
+                b["contract"].as_str().unwrap(),
+                b["exchange"].as_str().unwrap(),
+                b["pattern"].as_str().unwrap(),
+            )
+        })
+        .collect::<Vec<_>>();
+    rows.sort();
+    assert_eq!(
+        rows,
+        [
+            ("channel::amqp::broadcast", "fan", "#"),
+            (
+                "channel::amqp::composed-inbox",
+                "composed-exchange",
+                "order.created"
+            ),
+            ("channel::amqp::direct-inbox", "direct", "order.created"),
+            ("channel::amqp::inbox", "events", "order.*"),
+        ]
+    );
+    let links = value["links"].as_array().unwrap();
+    assert_eq!(links.len(), 4, "{value}");
+    let mut deliveries = links
+        .iter()
+        .map(|l| {
+            (
+                l["contract"].as_str().unwrap(),
+                l["level"].as_str().unwrap(),
+            )
+        })
+        .collect::<Vec<_>>();
+    deliveries.sort();
+    assert_eq!(
+        deliveries,
+        [
+            ("channel::amqp::broadcast", "inferred"),
+            ("channel::amqp::composed-inbox", "exact"),
+            ("channel::amqp::direct-inbox", "exact"),
+            ("channel::amqp::inbox", "inferred")
+        ]
+    );
+    assert_eq!(value["provisions"].as_array().unwrap().len(), 9, "{value}");
+    let binding = "Binding.rabbitmq.com/topic-bind";
+    let context = engine.context(binding, Some(12000)).unwrap();
+    assert!(
+        context.contains("Exchange.rabbitmq.com/event-object"),
+        "{context}"
+    );
+    assert!(
+        context.contains("Queue.rabbitmq.com/inbox-object"),
+        "{context}"
+    );
+    let down = engine
+        .trace(Start::From(binding), Direction::Down, Some(12000))
+        .unwrap();
+    assert!(down.contains("onInbox"), "{down}");
+    let up = engine
+        .trace(Start::From("emitTopic"), Direction::Up, Some(12000))
+        .unwrap();
+    assert!(up.contains("Queue.rabbitmq.com/inbox-object"), "{up}");
+    let exchange = engine
+        .context("Exchange.rabbitmq.com/event-object", Some(12000))
+        .unwrap();
+    assert!(exchange.contains("name: \"events\""), "{exchange}");
 }

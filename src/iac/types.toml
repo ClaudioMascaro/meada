@@ -833,3 +833,17 @@ source = "terraform-aws-modules/ecs/aws//modules/service"
 entry = "terraform:aws_ecs_task_definition"
 input = "name"
 create = ["create", "create_service", "create_task_definition"]
+
+# Rabbit topology roles are distinct from channel provisioners.
+[[topology]]
+format = "kubernetes"
+type = "Queue.rabbitmq.com"
+role = "queue"
+[[topology]]
+format = "kubernetes"
+type = "Exchange.rabbitmq.com"
+role = "exchange"
+[[topology]]
+format = "kubernetes"
+type = "Binding.rabbitmq.com"
+role = "binding"
