@@ -1,0 +1,6 @@
+jobs:
+  image:
+    steps:
+      - uses: docker/build-push-action@v6
+        with:
+          tags: ghcr.io/http-iac/client:v1

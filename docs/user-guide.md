@@ -1130,7 +1130,7 @@ Como a ligação é escolhida, conforme o que a URL mostra:
 1. **Host.** A URL tem um host (`https://api.example.com/orders`) que algum repositório lista em
    `[serve] hosts`. O elo é `exact`. Se nenhum repositório serve esse host, não há elo.
 2. **Variável de ambiente.** A URL começa por uma leitura de ambiente (`API_URL`) que um par
-   declara em `base_url_env`. O elo é `inferred`, e o Meada nunca lê o valor da variável.
+   declara em `base_url_env`. O elo é `inferred`; o valor no ambiente do processo nunca é lido.
 3. **Host desconhecido.** A URL não diz de onde vem (um caminho relativo, por exemplo) e só um
    repositório do workspace serve esse método e esse caminho. O elo é `inferred`, com o motivo
    `the only repository serving it is`.
@@ -1152,6 +1152,22 @@ Por que um elo pode faltar:
   no meio da URL vira um parâmetro `{}` e ainda liga.)
 - O framework ou o cliente não está na lista da linguagem (seção 9).
 - O repositório que serve a rota não está entre os pares, e o workspace não o tem.
+
+Uma URL base literal da configuração ou de uma entrada do workload também pode apontar para
+um Service Kubernetes: `http://orders:8080`, `orders.shop`, `orders.shop.svc` ou
+`orders.shop.svc.cluster.local`, sempre com ou sem porta. O Meada segue o selector, o workload
+selecionado e sua imagem até o repositório que serve a rota. Nomes Compose seguem o serviço
+e sua imagem ou seu contexto de build local. O vínculo é `inferred`, com o Service no motivo;
+para uma variável de ambiente, o motivo também identifica o workload e a variável. A leitura
+usa somente entradas indexadas do workload que executa o código, respeitando container,
+namespace, raiz de avaliação e caminho local. Candidatos distintos ficam `ambiguous`.
+
+Um Ingress com host `shop.example.com`, prefixo `/store` e backend `orders` permite que
+`https://shop.example.com/store/orders` alcance a rota `/orders` desse Service. O prefixo
+mais específico prevalece, como um prefixo de gateway. Anotações de rewrite, backends não
+resolvidos e `pathType` diferente de `Prefix` não criam vínculos; formas antigas sem
+`pathType` são aceitas. Hosts com curinga e caminhos específicos de controller não são
+interpretados. A resolução usa os fatos indexados, sem consultar um cluster.
 
 ### 8.2 Recursos declarados e prefixos de gateway
 

@@ -46,6 +46,9 @@ forms, separately from an unresolved channel identifier. These legacy sides carr
 workload marker in storage, cleared before query output when no workload resolves the read;
 unmatched sides retain their earlier absent `via`. Established SDK `env:` provenance stays intact.
 
+`image::execution_links` projects raw image links through the existing generic decision replay
+for workload scope. Environment and HTTP derivation share it; raw links remain the input for
+items, validation and stale/waiting reports, so a choice cannot invalidate itself.
 `image::environment::Environments::new(exports, repositories)` collects those scoped entries;
 `values(repository, site, variable)` returns only values for that code site, with their workload
 and variable explanations. HTTP base resolution can reuse this lookup without duplicating

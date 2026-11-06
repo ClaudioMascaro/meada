@@ -2854,6 +2854,8 @@ mod tests {
             decisions: crate::decisions::Decisions::default(),
             name_candidates: std::collections::BTreeMap::new(),
             iac: Vec::new(),
+            iac_references: Vec::new(),
+            http: None,
             workload_images: Vec::new(),
             executions: Vec::new(),
             repository: name.into(),

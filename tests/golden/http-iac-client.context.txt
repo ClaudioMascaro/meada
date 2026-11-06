@@ -1,0 +1,11 @@
+example.com/http-iac/client client.ts:1-3 workloadOrders
+community: none
+processes: 1 (1 export; 1 repository): workloadOrders (example.com/http-iac/client)
+function workloadOrders() {
+  return fetch(`${process.env.ORDERS_URL}/orders`);
+}
+callers: none
+callees:
+example.com/http-iac/client client.ts:2 (unresolved) fetch
+contracts:
+example.com/http-iac/client client.ts:2 consumes http::GET::/orders →[inferred: Service example.com/http-iac/deploy::workloads.yaml::Service/shop/orders (root .); workload:example.com/http-iac/deploy::workloads.yaml::Deployment.apps/shop/client (root .), env:ORDERS_URL] example.com/http-iac/server::app/orders/route.ts::GET

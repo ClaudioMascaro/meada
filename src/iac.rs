@@ -2037,6 +2037,13 @@ pub(crate) fn nodes(db: &Connection) -> Result<Vec<Node>> {
         .collect::<rusqlite::Result<_>>()?)
 }
 
+/// Stored reference facts used by contract kinds, without reopening infrastructure source.
+pub(crate) fn all_references(db: &Connection) -> Result<Vec<Reference>> {
+    Ok(db.prepare("SELECT root, source, target, via FROM iac_references ORDER BY root, source, target, via")?
+        .query_map([], |row| Ok(Reference { root: row.get(0)?, source: row.get(1)?, target: row.get(2)?, via: row.get(3)? }))?
+        .collect::<rusqlite::Result<_>>()?)
+}
+
 /// `<identity> <path>:<line> <address>`.
 fn at(identity: &str, n: &Node) -> String {
     format!("{identity} {}:{} {}", n.path, n.line, n.address)

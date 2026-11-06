@@ -19,6 +19,11 @@ All notable changes to Meada are recorded here. The format follows
   resolve to JSON nodes and refresh when sources change. Sensitive defaults, tfvars and SSM
   SecureString values also stay redacted in JSON block arrays (#642, #649).
 
+- HTTP base URLs follow Kubernetes Service DNS names and Compose service names through their
+  workloads to the repositories running the providers. Ingress hosts and literal prefixes
+  carry public URLs to their Services; rewrites remain unread mounts. Links are inferred and
+  name the Service, with workload environment provenance when applicable. Included in the
+  minor development release of meada and meada-core 1.4.0 (#665).
 - Declared resource `via` locations now accept IaC addresses in every indexed format and
   `<file>#<key path>` with list selectors (`[key=value]`). Sides retain their precise node or
   key for context and trace; removed locations produce the existing stale status diagnostics.

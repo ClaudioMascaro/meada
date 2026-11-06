@@ -89,6 +89,20 @@ Names resolve within the file's module first, then within the modules it imports
 
 ## HTTP and contract documents
 
+Base URLs from configuration or a workload environment can name a Kubernetes Service
+(`orders`, `orders.shop`, `orders.shop.svc` or `orders.shop.svc.cluster.local`, with or
+without a port) or a Compose service. Meada follows the Service selector and the workload's
+image or local code path to the repository serving the route. These links are `inferred`,
+with the Service in the reason. Short names use the known workload's namespace and evaluation
+root; distinct candidates remain `ambiguous`. Environment values come only from indexed
+entries of the workload running that code.
+
+An Ingress joins its host and literal prefix to the Service's route, like a gateway prefix.
+The most specific prefix wins. Rules with a rewrite annotation, an unknown backend or a
+`pathType` other than `Prefix` remain unlinked (older forms without `pathType` are accepted).
+Controller-specific paths, regular expressions and wildcard hosts are not interpreted.
+No cluster is queried.
+
 Meada connects consumers and providers across languages, including behind gateways. A route whose handler is in a test file (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`, a `tests` directory or `src/test`) is no provider unless `meada.toml` sets `test_routes = true` (see [Configuration](configuration.md)):
 
 | Language | HTTP consumers | HTTP providers |

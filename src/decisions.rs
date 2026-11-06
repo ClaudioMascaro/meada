@@ -323,21 +323,39 @@ fn evaluate(
 /// sorted, and for each repository the decisions that did not apply. A stale decision or one
 /// that waits on a missing peer changes no link: the core's stands.
 pub(crate) fn replay(
-    mut links: Vec<Link>,
+    links: Vec<Link>,
     workspace: &Workspace,
+    exports: &[Export],
+    include: impl Fn(&Decision) -> bool,
+) -> (Vec<Link>, Vec<Evaluation>) {
+    replay_repositories(
+        links,
+        &workspace.repos,
+        &workspace.missing,
+        exports,
+        include,
+    )
+}
+
+/// The same evaluation for a kind's execution projection. Raw links remain the input to
+/// open-item validation; derived environment and routing facts consume only this result.
+pub(crate) fn replay_repositories(
+    mut links: Vec<Link>,
+    repositories: &[crate::workspace::Repository],
+    missing: &[Missing],
     exports: &[Export],
     include: impl Fn(&Decision) -> bool,
 ) -> (Vec<Link>, Vec<Evaluation>) {
     let mut evaluations = Vec::new();
     let mut applied = Vec::new();
-    for (repo, export) in workspace.repos.iter().zip(exports) {
+    for (repo, export) in repositories.iter().zip(exports) {
         let mut evaluation = Evaluation {
             repository: repo.identity.clone(),
             stale: Vec::new(),
             waiting: Vec::new(),
         };
         for d in repo.decisions.items.iter().filter(|d| include(d)) {
-            let fate = evaluate(d, export, exports, &links, &workspace.missing);
+            let fate = evaluate(d, export, exports, &links, missing);
             let (call, target) = (d.call.clone(), d.target.clone());
             match fate {
                 Fate::Applies(provider, contract) => applied.push((d, provider, contract)),

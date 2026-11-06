@@ -89,6 +89,21 @@ Los nombres se resuelven primero en el módulo del archivo y después en los mó
 
 ## HTTP y documentos de contrato
 
+Las URLs base de la configuración o del entorno de un workload pueden nombrar un Service
+Kubernetes (`orders`, `orders.shop`, `orders.shop.svc` o
+`orders.shop.svc.cluster.local`, con o sin puerto) o un servicio Compose. Meada sigue
+el selector del Service y la imagen o la ruta local del workload hasta el repositorio que
+atiende la ruta. Estos enlaces son `inferred`, con el Service en el motivo. Los nombres
+cortos usan el namespace y la raíz de evaluación del workload conocido; los candidatos
+distintos quedan `ambiguous`. El entorno procede solo de las entradas indexadas del workload
+que ejecuta ese código.
+
+Un Ingress une su host y prefijo literal con la ruta del Service, como un prefijo de gateway.
+Prevalece el prefijo más específico. Las reglas con anotación de rewrite, backend desconocido
+o `pathType` distinto de `Prefix` quedan sin enlace (se aceptan las formas antiguas sin
+`pathType`). No se interpretan rutas específicas del controller, expresiones regulares ni
+hosts con comodines. No se consulta ningún cluster.
+
 Meada conecta consumidores y proveedores entre lenguajes, incluso detrás de gateways. Una ruta cuyo handler está en un archivo de prueba (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`, un directorio `tests` o `src/test`) no es proveedora, salvo que `meada.toml` tenga `test_routes = true` (véase [Configuración](configuration.md)):
 
 | Lenguaje | Consumidores HTTP | Proveedores HTTP |

@@ -15,6 +15,44 @@ mod patterns;
 
 pub struct Image;
 
+/// Effective image links for execution, without replacing the raw links used to validate
+/// decisions and list open items. Every consumer of workload scope shares this projection.
+pub(crate) fn execution_links(exports: &[Export], repositories: &[Repository]) -> Vec<Link> {
+    let providers = exports
+        .iter()
+        .zip(repositories)
+        .flat_map(|(e, r)| {
+            e.providers
+                .iter()
+                .filter(|p| p.contract.starts_with("image::"))
+                .map(move |p| (r, p))
+        })
+        .collect::<Vec<_>>();
+    let links = exports
+        .iter()
+        .zip(repositories)
+        .flat_map(|(e, r)| {
+            e.consumers
+                .iter()
+                .filter(|c| {
+                    c.contract
+                        .as_deref()
+                        .is_some_and(|c| c.starts_with("image::"))
+                })
+                .flat_map(|c| Image.link(c, r, &providers, exports))
+        })
+        .collect();
+    // Missing-target decisions cannot change these visible links. Their waiting/stale
+    // reports are still computed with the real workspace by the ordinary Engine replay.
+    crate::decisions::replay_repositories(links, repositories, &[], exports, |d| {
+        d.target
+            .split_once("::")
+            .is_some_and(|(_, c)| c.starts_with("image::"))
+            && !patterns::handles(d)
+    })
+    .0
+}
+
 impl ContractKind for Image {
     fn prefix(&self) -> &'static str {
         "image"
@@ -89,9 +127,7 @@ impl ContractKind for Image {
         let runners = images(export)
             .into_iter()
             .filter_map(|(node, image, via)| {
-                let Some(name) = evaluated(image) else {
-                    return None;
-                };
+                let name = evaluated(image)?;
                 Some(runner(
                     &repo.identity,
                     &node.path,

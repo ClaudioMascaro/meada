@@ -204,8 +204,8 @@ pub struct ConfigFacts<'a> {
 ///
 /// The engine fixes the phase order, and the kinds answer in `KINDS` order: `extract` and
 /// `entry` when the index is written; then every kind's `declare` over every repository, then
-/// every kind's `workspace_step` over all of them, then `link`, then the decisions replay,
-/// then every kind's `after_links`. The decisions are kind-free and a pass over the links must
+/// every kind's `workspace_step` and then `workspace_ready` over all of them, then `link`,
+/// then the decisions replay, then every kind's `after_links`. The decisions are kind-free and a pass over the links must
 /// see the decided ones, so they sit between. The queries ask the rest of the questions.
 ///
 /// One rule for "unresolved": a side is unresolved when its contract is absent (a consumer
@@ -280,8 +280,8 @@ pub trait ContractKind {
         Ok(())
     }
 
-    /// The symbols of `repo` that `declare`, `workspace_step`, `link` and `status` look up in
-    /// its export, given the export's contract rows: a query reads only some code rows of an
+    /// The symbols of `repo` that `declare`, `workspace_step`, `workspace_ready`, `link` and
+    /// `status` look up in its export, given the export's contract rows: a query reads only some code rows of an
     /// index (#396, `partial.rs`), these before any kind declares. `None` is every symbol of
     /// the repository; none by default.
     fn symbols_read(&self, _repo: &Repository, _export: &Export) -> Option<Vec<String>> {
@@ -292,6 +292,9 @@ pub trait ContractKind {
     /// order), after every kind's `declare` has run on every repository: a step that needs
     /// all of them, such as an index of the providers of the whole workspace.
     fn workspace_step(&self, _exports: &mut [Export], _repositories: &[Repository]) {}
+
+    /// A prepared view that depends on every kind's workspace step, before links are read.
+    fn workspace_ready(&self, _exports: &mut [Export], _repositories: &[Repository]) {}
 
     /// The links from `consumer`, held by the repository `from`, to the providers of the
     /// workspace (each with the repository holding it) and, for a queue, the publishes the
@@ -439,7 +442,13 @@ pub trait ContractKind {
     /// Whether a symbol's `context` explains an inferred link from this call consumer of
     /// repository `from`.
     /// This display policy changes no links; decided links are always explained.
-    fn explain_inferred(&self, _consumer: &Consumer, _from: &Repository) -> bool {
+    fn explain_inferred(
+        &self,
+        _consumer: &Consumer,
+        _from: &Repository,
+        _link: &Link,
+        _exports: &[Export],
+    ) -> bool {
         false
     }
 
@@ -563,6 +572,16 @@ pub trait ContractKind {
 /// Every contract kind of this release.
 pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel, &Packages, &Image, &Alert];
 
+/// Shared phase order for whole exports and answer-sized reads.
+pub(crate) fn workspace_steps(exports: &mut [Export], repositories: &[Repository]) {
+    for kind in KINDS {
+        kind.workspace_step(exports, repositories);
+    }
+    for kind in KINDS {
+        kind.workspace_ready(exports, repositories);
+    }
+}
+
 /// Contract configurations are read once at indexing time; queries use their stored summaries.
 pub(crate) fn config_file(path: &str) -> bool {
     KINDS.iter().any(|k| k.config_file(path))
@@ -641,12 +660,17 @@ pub fn flows_to_consumer(contract: Option<&str>) -> bool {
 }
 
 /// Whether the consumer's kind shows its inferred link in a symbol's `context`.
-pub(crate) fn explain_inferred(consumer: &Consumer, from: &Repository) -> bool {
+pub(crate) fn explain_inferred(
+    consumer: &Consumer,
+    from: &Repository,
+    link: &Link,
+    exports: &[Export],
+) -> bool {
     consumer
         .contract
         .as_deref()
         .and_then(kind_of)
-        .is_some_and(|kind| kind.explain_inferred(consumer, from))
+        .is_some_and(|kind| kind.explain_inferred(consumer, from, link, exports))
 }
 
 /// Whether `contract` is an unresolved side, by the rule of its kind.

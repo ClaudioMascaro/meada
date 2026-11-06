@@ -2472,6 +2472,9 @@ pub(crate) struct Export {
     pub(crate) config_sites: Vec<config_values::sites::Site>,
     pub(crate) configurations: Vec<(String, serde_json::Value)>,
     pub(crate) iac: Vec<iac::Node>,
+    pub(crate) iac_references: Vec<iac::Reference>,
+    /// HTTP's prepared workspace routing, never stored or written to the graph export.
+    pub(crate) http: Option<crate::http::Prepared>,
     pub(crate) workload_images: Vec<(String, String, String)>,
     pub(crate) executions: Vec<written::Execution>,
     pub(crate) subscriptions: Vec<iac::subscription::Subscription>,
@@ -3020,6 +3023,8 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
             })
             .collect::<Result<_>>()?,
         iac: iac::nodes(db)?,
+        iac_references: iac::all_references(db)?,
+        http: None,
         workload_images: db
             .prepare(
                 "SELECT root, address, image FROM iac_images ORDER BY root, address, container",

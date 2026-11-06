@@ -272,9 +272,7 @@ impl Engine {
             })
             .collect::<Result<Vec<_>>>()?;
         // Each kind's step over the whole workspace, once every repository has declared.
-        for kind in contract::KINDS {
-            kind.workspace_step(&mut exports, &self.workspace.repos);
-        }
+        contract::workspace_steps(&mut exports, &self.workspace.repos);
         Ok(exports)
     }
 
@@ -301,9 +299,7 @@ impl Engine {
                 kind.declare(repo, &mut partial.exports[n]);
             }
         }
-        for kind in contract::KINDS {
-            kind.workspace_step(&mut partial.exports, &self.workspace.repos);
-        }
+        contract::workspace_steps(&mut partial.exports, &self.workspace.repos);
         Ok(partial)
     }
 
@@ -1551,13 +1547,13 @@ fn contracts(
             continue;
         };
         let location = files.at(&call.span.path, call.span.start);
-        let explain_inferred = contract::explain_inferred(consumer, repo);
         let explained = links
             .iter()
             .filter(|l| {
                 l.consumer == consumer.site
                     && (l.level == Level::Decided
-                        || (l.level == Level::Inferred && explain_inferred))
+                        || (l.level == Level::Inferred
+                            && contract::explain_inferred(consumer, repo, l, exports)))
             })
             .filter(|l| consumer.contract.as_ref().is_none_or(|c| *c == l.contract));
         let mut any = false;
