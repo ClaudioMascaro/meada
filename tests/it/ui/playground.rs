@@ -146,6 +146,74 @@ fn answers_from_index_dir_as_a_node_and_meada_export_do() {
     assert_eq!(contents(&dir.join("indexes")), before, "index_dir changed");
 }
 
+/// Infrastructure fixtures cross the real console API, including a local alert link that the
+/// generic cross-repository view intentionally omits. Every exported row matches its golden.
+#[test]
+fn infrastructure_graph_fixtures_are_served_through_the_console_api() {
+    use crate::common::{assert_golden_but_indexed_commit, fixture_repo};
+    use crate::manifest::{list, run_args};
+
+    for (case, entries, golden) in [
+        (
+            "ui_graph_provisioners",
+            [
+                ("example.com/provision/infra", "provision-infra"),
+                ("example.com/provision/app", "provision-app"),
+            ],
+            "provision-infra.export.json",
+        ),
+        (
+            "ui_graph_images",
+            [
+                ("example.com/acme/deploy", "image-deploy"),
+                ("example.com/acme/app", "image-app"),
+            ],
+            "images.workflow.export.json",
+        ),
+        (
+            "ui_graph_alerts",
+            [
+                ("example.com/acme/monitoring", "alert-monitoring"),
+                ("example.com/acme/app", "alert-app"),
+            ],
+            "alerts.equality.export.json",
+        ),
+    ] {
+        let mut dir = PathBuf::new();
+        for (identity, fixture) in entries {
+            let repo = fixture_repo(case, fixture, Some(&format!("https://{identity}.git")));
+            dir = repo.parent().unwrap().to_path_buf();
+        }
+        if case == "ui_graph_images" {
+            for path in [
+                "image-app/compose.yaml",
+                "image-deploy/values.yaml",
+                "image-deploy/overlays/prod/kustomization.yaml",
+            ] {
+                fs::remove_file(dir.join(path)).unwrap();
+            }
+        }
+        list(&dir, &entries, true);
+        front_end(&dir, Some(VERSION));
+        append(&dir.join(MANIFEST), &format!("\n[ui]\n{}", ui_section()));
+        assert!(run(&dir, "index").2, "{case}: index");
+        let console = super::start(&dir, "127.0.0.1:0");
+        for (identity, _) in entries {
+            let reply = get(&console, &format!("/api/v1/repositories/{identity}/export"));
+            assert_eq!(reply.status, 200, "{case}: {}", reply.body);
+            let (cli, stderr, code) = run_args(
+                &dir,
+                &["export", "--workspace", MANIFEST, "--repo", identity],
+            );
+            assert_eq!(code, Some(0), "{stderr}");
+            assert_eq!(reply.body, cli, "{case}: complete same-mode export parity");
+            if identity == entries[0].0 {
+                assert_golden_but_indexed_commit(golden, &reply.body);
+            }
+        }
+    }
+}
+
 /// What every console refuses: `trace` with `changes: uncommitted` with the node's text, an
 /// unknown repository and an unheld generation with a 404, a body over the cap with a 413, a
 /// malformed body or an unknown tool with a fixed 400, and a query without the console's own

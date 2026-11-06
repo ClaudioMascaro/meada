@@ -7,8 +7,18 @@ import { graphModel } from './graph';
 import type { GraphModel } from './graph';
 import './graph.css';
 
-const views = ['communities', 'contracts', 'links', 'provisions', 'executions', 'drift', 'decisions'] as const;
+const views = ['communities', 'contracts', 'links', 'provisions', 'images', 'alerts', 'executions', 'drift', 'decisions'] as const;
 type View = typeof views[number];
+
+function hasView(graph: GraphModel, name: View) {
+  if (name === 'provisions') return graph.provisions.length > 0;
+  if (name === 'executions') return graph.executions.length > 0;
+  if (name === 'images' || name === 'alerts') {
+    const prefix = name === 'images' ? 'image::' : 'alert::';
+    return graph[name].length > 0 || graph.contracts.some(row => row.contract.startsWith(prefix));
+  }
+  return true;
+}
 
 function List({ values }: { values: string[] }) {
   return <ul className="graph-list">{values.map((value, index) => <li key={index}><code>{value}</code></li>)}</ul>;
@@ -47,6 +57,7 @@ export function GraphPage({ api, locale }: { api: Api; locale: Language }) {
         if (generation) exports.current.set(key, result);
       }
       setGraph(result); setLoadedGeneration(generation);
+      if (!hasView(result, view)) setView('communities');
     } catch (problem) { setError(problem instanceof Error ? problem.message : typeof problem === 'string' ? problem : t.failed); }
     finally { setBusy(false); }
   }
@@ -54,6 +65,8 @@ export function GraphPage({ api, locale }: { api: Api; locale: Language }) {
   function table(title: string, headers: string[], rows: ReactNode[][]) {
     return <GraphTable title={title} headers={headers} rows={rows} empty={t.noResults} />;
   }
+
+  const availableViews = graph ? views.filter(name => hasView(graph, name)) : [];
 
   return <>
     <h1>{t.graph}</h1><p className="intro">{t.graphIntro}</p>
@@ -65,10 +78,19 @@ export function GraphPage({ api, locale }: { api: Api; locale: Language }) {
     {error && <p className="error" role="alert">{error}</p>}
     {graph && <>
       <p className="file-path">{t.exportLoaded}: <code>{graph.repository}</code> · {t.generation}: <code>{loadedGeneration || t.current}</code></p>
+      <section className="graph-legend" aria-label={t.legend}>
+        <h2>{t.legend}</h2>
+        <dl>
+          <dt>{t.side} → {t.provisioner}</dt><dd>{t.provisionLegend}</dd>
+          <dt>{t.builder} → {t.runner}</dt><dd>{t.imageLegend}</dd>
+          <dt>{t.emitter} → {t.matcher}</dt><dd>{t.alertLegend}</dd>
+        </dl>
+        <p>{t.keyboardHelp}</p>
+      </section>
       <label className="graph-view-picker">{t.view}<select value={view} onChange={event => {
         const next = views.find(view => view === event.target.value);
         if (next) setView(next);
-      }}>{views.filter(view => (view !== 'provisions' || graph.provisions.length > 0) && (view !== 'executions' || graph.executions.length > 0)).map(view => <option value={view} key={view}>{t[view]}</option>)}</select></label>
+      }}>{availableViews.map(view => <option value={view} key={view}>{t[view]}</option>)}</select></label>
       {view === 'communities' && table(t.communities, [t.community, t.members], graph.communities.map(row => [row.name, <List values={row.members} />]))}
       {view === 'contracts' && table(t.contracts,
         [t.contract, t.providers, t.consumers, ...(graph.contracts.some(row => row.provisioners) ? [t.provisioners] : []), ...(graph.contracts.some(row => row.uses) ? [t.uses] : [])],
@@ -83,6 +105,16 @@ export function GraphPage({ api, locale }: { api: Api; locale: Language }) {
           <code>{row.provisioner} (root {row.root})</code>, row.level, row.reason,
         ]))}
       {view === 'links' && table(t.links, [t.contract, t.consumer, t.provider, t.level], graph.links.map(row => [<code>{row.contract}</code>, <code>{row.consumer}</code>, <code>{row.provider}</code>, row.level]))}
+      {(view === 'images' || view === 'alerts') && <>
+        {table(view === 'images' ? t.imageSides : t.alertSides,
+          [t.contract, view === 'images' ? t.builders : t.emitters, view === 'images' ? t.runners : t.matchers],
+          graph.contracts.filter(row => row.contract.startsWith(view === 'images' ? 'image::' : 'alert::')).map(row => [
+            <code>{row.contract}</code>, <List values={row.providers} />, <List values={row.consumers} />,
+          ]))}
+        {table(t[view], [t.contract, view === 'images' ? t.builder : t.emitter, view === 'images' ? t.runner : t.matcher, t.level, t.reason],
+          graph[view].map(row => [<code>{row.contract}</code>, <code>{row.provider}</code>,
+            <code>{row.consumer}{row.root ? ` (root ${row.root})` : ''}</code>, row.level, row.reason]))}
+      </>}
       {view === 'executions' && table(t.executions, [t.workload, t.repository, t.codePath, t.level, t.reason], graph.executions.map(row => [<code>{row.workload} (root {row.root})</code>, <code>{row.repository}</code>, <code>{row.path}</code>, row.level, row.reason]))}
       {view === 'drift' && table(t.drift, [t.contract, t.consumer, t.provider, t.missing, t.unchecked], graph.drift.map(row => [
         <code>{row.contract}</code>, <code>{row.consumer}</code>, <code>{row.provider}</code>,

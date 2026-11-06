@@ -8,6 +8,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- The console graph has image builder-to-runner and alert emitter-to-matcher views, including
+  links within a repository, alongside provisioner sides and provisioning links with roots,
+  levels and reasons. A bilingual legend explains each role and keyboard navigation. The
+  playground exposes `value`, `iac` and `alert` searches. Release level: minor, included in
+  meada and meada-core 1.4.0 (#675).
 - Terraform/OpenTofu JSON (`.tf.json`, `.tofu.json`) now creates IaC nodes with source spans,
   references, evaluated names and local module instances. JSON expression and literal rules
   share the HCL evaluator, provisioners and subscriptions; declared resource `via` addresses

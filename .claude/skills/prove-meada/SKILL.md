@@ -39,6 +39,7 @@ Follow each changed file to the surfaces and flows it reaches. Internal code cou
 | `src/workspace.rs`, `src/config.rs`, `src/repo.rs` | yes: discovery and server mode | CLI, MCP stdio, MCP HTTP | `--repos all --http` |
 | `src/main.rs`, `src/msg.rs` | yes: the CLI | CLI | every command's exit code and stderr; the `cli.*` goldens (rebless) |
 | `src/ui.rs`, `src/ui/`, `ui/`, `meada-core/src/{wasm,manifest,ids,workspace,authorize,named,effective,msg,http}.rs` | yes: the console | console pages and API | [references/console.md](references/console.md), viewer mode |
+| `ui/src/{graph,graph-i18n,GraphPage,PlaygroundPage}.*`, graph CSS and graph/playground fixtures | yes: A7 console infrastructure | console graph, query/export API | `console-graph.py --head-bin UI_BIN --ui-dir ui/dist --run DIR`; #675/#642, source-derived controls and whole same-mode CLI/API parity ([references/console-graph.md](references/console-graph.md)); existing viewer and image/config-use flows still apply |
 | `src/accounts*`, `src/postgres.rs`, `src/audit.rs` | yes: sign-in | console | console with `--accounts` |
 | `deploy/`, `Dockerfile`, `scripts/{compose-check,helm-check,container-smoke,ui-tarball}`, `.github/workflows/{compose,helm,container}.yml` | yes: every deployment | deploy | [references/deploy.md](references/deploy.md) |
 | `src/config_values.rs`, `src/index.rs` (`hidden_ci`, `config_files`), `src/document/` (the event reader), `src/msg.rs` (`ConfigFiles`) | yes: A7 config values | CLI (`meada status`), MCP stdio and HTTP | A7 config values: `prove.py values --http` over `infra.tsv` and `meada` ([references/config-iac.md](references/config-iac.md)) |
@@ -101,6 +102,7 @@ Ladder, best first: 1 an old system that does the same job, 2 a snapshot, 3 an i
 | MCP over HTTP | copies stdio | the same binary's stdio answers, byte for byte | 1 | `prove.py run --http` | the stdio server |
 | Console query and export API | copies MCP and CLI | the head's stdio answers and `meada export` bytes | 1 | `console.py api` | the MCP server and the CLI |
 | Console pages | existing | the budgets below, and the playground answer equal to stdio | budget + 1 | `console-pages.mjs` | the maintainer, 2026-11-02 |
+| A7 console infrastructure roles, roots, image/alert directions, same-repository links, unpaired sides and keyboard/search controls | new | #675/#642 and ADR 0026; complete same-mode CLI/API and playground/query parity | 4 + 1 | `console-graph.py`, [references/console-graph.md](references/console-graph.md) | maintainer specs; fresh independent checker |
 | Index time, peak RSS, export size | existing | head at most x1.25, x1.25 and x1.5 of the base (time only when the base takes 2 s or more) | budget | `prove.py run` | the maintainer, 2026-11-02 |
 | Compose and Helm renders | existing | the renders at the base | 1 | `prove.py deploy` | the deploy files before the change |
 | A7 config values (`search` kind `value`, the status config line) | new | spec #642's user stories 1 to 17, through `prove.py values`'s own reading of the files | 4 | `prove.py values` | the maintainer; the oracle reads the files, never Meada |
@@ -201,6 +203,8 @@ One section per surface. `/create-prove-it` adds a section when the app gains a 
 - A render shows a mounted file's path, never its text: `prove.py deploy` copies the Caddyfiles, workspace manifests, shell scripts and env examples the stack mounts into the render folder (`mounted-*`) so the base/head diff covers them. `compose-check` asserts only a few strings of those files (a Caddyfile upstream on the wrong port passed it, audit 2026-11-03, D3); read the `mounted-*` diff as you read a render's.
 
 ### A7: config values and IaC (spec #642)
+
+For #675's console graph, run `python3 $S/console-graph.py --head-bin "$RUN/bin/meada-head-ui" --ui-dir ui/dist --run "$RUN/console-graph"`. Inspect the screenshots, whole role/link tables, roots, reasons, native keyboard focus, unpaired sides and `value`/`iac`/`alert` playground answers; retain the receipt and CI artifact. [references/console-graph.md](references/console-graph.md) defines inputs, answer keys, budgets, controls and cleanup. The existing frontend CI job runs this executable flow against a real UI binary; unavailable browser tooling leaves it BLOCKED.
 
 For #663 workload environment resolution, run `python3 $S/environment.py --head-bin "$RUN/bin/meada-head" --run "$RUN/environment"` and inspect the saved source, resolved side/provision sets and raw transport answers ([references/environment.md](references/environment.md)).
 

@@ -5,6 +5,7 @@ interface Side { contract: string | null; site: string; at?: string; root?: stri
 interface Execution { workload: string; root: string; repository: string; path: string; level: string; reason: string }
 interface Link {
   consumer: string; provider: string; contract: string; level: string; reason: string;
+  root?: string;
   by?: string; p?: number; drift?: { missing?: Record<string, string>; unchecked?: Record<string, string> };
 }
 interface Provisioner { contract: string; node: string; root: string }
@@ -64,6 +65,8 @@ export function graphModel(text: string) {
     }
   }
   return {
+    images: data.links.filter(link => link.contract.startsWith('image::')),
+    alerts: data.links.filter(link => link.contract.startsWith('alert::')),
     executions: data.executions ?? [],
     provisions: data.provisions ?? [],
     repository: data.repository,

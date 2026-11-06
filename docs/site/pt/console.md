@@ -191,6 +191,26 @@ Ao configurar `[oidc]`, o login local desliga para todas as contas (veja [Break 
 
 O que deixa de funcionar: a entrada de qualquer conta que não seja `admin`; os tokens de sessão e de agente das contas locais (os nós e o servidor de propostas passam a admitir só os tokens do provedor, e os agentes passam a usar tokens do provedor de identidade); a página de contas, a emissão de tokens de agente e a verificação do login (404); e os sujeitos `local:<usuário>` registrados como autores, operadores de workspaces nomeados e registros de auditoria, que nunca coincidem com os do provedor, então refaça a lista de operadores de cada workspace nomeado. As contas continuam na tabela, inertes. Nenhuma conta ou grupo é migrado sozinho.
 
+## Infraestrutura no grafo
+
+Em **Grafo de código**, carregue a identidade de um repositório e, opcionalmente, uma geração.
+**Contratos** mostra provisionadores com endereço IaC e raiz de avaliação (módulo ou overlay),
+além de provedores, consumidores e usos de configuração. **Ligações de provisionamento**
+mantém cada uso ligado a cada provisionador, com a raiz, o nível e o motivo.
+
+**Ligações de imagens** mostra construtor → executor: o repositório que publica a imagem e a
+carga de trabalho que a executa. **Ligações de alertas** mostra emissor → correspondente: o
+rótulo ou tag e a condição que o testa. Essas visões incluem ligações dentro do mesmo
+repositório e entre repositórios, sem mudar a visão geral de ligações entre repositórios.
+As tabelas de contratos de cada tipo também mostram lados sem contraparte; não há ligação
+inventada para eles. A legenda explica os papéis e as tabelas de ligações preservam nível e motivo.
+
+Use Tab para chegar ao seletor de visão e às tabelas; as setas escolhem a visão e rolam a tabela
+em foco. Cada tabela tem nome acessível e cabeçalhos. As visões de infraestrutura aparecem
+quando o export contém os lados ou as ligações correspondentes. Recarregar mantém a visão
+selecionada, ou volta a comunidades se ela deixou de existir. O playground oferece os filtros `value`, `iac` e `alert`, além de `image`
+e dos tipos existentes, e mostra a resposta da API sem reescrevê-la.
+
 ## Frota e diagnóstico
 
 Cada `snapshot pull --every` envia um heartbeat, o registro periódico de estado do nó. Ele informa geração, fence, gerações locais, prontidão, versão e horário.

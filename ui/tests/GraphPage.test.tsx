@@ -118,3 +118,77 @@ test('Terraform contract sides and provisioning links retain each root and evide
     expect(links.textContent).toContain(link.reason);
   }
 });
+
+test.each(['en', 'pt-BR'] as const)('new kind views keep orphan sides visible and localize their accessible names in %s', async locale => {
+  const t = graphCopy[locale];
+  const data = JSON.parse(readFileSync('../tests/golden/images.builders.export.json', 'utf8'));
+  data.links = [];
+  const fetch = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(data)))
+    .mockImplementation(async () => new Response(readFileSync('../tests/golden/chain-web.export.json', 'utf8')));
+  vi.stubGlobal('fetch', fetch);
+  await act(() => root.render(<GraphPage api={new Api(new Auth(config))} locale={locale} />));
+  await act(() => {
+    fireEvent.change(getByRole(host, 'textbox', { name: t.repository }), { target: { value: data.repository } });
+    fireEvent.submit(getByRole(host, 'form', { name: t.graph }));
+  });
+  await waitFor(() => expect(getByRole(host, 'table', { name: t.communities })).toBeDefined());
+  await act(() => {
+    fireEvent.change(getByRole(host, 'combobox', { name: t.view }), { target: { value: 'images' } });
+  });
+  expect(getByRole(host, 'region', { name: t.legend }).textContent).toContain(`${t.builder} → ${t.runner}`);
+  const sides = getByRole(host, 'table', { name: t.imageSides });
+  for (const side of data.providers) expect(sides.textContent).toContain(side.at);
+  expect(getByRole(host, 'table', { name: t.images }).textContent).toContain(t.noResults);
+  await act(() => {
+    fireEvent.change(getByRole(host, 'textbox', { name: t.repository }), { target: { value: 'example.com/chain/web' } });
+    fireEvent.submit(getByRole(host, 'form', { name: t.graph }));
+  });
+  await waitFor(() => expect(getByRole(host, 'table', { name: t.communities })).toBeDefined());
+  expect((getByRole(host, 'combobox', { name: t.view }) as HTMLSelectElement).value).toBe('communities');
+  expect(queryByRole(host, 'option', { name: t.images })).toBeNull();
+  await act(() => {
+    fireEvent.change(getByRole(host, 'combobox', { name: t.view }), { target: { value: 'contracts' } });
+    fireEvent.submit(getByRole(host, 'form', { name: t.graph }));
+  });
+  await waitFor(() => expect(getByRole(host, 'table', { name: t.contracts })).toBeDefined());
+  expect((getByRole(host, 'combobox', { name: t.view }) as HTMLSelectElement).value).toBe('contracts');
+});
+
+test.each([
+  { view: 'images', golden: 'images.workflow', title: 'Image links', from: 'Builder', to: 'Runner',
+    contract: 'image::ghcr.io/acme/orders', provider: 'example.com/acme/app',
+    consumer: 'example.com/acme/deploy::deployment.yaml::Deployment.apps/shop/orders (root .)' },
+  { view: 'alerts', golden: 'alerts.equality', title: 'Alert links', from: 'Emitter', to: 'Matcher',
+    contract: 'alert::support::team-b', provider: 'example.com/acme/monitoring::rules.yaml::groups[0].rules[0]',
+    consumer: 'example.com/acme/monitoring::alertmanager.yaml::route.routes[0]' },
+])('$view show directed, named roles including links inside one repository', async example => {
+  const text = readFileSync(`../tests/golden/${example.golden}.export.json`, 'utf8');
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(text)));
+  await act(() => root.render(<GraphPage api={new Api(new Auth(config))} locale="en" />));
+  await act(() => {
+    fireEvent.change(getByRole(host, 'textbox', { name: 'Repository' }), {
+      target: { value: JSON.parse(text).repository },
+    });
+    fireEvent.submit(getByRole(host, 'form', { name: 'Code graph' }));
+  });
+  await waitFor(() => expect(getByRole(host, 'table', { name: 'Communities' })).toBeDefined());
+  const legend = getByRole(host, 'region', { name: 'Graph legend' });
+  expect(legend.textContent).toContain('Builder → Runner');
+  expect(legend.textContent).toContain('Emitter → Matcher');
+  expect(legend.textContent).toContain('Contract side → Provisioner');
+  await act(() => {
+    fireEvent.change(getByRole(host, 'combobox', { name: 'Graph view' }), { target: { value: example.view } });
+  });
+  const region = getByRole(host, 'region', { name: example.title });
+  expect(region.tabIndex).toBe(0);
+  region.focus();
+  expect(document.activeElement).toBe(region);
+  const table = getByRole(region, 'table', { name: example.title });
+  expect(Array.from(table.querySelectorAll('thead th')).map(th => th.textContent)).toEqual([
+    'Contract', example.from, example.to, 'Level', 'Reason',
+  ]);
+  expect(Array.from(table.querySelectorAll('tbody tr')).map(row =>
+    Array.from(row.querySelectorAll('td')).map(cell => cell.textContent))).toEqual([
+    [example.contract, example.provider, example.consumer, 'exact', JSON.parse(text).links[0].reason],
+  ]);
+});

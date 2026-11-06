@@ -235,6 +235,28 @@ jobs:
         working-directory: ui
       - run: npm test
         working-directory: ui
+      - name: Install console browser proof tools
+        env:
+          PROVE_NODE: ${{ runner.temp }}/console-graph-node
+        run: |
+          npm install --prefix "$PROVE_NODE" --no-audit --no-fund playwright-core@1.61.1 axe-core@4.12.1
+          "$PROVE_NODE/node_modules/.bin/playwright-core" install --with-deps chromium
+      - name: Prove the console infrastructure graph
+        env:
+          PROVE_NODE: ${{ runner.temp }}/console-graph-node
+        run: |
+          cargo build --locked --features ui
+          python3 .claude/skills/prove-meada/scripts/console-graph.py \
+            --head-bin target/debug/meada --ui-dir ui/dist \
+            --run .prove-it/runs/ci-console-graph
+      - name: Retain console graph evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: console-infrastructure-graph
+          path: .prove-it/runs/ci-console-graph
+          include-hidden-files: true
+          if-no-files-found: warn
 
   docs:
     runs-on: ubuntu-24.04

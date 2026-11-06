@@ -35,7 +35,7 @@ lands it writes the check.
 | HTTP through IaC: Services, Ingress, IaC-declared routes | 50 to 52 | CLI export, MCP | `boutique`, `sam-rust` | to write | pending |
 | Alert labels and Alertmanager routes | #672; 53, 54, 57 to 60 | CLI export/status, MCP stdio/HTTP, console graph | neutral generated monitoring/routing/app repositories; pinned `kube-prometheus` | `alerts.py --head-bin BIN --run DIR --http`, then graph and public-source checks below | landed (#672) |
 | `via` to an IaC address or a key path | 61, 62 | CLI export/status, MCP stdio/HTTP | neutral sibling repositories in `resource-via.py` | #641/#642, exact declared sites, all formats, selectors, stale remove/restore; [recipe](resource-via.md) | `resource-via.py --http` |
-| Export and console graph additions | 63, 64 | CLI export, console | every IaC entry | to write | pending |
+| Console provisioners/provisioning, image builders/runners and alert emitters/matchers, legend, keyboard navigation and search selectors | #675; 63, 64 | CLI export parity, console graph and query/export API | four neutral repositories with two roots, unpaired image sides and local equality/regex alerts | `console-graph.py --head-bin UI_BIN --ui-dir ui/dist --run DIR` ([console-graph.md](console-graph.md)); existing image/config-use/viewer flows still apply | #675, executable CI flow |
 
 ## `images.py`: #662
 
