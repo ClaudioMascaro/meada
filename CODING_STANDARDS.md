@@ -148,7 +148,9 @@ and `CHANGELOG.md` under its unreleased version.
 
 A change to what the code relies on updates the repository map (`docs/agents/architecture.md`)
 in the same change. Each kind of update goes to one place, and the map stays an index within its
-budget of 64 KB (`tests/it/docs.rs` fails above it):
+budget of 8 KiB (`tests/it/docs.rs` fails above it). The contracts and resolution/index/shape
+ceiling indexes share that entry budget; their topic leaves and the relocated map details stay
+within 24 KiB. Other areas keep their existing 64 KiB budget until split:
 
 - The map holds a line for a module, a seam or an invariant: what it owns or extends, in a
   sentence, and the area file that has the rest. A new module gets its line, naming its area
@@ -168,7 +170,8 @@ budget of 64 KB (`tests/it/docs.rs` fails above it):
   kind module; a hook added to one of them, or a kind's step added to the extraction loop, is a
   finding. What cannot be a question (a stored field, the manifest and tsconfig rows the index
   writer stores as the stored format, the phrase in the MCP `search` doc string, a variant of
-  `entry::EntryKind`, a reader in `document`) is named under "Seams and what extends them".
+  `entry::EntryKind`, a reader in `document`) is named under
+  [Seams and what extends them](docs/agents/map/overview/seams-and-what-extends-them.md).
 - A package ecosystem's rule lives in its own module under `package/`, behind the `Ecosystem`
   trait in `package.rs`. The shared package steps ask the trait; the index writer asks the
   seam's free functions (`programs`, `inherit`, `is_manifest`, `read_manifest`) and imports no

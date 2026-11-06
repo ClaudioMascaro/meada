@@ -635,6 +635,7 @@ fn listen<'a>(
     let texts =
         |key: &str| -> Vec<Option<String>> { all(key).iter().map(|v| text(v, config)).collect() };
     let message = |name: Option<String>, role: Side| Message {
+        environment: None,
         broker: "",
         name,
         path: path.into(),

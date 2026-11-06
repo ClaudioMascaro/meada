@@ -168,3 +168,15 @@ Python's stored `Def::asynchronous` marks a coroutine-producing definition, and 
 through aliases and opaque argument expansions as `...`/`*` keyword markers. Complete
 factory readers reject those expansions before selecting a default. The syntax sample
 changes the schema key so prior constructor rows rebuild.
+
+`iac_nodes.environment` (#663) is a JSON list of workload container names, evaluated images,
+variable names, target descriptions and optional resolved values. Kubernetes Secret values never
+enter the list; their key references retain a redacted target and no value. ConfigMap lookups
+remain in the same namespace and evaluation unit. Compose defaults come from checked-in text.
+The schema golden changes, rebuilding earlier indexes; environment entries follow the IaC
+reader's refresh, repository grants and storage budgets and stay out of graph exports.
+
+Legacy SQS forms retain their new environment variable name in `contracts.via` with a private
+pending workload marker. The workspace resolution step replaces a matched marker with workload
+evidence and removes an unmatched one before every query output. Existing SDK `env:` provenance
+keeps its earlier storage and output behavior.

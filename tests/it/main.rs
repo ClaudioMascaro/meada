@@ -26,6 +26,7 @@ mod docs;
 mod documents;
 mod drift;
 mod duplicates;
+mod environment;
 mod freshness;
 mod gateway;
 mod generations;

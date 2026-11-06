@@ -30,6 +30,8 @@ example.com/acme/deploy base/deployment.yaml:29 spec.template.spec.containers[0]
 example.com/acme/deploy base/deployment.yaml:31 spec.template.spec.volumes[0].name = "settings"
 example.com/acme/deploy base/deployment.yaml:33 spec.template.spec.volumes[0].configMap.name = "api-settings"
 image: image::ghcr.io/acme/api (no builder in the workspace)
+env web DATABASE_URL -> Secret/shop-dev/dev-db-credentials key url (redacted): unresolved
+env web LOG_LEVEL -> envFrom ConfigMap/shop-dev/dev-api-settings key LOG_LEVEL: info
 
 example.com/acme/deploy base/deployment.yaml:1-33 Deployment.apps/shop/api-v2
 type: Deployment
@@ -63,6 +65,8 @@ example.com/acme/deploy base/deployment.yaml:29 spec.template.spec.containers[0]
 example.com/acme/deploy base/deployment.yaml:31 spec.template.spec.volumes[0].name = "settings"
 example.com/acme/deploy base/deployment.yaml:33 spec.template.spec.volumes[0].configMap.name = "api-settings"
 image: image::registry.example.com/shop/api (no builder in the workspace)
+env web DATABASE_URL -> Secret/shop/db-credentials-v2 key url (redacted): unresolved
+env web LOG_LEVEL -> envFrom ConfigMap/shop/api-settings-v2 key LOG_LEVEL: info
 
 example.com/acme/deploy base/service.yaml:1-9 Service/shop/api-v2
 type: Service
@@ -189,3 +193,5 @@ example.com/acme/deploy base/deployment.yaml:29 spec.template.spec.containers[0]
 example.com/acme/deploy base/deployment.yaml:31 spec.template.spec.volumes[0].name = "settings"
 example.com/acme/deploy base/deployment.yaml:33 spec.template.spec.volumes[0].configMap.name = "api-settings"
 image: image::ghcr.io/acme/api (no builder in the workspace)
+env web DATABASE_URL -> Secret/shop-dev/dev-db-credentials key url (redacted): unresolved
+env web LOG_LEVEL -> envFrom ConfigMap/shop-dev/dev-api-settings key LOG_LEVEL: info

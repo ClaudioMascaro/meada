@@ -8,6 +8,7 @@ use crate::workspace::Repository;
 use serde_json::Value;
 
 mod config;
+pub(crate) mod environment;
 mod jib;
 
 pub struct Image;
@@ -151,6 +152,9 @@ impl ContractKind for Image {
         export.consumers.dedup_by(|a, b| {
             a.site == b.site && a.contract == b.contract && a.via == b.via && a.root == b.root
         });
+    }
+    fn workspace_step(&self, exports: &mut [Export], repositories: &[Repository]) {
+        environment::resolve(exports, repositories);
     }
     fn link(
         &self,
@@ -369,6 +373,17 @@ impl ContractKind for Image {
             }
             for n in &e.iac {
                 let identity = n.identity(&e.repository);
+                if identity == symbol && root.is_none_or(|r| r == n.root) {
+                    for entry in &n.environment {
+                        lines.push(format!(
+                            "env {} {} -> {}: {}",
+                            entry.container,
+                            entry.name,
+                            entry.target,
+                            entry.value.as_deref().unwrap_or("unresolved")
+                        ));
+                    }
+                }
                 if identity == symbol
                     && root.is_none_or(|r| r == n.root)
                     && let Some(path) = direct(e, n)

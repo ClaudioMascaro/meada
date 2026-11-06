@@ -132,7 +132,13 @@ fn tree(files: Vec<(String, String)>) -> usize {
 /// store.
 fn compose(text: String) -> usize {
     let (nodes, references) = crate::iac::evaluate(&[("compose.yaml".into(), file(text))]);
-    let nodes = nodes.iter().map(|n| n.address.len());
+    let nodes = nodes.iter().map(|n| {
+        n.address.len()
+            + n.environment
+                .iter()
+                .map(crate::iac::environment::Entry::size)
+                .sum::<usize>()
+    });
     let references = (references.iter())
         .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
     nodes.chain(references).sum()
@@ -179,7 +185,13 @@ fn objects(files: Vec<(&str, String)>) -> usize {
         .map(|(path, text)| (path.to_string(), file(text)))
         .collect();
     let out = crate::kube::evaluate(&files);
-    let nodes = out.nodes.iter().map(|n| n.address.len());
+    let nodes = out.nodes.iter().map(|n| {
+        n.address.len()
+            + n.environment
+                .iter()
+                .map(crate::iac::environment::Entry::size)
+                .sum::<usize>()
+    });
     let references = (out.references.iter())
         .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
     let images = out.images.iter().map(|i| i.address.len() + i.image.len());
@@ -1018,6 +1030,30 @@ fn probes() -> Vec<Probe> {
             let services = fill(1, |i| format!("  s{i}:\n    networks: [n]\n"));
             compose(format!("services:\n{services}"))
         }),
+        (
+            "compose: long image repeated by environment entries",
+            || {
+                let entries = count(512, |i| format!("      Q{i}: orders\n"));
+                let mut text = format!(
+                    "services:\n  worker:\n    image: {}\n    environment:\n{entries}",
+                    "i".repeat(400 << 10)
+                );
+                text.push_str(&" ".repeat(MAX_BYTES - text.len()));
+                compose(text)
+            },
+        ),
+        (
+            "compose: long service name repeated by environment entries",
+            || {
+                let entries = count(512, |i| format!("      Q{i}: orders\n"));
+                let mut text = format!(
+                    "services:\n  ? {}\n  :\n    image: worker\n    environment:\n{entries}",
+                    "w".repeat(400 << 10)
+                );
+                text.push_str(&" ".repeat(MAX_BYTES - text.len()));
+                compose(text)
+            },
+        ),
         ("compose: a default naming a default", || {
             let nest = "${A:-".repeat(5000) + "x" + &"}".repeat(5000);
             compose(format!("services:\n  a:\n    image: {nest}\n"))
@@ -1264,6 +1300,30 @@ fn probes() -> Vec<Probe> {
             files.extend(overlays.iter().map(|(p, t)| (p.as_str(), t.clone())));
             objects(files)
         }),
+        ("kubernetes: environment reference fan-out", || {
+            let data = fill(2, |i| format!("  Q{i}: {}\n", "x".repeat(512)));
+            let refs = fill(4, |_| "        - configMapRef: {name: values}\n".into());
+            objects(vec![(
+                "env.yaml",
+                format!(
+                    "apiVersion: v1\nkind: ConfigMap\nmetadata: {{name: values}}\ndata:\n{data}---\napiVersion: v1\nkind: Pod\nmetadata: {{name: app}}\nspec:\n  containers:\n    - name: app\n      image: nginx\n      envFrom:\n{refs}"
+                ),
+            )])
+        }),
+        (
+            "kubernetes: long container name repeated by environment entries",
+            || {
+                let entries = count(512, |i| {
+                    format!("        - {{name: Q{i}, value: orders}}\n")
+                });
+                let mut text = format!(
+                    "apiVersion: v1\nkind: Pod\nmetadata: {{name: app}}\nspec:\n  containers:\n    - name: {}\n      image: nginx\n      env:\n{entries}",
+                    "w".repeat(400 << 10)
+                );
+                text.push_str(&" ".repeat(MAX_BYTES - text.len()));
+                objects(vec![("env.yaml", text)])
+            },
+        ),
         ("kubernetes: services selecting many workloads", || {
             let pair = |i: usize| {
                 format!(

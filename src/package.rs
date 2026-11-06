@@ -589,6 +589,7 @@ pub struct ExportedShape {
 pub use meada_core::export::How;
 
 /// Where a call through a package import resolves in one provider of the package.
+#[derive(Clone)]
 pub struct Hop {
     /// The provider's site: its manifest.
     pub manifest: String,
@@ -1844,7 +1845,7 @@ impl ContractKind for Packages {
     /// reaches through a package import of their own repository (a monorepo: no door, at any
     /// level; an entry point of another kind stays one), and the shapes imported from a
     /// package (issue #175).
-    fn workspace_step(&self, exports: &mut [Export]) {
+    fn workspace_step(&self, exports: &mut [Export], _: &[Repository]) {
         ECOSYSTEMS.iter().for_each(|e| e.settle(exports));
         let providers = Providers::new(exports);
         consume(exports, &providers);

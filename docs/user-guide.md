@@ -2069,7 +2069,8 @@ infraestrutura pelo nome físico, sem conta ou região. Lados de SDK literais se
 `exact`, inclusive a outros lados de SDK do mesmo repositório; um lado declarado em
 `meada.toml` conserva `declared`. Valores de infraestrutura substituíveis continuam `inferred`.
 
-Uma leitura como `process.env.BUCKET` ou `os.getenv("BUCKET")` fica não resolvida, com
+Sem um ambiente correspondente do workload, uma leitura como `process.env.BUCKET` ou
+`os.getenv("BUCKET")` fica não resolvida, com
 `via: "env:BUCKET"` no export e o nome da variável no contexto da função. Um produtor ou
 escritor de SDK também tem `via`, opcional no formato 1; para um literal é `sdk:aws`.
 Meada não lê o ambiente do processo. A construção isolada de um comando, um publish SNS para
@@ -2112,3 +2113,18 @@ id = "team-b"
 role = "write"
 via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
 ```
+
+## Ambiente dos workloads
+
+Uma leitura de ambiente que nomeia uma fila, tópico ou recurso, como `process.env.QUEUE_URL`,
+é resolvida somente pelas entradas do workload que executa aquele código. O vínculo de
+execução vem da imagem publicada pelo repositório ou de um contexto de build local do Compose.
+Containers diferentes mantêm seus próprios ambientes. A resolução fica em `inferred`, com
+o workload e a variável no motivo.
+
+O Kubernetes fornece valores literais, referências a chaves de ConfigMap ou Secret e `envFrom`;
+o Compose fornece entradas em mapa ou lista e defaults como `${QUEUE_URL:-orders}`.
+`context` no workload mostra os nomes, os destinos e o valor disponível. Um Secret continua
+`redacted`, e uma referência ausente ou um valor não resolvido não cria vínculo. Nomes só
+coincidem dentro do escopo do workload: os valores vêm do IaC e da configuração dos
+repositórios, nunca do ambiente de um processo.

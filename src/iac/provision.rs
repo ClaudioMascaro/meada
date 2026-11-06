@@ -143,6 +143,20 @@ pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
         .flat_map(|e| &e.config_uses)
         .map(|u| ((u.site.as_str(), u.contract.as_str()), u))
         .collect::<std::collections::HashMap<_, _>>();
+    let evidence = exports
+        .iter()
+        .flat_map(|e| {
+            e.providers
+                .iter()
+                .map(|p| (p.site.as_str(), p.contract.as_str(), p.via.as_deref()))
+                .chain(e.consumers.iter().filter_map(|c| {
+                    Some((c.site.as_str(), c.contract.as_deref()?, c.via.as_deref()))
+                }))
+        })
+        .filter_map(|(site, contract, via)| {
+            crate::contract::environment_reason(via).map(|reason| ((site, contract), reason))
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
     let mut links = Vec::new();
     for export in exports {
         for p in &export.provisioners {
@@ -180,10 +194,13 @@ pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
             }
             for &(site, contract, use_level) in &sides {
                 if contracts.contains(contract) {
-                    let use_reason = match config.get(&(site, contract)) {
+                    let mut use_reason = match config.get(&(site, contract)) {
                         Some(u) => format!("{reason}; config {}#{}", u.path, u.key),
                         None => reason.clone(),
                     };
+                    if let Some(reason) = evidence.get(&(site, contract)) {
+                        use_reason += &format!("; {reason}");
+                    }
                     let mut link = Provision::new(
                         site.into(),
                         p.identity.clone(),

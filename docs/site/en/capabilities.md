@@ -315,7 +315,7 @@ link to patterns. The console graph lists provisioner sides and their separate l
 
 ### AWS SDKs in Java, Go and C#
 
-The operations below create contract sides without a `meada.toml` declaration. The client must come from an SDK constructor, with every hop used to establish that origin resolving through an exact call. Parameters, locals and type names that hide the client or its constructor do not inherit its origin. A literal name joins its provisioned physical name; an environment read stays unresolved and retains `env:NAME` in the export, including producers. Meada never reads the process environment.
+The operations below create contract sides without a `meada.toml` declaration. The client must come from an SDK constructor, with every hop used to establish that origin resolving through an exact call. Parameters, locals and type names that hide the client or its constructor do not inherit its origin. A literal name joins its provisioned physical name; an environment read without a matching workload entry stays unresolved and retains `env:NAME` in the export, including producers. Meada never reads the process environment.
 
 Environment reads through Go and C# import aliases retain their variable name. A named request stays unresolved when its name field is written, including through an alias.
 
@@ -462,7 +462,7 @@ physical name, without account or region. Literal SDK sides link at `exact`, inc
 SDK sides in the same repository; a side declared in `meada.toml` keeps `declared`.
 Overridable infrastructure values still weaken a link to `inferred`.
 
-A read such as `process.env.BUCKET` or `os.getenv("BUCKET")` stays unresolved, with
+Without a matching workload environment, a read such as `process.env.BUCKET` or `os.getenv("BUCKET")` stays unresolved, with
 `via: "env:BUCKET"` in the export and the variable named in its function's context. An SDK
 producer or writer also has `via`, optional in format 1; a literal uses `sdk:aws`.
 Meada never reads the process environment. Constructing an unused command, SNS publishes to
@@ -530,3 +530,16 @@ id = "team-b"
 role = "write"
 via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
 ```
+
+## Workload environments
+
+An environment read naming a queue, topic or resource, such as `process.env.QUEUE_URL`,
+resolves only against entries of the workload running that code. Execution evidence comes
+from the image the repository publishes or a local Compose build context. Containers keep
+their own environments. Resolution is `inferred`, with the workload and variable in its reason.
+
+Kubernetes supplies literals, ConfigMap or Secret key references and `envFrom`; Compose supplies
+map or list entries and defaults such as `${QUEUE_URL:-orders}`. Workload `context` shows
+names, targets and available values. A Secret stays `redacted`, and a missing reference or
+unresolved value creates no link. Names match only within the workload's scope: values come
+from the repositories' IaC and configuration, never from a process environment.

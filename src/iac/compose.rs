@@ -144,6 +144,7 @@ struct Service {
     image: Option<Resolved>,
     build: Option<Resolved>,
     builds: bool,
+    environment: BTreeMap<String, super::environment::Entry>,
     depends_on: BTreeSet<String>,
     links: BTreeSet<String>,
     networks: BTreeSet<String>,
@@ -152,6 +153,61 @@ struct Service {
     image_set: bool,
     build_set: bool,
     network_mode: bool,
+}
+
+/// Map and list environments share Compose's merge-by-variable rule. Bare names stay unknown.
+fn environment(value: Option<&Value>) -> BTreeMap<String, super::environment::Entry> {
+    let entries = match value {
+        Some(Value::Object(map)) => map
+            .iter()
+            .map(|(name, value)| {
+                let value = match value {
+                    Value::String(s) => Some(s.clone()),
+                    Value::Number(n) => Some(n.to_string()),
+                    Value::Bool(b) => Some(b.to_string()),
+                    _ => None,
+                };
+                (name.clone(), value)
+            })
+            .collect::<Vec<_>>(),
+        Some(Value::Array(list)) => list
+            .iter()
+            .filter_map(Value::as_str)
+            .map(|entry| {
+                entry.split_once('=').map_or_else(
+                    || (entry.into(), None),
+                    |(name, value)| (name.into(), Some(value.into())),
+                )
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
+    entries
+        .into_iter()
+        .map(|(name, value)| {
+            let expanded = value
+                .as_deref()
+                .map(expand)
+                .filter(|v| !v.text.contains("${"));
+            let target = match &expanded {
+                Some(v) if v.overridable => "Compose default",
+                Some(_) => "Compose literal",
+                None => "Compose environment (unresolved)",
+            };
+            let value = expanded
+                .as_ref()
+                .and_then(|v| super::environment::literal(&v.text));
+            let entry = super::environment::Entry {
+                // Shared service fields are added only after their full expansion fits.
+                container: String::new(),
+                image: None,
+                name: name.clone(),
+                target: target.into(),
+                value,
+            };
+            (name, entry)
+        })
+        .collect()
 }
 
 /// The names a `depends_on`, `links` or `networks` holds: a list's strings or a mapping's keys,
@@ -400,6 +456,7 @@ fn read(path: &str, src: &[u8]) -> BTreeMap<String, Service> {
                 line,
                 end_line: end,
                 image,
+                environment: environment(body.get("environment")),
                 build: body.get("build").and_then(|b| context(dir, b)),
                 builds: body
                     .get("build")
@@ -432,6 +489,7 @@ fn merge(
                     m.build = s.build;
                     m.builds = s.builds;
                 }
+                m.environment.extend(s.environment);
                 m.network_mode |= s.network_mode;
                 m.depends_on.extend(s.depends_on);
                 m.links.extend(s.links);
@@ -496,7 +554,29 @@ pub(super) fn evaluate(
                 });
         for (name, s) in services.iter().take(NODES_MAX) {
             let address = format!("services.{name}");
-            let size = address.len() + s.image.as_ref().map_or(0, |i| i.text.len());
+            let image_size = s.image.as_ref().map_or(0, |i| i.text.len());
+            let environment_size = s.environment.values().try_fold(0usize, |size, entry| {
+                let size = size
+                    .checked_add(entry.size())?
+                    .checked_add(name.len())?
+                    .checked_add(image_size)?;
+                (size <= super::environment::ENVIRONMENT_BYTES_MAX).then_some(size)
+            });
+            // Check repeated names and images before making any owned copies.
+            let environment = if environment_size.is_some() {
+                s.environment
+                    .values()
+                    .cloned()
+                    .map(|mut e| {
+                        e.container.clone_from(name);
+                        e.image = s.image.as_ref().map(|i| i.text.clone());
+                        e
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            let size = address.len() + image_size + environment_size.unwrap_or(0);
             if !take(size) {
                 break;
             }
@@ -521,6 +601,7 @@ pub(super) fn evaluate(
                 handler: None,
                 events: Vec::new(),
                 subscription: None,
+                environment,
             });
             let mut targets: BTreeSet<(String, String)> = BTreeSet::new();
             for (list, via) in [(&s.depends_on, "depends_on"), (&s.links, "links")] {
@@ -565,6 +646,29 @@ mod tests {
             .map(|(p, t)| (p.to_string(), t.as_bytes().to_vec()))
             .collect();
         evaluate(&files, &mut usize::MAX.clone())
+    }
+
+    #[test]
+    fn environment_expansion_accounts_for_long_images_and_service_names() {
+        let entries = (0..512)
+            .map(|i| format!("      Q{i}: orders\n"))
+            .collect::<String>();
+        for (name, image) in [
+            ("worker".into(), "i".repeat(400 << 10)),
+            ("w".repeat(400 << 10), "image".into()),
+        ] {
+            // Explicit keys keep this valid YAML past the implicit-key length limit.
+            let text = format!(
+                "services:\n  ? {name}\n  :\n    image: {image}\n    environment:\n{entries}"
+            );
+            assert!(text.len() < crate::lang::MAX_BYTES);
+            let (nodes, references) = unit(&[("compose.yaml", &text)]);
+            assert_eq!(nodes.len(), 1);
+            assert!(references.is_empty());
+            assert_eq!(nodes[0].address, format!("services.{name}"));
+            assert!(nodes[0].environment.is_empty());
+            assert_eq!(nodes[0].image.as_ref().unwrap().text, image);
+        }
     }
 
     fn x(text: &str) -> (String, bool) {

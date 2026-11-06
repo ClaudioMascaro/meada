@@ -64,7 +64,7 @@ CREATE TABLE iac_nodes (
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
     handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
-    subscription TEXT
+    subscription TEXT, environment TEXT NOT NULL
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -3404,8 +3404,8 @@ Output {
             pattern: false,
             overridable: [],
             path: "overlay/sample.kubernetes.yaml",
-            line: 29,
-            end_line: 32,
+            line: 33,
+            end_line: 38,
             block: "[2]",
             image: None,
             build: None,
@@ -3414,6 +3414,7 @@ Output {
             handler: None,
             events: [],
             subscription: None,
+            environment: [],
         },
         Node {
             address: "Deployment.apps/shop/dev-web",
@@ -3426,7 +3427,7 @@ Output {
             overridable: [],
             path: "overlay/sample.kubernetes.yaml",
             line: 3,
-            end_line: 19,
+            end_line: 23,
             block: "[0]",
             image: None,
             build: None,
@@ -3435,6 +3436,28 @@ Output {
             handler: None,
             events: [],
             subscription: None,
+            environment: [
+                Entry {
+                    container: "main",
+                    image: Some(
+                        "ghcr.io/acme/web:dev",
+                    ),
+                    name: "QUEUE_URL",
+                    target: "envFrom ConfigMap/shop/dev-settings key QUEUE_URL",
+                    value: Some(
+                        "https://sqs.us-east-1.amazonaws.com/123456789012/orders",
+                    ),
+                },
+                Entry {
+                    container: "main",
+                    image: Some(
+                        "ghcr.io/acme/web:dev",
+                    ),
+                    name: "TOKEN",
+                    target: "Secret/credentials key token (redacted)",
+                    value: None,
+                },
+            ],
         },
         Node {
             address: "Service/shop/dev-web",
@@ -3446,8 +3469,8 @@ Output {
             pattern: false,
             overridable: [],
             path: "overlay/sample.kubernetes.yaml",
-            line: 21,
-            end_line: 27,
+            line: 25,
+            end_line: 31,
             block: "[1]",
             image: None,
             build: None,
@@ -3456,6 +3479,7 @@ Output {
             handler: None,
             events: [],
             subscription: None,
+            environment: [],
         },
         Node {
             address: "ServiceAccount/shop/dev-runner",
@@ -3467,8 +3491,8 @@ Output {
             pattern: false,
             overridable: [],
             path: "overlay/sample.kubernetes.yaml",
-            line: 34,
-            end_line: 37,
+            line: 40,
+            end_line: 43,
             block: "[3]",
             image: None,
             build: None,
@@ -3477,6 +3501,7 @@ Output {
             handler: None,
             events: [],
             subscription: None,
+            environment: [],
         },
     ],
     references: [
@@ -3548,6 +3573,7 @@ Output {
             handler: None,
             events: [],
             subscription: None,
+            environment: [],
         },
         Node {
             address: "CompositeResourceDefinition.apiextensions.crossplane.io/xqueues.acme.io",
@@ -3571,6 +3597,7 @@ Output {
             handler: None,
             events: [],
             subscription: None,
+            environment: [],
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws",
@@ -3594,6 +3621,7 @@ Output {
             handler: None,
             events: [],
             subscription: None,
+            environment: [],
         },
         Node {
             address: "Queue.acme.io/shop/orders",
@@ -3617,6 +3645,7 @@ Output {
             handler: None,
             events: [],
             subscription: None,
+            environment: [],
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws/queue",
@@ -3640,6 +3669,7 @@ Output {
             handler: None,
             events: [],
             subscription: None,
+            environment: [],
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws/topic",
@@ -3663,6 +3693,7 @@ Output {
             handler: None,
             events: [],
             subscription: None,
+            environment: [],
         },
     ],
     references: [
@@ -3733,6 +3764,7 @@ sample.cloudformation.yaml
             handler: None,
             events: [],
             subscription: None,
+            environment: [],
         },
         Node {
             address: "Worker",
@@ -3761,6 +3793,7 @@ sample.cloudformation.yaml
             handler: None,
             events: [],
             subscription: None,
+            environment: [],
         },
     ],
     [
@@ -3868,6 +3901,7 @@ sample.serverless.yml
                 },
             ],
             subscription: None,
+            environment: [],
         },
         Node {
             address: "Queue",
@@ -3896,6 +3930,7 @@ sample.serverless.yml
             handler: None,
             events: [],
             subscription: None,
+            environment: [],
         },
     ],
     [
@@ -3933,6 +3968,7 @@ sample.provision.tf
             handler: None,
             events: [],
             subscription: None,
+            environment: [],
         },
         Node {
             address: "aws_sqs_queue.orders",
@@ -3954,6 +3990,7 @@ sample.provision.tf
             handler: None,
             events: [],
             subscription: None,
+            environment: [],
         },
     ],
     [],

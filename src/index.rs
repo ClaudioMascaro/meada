@@ -193,7 +193,7 @@ CREATE TABLE iac_nodes (
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
     handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
-    subscription TEXT
+    subscription TEXT, environment TEXT NOT NULL
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -2628,7 +2628,7 @@ pub(crate) struct Document {
 /// The provider side of a contract: a symbol that serves it, a file, a repository, the call
 /// that produces to a channel, or a route or channel side only a document lists
 /// (`<repository>::<document>::<METHOD> <path>`, or `... <broker> send <name>`).
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(crate) struct Provider {
     pub(crate) contract: String,
     pub(crate) site: String,
@@ -2669,6 +2669,7 @@ pub(crate) struct Gateway {
 /// how it names the provider's repository, such as `host:api.example.com` or `env:API_URL`.
 /// An unresolved one also keeps what could be read of its URL (see `Found`); the export leaves
 /// that out.
+#[derive(Clone)]
 pub(crate) struct Consumer {
     pub(crate) contract: Option<String>,
     pub(crate) site: String,

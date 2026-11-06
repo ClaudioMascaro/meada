@@ -12,6 +12,7 @@ All notable changes to Meada are recorded here. The format follows
   `<file>#<key path>` with list selectors (`[key=value]`). Sides retain their precise node or
   key for context and trace; removed locations produce the existing stale status diagnostics.
   Release level: minor, included in meada and meada-core 1.4.0 (#641).
+- Resolve environment reads through the workloads running their code, including Kubernetes ConfigMap references and Compose defaults, with inferred provenance and redacted Secret targets (#663).
 
 - Constructor-backed AWS SDK sides in Java 2.x, Go v2 and .NET: SQS, SNS, EventBridge,
   Kinesis, S3, DynamoDB, SSM Parameter Store and Secrets Manager. Literal names and ARNs join

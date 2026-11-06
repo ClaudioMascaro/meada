@@ -23,7 +23,9 @@ pub struct Resource;
 
 /// Both reader families establish SDK origins, through stored provenance or an operation.
 fn sdk_use(via: Option<&str>, operation: Option<&str>) -> bool {
-    via == Some("sdk:aws") || operation.is_some()
+    via == Some("sdk:aws")
+        || operation.is_some()
+        || crate::contract::environment_reason(via).is_some()
 }
 
 /// The start of every resource contract identifier.
@@ -150,7 +152,9 @@ impl ContractKind for Resource {
     }
 
     fn use_level(&self, via: Option<&str>, operation: Option<&str>) -> Level {
-        if sdk_use(via, operation) {
+        if crate::contract::environment_reason(via).is_some() {
+            Level::Inferred
+        } else if sdk_use(via, operation) {
             Level::Exact
         } else {
             Level::Declared
@@ -285,7 +289,7 @@ impl ContractKind for Resource {
                             && sdk_use(p.via.as_deref(), p.method.as_deref())))
             })
             .map(|(_, p)| {
-                Link::new(
+                let mut link = Link::new(
                     consumer.site.clone(),
                     p.site.clone(),
                     contract.clone(),
@@ -295,7 +299,10 @@ impl ContractKind for Resource {
                     None,
                     None,
                     None,
-                )
+                );
+                crate::contract::environment_link(&mut link, consumer.via.as_deref());
+                crate::contract::environment_link(&mut link, p.via.as_deref());
+                link
             })
             .collect()
     }

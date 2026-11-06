@@ -107,10 +107,10 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                     out.extend(consume(code, path, n, "kafka", &read, None));
                 }
                 (Client::Sqs, "send_message" | "send_message_batch") => {
-                    out.extend(produce(code, path, n, "sqs", &|_, k| queue(k)));
+                    out.extend(sqs(code, path, n, false));
                 }
                 (Client::Sqs, "receive_message") => {
-                    out.extend(consume(code, path, n, "sqs", &|_, k| queue(k), None));
+                    out.extend(sqs(code, path, n, true));
                 }
                 (Client::Nats, "publish") => {
                     out.extend(produce(code, path, n, "nats", &|a, k| {
@@ -266,6 +266,45 @@ pub(super) fn aws(code: &Code) -> Vec<crate::contract::Found> {
         }
     }
     out
+}
+
+/// SQS queue arguments retain an environment read through the same exact expansion as URLs.
+fn sqs<'a>(code: &Code<'a>, path: &'a str, n: usize, consumer: bool) -> Vec<Message> {
+    code.expand(crate::resolve::Expand::Call(path, n), &|_, keywords| {
+        let names = queue(keywords)?;
+        let environment = keywords
+            .iter()
+            .find(|(key, _)| key == "QueueUrl")
+            .and_then(|(_, value)| crate::names::argument(value))
+            .and_then(|a| match a {
+                crate::names::Argument::Environment(name) => Some(name),
+                _ => None,
+            });
+        Some((names, environment))
+    })
+    .into_iter()
+    .flat_map(|expanded| {
+        let (names, environment) = expanded.found;
+        let role = if consumer {
+            super::message::Side::Consumer(Handler::Def {
+                path: expanded.site.0.into(),
+                name: code.files()[expanded.site.0].calls[expanded.site.1]
+                    .scope
+                    .clone(),
+            })
+        } else {
+            super::message::Side::Producer
+        };
+        names.into_iter().map(move |name| Message {
+            broker: "sqs",
+            name,
+            environment: environment.clone(),
+            path: expanded.site.0.into(),
+            call: expanded.site.1,
+            role: role.clone(),
+        })
+    })
+    .collect()
 }
 
 #[cfg(test)]

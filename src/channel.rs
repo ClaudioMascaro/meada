@@ -241,7 +241,12 @@ impl ContractKind for Channel {
             .iter()
             .map(|m| {
                 let mut contract = Some(contract(m.broker, m.name.as_deref()));
-                let (mut via, mut method) = (None, None);
+                let (mut via, mut method) = (
+                    m.environment
+                        .as_deref()
+                        .map(crate::image::environment::pending),
+                    None,
+                );
                 let (role, site) = match &m.role {
                     Side::Producer => (Role::Provider, call(m)),
                     // A publish whose routing key could not be evaluated is an unresolved
@@ -383,7 +388,7 @@ impl ContractKind for Channel {
         let providers = providers.iter().map(|&(_, p)| p);
         (reaching(contract, providers, &Routes::new(exports)).into_iter())
             .map(|(provider, (level, reason))| {
-                Link::new(
+                let mut link = Link::new(
                     consumer.site.clone(),
                     provider.to_string(),
                     contract.clone(),
@@ -392,7 +397,9 @@ impl ContractKind for Channel {
                     None,
                     None,
                     None,
-                )
+                );
+                crate::contract::environment_link(&mut link, consumer.via.as_deref());
+                link
             })
             .collect()
     }
@@ -479,10 +486,18 @@ fn reaching<'p>(
 ) -> BTreeMap<&'p str, (Level, String)> {
     let mut found = BTreeMap::new();
     for p in providers {
-        if let Some(matched) = fits(&p.contract, contract) {
+        if let Some(mut matched) = fits(&p.contract, contract) {
+            if let Some(reason) = crate::contract::environment_reason(p.via.as_deref()) {
+                matched.0 = matched.0.max(Level::Inferred);
+                matched.1 += &format!("; {reason}");
+            }
             strongest(&mut found, &p.site, matched);
         }
-        if let Some(matched) = subscribed(&p.contract, contract, routes) {
+        if let Some(mut matched) = subscribed(&p.contract, contract, routes) {
+            if let Some(reason) = crate::contract::environment_reason(p.via.as_deref()) {
+                matched.0 = matched.0.max(Level::Inferred);
+                matched.1 += &format!("; {reason}");
+            }
             strongest(&mut found, &p.site, matched);
         }
     }

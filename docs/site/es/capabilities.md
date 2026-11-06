@@ -317,7 +317,7 @@ los provisionadores y sus enlaces propios.
 
 ### SDK AWS en Java, Go y C#
 
-Las operaciones siguientes crean lados de contratos sin declaración en `meada.toml`. El cliente debe proceder de un constructor del SDK, con cada salto usado para demostrar ese origen resuelto mediante una llamada exacta. Parámetros, locales y nombres de tipos que ocultan el cliente o su constructor no heredan su origen. Un nombre literal se une al nombre físico aprovisionado; una lectura del entorno queda sin resolver y conserva `env:NOMBRE` en el export, incluidos los productores. Meada nunca lee el entorno del proceso.
+Las operaciones siguientes crean lados de contratos sin declaración en `meada.toml`. El cliente debe proceder de un constructor del SDK, con cada salto usado para demostrar ese origen resuelto mediante una llamada exacta. Parámetros, locales y nombres de tipos que ocultan el cliente o su constructor no heredan su origen. Un nombre literal se une al nombre físico aprovisionado; una lectura del entorno sin una entrada correspondiente en el workload queda sin resolver y conserva `env:NOMBRE` en el export, incluidos los productores. Meada nunca lee el entorno del proceso.
 
 Las lecturas del entorno mediante alias de importación en Go y C# conservan el nombre de la variable. Una solicitud guardada por nombre queda sin resolver cuando se escribe el campo que nombra el recurso, incluso mediante un alias.
 
@@ -465,7 +465,7 @@ a la infraestructura por nombre físico, sin cuenta ni región. Los lados SDK li
 en `exact`, incluso a otros lados SDK del mismo repositorio; un lado declarado en `meada.toml`
 conserva `declared`. Los valores de infraestructura sustituibles siguen dando `inferred`.
 
-Una lectura como `process.env.BUCKET` u `os.getenv("BUCKET")` queda sin resolver, con
+Sin una entrada correspondiente en el entorno del workload, una lectura como `process.env.BUCKET` u `os.getenv("BUCKET")` queda sin resolver, con
 `via: "env:BUCKET"` en el export y la variable nombrada en el contexto de su función. Un
 productor o escritor SDK también tiene `via`, opcional en el formato 1; un literal usa `sdk:aws`.
 Meada no lee el entorno del proceso. La construcción aislada de un comando, los publishes SNS
@@ -536,3 +536,18 @@ id = "team-b"
 role = "write"
 via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
 ```
+
+## Entornos de los workloads
+
+Una lectura de entorno que nombra una cola, tópico o recurso, como `process.env.QUEUE_URL`,
+se resuelve solo con las entradas del workload que ejecuta ese código. La evidencia de
+ejecución viene de la imagen publicada por el repositorio o de un contexto de build local
+de Compose. Los contenedores conservan sus propios entornos. La resolución es `inferred`,
+con el workload y la variable en el motivo.
+
+Kubernetes aporta literales, referencias a claves de ConfigMap o Secret y `envFrom`; Compose
+aporta entradas en mapa o lista y valores predeterminados como `${QUEUE_URL:-orders}`.
+`context` del workload muestra los nombres, destinos y valores disponibles. Un Secret sigue
+`redacted`, y una referencia ausente o un valor no resuelto no crea vínculos. Los nombres solo
+coinciden dentro del ámbito del workload: los valores vienen del IaC y la configuración de
+los repositorios, nunca del entorno de un proceso.

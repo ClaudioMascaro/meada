@@ -272,7 +272,7 @@ impl Engine {
             .collect::<Result<Vec<_>>>()?;
         // Each kind's step over the whole workspace, once every repository has declared.
         for kind in contract::KINDS {
-            kind.workspace_step(&mut exports);
+            kind.workspace_step(&mut exports, &self.workspace.repos);
         }
         Ok(exports)
     }
@@ -300,7 +300,7 @@ impl Engine {
             }
         }
         for kind in contract::KINDS {
-            kind.workspace_step(&mut partial.exports);
+            kind.workspace_step(&mut partial.exports, &self.workspace.repos);
         }
         Ok(partial)
     }

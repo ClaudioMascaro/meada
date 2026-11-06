@@ -1,0 +1,56 @@
+# Image contracts (#662)
+
+`image.rs` owns builders, runners, matching and workload execution; `image/config.rs` reads
+GitHub Actions tags/images, Skaffold artifacts, literal Maven/Gradle Jib destinations and ko
+commands with checked-in `KO_DOCKER_REPO` and `--bare`. A ko base image is an input, never a
+builder. Only one simple literal ko command is read; multiline and compound shell scripts
+stay absent. The recognized command has one `--bare`, at most one literal target and no other
+flags; an explicit shell is `bash` or `sh`. No process environment is read. Configuration
+facts enter the stamped `contract_configs` table through `ContractKind::config_file` and
+`config_summary`; `config_reads_paths` rechecks Compose paths when only the tree changed.
+
+The kind declares repository-level providers with `at`, workload consumers from stored Compose
+and Kubernetes images, and Helm `image.repository` consumers. `iac/types.toml` marks workload
+types. Image normalization expands Docker Hub names, removes tags/digests and lowercases names.
+Unknown interpolations remain patterns; the IaC pattern matcher enforces the existing literal
+and segment ceilings. A literal name is exact, defaults and Helm values inferred, and distinct
+matching image candidates ambiguous, including two images built by the same repository.
+Duplicate build evidence for one repository and image is collapsed to its strongest evidence.
+
+`ContractKind::executions` lets the shared trace follow workloads into repository entry points
+and code back to workloads. Same-repository Compose paths are exact without an image link and
+appear in the optional `executions` export array. Paths are normalized inside the root and
+cross no symlink; a changed path is rechecked even when the Compose file did not change.
+`scope_status` and `side_note` implement the two-role orphan rule in the visible workspace.
+`exports_repository_links` includes repository-level builders in their own export without
+changing the export scope of earlier kinds. IaC spans also let ambiguous workload consumers
+be open items with the provider's own image identities as decision candidates.
+
+Image consumer/link `root` fields retain evaluation scope. `meada-core::export::side_id` is the
+single rule for a workload image's decision identity (site, contract and root); older kinds
+retain the call-site identity. Item grouping and decision replay use that identity, while
+context and trace keep the workload's site. Helm's configuration-derived nodes participate in
+the same visible-export lookup as stored IaC nodes, so their exported identities start queries.
+
+## Workload environment resolution (#663)
+
+`Image::workspace_step` reuses image links and safe direct executions to resolve directed
+channel/resource environment reads. The workspace hook receives repositories as well as exports
+so builder selection has the same evidence as ordinary image linking. Container images, workload
+identities, evaluation roots and direct build paths scope every match. The stored environment
+stays out of the graph export; workload context lists its names and targets. A resolved side's
+`via` carries `workload:<identity> (root <root>), env:<name>`; the contract evidence seam keeps
+provisioning and ordinary directed links inferred and names that provenance in their reasons.
+`channel/message.rs` retains an optional environment name, including the legacy TypeScript SQS
+forms, separately from an unresolved channel identifier. These legacy sides carry a pending
+workload marker in storage, cleared before query output when no workload resolves the read;
+unmatched sides retain their earlier absent `via`. Established SDK `env:` provenance stays intact.
+
+`image::environment::Environments::new(exports, repositories)` collects those scoped entries;
+`values(repository, site, variable)` returns only values for that code site, with their workload
+and variable explanations. HTTP base resolution can reuse this lookup without duplicating
+builder matching. Several workloads resolving one side to one contract contribute their reasons
+to a single side. Workspaces with no environment entries avoid the extra image-link pass.
+Construction indexes executions by workload/root and builders by workload/root/image, reusing
+each image match for its container entries. Queries index repository, variable and build path,
+visiting only the source file and its ancestor paths.

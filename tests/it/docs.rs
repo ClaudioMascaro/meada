@@ -242,14 +242,14 @@ fn every_entry_point_kind_is_listed_in_the_map() {
         .collect();
     assert!(kinds.contains(&"program".to_string()), "{kinds:?}");
     let missing = unlisted(
-        "docs/agents/architecture.md",
+        "docs/agents/map/overview/identities-and-formats.md",
         "`kind` being ",
         ", each step",
         &kinds,
     );
     assert!(
         missing.is_empty(),
-        "entry point kinds missing from the `processes` kinds in the architecture map: {missing:?}"
+        "entry point kinds missing from the `processes` kinds in the identities map: {missing:?}"
     );
 }
 
@@ -281,12 +281,16 @@ fn every_process_mark_is_listed_in_the_queries_map() {
     );
 }
 
-// ponytail: the repository map is an index an agent reads whole: 64 KiB, in bytes. Detail goes to
-// the area file in `docs/agents/map/`, a limit to `docs/agents/ceilings.md` (#572).
-const MAP_BUDGET: u64 = 64 * 1024;
+// ponytail: the architecture, contracts and resolution/index/shape ceiling indexes route an
+// agent to relevant topics within 8 KiB, in bytes. Detail belongs in their topic leaves.
+const MAP_BUDGET: u64 = 8 * 1024;
+
+// ponytail: the relocated overview, contract and resolution/index/shape ceiling topics each fit
+// within 24 KiB, in bytes; unrelated areas keep their existing budget during this first wave.
+const DETAIL_BUDGET: u64 = 24 * 1024;
 
 // ponytail: every other Markdown file under `docs/agents` (an area file, the ceilings list, a part
-// the splitter wrote) holds at most 64 KiB, in bytes, so an agent reads one in a single call. A
+// the splitter wrote) holds at most 64 KiB, in bytes, until its area is migrated. A
 // file past it is split by `examples/split_agents.rs`, never trimmed (#644).
 const AREA_BUDGET: u64 = 64 * 1024;
 
@@ -316,8 +320,22 @@ fn agents_markdown() -> Vec<(String, String)> {
 fn over_budget(sizes: &[(String, u64)]) -> Vec<String> {
     (sizes.iter())
         .map(|(path, size)| {
-            let budget = if path == "docs/agents/architecture.md" {
+            let budget = if matches!(
+                path.as_str(),
+                "docs/agents/architecture.md"
+                    | "docs/agents/map/contracts.md"
+                    | "docs/agents/ceilings/resolution-the-index-and-shape-readers.md"
+            ) {
                 MAP_BUDGET
+            } else if [
+                "docs/agents/map/overview/",
+                "docs/agents/map/contracts/",
+                "docs/agents/ceilings/resolution-the-index-and-shape-readers/",
+            ]
+            .iter()
+            .any(|prefix| path.starts_with(prefix))
+            {
+                DETAIL_BUDGET
             } else {
                 AREA_BUDGET
             };
@@ -345,12 +363,12 @@ fn every_agents_markdown_file_stays_within_its_budget() {
     ] {
         assert!(files.iter().any(|(p, _)| p.ends_with(seen)), "{seen}");
     }
-    // The scan above covers `src/` only: the two budgets of this file are named by hand.
+    // The scan above covers `src/` only: the budgets of this file are named by hand.
     let ceilings: String = (files.iter())
         .filter(|(path, _)| path.starts_with("docs/agents/ceilings"))
         .map(|(_, text)| text.as_str())
         .collect();
-    for name in ["MAP_BUDGET", "AREA_BUDGET"] {
+    for name in ["MAP_BUDGET", "DETAIL_BUDGET", "AREA_BUDGET"] {
         assert!(
             ceilings.contains(&format!("`{name}`")),
             "{name} not in the ceilings"
@@ -370,10 +388,39 @@ fn a_file_past_its_budget_fails_with_the_path_the_size_the_budget_and_the_splitt
     let fits = ("docs/agents/map/core.md".to_string(), AREA_BUDGET);
     let over = over_budget(&[map, area, fits]);
     assert_eq!(over.len(), 2, "{over:#?}");
-    assert!(over[0].contains("docs/agents/architecture.md is 65537 bytes"));
-    assert!(over[0].contains("budget of 65536 bytes"));
+    assert!(over[0].contains("docs/agents/architecture.md is 8193 bytes"));
+    assert!(over[0].contains("budget of 8192 bytes"));
     assert!(over[1].contains("docs/agents/map/tests.md is 65543 bytes"));
     assert!(over[1].contains("cargo run --example split_agents -- docs/agents/map/tests.md"));
+}
+
+#[test]
+fn migrated_indexes_and_topics_enforce_their_budgets_at_the_boundary() {
+    for (path, budget) in [
+        ("docs/agents/map/contracts.md", MAP_BUDGET),
+        (
+            "docs/agents/ceilings/resolution-the-index-and-shape-readers.md",
+            MAP_BUDGET,
+        ),
+        (
+            "docs/agents/map/overview/identities-and-formats.md",
+            DETAIL_BUDGET,
+        ),
+        (
+            "docs/agents/map/contracts/http-extraction-and-linking.md",
+            DETAIL_BUDGET,
+        ),
+        (
+            "docs/agents/ceilings/resolution-the-index-and-shape-readers/resolution-and-value-flow.md",
+            DETAIL_BUDGET,
+        ),
+        ("docs/agents/map/queries.md", AREA_BUDGET),
+    ] {
+        assert!(over_budget(&[(path.to_string(), budget)]).is_empty());
+        let over = over_budget(&[(path.to_string(), budget + 1)]);
+        assert_eq!(over.len(), 1, "{path}: {over:?}");
+        assert!(over[0].contains(&format!("budget of {budget} bytes")));
+    }
 }
 
 #[test]

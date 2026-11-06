@@ -343,6 +343,16 @@ this file, and a change to these modules updates it.
   when every type says so and never when read); unresolved, a provider's part is open and a
   consumer's adds nothing. `under(prefix, path)` joins paths (the root below `a` is `a`).
 
+
+`kube/environment.rs` (#663) reads container literals, key references and `envFrom`; its lookup
+follows ConfigMap/Secret references at each overlay transformation, then resolves final names
+within the evaluated namespace and unit. Duplicate targets stay unresolved. Stored targets and
+container images reflect Kustomize transforms. An unread later `envFrom` invalidates earlier
+imports only in its container and prefix; explicit entries can restore them. Secrets contribute
+names only. `iac/compose.rs` merges map/list environment entries by variable,
+including explicit unresolved overrides, and expands only checked-in defaults. Both store
+`iac::environment::Entry` on the workload node for the image kind's scoped resolution.
+
 ## Declaration key paths (#641)
 
 `config_values/sites.rs` parses jq-style paths and `[key=value]` list selectors iteratively.

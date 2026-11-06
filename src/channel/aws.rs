@@ -247,6 +247,7 @@ pub(super) fn test_messages(
                 _ => return None,
             };
             Some(Message {
+                environment: None,
                 broker,
                 name,
                 path,

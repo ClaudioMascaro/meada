@@ -298,6 +298,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                         let here = m.call == at && m.path == path;
                         if here || first_send {
                             out.push(Message {
+                                environment: None,
                                 broker: m.broker,
                                 name: m.name.clone(),
                                 path: m.path.clone(),

@@ -128,6 +128,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                      }| {
                         let handler = handler.clone().unwrap_or_else(|| enclosing(code, site, at));
                         names.into_iter().map(move |name| Message {
+                            environment: None,
                             broker,
                             name,
                             path: site.into(),
@@ -153,15 +154,15 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                     }
                 }
                 (AWS_SQS, "SendMessageCommand", _) => {
-                    out.extend(produce("sqs", &|a| queue(a, "QueueUrl")));
+                    out.extend(sqs(code, path, n, "QueueUrl", false, None));
                 }
                 (AWS_SQS, "ReceiveMessageCommand", _) => {
-                    out.extend(consume("sqs", &|a| queue(a, "QueueUrl"), None));
+                    out.extend(sqs(code, path, n, "QueueUrl", true, None));
                 }
                 (SQS_CONSUMER, "Consumer.create", _) => {
                     let handler =
                         handler(code, path, n, 0, &["handleMessage", "handleMessageBatch"]);
-                    out.extend(consume("sqs", &|a| queue(a, "queueUrl"), handler));
+                    out.extend(sqs(code, path, n, "queueUrl", true, handler));
                 }
                 (NATS, NATS_CONNECTION, "publish") => {
                     out.extend(produce("nats", &first));
@@ -241,6 +242,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
             let handler = binding.and_then(|b| handlers.get(&b)).cloned();
             let handler = handler.unwrap_or_else(|| enclosing(code, site, at));
             out.extend(names.into_iter().map(|name| Message {
+                environment: None,
                 broker: "kafka",
                 name,
                 path: site.into(),
@@ -262,6 +264,7 @@ fn producers(broker: &'static str, found: Vec<Expanded<Vec<Option<String>>>>) ->
                  ..
              }| {
                 names.into_iter().map(move |name| Message {
+                    environment: None,
                     broker,
                     name,
                     path: site.into(),
@@ -407,6 +410,53 @@ fn keys(args: &[Value]) -> Option<Vec<Option<String>>> {
 /// depends on a parameter, `Some(None)` when it is not a literal string.
 fn arg_name(args: &[Value], at: usize) -> Option<Option<String>> {
     args.get(at).map_or(Some(None), name)
+}
+
+/// SQS keeps the variable separately from the unresolved queue name, through exact expansions.
+fn sqs<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    n: usize,
+    key: &str,
+    consumer: bool,
+    handler: Option<Handler>,
+) -> Vec<Message> {
+    code.expand(Expand::Call(path, n), &|args, _| {
+        let names = queue(args, key)?;
+        let value = match args.first() {
+            Some(Value::Object(fields)) => property(fields, key).ok().flatten(),
+            _ => None,
+        };
+        let environment = value
+            .and_then(crate::names::argument)
+            .and_then(|a| match a {
+                crate::names::Argument::Environment(name) => Some(name),
+                _ => None,
+            });
+        Some((names, environment))
+    })
+    .into_iter()
+    .flat_map(|expanded| {
+        let (names, environment) = expanded.found;
+        let role = if consumer {
+            Side::Consumer(
+                handler
+                    .clone()
+                    .unwrap_or_else(|| enclosing(code, expanded.site.0, expanded.site.1)),
+            )
+        } else {
+            Side::Producer
+        };
+        names.into_iter().map(move |name| Message {
+            broker: "sqs",
+            name,
+            environment: environment.clone(),
+            path: expanded.site.0.into(),
+            call: expanded.site.1,
+            role: role.clone(),
+        })
+    })
+    .collect()
 }
 
 #[cfg(test)]

@@ -54,6 +54,7 @@ use meada_core::trace::{Chain, Row};
 pub(crate) mod cloudformation;
 pub(crate) mod compose;
 pub(crate) mod config_uses;
+pub(crate) mod environment;
 mod functions;
 pub(crate) mod orphans;
 pub(crate) mod pattern;
@@ -189,6 +190,7 @@ pub(crate) struct Node {
     /// The events of a Serverless function, in file order.
     pub events: Vec<Resolved>,
     pub subscription: Option<subscription::Subscription>,
+    pub environment: Vec<environment::Entry>,
 }
 
 impl Node {
@@ -1116,6 +1118,7 @@ impl<'m> Eval<'m> {
                     handler: None,
                     events: Vec::new(),
                     subscription: None,
+                    environment: Vec::new(),
                 });
                 let local = (block.source.as_deref())
                     .and_then(|s| local_source(dir, s))
@@ -1823,7 +1826,7 @@ pub(crate) fn refresh_template(tx: &Transaction, path: &str, src: Option<&[u8]>)
 /// Stores `nodes` and `references`.
 pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference]) -> Result<()> {
     let mut insert = tx
-        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)")?;
+        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)")?;
     for n in nodes {
         let (line, end) = (n.line as i64, n.end_line as i64);
         let overridable = serde_json::to_string(&n.overridable)?;
@@ -1853,6 +1856,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
                 .as_ref()
                 .map(serde_json::to_string)
                 .transpose()?,
+            serde_json::to_string(&n.environment)?,
         ])?;
     }
     let mut insert = tx.prepare_cached("INSERT INTO iac_references VALUES (?1, ?2, ?3, ?4)")?;
@@ -1865,7 +1869,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
 /// The columns of a node, in `row`'s order.
 const COLUMNS: &str = "address, root, type, name, pattern, overridable, path, line, end_line, \
                        block, image, image_overridable, build, build_overridable, role, \
-                       handler, handler_overridable, events, build_image, subscription";
+                       handler, handler_overridable, events, build_image, subscription, environment";
 
 /// The text at column `at` and its overridable flag at the next one, when there is a text.
 fn resolved(r: &rusqlite::Row, at: usize) -> rusqlite::Result<Option<Resolved>> {
@@ -1896,6 +1900,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Node> {
         role: r.get(14)?,
         handler: resolved(r, 15)?,
         events: serde_json::from_str(&r.get::<_, String>(17)?).unwrap_or_default(),
+        environment: serde_json::from_str(&r.get::<_, String>(20)?).unwrap_or_default(),
         subscription: r
             .get::<_, Option<String>>(19)?
             .and_then(|s| serde_json::from_str(&s).ok()),

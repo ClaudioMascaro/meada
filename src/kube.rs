@@ -32,6 +32,7 @@ use crate::lang::MAX_BYTES;
 use crate::msg::Msg;
 
 mod crossplane;
+mod environment;
 
 /// How deep kustomizations name each other as bases; a base deeper is not followed and is
 /// counted as unresolved.
@@ -131,7 +132,7 @@ struct Facts {
     labels: Option<BTreeMap<String, String>>,
     /// A Service's selector.
     selector: BTreeMap<String, String>,
-    /// The ConfigMaps and Secrets its pods mount: kind, name as written, and how it names it.
+    /// The ConfigMaps and Secrets its pods mount: kind, transformed name, and how it names it.
     mounts: Vec<(&'static str, String, String)>,
     account: Option<String>,
     /// An Ingress's backend Services: name as written and the rule that names it.
@@ -140,6 +141,8 @@ struct Facts {
     images: Vec<(String, String)>,
     /// What it offers Crossplane's roles and references (#655).
     xp: crossplane::Facts,
+    environment: Vec<environment::Input>,
+    data: BTreeMap<String, Option<String>>,
 }
 
 /// One Kubernetes object, as read and as a kustomization on the way changed it.
@@ -250,6 +253,25 @@ fn template<'a>(value: &'a Value, kind: &str) -> Option<&'a Value> {
 
 fn facts(value: &Value, kind: &str, group: &str) -> Facts {
     let mut facts = Facts::default();
+    if matches!(kind, "ConfigMap" | "Secret") && group.is_empty() {
+        let keys = if kind == "Secret" {
+            &["data", "stringData"][..]
+        } else {
+            &["data"][..]
+        };
+        for key in keys {
+            for (name, value) in value[*key].as_object().into_iter().flatten() {
+                facts.data.insert(
+                    name.clone(),
+                    if kind == "Secret" {
+                        None
+                    } else {
+                        value.as_str().and_then(crate::iac::environment::literal)
+                    },
+                );
+            }
+        }
+    }
     if let Some(template) = template(value, kind) {
         facts.labels = Some(strings(at(template, &["metadata", "labels"])));
         let spec = &template["spec"];
@@ -265,6 +287,7 @@ fn facts(value: &Value, kind: &str, group: &str) -> Facts {
         };
         for key in ["containers", "initContainers", "ephemeralContainers"] {
             for c in list(spec, &[key]) {
+                facts.environment.extend(environment::read(c));
                 for e in list(c, &["env"]) {
                     let var = text(e, &["name"]).unwrap_or_default();
                     let via = format!("env {var}");
@@ -657,6 +680,7 @@ impl<'m> Eval<'m> {
                 Entry::File(..) => {}
             }
         }
+        environment::transform(&mut objs, &k.prefix, &k.suffix, k.namespace.as_deref());
         for o in &mut objs {
             if !(k.prefix.is_empty() && k.suffix.is_empty()
                 || UNPREFIXED.contains(&o.kind.as_str()))
@@ -678,14 +702,25 @@ impl<'m> Eval<'m> {
     /// The nodes, references and images of the unit `root` holds `objs` of.
     fn unit(&mut self, mut objs: Vec<Obj>) {
         objs.truncate(OBJECTS_MAX);
+        // Reject duplicate config targets before address deduplication can conceal them.
+        environment::transform(&mut objs, "", "", None);
         objs.sort_by_cached_key(Obj::address);
         objs.dedup_by_key(|o| o.address());
         let addresses: Vec<String> = objs.iter().map(Obj::address).collect();
         let roles: Vec<Option<crossplane::Role>> =
             objs.iter().map(|o| self.kinds.role(o)).collect();
+        let configs = environment::configs(&objs);
         let mut kept = 0;
         for (o, address) in objs.iter().zip(&addresses) {
-            if !self.charge(address.len() + o.path.len()) {
+            let environment = environment::resolve(o, &configs);
+            if !self.charge(
+                address.len()
+                    + o.path.len()
+                    + environment
+                        .iter()
+                        .map(crate::iac::environment::Entry::size)
+                        .sum::<usize>(),
+            ) {
                 break;
             }
             kept += 1;
@@ -714,6 +749,7 @@ impl<'m> Eval<'m> {
                 handler: None,
                 events: Vec::new(),
                 subscription: None,
+                environment,
             });
         }
         let (objs, addresses, roles) = (&objs[..kept], &addresses[..kept], &roles[..kept]);
@@ -747,6 +783,7 @@ impl<'m> Eval<'m> {
                     handler: None,
                     events: Vec::new(),
                     subscription: None,
+                    environment: Vec::new(),
                 });
                 held.entry(i).or_default().push(composed.len());
                 composed.push((i, address, b));
@@ -760,7 +797,15 @@ impl<'m> Eval<'m> {
         for (i, o) in objs.iter().enumerate() {
             if o.group.is_empty() {
                 named
-                    .entry((&o.kind, &o.orig, o.ns.as_deref()))
+                    .entry((
+                        &o.kind,
+                        if matches!(o.kind.as_str(), "ConfigMap" | "Secret") {
+                            &o.name
+                        } else {
+                            &o.orig
+                        },
+                        o.ns.as_deref(),
+                    ))
                     .or_default()
                     .push(i);
             }

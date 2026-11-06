@@ -30,23 +30,27 @@ write tools; one index per repository; determinism) live in
 ## Workflow
 
 - Conventional Commits.
-- Gate before every commit: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
-  `cargo test`; for a change under a cloud module's feature `<f>` (ADR 0012), also
-  `cargo clippy --all-targets --features <f> -- -D warnings` and `cargo test --features <f>` (CI's
-  `clippy-features` matrix runs the clippy half for every feature alone and for the pairs the code
-  gates on).
+- Before every local commit: `cargo fmt --check`, `cargo check --locked` and only the focused
+  regression tests relevant to the change.
+- GitHub Actions owns the full test suites, all-target Clippy feature matrix (ADR 0012), UI,
+  documentation and deployment checks. CI for the exact PR head must be green before marking
+  the PR ready for review or merging into main.
 - Before a change is called done, `/prove-meada` runs on it and the PR body's Evidence section
   names its receipt (`.prove-it/runs/`, kept out of git); a change whose diff reaches a surface of
   the skill's Scope table is not done on a BROKEN verdict.
+  Record proof scope separately from CI validation; run heavy integration proof in CI where
+  applicable.
 - `.githooks/` runs part of the gate locally: `cargo fmt --check` and no em dash in staged
   Markdown on commit; on push, a check against the maintainer's private-term list. Enable it
   once per clone with `git config core.hooksPath .githooks`.
 - Prose separates clauses with commas, colons or parentheses rather than em dashes.
 - Decisions are recorded as ADRs in `docs/adr/`.
 - Domain terms are defined in `GLOSSARY.md`. Use them in code, docs and issues.
-- Repository map in `docs/agents/architecture.md`: read it before exploring or changing code, then
-  the area file in `docs/agents/map/` that the map names for the area being changed. The
-  limits of the code are in `docs/agents/ceilings.md`: read it when a limit is touched. A
+- Repository routing index in `docs/agents/architecture.md`: read it before exploring or changing
+  code, then follow its area index and read the topics relevant to the change. A split index is
+  navigation, not a request to read every leaf. Read the relevant extension and invariant details
+  it names when changing a seam. The limits of the code are in `docs/agents/ceilings.md`: follow
+  it to the relevant limit topic when a limit is touched. A
   `docs/agents` file past its size budget (`tests/it/docs.rs` names it) is split in the same PR
   with `cargo run --example split_agents -- <file>`, never trimmed by dropping entries.
 - Coding standards in `CODING_STANDARDS.md`: read them before writing or reviewing resolution, a

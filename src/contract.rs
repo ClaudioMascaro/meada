@@ -283,7 +283,7 @@ pub trait ContractKind {
     /// Runs once over the index content of every repository of the workspace (in workspace
     /// order), after every kind's `declare` has run on every repository: a step that needs
     /// all of them, such as an index of the providers of the whole workspace.
-    fn workspace_step(&self, _exports: &mut [Export]) {}
+    fn workspace_step(&self, _exports: &mut [Export], _repositories: &[Repository]) {}
 
     /// The links from `consumer`, held by the repository `from`, to the providers of the
     /// workspace (each with the repository holding it) and, for a queue, the publishes the
@@ -509,9 +509,28 @@ pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {
     KINDS.iter().copied().find(|k| k.prefix() == prefix)
 }
 
+/// Explanation retained by a side resolved through a workload environment.
+pub(crate) fn environment_reason(via: Option<&str>) -> Option<&str> {
+    via.filter(|v| v.starts_with("workload:"))
+}
+
+pub(crate) fn environment_link(link: &mut Link, via: Option<&str>) {
+    if let Some(reason) = environment_reason(via) {
+        link.level = link.level.max(Level::Inferred);
+        let evidence = format!("; {reason}");
+        if !link.reason.contains(&evidence) {
+            link.reason += &evidence;
+        }
+    }
+}
+
 /// The kind's evidence level for a directed use; unknown kinds cannot establish exact uses.
 pub(crate) fn use_level(contract: &str, via: Option<&str>, operation: Option<&str>) -> Level {
-    kind_of(contract).map_or(Level::Declared, |kind| kind.use_level(via, operation))
+    if environment_reason(via).is_some() {
+        Level::Inferred
+    } else {
+        kind_of(contract).map_or(Level::Declared, |kind| kind.use_level(via, operation))
+    }
 }
 
 /// Preserve each kind's export scope, including repository-level builders where supported.
@@ -773,7 +792,7 @@ mod tests {
         ];
         let mut exports = vec![export];
         for kind in [&Packages as &dyn ContractKind, &Http, &Resource, &Channel] {
-            kind.workspace_step(&mut exports);
+            kind.workspace_step(&mut exports, &[]);
         }
         let kept: Vec<_> = (exports[0].entry_points.iter())
             .map(|e| &e.identity[..])

@@ -274,6 +274,8 @@ other node) and `values:` (the config values of its block), each followed by its
 printing `none`. An address several nodes have (one per root module that instantiates it) gives
 a `fits` line and one line per node, with what to pass for it. Declared resource sides at the
 node add the same `provides`, `consumes`, `reader:` and `writer:` lines as a declared key.
+Workload context also lists environment names, their targets and available checked-in values.
+Secret targets are marked `redacted`; absent, secret or unresolved values print `unresolved`.
 
 **Nothing.** A `no symbol` or `no contract` line.
 
@@ -314,7 +316,7 @@ words:
 | consumes | `<repository> <place> consumes <shown-contract><orphan-note?>` | The symbol, or a call of it, consumes the contract. |
 | consumes linked | `<repository> <place> consumes <contract><orphan-note?> <arrow> <identity>` | A call of the symbol consumes the contract, linked at `inferred` or `decided` to the provider `<identity>`, with its level and reason. |
 | consumes unresolved | `<repository> <place> consumes (unresolved) <callee>` | A call of the symbol consumes a contract Meada cannot read. |
-| environment | `<repository> <place> unresolved environment <text>` | An SDK argument reads this environment variable; Meada retains its name and never reads its value. |
+| environment | `<repository> <place> unresolved environment <text>` | An SDK argument reads an environment variable without a matching workload value; Meada retains its name and never reads the process environment. |
 | fits | ``` `<query>` fits <n> symbols; pass one of: ``` | The name fits several symbols, listed after it. |
 | no symbol | `` no symbol matches `<query>` `` | No symbol has the name. |
 | config use | `<repository> use <config-place> [<level>] <contract><orphan-note?>` | A directionless config use named by its key locator. |
@@ -336,6 +338,7 @@ words:
 | iac image | `image: <text><iac-mark?>` | A Compose service's image quoted as JSON, or a workload's image contract with its optional missing-builder note. |
 | image builder | `  builder: <repository> [<level>: <reason>]` | A workload's image builder, with its evaluated evidence. |
 | workload code | `code: <repository> <path> [exact]` | A safe same-repository Compose code path. |
+| workload environment | `env <container> <environment-name> -> <environment-target>: <environment-value?>` | One environment entry of the workload, with its checked-in source and available value. |
 | iac build | `build: <text><iac-mark?>` | A Compose service's build context, a path inside the repository, quoted as JSON. |
 | iac handler | `handler: <text><iac-mark?>` | A Serverless function's handler, quoted as JSON. |
 | iac event | `event: <text><iac-mark?>` | One event of a Serverless function, in file order: its type and what identifies it, quoted as JSON (`"http GET /orders"`, `"sqs Queue.Arn"`). |
@@ -351,7 +354,10 @@ words:
 | --- | --- | --- |
 | `<last>` | `<number>` | The last line of the span. |
 | `<physical-name>` | `<text>` | The node's `name` argument as static evaluation resolves it, quoted as JSON, or `none`. |
-| `<container>` | `<word>` | The name of a container of a Kubernetes workload's pod spec. |
+| `<container>` | `<word>` | The name of a Kubernetes container or Compose service. |
+| `<environment-name>` | `<word>` | The environment entry's name, or a prefix followed by `*` for an unresolved `envFrom`. |
+| `<environment-target>` | `<text>` | A literal, Compose literal/default or unresolved source, or a ConfigMap/Secret address and key, optionally imported by `envFrom`; Secret targets carry `redacted`. |
+| `<environment-value>` | `<text>` | The available checked-in value, or `unresolved`; an empty literal leaves this field empty. |
 | `<image-ref>` | `<text>` | An image as the overlay leaves it: `ghcr.io/acme/api:1.4.0`. |
 | `<physical-name>` | `<text> (pattern)` | The same name with an unresolved part, each such part a `*`. |
 | `<iac-section>` | `overridable` | The values a deployer can override that its name went through. |

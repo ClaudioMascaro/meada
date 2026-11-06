@@ -663,7 +663,7 @@ impl ContractKind for Http {
 
     /// Keeps, of the two readings of a `${X:default}` base, the one that applies
     /// (`keep_applicable`), once every repository declared its hosts.
-    fn workspace_step(&self, exports: &mut [IndexExport]) {
+    fn workspace_step(&self, exports: &mut [IndexExport], _: &[Repository]) {
         keep_applicable(exports);
     }
 
