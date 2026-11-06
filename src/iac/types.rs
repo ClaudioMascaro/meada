@@ -56,6 +56,9 @@ pub(crate) struct Workload {
     pub images: Vec<String>,
     pub code: Option<String>,
     pub name: Option<String>,
+    /// Whether direct code must be a file, as for a deployment archive.
+    #[serde(default)]
+    pub code_file: bool,
 }
 
 static WORKLOADS: LazyLock<Vec<Workload>> =
@@ -104,8 +107,11 @@ pub(crate) fn format_of(path: &str) -> Option<&'static str> {
     }
 }
 
-/// The unique contract named by an AWS structured identifier. Forms stay in the type table.
+/// The unique contract named by a structured identifier. AWS forms stay in the type table.
 pub(crate) fn identified(text: &str) -> Option<String> {
+    if let Some(contract) = crate::contract::azure::identified(text) {
+        return Some(contract);
+    }
     if !(text.starts_with("arn:") || text.starts_with("https://") || text.starts_with("s3://")) {
         return None;
     }
@@ -137,6 +143,22 @@ impl Entry {
             format!("{block}.Properties.{}", self.name)
         } else {
             format!("{block}.{}", self.name)
+        }
+    }
+
+    /// Provider-specific identity validation belongs to the kind, shared with SDK/config readers.
+    pub(crate) fn project(&self, text: &str) -> Option<String> {
+        match self.ty.as_str() {
+            "azurerm_servicebus_queue" | "azurerm_servicebus_topic" => {
+                crate::contract::azure::servicebus(text)
+            }
+            "azurerm_servicebus_subscription" => crate::contract::azure::subscription(text)
+                .or_else(|| crate::contract::azure::servicebus(text).filter(|s| !s.contains('/'))),
+            "azurerm_eventhub" => crate::contract::azure::eventhub(text),
+            "azurerm_storage_account" => crate::contract::azure::account(text),
+            "azurerm_storage_container" => crate::contract::azure::container(text),
+            "azurerm_key_vault_secret" => crate::contract::azure::secret(text),
+            _ => Some(self.read(text).to_string()),
         }
     }
     /// The contract a node of this type named `name` provisions.
@@ -294,6 +316,7 @@ mod tests {
                 "/tests/fixtures/aws-infra"
             )),
             fixtures.join("aws-workload-aliases"),
+            fixtures.join("azure-infra"),
         ];
         while let Some(dir) = dirs.pop() {
             for e in std::fs::read_dir(&dir).unwrap() {

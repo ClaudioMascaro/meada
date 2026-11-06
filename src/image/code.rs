@@ -90,6 +90,12 @@ pub(super) fn checked(root: &Path, node: &crate::iac::Node, room: usize) -> Opti
     {
         return None;
     }
+    let file_only = crate::iac::types::format_of(&node.path)
+        .and_then(|format| crate::iac::types::workload(format, &node.ty))
+        .is_some_and(|workload| workload.code_file);
+    if file_only && !root.join(path.as_ref()).is_file() {
+        return None;
+    }
     Some(Code {
         address: node.address.clone(),
         root: node.root.clone(),

@@ -18,10 +18,24 @@ pub(crate) struct Side {
 }
 
 impl Side {
+    pub(crate) fn pattern(&self) -> bool {
+        self.node
+            .provisioned
+            .as_ref()
+            .map_or(self.node.pattern, |p| p.pattern)
+    }
+
+    pub(crate) fn overridable(&self) -> &[super::Overridable] {
+        self.node
+            .provisioned
+            .as_ref()
+            .map_or(&self.node.overridable, |p| &p.through)
+    }
+
     pub(crate) fn matches(&self, contract: &str) -> bool {
         // A written asterisk is not an unresolved part when evaluation says the name is
         // literal. Preserve its literal identity instead of inventing wildcard evidence.
-        if !self.node.pattern && self.contract.contains('*') {
+        if !self.pattern() && self.contract.contains('*') {
             return self.contract == contract;
         }
         let (Some((kind, pattern)), Some((other, name))) =
@@ -72,7 +86,11 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
         let Some(entry) = types::provision_entry(&node.path, &node.block, &node.ty) else {
             continue;
         };
-        let Some(name) = node.name.as_deref().filter(|n| !n.is_empty()) else {
+        let target = node
+            .provisioned
+            .as_ref()
+            .map_or(node.name.as_deref(), |p| p.name.as_deref());
+        let Some(name) = target.filter(|n| !n.is_empty()) else {
             continue;
         };
         // A structured identifier the entry could not read is not a physical AWS name.
@@ -80,7 +98,12 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
         if name.starts_with("arn:") || name.contains("://") {
             continue;
         }
-        if node.pattern && !super::pattern::supported(name) {
+        if node
+            .provisioned
+            .as_ref()
+            .map_or(node.pattern, |p| p.pattern)
+            && !super::pattern::supported(name)
+        {
             continue;
         }
         sides.push(Side {
@@ -213,7 +236,7 @@ fn raw_links(exports: &[Export]) -> Vec<Provision> {
                 }
             }
             let mut reason = p.contract.clone();
-            if p.node.pattern {
+            if p.pattern() {
                 level = if contracts.len() > 1 {
                     Level::Ambiguous
                 } else {
@@ -221,11 +244,10 @@ fn raw_links(exports: &[Export]) -> Vec<Provision> {
                 };
                 reason += "; pattern";
             }
-            if !p.node.overridable.is_empty() {
+            if !p.overridable().is_empty() {
                 level = level.max(Level::Inferred);
                 let values = p
-                    .node
-                    .overridable
+                    .overridable()
                     .iter()
                     .map(|o| {
                         let from = if o.tfvars { "tfvars" } else { "default" };
@@ -474,7 +496,7 @@ impl<'a> Choices<'a> {
             else {
                 continue;
             };
-            let (repository, site) = if target.node.pattern {
+            let (repository, site) = if target.pattern() {
                 (
                     link.side
                         .split_once("::")
@@ -507,7 +529,7 @@ impl<'a> Choices<'a> {
         let (_, target) = self
             .targets
             .get(&(link.provisioner.as_str(), link.root.as_str()))?;
-        if target.node.pattern {
+        if target.pattern() {
             Some((Source::Provisioner(target).id(), &link.contract))
         } else if link.contract.contains('*') && !target.contract.contains('*') {
             Some((
@@ -634,9 +656,10 @@ pub(crate) fn items(
     exports: &[Export],
 ) -> Vec<(crate::items::OpenItem, bool)> {
     use crate::items::{ItemKind, OpenItem};
-    if !exports.iter().any(|e| {
-        e.provisioners.iter().any(|p| p.node.pattern) || uses(e).any(|(_, c)| c.contains('*'))
-    }) {
+    if !exports
+        .iter()
+        .any(|e| e.provisioners.iter().any(Side::pattern) || uses(e).any(|(_, c)| c.contains('*')))
+    {
         return Vec::new();
     }
     let core = raw_links(exports);

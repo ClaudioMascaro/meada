@@ -584,3 +584,26 @@ Grafana rules also come from JSON exports and `rule` blocks of Terraform/OpenTof
 A root route without matchers creates no alert side: there is no key and value for a contract. The graph describes written matchers, without predicting final notifications, inhibition or schedules.
 
 Prometheus and Loki also emit the literal `alertname` from the rule name, overriding a label of that name. Labels that may come from the expression remain unknown, not empty. Files under `templates/` are not rendered or treated as alert emitters.
+## Azure contracts and Functions
+
+The Terraform/OpenTofu table reads `azurerm_servicebus_queue`, `azurerm_servicebus_topic`
+and `azurerm_servicebus_subscription` as `servicebus` channels; `azurerm_eventhub` as
+`eventhubs`; `azurerm_storage_account` as resource `azurestorage`,
+`azurerm_storage_container` as `azureblob` and `azurerm_key_vault_secret` as `keyvault`.
+An account and container with the same name remain distinct contracts.
+
+A subscription has identity `channel::servicebus::subscription:<topic>/<subscription>`.
+It joins its consumers to the topic's producers, at `exact` without a filter rule and
+`inferred` when a rule is declared. Queue/topic names retain `/`. Existing C# processors
+retain topic identity, including overloads taking a subscription. Complete supported ARM
+IDs and blob/secret URLs give `exact` uses; final keys `servicebus_queue`, `servicebus_topic`,
+`servicebus_subscription` (value `topic/subscription`), `eventhubs_hub`,
+`azurestorage_account`, `azureblob_container` and `keyvault_secret` give `inferred`.
+Equal values without that evidence create no link.
+
+`azurerm_linux_function_app` reads the Docker block under `site_config.application_stack`;
+both Linux and Windows types read local `zip_deploy_file` and `app_settings`. A local file
+stays inside the repository with no `..` or symlink; ZIP archives are never opened. A remote
+package identifies no local code. Key Vault app-setting references stay redacted and
+unresolved. Contracts and workloads participate in `context`, `trace`, orphans,
+provisioning and export.

@@ -18,6 +18,13 @@ All notable changes to Meada are recorded here. The format follows
   share the HCL evaluator, provisioners and subscriptions; declared resource `via` addresses
   resolve to JSON nodes and refresh when sources change. Sensitive defaults, tfvars and SSM
   SecureString values also stay redacted in JSON block arrays (#642, #649).
+- Azure Terraform/OpenTofu contracts (#669): Service Bus queues, topics and topic-qualified
+  subscriptions with filter routing, Event Hubs, Storage accounts and blob containers as
+  distinct kinds, and Key Vault secrets. ARM identifiers and supported blob/vault URLs give
+  exact config uses; provider-specific typed keys remain inferred. Linux Functions run
+  evaluated container images; Linux and Windows Functions run safe local deployment archives, with scoped
+  app settings and unresolved Key Vault references. Existing C# topic processors retain
+  their topic identity. This shares the 1.4.0 development release.
 
 - Declared resource `via` locations now accept IaC addresses in every indexed format and
   `<file>#<key path>` with list selectors (`[key=value]`). Sides retain their precise node or

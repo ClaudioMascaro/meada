@@ -1,5 +1,13 @@
 # Terraform and provisioning
 
+- `AZURE_IDENTIFIER_MAX` (`contract/azure.rs`, #669): 1,024 bytes, checked before splitting
+  identifiers or allocating projected components. Longer ARM/URL/typed-name text stays
+  unresolved. Azure projections, rule indexes and Function summaries share the existing
+  root evaluation/work/storage and workload environment budgets; archives are never opened.
+  The platform name ceilings `SERVICEBUS_ENTITY_MAX` (260), `SERVICEBUS_SUBSCRIPTION_MAX`
+  (50), `EVENTHUB_NAME_MAX` (256) and `KEYVAULT_SECRET_MAX` (127) reject invalid names before
+  they can become exact targets.
+
 - `iac.rs` (#649, ADR 0025): `EXPANSION_MAX` (1,000 instances of one `count` or `for_each`; past it,
   or over anything that does not resolve to a whole number, an object or a list of strings, the
   block is one node with no key); `MODULE_DEPTH_MAX` (16 local module calls inside each other;

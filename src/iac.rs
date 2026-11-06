@@ -52,6 +52,7 @@ use crate::trace::Direction;
 use meada_core::export::Level;
 use meada_core::trace::{Chain, Row};
 
+mod azure;
 pub(crate) mod cloudformation;
 pub(crate) mod compose;
 pub(crate) mod config_uses;
@@ -1089,6 +1090,16 @@ impl<'m> Eval<'m> {
         self.evaluating.clear();
         self.outputs = true;
         let pending = std::mem::take(&mut self.pending);
+        // An unknown composite must never fall back to its physical short name, even if
+        // the root exhausts its evaluation/storage budget before projection runs.
+        for &(node, _, block, _) in &pending {
+            if block.kind == Kind::Resource
+                && block.ty.starts_with("azurerm_")
+                && types::entry("terraform", &block.ty).is_some()
+            {
+                self.nodes[node].provisioned = Some(Projection::default());
+            }
+        }
         for &(node, instance, block, ref each) in &pending {
             let Some(named) = &block.named else { continue };
             let found = self.value(instance, each.as_ref(), named, 0);
@@ -1116,6 +1127,10 @@ impl<'m> Eval<'m> {
             node.overridable = found.through.into_iter().collect();
         }
         self.prepare_subscriptions(&pending);
+        for &(node, _, block, _) in &pending {
+            self.azure_projection(node, block);
+        }
+        self.azure_subscriptions(&pending);
         for &(node, instance, block, ref each) in &pending {
             self.workload(node, instance, each.as_ref(), block);
         }
@@ -1128,6 +1143,9 @@ impl<'m> Eval<'m> {
                 return;
             }
             self.nodes[node].subscription = Some(subscription);
+        }
+        for &(node, at, block, ref each) in &pending {
+            self.azure_workload(node, at, each.as_ref(), block);
         }
         let modules = self.modules;
         for i in 0..self.instances.len() {

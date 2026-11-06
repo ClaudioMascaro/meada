@@ -2201,3 +2201,26 @@ Las reglas Grafana también se leen de exports JSON y bloques `rule` de recursos
 Una ruta raíz sin matchers no crea un lado de alerta: no hay clave y valor para el contrato. El grafo describe los matchers escritos, sin predecir notificaciones finales, inhibiciones ni horarios.
 
 Prometheus y Loki también emiten el `alertname` literal del nombre de la regla, sobrescribiendo una etiqueta con ese nombre. Las etiquetas que puedan venir de la expresión permanecen desconocidas, no vacías. Los archivos bajo `templates/` no se renderizan ni se tratan como emisores de alertas.
+## Infraestructura Azure
+
+Terraform/OpenTofu aprovisionan colas, temas y suscripciones Service Bus, Event Hubs,
+cuentas Storage (`azurestorage`), contenedores Blob (`azureblob`) y secretos Key Vault
+(`keyvault`). Una suscripción es `channel::servicebus::subscription:orders/audit`, distinta
+de la cola válida `orders/subscriptions/audit`. Las reglas declaradas debilitan la entrega
+a `inferred`; sin regla es `exact`. Los processors C# existentes conservan el tema.
+
+Un ID ARM completo admitido o URL de blob/secreto es un uso `exact`. Las claves finales
+`servicebus_queue`, `servicebus_topic`, `servicebus_subscription`, `eventhubs_hub`,
+`azurestorage_account`, `azureblob_container` y `keyvault_secret` dan usos `inferred`;
+la suscripción requiere valor `tema/suscripción`. Las claves genéricas `queue`, `topic`,
+`bucket` y `table` conservan sus significados AWS. Cuenta, namespace, vault, versión y
+objeto se descartan solo después de validar el identificador completo.
+
+Functions Linux lee `site_config.application_stack.docker` con `registry_url`,
+`image_name` e `image_tag`. Functions Linux y Windows leen `zip_deploy_file` y
+`app_settings`; solo un archivo local seguro y existente da ejecución directa, sin abrir
+el ZIP. Rutas ausentes, remotas, con `..` o symlinks no dan código. App settings resuelven
+lecturas solo en el código ejecutado por la imagen o ruta correspondiente, con nivel
+`inferred`. Referencias a secretos y valores desconocidos quedan sin resolver. Consulte
+[capacidades](site/es/capabilities.md#contratos-azure-y-functions) para los tipos y límites;
+`context`, `trace`, export y huérfanos siguen las mismas reglas de aprovisionamiento.

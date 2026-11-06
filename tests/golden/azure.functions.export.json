@@ -1,0 +1,125 @@
+{
+  "format": 1,
+  "repository": "example.com/azure/infra",
+  "commit": "ca8503d9e8520d9186c44d2485dc4fd2fb9bc31a",
+  "dirty": false,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "image::ghcr.io/azure/functions",
+      "site": "example.com/azure/infra::main.tf::azurerm_linux_function_app.image",
+      "via": "image: main.tf#resource.azurerm_linux_function_app.image (var.tag main.tf:1)",
+      "root": "."
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "example.com/azure/infra::main.tf::aws_sqs_queue.tasks",
+      "address": "aws_sqs_queue.tasks",
+      "type": "aws_sqs_queue",
+      "root": ".",
+      "path": "main.tf",
+      "line": 2,
+      "end_line": 2
+    },
+    {
+      "identity": "example.com/azure/infra::main.tf::azurerm_linux_function_app.image",
+      "address": "azurerm_linux_function_app.image",
+      "type": "azurerm_linux_function_app",
+      "root": ".",
+      "path": "main.tf",
+      "line": 3,
+      "end_line": 20
+    },
+    {
+      "identity": "example.com/azure/infra::main.tf::azurerm_linux_function_app.local",
+      "address": "azurerm_linux_function_app.local",
+      "type": "azurerm_linux_function_app",
+      "root": ".",
+      "path": "main.tf",
+      "line": 26,
+      "end_line": 30
+    },
+    {
+      "identity": "example.com/azure/infra::main.tf::azurerm_windows_function_app.archive",
+      "address": "azurerm_windows_function_app.archive",
+      "type": "azurerm_windows_function_app",
+      "root": ".",
+      "path": "main.tf",
+      "line": 21,
+      "end_line": 25
+    }
+  ],
+  "executions": [
+    {
+      "workload": "example.com/azure/infra::main.tf::azurerm_linux_function_app.local",
+      "root": ".",
+      "repository": "example.com/azure/infra",
+      "path": "local.zip",
+      "level": "exact",
+      "reason": "azurerm_linux_function_app main.tf#resource.azurerm_linux_function_app.local"
+    },
+    {
+      "workload": "example.com/azure/infra::main.tf::azurerm_windows_function_app.archive",
+      "root": ".",
+      "repository": "example.com/azure/infra",
+      "path": "worker.zip",
+      "level": "exact",
+      "reason": "azurerm_windows_function_app main.tf#resource.azurerm_windows_function_app.archive"
+    }
+  ],
+  "provisioners": [
+    {
+      "contract": "channel::sqs::tasks",
+      "node": "example.com/azure/infra::main.tf::aws_sqs_queue.tasks",
+      "root": "."
+    }
+  ],
+  "uses": [
+    {
+      "contract": "channel::sqs::tasks",
+      "site": "example.com/azure/infra",
+      "at": "main.tf#resource.azurerm_linux_function_app.image.app_settings.LITERAL_QUEUE"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/azure/infra::main.tf::azurerm_linux_function_app.image",
+      "provider": "example.com/azure/app",
+      "contract": "image::ghcr.io/azure/functions",
+      "level": "inferred",
+      "reason": "image::ghcr.io/azure/functions; image: main.tf#resource.azurerm_linux_function_app.image (var.tag main.tf:1)",
+      "root": "."
+    }
+  ],
+  "provisions": [
+    {
+      "side": "example.com/azure/app::app.ts::literal::SendMessageCommand#0",
+      "provisioner": "example.com/azure/infra::main.tf::aws_sqs_queue.tasks",
+      "root": ".",
+      "contract": "channel::sqs::tasks",
+      "level": "inferred",
+      "reason": "channel::sqs::tasks; workload:example.com/azure/infra::main.tf::azurerm_linux_function_app.image (root .), env:LITERAL_QUEUE"
+    },
+    {
+      "side": "example.com/azure/app::app.ts::task::SendMessageCommand#0",
+      "provisioner": "example.com/azure/infra::main.tf::aws_sqs_queue.tasks",
+      "root": ".",
+      "contract": "channel::sqs::tasks",
+      "level": "inferred",
+      "reason": "channel::sqs::tasks; workload:example.com/azure/infra::main.tf::azurerm_linux_function_app.image (root .), env:TASK_QUEUE"
+    },
+    {
+      "side": "example.com/azure/infra",
+      "provisioner": "example.com/azure/infra::main.tf::aws_sqs_queue.tasks",
+      "root": ".",
+      "contract": "channel::sqs::tasks",
+      "level": "exact",
+      "reason": "channel::sqs::tasks; config main.tf#resource.azurerm_linux_function_app.image.app_settings.LITERAL_QUEUE",
+      "at": "main.tf#resource.azurerm_linux_function_app.image.app_settings.LITERAL_QUEUE"
+    }
+  ]
+}
