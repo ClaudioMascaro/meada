@@ -55,7 +55,11 @@ fresh judgment. Old BROKEN, unfinished and refused receipts remain intact.
    `verdict`, `checker`, `receipt`, a verbatim symptom excerpt in `symptom`, a relative raw
    `evidence` file, `script_names_symptom` and
    `fresh_blind_checker`. An expected check's exit 1 plus evidence naming the symptom can be a
-   script catch. Unrelated failure is luck; no symptom is a miss. Ask a fresh adjudicator when
+   script detection, recorded separately. A blind catch requires the actual fresh checker's
+   BROKEN verdict with the named symptom. PROVED is a miss even when scripts detected it;
+   script-only or BLOCKED/UNPROVEN judgments leave the round incomplete. Unrelated BROKEN
+   evidence is luck. Aggregate reporting revalidates these judgments rather than trusting
+   derived catch flags. Ask a fresh adjudicator when
    uncertain. Retain the original miss, fix only the authorized verifier/key gap, baseline the
    new frozen keys, and replant it. A missing product behavior is a finding, never a new key.
 5. Dispatch `final` on the same exact source/keys after all rounds. Judge the clean raw results
@@ -77,14 +81,20 @@ resolutions, including terminal process steps. It never drops whole landed consu
 or processes. Unexpected fields, locations, second calls, process metadata and extra steps
 must fail. `a8-mcp.py` adds complete HTTP/stdio reply parity, direct context/trace provenance,
 closed-item checks, ordinary HTTP base-answer preservation, and partial-only content refresh
-with warm/cold full-export equality and exact restoration.
+with context as the first reader after both edit and restoration. Context and trace each
+assert the source-selected API_URL/ALT_URL reason and peer, with warm/cold full-export
+equality and exact restoration.
 
 Generic IaC preserves existing annotation and contract-role tails without taking independent
 identity/type/root/name expectations from the head. The Terraform oracle reads an S3 name
 from its provider-native `bucket` field. An unsupported name expression remains explicitly
 unchecked and uses a trusted existing base answer, never a guessed new name. CloudFormation
 NoEcho defaults are identified from source keys and redacted directly; status counts add only
-defaults the base did not already redact. Native HCL values remain outside the YAML/JSON value
+defaults the base did not already redact. Recognition requires a CFN header or SAM transform
+and a Resources mapping: missing/nonmapping Resources stay ordinary public config. YAML
+aliases in parameter/default/flag fields are unwrapped for privacy while value locations keep
+their alias-use lines. Live positive and negative controls protect both failure directions.
+Native HCL values remain outside the YAML/JSON value
 oracle; the dedicated SSM/provisioner drivers cover their scoped semantics.
 
 `incident-guards.py` retains the independent #673 dynamic AND/OR and first-match count,

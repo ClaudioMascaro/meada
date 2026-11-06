@@ -276,6 +276,16 @@ def check(args):
     return 0 if receipt['script_result'] == 'CHECKS_PASSED' else 1
 
 
+def blind_result(judgment, names_symptom):
+    """A script detection cannot replace the fresh checker's actual verdict."""
+    fresh = bool(judgment.get('fresh_blind_checker') is True and judgment.get('checker') and judgment.get('receipt'))
+    if not fresh or judgment.get('verdict') not in ('PROVED', 'BROKEN'):
+        return 'incomplete', fresh
+    if judgment['verdict'] == 'PROVED':
+        return 'missed', fresh
+    return ('caught' if names_symptom else 'caught by luck'), fresh
+
+
 def score(args):
     """Adjudicate one round. Exit alone is never a catch; require named symptom evidence."""
     auditor = Path(args.auditor).resolve()
@@ -295,11 +305,12 @@ def score(args):
     symptom = judged.get('symptom', '')
     names_symptom = bool(symptom and symptom in evidence_text and re.search(case['evidence'], evidence_text, re.I))
     script_caught = failed['exit'] == 1 and names_symptom and judged.get('script_names_symptom') is True
-    checker_caught = bool(judged.get('verdict') == 'BROKEN' and names_symptom and judged.get('checker'))
-    fresh_blind = bool(judged.get('fresh_blind_checker') is True and judged.get('checker') and judged.get('receipt'))
-    result = 'caught' if script_caught or checker_caught else \
+    checker_caught = bool(judged.get('verdict') == 'BROKEN' and names_symptom and judged.get('checker') and judged.get('receipt'))
+    script_detection = 'caught' if script_caught else \
         'caught by luck' if checks['script_result'] != 'CHECKS_PASSED' else 'missed'
-    save(args.output, {'mutation': case['id'], 'result': result, 'script_caught': script_caught,
+    result, fresh_blind = blind_result(judged, names_symptom)
+    save(args.output, {'schema': 2, 'mutation': case['id'], 'result': result, 'script_caught': script_caught,
+         'script_detection': script_detection, 'names_symptom': names_symptom, 'blind_caught': result == 'caught',
          'baseline_manifest_sha256': checks['baseline_manifest_sha256'],
          'fresh_blind_checker': fresh_blind,
          'checker_caught': checker_caught, 'symptom': symptom, 'evidence': str(evidence),
@@ -318,6 +329,13 @@ def report(args):
     for item in current:
         if item['baseline_manifest_sha256'] != baseline_hash:
             raise RuntimeError('BLOCKED: latest round belongs to another source/key baseline')
+        expected_result, fresh = blind_result(item['judgment'], item.get('names_symptom') is True)
+        checker_caught = bool(item['judgment'].get('verdict') == 'BROKEN' and item.get('names_symptom') is True
+                              and item['judgment'].get('checker') and item['judgment'].get('receipt'))
+        if item.get('schema') != 2 or item['result'] != expected_result \
+                or item['fresh_blind_checker'] != fresh or item.get('checker_caught') != checker_caught \
+                or item.get('blind_caught') != (expected_result == 'caught'):
+            raise RuntimeError('BLOCKED: round contradicts its actual checker verdict; re-score with this verifier')
     final = json.loads(Path(args.final).read_text())
     judged = json.loads(Path(args.final_judgment).read_text())
     final_clean = final['phase'] == 'final clean rerun' and final['script_result'] == 'CHECKS_PASSED' \
@@ -329,19 +347,29 @@ def report(args):
     caught = sum(item['result'] == 'caught' for item in current)
     scripts = sum(item['script_caught'] for item in current)
     blind = sum(item['fresh_blind_checker'] for item in current)
-    complete = not missing and caught == len(planned) and blind == len(planned) and final_clean and independent_final
+    missed = [item['mutation'] for item in current if item['result'] == 'missed']
+    luck = [item['mutation'] for item in current if item['result'] == 'caught by luck']
+    incomplete = [item['mutation'] for item in current if item['result'] == 'incomplete']
+    script_only = [item['mutation'] for item in current if item['script_caught'] and not item['blind_caught']]
+    complete = not (missing or missed or luck or incomplete) and caught == len(planned) \
+        and blind == len(planned) and final_clean and independent_final
     result = {'audit_result': 'COMPLETE' if complete else 'INCOMPLETE', 'baseline_manifest_sha256': baseline_hash,
               'planned': len(planned), 'caught': caught, 'script_caught': scripts, 'fresh_blind_rounds': blind,
+              'script_only_detections': script_only, 'missed': missed, 'caught_by_luck': luck, 'incomplete_rounds': incomplete,
+              'script_only_count': len(script_only), 'missed_count': len(missed),
+              'caught_by_luck_count': len(luck), 'incomplete_count': len(incomplete), 'missing_count': len(missing),
               'missing': missing, 'final_clean_checks': bool(final_clean), 'final_fresh_verdict': bool(independent_final),
               'history': history, 'latest': current, 'final_judgment': judged,
               'limit': 'Bounded observed bugs, not a whole-app proof or a general completeness claim.'}
     save(args.output, result)
-    lines = ['# A7/A8 bounded audit', '', f"Result: {result['audit_result']}; {caught}/{len(planned)} caught, {scripts} by scripts, {blind} fresh blind rounds.",
+    lines = ['# A7/A8 bounded audit', '', f"Result: {result['audit_result']}; {caught}/{len(planned)} blind catches, {scripts} script detections, {blind} fresh blind judgments.",
              f'Final clean checks: {bool(final_clean)}; final independent PROVED: {bool(independent_final)}.', '',
              '| Mutation | Result | Script caught | Fresh blind | Symptom |', '|---|---|---|---|---|']
     lines += [f"| {item['mutation']} | {item['result']} | {item['script_caught']} | {item['fresh_blind_checker']} | {item['symptom'].replace('|', '/')} |"
               for item in history]
-    lines += ['', 'Missing: ' + (', '.join(missing) or 'none'), '', result['limit']]
+    lines += ['', 'Missing: ' + (', '.join(missing) or 'none'),
+              'Missed: ' + (', '.join(missed) or 'none'), 'Incomplete: ' + (', '.join(incomplete) or 'none'),
+              'Script detections without a blind catch: ' + (', '.join(script_only) or 'none'), '', result['limit']]
     Path(args.output).with_suffix('.md').write_text('\n'.join(lines) + '\n')
     return 0 if complete else 1
 

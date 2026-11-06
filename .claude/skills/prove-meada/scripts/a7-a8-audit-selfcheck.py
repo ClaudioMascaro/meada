@@ -118,12 +118,14 @@ def main():
         scored = observed / 'score.json'
         audit.score(argparse.Namespace(auditor=str(checker.parent / 'auditor'), checks=str(observed),
                                        judgment=str(judgment), output=str(scored)))
-        assert json.loads(scored.read_text())['result'] == 'caught by luck'
+        item = json.loads(scored.read_text())
+        assert item['result'] == 'incomplete' and item['script_detection'] == 'caught by luck'
         checks.append({'check': 'unrelated failure cannot count as a symptom catch', 'passed': True})
         evidence.write_text('dummy symptom visibly occurred\n')
         audit.score(argparse.Namespace(auditor=str(checker.parent / 'auditor'), checks=str(observed),
                                        judgment=str(judgment), output=str(scored)))
-        assert json.loads(scored.read_text())['result'] == 'caught by luck'
+        item = json.loads(scored.read_text())
+        assert item['result'] == 'incomplete' and item['script_detection'] == 'caught by luck'
         checks.append({'check': 'judged symptom must occur in the named raw evidence', 'passed': True})
         judged = json.loads(judgment.read_text())
         judged['symptom'] = 'dummy symptom visibly occurred'
@@ -142,6 +144,54 @@ def main():
         assert result == 1 and json.loads((observed / 'report.json').read_text())['audit_result'] == 'INCOMPLETE'
         checks.append({'check': 'script catches without fresh blind evidence cannot complete the audit', 'passed': True})
         audit.save(run / 'dummy-report.json', json.loads((observed / 'report.json').read_text()))
+        # The independent review found that a script detection overrode PROVED. Keep the
+        # actual contradictory verdict in both the score and aggregate regression.
+        judged.update(verdict='PROVED', fresh_blind_checker=True, receipt='dummy contradictory verdict fixture only')
+        audit.save(judgment, judged)
+        audit.score(argparse.Namespace(auditor=str(checker.parent / 'auditor'), checks=str(observed),
+                                       judgment=str(judgment), output=str(scored)))
+        item = json.loads(scored.read_text())
+        assert item['script_caught'] and item['result'] == 'missed'
+        assert item['fresh_blind_checker'] and not item['checker_caught'] and not item['blind_caught']
+        result = audit.report(argparse.Namespace(baseline=str(baseline), rounds=[str(scored)],
+            final=str(observed / 'final.json'), final_judgment=str(final_judgment), output=str(observed / 'report.json')))
+        report = json.loads((observed / 'report.json').read_text())
+        assert result == 1 and report['audit_result'] == 'INCOMPLETE' and report['caught'] == 0
+        assert report['missed'] == ['dummy'] and report['script_only_detections'] == ['dummy']
+        assert report['missed_count'] == 1 and report['script_only_count'] == 1 and report['incomplete_count'] == 0
+        assert report['script_caught'] == 1 and report['fresh_blind_rounds'] == 1
+        checks.append({'check': 'fresh PROVED remains missed despite a script detection, including aggregate', 'passed': True})
+        audit.save(run / 'dummy-contradictory-score.json', item)
+        audit.save(run / 'dummy-contradictory-report.json', report)
+        # Old or inconsistent derived fields must not bypass the nested actual verdict.
+        inconsistent = dict(item, result='caught', checker_caught=True, blind_caught=True)
+        audit.save(observed / 'inconsistent-score.json', inconsistent)
+        refused('aggregate rejects catch flags contradicting actual PROVED verdict', lambda: audit.report(
+            argparse.Namespace(baseline=str(baseline), rounds=[str(observed / 'inconsistent-score.json')],
+                final=str(observed / 'final.json'), final_judgment=str(final_judgment), output=str(observed / 'inconsistent-report.json'))))
+        judged['verdict'] = 'BROKEN'
+        audit.save(judgment, judged)
+        audit.score(argparse.Namespace(auditor=str(checker.parent / 'auditor'), checks=str(observed),
+                                       judgment=str(judgment), output=str(scored)))
+        item = json.loads(scored.read_text())
+        assert item['result'] == 'caught' and item['blind_caught'] and item['checker_caught']
+        result = audit.report(argparse.Namespace(baseline=str(baseline), rounds=[str(scored)],
+            final=str(observed / 'final.json'), final_judgment=str(final_judgment), output=str(observed / 'positive-control.json')))
+        assert result == 0
+        checks.append({'check': 'actual fresh BROKEN with named symptom is the positive catch control', 'passed': True})
+        for verdict in ('BLOCKED', 'UNPROVEN'):
+            judged['verdict'] = verdict
+            audit.save(judgment, judged)
+            audit.score(argparse.Namespace(auditor=str(checker.parent / 'auditor'), checks=str(observed),
+                                           judgment=str(judgment), output=str(scored)))
+            item = json.loads(scored.read_text())
+            assert item['result'] == 'incomplete' and item['script_caught'] and not item['blind_caught']
+            result = audit.report(argparse.Namespace(baseline=str(baseline), rounds=[str(scored)],
+                final=str(observed / 'final.json'), final_judgment=str(final_judgment), output=str(observed / 'unfinished-report.json')))
+            unfinished = json.loads((observed / 'unfinished-report.json').read_text())
+            assert result == 1 and unfinished['incomplete_rounds'] == ['dummy'] and unfinished['caught'] == 0
+            assert unfinished['incomplete_count'] == 1 and unfinished['script_only_count'] == 1
+        checks.append({'check': 'fresh BLOCKED and UNPROVEN judgments leave detected rounds incomplete', 'passed': True})
     audit.save(run / 'checks.json', {'checks': checks, 'scope': 'disposable dummy repository only',
                                     'product_mutations': 0, 'compiler_runs': 0})
     print(f'{len(checks)} audit safety gates passed; no product audit score.')

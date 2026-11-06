@@ -783,6 +783,30 @@ def cmd_selftest(_):
         assert f.read_bytes() == b"fn foQ() {}\nfn fooBar() { foQ() }\n", f.read_bytes()
         assert rename_in_place(Path(d), {"symbols": [{"id": "r::a.rs::ab", "span": {"path": "a.rs"}}]}) is None
         assert rename_in_place(Path(d), {"symbols": [{"id": "r::other::fooBar", "span": {"path": "a.rs"}}]}) is None
+        # NoEcho applies only to recognized CFN/SAM templates. AliasLoader deliberately
+        # preserves use-site lines, so the privacy scanner must unwrap aliases without
+        # changing the value walk's location. These are source controls, not product keys.
+        header = 'AWSTemplateFormatVersion: "2010-09-09"\n'
+        params = 'Parameters:\n  Example:\n    NoEcho: true\n    Default: neutral-default\n'
+        cases = [
+            (header + params, False),
+            (header + params + 'Resources: []\n', False),
+            (header + params + 'Resources: not-a-map\n', False),
+            (header + params + 'Resources: {}\n', True),
+            ('Transform: AWS::Serverless-2016-10-31\n' + params + 'Resources: {}\n', True),
+            (header + 'Public: &default neutral-default\n' + params.replace('Default: neutral-default', 'Default: *default') + 'Resources: {}\n', True),
+            (header + 'Flag: &flag true\n' + params.replace('NoEcho: true', 'NoEcho: *flag') + 'Resources: {}\n', True),
+            (header + 'Source: &params\n  Example: {NoEcho: true, Default: neutral-default}\nParameters: *params\nResources: {}\n', True),
+            (header + params + 'Source: &resources {}\nResources: *resources\n', True),
+        ]
+        for i, (source, private) in enumerate(cases):
+            (Path(d) / 'config.yaml').write_text(source)
+            outcome = read_config(Path(d), 'config.yaml')
+            assert outcome[0] == 'read', (i, outcome)
+            row = next(r for r in outcome[1] if r['key'] == 'Parameters.Example.Default')
+            assert row['value'] == (None if private else 'neutral-default'), (i, row)
+            if 'Default: *default' in source:
+                assert row['line'] == next(n for n, line in enumerate(source.splitlines(), 1) if 'Default: *default' in line), row
     e = b'{\n  "format": 1,\n  "repository": "r",\n  "commit": "abc",\n  "dirty": false,\n  "files": []\n}\n'
     assert body(e) == b'{\n  "format": 1,\n  "repository": "r",\n  "files": []\n}\n', body(e)
     assert body(e) == body(e.replace(b'  "commit": "abc",\n  "dirty": false,\n', b"")) and quoted("r::a") == b'"r::a"'
@@ -961,22 +985,38 @@ def read_config(repo, rel, lockfiles=True):
 
 def cfn_private_keys(node, prefix=""):
     """#653: source-derived scalar NoEcho defaults, independent of the product reader."""
+    def unalias(value):
+        seen = set()
+        while isinstance(value, AliasRef):
+            if id(value) in seen:
+                raise ValueError('recursive YAML alias')
+            seen.add(id(value))
+            value = value.node
+        return value
+
+    def fields(mapping):
+        return {key.value: unalias(value) for k, value in mapping.value
+                if isinstance(key := unalias(k), yaml.ScalarNode)}
+
+    node = unalias(node)
     if not isinstance(node, yaml.MappingNode):
         return set()
-    root = {k.value: v for k, v in node.value if isinstance(k, yaml.ScalarNode)}
+    root = fields(node)
     transform = root.get("Transform")
     sam = isinstance(transform, yaml.ScalarNode) and transform.value == "AWS::Serverless-2016-10-31"
     sam |= isinstance(transform, yaml.SequenceNode) and any(
-        isinstance(v, yaml.ScalarNode) and v.value == "AWS::Serverless-2016-10-31" for v in transform.value)
+        isinstance(value := unalias(v), yaml.ScalarNode) and value.value == "AWS::Serverless-2016-10-31" for v in transform.value)
     params = root.get("Parameters")
-    if not ("AWSTemplateFormatVersion" in root or sam) or not isinstance(params, yaml.MappingNode):
+    if not ("AWSTemplateFormatVersion" in root or sam) or not isinstance(root.get("Resources"), yaml.MappingNode) \
+            or not isinstance(params, yaml.MappingNode):
         return set()
     private = set()
     for name, body in params.value:
+        name, body = unalias(name), unalias(body)
         if not isinstance(name, yaml.ScalarNode) or not isinstance(body, yaml.MappingNode):
             continue
-        fields = {k.value: v for k, v in body.value if isinstance(k, yaml.ScalarNode)}
-        flag, default = fields.get("NoEcho"), fields.get("Default")
+        parameter = fields(body)
+        flag, default = parameter.get("NoEcho"), parameter.get("Default")
         if isinstance(flag, yaml.ScalarNode) and flag.value.lower() in ("true", "yes", "on", "y") \
                 and isinstance(default, yaml.ScalarNode) and scalar_kind(default) is not None:
             private.add(prefix + (".Parameters" if prefix else "Parameters") + key_step(name.value) + ".Default")

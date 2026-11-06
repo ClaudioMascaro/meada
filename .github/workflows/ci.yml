@@ -103,6 +103,7 @@ jobs:
           S=.claude/skills/prove-meada/scripts/a7-a8-audit.py
           R=.prove-it/runs/ci-a7-a8
           B=.prove-it/runs/ci-a7-a8-input/baseline
+          "$P" .claude/skills/prove-meada/scripts/prove.py selftest
           "$P" .claude/skills/prove-meada/scripts/a7-a8-audit-selfcheck.py --run "$R/safety-checks"
           "$P" "$S" validate-plan
           case "$PROOF_PHASE" in

@@ -64,25 +64,47 @@ def refresh(binary, source, folder):
     backup = folder / 'partial.original'
     backup.write_bytes(original)
     client = Stdio(binary, root, folder / 'stdio.err')
-    query = {'name': 'trace', 'arguments': {'from': 'ordersConfig', 'direction': 'down', 'budget': 12000}}
+    queries = [
+        {'name': 'context', 'arguments': {'symbol': 'ordersConfig', 'budget': 12000}},
+        {'name': 'trace', 'arguments': {'from': 'ordersConfig', 'direction': 'down', 'budget': 12000}},
+    ]
+    observations = {'query_order': ['context', 'trace'], 'queries': queries}
+
+    def read(phase):
+        # Context must be the first reader of edited content. Trace cannot warm an index
+        # and hide a context-specific freshness regression. Both answers use source keys.
+        observed = {q['name']: answer(client.call('tools/call', q)) for q in queries}
+        observations[phase] = observed
+        save(folder / 'answers.json', observations)
+        return observed
+
+    def selected_peer(observed, variable, peer):
+        reason = f'base URL from {variable}, a base_url_env of peer example.com/acme/{peer}'
+        provider = f'example.com/acme/{peer}::main.go::orders'
+        provider_line = next(i for i, line in enumerate((root.parent / peer / 'main.go').read_text().splitlines(), 1)
+                             if line.startswith('func orders('))
+        for tool, text in observed.items():
+            rendered = provider if tool == 'context' else f'example.com/acme/{peer} main.go:{provider_line} orders'
+            assert reason in text and rendered in text, (tool, variable, peer, text)
+
     try:
-        before = answer(client.call('tools/call', query))
+        before = read('before')
         before_export = export(binary, root, folder, 'before')
         partial.write_bytes(original.replace(b'API_URL', b'ALT_URL'))
-        after = answer(client.call('tools/call', query))
+        after = read('after')
         warm = export(binary, root, folder, 'warm')
         cold_root = scope(folder / 'work', folder / 'cold', 'g10b')
         cold = export(binary, cold_root, folder, 'cold')
         normalize = lambda doc: {k: v for k, v in doc.items() if k not in ('commit', 'dirty')}
-        save(folder / 'answers.json', {'before': before, 'after': after})
-        assert 'base URL from API_URL' in before and 'example.com/acme/api' in before, before
-        assert 'base URL from ALT_URL' in after and 'example.com/acme/other' in after, after
-        assert before != after and normalize(warm) == normalize(cold), 'include warm/cold full export mismatch'
+        selected_peer(before, 'API_URL', 'api')
+        selected_peer(after, 'ALT_URL', 'other')
+        assert all(before[tool] != after[tool] for tool in before), 'include edit did not reach both context and trace'
+        assert normalize(warm) == normalize(cold), 'include warm/cold full export mismatch'
         partial.write_bytes(original)
         subprocess.run(['cmp', str(backup), str(partial)], check=True)
-        restored = answer(client.call('tools/call', query))
+        restored = read('restored')
         restored_export = export(binary, root, folder, 'restored')
-        save(folder / 'answers.json', {'before': before, 'after': after, 'restored': restored})
+        selected_peer(restored, 'API_URL', 'api')
         assert restored == before and normalize(restored_export) == normalize(before_export), 'include restore differs'
     finally:
         partial.write_bytes(original)
