@@ -235,9 +235,12 @@ impl Walk<'_> {
                         && b.ident.as_str() == "resource"
                         && b.labels.len() == 2
                         && b.labels[0].as_str() == "aws_ssm_parameter"
-                        && (b.body.get_attribute("type")).is_some_and(
-                            |a| matches!(&a.value, Expression::String(v) if v.value() == "SecureString"),
-                        );
+                        && b.body.get_attribute("type").is_some_and(|a| {
+                            super::ssm_value_is_secret(match &a.value {
+                                Expression::String(s) => Some(s.value().as_str()),
+                                _ => None,
+                            })
+                        });
                     let inner = if sensitive {
                         Hide::Attribute("default")
                     } else if secure {

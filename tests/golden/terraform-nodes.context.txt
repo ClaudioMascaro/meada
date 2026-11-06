@@ -13,6 +13,8 @@ example.com/acme/infra modules/queue/main.tf:13 module.payments.aws_sns_topic_su
 values:
 example.com/acme/infra envs/prod/main.tf:4 resource.aws_sns_topic.orders.name = "orders-events"
 example.com/acme/infra envs/prod/main.tf:6 resource.aws_sns_topic.orders.tags.account = data.aws_caller_identity.current.account_id
+channel::sns::orders-events
+  example.com/acme/infra provisioner envs/prod/main.tf:3 aws_sns_topic.orders (root envs/prod) (no use in the workspace)
 
 `module.orders.aws_sqs_queue.this` fits 2 IaC nodes; pass one of:
 example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (root envs/prod)

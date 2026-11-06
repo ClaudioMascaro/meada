@@ -72,6 +72,11 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
         let Some(name) = node.name.as_deref().filter(|n| !n.is_empty()) else {
             continue;
         };
+        // A structured identifier the entry could not read is not a physical AWS name.
+        // It may name another service, so never invent a typed provisioner for it.
+        if name.starts_with("arn:") || name.contains("://") {
+            continue;
+        }
         if node.pattern && !super::pattern::supported(name) {
             continue;
         }

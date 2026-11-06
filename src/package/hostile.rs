@@ -116,7 +116,13 @@ fn tree(files: Vec<(String, String)>) -> usize {
         .map(|(path, text)| (path, file(text)))
         .collect();
     let (nodes, references) = crate::iac::evaluate(&files);
-    let nodes = (nodes.iter()).map(|n| n.address.len() + n.name.as_ref().map_or(0, String::len));
+    let nodes = (nodes.iter()).map(|n| {
+        n.address.len()
+            + n.name.as_ref().map_or(0, String::len)
+            + n.subscription
+                .as_ref()
+                .map_or(0, |s| serde_json::to_vec(s).unwrap().len())
+    });
     let references = (references.iter())
         .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
     nodes.chain(references).sum()
@@ -138,7 +144,13 @@ fn template(text: String) -> usize {
     let head = "AWSTemplateFormatVersion: x\n";
     let (nodes, references) =
         crate::iac::evaluate(&[("template.yaml".into(), file(format!("{head}{text}")))]);
-    let nodes = (nodes.iter()).map(|n| n.address.len() + n.name.as_ref().map_or(0, String::len));
+    let nodes = (nodes.iter()).map(|n| {
+        n.address.len()
+            + n.name.as_ref().map_or(0, String::len)
+            + n.subscription
+                .as_ref()
+                .map_or(0, |s| serde_json::to_vec(s).unwrap().len())
+    });
     let references = (references.iter())
         .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
     nodes.chain(references).sum()
@@ -834,6 +846,29 @@ fn probes() -> Vec<Probe> {
             stored("a.tfvars", fill(1, |i| format!("v{i} = \"x\"\n")))
         }),
         // IaC nodes (#649): what the evaluation of one root module stores
+        (
+            "iac: AWS subscriptions with repeated references and filters",
+            || {
+                let subscriptions = fill(1, |i| {
+                    format!(
+                        "resource \"aws_sns_topic_subscription\" \"s{i}\" {{\n topic_arn = aws_sns_topic.source.arn\n protocol = \"sqs\"\n endpoint = aws_sqs_queue.target.arn\n filter_policy = jsonencode({{x = [\"a\"]}})\n}}\n"
+                    )
+                });
+                nodes(format!(
+                    "resource \"aws_sns_topic\" \"source\" {{ name = \"source\" }}\nresource \"aws_sqs_queue\" \"target\" {{ name = \"target\" }}\n{subscriptions}"
+                ))
+            },
+        ),
+        ("iac: AWS EventBridge rules and targets", || {
+            let routes = fill(1, |i| {
+                format!(
+                    "resource \"aws_cloudwatch_event_rule\" \"r{i}\" {{\n name = \"r{i}\"\n event_bus_name = \"events\"\n event_pattern = \"{{}}\"\n}}\nresource \"aws_cloudwatch_event_target\" \"t{i}\" {{\n rule = aws_cloudwatch_event_rule.r{i}.name\n event_bus_name = \"events\"\n arn = aws_sqs_queue.target.arn\n}}\n"
+                )
+            });
+            nodes(format!(
+                "{routes}resource \"aws_sqs_queue\" \"target\" {{ name = \"target\" }}\n"
+            ))
+        }),
         ("iac: a chain of resources", || {
             nodes(fill(1, |i| {
                 format!("resource \"a\" \"r{}\" {{ x = a.r{i}.id }}\n", i + 1)

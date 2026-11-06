@@ -50,6 +50,7 @@ KEYED = {
     "iac_nodes": ("identity", "root"),
     "provisioners": ("contract", "node", "root"),
     "provisions": ("side", "provisioner", "root", "contract"),
+    "subscriptions": ("source", "target", "node", "root"),
     "providers": ("contract", "site"),
     "consumers": ("contract", "site"),
 }
@@ -723,6 +724,13 @@ def cmd_selftest(_):
     assert "candidates: [2 items] -> [3 items]: 1" in text, text
     assert "communities" not in text and len(sample) == 0, (text, sample)  # no repo: nothing rendered
     assert export_diff(base, json.loads(json.dumps(base))) == ([], [])
+    subscription = {"source": "channel::sns::events", "target": "channel::sqs::jobs",
+                    "node": "infra::main.tf::aws_sns_topic_subscription.jobs", "root": "dev"}
+    subscription_key = "channel::sns::events | channel::sqs::jobs | infra::main.tf::aws_sns_topic_subscription.jobs | dev"
+    assert export_diff({}, {"subscriptions": [subscription]}) == ([
+        "  subscriptions: +1 -0 ~0", f"    + {subscription_key}"], [])
+    assert export_diff({"subscriptions": [subscription]}, {}) == ([
+        "  subscriptions: +0 -1 ~0", f"    - {subscription_key}"], [])
     assert spread(list(range(100)), 4) == [0, 25, 50, 75] and spread([1, 2], 10) == [1, 2]
     assert short("target", "r::x") == "set" and short("candidates", [1]) == "[1 items]"
     q = auto_queries({"calls": [{"target": "r::k.kt::p.Flow.test(Duration?,String?)"}], "providers": []})

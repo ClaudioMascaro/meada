@@ -8,6 +8,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- AWS infrastructure contracts: Terraform/OpenTofu SNS, EventBridge and Kinesis channels;
+  DynamoDB, RDS instances and clusters, ElastiCache clusters and replication groups, SSM and
+  Secrets Manager resources, including ARN name extraction. SNS-to-SQS subscriptions and
+  EventBridge rules/targets link queue consumers to source producers, exact without a filter
+  and inferred with one. Context, trace, export and scoped orphan reporting cover all kinds;
+  SSM SecureString values are redacted, including Terraform/OpenTofu JSON. The schema adds subscription summaries and older
+  indexes rebuild. Release level: minor, meada and meada-core 1.3.0 (#658).
 - Orphan infrastructure contracts (#657): `meada status` lists provisioners without uses and
   uses without provisioners only for a contract kind and broker or resource kind with both
   sides in the visible scope. Otherwise `search` and `context` mark the side with

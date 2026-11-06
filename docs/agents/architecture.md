@@ -95,8 +95,9 @@ for the area a change touches.
 - `xml.rs`: the bounds the XML build readers of `jvm/` and `dotnet/` share. [seams](map/seams.md)
 - `document/`: OpenAPI and AsyncAPI provider documents, read into a `Summary` (spec #21), and `events.rs`, the one YAML and JSON event reader every YAML or JSON reader goes through (#646). [documents](map/documents.md)
 - `config_values.rs`, `config_values/hcl.rs`: config values (#639, #640, ADR 0025): every scalar of the YAML, JSON and Terraform files the walk visits and of the hidden CI paths, with its key path, `search` kind `value` and the `meada status` counts. [documents](map/documents.md)
-- `iac.rs`, `iac/`: the embedded type table and provisioning sides/links (#656), and
-  `iac/orphans.rs`, scope-aware orphan reports and side markers (#657); IaC nodes (#649,
+- `iac.rs`, `iac/`: the embedded AWS type table, provisioning sides/links and subscription
+  summaries (`iac/subscription.rs`, #656, #658), and `iac/orphans.rs`, scope-aware orphan
+  reports and side markers (#657); IaC nodes (#649,
   ADR 0025): the Terraform resources, data blocks and module calls with their address and root
   module, the references between them, the static evaluation of their names (#650,
   `iac/functions.rs` the pure functions), `search` kind `iac`, and `context` and `trace` on an

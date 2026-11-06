@@ -6,6 +6,16 @@ this file, and a change to these modules updates it.
 
 ## Modules in brief
 
+- AWS subscriptions (#658): `iac/subscription.rs` evaluates source and SQS target names in
+  each Terraform/OpenTofu instance, with bounded alias/module traversal and known-resource
+  name/ARN/id references. `channel.rs` routes consumer links and related context sides through
+  the stored summaries, preserving levels and subscription reasons. New AWS source channels
+  (`sns`, `eventbridge`, `kinesis`) can start a trace through the existing `starts` seam;
+  provisioning traces continue through documented producers when consumers follow them.
+  Resource addresses and EventBridge rules are indexed once per root; each subscription
+  receives its node index directly, so lookups never rescan all pending nodes.
+  These decisions apply equally to full and partial exports.
+
 - Orphans (#657): `iac::orphans::Scope` groups provisioners and uses by
   `ContractKind::provisioned_group` (contract kind plus broker or resource kind). Status lists
   unmatched sides only in groups with both roles in the visible exports, using provisioning

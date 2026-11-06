@@ -340,8 +340,8 @@ mais casa. Eles não entram no `meada export`.
   com `apiVersion` e `kind: Secret`, ou um item assim de uma lista `items`), o `default` de uma
   `variable` do Terraform com `sensitive = true` e todo valor que um arquivo `.tfvars` dá a uma
   variável desse nome (todo valor, quando um arquivo Terraform na pasta dele ou acima não é lido)
-  e o `value` de um recurso `aws_ssm_parameter` com `type = "SecureString"` literal, em HCL
-  ou Terraform JSON, ficam guardados como `redacted`, com o caminho da chave, o tipo e a linha. Fora disso nada é filtrado: o índice
+  ficam guardados como `redacted`. Valores SSM com tipo SecureString ou não resolvido, em HCL
+  e no JSON de Terraform/OpenTofu, também são ocultados, com o caminho da chave, o tipo e a linha. Fora disso nada é filtrado: o índice
   guarda o que o checkout já tem. Ponha no `.meadaignore` os arquivos que não devem entrar no
   índice (`secrets/`, `*.env.json`).
 
@@ -524,6 +524,46 @@ Um padrão
 com pelo menos três caracteres literais e curingas nos limites de segmentos (`-`, `_`, `.`, `/`)
 se liga a um nome literal em `inferred`, ou `ambiguous` quando vários nomes correspondem. Padrões
 nunca se ligam a padrões. O grafo da console lista os provisionadores e suas ligações próprias.
+
+### Canais, dados, segredos e assinaturas AWS
+
+A tabela Terraform/OpenTofu também reconhece os tipos abaixo. ARNs são reduzidos ao nome
+físico, incluindo caminhos de parâmetros e segredos; o sufixo de seis caracteres do ARN do
+Secrets Manager é removido. As mesmas regras de provisionamento, `context`, `trace` e export
+valem para todos esses contratos.
+
+| Tipo Terraform | Nome físico | Contrato |
+| --- | --- | --- |
+| `aws_sns_topic` | `name` | `channel::sns` |
+| `aws_cloudwatch_event_bus` | `name` | `channel::eventbridge` |
+| `aws_kinesis_stream` | `name` | `channel::kinesis` |
+| `aws_dynamodb_table` | `name` | `resource::dynamodb` |
+| `aws_db_instance` | `identifier` | `resource::rds` |
+| `aws_rds_cluster` | `cluster_identifier` | `resource::rds` |
+| `aws_elasticache_cluster` | `cluster_id` | `resource::elasticache` |
+| `aws_elasticache_replication_group` | `replication_group_id` | `resource::elasticache` |
+| `aws_ssm_parameter` | `name`, preservando `/` inicial | `resource::ssm` |
+| `aws_secretsmanager_secret` | `name` | `resource::secretsmanager` |
+
+Um parâmetro SSM `SecureString` tem `value` armazenado como `redacted` em HCL e no JSON de Terraform/OpenTofu. Quando `type` é uma
+expressão que o leitor de valores não resolve, o valor também é ocultado por precaução.
+
+`aws_sns_topic_subscription` com `protocol = "sqs"` liga consumidores da fila aos produtores
+do tópico. `aws_cloudwatch_event_rule` e `aws_cloudwatch_event_target` fazem o mesmo do bus para
+a fila; sem `event_bus_name`, usam `default`. Sem filtro, o nível é `exact`; com `filter_policy`
+ou `event_pattern`, é `inferred`. Nomes sobrescrevíveis também dão `inferred`, com as variáveis
+no motivo. O motivo identifica a assinatura ou o target e a regra. Endpoints não resolvidos,
+protocolos diferentes e targets sem uma regra única no mesmo bus não criam ligações.
+Regras somente com agendamento não roteiam eventos publicados no bus.
+
+`context` lista produtores e consumidores através da assinatura. `trace` sobe do consumidor
+até o produtor e desce do provisionador até os consumidores; um canal de origem `sns`,
+`eventbridge` ou `kinesis` também pode iniciar o trace. Os resumos entram no array opcional `subscriptions`, com origem, destino, nó e raiz.
+As ligações entram em `links`, mantendo
+as ligações de provisionamento separadas em `provisions`. `meada status` lista contratos
+provisionados sem uso e usos sem provisionador, por kind e broker, somente quando o workspace
+contém ao menos um provisionador e um uso daquele grupo. Os outros formatos IaC continuam
+como nós e referências; esta tabela de contratos cobre arquivos `.tf` e `.tofu`.
 
 ## 4. `meada.toml`: referência
 

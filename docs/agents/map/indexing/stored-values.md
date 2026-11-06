@@ -108,7 +108,9 @@ from ...", with the whole list. A value the index now stores joins it.
   `overridable` (a JSON list of `iac::Overridable`: path, line, `var.<name>` and whether a var file
   gives the value), file, first and last line, the key path of its block and, for a Compose service
   (#652), its image and build context with an overridable flag each (NULL elsewhere), and for a
-  Crossplane object its `role` (#655, NULL elsewhere), and `iac_references`, each reference's root,
+  Crossplane object its `role` (#655, NULL elsewhere), and `subscription` (#658, NULL elsewhere), a JSON summary with source and target channel
+  contracts, an inferred flag and the reason identifying the subscription/target, rule, root
+  and overridable values (no payloads or filter contents), and `iac_references`, each reference's root,
   source and target addresses and `via` (the `var`, `local` or module output it went through), both
   rewritten root by root (`iac::refresh`) for the roots whose evaluation unit holds a Terraform
   file, var file or Compose file that changed; the CloudFormation and SAM resources of

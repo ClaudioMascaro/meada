@@ -523,6 +523,10 @@
   `iac` scans every node of every repository (a `ponytail:` in `iac::hits`); an indexed lookup waits
   for a workspace that makes it slow. A module call has no physical name: its `name` is one of its
   inputs.
+- AWS subscriptions (#658) share `EVAL_DEPTH_MAX`, `EVAL_WORK_MAX`, `ROOT_STORED_MAX` and
+  `STORED_MAX`: alias/module traversal is bounded by evaluation depth/work and every stored
+  summary is charged to the existing per-root and repository byte budgets. The hostile probe
+  table includes repeated subscription endpoints and filters; its output counts the summaries.
 - `iac/types.rs` (#656): `FORM_TEXT_MAX` (1,024 bytes); longer identifiers keep their whole
   text as the name, bounding the form matcher. The table covers SQS queues and S3 buckets in
   `.tf` and `.tofu` resource blocks only. Data blocks and unlisted types make no provisioner.

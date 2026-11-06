@@ -58,6 +58,7 @@ pub(crate) mod orphans;
 mod pattern;
 pub(crate) mod provision;
 pub(crate) mod serverless;
+pub(crate) mod subscription;
 pub(crate) mod types;
 
 /// The instances one `count` or `for_each` gives; past it the block is one node with no key.
@@ -184,6 +185,7 @@ pub(crate) struct Node {
     pub handler: Option<Resolved>,
     /// The events of a Serverless function, in file order.
     pub events: Vec<Resolved>,
+    pub subscription: Option<subscription::Subscription>,
 }
 
 /// A root module's variable a name went through: by its default, or by the value a var file
@@ -560,7 +562,7 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
         let mut refs = Refs::default();
         refs.visit_body(&b.body);
         let mut args = BTreeMap::new();
-        if kind == Kind::Module {
+        if kind == Kind::Module || subscription::reads(ty) {
             for a in b.body.attributes() {
                 args.insert(a.key.as_str().to_string(), Named::new(&a.value));
             }
@@ -888,6 +890,7 @@ struct Eval<'m> {
     /// The nodes whose physical name waits for every instance: the node, its instance, its block
     /// and its instance's `each`.
     pending: Vec<(usize, usize, &'m Block, Option<Each>)>,
+    subscription_inputs: subscription::Inputs,
     root: String,
     root_nodes: usize,
     root_left: usize,
@@ -911,6 +914,7 @@ impl<'m> Eval<'m> {
             outputs: false,
             work: 0,
             pending: Vec::new(),
+            subscription_inputs: subscription::Inputs::default(),
             root: String::new(),
             root_nodes: 0,
             root_left: 0,
@@ -945,6 +949,7 @@ impl<'m> Eval<'m> {
         self.values.clear();
         self.evaluating.clear();
         self.pending.clear();
+        self.subscription_inputs = subscription::Inputs::default();
         self.outputs = false;
         self.work = EVAL_WORK_MAX;
         self.root = label(dir).to_string();
@@ -955,7 +960,8 @@ impl<'m> Eval<'m> {
         self.values.clear();
         self.evaluating.clear();
         self.outputs = true;
-        for (node, instance, block, each) in std::mem::take(&mut self.pending) {
+        let pending = std::mem::take(&mut self.pending);
+        for &(node, instance, block, ref each) in &pending {
             let Some(named) = &block.named else { continue };
             let found = self.value(instance, each.as_ref(), named, 0);
             // A null or a collection is no name; anything else is its text, `*` when unresolved.
@@ -980,6 +986,17 @@ impl<'m> Eval<'m> {
             let node = &mut self.nodes[node];
             (node.name, node.pattern) = (name, pattern);
             node.overridable = found.through.into_iter().collect();
+        }
+        self.prepare_subscriptions(&pending);
+        for &(node, instance, block, ref each) in &pending {
+            let Some(subscription) = self.subscription(node, instance, each.as_ref(), block) else {
+                continue;
+            };
+            let bytes = serde_json::to_vec(&subscription).map_or(usize::MAX, |s| s.len());
+            if !self.charge(bytes) {
+                return;
+            }
+            self.nodes[node].subscription = Some(subscription);
         }
         let modules = self.modules;
         for i in 0..self.instances.len() {
@@ -1070,6 +1087,7 @@ impl<'m> Eval<'m> {
                     role: None,
                     handler: None,
                     events: Vec::new(),
+                    subscription: None,
                 });
                 let local = (block.source.as_deref())
                     .and_then(|s| local_source(dir, s))
@@ -1777,7 +1795,7 @@ pub(crate) fn refresh_template(tx: &Transaction, path: &str, src: Option<&[u8]>)
 /// Stores `nodes` and `references`.
 pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference]) -> Result<()> {
     let mut insert = tx
-        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)")?;
+        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)")?;
     for n in nodes {
         let (line, end) = (n.line as i64, n.end_line as i64);
         let overridable = serde_json::to_string(&n.overridable)?;
@@ -1802,6 +1820,10 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
             n.handler.as_ref().map(|h| &h.text),
             n.handler.as_ref().map(|h| h.overridable),
             events,
+            n.subscription
+                .as_ref()
+                .map(serde_json::to_string)
+                .transpose()?,
         ])?;
     }
     let mut insert = tx.prepare_cached("INSERT INTO iac_references VALUES (?1, ?2, ?3, ?4)")?;
@@ -1814,7 +1836,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
 /// The columns of a node, in `row`'s order.
 const COLUMNS: &str = "address, root, type, name, pattern, overridable, path, line, end_line, \
                        block, image, image_overridable, build, build_overridable, role, \
-                       handler, handler_overridable, events";
+                       handler, handler_overridable, events, subscription";
 
 /// The text at column `at` and its overridable flag at the next one, when there is a text.
 fn resolved(r: &rusqlite::Row, at: usize) -> rusqlite::Result<Option<Resolved>> {
@@ -1844,6 +1866,9 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Node> {
         role: r.get(14)?,
         handler: resolved(r, 15)?,
         events: serde_json::from_str(&r.get::<_, String>(17)?).unwrap_or_default(),
+        subscription: r
+            .get::<_, Option<String>>(18)?
+            .and_then(|s| serde_json::from_str(&s).ok()),
     })
 }
 
@@ -1981,7 +2006,7 @@ fn references(
     let mut statement = db.prepare(&sql)?;
     let mut found: Vec<(Node, Option<String>)> = statement
         .query_map(params![node.root, node.address], |r| {
-            Ok((row(r)?, r.get(18)?))
+            Ok((row(r)?, r.get(COLUMNS.split(", ").count())?))
         })?
         .collect::<rusqlite::Result<_>>()?;
     found.sort_by(|(a, va), (b, vb)| {

@@ -258,7 +258,9 @@ impl<'a> Graph<'a> {
                     walk.push(depth, row);
                     walk.call_down(c, depth + 1, &mut HashSet::new());
                 }
-                None if self.ends(site) => walk.push(depth, row),
+                None if self.ends(site) && self.into.get(site).is_none_or(Vec::is_empty) => {
+                    walk.push(depth, row)
+                }
                 None => walk.enter(site, depth, row),
             }
         }
@@ -278,6 +280,14 @@ impl<'a> Graph<'a> {
             };
         }
         // A route is a whole contract (`GET /users` names one too), or a path on any method.
+        let mut sites: Vec<&str> = (contract::KINDS.iter())
+            .flat_map(|kind| kind.starts(from, &self.providers))
+            .collect();
+        sites.sort();
+        sites.dedup();
+        if !sites.is_empty() {
+            return Lookup::Nodes(sites);
+        }
         if let Some(kind) = contract::kind_of(from)
             && let Some((provider, consumer)) = kind.sides()
         {
@@ -287,14 +297,6 @@ impl<'a> Graph<'a> {
                  from one",
                 kind.prefix()
             )]);
-        }
-        let mut sites: Vec<&str> = (contract::KINDS.iter())
-            .flat_map(|kind| kind.starts(from, &self.providers))
-            .collect();
-        sites.sort();
-        sites.dedup();
-        if !sites.is_empty() {
-            return Lookup::Nodes(sites);
         }
         if self.is_repo(from) && self.provisions.iter().any(|l| l.side == from) {
             let id = self
@@ -431,9 +433,6 @@ pub(crate) fn starts(
             Direction::Up => Vec::new(),
         });
     }
-    if contract::kind_of(from).is_some_and(|kind| kind.sides().is_some()) {
-        return Ok(Vec::new());
-    }
     let providers: Vec<(&str, &str)> = (partial.exports.iter())
         .flat_map(|e| &e.providers)
         .map(|p| (p.contract.as_str(), p.site.as_str()))
@@ -444,6 +443,9 @@ pub(crate) fn starts(
         .collect();
     if !sites.is_empty() {
         return Ok(sites);
+    }
+    if contract::kind_of(from).is_some_and(|kind| kind.sides().is_some()) {
+        return Ok(Vec::new());
     }
     if partial.exports.iter().any(|e| e.repository == from)
         && crate::iac::provision::links(&partial.exports)

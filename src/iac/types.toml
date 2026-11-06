@@ -18,7 +18,10 @@
 #   form followed by `/` and anything (an object key under a bucket). A text that fits no form is
 #   the name as it is.
 #
-# Every entry has a fixture case: a block of its type in `tests/fixtures/provision-infra/`
+# `{path}` captures a name including `/` and must fit the whole text; `?` matches one
+# ASCII alphanumeric character (the six-character Secrets Manager ARN suffix).
+#
+# Every entry has a fixture case: a block of its type in `tests/fixtures/{provision-infra,aws-infra}/`
 # (`types::tests::every_entry_has_a_fixture_case`).
 
 [[entry]]
@@ -46,3 +49,83 @@ forms = [
   "https://{name}.s3.*.amazonaws.com",
   "https://s3.*.amazonaws.com/{name}",
 ]
+
+[[entry]]
+format = "terraform"
+type = "aws_sns_topic"
+contract = "channel"
+kind = "sns"
+name = "name"
+forms = ["arn:*:sns:*:*:{name}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_cloudwatch_event_bus"
+contract = "channel"
+kind = "eventbridge"
+name = "name"
+forms = ["arn:*:events:*:*:event-bus/{path}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_kinesis_stream"
+contract = "channel"
+kind = "kinesis"
+name = "name"
+forms = ["arn:*:kinesis:*:*:stream/{name}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_dynamodb_table"
+contract = "resource"
+kind = "dynamodb"
+name = "name"
+forms = ["arn:*:dynamodb:*:*:table/{name}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_db_instance"
+contract = "resource"
+kind = "rds"
+name = "identifier"
+forms = ["arn:*:rds:*:*:db:{name}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_rds_cluster"
+contract = "resource"
+kind = "rds"
+name = "cluster_identifier"
+forms = ["arn:*:rds:*:*:cluster:{name}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_elasticache_cluster"
+contract = "resource"
+kind = "elasticache"
+name = "cluster_id"
+forms = ["arn:*:elasticache:*:*:cluster:{name}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_elasticache_replication_group"
+contract = "resource"
+kind = "elasticache"
+name = "replication_group_id"
+forms = ["arn:*:elasticache:*:*:replicationgroup:{name}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_ssm_parameter"
+contract = "resource"
+kind = "ssm"
+name = "name"
+forms = ["arn:*:ssm:*:*:parameter{path}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_secretsmanager_secret"
+contract = "resource"
+kind = "secretsmanager"
+name = "name"
+forms = ["arn:*:secretsmanager:*:*:secret:{path}-??????"]

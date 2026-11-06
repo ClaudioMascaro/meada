@@ -712,6 +712,7 @@ impl<'m> Eval<'m> {
                 role: roles[kept - 1].map(|r| r.text().into()),
                 handler: None,
                 events: Vec::new(),
+                subscription: None,
             });
         }
         let (objs, addresses, roles) = (&objs[..kept], &addresses[..kept], &roles[..kept]);
@@ -743,6 +744,7 @@ impl<'m> Eval<'m> {
                     role: Some(crossplane::Role::Composed.text().into()),
                     handler: None,
                     events: Vec::new(),
+                    subscription: None,
                 });
                 held.entry(i).or_default().push(composed.len());
                 composed.push((i, address, b));

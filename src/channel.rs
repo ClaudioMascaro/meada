@@ -51,6 +51,7 @@ pub fn contract(broker: &str, name: Option<&str>) -> String {
 struct Routes<'a> {
     pub bindings: Vec<&'a Binding>,
     pub publishes: Vec<&'a Publish>,
+    pub subscriptions: Vec<&'a crate::iac::subscription::Subscription>,
 }
 
 impl<'a> Routes<'a> {
@@ -58,6 +59,7 @@ impl<'a> Routes<'a> {
         Self {
             bindings: exports.iter().flat_map(|e| &e.bindings).collect(),
             publishes: exports.iter().flat_map(|e| &e.publishes).collect(),
+            subscriptions: exports.iter().flat_map(|e| &e.subscriptions).collect(),
         }
     }
 
@@ -166,7 +168,27 @@ impl ContractKind for Channel {
                 matched: None,
                 shape: None,
             });
+        let subscribed_producers = export.providers.iter().filter_map(|p| {
+            Some(Related {
+                site: &p.site,
+                role: Role::Provider,
+                words: format!("{producer} {}", crate::render::label(&p.site)),
+                matched: Some(subscribed(&p.contract, contract, &routes)?),
+                shape: p.shape.as_ref(),
+            })
+        });
+        let subscribed_consumers = export.consumers.iter().filter_map(|c| {
+            Some(Related {
+                site: &c.site,
+                role: Role::Consumer,
+                words: consumer.into(),
+                matched: Some(subscribed(contract, c.contract.as_deref()?, &routes)?),
+                shape: c.shape.as_ref(),
+            })
+        });
         provided
+            .chain(subscribed_producers)
+            .chain(subscribed_consumers)
             .chain(published)
             .chain(consumed)
             .chain(bound)
@@ -356,6 +378,22 @@ impl ContractKind for Channel {
             .collect()
     }
 
+    /// New AWS source channels can start a trace at each producer, so a subscription's
+    /// source can be followed without selecting one producer first.
+    fn starts<'a>(&self, from: &str, providers: &[(&'a str, &'a str)]) -> Vec<&'a str> {
+        if !matches!(
+            parse(from),
+            Some(("sns" | "eventbridge" | "kinesis", Some(_)))
+        ) {
+            return Vec::new();
+        }
+        providers
+            .iter()
+            .filter(|(contract, _)| *contract == from)
+            .map(|(_, site)| *site)
+            .collect()
+    }
+
     /// A consumer is a door, an unresolved side included: the handler still consumes from
     /// somewhere.
     fn entry(&self, role: Role, contract: &str) -> Option<EntryKind> {
@@ -425,6 +463,9 @@ fn reaching<'p>(
         if let Some(matched) = fits(&p.contract, contract) {
             strongest(&mut found, &p.site, matched);
         }
+        if let Some(matched) = subscribed(&p.contract, contract, routes) {
+            strongest(&mut found, &p.site, matched);
+        }
     }
     for b in routes.bindings.iter().filter(|b| b.contract == contract) {
         for p in routes.publishes.iter().copied() {
@@ -434,6 +475,26 @@ fn reaching<'p>(
         }
     }
     found
+}
+
+/// A subscription carries the source channel to the target; a filter is evidence of a
+/// possible delivery, never an exact one. Several routes to one producer keep the strongest.
+fn subscribed(source: &str, target: &str, routes: &Routes<'_>) -> Option<(Level, String)> {
+    routes
+        .subscriptions
+        .iter()
+        .filter(|s| s.source == source && s.target == target)
+        .map(|s| {
+            (
+                if s.inferred {
+                    Level::Inferred
+                } else {
+                    Level::Exact
+                },
+                s.reason.clone(),
+            )
+        })
+        .min()
 }
 
 /// Keeps the strongest of the matches to `key`.

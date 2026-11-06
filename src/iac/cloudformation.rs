@@ -615,6 +615,7 @@ pub(super) fn nodes(unit: &Unit) -> (Vec<Node>, Vec<Reference>) {
             role: None,
             handler: None,
             events: Vec::new(),
+            subscription: None,
         });
         let targets = referenced(&id, &r.body, |t| eval.resources.contains_key(t));
         for (target, via) in targets.into_iter().take(REFERENCES_MAX) {

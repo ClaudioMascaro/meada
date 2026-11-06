@@ -514,6 +514,7 @@ pub(super) fn evaluate(
                 role: None,
                 handler: None,
                 events: Vec::new(),
+                subscription: None,
             });
             let mut targets: BTreeSet<(String, String)> = BTreeSet::new();
             for (list, via) in [(&s.depends_on, "depends_on"), (&s.links, "links")] {

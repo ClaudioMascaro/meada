@@ -270,14 +270,14 @@ enum SecretPlace {
     /// Under `variable.<name>.default` of a Terraform JSON file: secret when the variable says
     /// `"sensitive": true`.
     Variable(String),
-    /// Under `resource.aws_ssm_parameter.<name>.value`: secret for a SecureString parameter.
-    SsmParameter(String),
     /// Under the top-level key `<name>` of a `.tfvars.json` file: secret when the variable is
     /// sensitive.
     Tfvars(String),
     /// Under `Parameters.<name>.Default`: secret when the file is a CloudFormation template and
     /// the parameter says `NoEcho`.
     Parameter(String),
+    /// An SSM parameter value in Terraform/OpenTofu JSON; its type controls redaction.
+    SsmParameter(String),
 }
 
 impl SecretPlace {
@@ -320,6 +320,12 @@ impl SecretPlace {
             _ => SecretPlace::No,
         }
     }
+}
+
+/// Only an explicitly public SSM type permits storing its value. An unresolved type is
+/// conservatively secret in both HCL and JSON; absence is handled by their attribute readers.
+fn ssm_value_is_secret(kind: Option<&str>) -> bool {
+    !matches!(kind, Some("String" | "StringList"))
 }
 
 /// Whether `file` is a Terraform or OpenTofu JSON file (`*.tf.json`, `*.tofu.json`).
@@ -485,14 +491,14 @@ pub(crate) fn read_with(
                     SecretPlace::Variable(name) => {
                         doc["variable"][name.as_str()]["sensitive"] == Value::Bool(true)
                     }
-                    SecretPlace::SsmParameter(name) => {
-                        doc["resource"]["aws_ssm_parameter"][name.as_str()]["type"].as_str()
-                            == Some("SecureString")
-                    }
                     SecretPlace::Tfvars(name) => {
                         sensitive.contains(&name) || sensitive.contains(ANY_VARIABLE)
                     }
                     SecretPlace::Parameter(name) => crate::iac::cloudformation::no_echo(doc, &name),
+                    SecretPlace::SsmParameter(name) => doc["resource"]["aws_ssm_parameter"]
+                        [name.as_str()]
+                    .get("type")
+                    .is_some_and(|t| ssm_value_is_secret(t.as_str())),
                 };
                 if hidden {
                     row.value = None;

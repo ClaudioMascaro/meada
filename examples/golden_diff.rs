@@ -24,6 +24,7 @@ const KEYED: &[&str] = &[
     "iac_nodes",
     "provisioners",
     "provisions",
+    "subscriptions",
 ];
 const OTHER: &[&str] = &[
     "files",
@@ -58,6 +59,7 @@ fn key(section: &str, v: &Value) -> String {
         "iac_nodes" => &["identity", "root"],
         "provisioners" => &["contract", "node", "root"],
         "provisions" => &["side", "provisioner", "root", "contract"],
+        "subscriptions" => &["source", "target", "node", "root"],
         "providers" | "consumers" => &["contract", "site"],
         _ => return v.to_string(),
     };

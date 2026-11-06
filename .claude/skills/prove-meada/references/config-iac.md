@@ -22,6 +22,7 @@ lands it writes the check.
 | IaC nodes, Serverless (#654): `search` kind `iac`, `context` and `trace` on `functions.<name>` and on the `resources` section's logical ids, handler and events, `${self:...}` and `${opt:...}` resolved, `${env:...}` and `${ssm:...}` as patterns | #654's criteria (of 18 to 31) | MCP stdio and HTTP | `a7-sls` | by hand against the probe's README (no oracle yet: a follow-up) | landed, unchecked by script (#654) |
 | IaC nodes of the other formats (Kubernetes, Kustomize, Compose, Crossplane) | 18 to 31 | MCP stdio and HTTP, CLI status | `boutique`, `crossplane-aws`, `kube-prometheus` | to write | pending |
 | Terraform SQS/S3 provisioners, bounded patterns, levels, root labels, context and trace | #656 | CLI export, MCP stdio and HTTP | neutral generated workspace | `provisions.py --head-bin BIN --run DIR` | landed (#656) |
+| AWS SNS/EventBridge/Kinesis, DynamoDB/RDS/ElastiCache/SSM/Secrets Manager provisioners, ARN extraction, SecureString and SNS/EventBridge subscriptions | #658, #642 32 to 43 and 57 to 60 | CLI export/status, MCP stdio and HTTP | independently generated neutral AWS workspace | `aws.py --head-bin BIN --base-bin BASE --run DIR` and `aws.py --json-values --head-bin BIN --run DIR` ([aws.md](aws.md)) | landed (#658) |
 | Scope-aware orphans: status only when both sides of the contract kind plus broker/resource kind exist; otherwise side markers in search and context | #657; #642 stories 59, 60; ADR 0026 Orphans | CLI status/export, MCP stdio and HTTP; existing shared queries also console API | neutral independently generated repositories, hashed per run | `orphans.py --base-bin BASE --head-bin HEAD --run DIR --http`, plus all-corpus base parity and console API | landed (#657) |
 | Infrastructure contracts: SDK and config use sides, subscriptions | 32 to 43, 57, 58 | CLI export and status, MCP | `terraform-sqs`, `sam-rust`, `crossplane-aws` | to write | pending |
 | Workloads, image contract, environment entries | 44 to 49 | CLI export, MCP | `boutique`, `sam-rust` | to write | pending |
@@ -36,6 +37,10 @@ lands it writes the check.
 python3 $S/orphans.py --base-bin "$RUN/bin/meada-base" --head-bin "$RUN/bin/meada-head" \
   --run "$RUN/orphans" --http
 ```
+
+When the brief's exact baseline already contains #657, add `--base-has-orphans`:
+the complete status, including its orphan rows, must equal that baseline. The
+script still independently asserts the source-derived orphan set and row count.
 
 When the six scenarios were already completed and only the same-token cross-kind control
 needs adding, the same command with `--cross-kind-only` drives just that focused addendum in

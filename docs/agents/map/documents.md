@@ -123,7 +123,10 @@ this file, and a change to these modules updates it.
   `expression` or `template` with its source text (shown on one line by `one_line`); a file nested past `NESTING_MAX` brackets
   (counted by `nested_past` before the parser runs) is unreadable. `.tf.json`, `.tofu.json`
   and `.tfvars.json` go through the event reader (their key paths are the same), their strings
-  with an interpolation typed by `json_kind` and stored as the quoted JSON string. Sensitive:
+  with an interpolation typed by `json_kind` and stored as the quoted JSON string.
+  SSM parameter `value` scalars in HCL and Terraform/OpenTofu JSON share the type policy:
+  SecureString and unresolved types are redacted; literal String and StringList remain public.
+  Sensitive:
   a top-level `variable` with `sensitive = true` hides its `default` (`SecretPlace::Variable`
   in JSON, `Hide::Attribute` in HCL); an `aws_ssm_parameter` resource with literal
   `type = "SecureString"` hides its `value` (`SecretPlace::SsmParameter` in JSON,

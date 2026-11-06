@@ -163,8 +163,62 @@ fn only_iac_nodes_holding_contract_sides_enter_the_export() {
     let text = Engine::open(&repo).unwrap().export().unwrap();
     let json: serde_json::Value = serde_json::from_str(&text).unwrap();
     let nodes = json["iac_nodes"].as_array().unwrap();
-    assert!(!nodes.is_empty());
-    assert!(nodes.iter().all(|n| n["type"] == "aws_sqs_queue"));
+    let sides: Vec<_> = nodes
+        .iter()
+        .map(|n| {
+            (
+                n["address"].as_str().unwrap(),
+                n["type"].as_str().unwrap(),
+                n["root"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        sides,
+        [
+            ("aws_sns_topic.orders", "aws_sns_topic", "envs/prod"),
+            ("aws_sqs_queue.dlq[0]", "aws_sqs_queue", "envs/prod"),
+            ("aws_sqs_queue.dlq[1]", "aws_sqs_queue", "envs/prod"),
+            (
+                "module.orders.aws_sqs_queue.this",
+                "aws_sqs_queue",
+                "envs/prod"
+            ),
+            (
+                "module.orders.aws_sqs_queue.this",
+                "aws_sqs_queue",
+                "envs/stage"
+            ),
+            (
+                "module.payments.aws_sqs_queue.this",
+                "aws_sqs_queue",
+                "envs/prod"
+            ),
+        ]
+    );
+    assert_eq!(
+        json["subscriptions"],
+        serde_json::json!([
+            {
+                "source": "channel::sns::orders-events",
+                "target": "channel::sqs::orders",
+                "node": "example.com/acme/infra::modules/queue/main.tf::module.orders.aws_sns_topic_subscription.this",
+                "root": "envs/prod"
+            },
+            {
+                "source": "channel::sns::orders-events",
+                "target": "channel::sqs::payments",
+                "node": "example.com/acme/infra::modules/queue/main.tf::module.payments.aws_sns_topic_subscription.this",
+                "root": "envs/prod"
+            },
+            {
+                "source": "channel::sns::orders-stage",
+                "target": "channel::sqs::orders-stage",
+                "node": "example.com/acme/infra::modules/queue/main.tf::module.orders.aws_sns_topic_subscription.this",
+                "root": "envs/stage"
+            }
+        ])
+    );
     assert!(json.get("iac_references").is_none());
 }
 

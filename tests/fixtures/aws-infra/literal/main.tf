@@ -1,0 +1,10 @@
+resource "aws_sns_topic" "topic" { name = "alerts" }
+resource "aws_cloudwatch_event_bus" "bus" { name = "events" }
+resource "aws_kinesis_stream" "stream" { name = "records" }
+resource "aws_dynamodb_table" "table" { name = "orders" }
+resource "aws_db_instance" "database" { identifier = "orders-db" }
+resource "aws_rds_cluster" "database_cluster" { cluster_identifier = "orders-cluster" }
+resource "aws_elasticache_cluster" "cache" { cluster_id = "orders-cache" }
+resource "aws_elasticache_replication_group" "cache_group" { replication_group_id = "orders-group" }
+resource "aws_ssm_parameter" "parameter" { name = "/orders/token" }
+resource "aws_secretsmanager_secret" "secret" { name = "orders/token" }

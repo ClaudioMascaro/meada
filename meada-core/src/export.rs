@@ -111,6 +111,10 @@ pub struct Export {
     /// side of a contract to each of its provisioners, by side, provisioner, root, contract.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub provisions: Vec<Provision>,
+    /// IaC subscriptions (ADR 0026), by source, target, node and root. Their consumer links
+    /// remain in `links`, as a binding's do.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub subscriptions: Vec<Subscription>,
     /// The process of each entry point (spec #31), in entry point order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub processes: Vec<Process>,
@@ -142,6 +146,7 @@ impl Default for Export {
             provisioners: Vec::new(),
             links: Vec::new(),
             provisions: Vec::new(),
+            subscriptions: Vec::new(),
             processes: Vec::new(),
             stale_decisions: Vec::new(),
         }
@@ -437,6 +442,16 @@ pub struct IacNode {
 #[non_exhaustive]
 pub struct Provisioner {
     pub contract: String,
+    pub node: String,
+    pub root: String,
+}
+
+/// A subscription read from IaC: source and target channel contracts and the declaring node.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[non_exhaustive]
+pub struct Subscription {
+    pub source: String,
+    pub target: String,
     pub node: String,
     pub root: String,
 }

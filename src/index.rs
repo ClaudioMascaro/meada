@@ -188,7 +188,7 @@ CREATE TABLE iac_nodes (
     pattern INTEGER NOT NULL, overridable TEXT NOT NULL, path TEXT NOT NULL,
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
-    handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL
+    handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, subscription TEXT
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -2424,6 +2424,7 @@ pub(crate) struct Export {
     pub(crate) communities: Vec<Community>,
     pub(crate) links: Vec<Link>,
     pub(crate) provisioners: Vec<iac::provision::Side>,
+    pub(crate) subscriptions: Vec<iac::subscription::Subscription>,
     pub(crate) provisions: Vec<written::Provision>,
     /// The repository's entry points (spec #31), sorted by identity. Not exported as such:
     /// `processes` is what the export shows.
@@ -2507,6 +2508,20 @@ impl Export {
             .sort_by(|a, b| (&a.identity, &a.root).cmp(&(&b.identity, &b.root)));
         out.iac_nodes.dedup();
         out.provisions = self.provisions;
+        out.subscriptions = self
+            .subscriptions
+            .into_iter()
+            .map(|s| {
+                let mut summary = written::Subscription::default();
+                summary.source = s.source;
+                summary.target = s.target;
+                summary.node = s.node;
+                summary.root = s.root;
+                summary
+            })
+            .collect();
+        out.subscriptions.sort();
+        out.subscriptions.dedup();
         out.processes = self.processes;
         out.stale_decisions = self.stale_decisions;
         out
@@ -2877,6 +2892,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         communities: Vec::new(),
         links: Vec::new(),
         provisioners: iac::provision::read(db, identity)?,
+        subscriptions: iac::subscription::read(db, identity)?,
         provisions: Vec::new(),
         entry_points,
         processes: Vec::new(),

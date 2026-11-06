@@ -340,10 +340,9 @@ matches. They stay out of `meada export`.
 - **Secrets**: the values of `data` and `stringData` of a Kubernetes `Secret` (a document with
   `apiVersion` and `kind: Secret`, or such an item of a list's `items`), the `default` of a
   Terraform `variable` with `sensitive = true` and every value a `.tfvars` file gives a variable
-  of that name (every value, when a Terraform file in its directory or above does not parse), and
-  the `value` of an `aws_ssm_parameter` resource with literal `type = "SecureString"`, in HCL
-  or Terraform JSON, are stored as `redacted`, with their key path, type and line.
-  Nothing else is filtered: the index holds what the checkout
+  of that name (every value, when a Terraform file in its directory or above does not parse) are
+  stored as `redacted`. SSM parameter values with SecureString or unresolved types in HCL and
+  Terraform/OpenTofu JSON are redacted too. Each row keeps its key path, type and line. Nothing else is filtered: the index holds what the checkout
   already does. List in `.meadaignore` the files that must stay out of the index (`secrets/`,
   `*.env.json`).
 
@@ -525,6 +524,45 @@ pattern
 with at least three literal characters and wildcards on segment boundaries (`-`, `_`, `.`, `/`)
 links to a literal name at `inferred`, or `ambiguous` when several names match. Patterns never
 link to patterns. The console graph lists provisioner sides and their separate links.
+
+### AWS channels, data, secrets and subscriptions
+
+The Terraform/OpenTofu table also recognizes the types below. ARNs reduce to physical names,
+including parameter and secret paths; the six-character Secrets Manager ARN suffix is removed.
+The same provisioning, `context`, `trace` and export rules apply to every contract.
+
+| Terraform type | Physical name | Contract |
+| --- | --- | --- |
+| `aws_sns_topic` | `name` | `channel::sns` |
+| `aws_cloudwatch_event_bus` | `name` | `channel::eventbridge` |
+| `aws_kinesis_stream` | `name` | `channel::kinesis` |
+| `aws_dynamodb_table` | `name` | `resource::dynamodb` |
+| `aws_db_instance` | `identifier` | `resource::rds` |
+| `aws_rds_cluster` | `cluster_identifier` | `resource::rds` |
+| `aws_elasticache_cluster` | `cluster_id` | `resource::elasticache` |
+| `aws_elasticache_replication_group` | `replication_group_id` | `resource::elasticache` |
+| `aws_ssm_parameter` | `name`, leading `/` kept | `resource::ssm` |
+| `aws_secretsmanager_secret` | `name` | `resource::secretsmanager` |
+
+An SSM `SecureString` parameter stores `value` as `redacted` in HCL and Terraform/OpenTofu JSON. When `type` is an expression the
+value reader cannot resolve, its value is also hidden conservatively.
+
+An `aws_sns_topic_subscription` with `protocol = "sqs"` links queue consumers to topic
+producers. `aws_cloudwatch_event_rule` with `aws_cloudwatch_event_target` does the same from a
+bus to a queue; absent `event_bus_name` means `default`. Without a filter the level is `exact`;
+with `filter_policy` or `event_pattern` it is `inferred`. Overridable names also give `inferred`,
+with their variables in the reason. The reason identifies the subscription or target and rule.
+Unresolved endpoints, other protocols and targets without a unique rule in the same bus add no
+links. Timer-only rules do not route events published to the bus.
+
+`context` lists producers and consumers through the subscription. `trace` goes up from the
+consumer to the producer and down from the provisioner to consumers; an `sns`, `eventbridge`
+or `kinesis` source channel can also start a trace. Subscription summaries enter the optional `subscriptions` array with source, target, node and
+root. Their links enter `links`, keeping
+provisioning links separate in `provisions`. `meada status` lists provisioned contracts without
+use and uses without a provisioner, per kind and broker, only when the workspace contains at
+least one provisioner and one use of that group. Other IaC formats remain nodes and references;
+this contract table covers `.tf` and `.tofu` files.
 
 ## 4. `meada.toml`: reference
 

@@ -17,6 +17,15 @@
       "end_line": 2
     },
     {
+      "identity": "example.com/provision/infra::envs/dev/main.tf::aws_sns_topic.unlisted",
+      "address": "aws_sns_topic.unlisted",
+      "type": "aws_sns_topic",
+      "root": "envs/dev",
+      "path": "envs/dev/main.tf",
+      "line": 6,
+      "end_line": 6
+    },
+    {
       "identity": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.arn",
       "address": "aws_sqs_queue.arn",
       "type": "aws_sqs_queue",
@@ -90,6 +99,11 @@
     }
   ],
   "provisioners": [
+    {
+      "contract": "channel::sns::orders",
+      "node": "example.com/provision/infra::envs/dev/main.tf::aws_sns_topic.unlisted",
+      "root": "envs/dev"
+    },
     {
       "contract": "channel::sqs::orders",
       "node": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.orders",

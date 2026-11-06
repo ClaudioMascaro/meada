@@ -1020,13 +1020,7 @@ impl Engine {
         if let Some(kind) = contract::kind_of(contract)
             && let Some(view) = kind.view(contract)
         {
-            let exports = &partial.exports;
-            let sites = (exports.iter().enumerate())
-                .flat_map(|(n, e)| {
-                    let sides = sides_of(exports, e, contract, view, kind);
-                    sides.into_iter().map(move |side| (n, side.0.to_string()))
-                })
-                .collect();
+            let sites = side_sites(&partial.exports, contract, view, kind);
             partial.sites(sites)?;
             let links = match view.follows_drift() {
                 true => {
@@ -1075,11 +1069,18 @@ impl Engine {
                                     .map(|l| l.contract.clone()),
                             )
                             .collect::<std::collections::BTreeSet<_>>();
-                        let sites = provisions
+                        let mut sites: Vec<_> = provisions
                             .iter()
                             .filter(|l| l.provisioner == identity && l.root == node.root)
                             .flat_map(|l| (0..repos.len()).map(move |n| (n, l.side.clone())))
                             .collect();
+                        for contract in &contracts {
+                            if let Some(kind) = contract::kind_of(contract)
+                                && let Some(view) = kind.view(contract)
+                            {
+                                sites.extend(side_sites(&partial.exports, contract, view, kind));
+                            }
+                        }
                         partial.sites(sites)?;
                         for contract in contracts {
                             if let Some(kind) = contract::kind_of(&contract)
@@ -1211,6 +1212,23 @@ impl Engine {
 /// contract_sides` lists them: its site, order (provider, consumer, other), role words, tag and
 /// shape. The sides that hold it come from the engine, the others from the kind
 /// (`ContractKind::related_sides`).
+fn side_sites(
+    exports: &[Export],
+    contract: &str,
+    view: View,
+    kind: &dyn ContractKind,
+) -> Vec<(usize, String)> {
+    exports
+        .iter()
+        .enumerate()
+        .flat_map(|(n, e)| {
+            sides_of(exports, e, contract, view, kind)
+                .into_iter()
+                .map(move |s| (n, s.0.to_string()))
+        })
+        .collect()
+}
+
 fn sides_of<'e>(
     exports: &'e [Export],
     export: &'e Export,

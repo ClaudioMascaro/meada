@@ -87,7 +87,8 @@ impl Entry {
 enum Piece<'f> {
     Text(&'f str),
     Any,
-    Name,
+    Name(bool),
+    Suffix,
 }
 
 fn pieces(form: &str) -> Vec<Piece<'_>> {
@@ -95,16 +96,21 @@ fn pieces(form: &str) -> Vec<Piece<'_>> {
     let mut rest = form;
     while !rest.is_empty() {
         let star = rest.find('*');
-        let name = rest.find("{name}");
-        let next = [star, name].into_iter().flatten().min();
+        let name = rest.find("{name}").or_else(|| rest.find("{path}"));
+        let suffix = rest.find('?');
+        let next = [star, name, suffix].into_iter().flatten().min();
         match next {
             Some(0) if star == Some(0) => {
                 out.push(Piece::Any);
                 rest = &rest[1..];
             }
-            Some(0) => {
-                out.push(Piece::Name);
+            Some(0) if name == Some(0) => {
+                out.push(Piece::Name(rest.starts_with("{path}")));
                 rest = &rest["{name}".len()..];
+            }
+            Some(0) => {
+                out.push(Piece::Suffix);
+                rest = &rest[1..];
             }
             Some(at) => {
                 out.push(Piece::Text(&rest[..at]));
@@ -145,17 +151,29 @@ fn matches<'t>(
         return false;
     }
     let found = match pieces.get(p) {
-        None => at == text.len() || text[at..].starts_with('/'),
+        None => {
+            at == text.len()
+                || (!pieces.iter().any(|p| matches!(p, Piece::Name(true)))
+                    && text[at..].starts_with('/'))
+        }
         Some(Piece::Text(t)) => {
             text[at..].starts_with(t) && matches(pieces, text, p + 1, at + t.len(), failed, name)
         }
-        Some(piece @ (Piece::Any | Piece::Name)) => {
-            let run = text[at..].find([':', '/']).map_or(text.len(), |i| at + i);
+        Some(Piece::Suffix) => {
+            text.as_bytes()
+                .get(at)
+                .is_some_and(u8::is_ascii_alphanumeric)
+                && matches(pieces, text, p + 1, at + 1, failed, name)
+        }
+        Some(piece @ (Piece::Any | Piece::Name(_))) => {
+            let run = text[at..]
+                .find(|c| c == ':' || (c == '/' && !matches!(piece, Piece::Name(true))))
+                .map_or(text.len(), |i| at + i);
             let ends = (at + 1..=run).filter(|&e| text.is_char_boundary(e));
             let mut hit = false;
             for end in ends {
                 if matches(pieces, text, p + 1, end, failed, name) {
-                    if matches!(piece, Piece::Name) {
+                    if matches!(piece, Piece::Name(_)) {
                         *name = Some(&text[at..end]);
                     }
                     hit = true;
@@ -190,7 +208,13 @@ mod tests {
             "/tests/fixtures/provision-infra"
         );
         let mut text = String::new();
-        let mut dirs = vec![std::path::PathBuf::from(root)];
+        let mut dirs = vec![
+            std::path::PathBuf::from(root),
+            std::path::PathBuf::from(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/aws-infra"
+            )),
+        ];
         while let Some(dir) = dirs.pop() {
             for e in std::fs::read_dir(&dir).unwrap() {
                 let path = e.unwrap().path();
@@ -218,7 +242,7 @@ mod tests {
         let s3 = entry("terraform", "aws_s3_bucket").unwrap();
         assert_eq!(s3.contract("archive"), "resource::s3::archive");
         assert_eq!(s3.name, "bucket");
-        assert!(entry("terraform", "aws_sns_topic").is_none());
+        assert!(entry("terraform", "aws_unknown_resource").is_none());
         assert!(entry("cloudformation", "aws_sqs_queue").is_none());
     }
 

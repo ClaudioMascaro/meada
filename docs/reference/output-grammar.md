@@ -371,6 +371,7 @@ words:
 | `<role>` | `writer` | Writes the resource. |
 | `<role>` | `reader` | Reads the resource. |
 | `<role>` | `producer` | Produces to the channel: the symbol around the producing call. |
+| `<role>` | `producer <broker> send <channel>` | A documented producer on a subscription's source channel, shown in the target channel's context. |
 | `<role>` | `consumer` | Consumes the channel (its handler), or calls the route. |
 | `<role>` | `provider` | Serves the route: its handler. |
 | `<role>` | `package` | The manifest that declares the package. |

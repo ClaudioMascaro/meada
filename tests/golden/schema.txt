@@ -59,7 +59,7 @@ CREATE TABLE iac_nodes (
     pattern INTEGER NOT NULL, overridable TEXT NOT NULL, path TEXT NOT NULL,
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
-    handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL
+    handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, subscription TEXT
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -3301,6 +3301,7 @@ Output {
             role: None,
             handler: None,
             events: [],
+            subscription: None,
         },
         Node {
             address: "Deployment.apps/shop/dev-web",
@@ -3320,6 +3321,7 @@ Output {
             role: None,
             handler: None,
             events: [],
+            subscription: None,
         },
         Node {
             address: "Service/shop/dev-web",
@@ -3339,6 +3341,7 @@ Output {
             role: None,
             handler: None,
             events: [],
+            subscription: None,
         },
         Node {
             address: "ServiceAccount/shop/dev-runner",
@@ -3358,6 +3361,7 @@ Output {
             role: None,
             handler: None,
             events: [],
+            subscription: None,
         },
     ],
     references: [
@@ -3427,6 +3431,7 @@ Output {
             ),
             handler: None,
             events: [],
+            subscription: None,
         },
         Node {
             address: "CompositeResourceDefinition.apiextensions.crossplane.io/xqueues.acme.io",
@@ -3448,6 +3453,7 @@ Output {
             ),
             handler: None,
             events: [],
+            subscription: None,
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws",
@@ -3469,6 +3475,7 @@ Output {
             ),
             handler: None,
             events: [],
+            subscription: None,
         },
         Node {
             address: "Queue.acme.io/shop/orders",
@@ -3490,6 +3497,7 @@ Output {
             ),
             handler: None,
             events: [],
+            subscription: None,
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws/queue",
@@ -3511,6 +3519,7 @@ Output {
             ),
             handler: None,
             events: [],
+            subscription: None,
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws/topic",
@@ -3532,6 +3541,7 @@ Output {
             ),
             handler: None,
             events: [],
+            subscription: None,
         },
     ],
     references: [
@@ -3600,6 +3610,7 @@ sample.cloudformation.yaml
             role: None,
             handler: None,
             events: [],
+            subscription: None,
         },
         Node {
             address: "Worker",
@@ -3626,6 +3637,7 @@ sample.cloudformation.yaml
             role: None,
             handler: None,
             events: [],
+            subscription: None,
         },
     ],
     [
@@ -3731,6 +3743,7 @@ sample.serverless.yml
                     overridable: false,
                 },
             ],
+            subscription: None,
         },
         Node {
             address: "Queue",
@@ -3757,6 +3770,7 @@ sample.serverless.yml
             role: None,
             handler: None,
             events: [],
+            subscription: None,
         },
     ],
     [
@@ -3792,6 +3806,7 @@ sample.provision.tf
             role: None,
             handler: None,
             events: [],
+            subscription: None,
         },
         Node {
             address: "aws_sqs_queue.orders",
@@ -3811,6 +3826,7 @@ sample.provision.tf
             role: None,
             handler: None,
             events: [],
+            subscription: None,
         },
     ],
     [],

@@ -227,7 +227,9 @@ class Probe:
                             'resource::s3::archive': 'no provisioner', 'resource::s3::a-live': 'no provisioner'}
             self.check(name + ' exact orphan set', orphan_set_matches(h, expected), repr(lines))
             without = ''.join(l + '\n' for l in h.splitlines() if not l.strip().startswith('orphan '))
-            self.check(name + ' whole status baseline parity', without == b,
+            self.check(name + ' whole status baseline parity',
+                       (h if self.base_has_orphans else without) == b,
+                       'The current tier already has #657: compare complete status.' if self.base_has_orphans else
                        'Only the exact new orphan lines may differ; existing declared-resource diagnostics remain independent.')
             be = json.loads((self.run / f'base/{name}/export.out').read_text())
             he = json.loads((self.run / f'head/{name}/export.out').read_text())
@@ -373,10 +375,13 @@ def main():
     p.add_argument('--head-bin', required=True)
     p.add_argument('--run', required=True)
     p.add_argument('--http', action='store_true')
+    p.add_argument('--base-has-orphans', action='store_true',
+                   help='baseline already includes #657; require complete status parity')
     p.add_argument('--cross-kind-only', action='store_true', help='focused same-token cross-kind addendum only')
     args = p.parse_args()
     os.environ['LANG'] = 'C.UTF-8'
     probe = Probe(args)
+    probe.base_has_orphans = args.base_has_orphans
     try:
         return probe.cross_kind_only() if args.cross_kind_only else probe.run_checks()
     except Exception as e:

@@ -1,0 +1,39 @@
+[[peer]]
+repo = "example.com/aws/infra"
+
+[[resource]]
+kind = "dynamodb"
+id = "orders"
+role = "read"
+
+[[resource]]
+kind = "rds"
+id = "orders-db"
+role = "read"
+
+[[resource]]
+kind = "rds"
+id = "orders-cluster"
+role = "read"
+
+[[resource]]
+kind = "elasticache"
+id = "orders-cache"
+role = "read"
+
+[[resource]]
+kind = "elasticache"
+id = "orders-group"
+role = "read"
+
+[[resource]]
+kind = "ssm"
+id = "/orders/token"
+role = "read"
+
+[[resource]]
+kind = "secretsmanager"
+id = "orders/token"
+role = "read"
+
+[serve]

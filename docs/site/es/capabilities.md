@@ -302,6 +302,46 @@ de segmentos (`-`, `_`, `.`, `/`) se enlaza a un nombre literal en `inferred`, o
 coinciden varios nombres. Los patrones nunca se enlazan entre sí. El grafo de la consola muestra
 los provisionadores y sus enlaces propios.
 
+### Canales, datos, secretos y suscripciones AWS
+
+La tabla Terraform/OpenTofu también reconoce los tipos siguientes. Los ARN se reducen al
+nombre físico, incluidas las rutas de parámetros y secretos; se elimina el sufijo de seis
+caracteres del ARN de Secrets Manager. Las mismas reglas de aprovisionamiento, `context`,
+`trace` y export se aplican a todos estos contratos.
+
+| Tipo Terraform | Nombre físico | Contrato |
+| --- | --- | --- |
+| `aws_sns_topic` | `name` | `channel::sns` |
+| `aws_cloudwatch_event_bus` | `name` | `channel::eventbridge` |
+| `aws_kinesis_stream` | `name` | `channel::kinesis` |
+| `aws_dynamodb_table` | `name` | `resource::dynamodb` |
+| `aws_db_instance` | `identifier` | `resource::rds` |
+| `aws_rds_cluster` | `cluster_identifier` | `resource::rds` |
+| `aws_elasticache_cluster` | `cluster_id` | `resource::elasticache` |
+| `aws_elasticache_replication_group` | `replication_group_id` | `resource::elasticache` |
+| `aws_ssm_parameter` | `name`, conservando `/` inicial | `resource::ssm` |
+| `aws_secretsmanager_secret` | `name` | `resource::secretsmanager` |
+
+Un parámetro SSM `SecureString` guarda `value` como `redacted` en HCL y JSON de Terraform/OpenTofu. Si `type` es una expresión que
+el lector de valores no resuelve, su valor también se oculta por precaución.
+
+`aws_sns_topic_subscription` con `protocol = "sqs"` enlaza consumidores de la cola con
+productores del tópico. `aws_cloudwatch_event_rule` junto con `aws_cloudwatch_event_target`
+hace lo mismo del bus a la cola; sin `event_bus_name` se usa `default`. Sin filtro el nivel es
+`exact`; con `filter_policy` o `event_pattern` es `inferred`. Los nombres reemplazables también
+dan `inferred`, con sus variables en el motivo. El motivo identifica la suscripción o el target
+y su regla. Endpoints sin resolver, otros protocolos y targets sin una regla única en el mismo
+bus no crean enlaces. Las reglas solo con programación no enrutan eventos publicados en el bus.
+
+`context` muestra productores y consumidores a través de la suscripción. `trace` sube del
+consumidor al productor y baja del aprovisionador a los consumidores; un canal de origen `sns`,
+`eventbridge` o `kinesis` también puede iniciar el trace. Los resúmenes entran en el array opcional `subscriptions`, con origen, destino, nodo y raíz.
+Los enlaces entran en `links`,
+conservando aparte los de aprovisionamiento en `provisions`. `meada status` muestra contratos
+aprovisionados sin uso y usos sin aprovisionador, por kind y broker, solo cuando el workspace
+contiene al menos un aprovisionador y un uso del grupo. Los otros formatos IaC siguen como
+nodos y referencias; esta tabla de contratos cubre archivos `.tf` y `.tofu`.
+
 ## Kubernetes y Kustomize
 
 Todo documento YAML o JSON con `apiVersion`, `kind` y `metadata.name` es un nodo IaC, con dirección `<Kind>[.<grupo>]/<namespace>/<nombre>` (`Deployment.apps/shop/api`, `Service/shop/api`; el grupo core no escribe grupo). Un kind de alcance de clúster no tiene namespace en la dirección (`ClusterRole.rbac.authorization.k8s.io/reader`), ni un objeto que no define ninguno y al que ningún overlay da uno. Una plantilla Helm (un nombre con `{{`) y un archivo de Kustomize no son objetos.

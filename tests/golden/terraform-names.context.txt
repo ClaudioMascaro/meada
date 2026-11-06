@@ -21,6 +21,8 @@ references: none
 referenced by: none
 values:
 example.com/acme/infra envs/prod/main.tf:24 resource.aws_sns_topic.events.name = upper(local.service)
+channel::sns::ORDERS
+  example.com/acme/infra provisioner envs/prod/main.tf:23 aws_sns_topic.events (root envs/prod) (no use in the workspace)
 
 example.com/acme/infra envs/prod/main.tf:27-30 aws_sqs_queue.regional["us"]
 type: aws_sqs_queue
@@ -73,6 +75,8 @@ example.com/acme/infra envs/prod/main.tf:41 data.aws_caller_identity.current
 referenced by: none
 values:
 example.com/acme/infra envs/prod/main.tf:44 resource.aws_sns_topic.account.name = "alerts-${data.aws_caller_identity.current.account_id}"
+channel::sns::alerts-*
+  example.com/acme/infra provisioner envs/prod/main.tf:43 aws_sns_topic.account (root envs/prod) (no use in the workspace)
 
 example.com/acme/infra modules/queue/main.tf:9-11 module.billing.aws_sqs_queue.this
 type: aws_sqs_queue

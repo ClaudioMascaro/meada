@@ -225,6 +225,9 @@ fn broker(protocol: &str) -> Option<&'static str> {
         "nats" => "nats",
         "redis" => "redis",
         "sqs" => "sqs",
+        "sns" => "sns",
+        "eventbridge" => "eventbridge",
+        "kinesis" => "kinesis",
         _ => return None,
     })
 }
