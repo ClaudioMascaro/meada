@@ -240,7 +240,7 @@ this file, and a change to these modules updates it.
   declarations (spec #19) read no code; `declare` turns each `[[resource]]` `via` symbol the repository has into a
   provider (writer) or consumer (reader) of `resource::<kind>::<id>`, and `link` joins every
   declared reader to every declared writer of another repository at `declared`, reason the contract. The
-  [AWS SDK use sides](#aws-sdk-use-sides-659) below add code extraction and exact local SDK links. A `via` that
+  [AWS SDK use sides](#aws-sdk-use-sides-659-660) below add code extraction and exact local SDK links. A `via` that
   names no symbol is dropped. An entry without `via`, or with none matched, makes the repository
   the side: the `site` is the bare repository identity (no `::`), the **repository-level** side.
   `report` gives the status lines per repository: each unmatched `via`, the fallback to repository
