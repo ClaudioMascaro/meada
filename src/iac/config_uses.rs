@@ -93,6 +93,25 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
                     .map(|contract| (contract, Level::Inferred))
             })
             .or_else(|| {
+                let alias = [
+                    "pubsub_topic",
+                    "pubsub_subscription",
+                    "gcs_bucket",
+                    "cloudsql_instance",
+                    "cloudsql_database",
+                    "gcpsecretmanager_secret",
+                ]
+                .into_iter()
+                .find(|alias| {
+                    key == *alias
+                        || key.ends_with(&format!(".{alias}"))
+                        || key.ends_with(&format!("[\"{alias}\"]"))
+                });
+                if let Some(contract) =
+                    alias.and_then(|alias| crate::contract::gcp::typed(alias, &value))
+                {
+                    return Some((contract, Level::Inferred));
+                }
                 if value.is_empty()
                     || !value
                         .bytes()

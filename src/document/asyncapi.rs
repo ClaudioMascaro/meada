@@ -240,6 +240,7 @@ fn broker(protocol: &str) -> Option<&'static str> {
         "kinesis" => "kinesis",
         "servicebus" => "servicebus",
         "eventhubs" => "eventhubs",
+        "pubsub" => "pubsub",
         _ => return None,
     })
 }

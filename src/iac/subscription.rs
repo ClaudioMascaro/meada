@@ -20,6 +20,7 @@ pub(crate) fn reads(ty: &str) -> bool {
             | "aws_cloudwatch_event_target"
             | "azurerm_servicebus_subscription"
             | "azurerm_servicebus_subscription_rule"
+            | "google_pubsub_subscription"
     )
 }
 
@@ -344,15 +345,48 @@ impl<'m> Eval<'m> {
                     Some(self.nodes[matched.node].address.clone()),
                 )
             }
+            "google_pubsub_subscription" => {
+                let mut source =
+                    self.endpoint_arg(at, each, block, "topic", "google_pubsub_topic")?;
+                let target = &self.nodes[node];
+                if target
+                    .provisioned
+                    .as_ref()
+                    .map_or(target.pattern, |p| p.pattern)
+                {
+                    return None;
+                }
+                let target = Endpoint {
+                    name: target
+                        .provisioned
+                        .as_ref()
+                        .map_or(target.name.as_ref(), |p| p.name.as_ref())?
+                        .clone(),
+                    through: target
+                        .provisioned
+                        .as_ref()
+                        .map_or(&target.overridable, |p| &p.through)
+                        .iter()
+                        .cloned()
+                        .collect(),
+                };
+                let filtered = block.args.get("filter").is_some_and(|arg| {
+                    let found = self.value(at, each, &arg.expr, 0);
+                    source.through.extend(found.through);
+                    found.val != Val::Known(Value::String(String::new()))
+                });
+                (source, target, filtered, None)
+            }
             _ => return None,
         };
         let broker = match block.ty.as_str() {
             "aws_sns_topic_subscription" => "sns",
             "azurerm_servicebus_subscription" => "servicebus",
+            "google_pubsub_subscription" => "pubsub",
             _ => "eventbridge",
         };
         let source_contract = format!("channel::{broker}::{}", source.name);
-        let target_broker = if broker == "servicebus" {
+        let target_broker = if matches!(broker, "servicebus" | "pubsub") {
             broker
         } else {
             "sqs"

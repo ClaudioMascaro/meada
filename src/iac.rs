@@ -58,6 +58,7 @@ pub(crate) mod compose;
 pub(crate) mod config_uses;
 pub(crate) mod environment;
 mod functions;
+mod gcp;
 pub(crate) mod json;
 pub(crate) mod orphans;
 pub(crate) mod pattern;
@@ -682,7 +683,11 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
         refs.visit_body(&b.body);
         let mut args = BTreeMap::new();
         let workload = types::workload("terraform", ty).is_some();
-        if kind == Kind::Module || subscription::reads(ty) || workload || ty == "archive_file" {
+        if kind == Kind::Module
+            || subscription::reads(ty)
+            || workload
+            || matches!(ty, "archive_file" | "google_sql_database")
+        {
             for a in b.body.attributes() {
                 args.insert(a.key.as_str().to_string(), Named::new(&a.value));
             }
@@ -1094,7 +1099,7 @@ impl<'m> Eval<'m> {
         // the root exhausts its evaluation/storage budget before projection runs.
         for &(node, _, block, _) in &pending {
             if block.kind == Kind::Resource
-                && block.ty.starts_with("azurerm_")
+                && (block.ty.starts_with("azurerm_") || block.ty.starts_with("google_"))
                 && types::entry("terraform", &block.ty).is_some()
             {
                 self.nodes[node].provisioned = Some(Projection::default());
@@ -1112,11 +1117,22 @@ impl<'m> Eval<'m> {
                     let entry = (block.kind == Kind::Resource)
                         .then(|| types::entry("terraform", &block.ty))
                         .flatten();
-                    let text = match entry {
-                        Some(e) if !pattern => e.read(&text).to_string(),
-                        _ => text,
+                    let name = match entry {
+                        Some(e) if !pattern && e.ty.starts_with("google_") => {
+                            // Context keeps the physical name. A separate projection below
+                            // carries the canonical target and explicit unresolved state.
+                            e.project(&text)
+                                .map(|name| {
+                                    name.strip_prefix("subscriptions/")
+                                        .unwrap_or(&name)
+                                        .to_string()
+                                })
+                                .or(Some(text))
+                        }
+                        Some(e) if !pattern => e.project(&text),
+                        _ => Some(text),
                     };
-                    (Some(text), pattern)
+                    (name, pattern)
                 }
             };
             if !self.charge(name.as_ref().map_or(0, String::len)) {
@@ -1129,9 +1145,15 @@ impl<'m> Eval<'m> {
         self.prepare_subscriptions(&pending);
         for &(node, _, block, _) in &pending {
             self.azure_projection(node, block);
+            self.gcp_projection(node, block);
         }
         self.azure_subscriptions(&pending);
         for &(node, instance, block, ref each) in &pending {
+            self.gcp_database(node, instance, each.as_ref(), block);
+        }
+        for &(node, instance, block, ref each) in &pending {
+            self.gcp_workload(node, instance, each.as_ref(), block);
+            self.azure_workload(node, instance, each.as_ref(), block);
             self.workload(node, instance, each.as_ref(), block);
         }
         for &(node, instance, block, ref each) in &pending {
@@ -1143,9 +1165,6 @@ impl<'m> Eval<'m> {
                 return;
             }
             self.nodes[node].subscription = Some(subscription);
-        }
-        for &(node, at, block, ref each) in &pending {
-            self.azure_workload(node, at, each.as_ref(), block);
         }
         let modules = self.modules;
         for i in 0..self.instances.len() {

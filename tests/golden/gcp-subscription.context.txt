@@ -1,0 +1,6 @@
+channel::pubsub::subscriptions/orders
+  example.com/gcp/app producer pubsub send orders asyncapi.json (documented only) [inferred: channel::pubsub::subscriptions/orders subscription google_pubsub_subscription.orders (root .); filter]
+  example.com/gcp/app consumer asyncapi.json (documented only)
+  example.com/gcp/app use settings.yaml#exact.subscription (line 3) [exact]
+  example.com/gcp/app use settings.yaml#typed.pubsub_subscription (line 8) [inferred]
+  example.com/gcp/infra provisioner main.tf:2 google_pubsub_subscription.orders (root .)

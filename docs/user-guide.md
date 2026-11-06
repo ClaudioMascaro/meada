@@ -552,6 +552,38 @@ com pelo menos três caracteres literais e curingas nos limites de segmentos (`-
 se liga a um nome literal em `inferred`, ou `ambiguous` quando vários nomes correspondem. Padrões
 nunca se ligam a padrões. O grafo da console lista os provisionadores e suas ligações próprias.
 
+### GCP e Cloud Run
+
+Terraform/OpenTofu reconhece `google_pubsub_topic` e `google_pubsub_subscription` como canais
+`pubsub`, `google_storage_bucket` como `gcs`, `google_sql_database_instance` e
+`google_sql_database` como `cloudsql`, e `google_secret_manager_secret` como
+`gcpsecretmanager`. O nome vem de `name`, exceto no segredo, que usa `secret_id`.
+Instâncias Cloud SQL usam `<instância>`; bancos usam `<instância>/<banco>`, com a instância
+literal ou uma referência resolvida a uma instância conhecida. Um banco não provisiona sua
+instância. Projetos ficam fora da identidade.
+
+Um tópico usa `channel::pubsub::<id>`; uma assinatura usa
+`channel::pubsub::subscriptions/<id>`, mesmo quando ambos têm o mesmo id. A assinatura liga
+consumidores de seu destino aos produtores do tópico indicado por `topic`: `exact` sem
+filtro, `inferred` com filtro ou nomes sobrescrevíveis. Uma assinatura sem tópico resolvido
+não inventa uma ligação nem um tópico com seu nome.
+
+`gs://<bucket>/objeto`, `projects/<projeto>/topics/<id>`,
+`projects/<projeto>/subscriptions/<id>` e `projects/<projeto>/secrets/<id>` (também com
+`/versions/<versão>`) são usos de configuração `exact`. Os nomes simples sob as chaves finais
+`pubsub_topic`, `pubsub_subscription`, `gcs_bucket`, `cloudsql_instance`, `cloudsql_database`
+e `gcpsecretmanager_secret` são `inferred`; `cloudsql_database` exige `<instância>/<banco>`.
+As chaves genéricas `topic` e `bucket` conservam seus significados SNS e S3. Identificadores
+malformados, valores ocultados ou cortados e uma simples igualdade de texto não criam usos.
+
+`google_cloud_run_service`, `google_cloud_run_v2_service` e `google_cloud_run_v2_job` são
+workloads: cada contêiner guarda sua imagem e seu ambiente. Imagens ligam ao repositório que
+as publica; um padrão sobrescrevível enfraquece a ligação. Leituras de ambiente só recebem
+valores do contêiner que executa seu código e ficam `inferred`. Referências Secret Manager
+continuam alvos não resolvidos, sem ler o conteúdo do segredo. Busca, `context`, `trace` nos
+dois sentidos, órfãos por escopo e export incluem os novos contratos e runners; entradas de
+ambiente e valores de configuração ficam fora do export.
+
 ### Canais, dados, segredos e assinaturas AWS
 
 A tabela Terraform/OpenTofu também reconhece os tipos abaixo. ARNs são reduzidos ao nome

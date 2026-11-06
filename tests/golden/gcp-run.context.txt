@@ -1,0 +1,77 @@
+example.com/gcp/infra run.tf:5-48 google_cloud_run_service.v1
+type: google_cloud_run_service
+name: "legacy-service"
+root: .
+overridable: none
+references:
+example.com/gcp/infra main.tf:7 google_storage_bucket.assets
+referenced by: none
+values:
+example.com/gcp/infra run.tf:6 resource.google_cloud_run_service.v1.name = "legacy-service"
+example.com/gcp/infra run.tf:10 resource.google_cloud_run_service.v1.template.spec.containers[0].name = "worker"
+example.com/gcp/infra run.tf:11 resource.google_cloud_run_service.v1.template.spec.containers[0].image = "ghcr.io/acme/gcp-worker:v1"
+example.com/gcp/infra run.tf:13 resource.google_cloud_run_service.v1.template.spec.containers[0].env[0].name = "QUEUE_URL"
+example.com/gcp/infra run.tf:14 resource.google_cloud_run_service.v1.template.spec.containers[0].env[0].value = "tasks-v1"
+example.com/gcp/infra run.tf:17 resource.google_cloud_run_service.v1.template.spec.containers[0].env[1].name = "SECRET_QUEUE"
+example.com/gcp/infra run.tf:20 resource.google_cloud_run_service.v1.template.spec.containers[0].env[1].value_from.secret_key_ref.name = "api-key"
+example.com/gcp/infra run.tf:21 resource.google_cloud_run_service.v1.template.spec.containers[0].env[1].value_from.secret_key_ref.key = "latest"
+example.com/gcp/infra run.tf:26 resource.google_cloud_run_service.v1.template.spec.containers[0].env[2].name = "BUCKET_AS_QUEUE"
+example.com/gcp/infra run.tf:27 resource.google_cloud_run_service.v1.template.spec.containers[0].env[2].value = google_storage_bucket.assets.name
+example.com/gcp/infra run.tf:30 resource.google_cloud_run_service.v1.template.spec.containers[0].env[3].name = "DUP_QUEUE"
+example.com/gcp/infra run.tf:31 resource.google_cloud_run_service.v1.template.spec.containers[0].env[3].value = "first-queue"
+example.com/gcp/infra run.tf:34 resource.google_cloud_run_service.v1.template.spec.containers[0].env[4].name = "DUP_QUEUE"
+example.com/gcp/infra run.tf:35 resource.google_cloud_run_service.v1.template.spec.containers[0].env[4].value = "second-queue"
+example.com/gcp/infra run.tf:39 resource.google_cloud_run_service.v1.template.spec.containers[1].name = "sidecar"
+example.com/gcp/infra run.tf:40 resource.google_cloud_run_service.v1.template.spec.containers[1].image = "ghcr.io/acme/gcp-sidecar:v1"
+example.com/gcp/infra run.tf:42 resource.google_cloud_run_service.v1.template.spec.containers[1].env.name = "SIDE_QUEUE"
+example.com/gcp/infra run.tf:43 resource.google_cloud_run_service.v1.template.spec.containers[1].env.value = "other-container"
+image: image::ghcr.io/acme/gcp-sidecar
+image: image::ghcr.io/acme/gcp-worker
+  builder: example.com/gcp/app [exact: image::ghcr.io/acme/gcp-worker]
+env worker BUCKET_AS_QUEUE -> Terraform google_storage_bucket assets: resource::gcs::assets
+env worker DUP_QUEUE -> duplicate environment entry: unresolved
+env worker QUEUE_URL -> Terraform environment: tasks-v1
+env worker SECRET_QUEUE -> secret api-key: unresolved
+env sidecar SIDE_QUEUE -> Terraform environment: other-container
+
+example.com/gcp/infra run.tf:50-71 google_cloud_run_v2_service.v2
+type: google_cloud_run_v2_service
+name: "current-service"
+root: .
+overridable: none
+references:
+example.com/gcp/infra main.tf:18 google_secret_manager_secret.token
+referenced by: none
+values:
+example.com/gcp/infra run.tf:51 resource.google_cloud_run_v2_service.v2.name = "current-service"
+example.com/gcp/infra run.tf:54 resource.google_cloud_run_v2_service.v2.template.containers.name = "worker"
+example.com/gcp/infra run.tf:55 resource.google_cloud_run_v2_service.v2.template.containers.image = var.image
+example.com/gcp/infra run.tf:57 resource.google_cloud_run_v2_service.v2.template.containers.env[0].name = "V2_QUEUE"
+example.com/gcp/infra run.tf:58 resource.google_cloud_run_v2_service.v2.template.containers.env[0].value = var.queue
+example.com/gcp/infra run.tf:61 resource.google_cloud_run_v2_service.v2.template.containers.env[1].name = "V2_SECRET"
+example.com/gcp/infra run.tf:64 resource.google_cloud_run_v2_service.v2.template.containers.env[1].value_source.secret_key_ref.secret = google_secret_manager_secret.token.id
+example.com/gcp/infra run.tf:65 resource.google_cloud_run_v2_service.v2.template.containers.env[1].value_source.secret_key_ref.version = "latest"
+image: image::ghcr.io/acme/gcp-worker
+  builder: example.com/gcp/app [inferred: image::ghcr.io/acme/gcp-worker; image: run.tf#resource.google_cloud_run_v2_service.v2 (var.image run.tf:1)]
+env worker V2_QUEUE -> Terraform default var.queue: tasks-v2
+env worker V2_SECRET -> secret resource::gcpsecretmanager::api-key: unresolved
+
+example.com/gcp/infra run.tf:73-91 google_cloud_run_v2_job.batch
+type: google_cloud_run_v2_job
+name: "batch-job"
+root: .
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/gcp/infra run.tf:74 resource.google_cloud_run_v2_job.batch.name = "batch-job"
+example.com/gcp/infra run.tf:78 resource.google_cloud_run_v2_job.batch.template.template.containers.name = "worker"
+example.com/gcp/infra run.tf:79 resource.google_cloud_run_v2_job.batch.template.template.containers.image = "ghcr.io/acme/gcp-worker:v1"
+example.com/gcp/infra run.tf:81 resource.google_cloud_run_v2_job.batch.template.template.containers.env[0].name = "JOB_QUEUE"
+example.com/gcp/infra run.tf:82 resource.google_cloud_run_v2_job.batch.template.template.containers.env[0].value = "tasks-job"
+example.com/gcp/infra run.tf:85 resource.google_cloud_run_v2_job.batch.template.template.containers.env[1].name = "UNKNOWN_QUEUE"
+example.com/gcp/infra run.tf:86 resource.google_cloud_run_v2_job.batch.template.template.containers.env[1].value = var.unknown
+image: image::ghcr.io/acme/gcp-worker
+  builder: example.com/gcp/app [exact: image::ghcr.io/acme/gcp-worker]
+env worker JOB_QUEUE -> Terraform environment: tasks-job
+env worker UNKNOWN_QUEUE -> Terraform environment (unresolved): unresolved

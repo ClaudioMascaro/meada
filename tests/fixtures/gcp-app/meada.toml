@@ -1,0 +1,14 @@
+[[peer]]
+repo = "example.com/gcp/infra"
+
+[[resource]]
+kind = "cloudsql"
+id = "orders-db/orders"
+role = "read"
+
+[[resource]]
+kind = "cloudsql"
+id = "audit-db/orders"
+role = "read"
+
+[serve]

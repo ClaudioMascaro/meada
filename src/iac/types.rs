@@ -107,10 +107,13 @@ pub(crate) fn format_of(path: &str) -> Option<&'static str> {
     }
 }
 
-/// The unique contract named by a structured identifier. AWS forms stay in the type table.
+/// The unique contract named by a structured cloud identifier. AWS forms stay in the table.
 pub(crate) fn identified(text: &str) -> Option<String> {
     if let Some(contract) = crate::contract::azure::identified(text) {
         return Some(contract);
+    }
+    if text.starts_with("gs://") || text.starts_with("projects/") {
+        return crate::contract::gcp::identified(text);
     }
     if !(text.starts_with("arn:") || text.starts_with("https://") || text.starts_with("s3://")) {
         return None;
@@ -148,6 +151,7 @@ impl Entry {
 
     /// Provider-specific identity validation belongs to the kind, shared with SDK/config readers.
     pub(crate) fn project(&self, text: &str) -> Option<String> {
+        use crate::contract::gcp;
         match self.ty.as_str() {
             "azurerm_servicebus_queue" | "azurerm_servicebus_topic" => {
                 crate::contract::azure::servicebus(text)
@@ -158,7 +162,14 @@ impl Entry {
             "azurerm_storage_account" => crate::contract::azure::account(text),
             "azurerm_storage_container" => crate::contract::azure::container(text),
             "azurerm_key_vault_secret" => crate::contract::azure::secret(text),
-            _ => Some(self.read(text).to_string()),
+            "google_pubsub_topic" => gcp::pubsub(text, false),
+            "google_pubsub_subscription" => gcp::pubsub(text, true),
+            "google_storage_bucket" => gcp::bucket(text),
+            "google_sql_database_instance" => gcp::instance(text),
+            // The evaluator qualifies a database with its instance after names are known.
+            "google_sql_database" => gcp::database_name(text).then(|| text.into()),
+            "google_secret_manager_secret" => gcp::secret(text),
+            _ => Some(self.read(text).into()),
         }
     }
     /// The contract a node of this type named `name` provisions.
@@ -317,6 +328,7 @@ mod tests {
             )),
             fixtures.join("aws-workload-aliases"),
             fixtures.join("azure-infra"),
+            fixtures.join("gcp-infra"),
         ];
         while let Some(dir) = dirs.pop() {
             for e in std::fs::read_dir(&dir).unwrap() {

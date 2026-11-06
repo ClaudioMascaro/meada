@@ -340,6 +340,38 @@ Environment reads through Go and C# import aliases retain their variable name. A
 
 Operation names use Go spelling; Java starts lowercase and .NET accepts synchronous and `Async` forms. .NET S3 uses `BucketName` and `GetObjectMetadata` for `HeadObject`. ARNs reduce to the infrastructure's physical name. `GetParametersByPath` stays unresolved because `Path` is a hierarchy, not a parameter. RDS and ElastiCache control-plane operations do not establish data reads or writes. An unnamed resource never links; a `meada.toml` declaration retains `declared` level.
 
+### GCP and Cloud Run
+
+Terraform/OpenTofu recognizes `google_pubsub_topic` and `google_pubsub_subscription` as
+`pubsub` channels, `google_storage_bucket` as `gcs`, `google_sql_database_instance` and
+`google_sql_database` as `cloudsql`, and `google_secret_manager_secret` as
+`gcpsecretmanager`. The name comes from `name`, except secrets use `secret_id`.
+Cloud SQL instances use `<instance>`; databases use `<instance>/<database>`, with a literal
+instance or a resolved reference to a known instance. A database does not provision its
+instance. Projects stay outside the identity.
+
+A topic uses `channel::pubsub::<id>`; a subscription uses
+`channel::pubsub::subscriptions/<id>`, including when both share the same id. A subscription
+links its target's consumers to producers of the topic named by `topic`: `exact` without a
+filter, `inferred` with a filter or overridable names. An unresolved source adds no route
+and never invents a topic from the subscription's name.
+
+`gs://<bucket>/object`, `projects/<project>/topics/<id>`,
+`projects/<project>/subscriptions/<id>` and `projects/<project>/secrets/<id>` (also with
+`/versions/<version>`) are `exact` config uses. Plain names under final keys
+`pubsub_topic`, `pubsub_subscription`, `gcs_bucket`, `cloudsql_instance`, `cloudsql_database`
+and `gcpsecretmanager_secret` are `inferred`; `cloudsql_database` requires
+`<instance>/<database>`. Generic `topic` and `bucket` retain their SNS and S3 meanings.
+Malformed identifiers, hidden or cut values and bare text equality create no use.
+
+`google_cloud_run_service`, `google_cloud_run_v2_service` and `google_cloud_run_v2_job` are
+workloads: each container keeps its image and environment. Images join the repository that
+publishes them; overridable evidence weakens the link. Environment reads receive values only
+from the container running their code and remain `inferred`. Secret Manager references stay
+unresolved targets, without reading secret contents. Search, `context`, `trace` in both
+directions, scoped orphans and export include the new contracts and runners; environment
+entries and configuration values stay outside the export.
+
 ### AWS channels, data, secrets and subscriptions
 
 The Terraform/OpenTofu table also recognizes the types below. ARNs reduce to physical names,

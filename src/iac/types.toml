@@ -21,7 +21,9 @@
 # `{path}` captures a name including `/` and must fit the whole text; `?` matches one
 # ASCII alphanumeric character (the six-character Secrets Manager ARN suffix).
 #
-# Every entry has a fixture case: a block of its type in `tests/fixtures/{provision-infra,aws-infra}/`
+# GCP structured identities use the contract kind's validated projection: subscriptions keep
+# `subscriptions/<id>`, and Cloud SQL databases combine their instance and name.
+# Every entry has a fixture case in `tests/fixtures/{provision-infra,aws-infra,gcp-infra,azure-infra}/`
 # (`types::tests::every_entry_has_a_fixture_case`).
 
 [[entry]]
@@ -298,6 +300,65 @@ format = "cloudformation"
 type = "AWS::Serverless::Function"
 images = ["Properties.ImageUri"]
 code = "Properties.CodeUri"
+
+[[entry]]
+format = "terraform"
+type = "google_pubsub_topic"
+contract = "channel"
+kind = "pubsub"
+name = "name"
+forms = ["projects/*/topics/{name}"]
+
+[[entry]]
+format = "terraform"
+type = "google_pubsub_subscription"
+contract = "channel"
+kind = "pubsub"
+name = "name"
+forms = ["projects/*/subscriptions/{name}"]
+
+[[entry]]
+format = "terraform"
+type = "google_storage_bucket"
+contract = "resource"
+kind = "gcs"
+name = "name"
+forms = ["gs://{name}"]
+
+[[entry]]
+format = "terraform"
+type = "google_sql_database_instance"
+contract = "resource"
+kind = "cloudsql"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "google_sql_database"
+contract = "resource"
+kind = "cloudsql"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "google_secret_manager_secret"
+contract = "resource"
+kind = "gcpsecretmanager"
+name = "secret_id"
+forms = ["projects/*/secrets/{name}"]
+
+[[workload]]
+format = "terraform"
+type = "google_cloud_run_service"
+images = ["template.spec.containers[].image"]
+[[workload]]
+format = "terraform"
+type = "google_cloud_run_v2_service"
+images = ["template.containers[].image"]
+[[workload]]
+format = "terraform"
+type = "google_cloud_run_v2_job"
+images = ["template.template.containers[].image"]
 
 [[entry]]
 format = "terraform"
