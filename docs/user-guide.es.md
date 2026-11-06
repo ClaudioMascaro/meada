@@ -459,6 +459,28 @@ Cada servicio es un nodo IaC `services.<nombre>` de tipo `service`.
   raíz; una ruta absoluta, una URL, una que sale de la raíz o una con una parte sin resolver no.
 - **Consultas**: como en los nodos Terraform, `search` con `kind = "iac"`, `context` y `trace`.
 
+### Imágenes y código de workloads
+
+El contrato `image::<registry>/<repositorio>` conecta un workload con el repositorio que construye
+su imagen. Se expanden los nombres cortos de Docker Hub, los nombres pasan a minúsculas y se
+quitan tag y digest. Los builders vienen de tags de docker/build-push-action, imágenes de
+docker/metadata-action, Compose con `build` e `image`, artefactos Skaffold, destinos Jib y comandos
+ko simples con `KO_DOCKER_REPO` escrito en la configuración y `--bare`. La sintaxis de shell no
+leída en scripts ko no declara builder. El comando acepta un `--bare`, como máximo un paquete
+literal y ninguna otra opción; un shell explícito debe ser `bash` o `sh`. Los runners vienen de containers e init containers
+Kubernetes, servicios Compose, `image.repository` de values Helm e imágenes tras overrides Kustomize.
+
+`search` con `kind = "image"` encuentra estos contratos. `context` del workload muestra su imagen
+y el repositorio builder; `trace` baja del workload al código y sube del código a los workloads.
+Los nombres literales enlazan en `exact`; patrones y valores reemplazables en `inferred`, con
+su motivo. Varios candidatos quedan `ambiguous`. Un contexto Compose local seguro conecta el
+servicio directamente con su código en `exact`, incluso sin imagen. Las rutas no cruzan enlaces simbólicos.
+
+`meada status` solo lista imágenes huérfanas si el ámbito contiene builder y runner. Con un solo
+papel, `search` y `context` muestran `no builder in the workspace` o `no runner in the workspace`.
+El export conserva `format: 1`, guarda ubicaciones de builders y raíces de workloads e incluye
+`executions` para rutas directas; el grafo de la consola muestra contratos y código de workloads.
+
 ### CloudFormation y SAM
 
 Una plantilla válida llamada `compose.yaml` conserva sus nodos y referencias en el índice inicial y las actualizaciones; el nombre del archivo no la convierte en Compose.

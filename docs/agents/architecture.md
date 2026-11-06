@@ -87,6 +87,7 @@ for the area a change touches.
 - `contract.rs`: the `ContractKind` trait, `KINDS` and the free functions the engine asks. [contracts](map/contracts.md)
 - `http.rs`, `http/`: the HTTP kind: the contract and path rules, mounts, and one submodule per language for providers and consumers. [contracts](map/contracts.md)
 - `resource.rs`: the resource kind, declared in `meada.toml`. [contracts](map/contracts.md)
+- `image.rs`, `image/config.rs`: image builders/runners, normalized names, checked-in build configuration, workload execution and two-role orphans. [contracts](map/contracts.md)
 - `channel.rs`, `channel/`: the channel kind (queues and topics), one module per language for message libraries. [contracts](map/contracts.md)
 - `package.rs`, `package/`: packages as contracts, one module per ecosystem behind the `Ecosystem` trait. [contracts](map/contracts.md)
 - `names.rs`: the questions the contract kinds ask of a name: what a library outside the repository is. [languages](map/languages.md)

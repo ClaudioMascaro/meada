@@ -46,6 +46,7 @@ pub(crate) struct Graph<'a> {
     workspace: &'a Workspace,
     exports: &'a [Export],
     provisions: Vec<meada_core::export::Provision>,
+    executions: Vec<meada_core::export::Execution>,
     symbols: HashMap<&'a str, (usize, &'a Symbol)>,
     calls: HashMap<&'a str, Call<'a>>,
     /// The calls each symbol (or file, for top-level calls) makes, in source order.
@@ -80,6 +81,10 @@ impl<'a> Graph<'a> {
             workspace,
             exports,
             provisions: crate::iac::provision::links(exports),
+            executions: contract::KINDS
+                .iter()
+                .flat_map(|k| k.executions(exports, links))
+                .collect(),
             symbols: HashMap::new(),
             calls: HashMap::new(),
             callees: HashMap::new(),
@@ -264,6 +269,46 @@ impl<'a> Graph<'a> {
                 None => walk.enter(site, depth, row),
             }
         }
+        for execution in self
+            .executions
+            .iter()
+            .filter(|x| x.workload == identity && x.root == node.root)
+        {
+            let Some(n) = self
+                .exports
+                .iter()
+                .position(|e| e.repository == execution.repository)
+            else {
+                continue;
+            };
+            let mut row = Row::call(
+                format!(
+                    "runs code {} {} [{}: {}]",
+                    execution.repository,
+                    execution.path,
+                    execution.level.name(),
+                    execution.reason
+                ),
+                n,
+                Some(execution.level),
+            );
+            row.link = true;
+            walk.push(depth, row);
+            if execution.level != Level::Ambiguous {
+                for entry in self.exports[n].entry_points.iter().filter(|e| {
+                    self.symbols
+                        .get(e.site.as_str())
+                        .is_some_and(|(_, s)| in_path(&s.span.path, &execution.path))
+                }) {
+                    let (n, text) = walk.node(&entry.site);
+                    walk.enter(
+                        &entry.site,
+                        depth + 1,
+                        Row::call(text, n, Some(execution.level)),
+                    );
+                }
+            }
+        }
         walk.rows
     }
 
@@ -400,6 +445,47 @@ impl<'a> Graph<'a> {
 /// The answer's line when `from` names no symbol, route or call site.
 pub(crate) fn no_start(from: &str) -> String {
     format!("no symbol, route or call site matches `{from}`")
+}
+
+fn in_path(file: &str, directory: &str) -> bool {
+    directory == "."
+        || file == directory
+        || file
+            .strip_prefix(directory)
+            .is_some_and(|s| s.starts_with('/'))
+}
+
+/// Read the entry points that workload execution can reach before constructing the graph.
+pub(crate) fn read_executions(partial: &mut Partial, links: &[Link]) -> Result<()> {
+    let executions = contract::KINDS
+        .iter()
+        .flat_map(|k| k.executions(&partial.exports, links))
+        .collect::<Vec<_>>();
+    let mut starts = Vec::new();
+    for execution in executions {
+        let Some(n) = partial
+            .exports
+            .iter()
+            .position(|e| e.repository == execution.repository)
+        else {
+            continue;
+        };
+        let sites = partial.exports[n]
+            .entry_points
+            .iter()
+            .map(|e| e.site.clone())
+            .collect::<Vec<_>>();
+        partial.symbols(Some(n), &sites)?;
+        starts.extend(
+            partial.exports[n]
+                .symbols
+                .iter()
+                .filter(|s| in_path(&s.span.path, &execution.path))
+                .map(|s| s.id.clone()),
+        );
+    }
+    read(partial, links, starts, Direction::Down, true)?;
+    Ok(())
 }
 
 /// The nodes `start` names, as `Graph::find` and `Graph::changed` find them, read into
@@ -659,6 +745,7 @@ impl<'a> Walk<'_, 'a> {
                 }
             }
             Direction::Up => {
+                self.executors_up(id, depth + 1);
                 self.provisioners_up(id, depth + 1);
                 for &(_, c) in graph.callees.get(id).into_iter().flatten() {
                     self.provisioners_up(&c.id, depth + 1);
@@ -730,6 +817,39 @@ impl<'a> Walk<'_, 'a> {
                 let mut row = Row::call(text, n, Some(link.level));
                 row.link = true;
                 self.push(depth, row);
+            }
+        }
+    }
+
+    /// A code symbol is upstream of the workload that runs its repository or code directory.
+    fn executors_up(&mut self, id: &str, depth: usize) {
+        let graph = self.graph;
+        let Some(&(n, symbol)) = graph.symbols.get(id) else {
+            return;
+        };
+        for execution in graph.executions.iter().filter(|x| {
+            x.repository == graph.exports[n].repository && in_path(&symbol.span.path, &x.path)
+        }) {
+            for (m, export) in graph.exports.iter().enumerate() {
+                for node in &export.iac {
+                    if node.identity(&export.repository) == execution.workload
+                        && node.root == execution.root
+                    {
+                        let text = format!(
+                            "runs code [{}: {}] {} {}:{} {} (root {})",
+                            execution.level.name(),
+                            execution.reason,
+                            export.repository,
+                            node.path,
+                            node.line,
+                            node.address,
+                            node.root
+                        );
+                        let mut row = Row::call(text, m, Some(execution.level));
+                        row.link = true;
+                        self.push(depth, row);
+                    }
+                }
             }
         }
     }

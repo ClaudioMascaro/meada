@@ -221,8 +221,7 @@ impl Engine {
             .map(|e| graph.export_process(e))
             .collect();
         let links = all.into_iter();
-        let links =
-            links.filter(|l| l.consumer.starts_with(&here) || l.provider.starts_with(&here));
+        let links = links.filter(|l| contract::link_in_repository(l, &self.identity));
         let provisions = iac::provision::links(&exports)
             .into_iter()
             .filter(|l| {
@@ -376,7 +375,7 @@ impl Engine {
         .map(|(((((repo, export), drift), config), kube), orphans)| {
             let prefix = format!("{}::", repo.identity);
             let mut lines: Vec<String> = (contract::KINDS.iter())
-                .flat_map(|kind| kind.status(repo, export, &links))
+                .flat_map(|kind| kind.scope_status(repo, export, &exports, &links))
                 .collect();
             lines.extend(document::report(repo, export));
             lines.extend(orphans);
@@ -461,9 +460,9 @@ impl Engine {
         let exports = partial.exports;
         let items = items::list(&self.workspace.repos, &exports, &core);
         let (links, _) = decisions::replay(core, &self.workspace, &exports);
-        let decided: HashSet<&str> = (links.iter())
+        let decided: HashSet<String> = (links.iter())
             .filter(|l| l.level == Level::Decided)
-            .map(|l| l.consumer.as_str())
+            .map(|l| l.item_site().into_owned())
             .collect();
         Ok((items.into_iter())
             .map(|item| {
@@ -495,6 +494,11 @@ impl Engine {
         let none = starts.is_empty();
         trace::read(&mut partial, &links, starts, direction, true)?;
         if none && direction == Direction::Down {
+            if let Start::From(from) = start
+                && !iac::found(&partial.exports, from).is_empty()
+            {
+                trace::read_executions(&mut partial, &links)?;
+            }
             let uses: Vec<String> = iac::provision::links(&partial.exports)
                 .into_iter()
                 .map(|l| l.side)
@@ -515,10 +519,14 @@ impl Engine {
             && none
             && graph.answer(start, None, direction, Some(usize::MAX / 8))
                 == format!("{}\n", trace::no_start(from))
-            && let Some(iac) =
-                iac::trace(&self.indexes(), from, direction, budget, |r, n, depth| {
-                    graph.provisioned_rows(r, n, depth)
-                })?
+            && let Some(iac) = iac::trace(
+                &self.indexes(),
+                &exports,
+                from,
+                direction,
+                budget,
+                |r, n, depth| graph.provisioned_rows(r, n, depth),
+            )?
         {
             return Ok(iac);
         }
@@ -629,25 +637,29 @@ impl Engine {
             let provided = export
                 .providers
                 .iter()
-                .map(|p| (p.contract.clone(), &p.site));
+                .map(|p| (p.contract.clone(), &p.site, Role::Provider));
             // An unresolved consumer has no contract: it shows as `(unresolved) <callee>`.
             let consumed = export.consumers.iter().map(|c| {
                 let contract = c.contract.clone();
-                (contract.unwrap_or_else(|| unresolved(&c.site)), &c.site)
+                (
+                    contract.unwrap_or_else(|| unresolved(&c.site)),
+                    &c.site,
+                    Role::Consumer,
+                )
             });
             let mut ranked = Vec::new();
-            for (contract, site) in provided.chain(consumed) {
+            for (contract, site, role) in provided.chain(consumed) {
                 if !contract.starts_with(prefix) {
                     continue;
                 }
                 let Some(r) = contract_rank(&contract, &needle) else {
                     continue;
                 };
-                ranked.push((r, contract, site));
+                ranked.push((r, contract, site, role));
             }
-            let sites: Vec<&str> = ranked.iter().map(|(_, _, s)| s.as_str()).collect();
+            let sites: Vec<&str> = ranked.iter().map(|(_, _, s, _)| s.as_str()).collect();
             let spans = partial::spans(db, &sites)?;
-            for (r, contract, site) in ranked {
+            for (r, contract, site, role) in ranked {
                 let location = match spans.get(site.as_str()) {
                     Some(span) => files.at(&span.path, span.start),
                     None if *site == repo.identity => REPOSITORY_LEVEL.into(),
@@ -666,7 +678,12 @@ impl Engine {
                     "{} {location} {}{}",
                     repo.identity,
                     contract::shown(&contract),
-                    orphans.use_note(&contract)
+                    format_args!(
+                        "{}{}",
+                        orphans.use_note(&contract),
+                        contract::kind_of(&contract)
+                            .map_or("", |k| k.side_note(&exports, &contract, role))
+                    )
                 );
                 hits.push((r, format!("{contract} {site}"), line));
             }
@@ -954,7 +971,19 @@ impl Engine {
                 let line = format!(
                     "{} {role} {place}{tag}{}",
                     repo.identity,
-                    orphans.use_note(contract)
+                    format_args!(
+                        "{}{}",
+                        orphans.use_note(contract),
+                        kind.side_note(
+                            exports,
+                            contract,
+                            if order == 0 {
+                                Role::Provider
+                            } else {
+                                Role::Consumer
+                            }
+                        )
+                    )
                 );
                 sides.push((order, line, shape));
             }
@@ -1051,11 +1080,19 @@ impl Engine {
         let [(n, symbol_found)] = found[..] else {
             if found.is_empty() {
                 // An IaC node (#649) by its address, when no symbol has that name.
-                if let Some(mut lines) = iac::context(&self.indexes(), symbol)? {
-                    let nodes = iac::found(&self.indexes(), symbol)?;
+                if let Some(mut lines) = iac::context(&self.indexes(), &partial.exports, symbol)? {
+                    let nodes = iac::found(&partial.exports, symbol);
                     if let [(n, node)] = &nodes[..] {
-                        let identity =
-                            format!("{}::{}::{}", repos[*n].identity, node.path, node.address);
+                        let identity = node.identity(&repos[*n].identity);
+                        for kind in KINDS {
+                            lines.extend(kind.context_at(
+                                &partial.exports,
+                                repos,
+                                &self.links(&partial.exports),
+                                &identity,
+                                Some(&node.root),
+                            ));
+                        }
                         let provisions = iac::provision::links(&partial.exports);
                         let contracts = partial.exports[*n]
                             .provisioners

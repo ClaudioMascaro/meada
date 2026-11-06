@@ -423,3 +423,8 @@
   broker/resource-kind isolation, unresolved sides, same-repository uses, pattern matching,
   independent roots and a changed IaC name. `orphan*.status.txt` and `orphan*.context.txt`
   hold the whole answers.
+
+- `images.rs` (#662): image normalization and builders/runners across sibling repositories,
+  Compose and Helm evidence, Kustomize image overrides, direct code paths without images,
+  trace in both directions, scope-aware orphans, segment-bounded patterns, ambiguous image
+  open items, safe-path and symlink refresh, plus export/context/trace goldens.

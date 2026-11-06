@@ -32,6 +32,7 @@ mod gopkg;
 mod grammar;
 mod hostile;
 mod iac;
+mod images;
 mod index;
 mod indexed_commit;
 mod items;

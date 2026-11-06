@@ -1079,6 +1079,7 @@ mod tests {
             method: Some("GET".into()),
             fragments: vec!["/shop/".into()],
             hops: Vec::new(),
+            root: None,
         };
         let direct = provider("http::GET::/shop/users");
         let gateway = Provider {

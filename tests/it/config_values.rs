@@ -120,20 +120,31 @@ fn the_default_search_falls_back_to_values_only_when_nothing_else_matches() {
     assert_eq!(nothing, "no matches for `no-such-value`\n");
 }
 
-/// Values stay out of `meada export`, and a Secret's values out of the index itself: its file
+/// Scalars stay out of `meada export` except names that form image contracts (#662), and a
+/// Secret's values stay out of the index itself: its file
 /// holds neither the encoded `data` nor the plain `stringData`.
 #[test]
 fn values_stay_out_of_the_export_and_a_secret_out_of_the_index() {
     let repo = fixture_repo("config_values_export", "config-values", ORIGIN);
     let export = Engine::open(&repo).unwrap().export().unwrap();
-    for value in [
-        "team-b",
-        "ghcr.io",
-        "HealthCheckFailing",
-        "config/settings.json",
-    ] {
+    for value in ["team-b", "HealthCheckFailing", "config/settings.json"] {
         assert!(!export.contains(value), "{value} in the export");
     }
+    let written: serde_json::Value = serde_json::from_str(&export).unwrap();
+    assert_eq!(
+        written["providers"],
+        serde_json::json!([
+            {"contract": "image::ghcr.io/acme/app", "site": "example.com/acme/app", "at": ".github/workflows/ci.yml#jobs.image.steps[0].with.tags"},
+            {"contract": "package::npm::app", "site": "example.com/acme/app::package.json"}
+        ])
+    );
+    assert_eq!(
+        written["consumers"],
+        serde_json::json!([
+            {"contract": "image::ghcr.io/acme/app", "site": "example.com/acme/app::chart/values-prd.yaml::image.repository", "via": "image: chart/values-prd.yaml#image.repository (Helm value)", "root": "chart"},
+            {"contract": "image::ghcr.io/acme/app", "site": "example.com/acme/app::deploy/app.yaml::Deployment.apps/shop/app", "via": null, "root": "deploy"}
+        ])
+    );
     let index = fs::read(repo.join(".meada/index.db")).unwrap();
     let found = |needle: &[u8]| index.windows(needle.len()).any(|w| w == needle);
     assert!(found(b"team-b"), "the index holds the values");

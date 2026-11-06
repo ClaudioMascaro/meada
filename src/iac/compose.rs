@@ -143,6 +143,7 @@ struct Service {
     end_line: usize,
     image: Option<Resolved>,
     build: Option<Resolved>,
+    builds: bool,
     depends_on: BTreeSet<String>,
     links: BTreeSet<String>,
     networks: BTreeSet<String>,
@@ -400,6 +401,9 @@ fn read(path: &str, src: &[u8]) -> BTreeMap<String, Service> {
                 end_line: end,
                 image,
                 build: body.get("build").and_then(|b| context(dir, b)),
+                builds: body
+                    .get("build")
+                    .is_some_and(|b| b.is_object() || b.as_str().is_some_and(|s| !s.is_empty())),
                 depends_on: names(body.get("depends_on"), false),
                 links: names(body.get("links"), true),
                 networks: names(body.get("networks"), false),
@@ -426,6 +430,7 @@ fn merge(
                 }
                 if s.build_set {
                     m.build = s.build;
+                    m.builds = s.builds;
                 }
                 m.network_mode |= s.network_mode;
                 m.depends_on.extend(s.depends_on);
@@ -511,6 +516,7 @@ pub(super) fn evaluate(
                 ]),
                 image: s.image.clone(),
                 build: s.build.clone(),
+                build_image: s.builds,
                 role: None,
                 handler: None,
                 events: Vec::new(),

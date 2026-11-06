@@ -29,6 +29,7 @@ pub mod github_app;
 mod grant;
 mod http;
 mod iac;
+mod image;
 mod index;
 #[doc(hidden)]
 pub use index::{value_parses, with_busy_timeout, with_reversed_walk};

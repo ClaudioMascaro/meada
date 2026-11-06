@@ -123,3 +123,13 @@ return exactly their expected no-matches line with newline, and both ordinary ke
 remain visible. All twelve answers and the tool list must equal HTTP. The server is stopped
 by its own pid; raw CLI, query, stdio and HTTP evidence stays under the new run directory.
 This supplements format coverage and does not claim additional JSON IaC graph behavior.
+
+## Shared image storage and trace supplement
+
+When the required baseline already supports this AWS flow, also run `images-mixed.py` as
+documented in [config-iac.md](config-iac.md#combined-imageaws-and-literal-ko-regressions).
+It places an AWS subscription and image workloads in the same repository, preserves the
+baseline's complete AWS rows, drives both trace relationships together, and edits/restores
+each feature without disturbing the other. Its unresolved-registry case also checks that
+static image inference does not read process environment. This supplements, never replaces,
+the broad AWS and JSON SecureString modes above.

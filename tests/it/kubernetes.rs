@@ -123,14 +123,27 @@ fn status_counts_the_entries_a_kustomization_did_not_follow() {
     }
 }
 
-/// Objects stay out of `meada export`.
+/// Only workload objects with image sides enter the export (#662).
 #[test]
-fn kubernetes_objects_stay_out_of_the_export() {
+fn only_kubernetes_objects_with_image_sides_enter_the_export() {
     let repo = fixture_repo("kube_export", "kubernetes-nodes", ORIGIN);
     let text = Engine::open(&repo).unwrap().export().unwrap();
-    for name in ["dev-api", "api-settings", "Deployment.apps", "overlays/dev"] {
-        assert!(!text.contains(name), "{name} in {text}");
-    }
+    let export: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(export["providers"], serde_json::json!([]));
+    assert_eq!(export["links"], serde_json::json!([]));
+    assert_eq!(export["consumers"].as_array().unwrap().len(), 4, "{text}");
+    assert_eq!(export["iac_nodes"].as_array().unwrap().len(), 4, "{text}");
+    assert!(
+        export["consumers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|c| c["contract"]
+                .as_str()
+                .is_some_and(|c| c.starts_with("image::"))),
+        "{text}"
+    );
+    assert!(!text.contains("api-settings"), "{text}");
 }
 
 /// The default search leaves objects out: a name finds the config values that hold it.

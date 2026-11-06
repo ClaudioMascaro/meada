@@ -935,6 +935,7 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
                 block: config_values::key_path(&at[..2]),
                 image: None,
                 build: None,
+                build_image: false,
                 role: None,
                 handler,
                 events,

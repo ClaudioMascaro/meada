@@ -172,6 +172,10 @@ CREATE TABLE config_files (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL
 );
+CREATE TABLE contract_configs (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    summary TEXT NOT NULL
+);
 CREATE TABLE config_values (
     id INTEGER PRIMARY KEY, path TEXT NOT NULL, key TEXT NOT NULL, value TEXT, type TEXT NOT NULL, line INTEGER NOT NULL,
     cut INTEGER NOT NULL, folded_key TEXT NOT NULL, folded_value TEXT
@@ -188,7 +192,8 @@ CREATE TABLE iac_nodes (
     pattern INTEGER NOT NULL, overridable TEXT NOT NULL, path TEXT NOT NULL,
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
-    handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, subscription TEXT
+    handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
+    subscription TEXT
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -259,6 +264,7 @@ fn provenance_fingerprint(db: &Connection) -> Result<String> {
         "SELECT path, hash FROM documents ORDER BY path",
         "SELECT path, hash FROM manifests ORDER BY path",
         "SELECT path, hash FROM config_files ORDER BY path",
+        "SELECT path, hash FROM contract_configs ORDER BY path",
     ] {
         hash.update(query.as_bytes());
         let mut statement = db.prepare(query)?;
@@ -703,7 +709,7 @@ fn refresh_keeping(
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
                  DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports; \
                  DELETE FROM families; DELETE FROM flexible; DELETE FROM entry_points; DELETE FROM communities; \
-                 DELETE FROM valued; DELETE FROM config_files; DELETE FROM config_values; \
+                 DELETE FROM valued; DELETE FROM config_files; DELETE FROM contract_configs; DELETE FROM config_values; \
                  INSERT INTO config_search (config_search) VALUES ('delete-all'); \
                  DELETE FROM iac_nodes; DELETE FROM iac_references; DELETE FROM iac_images; \
                  DELETE FROM iac_unresolved;",
@@ -738,7 +744,27 @@ fn refresh_keeping(
     // Config values hold no code either: an edited config file changes its rows alone.
     // A `.tfvars` file is redacted for the sensitive variables of other files (they sort last,
     // so those are stored first) and is read again when they change.
-    let configs = configs_found(&all, &hidden_ci(root));
+    let hidden = hidden_ci(root);
+    let configs = configs_found(&all, &hidden);
+    let contract_configs = all
+        .iter()
+        .chain(&hidden)
+        .filter(|(p, _)| contract::config_file(p))
+        .cloned()
+        .collect::<Vec<_>>();
+    refresh_stamped(
+        &tx,
+        "contract_configs",
+        &contract_configs,
+        now,
+        |path| Ok(contract::config_reads_paths(path)),
+        |abs| read_up_to(abs, lang::MAX_BYTES),
+        |path, src| {
+            Ok(serde_json::to_string(&contract::config_summary(
+                path, src, root,
+            ))?)
+        },
+    )?;
     let sensitive = config_values::Sensitive::new(&tx, &configs);
     // The Terraform files and var files read again: the units holding them are evaluated again.
     let terraform = std::cell::RefCell::new(BTreeSet::new());
@@ -2424,6 +2450,10 @@ pub(crate) struct Export {
     pub(crate) communities: Vec<Community>,
     pub(crate) links: Vec<Link>,
     pub(crate) provisioners: Vec<iac::provision::Side>,
+    pub(crate) configurations: Vec<(String, serde_json::Value)>,
+    pub(crate) iac: Vec<iac::Node>,
+    pub(crate) workload_images: Vec<(String, String, String)>,
+    pub(crate) executions: Vec<written::Execution>,
     pub(crate) subscriptions: Vec<iac::subscription::Subscription>,
     pub(crate) provisions: Vec<written::Provision>,
     /// The repository's entry points (spec #31), sorted by identity. Not exported as such:
@@ -2467,6 +2497,7 @@ impl Export {
                 let mut provider = written::Provider::default();
                 provider.contract = p.contract;
                 provider.site = p.site;
+                provider.at = p.at;
                 provider.gateway = p.gateway;
                 provider.shape = p.shape;
                 provider
@@ -2479,6 +2510,7 @@ impl Export {
                 consumer.site = c.site;
                 consumer.via = c.via;
                 consumer.shape = c.shape;
+                consumer.root = c.root;
                 consumer
             })
             .collect();
@@ -2504,10 +2536,30 @@ impl Export {
             out.iac_nodes.push(node);
             out.provisioners.push(provisioner);
         }
+        for node in &self.iac {
+            let identity = node.identity(&out.repository);
+            if out
+                .consumers
+                .iter()
+                .any(|c| c.site == identity && c.root.as_deref().is_none_or(|r| r == node.root))
+                || self.executions.iter().any(|x| x.workload == identity)
+            {
+                let mut written = written::IacNode::default();
+                written.identity = identity;
+                written.address = node.address.clone();
+                written.ty = node.ty.clone();
+                written.root = node.root.clone();
+                written.path = node.path.clone();
+                written.line = node.line;
+                written.end_line = node.end_line;
+                out.iac_nodes.push(written);
+            }
+        }
         out.iac_nodes
             .sort_by(|a, b| (&a.identity, &a.root).cmp(&(&b.identity, &b.root)));
         out.iac_nodes.dedup();
         out.provisions = self.provisions;
+        out.executions = self.executions;
         out.subscriptions = self
             .subscriptions
             .into_iter()
@@ -2555,6 +2607,10 @@ pub(crate) struct Document {
 pub(crate) struct Provider {
     pub(crate) contract: String,
     pub(crate) site: String,
+    /// Configuration location for a repository-level builder.
+    pub(crate) at: Option<String>,
+    /// Evidence that this side's evaluated name is overridable.
+    pub(crate) evidence: Option<String>,
     /// The path a gateway serves the route at, when `[serve]` rewrites it (`meada export`).
     pub(crate) gateway: Option<String>,
     /// What the route's response or the channel's messages carry: from the first document by
@@ -2597,6 +2653,17 @@ pub(crate) struct Consumer {
     /// For a call through a package import, where it resolves in each provider of the package
     /// (`package::import`); `Packages::link` turns them into links.
     pub(crate) hops: Vec<Hop>,
+    pub(crate) root: Option<String>,
+}
+
+impl Consumer {
+    pub(crate) fn item_site(&self) -> std::borrow::Cow<'_, str> {
+        written::side_id(
+            &self.site,
+            self.contract.as_deref().unwrap_or_default(),
+            self.root.as_deref(),
+        )
+    }
 }
 
 /// A `contracts.shape` value; one that does not parse reads as no shape.
@@ -2699,6 +2766,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
                     .and_then(|f| serde_json::from_str(&f).ok())
                     .unwrap_or_default(),
                 hops: Vec::new(),
+                root: None,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -2892,6 +2960,22 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         communities: Vec::new(),
         links: Vec::new(),
         provisioners: iac::provision::read(db, identity)?,
+        configurations: db
+            .prepare("SELECT path, summary FROM contract_configs ORDER BY path")?
+            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+            .map(|r| {
+                let (p, s) = r?;
+                Ok((p, serde_json::from_str(&s)?))
+            })
+            .collect::<Result<_>>()?,
+        iac: iac::nodes(db)?,
+        workload_images: db
+            .prepare(
+                "SELECT root, address, image FROM iac_images ORDER BY root, address, container",
+            )?
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            .collect::<rusqlite::Result<_>>()?,
+        executions: Vec::new(),
         subscriptions: iac::subscription::read(db, identity)?,
         provisions: Vec::new(),
         entry_points,

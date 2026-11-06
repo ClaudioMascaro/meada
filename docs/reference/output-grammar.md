@@ -78,6 +78,8 @@ file whose path holds a space reads as more fields than it has.
 | `<query>` | `<text>` | What the call was given, echoed. |
 | `<orphan-note>` | ` (no provisioner in the workspace)` | The visible scope has uses but no provisioner of this contract kind and broker or resource kind. |
 | `<orphan-note>` | ` (no use in the workspace)` | The visible scope has provisioners but no use of this group. |
+| `<orphan-note>` | ` (no builder in the workspace)` | The visible image scope has runners but no builder. |
+| `<orphan-note>` | ` (no runner in the workspace)` | The visible image scope has builders but no runner. |
 
 ## Levels
 
@@ -129,6 +131,7 @@ A contract identifier starts with its contract kind and `::`:
 | `<contract>` | `http::ANY::<route>` | A route a provider serves on every method: it fits a consumer of any method. |
 | `<contract>` | `channel::<broker>::<channel>` | A queue, topic or subject of a broker: `channel::kafka::orders.created`. |
 | `<contract>` | `package::<ecosystem>::<package>` | A package: `package::npm::@example/kit`. |
+| `<contract>` | `image::<word>` | A normalized image name or an unresolved image pattern. |
 | `<contract>` | `resource::<resource-kind>::<resource-id>` | A resource declared in `meada.toml`: `resource::postgres::orders`. |
 | `<method>` | `<word>` | An HTTP method in upper case, such as `GET` or `POST`. |
 | `<route>` | `<word>` | A route path; each parameter is `{}`. |
@@ -139,6 +142,7 @@ A contract identifier starts with its contract kind and `::`:
 | `<resource-kind>` | `<word>` | The resource's `kind` in `meada.toml`. |
 | `<resource-id>` | `<text>` | The resource's `id` in `meada.toml`. |
 | `<shown-contract>` | `<contract>` | A contract as answers show it. |
+| `<shown-contract>` | `image::<word> (unresolved)` | An image pattern with insufficient literal or segment evidence. |
 | `<shown-contract>` | `channel::<broker> (unresolved)` | A channel side whose name Meada cannot read. |
 | `<shown-contract>` | `(unresolved) <callee>` | In `search`: a consumer whose contract Meada cannot read (an open item), with the call it sits at. |
 
@@ -154,6 +158,7 @@ substrings), and an optional `kind`:
 | `route` | Providers and consumers of `http::` contracts. |
 | `resource` | Writers, readers and provisioners of `resource::` contracts. |
 | `channel` | Producers, consumers and provisioners of `channel::` contracts. |
+| `image` | Builders and workload runners of `image::` contracts. |
 | `document` | OpenAPI and AsyncAPI documents, by path or title. |
 | `package` | Packages, by name. |
 | `drift` | Fields a consumer reads that its provider lacks, by route or field path. |
@@ -306,7 +311,9 @@ words:
 | iac name | `name: <physical-name>` | The IaC node's physical name. |
 | iac root | `root: <iac-root>` | The IaC node's root module. |
 | iac role | `role: <text>` | What a Kubernetes object is to Crossplane: `crossplane composite resource definition`, `crossplane composition`, `crossplane claim`, `crossplane composite resource`, `crossplane managed resource` or `crossplane composed resource`. |
-| iac image | `image: <text><iac-mark?>` | A Compose service's image, quoted as JSON. |
+| iac image | `image: <text><iac-mark?>` | A Compose service's image quoted as JSON, or a workload's image contract with its optional missing-builder note. |
+| image builder | `  builder: <repository> [<level>: <reason>]` | A workload's image builder, with its evaluated evidence. |
+| workload code | `code: <repository> <path> [exact]` | A safe same-repository Compose code path. |
 | iac build | `build: <text><iac-mark?>` | A Compose service's build context, a path inside the repository, quoted as JSON. |
 | iac handler | `handler: <text><iac-mark?>` | A Serverless function's handler, quoted as JSON. |
 | iac event | `event: <text><iac-mark?>` | One event of a Serverless function, in file order: its type and what identifies it, quoted as JSON (`"http GET /orders"`, `"sqs Queue.Arn"`). |
@@ -367,6 +374,8 @@ words:
 | `<paths>` | `<text>` | Field paths joined by `, `. |
 | `<exchange>` | `<word>` | An exchange. |
 | `<key>` | `<word>` | A routing key. |
+| `<role>` | `builder` | The repository whose configuration publishes an image. |
+| `<role>` | `runner` | A workload that runs an image. |
 | `<role>` | `provisioner` | Creates the resource. |
 | `<role>` | `writer` | Writes the resource. |
 | `<role>` | `reader` | Reads the resource. |
@@ -391,6 +400,7 @@ words:
 | `<contract-kind>` | `channel` | A channel. |
 | `<contract-kind>` | `resource` | A resource. |
 | `<contract-kind>` | `package` | A package. |
+| `<contract-kind>` | `image` | An image. |
 
 ## `trace`
 
@@ -417,6 +427,8 @@ carries its level with no reason.
 
 | Kind | Line | Meaning |
 | --- | --- | --- |
+| runs code | `<indent>runs code <repository> <path> [<level>: <reason>]` | A workload reaches the repository's code entry points. |
+| run by workload | `<indent>runs code [<level>: <reason>] <repository> <place> <address> (root <iac-root>)` | Code reaches a workload that runs it. |
 | provision | `<indent>provisions <contract> [<level>: <reason>] <text>` | A provisioning hop, with its root when it reaches IaC. |
 | process | `process <label>` | The process whose steps follow. |
 | node | `<indent><node><call-mark?><repeat?><drift?>` | A node the walk reaches through a call, or a start. |
@@ -462,9 +474,11 @@ carries its level with no reason.
 | `<sided-kind>` | `resource` | A resource. |
 | `<sided-kind>` | `channel` | A channel. |
 | `<sided-kind>` | `package` | A package. |
+| `<sided-kind>` | `image` | An image. |
 | `<sides>` | `writers and readers` | A resource's sides. |
 | `<sides>` | `producers and consumers` | A channel's sides. |
 | `<sides>` | `packages and dependents` | A package's sides. |
+| `<sides>` | `builders and runners` | An image's sides. |
 | `<call-site>` | `<identity>::<callee>#<n>` | A call site's identity: its caller's (a symbol, or a file for a call at its top level), what it calls, and its ordinal among the caller's calls of that name. |
 
 ## Every tool

@@ -257,3 +257,30 @@ its rule on environment variables and its `inferred` level change as the section
   contract, as channels are, and the provisioner's root label tells environments apart.
 - **A `router` side for alerts.** Rejected: router is HTTP vocabulary; emitter and matcher name
   what each side does.
+
+### Image execution representation (#662, 2026-11-06)
+
+The image addition keeps export format 1. Builder locations use the optional provider `at`
+field described above. Workload consumers retain their IaC identity, and their nodes enter
+`iac_nodes`. A direct same-repository code path enters an optional `executions` array with
+`workload`, its `root`, `repository`, repository-relative `path`, `level` and `reason`. These
+rows are not consumer/provider image links. Image links derive the same execution relation
+at query time for context and trace. Readers that do not know the array ignore it.
+
+Several distinct normalized image names matching a pattern are distinct candidates even when
+one repository builds them. Several tags or configuration locations for one repository and
+normalized image are evidence of the same candidate. The kind retains the strongest evidence.
+
+This slice recognizes literal ko destinations in checked-in CI `KO_DOCKER_REPO` with
+`ko build --bare` or `ko publish --bare`. Other ko naming modes add import-path names or hashes;
+unread commands yield no guessed builder. Base-image settings never publish an image.
+The merged #658 tier supplies synchronized 1.3.0 versions for both crates; image contracts
+share that minor release under Unreleased. ko scripts are read only as single simple commands;
+multiline scripts and unsupported shell syntax yield no guessed builder. A supported command
+has exactly one `--bare`, at most one literal package target and no other flags; a specified
+shell must be `bash` or `sh`. Help, unknown options and other shells stay absent.
+
+Image consumer and link rows optionally carry their evaluation `root`. Their `site` and
+`consumer` still identify the workload. An open item's decision identity additionally names
+the image contract and root, so two container images or overlays do not share a decision.
+Replaying one decision preserves every other image side's ambiguity.

@@ -52,10 +52,10 @@ use meada_core::export::Level;
 use meada_core::trace::{Chain, Row};
 
 pub(crate) mod cloudformation;
-mod compose;
+pub(crate) mod compose;
 mod functions;
 pub(crate) mod orphans;
-mod pattern;
+pub(crate) mod pattern;
 pub(crate) mod provision;
 pub(crate) mod serverless;
 pub(crate) mod subscription;
@@ -155,7 +155,7 @@ pub(crate) fn is_input(path: &str) -> bool {
 }
 
 /// One IaC node as stored.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub(crate) struct Node {
     pub address: String,
     /// The label of the root module its evaluation starts from: its directory, `.` for the root.
@@ -178,6 +178,8 @@ pub(crate) struct Node {
     pub image: Option<Resolved>,
     /// The build context of a Compose service: a path inside the repository from its root.
     pub build: Option<Resolved>,
+    /// Whether Compose configures a build, including remote contexts.
+    pub build_image: bool,
     /// What a Kubernetes object is to Crossplane (#655): `crossplane claim`, `crossplane
     /// composition` and the like; `None` for any other node.
     pub role: Option<String>,
@@ -186,6 +188,30 @@ pub(crate) struct Node {
     /// The events of a Serverless function, in file order.
     pub events: Vec<Resolved>,
     pub subscription: Option<subscription::Subscription>,
+}
+
+impl Node {
+    pub(crate) fn identity(&self, repository: &str) -> String {
+        format!("{repository}::{}::{}", self.path, self.address)
+    }
+
+    /// The node's stored line range as the code-span shape used by open items.
+    pub(crate) fn span(&self, source: Option<&[u8]>) -> crate::index::Span {
+        let mut span = crate::index::Span::default();
+        span.path = self.path.clone();
+        if let Some(source) = source {
+            let lengths = source
+                .split_inclusive(|&b| b == b'\n')
+                .map(<[u8]>::len)
+                .collect::<Vec<_>>();
+            span.start = lengths
+                .iter()
+                .take(self.line.saturating_sub(1))
+                .sum::<usize>() as i64;
+            span.end = lengths.iter().take(self.end_line).sum::<usize>() as i64;
+        }
+        span
+    }
 }
 
 /// A root module's variable a name went through: by its default, or by the value a var file
@@ -1084,6 +1110,7 @@ impl<'m> Eval<'m> {
                     block: block.key_path(),
                     image: None,
                     build: None,
+                    build_image: false,
                     role: None,
                     handler: None,
                     events: Vec::new(),
@@ -1795,7 +1822,7 @@ pub(crate) fn refresh_template(tx: &Transaction, path: &str, src: Option<&[u8]>)
 /// Stores `nodes` and `references`.
 pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference]) -> Result<()> {
     let mut insert = tx
-        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)")?;
+        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)")?;
     for n in nodes {
         let (line, end) = (n.line as i64, n.end_line as i64);
         let overridable = serde_json::to_string(&n.overridable)?;
@@ -1820,6 +1847,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
             n.handler.as_ref().map(|h| &h.text),
             n.handler.as_ref().map(|h| h.overridable),
             events,
+            n.build_image,
             n.subscription
                 .as_ref()
                 .map(serde_json::to_string)
@@ -1836,7 +1864,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
 /// The columns of a node, in `row`'s order.
 const COLUMNS: &str = "address, root, type, name, pattern, overridable, path, line, end_line, \
                        block, image, image_overridable, build, build_overridable, role, \
-                       handler, handler_overridable, events, subscription";
+                       handler, handler_overridable, events, build_image, subscription";
 
 /// The text at column `at` and its overridable flag at the next one, when there is a text.
 fn resolved(r: &rusqlite::Row, at: usize) -> rusqlite::Result<Option<Resolved>> {
@@ -1863,13 +1891,24 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Node> {
         block: r.get(9)?,
         image: resolved(r, 10)?,
         build: resolved(r, 12)?,
+        build_image: r.get(18)?,
         role: r.get(14)?,
         handler: resolved(r, 15)?,
         events: serde_json::from_str(&r.get::<_, String>(17)?).unwrap_or_default(),
         subscription: r
-            .get::<_, Option<String>>(18)?
+            .get::<_, Option<String>>(19)?
             .and_then(|s| serde_json::from_str(&s).ok()),
     })
+}
+
+/// The stored IaC nodes, shared by contract kinds that read workloads.
+pub(crate) fn nodes(db: &Connection) -> Result<Vec<Node>> {
+    Ok(db
+        .prepare(&format!(
+            "SELECT {COLUMNS} FROM iac_nodes ORDER BY root, path, address"
+        ))?
+        .query_map([], row)?
+        .collect::<rusqlite::Result<_>>()?)
 }
 
 /// `<identity> <path>:<line> <address>`.
@@ -1922,7 +1961,7 @@ pub(crate) fn hits(
 
 /// The nodes `text` names in `db` (repository `identity`): `<address>`, `<path>::<address>` or
 /// `<identity>::<path>::<address>`, any of them followed by ` (root <root>)` to pick a root.
-fn named(identity: &str, db: &Connection, text: &str) -> Result<Vec<Node>> {
+fn named(identity: &str, nodes: &[Node], text: &str) -> Vec<Node> {
     let (text, root) = match text
         .strip_suffix(')')
         .and_then(|t| t.rsplit_once(" (root "))
@@ -1930,38 +1969,34 @@ fn named(identity: &str, db: &Connection, text: &str) -> Result<Vec<Node>> {
         Some((text, root)) => (text, Some(root)),
         None => (text, None),
     };
-    // The address is the whole text, or what follows one of its `::`.
-    let mut candidates = vec![text];
-    candidates.extend(text.match_indices("::").map(|(i, _)| &text[i + 2..]));
-    let mut statement = db.prepare(&format!(
-        "SELECT {COLUMNS} FROM iac_nodes WHERE address = ?1"
-    ))?;
-    let mut found = Vec::new();
-    for address in candidates {
-        for n in statement.query_map(params![address], row)? {
-            let n = n?;
-            let path = format!("{}::{address}", n.path);
-            let fits = text == address || text == path || text == format!("{identity}::{path}");
-            if fits && root.is_none_or(|r| r == n.root) {
-                found.push(n);
-            }
-        }
-    }
+    let mut found = nodes
+        .iter()
+        .filter(|n| {
+            let path = format!("{}::{}", n.path, n.address);
+            (text == n.address || text == path || text == n.identity(identity))
+                && root.is_none_or(|r| r == n.root)
+        })
+        .cloned()
+        .collect::<Vec<_>>();
     found.sort_by(|a, b| {
         (&a.path, a.line, &a.address, &a.root).cmp(&(&b.path, b.line, &b.address, &b.root))
     });
     found.dedup();
-    Ok(found)
+    found
 }
 
-/// The nodes of the workspace `text` names (`named`), with the position of their repository;
-/// `repos` holds each repository's identity and index.
-pub(crate) fn found(repos: &[(&str, &Connection)], text: &str) -> Result<Vec<(usize, Node)>> {
-    let mut found = Vec::new();
-    for (n, (identity, db)) in repos.iter().enumerate() {
-        found.extend(named(identity, db, text)?.into_iter().map(|node| (n, node)));
-    }
-    Ok(found)
+/// Nodes resolved from the visible exports include stored nodes and configuration-derived
+/// workloads. Neither lookup nor a server-mode query reads a build configuration from disk.
+pub(crate) fn found(exports: &[crate::index::Export], text: &str) -> Vec<(usize, Node)> {
+    exports
+        .iter()
+        .enumerate()
+        .flat_map(|(n, e)| {
+            named(&e.repository, &e.iac, text)
+                .into_iter()
+                .map(move |node| (n, node))
+        })
+        .collect()
 }
 
 /// The answer when `text` fits several nodes: one line each, with what to pass for it.
@@ -2040,8 +2075,12 @@ fn reached(identity: &str, n: &Node, via: &Option<String>) -> String {
 /// `(pattern)` when a part is unresolved), its root, its Crossplane role when it has one (#655),
 /// the overridable values its name went through, the nodes it references, those that reference
 /// it and its config values. A text that fits several nodes lists them.
-pub(crate) fn context(repos: &[(&str, &Connection)], text: &str) -> Result<Option<Vec<String>>> {
-    let found = found(repos, text)?;
+pub(crate) fn context(
+    repos: &[(&str, &Connection)],
+    exports: &[crate::index::Export],
+    text: &str,
+) -> Result<Option<Vec<String>>> {
+    let found = found(exports, text);
     let [(r, n)] = &found[..] else {
         return Ok((!found.is_empty()).then(|| several(repos, text, &found)));
     };
@@ -2100,12 +2139,13 @@ pub(crate) fn context(repos: &[(&str, &Connection)], text: &str) -> Result<Optio
 /// ` (see above)`; then the chain footer. A text that fits several nodes lists them.
 pub(crate) fn trace(
     repos: &[(&str, &Connection)],
+    exports: &[crate::index::Export],
     text: &str,
     direction: Direction,
     budget: Option<usize>,
     mut provisioned: impl FnMut(usize, &Node, usize) -> Vec<Row>,
 ) -> Result<Option<String>> {
-    let found = found(repos, text)?;
+    let found = found(exports, text);
     let [(r, start)] = &found[..] else {
         return Ok((!found.is_empty())
             .then(|| crate::render::budgeted(&several(repos, text, &found), budget)));

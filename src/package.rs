@@ -1294,6 +1294,7 @@ fn import(exports: &mut [Export], providers: &Providers) {
                         method: entry.range.clone(),
                         fragments: Vec::new(),
                         hops,
+                        root: None,
                     });
                 }
             }
@@ -1575,6 +1576,7 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                         method: e.range.clone(),
                         fragments: Vec::new(),
                         hops: Vec::new(),
+                        root: None,
                     });
                     let mut dependency = Dependency::default();
                     dependency.manifest = manifest.path.clone();
@@ -2068,6 +2070,7 @@ mod tests {
                 method: Some("^1.0.0".into()),
                 fragments: Vec::new(),
                 hops: Vec::new(),
+                root: None,
             }],
             calls: vec![call_site],
             ..Export::default()
@@ -2651,6 +2654,7 @@ mod tests {
             method: Some("1".into()),
             fragments: Vec::new(),
             hops: Vec::new(),
+            root: None,
         };
         let repo = Repository {
             root: "/nonexistent".into(),
@@ -2845,6 +2849,10 @@ mod tests {
             shape
         };
         Export {
+            configurations: Vec::new(),
+            iac: Vec::new(),
+            workload_images: Vec::new(),
+            executions: Vec::new(),
             repository: name.into(),
             root: PathBuf::new(),
             files: (files.iter())

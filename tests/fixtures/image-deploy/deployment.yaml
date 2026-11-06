@@ -1,0 +1,14 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders
+  namespace: shop
+spec:
+  template:
+    spec:
+      containers:
+        - name: orders
+          image: ghcr.io/acme/orders:v2
+      initContainers:
+        - name: migration
+          image: ghcr.io/acme/orders@sha256:abc

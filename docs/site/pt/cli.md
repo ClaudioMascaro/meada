@@ -25,3 +25,21 @@ ou os arquivos mudam durante a atualização. No modo servidor eles vêm do que 
 Meada só escreve dentro de `.meada/`, que se ignora no git. Toda consulta primeiro atualiza o
 índice com o que mudou nos arquivos, inclusive o que ainda não foi commitado. As mensagens da
 linha de comando seguem o `LANG` (português, inglês ou espanhol); as do MCP são sempre em inglês.
+
+### Da carga de trabalho ao código
+
+Com os repositórios da aplicação e do deploy no mesmo workspace, procure a imagem normalizada,
+leia quem a constrói e percorra o código que a carga executa, pelas ferramentas MCP:
+
+```text
+search(query="ghcr.io/acme/orders", kind="image")
+context(symbol="image::ghcr.io/acme/orders")
+context(symbol="Deployment.apps/shop/orders")
+trace(from="Deployment.apps/shop/orders", direction="down")
+trace(from="orders.py::orders", direction="up")
+```
+
+Um Compose com `build: ./src` também chega ao código sem publicar uma imagem. `status` usa o
+escopo visível para os órfãos; um construtor isolado recebe a marca `no runner in the workspace`
+na consulta. No console, a visão de contratos mostra imagens e suas origens; a visão de código
+das cargas de trabalho mostra os caminhos diretos. Veja os formatos em [Capacidades](capabilities.md).

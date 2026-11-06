@@ -42,6 +42,26 @@ pub(crate) struct Entry {
 #[serde(deny_unknown_fields)]
 struct Table {
     entry: Vec<Entry>,
+    #[serde(default)]
+    workload: Vec<Workload>,
+}
+
+/// A type that runs code, with the image and code paths its format reads.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Workload {
+    pub format: String,
+    #[serde(rename = "type")]
+    pub ty: String,
+    pub images: Vec<String>,
+    pub code: Option<String>,
+}
+
+static WORKLOADS: LazyLock<Vec<Workload>> =
+    LazyLock::new(|| toml::from_str::<Table>(TABLE).map_or_else(|_| Vec::new(), |t| t.workload));
+
+pub(crate) fn workload(format: &str, ty: &str) -> Option<&'static Workload> {
+    WORKLOADS.iter().find(|w| w.format == format && w.ty == ty)
 }
 
 static ENTRIES: LazyLock<Vec<Entry>> = LazyLock::new(|| {

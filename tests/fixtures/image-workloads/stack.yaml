@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          image: nginx:1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: statefulset
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          image: nginx:1
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: daemonset
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          image: nginx:1
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: replicaset
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          image: nginx:1
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: replicationcontroller
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          image: nginx:1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: job
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          image: nginx:1
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cronjob
+spec:
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          initContainers:
+            - name: init
+              image: nginx:1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod
+spec:
+  containers:
+    - name: app
+      image: nginx:1

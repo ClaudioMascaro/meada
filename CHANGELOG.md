@@ -8,6 +8,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Image contracts (#662): normalized `image::<registry>/<repository>` names connect builders
+  in GitHub Actions, Compose, Skaffold, ko and Jib to Kubernetes, Compose and Helm runners,
+  including Kustomize image overrides. Context shows builders, trace crosses into code and
+  back, and status reports image orphans only in scopes with both roles. Compose build paths
+  run same-repository code directly at `exact`, without following symlinks. Export format 1
+  adds optional builder `at` locations and direct `executions`; the console graph displays
+  both. Release level: minor for meada and meada-core, included in synchronized 1.3.0.
+
 - AWS infrastructure contracts: Terraform/OpenTofu SNS, EventBridge and Kinesis channels;
   DynamoDB, RDS instances and clusters, ElastiCache clusters and replication groups, SSM and
   Secrets Manager resources, including ARN name extraction. SNS-to-SQS subscriptions and

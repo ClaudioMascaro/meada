@@ -453,6 +453,28 @@ na mesma pasta é lido como um projeto, enraizado na pasta. Cada serviço é um 
   resolvida não são.
 - **Consultas**: como nos nós Terraform, `search` com `kind = "iac"`, `context` e `trace`.
 
+### Imagens e código de workloads
+
+O contrato `image::<registry>/<repositório>` liga um workload ao repositório que constrói sua
+imagem. Nomes curtos do Docker Hub são expandidos, letras ficam minúsculas e tag e digest são
+removidos. O builder vem de tags do docker/build-push-action, imagens do docker/metadata-action,
+Compose com `build` e `image`, artefatos Skaffold, destinos Jib e comandos ko simples com
+`KO_DOCKER_REPO` escrito na configuração e `--bare`. Scripts ko com sintaxe de shell não lida
+não declaram builder. O comando aceita um `--bare`, no máximo um pacote literal e nenhuma outra
+opção; um shell explícito deve ser `bash` ou `sh`. Runners vêm de containers e init containers Kubernetes, serviços Compose,
+`image.repository` de values Helm e imagens após overrides Kustomize.
+
+`search` com `kind = "image"` encontra esses contratos. `context` no workload mostra sua imagem
+e o repositório builder; `trace` desce do workload ao código e sobe do código aos workloads.
+Nomes literais ligam em `exact`; padrões e valores sobrescrevíveis em `inferred`, com o motivo.
+Vários candidatos ficam `ambiguous`. Um contexto Compose local e seguro liga o serviço ao seu
+código diretamente em `exact`, mesmo sem imagem. Caminhos não atravessam links simbólicos.
+
+`meada status` só lista imagens órfãs quando o escopo contém builder e runner. Com apenas um
+papel, `search` e `context` mostram `no builder in the workspace` ou `no runner in the workspace`.
+O export conserva `format: 1`, guarda locais dos builders e raízes dos workloads e inclui
+`executions` para caminhos diretos; o grafo da console mostra contratos e código dos workloads.
+
 ### CloudFormation e SAM
 
 Um template qualificado chamado `compose.yaml` mantém seus nós e referências no índice inicial e nas atualizações; o nome do arquivo não o torna Compose.

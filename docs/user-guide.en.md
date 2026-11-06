@@ -452,6 +452,28 @@ of type `service`.
   path, a URL, one that climbs out of the root or one with an unresolved part is not.
 - **Queries**: as for Terraform nodes, `search` with `kind = "iac"`, `context` and `trace`.
 
+### Images and workload code
+
+The `image::<registry>/<repository>` contract connects a workload to the repository that builds
+its image. Docker Hub short names expand, names become lowercase, and tags and digests are
+removed. Builders come from docker/build-push-action tags, docker/metadata-action images,
+Compose with `build` and `image`, Skaffold artifacts, Jib destinations and simple ko commands
+with checked-in `KO_DOCKER_REPO` and `--bare`. Unread shell syntax in ko scripts declares no
+builder. The command accepts one `--bare`, at most one literal package and no other flags; an
+explicit shell must be `bash` or `sh`. Runners come from Kubernetes containers and init containers, Compose services,
+Helm values `image.repository` and images after Kustomize overrides.
+
+`search` with `kind = "image"` finds these contracts. Workload `context` shows its image and
+builder repository; `trace` goes down from the workload to code and up from code to workloads.
+Literal names link at `exact`; patterns and overridable values link at `inferred`, with a reason.
+Several candidates stay `ambiguous`. A safe local Compose build context connects the service
+directly to its code at `exact`, even without an image. Paths never cross symbolic links.
+
+`meada status` lists image orphans only when the scope contains both builder and runner. With
+one role, `search` and `context` show `no builder in the workspace` or `no runner in the workspace`.
+Export keeps `format: 1`, retains builder locations and workload roots, and includes `executions`
+for direct paths; the console graph shows the image contracts and workload code.
+
 ### CloudFormation and SAM
 
 A qualifying template named `compose.yaml` keeps its nodes and references through cold indexing and warm refreshes; its filename does not make it Compose.

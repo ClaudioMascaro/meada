@@ -402,3 +402,29 @@ A process is the call tree from an entry point, across repositories. Routes, cha
 ## Limits and next steps
 
 Languages and HTTP or messaging clients outside these lists are not yet supported. [ADR 0003](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0003-v1-scope-and-roadmap.md) defines scope and order. See the [roadmap](roadmap.md), [decisions](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr) and [CHANGELOG](https://github.com/ClaudioMascaro/meada/blob/main/CHANGELOG.md).
+
+## Images and workload code
+
+The `image::<registry>/<repository>` contract connects a workload to the repository whose
+configuration builds its image (#662). `nginx:1.27` becomes `image::docker.io/library/nginx`;
+`acme/api` becomes `image::docker.io/acme/api`. Names are lowercase, without tags or digests.
+
+Builders come from `docker/build-push-action` (`tags`), `docker/metadata-action` (`images`),
+Compose with `build` and `image`, Skaffold artifacts (including multiple YAML documents),
+literal Maven/Gradle Jib destinations and ko `build --bare` or `publish --bare` commands with
+`KO_DOCKER_REPO` set in the workflow. Base images are not destinations. Other ko naming modes
+and unread Gradle expressions do not create a guessed builder.
+
+Runners are Kubernetes workload containers and init containers, after Kustomize image
+overrides, Compose services and Helm values files' `image.repository`. Helm templates are not
+rendered. `context` shows the image and builder repositories; `trace` crosses the relationship
+both ways, reaching code entry points. A local Compose context directly runs code in the same
+repository at `exact`, even without `image`, inside the root and through no symbolic link.
+
+Literals link at `exact`; Compose defaults and Helm values at `inferred`, with their source in
+the reason. Unresolved parts remain patterns and match only literal names at segment
+boundaries; several candidates remain `ambiguous` and can receive a decision. `status` lists
+image orphans only when the visible scope contains builders and runners. Otherwise `search`
+and `context` mark the side with no counterpart. Export stays at format 1, adding builder `at`
+locations and direct-path `executions`; the console graph shows image contracts, their links
+and workload code.
