@@ -49,7 +49,8 @@ KEYED = {
     "links": ("consumer", "provider", "contract"),
     "iac_nodes": ("identity", "root"),
     "provisioners": ("contract", "node", "root"),
-    "provisions": ("side", "provisioner", "root", "contract"),
+    "provisions": ("side", "provisioner", "root", "contract", "at"),
+    "uses": ("contract", "site", "at"),
     "subscriptions": ("source", "target", "node", "root"),
     "providers": ("contract", "site"),
     "consumers": ("contract", "site"),
@@ -731,6 +732,36 @@ def cmd_selftest(_):
         "  subscriptions: +1 -0 ~0", f"    + {subscription_key}"], [])
     assert export_diff({"subscriptions": [subscription]}, {}) == ([
         "  subscriptions: +0 -1 ~0", f"    - {subscription_key}"], [])
+    # #661: repository-level sites need their at locator in both keys. Otherwise
+    # two references to one contract silently collapse in the comparison dictionary.
+    uses = [{"contract": "channel::sqs::parcel", "site": "app", "at": f"values.yaml#worker.{key}"}
+            for key in ["queue", "secondary.queue"]]
+    provisions = [{"side": "app", "provisioner": "infra::main.tf::aws_sqs_queue.parcel", "root": ".",
+                   "contract": "channel::sqs::parcel", "at": use["at"], "level": "inferred", "reason": "typed key"}
+                  for use in uses]
+    pair = {"uses": uses, "provisions": provisions}
+    lines, _ = export_diff({}, pair)
+    text = "\n".join(lines)
+    assert "uses: +2 -0 ~0" in text and "provisions: +2 -0 ~0" in text, text
+    lines, _ = export_diff(pair, {"uses": uses[1:], "provisions": provisions[1:]})
+    text = "\n".join(lines)
+    assert "uses: +0 -1 ~0" in text and "provisions: +0 -1 ~0" in text, text
+    assert uses[0]["at"] in text and uses[1]["at"] not in text, text
+    changed = json.loads(json.dumps(pair))
+    changed["provisions"][0]["level"] = "exact"
+    lines, _ = export_diff(pair, changed)
+    text = "\n".join(lines)
+    assert "provisions: +0 -0 ~1" in text and "level: inferred -> exact: 1" in text, text
+    assert uses[0]["at"] in text and uses[1]["at"] not in text, text
+    # Retain the failure mechanism: removing at from the feature's identity key makes
+    # the two-row addition fail its required +2 comparison, not merely a saved JSON check.
+    fields = KEYED["provisions"]
+    try:
+        KEYED["provisions"] = tuple(f for f in fields if f != "at")
+        mutant, _ = export_diff({}, pair)
+        assert "provisions: +2 -0 ~0" not in "\n".join(mutant), mutant
+    finally:
+        KEYED["provisions"] = fields
     assert spread(list(range(100)), 4) == [0, 25, 50, 75] and spread([1, 2], 10) == [1, 2]
     assert short("target", "r::x") == "set" and short("candidates", [1]) == "[1 items]"
     q = auto_queries({"calls": [{"target": "r::k.kt::p.Flow.test(Duration?,String?)"}], "providers": []})

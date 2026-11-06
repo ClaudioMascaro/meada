@@ -77,6 +77,17 @@ test('an invalid export is refused with the core parse error before building any
     .toThrow('files[0].hash');
 });
 
+test('config use sites stay separate from directed sides, even without a provisioner', () => {
+  const data = JSON.parse(golden('chain-web'));
+  data.uses = [{ contract: 'channel::sqs::configured',
+    site: 'example.com/chain/web', at: 'values.yaml#queue' }];
+  const graph = graphModel(JSON.stringify(data));
+  expect(graph.contracts.find(row => row.contract === 'channel::sqs::configured')).toEqual({
+    contract: 'channel::sqs::configured', providers: [], consumers: [],
+    uses: ['example.com/chain/web values.yaml#queue'],
+  });
+});
+
 test('image builders retain their config locations and direct workloads retain their code paths', () => {
   const data = JSON.parse(golden('chain-web'));
   data.providers = [{ contract: 'image::ghcr.io/acme/orders', site: data.repository, at: '.github/workflows/build.yml#jobs.publish.steps[0].with.tags' }];

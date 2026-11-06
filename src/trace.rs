@@ -343,7 +343,21 @@ impl<'a> Graph<'a> {
                 kind.prefix()
             )]);
         }
-        if self.is_repo(from) && self.provisions.iter().any(|l| l.side == from) {
+        let configured = crate::iac::config_uses::found(self.exports, from);
+        if !configured.is_empty() {
+            return Lookup::Nodes(
+                configured
+                    .into_iter()
+                    .map(|(_, u)| u.site.as_str())
+                    .collect(),
+            );
+        }
+        if self.is_repo(from)
+            && self
+                .provisions
+                .iter()
+                .any(|l| crate::iac::provision::at_site(l, from))
+        {
             let id = self
                 .workspace
                 .repos
@@ -438,7 +452,12 @@ impl<'a> Graph<'a> {
     /// Whether the chain ends at `id`, reached through a link: a whole repository, or a side
     /// only a document lists, since no code of it is indexed.
     fn ends(&self, id: &str) -> bool {
-        self.is_repo(id) || self.documented.contains_key(id)
+        self.is_repo(id)
+            || self.documented.contains_key(id)
+            || self
+                .exports
+                .iter()
+                .any(|e| e.config_uses.iter().any(|u| u.site == id))
     }
 }
 
@@ -533,10 +552,17 @@ pub(crate) fn starts(
     if contract::kind_of(from).is_some_and(|kind| kind.sides().is_some()) {
         return Ok(Vec::new());
     }
+    let configured = crate::iac::config_uses::found(&partial.exports, from);
+    if !configured.is_empty() {
+        return Ok(configured
+            .into_iter()
+            .map(|(_, u)| u.site.clone())
+            .collect());
+    }
     if partial.exports.iter().any(|e| e.repository == from)
         && crate::iac::provision::links(&partial.exports)
             .iter()
-            .any(|l| l.side == from)
+            .any(|l| crate::iac::provision::at_site(l, from))
     {
         return Ok(vec![from.to_string()]);
     }
@@ -805,7 +831,11 @@ impl<'a> Walk<'_, 'a> {
     /// Upstream of a contract side is every root that provisions it.
     fn provisioners_up(&mut self, site: &str, depth: usize) {
         let graph = self.graph;
-        for link in graph.provisions.iter().filter(|l| l.side == site) {
+        for link in graph
+            .provisions
+            .iter()
+            .filter(|l| crate::iac::provision::at_site(l, site))
+        {
             if let Some((n, p)) = crate::iac::provision::target(graph.exports, link) {
                 let text = format!(
                     "provisions {} [{}: {}] {}",
@@ -966,6 +996,14 @@ impl<'a> Walk<'_, 'a> {
             Some((_, s)) => {
                 let at = self.files[n].at(&s.span.path, s.span.start);
                 format!("{identity} {at} {}", label(id))
+            }
+            None if graph.exports[n].config_uses.iter().any(|u| u.site == id) => {
+                let u = graph.exports[n]
+                    .config_uses
+                    .iter()
+                    .find(|u| u.site == id)
+                    .unwrap();
+                format!("{identity} use {} [{}]", u.place(), u.level.name())
             }
             None if graph.is_repo(id) => format!("{identity} {REPOSITORY_LEVEL}"),
             None => match document {

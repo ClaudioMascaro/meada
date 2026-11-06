@@ -97,7 +97,8 @@ for the area a change touches.
 - `document/`: OpenAPI and AsyncAPI provider documents, read into a `Summary` (spec #21), and `events.rs`, the one YAML and JSON event reader every YAML or JSON reader goes through (#646). [documents](map/documents.md)
 - `config_values.rs`, `config_values/hcl.rs`: config values (#639, #640, ADR 0025): every scalar of the YAML, JSON and Terraform files the walk visits and of the hidden CI paths, with its key path, `search` kind `value` and the `meada status` counts. [documents](map/documents.md)
 - `iac.rs`, `iac/`: the embedded AWS type table, provisioning sides/links and subscription
-  summaries (`iac/subscription.rs`, #656, #658), and `iac/orphans.rs`, scope-aware orphan
+  summaries (`iac/subscription.rs`, #656, #658), directionless config uses
+  (`iac/config_uses.rs`, #661), and `iac/orphans.rs`, scope-aware orphan
   reports and side markers (#657); IaC nodes (#649,
   ADR 0025): the Terraform resources, data blocks and module calls with their address and root
   module, the references between them, the static evaluation of their names (#650,

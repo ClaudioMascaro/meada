@@ -2,7 +2,8 @@ example.com/provision/infra envs/dev/main.tf:1 aws_sqs_queue.orders
   provisions channel::sqs::orders [exact: channel::sqs::orders] example.com/provision/app src/consumer.ts:7 drain
   provisions channel::sqs::orders [exact: channel::sqs::orders] example.com/provision/app src/producer.ts:9 enqueueOrder
     →[exact: channel::sqs::orders] example.com/provision/app src/consumer.ts:7 drain (see above)
-chain: exact · 3 hops · 2 repos · 113 tokens
+  provisions channel::sqs::orders [inferred: channel::sqs::orders; config envs/prod/terraform.tfvars#queue] example.com/provision/infra use envs/prod/terraform.tfvars#queue (line 1) [inferred]
+chain: inferred · 4 hops · 2 repos · 162 tokens
 
 example.com/provision/infra envs/prod/main.tf:4 aws_s3_bucket.archive
   provisions resource::s3::archive [inferred: resource::s3::archive; overridable: example.com/provision/infra envs/prod/main.tf:2 var.bucket (default)] example.com/provision/app (repository-level)

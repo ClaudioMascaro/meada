@@ -89,6 +89,10 @@ test('Terraform contract sides and provisioning links retain each root and evide
   });
   const contracts = getByRole(host, 'table', { name: 'Contracts' });
   expect(getByRole(contracts, 'columnheader', { name: 'Provisioners' })).toBeDefined();
+  expect(getByRole(contracts, 'columnheader', { name: 'Config uses' })).toBeDefined();
+  const useSite = 'example.com/provision/infra envs/prod/terraform.tfvars#queue';
+  const queue = getByRole(contracts, 'row', { name: /channel::sqs::orders/ });
+  expect(getByRole(queue, 'cell', { name: useSite })).toBeDefined();
   for (const side of data.provisioners) {
     expect(contracts.textContent).toContain(`${side.node} (root ${side.root})`);
   }
@@ -98,7 +102,15 @@ test('Terraform contract sides and provisioning links retain each root and evide
     });
   });
   const links = getByRole(host, 'table', { name: 'Provisioning links' });
-  expect(links.querySelectorAll('tbody tr')).toHaveLength(16);
+  const rows = Array.from(links.querySelectorAll<HTMLTableRowElement>('tbody tr'));
+  const configRows = rows.filter(row => queryByRole(row, 'cell', { name: useSite }));
+  expect(rows.filter(row => !configRows.includes(row))).toHaveLength(16);
+  expect(configRows).toHaveLength(2);
+  for (const root of ['envs/dev', 'envs/prod']) {
+    expect(configRows.some(row => row.textContent?.includes(
+      `example.com/provision/infra::${root}/main.tf::aws_sqs_queue.orders (root ${root})`,
+    ))).toBe(true);
+  }
   for (const link of data.provisions) {
     expect(links.textContent).toContain(`${link.provisioner} (root ${link.root})`);
     expect(links.textContent).toContain(link.side);

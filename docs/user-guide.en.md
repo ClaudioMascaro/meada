@@ -346,6 +346,8 @@ matches. They stay out of `meada export`.
   already does. List in `.meadaignore` the files that must stay out of the index (`secrets/`,
   `*.env.json`).
 
+An AWS ARN recognized by the type table, an SQS URL or `s3://archive/path` in config becomes an `exact` use side, located by `<file>#<key path>`. A plain name under the final key `queue`, `topic`, `bucket` or `table` becomes an `inferred` SQS, SNS, S3 or DynamoDB use, respectively. For example, `queue: orders` in Helm values uses `channel::sqs::orders`; `other: orders` links nothing. A use has no direction: it links only to provisioners and counts for orphans, without becoming a producer, consumer, writer or reader. `context` and contract search show these uses, and `trace` follows provisioning links to the key and back. Redacted, cut or unresolved values stay out; the attribute defining a provisioner's name does not use its own resource. Export includes the sides in `uses`, without value text, and the console shows them separately from directed sides.
+
 ### IaC nodes
 
 Each `resource`, `data` block and `module` call of the `*.tf` and `*.tofu` files is an **IaC

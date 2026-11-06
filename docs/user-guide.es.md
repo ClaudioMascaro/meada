@@ -351,6 +351,8 @@ hay clave para activarlo: la búsqueda con `kind = "value"` los encuentra, y la 
   que el checkout ya tiene. Pon en `.meadaignore` los archivos que no deben entrar en el índice
   (`secrets/`, `*.env.json`).
 
+Un ARN AWS reconocido por la tabla de tipos, una URL SQS o `s3://archive/ruta` en configuración se convierte en un lado de uso `exact`, ubicado por `<archivo>#<ruta de la clave>`. Un nombre simple bajo la última clave `queue`, `topic`, `bucket` o `table` se convierte en un uso SQS, SNS, S3 o DynamoDB `inferred`, respectivamente. Por ejemplo, `queue: orders` en valores Helm usa `channel::sqs::orders`; `other: orders` no enlaza nada. El uso no tiene dirección: solo enlaza a los provisionadores y cuenta para huérfanos, sin convertirse en productor, consumidor, escritor o lector. `context` y la búsqueda de contratos muestran estos usos, y `trace` sigue los enlaces de aprovisionamiento hasta la clave y de vuelta. Los valores ocultados, cortados o sin resolver quedan fuera; el atributo que define el nombre de un provisionador no usa su propio recurso. El export incluye los lados en `uses`, sin el texto de los valores, y la consola los muestra separados de los lados con dirección.
+
 ### Nodos IaC
 
 Cada `resource`, bloque `data` y llamada `module` de los archivos `*.tf` y `*.tofu` es un **nodo

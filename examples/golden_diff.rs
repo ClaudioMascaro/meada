@@ -23,6 +23,7 @@ const KEYED: &[&str] = &[
     "links",
     "iac_nodes",
     "provisioners",
+    "uses",
     "provisions",
     "subscriptions",
 ];
@@ -58,7 +59,8 @@ fn key(section: &str, v: &Value) -> String {
         "links" => &["consumer", "provider", "contract"],
         "iac_nodes" => &["identity", "root"],
         "provisioners" => &["contract", "node", "root"],
-        "provisions" => &["side", "provisioner", "root", "contract"],
+        "provisions" => &["side", "provisioner", "root", "contract", "at"],
+        "uses" => &["contract", "site", "at"],
         "subscriptions" => &["source", "target", "node", "root"],
         "providers" | "consumers" => &["contract", "site"],
         _ => return v.to_string(),
@@ -265,6 +267,25 @@ mod tests {
         assert!(
             err.contains("no-such-ref-592") && err.contains("--range"),
             "{err}"
+        );
+    }
+
+    #[test]
+    fn config_key_uses_and_provisions_are_audited_independently() {
+        let usage = |at: &str| json!({"contract":"channel::sqs::orders", "site":"app", "at":at});
+        let provision = |at: &str| json!({"side":"app", "provisioner":"infra::queue", "root":".", "contract":"channel::sqs::orders", "level":"exact", "reason":"config", "at":at});
+        let head = json!({"uses":[usage("one.yaml#queue"),usage("two.yaml#queue")], "provisions":[provision("one.yaml#queue"),provision("two.yaml#queue")]});
+        let out = diff_docs(&json!({}), &head);
+        assert_eq!(
+            out,
+            concat!(
+                "  uses: +2 -0 ~0\n",
+                "    + channel::sqs::orders | app | one.yaml#queue\n",
+                "    + channel::sqs::orders | app | two.yaml#queue\n",
+                "  provisions: +2 -0 ~0\n",
+                "    + app | infra::queue | . | channel::sqs::orders | one.yaml#queue\n",
+                "    + app | infra::queue | . | channel::sqs::orders | two.yaml#queue\n",
+            )
         );
     }
 

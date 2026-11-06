@@ -108,12 +108,23 @@ pub(crate) fn uses(export: &Export) -> impl Iterator<Item = (&str, &str)> {
                 .iter()
                 .filter_map(|c| Some((c.site.as_str(), c.contract.as_deref()?))),
         )
+        .chain(
+            export
+                .config_uses
+                .iter()
+                .map(|u| (u.site.as_str(), u.contract.as_str())),
+        )
 }
 
 /// Every use of the same contract reaches every provisioner, including one in its repository.
 /// Several roots are independent sides, never ambiguous candidates of one another.
 pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
     let sides = exports.iter().flat_map(uses).collect::<Vec<_>>();
+    let config = exports
+        .iter()
+        .flat_map(|e| &e.config_uses)
+        .map(|u| ((u.site.as_str(), u.contract.as_str()), u))
+        .collect::<std::collections::HashMap<_, _>>();
     let mut links = Vec::new();
     for export in exports {
         for p in &export.provisioners {
@@ -151,14 +162,34 @@ pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
             }
             for &(site, contract) in &sides {
                 if contracts.contains(contract) {
-                    links.push(Provision::new(
+                    let (use_level, use_reason) = match config.get(&(site, contract)) {
+                        Some(u) => {
+                            // Resource provisioners' `declared` level describes their old
+                            // directed sides. A literal config identifier has exact evidence.
+                            let base = if level == Level::Declared {
+                                Level::Exact
+                            } else {
+                                level
+                            };
+                            (
+                                base.max(u.level),
+                                format!("{reason}; config {}#{}", u.path, u.key),
+                            )
+                        }
+                        None => (level, reason.clone()),
+                    };
+                    let mut link = Provision::new(
                         site.into(),
                         p.identity.clone(),
                         p.node.root.clone(),
                         contract.into(),
-                        level,
-                        reason.clone(),
-                    ));
+                        use_level,
+                        use_reason,
+                    );
+                    if let Some(u) = config.get(&(site, contract)) {
+                        link.at = Some(format!("{}#{}", u.path, u.key));
+                    }
+                    links.push(link);
                 }
             }
         }
@@ -166,6 +197,16 @@ pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
     links.sort();
     links.dedup();
     links
+}
+
+/// A key is independently traceable; its repository-level site aggregates its config uses.
+pub(crate) fn at_site(link: &Provision, site: &str) -> bool {
+    link.side == site
+        || (link.at.is_some()
+            && link
+                .side
+                .split_once("::")
+                .is_some_and(|(repo, _)| repo == site))
 }
 
 pub(crate) fn target<'a>(exports: &'a [Export], link: &Provision) -> Option<(usize, &'a Side)> {

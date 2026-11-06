@@ -345,6 +345,8 @@ mais casa. Eles não entram no `meada export`.
   guarda o que o checkout já tem. Ponha no `.meadaignore` os arquivos que não devem entrar no
   índice (`secrets/`, `*.env.json`).
 
+Um ARN AWS reconhecido pela tabela de tipos, uma URL SQS ou `s3://archive/caminho` em configuração vira um lado de uso `exact`, localizado por `<arquivo>#<caminho da chave>`. Um nome simples sob a última chave `queue`, `topic`, `bucket` ou `table` vira, respectivamente, um uso SQS, SNS, S3 ou DynamoDB `inferred`. Por exemplo, `queue: orders` em valores Helm usa `channel::sqs::orders`; `other: orders` não liga nada. O uso não tem direção: liga somente aos provisionadores e conta para órfãos, sem virar produtor, consumidor, escritor ou leitor. `context` e a busca de contratos mostram esses usos, e `trace` segue a ligação de provisionamento até a chave e de volta. Valores ocultados, cortados ou não resolvidos ficam de fora; o atributo que define o nome de um provisionador não usa o próprio recurso. O export inclui os lados em `uses`, sem o texto dos valores, e o console os mostra separados dos lados com direção.
+
 ### Nós IaC
 
 Cada `resource`, bloco `data` e chamada `module` dos arquivos `*.tf` e `*.tofu` é um **nó IaC**,

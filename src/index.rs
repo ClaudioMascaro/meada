@@ -2450,6 +2450,7 @@ pub(crate) struct Export {
     pub(crate) communities: Vec<Community>,
     pub(crate) links: Vec<Link>,
     pub(crate) provisioners: Vec<iac::provision::Side>,
+    pub(crate) config_uses: Vec<iac::config_uses::Side>,
     pub(crate) configurations: Vec<(String, serde_json::Value)>,
     pub(crate) iac: Vec<iac::Node>,
     pub(crate) workload_images: Vec<(String, String, String)>,
@@ -2558,7 +2559,27 @@ impl Export {
         out.iac_nodes
             .sort_by(|a, b| (&a.identity, &a.root).cmp(&(&b.identity, &b.root)));
         out.iac_nodes.dedup();
-        out.provisions = self.provisions;
+        out.provisions = self
+            .provisions
+            .into_iter()
+            .map(|mut link| {
+                // Internal key identities let trace start at one key. The wire format uses
+                // the repository as the side, with the locator kept separately (ADR 0026).
+                if link.at.is_some()
+                    && let Some((repository, _)) = link.side.split_once("::")
+                {
+                    link.side = repository.to_string();
+                }
+                link
+            })
+            .collect();
+        out.provisions.sort();
+        out.provisions.dedup();
+        out.uses = self
+            .config_uses
+            .iter()
+            .map(|u| u.written(&out.repository))
+            .collect();
         out.executions = self.executions;
         out.subscriptions = self
             .subscriptions
@@ -2960,6 +2981,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         communities: Vec::new(),
         links: Vec::new(),
         provisioners: iac::provision::read(db, identity)?,
+        config_uses: iac::config_uses::read(db, identity)?,
         configurations: db
             .prepare("SELECT path, summary FROM contract_configs ORDER BY path")?
             .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?

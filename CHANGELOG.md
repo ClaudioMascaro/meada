@@ -8,6 +8,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Config values naming AWS resources become directionless use sides (#661): recognized ARNs,
+  SQS queue URLs and S3 URIs are exact; plain names under final `queue`, `topic`, `bucket` and
+  `table` keys are inferred. Each key links only to provisioners and counts for scoped orphans;
+  bare equal values, redacted/cut values and provisioner name definitions create no use.
+  Search, context, trace, export's optional `uses` and the console retain key locations
+  without adding producer/consumer or writer/reader links. Release level: minor, meada and
+  meada-core 1.4.0.
 - Image contracts (#662): normalized `image::<registry>/<repository>` names connect builders
   in GitHub Actions, Compose, Skaffold, ko and Jib to Kubernetes, Compose and Helm runners,
   including Kustomize image overrides. Context shows builders, trace crosses into code and

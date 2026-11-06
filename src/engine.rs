@@ -637,18 +637,22 @@ impl Engine {
             let provided = export
                 .providers
                 .iter()
-                .map(|p| (p.contract.clone(), &p.site, Role::Provider));
+                .map(|p| (p.contract.clone(), &p.site, Some(Role::Provider)));
             // An unresolved consumer has no contract: it shows as `(unresolved) <callee>`.
             let consumed = export.consumers.iter().map(|c| {
                 let contract = c.contract.clone();
                 (
                     contract.unwrap_or_else(|| unresolved(&c.site)),
                     &c.site,
-                    Role::Consumer,
+                    Some(Role::Consumer),
                 )
             });
             let mut ranked = Vec::new();
-            for (contract, site, role) in provided.chain(consumed) {
+            let configured = export
+                .config_uses
+                .iter()
+                .map(|u| (u.contract.clone(), &u.site, None));
+            for (contract, site, role) in provided.chain(consumed).chain(configured) {
                 if !contract.starts_with(prefix) {
                     continue;
                 }
@@ -662,6 +666,10 @@ impl Engine {
             for (r, contract, site, role) in ranked {
                 let location = match spans.get(site.as_str()) {
                     Some(span) => files.at(&span.path, span.start),
+                    None if export.config_uses.iter().any(|u| &u.site == site) => {
+                        let u = export.config_uses.iter().find(|u| &u.site == site).unwrap();
+                        format!("use {} [{}]", u.place(), u.level.name())
+                    }
                     None if *site == repo.identity => REPOSITORY_LEVEL.into(),
                     None => match export.document_of(site) {
                         // A route or channel side only a document lists.
@@ -681,8 +689,8 @@ impl Engine {
                     format_args!(
                         "{}{}",
                         orphans.use_note(&contract),
-                        contract::kind_of(&contract)
-                            .map_or("", |k| k.side_note(&exports, &contract, role))
+                        role.zip(contract::kind_of(&contract))
+                            .map_or("", |(role, kind)| kind.side_note(&exports, &contract, role))
                     )
                 );
                 hits.push((r, format!("{contract} {site}"), line));
@@ -989,6 +997,21 @@ impl Engine {
             }
         }
         for export in exports {
+            for u in &export.config_uses {
+                if u.contract == contract {
+                    sides.push((
+                        2,
+                        format!(
+                            "{} use {} [{}]{}",
+                            export.repository,
+                            u.place(),
+                            u.level.name(),
+                            orphans.use_note(contract)
+                        ),
+                        Vec::new(),
+                    ));
+                }
+            }
             for p in &export.provisioners {
                 if p.contract == contract || p.matches(contract) {
                     sides.push((
@@ -1064,6 +1087,23 @@ impl Engine {
             if view.follows_drift() {
                 let entries = drift_view::entries(repos, &exports, &links);
                 lines.extend(drift_view::consumers(&entries, contract));
+            }
+            return Ok(render::budgeted(&lines, budget));
+        }
+        let configured = iac::config_uses::found(&partial.exports, symbol);
+        if !configured.is_empty() {
+            let mut lines = Vec::new();
+            let scope = iac::orphans::Scope::new(&partial.exports);
+            for (n, u) in configured {
+                lines.push(format!(
+                    "{} use {} [{}] {}{}",
+                    repos[n].identity,
+                    u.place(),
+                    u.level.name(),
+                    u.contract,
+                    scope.use_note(&u.contract)
+                ));
+                lines.extend(iac::provision::context(&partial.exports, &u.site));
             }
             return Ok(render::budgeted(&lines, budget));
         }

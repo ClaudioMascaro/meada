@@ -374,6 +374,23 @@
       "root": "literal"
     }
   ],
+  "uses": [
+    {
+      "contract": "channel::sns::alerts",
+      "site": "example.com/aws/infra",
+      "at": "routes/main.tf#resource.aws_sns_topic_subscription.filtered.topic_arn"
+    },
+    {
+      "contract": "channel::sqs::filtered-jobs",
+      "site": "example.com/aws/infra",
+      "at": "routes/main.tf#resource.aws_sns_topic_subscription.filtered.endpoint"
+    },
+    {
+      "contract": "channel::sqs::pattern-jobs",
+      "site": "example.com/aws/infra",
+      "at": "routes/main.tf#resource.aws_cloudwatch_event_target.pattern.arn"
+    }
+  ],
   "links": [],
   "provisions": [
     {
@@ -583,6 +600,51 @@
       "contract": "channel::sns::alerts",
       "level": "exact",
       "reason": "channel::sns::alerts"
+    },
+    {
+      "side": "example.com/aws/infra",
+      "provisioner": "example.com/aws/infra::arn/main.tf::aws_sns_topic.topic",
+      "root": "arn",
+      "contract": "channel::sns::alerts",
+      "level": "exact",
+      "reason": "channel::sns::alerts; config routes/main.tf#resource.aws_sns_topic_subscription.filtered.topic_arn",
+      "at": "routes/main.tf#resource.aws_sns_topic_subscription.filtered.topic_arn"
+    },
+    {
+      "side": "example.com/aws/infra",
+      "provisioner": "example.com/aws/infra::literal/main.tf::aws_sns_topic.topic",
+      "root": "literal",
+      "contract": "channel::sns::alerts",
+      "level": "exact",
+      "reason": "channel::sns::alerts; config routes/main.tf#resource.aws_sns_topic_subscription.filtered.topic_arn",
+      "at": "routes/main.tf#resource.aws_sns_topic_subscription.filtered.topic_arn"
+    },
+    {
+      "side": "example.com/aws/infra",
+      "provisioner": "example.com/aws/infra::routes/main.tf::aws_sns_topic.alerts",
+      "root": "routes",
+      "contract": "channel::sns::alerts",
+      "level": "exact",
+      "reason": "channel::sns::alerts; config routes/main.tf#resource.aws_sns_topic_subscription.filtered.topic_arn",
+      "at": "routes/main.tf#resource.aws_sns_topic_subscription.filtered.topic_arn"
+    },
+    {
+      "side": "example.com/aws/infra",
+      "provisioner": "example.com/aws/infra::routes/main.tf::aws_sqs_queue.filtered",
+      "root": "routes",
+      "contract": "channel::sqs::filtered-jobs",
+      "level": "exact",
+      "reason": "channel::sqs::filtered-jobs; config routes/main.tf#resource.aws_sns_topic_subscription.filtered.endpoint",
+      "at": "routes/main.tf#resource.aws_sns_topic_subscription.filtered.endpoint"
+    },
+    {
+      "side": "example.com/aws/infra",
+      "provisioner": "example.com/aws/infra::routes/main.tf::aws_sqs_queue.pattern",
+      "root": "routes",
+      "contract": "channel::sqs::pattern-jobs",
+      "level": "exact",
+      "reason": "channel::sqs::pattern-jobs; config routes/main.tf#resource.aws_cloudwatch_event_target.pattern.arn",
+      "at": "routes/main.tf#resource.aws_cloudwatch_event_target.pattern.arn"
     }
   ],
   "subscriptions": [

@@ -1,0 +1,7 @@
+channel::sqs::orders
+  example.com/config-use/app use application.yml#spring.messaging.endpoint (line 4) [exact]
+  example.com/config-use/app use values.yaml#worker.queue (line 2) [inferred]
+  example.com/config-use/infra provisioner main.tf:1 aws_sqs_queue.orders (root .)
+example.com/config-use/app use values.yaml#worker.queue (line 2) [inferred] channel::sqs::orders
+provisioners:
+example.com/config-use/infra main.tf:1 aws_sqs_queue.orders (root .) [inferred: channel::sqs::orders; config values.yaml#worker.queue]

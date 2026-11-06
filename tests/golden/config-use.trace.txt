@@ -1,0 +1,7 @@
+example.com/config-use/app use values.yaml#worker.queue (line 2) [inferred]
+  provisions channel::sqs::orders [inferred: channel::sqs::orders; config values.yaml#worker.queue] example.com/config-use/infra main.tf:1 aws_sqs_queue.orders (root .)
+chain: inferred · 1 hops · 2 repos · 74 tokens
+example.com/config-use/infra main.tf:1 aws_sqs_queue.orders
+  provisions channel::sqs::orders [exact: channel::sqs::orders; config application.yml#spring.messaging.endpoint] example.com/config-use/app use application.yml#spring.messaging.endpoint (line 4) [exact]
+  provisions channel::sqs::orders [inferred: channel::sqs::orders; config values.yaml#worker.queue] example.com/config-use/app use values.yaml#worker.queue (line 2) [inferred]
+chain: inferred · 2 hops · 2 repos · 123 tokens

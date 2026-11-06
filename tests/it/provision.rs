@@ -33,9 +33,27 @@ fn terraform_provisions_every_side_in_every_root_without_ambiguity() {
         let json = serde_json::to_value(&export).unwrap();
         assert_eq!(json["format"], 1);
         let provisions = json["provisions"].as_array().unwrap();
-        assert_eq!(provisions.len(), 16, "{text}");
+        assert_eq!(
+            provisions.len(),
+            if name == "infra" { 18 } else { 16 },
+            "{text}"
+        );
+        let config: Vec<_> = provisions
+            .iter()
+            .filter(|l| l.get("at").is_some())
+            .collect();
+        assert_eq!(config.len(), if name == "infra" { 2 } else { 0 }, "{text}");
+        for link in &config {
+            assert_eq!(link["side"], "example.com/provision/infra");
+            assert_eq!(link["at"], "envs/prod/terraform.tfvars#queue");
+            assert_eq!(link["contract"], "channel::sqs::orders");
+            assert_eq!(link["level"], "inferred");
+        }
         assert!(provisions.iter().all(|l| l["level"] != "ambiguous"));
         for l in provisions {
+            if l.get("at").is_some() {
+                continue;
+            }
             assert!(
                 l["contract"]
                     .as_str()

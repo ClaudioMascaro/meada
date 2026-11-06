@@ -9,11 +9,12 @@ interface Link {
 }
 interface Provisioner { contract: string; node: string; root: string }
 interface Provision {
-  side: string; provisioner: string; root: string; contract: string; level: string; reason: string;
+  side: string; provisioner: string; root: string; contract: string; level: string; reason: string; at?: string;
 }
+interface ConfigUse { contract: string; site: string; at: string }
 interface Stale { call: string; target: string; cause: string }
-interface Export { repository: string; communities?: Community[]; providers: Side[]; consumers: Side[]; links: Link[]; stale_decisions?: Stale[]; provisioners?: Provisioner[]; provisions?: Provision[]; executions?: Execution[] }
-interface Contract { contract: string; providers: string[]; consumers: string[]; provisioners?: string[] }
+interface Export { repository: string; communities?: Community[]; providers: Side[]; consumers: Side[]; links: Link[]; stale_decisions?: Stale[]; provisioners?: Provisioner[]; provisions?: Provision[]; uses?: ConfigUse[]; executions?: Execution[] }
+interface Contract { contract: string; providers: string[]; consumers: string[]; provisioners?: string[]; uses?: string[] }
 
 /** parseExport checks every field with the release's Rust types before any model is built. */
 export function graphModel(text: string) {
@@ -30,6 +31,14 @@ export function graphModel(text: string) {
       const location = entry.at ? `${entry.site} (${entry.at})` : entry.site;
       row[side].push(entry.root ? `${location} (root ${entry.root})` : location);
     }
+  }
+  for (const entry of data.uses ?? []) {
+    let row = contracts.get(entry.contract);
+    if (!row) {
+      row = { contract: entry.contract, providers: [], consumers: [] };
+      contracts.set(entry.contract, row);
+    }
+    (row.uses ??= []).push(`${entry.site} ${entry.at}`);
   }
   for (const entry of data.provisioners ?? []) {
     let row = contracts.get(entry.contract);
@@ -48,6 +57,11 @@ export function graphModel(text: string) {
     const place = `${entry.provisioner} (root ${entry.root})`;
     const provisioners = row.provisioners ??= [];
     if (!provisioners.includes(place)) provisioners.push(place);
+    if (entry.at) {
+      const uses = row.uses ??= [];
+      const use = `${entry.side} ${entry.at}`;
+      if (!uses.includes(use)) uses.push(use);
+    }
   }
   return {
     executions: data.executions ?? [],
