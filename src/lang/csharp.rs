@@ -426,9 +426,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // The types declared so far: a local whose scope is one sits in an initializer.
     let mut classes = BTreeSet::new();
     // What a name written in a definition is bound to (`Facts::bound`), and the names assigned
-    // anywhere in the file (`=`, `+=`, `++`, `out`, `ref`), which hold no one value.
+    // in their binding's scope (`=`, `+=`, `++`, `out`, `ref`), which hold no one value.
     let mut bound: Vec<Bound> = Vec::new();
-    let mut assigned: BTreeSet<String> = BTreeSet::new();
+    let mut assigned: Vec<(String, String, bool)> = Vec::new();
     // The assignments through a name (`c.BaseAddress = v`, `_c = v`): the scope written in, the
     // path without a leading `this.`, whether it began with one, and the value.
     let mut members: Vec<(String, String, bool, Value)> = Vec::new();
@@ -876,7 +876,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         }
                         _ => continue,
                     };
-                    assigned.insert(text(name, src).to_string());
+                    assigned.push((scope.as_ref().clone(), text(name, src).to_string(), this));
                     let at = (scope.as_ref().clone(), this, given.clone());
                     writes
                         .entry(text(name, src).to_string())
@@ -952,7 +952,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 if children(node).any(|c| matches!(c.kind(), "++" | "--")) =>
             {
                 for target in named(node).filter(|t| t.kind() == "identifier") {
-                    assigned.insert(text(target, src).to_string());
+                    assigned.push((scope.as_ref().clone(), text(target, src).to_string(), false));
                     let at = (scope.as_ref().clone(), false, None);
                     writes
                         .entry(text(target, src).to_string())
@@ -977,7 +977,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     _ => None,
                 });
                 for (target, this) in targets {
-                    assigned.insert(text(target, src).to_string());
+                    assigned.push((scope.as_ref().clone(), text(target, src).to_string(), this));
                     let at = (scope.as_ref().clone(), this, None);
                     writes
                         .entry(text(target, src).to_string())
@@ -1294,6 +1294,27 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // local or a parameter, in the scope that declares it.
     let bindings: BTreeSet<(&str, &str)> = (facts.receivers.iter())
         .map(|r| (r.scope.as_str(), r.name.as_str()))
+        .chain(
+            facts
+                .defs
+                .iter()
+                .flat_map(|d| d.params.iter().map(|p| (d.name.as_str(), p.name.as_str()))),
+        )
+        .collect();
+    let assigned: BTreeSet<(String, String)> = assigned
+        .into_iter()
+        .map(|(scope, name, this)| {
+            let mut at = scope.as_str();
+            while !at.is_empty() {
+                if (this && classes.contains(at))
+                    || (!this && bindings.contains(&(at, name.as_str())))
+                {
+                    break;
+                }
+                at = crate::parent(at);
+            }
+            (at.to_string(), name)
+        })
         .collect();
     let mut through: Vec<Bound> = Vec::new();
     let mut member_at: HashMap<(String, String), usize> = HashMap::new();
@@ -1343,10 +1364,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
             }
         }
     }
-    // A name assigned anywhere holds no one value, and its initializer is one more write of it
+    // A binding assigned anywhere holds no one value, and its initializer is one more write of it
     // (`name=`, the first): the kinds that read a name's only write count them.
-    let (kept, initial): (Vec<Bound>, Vec<Bound>) =
-        bound.into_iter().partition(|b| !assigned.contains(&b.name));
+    let (kept, initial): (Vec<Bound>, Vec<Bound>) = bound
+        .into_iter()
+        .partition(|b| !assigned.contains(&(b.scope.clone(), b.name.clone())));
     let bound = kept;
     let mut all: Vec<Bound> = (initial.into_iter())
         .map(|b| Bound {

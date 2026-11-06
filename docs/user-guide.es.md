@@ -593,6 +593,20 @@ secreto. Búsqueda, `context`, `trace` en ambos sentidos, huérfanos por ámbito
 los nuevos contratos y runners; las entradas de entorno y valores de configuración quedan
 fuera del export.
 
+### Uso de los SDK de GCP en cinco grupos de lenguajes
+
+Los clientes GCP con origen comprobado en el constructor crean productores Pub/Sub, consumidores de suscripciones, escritores/lectores de Cloud Storage y lectores de Secret Manager. JavaScript y TypeScript forman un grupo, con cada lenguaje de origen comprobado por separado. El inventario de operaciones es explícito; las demás sobrecargas quedan fuera de esta lista.
+
+| Grupo | Productor / consumidor Pub/Sub | Escritor / lector Cloud Storage | Lector Secret Manager |
+| --- | --- | --- | --- |
+| JavaScript + TypeScript | `new PubSub().topic(name).publishMessage(...)` / `.subscription(name).on("message", handler)` | `new Storage().bucket(name).file(object).save(...)` / `.download(...)` | `new SecretManagerServiceClient().accessSecretVersion({name})` |
+| Python | `PublisherClient().publish(topic, ...)` / `SubscriberClient().subscribe(subscription, callback=...)` | `storage.Client().bucket(name).blob(object).upload_from_string(...)` / `.download_as_bytes()` | `SecretManagerServiceClient().access_secret_version(request={"name": name})` |
+| Java | `Publisher.newBuilder(topic).build().publish(...)` / `Subscriber.newBuilder(subscription, handler).build().startAsync()` | `StorageOptions.newBuilder().build().getService().create(BlobInfo.newBuilder(BlobId.of(bucket, object)).build(), ...)` / `.readAllBytes(bucket, object)` | `SecretManagerServiceClient.create().accessSecretVersion(name)` |
+| Go | Pub/Sub v2 `NewClient`: `Publisher(topic).Publish(...)` / `Subscriber(subscription).Receive(ctx, handler)`; v1 `Topic` / `Subscription` | `storage.NewClient`: `Bucket(bucket).Object(object).NewWriter(ctx)` / `.NewReader(ctx)` | `secretmanager.NewClient`: `AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{Name: name})` |
+| C# | `PublisherClient.CreateAsync(topic).PublishAsync(...)` / `SubscriberClient.CreateAsync(subscription).StartAsync(handler)` | `StorageClient.Create()`: `UploadObject`, `UploadObjectAsync` / `DownloadObject`, `DownloadObjectAsync`, bucket as first argument | `SecretManagerServiceClient.Create()`: `AccessSecretVersion`, `AccessSecretVersionAsync` |
+
+Las identidades literales de temas, suscripciones, buckets y secretos usan la misma normalización que Terraform y la configuración. Una suscripción es `channel::pubsub::subscriptions/<id>` y nunca un tema adivinado. Los nombres leídos del entorno siguen sin resolver sin una carga que ejecute el código; los valores en ese ámbito se resuelven como `inferred`, conservando el subtipo de la operación. Los constructores ocultos, tipos inyectados sin construcción, fábricas encontradas solo por nombre, clientes reasignados y alternativas de retorno opacas no aportan un lado de SDK.
+
 ### Canales, datos, secretos y suscripciones AWS
 
 La tabla Terraform/OpenTofu también reconoce los tipos siguientes. Los ARN se reducen al

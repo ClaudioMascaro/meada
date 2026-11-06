@@ -380,6 +380,7 @@ in its builder repository, identified as `image-builder::<repository>::<pattern 
 Its candidates name runner repositories and literal image contracts. Several runners of one
 literal image are one name, and choosing that name retains them all. This is independent of a
 runner's ambiguity among several builders, whose existing decision identity is unchanged.
+
 ### Azure identifiers, subscriptions and Functions (#669)
 
 The AzureRM Terraform/OpenTofu entries are Service Bus queues, topics and subscriptions,
@@ -419,3 +420,35 @@ Remote package settings identify no local code. Literal/evaluated app settings a
 resource attribute targets use the common workload-scoped environment mechanism. Key Vault
 references and secret-content attributes retain no resolved value. This addition shares
 the synchronized 1.4.0 minor release and export format 1.
+
+### GCP SDK forms amendment (2026-11-06, #668)
+
+The adopted operation inventory counts JavaScript and TypeScript as one of five language
+groups, with independent controls for both source languages. A known constructor must establish
+the client through complete exact calls. A declared type, a name-matched factory, a hidden
+constructor, a reassigned client or an opaque return alternative supplies no client evidence.
+Making a topic, subscription, bucket or object handle alone supplies no direction.
+
+| Group | Pub/Sub producer / consumer | Cloud Storage writer / reader | Secret Manager reader |
+| --- | --- | --- | --- |
+| JavaScript + TypeScript | `@google-cloud/pubsub`: `new PubSub().topic(name).publishMessage(...)` / `.subscription(name).on("message", handler)` | `@google-cloud/storage`: `new Storage().bucket(name).file(object).save(...)` / `.download(...)` | `@google-cloud/secret-manager`: `new SecretManagerServiceClient().accessSecretVersion({name})` |
+| Python | `google.cloud.pubsub_v1.PublisherClient().publish(topic, ...)` / `SubscriberClient().subscribe(subscription, callback=...)` | `google.cloud.storage.Client().bucket(name).blob(object).upload_from_string(...)` / `.download_as_bytes()` | `google.cloud.secretmanager.SecretManagerServiceClient().access_secret_version(request={"name": name})` |
+| Java | `com.google.cloud.pubsub.v1.Publisher.newBuilder(topic).build().publish(...)` / `Subscriber.newBuilder(subscription, handler).build().startAsync()` | `com.google.cloud.storage.StorageOptions.newBuilder().build().getService().create(BlobInfo.newBuilder(BlobId.of(bucket, object)).build(), ...)` / `.readAllBytes(bucket, object)` | `com.google.cloud.secretmanager.v1.SecretManagerServiceClient.create().accessSecretVersion(name)` |
+| Go | `cloud.google.com/go/pubsub/v2.NewClient`: `Publisher(topic).Publish(...)` / `Subscriber(subscription).Receive(ctx, handler)`; v1 `cloud.google.com/go/pubsub` uses `Topic` / `Subscription` | `cloud.google.com/go/storage.NewClient`: `Bucket(bucket).Object(object).NewWriter(ctx)` / `.NewReader(ctx)` | `cloud.google.com/go/secretmanager/apiv1.NewClient`: `AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{Name: name})` |
+| C# | `Google.Cloud.PubSub.V1.PublisherClient.CreateAsync(topic).PublishAsync(...)` / `SubscriberClient.CreateAsync(subscription).StartAsync(handler)` | `Google.Cloud.Storage.V1.StorageClient.Create()`: `UploadObject(bucket, ...)`, `UploadObjectAsync` / `DownloadObject(bucket, ...)`, `DownloadObjectAsync` | `Google.Cloud.SecretManager.V1.SecretManagerServiceClient.Create()`: `AccessSecretVersion(name)`, `AccessSecretVersionAsync(name)` |
+
+Names retained in receivers are evaluated in their constructor/factory call's scope and exact
+return frames. Two calls of a factory retain their own names. A known bucket is not erased by
+an unknown object. Verified Java `TopicName.of`, `SubscriptionName.of`, `SecretVersionName.of`,
+C# typed-name constructors and `FromProjectTopic`/`FromProjectSubscription`, and Python
+`topic_path`/`subscription_path` select the identity component; an identically named local helper
+does not. Complete structured identities use the shared GCP physical-name policy above.
+
+Pub/Sub receive targets remain `subscriptions/<id>`, including a plain id supplied by a scoped
+workload environment. Receives never derive a topic from a subscription id. Literal SDK
+identities are exact; provisioning and subscription delivery retain their existing scope and
+filter evidence. Workload resolution remains `inferred` with the workload/variable reason.
+Without a matching workload the side remains unresolved with its established `env:NAME` metadata.
+The stored operation retains subtype evidence for this normalization; private intermediary
+provenance is never exported. The operation list is deliberately bounded: other overloads,
+streaming/polling families, delete/list/metadata operations and other SDKs are not promised.

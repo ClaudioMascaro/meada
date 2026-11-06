@@ -1,5 +1,11 @@
 # Resolution and value flow
 
+`Code::value_within` (#668) folds one selected identity argument with exact return-call
+frames and a kind-supplied typed-construction predicate. It uses the existing evaluation
+limits and does not change ordinary `Code::value`. Shared SDK evidence memoizes normalized
+frame argument names and client evidence; unknown alternatives invalidate the result. Go
+records only the first binding of a multiple-result call, leaving error/other results unknown.
+
 - `names.rs`, `http/csharp.rs`, `channel/java.rs` (#466): two cases are not pinned.
   (1) #358: a Rabbit `convertAndSend("orders", o)` whose `o` is a parameter of a type the
   repository does not declare (`void f(Order o)`) reads as the named producer `amqp orders

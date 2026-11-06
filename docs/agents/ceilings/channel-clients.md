@@ -99,3 +99,13 @@
   evidence rather than full call routes; a 1 MiB parameter-return lattice with 128 operations
   retains its whole side set. Opaque keyword/positional expansions supply no parameter evidence;
   a second await applied to already-awaited evidence remains unknown.
+
+- GCP SDKs (#668) share the complete, memoized constructor walk in `contract/sdk/origins.rs`.
+  `EVAL_DEPTH` (256) and `EVAL_BUDGET` (65,536) bound each file's walk and exact-frame argument
+  inventory; equivalent normalized frames share memo entries. Only ADR 0026's five-group
+  constructor/operation inventory is recognized. Injected types, unknown factories, opaque
+  return branches, reassigned clients and hidden constructors supply no side. Unsupported
+  overloads and builders are not implied by a supported operation name. A subscription never
+  guesses its topic; its canonical target is `subscriptions/<id>`. Creating a client or handle
+  supplies no direction. Unknown names retain unresolved sides; environment names resolve only
+  within a real scoped workload, through kind-owned normalization and typed target checks.

@@ -230,9 +230,8 @@ impl LanguagePack for Python {
                         facts.defs[at].return_values.push(Value::Unknown);
                     }
                 }
-                // ponytail: an import binds its names for the whole file, wherever it sits; a
-                // function-local one also hides an outer binding there, but other functions
-                // see it too. A star import that rebinds a name is not placed against the code
+                // A function-local import binds only its lexical scope. A star import that
+                // rebinds a name is not placed against the code
                 // that reads it either (`Resolver::rebound`): code run while the module loads
                 // gets the name unknown, a function the star import's.
                 "import_statement" | "import_from_statement" => {
@@ -251,6 +250,9 @@ impl LanguagePack for Python {
                                     Evidence::Assigned,
                                 );
                             }
+                        }
+                        for import in &mut facts.imports[first..] {
+                            import.local = qualify(&scope, &import.local);
                         }
                     }
                 }

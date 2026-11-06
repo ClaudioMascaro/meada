@@ -3364,7 +3364,11 @@ impl<'a> Resolver<'a> {
                 return Binding::Param(Target { path, name: s }, n, field);
             }
             match self.receivers[path].get(&(s, name)) {
-                Some(Class::Imported) => return self.imported_in(path, name, seen, true),
+                Some(Class::Imported) => {
+                    return self
+                        .imported_at(path, s, name, seen)
+                        .unwrap_or_else(|| self.imported_in(path, name, seen, true));
+                }
                 Some(_) => return Binding::Local(path, s, name),
                 None => {}
             }
@@ -3690,6 +3694,14 @@ impl<'a> Resolver<'a> {
             let import = &imports[at];
             if let Imported::Path(target) = &import.name
                 && !seen.aliases.contains(&(path, target.as_str()))
+            {
+                return Some(self.import(path, scope, &import.source, &import.name, seen));
+            }
+            if !scope.is_empty()
+                && !matches!(
+                    import.name,
+                    Imported::Path(_) | Imported::Glob { .. } | Imported::All
+                )
             {
                 return Some(self.import(path, scope, &import.source, &import.name, seen));
             }
@@ -4725,6 +4737,8 @@ struct Fold<'a, 'i> {
     held: Vec<(&'a str, &'a str)>,
     nested: usize,
     chain: bool,
+    /// Preserve verified constructor type names for selected SDK identity arguments.
+    new_types: Option<fn(&str) -> bool>,
     inject: Option<&'i Inject<'a, 'i>>,
     foreign: usize,
     /// How many struct fields deep the value is folded (`Code::field_read`).
@@ -5450,6 +5464,16 @@ impl<'a> Code<'a> {
         by_path: bool,
     ) -> Option<Outside<'a>> {
         self.outside_read(path, scope, name, by_path, false)
+    }
+
+    /// An actual value binding hides an imported static-factory head, including in
+    /// languages whose type namespace may otherwise still name the imported class.
+    pub(crate) fn value_bound(&self, path: &'a str, scope: &'a str, name: &'a str) -> bool {
+        matches!(
+            self.resolver
+                .lexical(path, scope, name, &mut self.resolver.seen(path, scope)),
+            Binding::Param(..) | Binding::Local(..) | Binding::Const(..) | Binding::Hidden
+        )
     }
 
     /// `outside` for the callee of a decorator call (an annotation or attribute): no field of
@@ -6272,6 +6296,28 @@ impl<'a> Code<'a> {
         unbind(folded, false)
     }
 
+    /// Fold an origin's selected argument in its exact return-call frames. Outside names
+    /// survive as they do in `Expand::Chain`, so a kind can verify typed name helpers.
+    pub(crate) fn value_within(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        value: &'a Value,
+        frames: &[Frame<'a>],
+        new_types: fn(&str) -> bool,
+    ) -> Value {
+        let mut fold = Fold {
+            chain: true,
+            new_types: Some(new_types),
+            ..Fold::default()
+        };
+        let frames: Vec<_> = frames.iter().rev().copied().collect();
+        unbind(
+            self.eval(path, scope, value, &frames, 0, &mut fold, &mut None),
+            true,
+        )
+    }
+
     /// The constant `name` refers to from `scope` in `path`: its file and qualified name, and
     /// its value as written.
     pub fn constant(
@@ -6905,21 +6951,46 @@ impl<'a> Code<'a> {
                     .collect(),
             ),
             Value::New(callee, args) => Value::New(
-                callee.clone(),
+                if let Some(known) = fold.new_types {
+                    self.outside_written(path, scope, callee)
+                        .and_then(|o| crate::names::one(&o.spellings(), known).map(str::to_string))
+                        .unwrap_or_default()
+                } else {
+                    callee.clone()
+                },
                 (args.iter())
                     .map(|v| self.eval(path, scope, v, frames, depth, fold, wants))
                     .collect(),
             ),
             Value::Call(call) if fold.chain => {
+                // Some packs retain only a call's range in a value. Selected-argument
+                // folding uses that exact stored call, never a method-name lookup.
+                let stored = fold
+                    .new_types
+                    .and_then(|_| self.call_index(path, &call.range))
+                    .and_then(|index| self.call(path, index));
+                let scope = stored.map_or(scope, |c| c.scope.as_str());
+                let args = stored.map_or(call.args.as_slice(), |c| c.args.as_slice());
+                let kwargs = stored.map_or(call.kwargs.as_slice(), |c| c.kwargs.as_slice());
+                let receiver = call
+                    .receiver
+                    .as_deref()
+                    .or_else(|| stored.and_then(|c| c.receiver.as_ref()));
+                let receiver = match receiver {
+                    Some(receiver) => Some(Box::new(
+                        self.eval(path, scope, receiver, frames, depth, fold, wants),
+                    )),
+                    None if stored.is_some() => call.callee.rsplit_once('.').map(|(head, _)| {
+                        Box::new(self.name(path, scope, head, frames, depth, fold, wants))
+                    }),
+                    None => None,
+                };
                 let mut eval = |v| self.eval(path, scope, v, frames, depth, fold, wants);
-                let receiver = call.receiver.as_deref().map(|r| Box::new(eval(r)));
                 Value::Call(Invocation {
                     callee: call.callee.clone(),
                     receiver,
-                    args: call.args.iter().map(&mut eval).collect(),
-                    kwargs: (call.kwargs.iter())
-                        .map(|(k, v)| (k.clone(), eval(v)))
-                        .collect(),
+                    args: args.iter().map(&mut eval).collect(),
+                    kwargs: (kwargs.iter()).map(|(k, v)| (k.clone(), eval(v))).collect(),
                     range: call.range.clone(),
                 })
             }

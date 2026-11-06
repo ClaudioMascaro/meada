@@ -147,7 +147,19 @@ impl LanguagePack for TsJs {
                             on: None,
                             unwraps: false,
                             awaits: false,
-                            receiver: None,
+                            receiver: (function.kind() == "member_expression")
+                                .then(|| function.child_by_field_name("object"))
+                                .flatten()
+                                .filter(|object| {
+                                    matches!(
+                                        object.kind(),
+                                        "call_expression"
+                                            | "new_expression"
+                                            | "await_expression"
+                                            | "parenthesized_expression"
+                                    )
+                                })
+                                .map(|object| value(object, src, &scope, &parents)),
                             arg_types: arguments
                                 .map(|a| named(a).map(|arg| cast(arg, src, &parents)).collect())
                                 .unwrap_or_default(),

@@ -9,7 +9,47 @@ use std::collections::{BTreeMap, BTreeSet};
 mod csharp;
 mod go;
 mod java;
-mod origins;
+pub(crate) mod origins;
+
+/// A folded SDK name, retaining verified runtime environment aliases. Physical identity
+/// projection belongs to the caller's contract kind.
+pub(crate) fn argument<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    value: &Value,
+) -> Option<crate::names::Argument> {
+    use crate::names::Argument;
+    match value {
+        Value::Str(parts) => match parts.as_slice() {
+            [
+                Part::Read {
+                    scope,
+                    callee,
+                    key,
+                    then,
+                },
+            ] if then.is_empty() => {
+                let aliases = code.files()[path]
+                    .imports
+                    .iter()
+                    .map(|i| (i.local.as_str(), i.local.as_str()))
+                    .collect();
+                Some(
+                    if csharp::environment(code, path, scope, callee, &aliases) {
+                        Argument::Environment(key.clone())
+                    } else {
+                        Argument::Unresolved
+                    },
+                )
+            }
+            _ => crate::names::argument(value),
+        },
+        Value::Call(call) if code.pack().extensions().contains(&"go") => {
+            Some(go::environment(call).map_or(Argument::Unresolved, Argument::Environment))
+        }
+        _ => crate::names::argument(value),
+    }
+}
 
 /// The SDK spellings of one client, supplied by its contract kind.
 pub(crate) struct Client {

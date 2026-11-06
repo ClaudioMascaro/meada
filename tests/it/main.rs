@@ -33,6 +33,7 @@ mod environment;
 mod freshness;
 mod gateway;
 mod gcp;
+mod gcp_sdk;
 mod generations;
 mod github_app;
 mod gopkg;

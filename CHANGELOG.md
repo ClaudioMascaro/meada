@@ -8,6 +8,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- GCP SDK use sides in JavaScript/TypeScript, Python, Java, Go and C# (#668): verified client
+  constructors connect Pub/Sub publish and subscription receive, Cloud Storage reads/writes
+  and Secret Manager access to their physical contracts. Subscription identities remain
+  distinct from topics through scoped workload environment resolution. The documented
+  operation inventory ships in the shared meada 1.4.0 minor release.
 - The console graph has image builder-to-runner and alert emitter-to-matcher views, including
   links within a repository, alongside provisioner sides and provisioning links with roots,
   levels and reasons. A bilingual legend explains each role and keyboard navigation. The

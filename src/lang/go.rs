@@ -769,6 +769,11 @@ impl Walk<'_> {
         };
         let one = match (&left[..], &right[..]) {
             ([name], [value]) => Some((name, values::value(*value, src, &self.std, scope, depth))),
+            // A multiple-result call's first binding holds its first result. Other results
+            // remain unknown; library readers still require their own constructor evidence.
+            ([name, _, ..], [call]) if call.kind() == "call_expression" => {
+                Some((name, values::value(*call, src, &self.std, scope, depth)))
+            }
             _ => None,
         };
         if let Some((name, value)) = lookup.or(one)

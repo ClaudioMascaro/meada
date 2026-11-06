@@ -1,0 +1,1661 @@
+{
+  "format": 1,
+  "repository": "local/gcp-sdk-env",
+  "files": [
+    {
+      "path": "Worker.cs",
+      "hash": "15b633ebd1eb43c96f27e7bf6e9a2151b81c1ea223cb555b7f9728328a1ba52b"
+    },
+    {
+      "path": "Worker.java",
+      "hash": "54b13a7b1c10c498ceb51f81dd0598acbde4c2dd84f4ff6364da570ec318c1f7"
+    },
+    {
+      "path": "worker.go",
+      "hash": "ded42abdfc65016f23cc959188f6ab1c953e57e31d14cd0190c762725caaeeb4"
+    },
+    {
+      "path": "worker.js",
+      "hash": "687392f0dfc98a56dcc86a1c409128d27a74e65bcb77327c6ef625ceddf90335"
+    },
+    {
+      "path": "worker.py",
+      "hash": "f7ee4d6ee005b213e9d49162c93e18b5c39fcd0ea5218b771d9522e94ac532f8"
+    },
+    {
+      "path": "worker.ts",
+      "hash": "d811c5794e0f7e609512f1ef862aeae5e8a9d60ee36c81ecdc7534708a9fdfc1"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/gcp-sdk-env::Worker.cs::Worker",
+      "span": {
+        "path": "Worker.cs",
+        "start": 44,
+        "end": 402
+      },
+      "hash": "f4370d71080ae31c8a5eec9f56c08cd5715aaac0816dacdf25430b590409a15e"
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 63,
+        "end": 228
+      },
+      "hash": "651181a2782a938a1a656232dbccc0f85f8b10e3a4d6351bec9070fcde2b7321"
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 233,
+        "end": 400
+      },
+      "hash": "e88119aabf4dc8398dd697a31766e4347aa540cff566ad86e80106d6f7b736c4"
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.java::Worker",
+      "span": {
+        "path": "Worker.java",
+        "start": 91,
+        "end": 366
+      },
+      "hash": "90c76ce829698a6aead77710d4167924f722d30b220f749aa79af04c647fcb74"
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.java::Worker.publishJava()",
+      "span": {
+        "path": "Worker.java",
+        "start": 110,
+        "end": 230
+      },
+      "hash": "856d8c0d2a75cea8eea79fb53818deeb7cc6ba8d50620633be3c20a26ae5fc16"
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()",
+      "span": {
+        "path": "Worker.java",
+        "start": 235,
+        "end": 364
+      },
+      "hash": "c1ce80e7fadc208e734e588fbe35945839fb93fcf21127b7f28da263ff8ecbc9"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.go::publishGo",
+      "span": {
+        "path": "worker.go",
+        "start": 66,
+        "end": 185
+      },
+      "hash": "655e9f5ec42f43044c1b73da517961928ef1c0ba4a5432633fa86c6d48394e78"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.go::receiveGo",
+      "span": {
+        "path": "worker.go",
+        "start": 186,
+        "end": 307
+      },
+      "hash": "c61460fdb2269c3ba1afe7e7f692e6e3dd66c872f58fe0c4f98319adcc5c5a94"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.js::publishJs",
+      "span": {
+        "path": "worker.js",
+        "start": 78,
+        "end": 158
+      },
+      "hash": "cb134916a9fd7ebcd37f0b92424f7bbdfcb8a5730d98e5477129baa994d678ea"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.js::receiveJs",
+      "span": {
+        "path": "worker.js",
+        "start": 166,
+        "end": 251
+      },
+      "hash": "eceeea3c9a04fd01b0f01b4ffc86744162606e8315cfe158023ecac21e775cdb"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.py::publishPython",
+      "span": {
+        "path": "worker.py",
+        "start": 122,
+        "end": 194
+      },
+      "hash": "4a86cb62052d4531530d55a05e6fb9bfc55018ea12c4643d165520315792053c"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.py::receivePython",
+      "span": {
+        "path": "worker.py",
+        "start": 195,
+        "end": 280
+      },
+      "hash": "b62768ce1544a7f3b6512a446e3068b6cdf7fe7b2fc3295f05c5494f7a6ce606"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::handler",
+      "span": {
+        "path": "worker.ts",
+        "start": 1330,
+        "end": 1358
+      },
+      "hash": "655a327c2704890c1e18a2e15b20d771f41dc4aa67fa5adcce98d5c1d5e415e4"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::publishPlain",
+      "span": {
+        "path": "worker.ts",
+        "start": 285,
+        "end": 368
+      },
+      "hash": "0ef9d1e28159d71ac64d2ab950cd0cf96a67613d64a1ef112fc49e0fde73f200"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::publishStructured",
+      "span": {
+        "path": "worker.ts",
+        "start": 472,
+        "end": 562
+      },
+      "hash": "41b1d8e0dce32c9cbd75a59122aed4de57fced56ae6d3de1d41162f1c0fbcfe5"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::publishTyped",
+      "span": {
+        "path": "worker.ts",
+        "start": 673,
+        "end": 759
+      },
+      "hash": "23eb312e0266a2b42bc37fe60ee83d4fe2397a19844c95361dc8f0515a18a809"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::readBucket",
+      "span": {
+        "path": "worker.ts",
+        "start": 1155,
+        "end": 1239
+      },
+      "hash": "7fa4b8ef4feb5da2e8e87c11c875bf0640474bf54cb52050b5009764de9686cf"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::readSecret",
+      "span": {
+        "path": "worker.ts",
+        "start": 1247,
+        "end": 1329
+      },
+      "hash": "dafbd8dd297b27379e0b41396d0d79a0a25059e964f126e0bbfe3375faf6e5dc"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::receivePlain",
+      "span": {
+        "path": "worker.ts",
+        "start": 376,
+        "end": 464
+      },
+      "hash": "b16238f05fc703dfcf10fd588c7f563e1456589eb28e8b47c69540ae002d4998"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::receiveStructured",
+      "span": {
+        "path": "worker.ts",
+        "start": 570,
+        "end": 665
+      },
+      "hash": "05f6cc5bf28a8405807f9639cfd34332aa375d65c3a6fcaa9e29018b91860bb0"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::receiveTyped",
+      "span": {
+        "path": "worker.ts",
+        "start": 767,
+        "end": 858
+      },
+      "hash": "705a106cf94efe5e3abed7b90b40c2d28bd20d163c542cda75a7aa9d76d6917c"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::unknown",
+      "span": {
+        "path": "worker.ts",
+        "start": 1062,
+        "end": 1147
+      },
+      "hash": "d58a9403f5f48cb0993c379980b4d7c65f406ebda03b14af6c6d736c86dcfe96"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::wrongSubscription",
+      "span": {
+        "path": "worker.ts",
+        "start": 866,
+        "end": 964
+      },
+      "hash": "cf8811436a1c84b16309536fff90b59899d3518c0ccdb15fc5c4560848b60a0d"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::wrongTopic",
+      "span": {
+        "path": "worker.ts",
+        "start": 972,
+        "end": 1054
+      },
+      "hash": "29e1304dac34d590f951a9f9d60f8defe2f58cb192244d5491160a9a5370f47a"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()::Environment.GetEnvironmentVariable#0",
+      "caller": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 142,
+        "end": 188
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()::PublisherClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 114,
+        "end": 189
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()::publisher.PublishAsync#0",
+      "caller": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 197,
+        "end": 225
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()::Environment.GetEnvironmentVariable#0",
+      "caller": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 314,
+        "end": 358
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()::SubscriberClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 285,
+        "end": 359
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()::subscriber.StartAsync#0",
+      "caller": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 367,
+        "end": 397
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.java::Worker.publishJava()::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-env::Worker.java::Worker.publishJava()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 147,
+        "end": 202
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.java::Worker.publishJava()::Publisher.newBuilder#0",
+      "caller": "local/gcp-sdk-env::Worker.java::Worker.publishJava()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 147,
+        "end": 194
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.java::Worker.publishJava()::System.getenv#0",
+      "caller": "local/gcp-sdk-env::Worker.java::Worker.publishJava()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 168,
+        "end": 193
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.java::Worker.publishJava()::publisher.publish#0",
+      "caller": "local/gcp-sdk-env::Worker.java::Worker.publishJava()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 204,
+        "end": 227
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 273,
+        "end": 336
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()::Subscriber.newBuilder#0",
+      "caller": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 273,
+        "end": 328
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()::System.getenv#0",
+      "caller": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 295,
+        "end": 318
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()::subscriber.startAsync#0",
+      "caller": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 338,
+        "end": 361
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.go::publishGo::(call_expression).Publish#0",
+      "caller": "local/gcp-sdk-env::worker.go::publishGo",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 125,
+        "end": 183
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.go::publishGo::bus.NewClient#0",
+      "caller": "local/gcp-sdk-env::worker.go::publishGo",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 100,
+        "end": 123
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.go::publishGo::client.Publisher#0",
+      "caller": "local/gcp-sdk-env::worker.go::publishGo",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 125,
+        "end": 164
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.go::publishGo::os.Getenv#0",
+      "caller": "local/gcp-sdk-env::worker.go::publishGo",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 142,
+        "end": 163
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.go::receiveGo::(call_expression).Receive#0",
+      "caller": "local/gcp-sdk-env::worker.go::receiveGo",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 245,
+        "end": 305
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.go::receiveGo::bus.NewClient#0",
+      "caller": "local/gcp-sdk-env::worker.go::receiveGo",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 220,
+        "end": 243
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.go::receiveGo::client.Subscriber#0",
+      "caller": "local/gcp-sdk-env::worker.go::receiveGo",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 245,
+        "end": 283
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.go::receiveGo::os.Getenv#0",
+      "caller": "local/gcp-sdk-env::worker.go::receiveGo",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 263,
+        "end": 282
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.js::PubSub#0",
+      "caller": "local/gcp-sdk-env::worker.js",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 57,
+        "end": 69
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.js::publishJs::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-env::worker.js::publishJs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 101,
+        "end": 155
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.js::publishJs::bus.topic#0",
+      "caller": "local/gcp-sdk-env::worker.js::publishJs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 101,
+        "end": 132
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.js::receiveJs::(call_expression).on#0",
+      "caller": "local/gcp-sdk-env::worker.js::receiveJs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 189,
+        "end": 248
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.js::receiveJs::bus.subscription#0",
+      "caller": "local/gcp-sdk-env::worker.js::receiveJs",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 189,
+        "end": 225
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.py::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-env::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 64,
+        "end": 85
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.py::bus.SubscriberClient#0",
+      "caller": "local/gcp-sdk-env::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 99,
+        "end": 121
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.py::publishPython::publisher.publish#0",
+      "caller": "local/gcp-sdk-env::worker.py::publishPython",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 147,
+        "end": 194
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.py::receivePython::subscriber.subscribe#0",
+      "caller": "local/gcp-sdk-env::worker.py::receivePython",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 220,
+        "end": 280
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::PubSub#0",
+      "caller": "local/gcp-sdk-env::worker.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 183,
+        "end": 195
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-env::worker.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 244,
+        "end": 276
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::Storage#0",
+      "caller": "local/gcp-sdk-env::worker.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 213,
+        "end": 226
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::publishPlain::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-env::worker.ts::publishPlain",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 311,
+        "end": 365
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::publishPlain::bus.topic#0",
+      "caller": "local/gcp-sdk-env::worker.ts::publishPlain",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 311,
+        "end": 342
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::publishStructured::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-env::worker.ts::publishStructured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 503,
+        "end": 559
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::publishStructured::bus.topic#0",
+      "caller": "local/gcp-sdk-env::worker.ts::publishStructured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 503,
+        "end": 536
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::publishTyped::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-env::worker.ts::publishTyped",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 699,
+        "end": 756
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::publishTyped::bus.topic#0",
+      "caller": "local/gcp-sdk-env::worker.ts::publishTyped",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 699,
+        "end": 733
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::readBucket::(call_expression).download#0",
+      "caller": "local/gcp-sdk-env::worker.ts::readBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1179,
+        "end": 1236
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::readBucket::(call_expression).file#0",
+      "caller": "local/gcp-sdk-env::worker.ts::readBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1179,
+        "end": 1225
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::readBucket::storage.bucket#0",
+      "caller": "local/gcp-sdk-env::worker.ts::readBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1179,
+        "end": 1213
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::readSecret::secrets.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-env::worker.ts::readSecret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1271,
+        "end": 1326
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::receivePlain::(call_expression).on#0",
+      "caller": "local/gcp-sdk-env::worker.ts::receivePlain",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 402,
+        "end": 461
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::receivePlain::bus.subscription#0",
+      "caller": "local/gcp-sdk-env::worker.ts::receivePlain",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 402,
+        "end": 438
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::receiveStructured::(call_expression).on#0",
+      "caller": "local/gcp-sdk-env::worker.ts::receiveStructured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 601,
+        "end": 662
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::receiveStructured::bus.subscription#0",
+      "caller": "local/gcp-sdk-env::worker.ts::receiveStructured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 601,
+        "end": 639
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::receiveTyped::(call_expression).on#0",
+      "caller": "local/gcp-sdk-env::worker.ts::receiveTyped",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 793,
+        "end": 855
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::receiveTyped::bus.subscription#0",
+      "caller": "local/gcp-sdk-env::worker.ts::receiveTyped",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 793,
+        "end": 832
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::unknown::(call_expression).on#0",
+      "caller": "local/gcp-sdk-env::worker.ts::unknown",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1083,
+        "end": 1144
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::unknown::bus.subscription#0",
+      "caller": "local/gcp-sdk-env::worker.ts::unknown",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1083,
+        "end": 1121
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::wrongSubscription::(call_expression).on#0",
+      "caller": "local/gcp-sdk-env::worker.ts::wrongSubscription",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 897,
+        "end": 961
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::wrongSubscription::bus.subscription#0",
+      "caller": "local/gcp-sdk-env::worker.ts::wrongSubscription",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 897,
+        "end": 938
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::wrongTopic::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-env::worker.ts::wrongTopic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 996,
+        "end": 1051
+      }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::wrongTopic::bus.topic#0",
+      "caller": "local/gcp-sdk-env::worker.ts::wrongTopic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 996,
+        "end": 1028
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-env::worker.ts::wrongTopic::(call_expression).publishMessage#0",
+      "via": "env:TYPED_SUB"
+    },
+    {
+      "contract": "channel::pubsub::orders-env",
+      "site": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()::publisher.PublishAsync#0",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID"
+    },
+    {
+      "contract": "channel::pubsub::orders-env",
+      "site": "local/gcp-sdk-env::Worker.java::Worker.publishJava()::publisher.publish#0",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID"
+    },
+    {
+      "contract": "channel::pubsub::orders-env",
+      "site": "local/gcp-sdk-env::worker.go::publishGo::(call_expression).Publish#0",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID"
+    },
+    {
+      "contract": "channel::pubsub::orders-env",
+      "site": "local/gcp-sdk-env::worker.js::publishJs::(call_expression).publishMessage#0",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID"
+    },
+    {
+      "contract": "channel::pubsub::orders-env",
+      "site": "local/gcp-sdk-env::worker.py::publishPython::publisher.publish#0",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID"
+    },
+    {
+      "contract": "channel::pubsub::orders-env",
+      "site": "local/gcp-sdk-env::worker.ts::publishPlain::(call_expression).publishMessage#0",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID"
+    },
+    {
+      "contract": "channel::pubsub::orders-env",
+      "site": "local/gcp-sdk-env::worker.ts::publishTyped::(call_expression).publishMessage#0",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_TOPIC"
+    },
+    {
+      "contract": "channel::pubsub::orders-path",
+      "site": "local/gcp-sdk-env::worker.ts::publishStructured::(call_expression).publishMessage#0",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_PATH"
+    },
+    {
+      "contract": "image::ghcr.io/acme/gcp-sdk-worker",
+      "site": "local/gcp-sdk-env",
+      "at": ".github/workflows/build.yml#jobs.build.steps[0].with.tags"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "site": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "site": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "contract": "image::ghcr.io/acme/gcp-sdk-worker",
+      "site": "local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker",
+      "via": null,
+      "root": "."
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "site": "local/gcp-sdk-env::worker.go::receiveGo",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "site": "local/gcp-sdk-env::worker.js::receiveJs",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "site": "local/gcp-sdk-env::worker.py::receivePython",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "contract": "resource::gcs::uploads-env",
+      "site": "local/gcp-sdk-env::worker.ts::readBucket",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:BUCKET"
+    },
+    {
+      "contract": "resource::gcpsecretmanager::token-env",
+      "site": "local/gcp-sdk-env::worker.ts::readSecret",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SECRET"
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "site": "local/gcp-sdk-env::worker.ts::receivePlain",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders-path",
+      "site": "local/gcp-sdk-env::worker.ts::receiveStructured",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_PATH"
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "site": "local/gcp-sdk-env::worker.ts::receiveTyped",
+      "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_SUB"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-env::worker.ts::unknown",
+      "via": "env:NO_SCOPE"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-env::worker.ts::wrongSubscription",
+      "via": "env:TYPED_TOPIC"
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker",
+      "address": "google_cloud_run_v2_service.worker",
+      "type": "google_cloud_run_v2_service",
+      "root": ".",
+      "path": "main.tf",
+      "line": 14,
+      "end_line": 53
+    },
+    {
+      "identity": "local/gcp-sdk-env::main.tf::google_pubsub_subscription.orders",
+      "address": "google_pubsub_subscription.orders",
+      "type": "google_pubsub_subscription",
+      "root": ".",
+      "path": "main.tf",
+      "line": 2,
+      "end_line": 6
+    },
+    {
+      "identity": "local/gcp-sdk-env::main.tf::google_pubsub_subscription.path",
+      "address": "google_pubsub_subscription.path",
+      "type": "google_pubsub_subscription",
+      "root": ".",
+      "path": "main.tf",
+      "line": 8,
+      "end_line": 11
+    },
+    {
+      "identity": "local/gcp-sdk-env::main.tf::google_pubsub_topic.orders",
+      "address": "google_pubsub_topic.orders",
+      "type": "google_pubsub_topic",
+      "root": ".",
+      "path": "main.tf",
+      "line": 1,
+      "end_line": 1
+    },
+    {
+      "identity": "local/gcp-sdk-env::main.tf::google_pubsub_topic.path",
+      "address": "google_pubsub_topic.path",
+      "type": "google_pubsub_topic",
+      "root": ".",
+      "path": "main.tf",
+      "line": 7,
+      "end_line": 7
+    },
+    {
+      "identity": "local/gcp-sdk-env::main.tf::google_secret_manager_secret.token",
+      "address": "google_secret_manager_secret.token",
+      "type": "google_secret_manager_secret",
+      "root": ".",
+      "path": "main.tf",
+      "line": 13,
+      "end_line": 13
+    },
+    {
+      "identity": "local/gcp-sdk-env::main.tf::google_storage_bucket.uploads",
+      "address": "google_storage_bucket.uploads",
+      "type": "google_storage_bucket",
+      "root": ".",
+      "path": "main.tf",
+      "line": 12,
+      "end_line": 12
+    }
+  ],
+  "provisioners": [
+    {
+      "contract": "channel::pubsub::orders-env",
+      "node": "local/gcp-sdk-env::main.tf::google_pubsub_topic.orders",
+      "root": "."
+    },
+    {
+      "contract": "channel::pubsub::orders-path",
+      "node": "local/gcp-sdk-env::main.tf::google_pubsub_topic.path",
+      "root": "."
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "node": "local/gcp-sdk-env::main.tf::google_pubsub_subscription.orders",
+      "root": "."
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders-path",
+      "node": "local/gcp-sdk-env::main.tf::google_pubsub_subscription.path",
+      "root": "."
+    },
+    {
+      "contract": "resource::gcpsecretmanager::token-env",
+      "node": "local/gcp-sdk-env::main.tf::google_secret_manager_secret.token",
+      "root": "."
+    },
+    {
+      "contract": "resource::gcs::uploads-env",
+      "node": "local/gcp-sdk-env::main.tf::google_storage_bucket.uploads",
+      "root": "."
+    }
+  ],
+  "uses": [
+    {
+      "contract": "channel::pubsub::orders-path",
+      "site": "local/gcp-sdk-env",
+      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[2].value"
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders-path",
+      "site": "local/gcp-sdk-env",
+      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[3].value"
+    },
+    {
+      "contract": "resource::gcpsecretmanager::token-env",
+      "site": "local/gcp-sdk-env",
+      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[7].value"
+    },
+    {
+      "contract": "resource::gcs::uploads-env",
+      "site": "local/gcp-sdk-env",
+      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[6].value"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()",
+      "provider": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()::publisher.PublishAsync#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()",
+      "provider": "local/gcp-sdk-env::Worker.java::Worker.publishJava()::publisher.publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()",
+      "provider": "local/gcp-sdk-env::worker.go::publishGo::(call_expression).Publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()",
+      "provider": "local/gcp-sdk-env::worker.js::publishJs::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()",
+      "provider": "local/gcp-sdk-env::worker.py::publishPython::publisher.publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()",
+      "provider": "local/gcp-sdk-env::worker.ts::publishPlain::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()",
+      "provider": "local/gcp-sdk-env::worker.ts::publishTyped::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_TOPIC; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()",
+      "provider": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()::publisher.PublishAsync#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()",
+      "provider": "local/gcp-sdk-env::Worker.java::Worker.publishJava()::publisher.publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()",
+      "provider": "local/gcp-sdk-env::worker.go::publishGo::(call_expression).Publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()",
+      "provider": "local/gcp-sdk-env::worker.js::publishJs::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()",
+      "provider": "local/gcp-sdk-env::worker.py::publishPython::publisher.publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()",
+      "provider": "local/gcp-sdk-env::worker.ts::publishPlain::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()",
+      "provider": "local/gcp-sdk-env::worker.ts::publishTyped::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_TOPIC; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker",
+      "provider": "local/gcp-sdk-env",
+      "contract": "image::ghcr.io/acme/gcp-sdk-worker",
+      "level": "exact",
+      "reason": "image::ghcr.io/acme/gcp-sdk-worker",
+      "root": "."
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.go::receiveGo",
+      "provider": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()::publisher.PublishAsync#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.go::receiveGo",
+      "provider": "local/gcp-sdk-env::Worker.java::Worker.publishJava()::publisher.publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.go::receiveGo",
+      "provider": "local/gcp-sdk-env::worker.go::publishGo::(call_expression).Publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.go::receiveGo",
+      "provider": "local/gcp-sdk-env::worker.js::publishJs::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.go::receiveGo",
+      "provider": "local/gcp-sdk-env::worker.py::publishPython::publisher.publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.go::receiveGo",
+      "provider": "local/gcp-sdk-env::worker.ts::publishPlain::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.go::receiveGo",
+      "provider": "local/gcp-sdk-env::worker.ts::publishTyped::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_TOPIC; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.js::receiveJs",
+      "provider": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()::publisher.PublishAsync#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.js::receiveJs",
+      "provider": "local/gcp-sdk-env::Worker.java::Worker.publishJava()::publisher.publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.js::receiveJs",
+      "provider": "local/gcp-sdk-env::worker.go::publishGo::(call_expression).Publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.js::receiveJs",
+      "provider": "local/gcp-sdk-env::worker.js::publishJs::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.js::receiveJs",
+      "provider": "local/gcp-sdk-env::worker.py::publishPython::publisher.publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.js::receiveJs",
+      "provider": "local/gcp-sdk-env::worker.ts::publishPlain::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.js::receiveJs",
+      "provider": "local/gcp-sdk-env::worker.ts::publishTyped::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_TOPIC; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.py::receivePython",
+      "provider": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()::publisher.PublishAsync#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.py::receivePython",
+      "provider": "local/gcp-sdk-env::Worker.java::Worker.publishJava()::publisher.publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.py::receivePython",
+      "provider": "local/gcp-sdk-env::worker.go::publishGo::(call_expression).Publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.py::receivePython",
+      "provider": "local/gcp-sdk-env::worker.js::publishJs::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.py::receivePython",
+      "provider": "local/gcp-sdk-env::worker.py::publishPython::publisher.publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.py::receivePython",
+      "provider": "local/gcp-sdk-env::worker.ts::publishPlain::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.py::receivePython",
+      "provider": "local/gcp-sdk-env::worker.ts::publishTyped::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_TOPIC; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.ts::receivePlain",
+      "provider": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()::publisher.PublishAsync#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.ts::receivePlain",
+      "provider": "local/gcp-sdk-env::Worker.java::Worker.publishJava()::publisher.publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.ts::receivePlain",
+      "provider": "local/gcp-sdk-env::worker.go::publishGo::(call_expression).Publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.ts::receivePlain",
+      "provider": "local/gcp-sdk-env::worker.js::publishJs::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.ts::receivePlain",
+      "provider": "local/gcp-sdk-env::worker.py::publishPython::publisher.publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.ts::receivePlain",
+      "provider": "local/gcp-sdk-env::worker.ts::publishPlain::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.ts::receivePlain",
+      "provider": "local/gcp-sdk-env::worker.ts::publishTyped::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_TOPIC; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.ts::receiveStructured",
+      "provider": "local/gcp-sdk-env::worker.ts::publishStructured::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-path",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-path subscription google_pubsub_subscription.path (root .); workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_PATH; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_PATH"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.ts::receiveTyped",
+      "provider": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()::publisher.PublishAsync#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_SUB"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.ts::receiveTyped",
+      "provider": "local/gcp-sdk-env::Worker.java::Worker.publishJava()::publisher.publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_SUB"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.ts::receiveTyped",
+      "provider": "local/gcp-sdk-env::worker.go::publishGo::(call_expression).Publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_SUB"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.ts::receiveTyped",
+      "provider": "local/gcp-sdk-env::worker.js::publishJs::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_SUB"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.ts::receiveTyped",
+      "provider": "local/gcp-sdk-env::worker.py::publishPython::publisher.publish#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_SUB"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.ts::receiveTyped",
+      "provider": "local/gcp-sdk-env::worker.ts::publishPlain::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_SUB"
+    },
+    {
+      "consumer": "local/gcp-sdk-env::worker.ts::receiveTyped",
+      "provider": "local/gcp-sdk-env::worker.ts::publishTyped::(call_expression).publishMessage#0",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env subscription google_pubsub_subscription.orders (root .); filter; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_TOPIC; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_SUB"
+    }
+  ],
+  "provisions": [
+    {
+      "side": "local/gcp-sdk-env",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_subscription.path",
+      "root": ".",
+      "contract": "channel::pubsub::subscriptions/orders-path",
+      "level": "exact",
+      "reason": "channel::pubsub::subscriptions/orders-path; config main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[3].value",
+      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[3].value"
+    },
+    {
+      "side": "local/gcp-sdk-env",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_topic.path",
+      "root": ".",
+      "contract": "channel::pubsub::orders-path",
+      "level": "exact",
+      "reason": "channel::pubsub::orders-path; config main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[2].value",
+      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[2].value"
+    },
+    {
+      "side": "local/gcp-sdk-env",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_secret_manager_secret.token",
+      "root": ".",
+      "contract": "resource::gcpsecretmanager::token-env",
+      "level": "exact",
+      "reason": "resource::gcpsecretmanager::token-env; config main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[7].value",
+      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[7].value"
+    },
+    {
+      "side": "local/gcp-sdk-env",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_storage_bucket.uploads",
+      "root": ".",
+      "contract": "resource::gcs::uploads-env",
+      "level": "exact",
+      "reason": "resource::gcs::uploads-env; config main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[6].value",
+      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[6].value"
+    },
+    {
+      "side": "local/gcp-sdk-env::Worker.cs::Worker.publishCsharp()::publisher.PublishAsync#0",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_topic.orders",
+      "root": ".",
+      "contract": "channel::pubsub::orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::orders-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID"
+    },
+    {
+      "side": "local/gcp-sdk-env::Worker.cs::Worker.receiveCsharp()",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_subscription.orders",
+      "root": ".",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "side": "local/gcp-sdk-env::Worker.java::Worker.publishJava()::publisher.publish#0",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_topic.orders",
+      "root": ".",
+      "contract": "channel::pubsub::orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::orders-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID"
+    },
+    {
+      "side": "local/gcp-sdk-env::Worker.java::Worker.receiveJava()",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_subscription.orders",
+      "root": ".",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "side": "local/gcp-sdk-env::worker.go::publishGo::(call_expression).Publish#0",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_topic.orders",
+      "root": ".",
+      "contract": "channel::pubsub::orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::orders-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID"
+    },
+    {
+      "side": "local/gcp-sdk-env::worker.go::receiveGo",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_subscription.orders",
+      "root": ".",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "side": "local/gcp-sdk-env::worker.js::publishJs::(call_expression).publishMessage#0",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_topic.orders",
+      "root": ".",
+      "contract": "channel::pubsub::orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::orders-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID"
+    },
+    {
+      "side": "local/gcp-sdk-env::worker.js::receiveJs",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_subscription.orders",
+      "root": ".",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "side": "local/gcp-sdk-env::worker.py::publishPython::publisher.publish#0",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_topic.orders",
+      "root": ".",
+      "contract": "channel::pubsub::orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::orders-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID"
+    },
+    {
+      "side": "local/gcp-sdk-env::worker.py::receivePython",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_subscription.orders",
+      "root": ".",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "side": "local/gcp-sdk-env::worker.ts::publishPlain::(call_expression).publishMessage#0",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_topic.orders",
+      "root": ".",
+      "contract": "channel::pubsub::orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::orders-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_ID"
+    },
+    {
+      "side": "local/gcp-sdk-env::worker.ts::publishStructured::(call_expression).publishMessage#0",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_topic.path",
+      "root": ".",
+      "contract": "channel::pubsub::orders-path",
+      "level": "inferred",
+      "reason": "channel::pubsub::orders-path; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TOPIC_PATH"
+    },
+    {
+      "side": "local/gcp-sdk-env::worker.ts::publishTyped::(call_expression).publishMessage#0",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_topic.orders",
+      "root": ".",
+      "contract": "channel::pubsub::orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::orders-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_TOPIC"
+    },
+    {
+      "side": "local/gcp-sdk-env::worker.ts::readBucket",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_storage_bucket.uploads",
+      "root": ".",
+      "contract": "resource::gcs::uploads-env",
+      "level": "inferred",
+      "reason": "resource::gcs::uploads-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:BUCKET"
+    },
+    {
+      "side": "local/gcp-sdk-env::worker.ts::readSecret",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_secret_manager_secret.token",
+      "root": ".",
+      "contract": "resource::gcpsecretmanager::token-env",
+      "level": "inferred",
+      "reason": "resource::gcpsecretmanager::token-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SECRET"
+    },
+    {
+      "side": "local/gcp-sdk-env::worker.ts::receivePlain",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_subscription.orders",
+      "root": ".",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_ID"
+    },
+    {
+      "side": "local/gcp-sdk-env::worker.ts::receiveStructured",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_subscription.path",
+      "root": ".",
+      "contract": "channel::pubsub::subscriptions/orders-path",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-path; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SUB_PATH"
+    },
+    {
+      "side": "local/gcp-sdk-env::worker.ts::receiveTyped",
+      "provisioner": "local/gcp-sdk-env::main.tf::google_pubsub_subscription.orders",
+      "root": ".",
+      "contract": "channel::pubsub::subscriptions/orders-env",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_SUB"
+    }
+  ],
+  "subscriptions": [
+    {
+      "source": "channel::pubsub::orders-env",
+      "target": "channel::pubsub::subscriptions/orders-env",
+      "node": "local/gcp-sdk-env::main.tf::google_pubsub_subscription.orders",
+      "root": "."
+    },
+    {
+      "source": "channel::pubsub::orders-path",
+      "target": "channel::pubsub::subscriptions/orders-path",
+      "node": "local/gcp-sdk-env::main.tf::google_pubsub_subscription.path",
+      "root": "."
+    }
+  ]
+}

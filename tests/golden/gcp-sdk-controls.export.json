@@ -1,0 +1,4408 @@
+{
+  "format": 1,
+  "repository": "local/gcp-sdk-controls",
+  "files": [
+    {
+      "path": "Control.cs",
+      "hash": "878069925e400de6e53a28e53800475a7e319b46e87f60795833c04573be42fd"
+    },
+    {
+      "path": "Control.java",
+      "hash": "8502328b847848b01915e8ec8bd5e9d571007852d8f74c076b472aa2228d5c4a"
+    },
+    {
+      "path": "Hidden.java",
+      "hash": "5c10c9c27c8751b712274de896249a07535dee4767a536c8624f4177ae8a70d3"
+    },
+    {
+      "path": "control.go",
+      "hash": "5b8c18c034c55c16d2f20f202d95fc4105eb4c741b760e703b9fdbb2e5203b11"
+    },
+    {
+      "path": "control.js",
+      "hash": "7d8006a9459e4e481314f17b8ce559e0a5468453615b944d20d03d9fd7dc6d68"
+    },
+    {
+      "path": "control.py",
+      "hash": "26970b85a9dd6c4f1db12f2a4f3851d0b3fbec645d4f11ff231ac14b57b4e1b7"
+    },
+    {
+      "path": "control.ts",
+      "hash": "c8f5b6d31ecef6f8adde9f9c2ddb0d9ca43a26468ea19df5699fd25095d2104a"
+    },
+    {
+      "path": "global.py",
+      "hash": "b9d4ac0c9182f5f72755825018e4916ed49236864da5e6a71cd84efac0bbd154"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control",
+      "span": {
+        "path": "Control.cs",
+        "start": 112,
+        "end": 1865
+      },
+      "hash": "62532f67e97db812ee8a42d6d6eb02229b48adaa4792c5668bdbd3dfbbecd11a"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvBucket()",
+      "span": {
+        "path": "Control.cs",
+        "start": 772,
+        "end": 922
+      },
+      "hash": "06af89c4baa46e1d4142c3e20549076038aa5f85badb71559cdcec5e8d571bf4"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvReceive()",
+      "span": {
+        "path": "Control.cs",
+        "start": 607,
+        "end": 767
+      },
+      "hash": "9a26dd282bb2a019d0e69cf8ea324ff9bc345864aa6ecf3137cb8bc14847f7c2"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvSecret()",
+      "span": {
+        "path": "Control.cs",
+        "start": 927,
+        "end": 1078
+      },
+      "hash": "c77d8b2bc371ae5ecdbd4ff6244b658dc2f53ac555801ba82b085254dfbab26e"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvSend()",
+      "span": {
+        "path": "Control.cs",
+        "start": 445,
+        "end": 602
+      },
+      "hash": "098d985b00132802bda8be2c454c65c19087d9f7c730b7cd52f62ecff9a8caa0"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.First()",
+      "span": {
+        "path": "Control.cs",
+        "start": 234,
+        "end": 334
+      },
+      "hash": "e4a0daf966dc15f6ba680e1f45c90359f49e7afe94f91bd8ce57df70e61fa9d0"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Guessed(object)",
+      "span": {
+        "path": "Control.cs",
+        "start": 1191,
+        "end": 1303
+      },
+      "hash": "da1570253e91c4ec22fed34baad80984b3267c21708a16d102463044399cb2b4"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Injected(PublisherClient)",
+      "span": {
+        "path": "Control.cs",
+        "start": 1783,
+        "end": 1863
+      },
+      "hash": "33621866a22f114b81ad4a216555ac058841bdb40c2bed46cfa48111ce1ce2bf"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Make(string)",
+      "span": {
+        "path": "Control.cs",
+        "start": 132,
+        "end": 229
+      },
+      "hash": "450d2f0e766baef776043c9e8f2855d7828b0b417e0ed74f6a8d6116e7ad13ae"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.MakeClient()",
+      "span": {
+        "path": "Control.cs",
+        "start": 1083,
+        "end": 1186
+      },
+      "hash": "df1fd4bf855ee617218876bebb577c08a49da9a77c35d9e730cbe9167872d877"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Mixed(bool,PublisherClient)",
+      "span": {
+        "path": "Control.cs",
+        "start": 1308,
+        "end": 1469
+      },
+      "hash": "929eecfd9ec64b412f8514b7923e5b7375ba74ae94bca46de985a0e05879783b"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Opaque(bool,PublisherClient)",
+      "span": {
+        "path": "Control.cs",
+        "start": 1474,
+        "end": 1605
+      },
+      "hash": "3005e00e0b3078932ec6ff42041ff6284431cc62def7da00002c82a4c509a64c"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Reassigned(PublisherClient)",
+      "span": {
+        "path": "Control.cs",
+        "start": 1610,
+        "end": 1778
+      },
+      "hash": "cb77cc37304ab8fd0e57c00c94eaa6418132d63c80e268dccd9fc1185afda144"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Second()",
+      "span": {
+        "path": "Control.cs",
+        "start": 339,
+        "end": 440
+      },
+      "hash": "f0e62fd13f3653660b1477cd2d65930721b4c1399367e6db5e690153e6cb2db7"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control",
+      "span": {
+        "path": "Control.java",
+        "start": 208,
+        "end": 1644
+      },
+      "hash": "92fa577635edc08502b9608ca7159b59c310c1198320e828199f56f745ee886a"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envBucket()",
+      "span": {
+        "path": "Control.java",
+        "start": 712,
+        "end": 855
+      },
+      "hash": "a6cad8ae78bc9123d7978766e0e90c75641dba663407925e48be0ece0a5cf2ac"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envReceive()",
+      "span": {
+        "path": "Control.java",
+        "start": 585,
+        "end": 707
+      },
+      "hash": "c08f8d515f168780f59f89aca30a6c507aff8d79eae0a958b003cb37277e21b1"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envSecret()",
+      "span": {
+        "path": "Control.java",
+        "start": 860,
+        "end": 988
+      },
+      "hash": "e68a6ce4667f87a74e74d69d27e39799562ecff7c488e2ba888ecf39dc881609"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envSend()",
+      "span": {
+        "path": "Control.java",
+        "start": 468,
+        "end": 580
+      },
+      "hash": "ac57a920ec5ddebe4356ab95b0a5944219308782008f8fa6c31674c13de83c95"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.first()",
+      "span": {
+        "path": "Control.java",
+        "start": 307,
+        "end": 382
+      },
+      "hash": "9a0056b2f1e9e9cd408253314255232b3fd855006598f31b4bf204dcec1c5c22"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.guessed()",
+      "span": {
+        "path": "Control.java",
+        "start": 1078,
+        "end": 1185
+      },
+      "hash": "4735259d5b29bba462a6095b29fc84f50edc7649e5ef0c6484d600d2d9052d1f"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.injected(Publisher)",
+      "span": {
+        "path": "Control.java",
+        "start": 1585,
+        "end": 1642
+      },
+      "hash": "162d4e893252f1f223f862ba4289d4397225c925e2edff4654831956906c5cff"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.make(String)",
+      "span": {
+        "path": "Control.java",
+        "start": 228,
+        "end": 302
+      },
+      "hash": "2e3d5adf4a944fb57ebc6e27ed6d16bd5b2cdceaa0c72ab1319f80ab6e7a8825"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.makeClient()",
+      "span": {
+        "path": "Control.java",
+        "start": 993,
+        "end": 1073
+      },
+      "hash": "d91b394077e2bc30f31b291c0999eb0ead53a253a46fb797d1924ba390fff692"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.mixed(boolean,Publisher)",
+      "span": {
+        "path": "Control.java",
+        "start": 1190,
+        "end": 1325
+      },
+      "hash": "5f536752d037ab09a758d8a9cd4b6e6ad1f6ca9fe505bce1da9f8fef6722e916"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.opaque(boolean,Publisher)",
+      "span": {
+        "path": "Control.java",
+        "start": 1330,
+        "end": 1435
+      },
+      "hash": "c576e3eae92c1ec42bac37bd7733289ea21de97ebb3aa230342493e6f23774a5"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.reassigned(Publisher)",
+      "span": {
+        "path": "Control.java",
+        "start": 1440,
+        "end": 1580
+      },
+      "hash": "ea5b4342d1eeb8a973690ec0392b59025593afe09863b0cf5b07f90a7b1bf80a"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.second()",
+      "span": {
+        "path": "Control.java",
+        "start": 387,
+        "end": 463
+      },
+      "hash": "fd7bc3bb502b52c6458e18ddcdb4717d0412532d6e747142eb2b633e77039ded"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Hidden.java::Hidden",
+      "span": {
+        "path": "Hidden.java",
+        "start": 45,
+        "end": 330
+      },
+      "hash": "4d14fe6c6be7a7af2666ad17f7780385df7b87be18b693f91c4be8dcef5f8d9d"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher",
+      "span": {
+        "path": "Hidden.java",
+        "start": 64,
+        "end": 223
+      },
+      "hash": "57c397dd777ff2e34270212047088c078474f64bc8ec529d1e50cd5989171be5"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.build()",
+      "span": {
+        "path": "Hidden.java",
+        "start": 158,
+        "end": 192
+      },
+      "hash": "a84479a6b91c07d2143f9c1c99b236c9c7e0569b8726760ebd2611f691d63b3d"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.newBuilder(String)",
+      "span": {
+        "path": "Hidden.java",
+        "start": 89,
+        "end": 157
+      },
+      "hash": "316885843b84b4ac7e9314c045fa749e0a92ab2d065240198976fb2368143476"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.publish(Object)",
+      "span": {
+        "path": "Hidden.java",
+        "start": 193,
+        "end": 221
+      },
+      "hash": "beac3d6eb66834d3fabaed77937b23b46cd8efa03c2e2187f84f6a237debef89"
+    },
+    {
+      "id": "local/gcp-sdk-controls::Hidden.java::Hidden.hidden()",
+      "span": {
+        "path": "Hidden.java",
+        "start": 228,
+        "end": 328
+      },
+      "hash": "2c3068f5c4cfb24da9db78fbad33f129b999e33feb5ed613281eb74cdd24b332"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::Factory",
+      "span": {
+        "path": "control.go",
+        "start": 1206,
+        "end": 1222
+      },
+      "hash": "d1b70fe97351615b426a285c02a0eb8505684d9273a9e0e6155d54c005488949"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::Factory.makeClient",
+      "span": {
+        "path": "control.go",
+        "start": 1223,
+        "end": 1340
+      },
+      "hash": "e63c7095af521a9e4ce5173910c7ed26bfb8cd43b896d4e04f10a1ef8371e233"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envBucket",
+      "span": {
+        "path": "control.go",
+        "start": 859,
+        "end": 1007
+      },
+      "hash": "dafef36742159f732c80af14319a9e00ab92ec001ed8c6d57d66c7243f939bab"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envReceive",
+      "span": {
+        "path": "control.go",
+        "start": 710,
+        "end": 858
+      },
+      "hash": "884b5ca5f312be92d1259b8d9a12d53b817ff541753284aaaa26c86f762ebeac"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envSecret",
+      "span": {
+        "path": "control.go",
+        "start": 1008,
+        "end": 1200
+      },
+      "hash": "6aeeb5f20386ec9efe711f210b365d54b71642c1562f6bf638f994e84d4dc793"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envSend",
+      "span": {
+        "path": "control.go",
+        "start": 566,
+        "end": 709
+      },
+      "hash": "8b3d1eb4c4c6bd5d49ee13a62c06041a5e22b770a7df2cebec45653abb27ba5a"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::first",
+      "span": {
+        "path": "control.go",
+        "start": 383,
+        "end": 473
+      },
+      "hash": "800b9e384ac3bc447c12a31efb64de94d0f6d9298801c4257f9a43e48384aec0"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::guessed",
+      "span": {
+        "path": "control.go",
+        "start": 1341,
+        "end": 1474
+      },
+      "hash": "ea97c4553381420af9aeb19ac2fa2fddc73d6471dc50790849429d38c9468e49"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::hidden",
+      "span": {
+        "path": "control.go",
+        "start": 1970,
+        "end": 2130
+      },
+      "hash": "20991acc722f1e7c5c312290a0aa141287e5b6e4348112146a279f6546497fa7"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::injected",
+      "span": {
+        "path": "control.go",
+        "start": 2131,
+        "end": 2240
+      },
+      "hash": "160f6e955a8b36a87bf9fcc1fb7fb10629e10f44962af172f89e40839e8798a4"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::makeTopic",
+      "span": {
+        "path": "control.go",
+        "start": 248,
+        "end": 382
+      },
+      "hash": "9bceb8a827747e4a5b8b805235c2790327c75af91792bfe1aaf2b2f4456ce134"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::mixed",
+      "span": {
+        "path": "control.go",
+        "start": 1475,
+        "end": 1636
+      },
+      "hash": "740f594098ebb1f42d596b211d4f34fcfeceabf81becfe9b07a7072de8e7b304"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::opaque",
+      "span": {
+        "path": "control.go",
+        "start": 1637,
+        "end": 1786
+      },
+      "hash": "ff6b2e0b40499ff735351ee9b9b541159d4aa74e95bbd7dee55f07c3a55b2fb6"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::reassigned",
+      "span": {
+        "path": "control.go",
+        "start": 1787,
+        "end": 1969
+      },
+      "hash": "d5146d41593c8f045702b8544c6e207cde4778b0a7e8a919611e7210dc2ce078"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::second",
+      "span": {
+        "path": "control.go",
+        "start": 474,
+        "end": 565
+      },
+      "hash": "d1be1c9a54a2b8d4b2edcbbf0f01feaaddc913c04390ae2abe4467fc9990841f"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::Factory",
+      "span": {
+        "path": "control.js",
+        "start": 912,
+        "end": 967
+      },
+      "hash": "2281c967522477e925653041c9ea537b462e8699d5ed94ff38a02fc9832e1982"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::Factory.makeClient",
+      "span": {
+        "path": "control.js",
+        "start": 928,
+        "end": 965
+      },
+      "hash": "d85ff235c1f6137d3cf02929e126218be013d7d6b1f2d727c49120056e6cca7d"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::caught",
+      "span": {
+        "path": "control.js",
+        "start": 1720,
+        "end": 1860
+      },
+      "hash": "f9e5f50ea1392042111de3e6250678d865b909a3630fcdfd5457de057fc17ee2"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::destructured",
+      "span": {
+        "path": "control.js",
+        "start": 1586,
+        "end": 1712
+      },
+      "hash": "5f4c2afaab16dd5f80010e646457185bb9be5aa6488627cab47e825830f8fdfa"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::envBucket",
+      "span": {
+        "path": "control.js",
+        "start": 704,
+        "end": 790
+      },
+      "hash": "e9235e3c2a148f5d1ddd96c4d6108222ad76a7bb77cb52d43419b36d56f0f39d"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::envReceive",
+      "span": {
+        "path": "control.js",
+        "start": 610,
+        "end": 696
+      },
+      "hash": "cc7a5e36acb7c8bca3339847f798f76b0b5cd69996e57e0e8010862799c9826e"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::envSecret",
+      "span": {
+        "path": "control.js",
+        "start": 798,
+        "end": 882
+      },
+      "hash": "c9040ef4d6d0048d581fcbe08bde327d53bedcad0b124c42c5fdb3d3f411a8ea"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::envSend",
+      "span": {
+        "path": "control.js",
+        "start": 524,
+        "end": 602
+      },
+      "hash": "6df38023771d3455383730e5f5ab99fc530849616c6c7d06a102fde9287cbc25"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::first",
+      "span": {
+        "path": "control.js",
+        "start": 310,
+        "end": 356
+      },
+      "hash": "c89a3796ac9483e2a5ce88ee318b822ba6bd27b6eba77d9e9e44f5990cd849f4"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::firstStructured",
+      "span": {
+        "path": "control.js",
+        "start": 2258,
+        "end": 2324
+      },
+      "hash": "1aa266de6a2d307a76622f971a234620759e10a958596cc1ead23e9492a65422"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::guessed",
+      "span": {
+        "path": "control.js",
+        "start": 975,
+        "end": 1095
+      },
+      "hash": "326a0cbf8d4985bb73ce780aa7aea91ea2ad2de10d2ec27c48d775e7cabd7663"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::handler",
+      "span": {
+        "path": "control.js",
+        "start": 883,
+        "end": 911
+      },
+      "hash": "655a327c2704890c1e18a2e15b20d771f41dc4aa67fa5adcce98d5c1d5e415e4"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::inline",
+      "span": {
+        "path": "control.js",
+        "start": 1986,
+        "end": 2063
+      },
+      "hash": "3430ed789b907fffbbc9ca47983fc6caa1e18a9b8e525929cb5fc1f025e73d60"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::make",
+      "span": {
+        "path": "control.js",
+        "start": 165,
+        "end": 238
+      },
+      "hash": "72050708164c9a13e32a2760d83786e591904dc65c3f2ccddad41ec433fb2f7d"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::mixed",
+      "span": {
+        "path": "control.js",
+        "start": 1096,
+        "end": 1174
+      },
+      "hash": "7c4b69e21c5480f6c9d63494bf154baa8de4dab0b02f6dad9b0d17a25c308aa8"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::opaque",
+      "span": {
+        "path": "control.js",
+        "start": 1182,
+        "end": 1310
+      },
+      "hash": "2650327f07fa5e5e862833a322e91b768505d0a94ca6dabb2c065d9bb1c97ae7"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::parameter",
+      "span": {
+        "path": "control.js",
+        "start": 1459,
+        "end": 1578
+      },
+      "hash": "1b001d0d61204c4885e213a5941f56dd39ac151c786b099bf199f97dc90c316b"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::reassigned",
+      "span": {
+        "path": "control.js",
+        "start": 1318,
+        "end": 1451
+      },
+      "hash": "358078f1abf1c4ea91d41d296490f5cee343a2edc10e4458b1bd5e57ead375c2"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::second",
+      "span": {
+        "path": "control.js",
+        "start": 364,
+        "end": 411
+      },
+      "hash": "c7cc0ddc197a595c27d12089f665ab6193c57c64c5a28f01a427aab21e037520"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::secondStructured",
+      "span": {
+        "path": "control.js",
+        "start": 2332,
+        "end": 2399
+      },
+      "hash": "50ef0079f7cfdcc16dffc7d2b547184f4ec6b4a89bbf5d6802316228891fd465"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::structured",
+      "span": {
+        "path": "control.js",
+        "start": 2064,
+        "end": 2130
+      },
+      "hash": "460b4ffddecc67e902125cb3799cafd42ff9f12f1181aab280efb98d11dcaca4"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::withoutNew",
+      "span": {
+        "path": "control.js",
+        "start": 1868,
+        "end": 1978
+      },
+      "hash": "e2e3957d7c43dffa6c3a60f5ff305a0a4bc2f62bccbb704ab94faf0877c04f41"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::Factory",
+      "span": {
+        "path": "control.py",
+        "start": 890,
+        "end": 968
+      },
+      "hash": "34980b14f91098b0c74ce84d3b41cc8ea84bc129efbf1c6446fdd35f3cd3cc70"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::Factory.make_client",
+      "span": {
+        "path": "control.py",
+        "start": 909,
+        "end": 968
+      },
+      "hash": "322df0888a2c560de5d551196aab20cec0e18d4a30ec54e63f01bc381dfce7e6"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::comprehension",
+      "span": {
+        "path": "control.py",
+        "start": 1833,
+        "end": 1955
+      },
+      "hash": "653d3953035e1d7aa1f1d0fcd3f4daeea2a71a8c6549e0fd58eb79bfd3f4482e"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::env_bucket",
+      "span": {
+        "path": "control.py",
+        "start": 659,
+        "end": 758
+      },
+      "hash": "76eab13f697b85e39e9e6216fd66e77f0ae2865080d766951cb58e07cdfa9782"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::env_receive",
+      "span": {
+        "path": "control.py",
+        "start": 571,
+        "end": 658
+      },
+      "hash": "b8310b061f3a7d6bd1cdd838be0b296aa33d5cb39799199bad5bef541d0b93c9"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::env_secret",
+      "span": {
+        "path": "control.py",
+        "start": 759,
+        "end": 857
+      },
+      "hash": "87ca19fcf5e621c262b62bdb7dd69e6a5084b4a1ac3be4572bcdec4157f4c1e0"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::env_send",
+      "span": {
+        "path": "control.py",
+        "start": 499,
+        "end": 570
+      },
+      "hash": "782d935e42712ce155cec33afb0abd470350e03268a918218ae668c5e163d9a6"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::except_name",
+      "span": {
+        "path": "control.py",
+        "start": 1588,
+        "end": 1722
+      },
+      "hash": "54cb98374758a5ff9ed59b354a836fa4aa2719017d89fa24f45a0987adb385d9"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::first",
+      "span": {
+        "path": "control.py",
+        "start": 269,
+        "end": 312
+      },
+      "hash": "7ec8c06acee098b53ab70898e1b5ff756f946bd6ff5132eeaeb2712e0d708a7a"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::guessed",
+      "span": {
+        "path": "control.py",
+        "start": 969,
+        "end": 1067
+      },
+      "hash": "457670c22c99c98daae3df289dfd557efeabe83738472aad692d73cff6cdcd86"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::handler",
+      "span": {
+        "path": "control.py",
+        "start": 858,
+        "end": 888
+      },
+      "hash": "f0e35ca9c73a93bb14d2188e8d3e53814091227e0f1a18c52f4adc5cb47342c1"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::imported",
+      "span": {
+        "path": "control.py",
+        "start": 2184,
+        "end": 2282
+      },
+      "hash": "2e47072e6922b638ae07a44c5752ab6c69d0ede2948df7b4596c721cfdf6868f"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::lam",
+      "span": {
+        "path": "control.py",
+        "start": 1956,
+        "end": 2045
+      },
+      "hash": "3531cd772d40af0c1aa3416bba5af54b1e83da4cc607d46d341037e246497f41"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::make",
+      "span": {
+        "path": "control.py",
+        "start": 144,
+        "end": 210
+      },
+      "hash": "da7ea4a9224898d3200b42bff6ed25f1c3bfb18b868e5b3942715826c4a0da48"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::matched",
+      "span": {
+        "path": "control.py",
+        "start": 2046,
+        "end": 2183
+      },
+      "hash": "e8d7a9aba7683439332f4d1115b9072af84798d2d5a24647b57a1ddba8c572e6"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::mixed",
+      "span": {
+        "path": "control.py",
+        "start": 1068,
+        "end": 1162
+      },
+      "hash": "d08973c9a36982e706eaf86c48cbbdd7d665bf4f7a46fc90de3aad7f86fa4396"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::opaque",
+      "span": {
+        "path": "control.py",
+        "start": 1163,
+        "end": 1268
+      },
+      "hash": "eec550b19c3bdc7d60c3a947a570304ee713015d56a35243cc679946725005e4"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::parameter",
+      "span": {
+        "path": "control.py",
+        "start": 1394,
+        "end": 1476
+      },
+      "hash": "78b878550a434e000ea1892441ce8201e9401901002e1776f85b5c763377dc8e"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::reassigned",
+      "span": {
+        "path": "control.py",
+        "start": 1269,
+        "end": 1393
+      },
+      "hash": "c8b2e8613d6e19fba2dd7b14c98e7acacf0907d8191024d63243516ff94e1a44"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::second",
+      "span": {
+        "path": "control.py",
+        "start": 313,
+        "end": 357
+      },
+      "hash": "3c30eb1df7aa08b4202bf53b8f4494a7f96622780faf2c817682fa4528394492"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::walrus",
+      "span": {
+        "path": "control.py",
+        "start": 1723,
+        "end": 1832
+      },
+      "hash": "1c6980d00cc6a35d35699625f6f811477d1bd0f77b1466bf663b6134124f09cb"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::with_name",
+      "span": {
+        "path": "control.py",
+        "start": 1477,
+        "end": 1587
+      },
+      "hash": "7f5fc7dfb1e05ca825d90bde7dca297e1ac13ddd2f806953c72e534a48caab18"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::Factory",
+      "span": {
+        "path": "control.ts",
+        "start": 912,
+        "end": 967
+      },
+      "hash": "2281c967522477e925653041c9ea537b462e8699d5ed94ff38a02fc9832e1982"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::Factory.makeClient",
+      "span": {
+        "path": "control.ts",
+        "start": 928,
+        "end": 965
+      },
+      "hash": "d85ff235c1f6137d3cf02929e126218be013d7d6b1f2d727c49120056e6cca7d"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::caught",
+      "span": {
+        "path": "control.ts",
+        "start": 1720,
+        "end": 1860
+      },
+      "hash": "f9e5f50ea1392042111de3e6250678d865b909a3630fcdfd5457de057fc17ee2"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::destructured",
+      "span": {
+        "path": "control.ts",
+        "start": 1586,
+        "end": 1712
+      },
+      "hash": "5f4c2afaab16dd5f80010e646457185bb9be5aa6488627cab47e825830f8fdfa"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::envBucket",
+      "span": {
+        "path": "control.ts",
+        "start": 704,
+        "end": 790
+      },
+      "hash": "cdae61990957002029e67a54a557af81bd66062db445f5bdcdcdd2fcc53b21ee"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::envReceive",
+      "span": {
+        "path": "control.ts",
+        "start": 610,
+        "end": 696
+      },
+      "hash": "46379279e13ee5b0aa83ef448afa67fd551ad2cd8901dfe9f02878e81f58988c"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::envSecret",
+      "span": {
+        "path": "control.ts",
+        "start": 798,
+        "end": 882
+      },
+      "hash": "b5bd13f8d5d204af1978d8c37a974c3c24f1e4241e7d407d74c9dbf711c56d06"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::envSend",
+      "span": {
+        "path": "control.ts",
+        "start": 524,
+        "end": 602
+      },
+      "hash": "9fc7fdcc70aa1044d600898fa18cae71deae151b7809d7d65922b8ce9183b1a4"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::first",
+      "span": {
+        "path": "control.ts",
+        "start": 310,
+        "end": 356
+      },
+      "hash": "c89a3796ac9483e2a5ce88ee318b822ba6bd27b6eba77d9e9e44f5990cd849f4"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::firstStructured",
+      "span": {
+        "path": "control.ts",
+        "start": 2258,
+        "end": 2324
+      },
+      "hash": "1aa266de6a2d307a76622f971a234620759e10a958596cc1ead23e9492a65422"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::guessed",
+      "span": {
+        "path": "control.ts",
+        "start": 975,
+        "end": 1095
+      },
+      "hash": "326a0cbf8d4985bb73ce780aa7aea91ea2ad2de10d2ec27c48d775e7cabd7663"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::handler",
+      "span": {
+        "path": "control.ts",
+        "start": 883,
+        "end": 911
+      },
+      "hash": "655a327c2704890c1e18a2e15b20d771f41dc4aa67fa5adcce98d5c1d5e415e4"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::inline",
+      "span": {
+        "path": "control.ts",
+        "start": 1986,
+        "end": 2063
+      },
+      "hash": "e901bdfde45458eee3d62c593b4755b4b48c918e5142631fdb6645f6c2677145"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::make",
+      "span": {
+        "path": "control.ts",
+        "start": 165,
+        "end": 238
+      },
+      "hash": "72050708164c9a13e32a2760d83786e591904dc65c3f2ccddad41ec433fb2f7d"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::mixed",
+      "span": {
+        "path": "control.ts",
+        "start": 1096,
+        "end": 1174
+      },
+      "hash": "7c4b69e21c5480f6c9d63494bf154baa8de4dab0b02f6dad9b0d17a25c308aa8"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::opaque",
+      "span": {
+        "path": "control.ts",
+        "start": 1182,
+        "end": 1310
+      },
+      "hash": "2650327f07fa5e5e862833a322e91b768505d0a94ca6dabb2c065d9bb1c97ae7"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::parameter",
+      "span": {
+        "path": "control.ts",
+        "start": 1459,
+        "end": 1578
+      },
+      "hash": "1b001d0d61204c4885e213a5941f56dd39ac151c786b099bf199f97dc90c316b"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::reassigned",
+      "span": {
+        "path": "control.ts",
+        "start": 1318,
+        "end": 1451
+      },
+      "hash": "358078f1abf1c4ea91d41d296490f5cee343a2edc10e4458b1bd5e57ead375c2"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::second",
+      "span": {
+        "path": "control.ts",
+        "start": 364,
+        "end": 411
+      },
+      "hash": "c7cc0ddc197a595c27d12089f665ab6193c57c64c5a28f01a427aab21e037520"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::secondStructured",
+      "span": {
+        "path": "control.ts",
+        "start": 2332,
+        "end": 2399
+      },
+      "hash": "50ef0079f7cfdcc16dffc7d2b547184f4ec6b4a89bbf5d6802316228891fd465"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::structured",
+      "span": {
+        "path": "control.ts",
+        "start": 2064,
+        "end": 2130
+      },
+      "hash": "460b4ffddecc67e902125cb3799cafd42ff9f12f1181aab280efb98d11dcaca4"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::withoutNew",
+      "span": {
+        "path": "control.ts",
+        "start": 1868,
+        "end": 1978
+      },
+      "hash": "e2e3957d7c43dffa6c3a60f5ff305a0a4bc2f62bccbb704ab94faf0877c04f41"
+    },
+    {
+      "id": "local/gcp-sdk-controls::global.py::outer",
+      "span": {
+        "path": "global.py",
+        "start": 157,
+        "end": 373
+      },
+      "hash": "ecad91be31a65f90caeb6a4954bb0561ee192a15b29bc87196877994a12aa682"
+    },
+    {
+      "id": "local/gcp-sdk-controls::global.py::outer.inner",
+      "span": {
+        "path": "global.py",
+        "start": 222,
+        "end": 356
+      },
+      "hash": "42f3e4681ce4598870e755a8dd9b38e08c6a1560567a2d7de692e3634fba0b3a"
+    },
+    {
+      "id": "local/gcp-sdk-controls::global.py::rebound",
+      "span": {
+        "path": "global.py",
+        "start": 42,
+        "end": 156
+      },
+      "hash": "60351b572c6f2b28fdc3b98f29f08ffc8cbdefd5337b5ddcd4b699db21393193"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvBucket()::Environment.GetEnvironmentVariable#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.EnvBucket()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 850,
+        "end": 901
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvBucket()::StorageClient.Create#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.EnvBucket()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 804,
+        "end": 826
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvBucket()::client.DownloadObject#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.EnvBucket()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 828,
+        "end": 919
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvReceive()::Environment.GetEnvironmentVariable#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.EnvReceive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 681,
+        "end": 729
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvReceive()::SubscriberClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.EnvReceive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 652,
+        "end": 730
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvReceive()::client.StartAsync#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.EnvReceive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 738,
+        "end": 764
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvSecret()::Environment.GetEnvironmentVariable#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.EnvSecret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 1023,
+        "end": 1074
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvSecret()::SecretManagerServiceClient.Create#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.EnvSecret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 959,
+        "end": 994
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvSecret()::client.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.EnvSecret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 996,
+        "end": 1075
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvSend()::Environment.GetEnvironmentVariable#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.EnvSend()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 515,
+        "end": 565
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvSend()::PublisherClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.EnvSend()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 487,
+        "end": 566
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.EnvSend()::client.PublishAsync#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.EnvSend()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 574,
+        "end": 599
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.First()::Make#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.First()",
+      "target": "local/gcp-sdk-controls::Control.cs::Control.Make(string)",
+      "level": "exact",
+      "span": {
+        "path": "Control.cs",
+        "start": 274,
+        "end": 298
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.First()::client.PublishAsync#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.First()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 306,
+        "end": 331
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Guessed(object)::client.PublishAsync#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.Guessed(object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 1275,
+        "end": 1300
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Guessed(object)::unknown.MakeClient#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.Guessed(object)",
+      "target": "local/gcp-sdk-controls::Control.cs::Control.MakeClient()",
+      "level": "inferred",
+      "span": {
+        "path": "Control.cs",
+        "start": 1247,
+        "end": 1267
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Injected(PublisherClient)::client.PublishAsync#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.Injected(PublisherClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 1835,
+        "end": 1860
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Make(string)::PublisherClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.Make(string)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 193,
+        "end": 226
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.MakeClient()::PublisherClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.MakeClient()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 1139,
+        "end": 1183
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Mixed(bool,PublisherClient)::PublisherClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.Mixed(bool,PublisherClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 1403,
+        "end": 1450
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Opaque(bool,PublisherClient)::Mixed#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.Opaque(bool,PublisherClient)",
+      "target": "local/gcp-sdk-controls::Control.cs::Control.Mixed(bool,PublisherClient)",
+      "level": "exact",
+      "span": {
+        "path": "Control.cs",
+        "start": 1549,
+        "end": 1569
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Opaque(bool,PublisherClient)::client.PublishAsync#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.Opaque(bool,PublisherClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 1577,
+        "end": 1602
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Reassigned(PublisherClient)::PublisherClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.Reassigned(PublisherClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 1678,
+        "end": 1724
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Reassigned(PublisherClient)::client.PublishAsync#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.Reassigned(PublisherClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 1750,
+        "end": 1775
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Second()::Make#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.Second()",
+      "target": "local/gcp-sdk-controls::Control.cs::Control.Make(string)",
+      "level": "exact",
+      "span": {
+        "path": "Control.cs",
+        "start": 380,
+        "end": 404
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.cs::Control.Second()::client.PublishAsync#0",
+      "caller": "local/gcp-sdk-controls::Control.cs::Control.Second()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.cs",
+        "start": 412,
+        "end": 437
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envBucket()::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envBucket()",
+      "target": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.build()",
+      "level": "inferred",
+      "span": {
+        "path": "Control.java",
+        "start": 744,
+        "end": 779
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envBucket()::(method_invocation).getService#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envBucket()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 744,
+        "end": 792
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envBucket()::StorageOptions.newBuilder#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envBucket()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 744,
+        "end": 771
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envBucket()::System.getenv#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envBucket()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 814,
+        "end": 842
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envBucket()::client.readAllBytes#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envBucket()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 794,
+        "end": 852
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envReceive()::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envReceive()",
+      "target": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.build()",
+      "level": "inferred",
+      "span": {
+        "path": "Control.java",
+        "start": 618,
+        "end": 683
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envReceive()::Subscriber.newBuilder#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envReceive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 618,
+        "end": 675
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envReceive()::System.getenv#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envReceive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 640,
+        "end": 665
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envReceive()::client.startAsync#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envReceive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 685,
+        "end": 704
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envSecret()::SecretManagerServiceClient.create#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envSecret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 892,
+        "end": 927
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envSecret()::System.getenv#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envSecret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 956,
+        "end": 984
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envSecret()::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envSecret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 929,
+        "end": 985
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envSend()::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envSend()",
+      "target": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.build()",
+      "level": "inferred",
+      "span": {
+        "path": "Control.java",
+        "start": 498,
+        "end": 555
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envSend()::Publisher.newBuilder#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envSend()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 498,
+        "end": 547
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envSend()::System.getenv#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envSend()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 519,
+        "end": 546
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.envSend()::client.publish#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.envSend()",
+      "target": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.publish(Object)",
+      "level": "inferred",
+      "span": {
+        "path": "Control.java",
+        "start": 557,
+        "end": 577
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.first()::client.publish#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.first()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 359,
+        "end": 379
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.first()::make#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.first()",
+      "target": "local/gcp-sdk-controls::Control.java::Control.make(String)",
+      "level": "exact",
+      "span": {
+        "path": "Control.java",
+        "start": 335,
+        "end": 357
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.guessed()::client.publish#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.guessed()",
+      "target": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.publish(Object)",
+      "level": "inferred",
+      "span": {
+        "path": "Control.java",
+        "start": 1162,
+        "end": 1182
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.guessed()::opaqueReceiver#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.guessed()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 1109,
+        "end": 1125
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.guessed()::unknown.makeClient#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.guessed()",
+      "target": "local/gcp-sdk-controls::Control.java::Control.makeClient()",
+      "level": "inferred",
+      "span": {
+        "path": "Control.java",
+        "start": 1140,
+        "end": 1160
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.injected(Publisher)::client.publish#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.injected(Publisher)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 1619,
+        "end": 1639
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.make(String)::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.make(String)",
+      "target": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.build()",
+      "level": "inferred",
+      "span": {
+        "path": "Control.java",
+        "start": 265,
+        "end": 299
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.make(String)::Publisher.newBuilder#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.make(String)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 265,
+        "end": 291
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.makeClient()::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.makeClient()",
+      "target": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.build()",
+      "level": "inferred",
+      "span": {
+        "path": "Control.java",
+        "start": 1025,
+        "end": 1070
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.makeClient()::Publisher.newBuilder#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.makeClient()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 1025,
+        "end": 1062
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.mixed(boolean,Publisher)::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.mixed(boolean,Publisher)",
+      "target": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.build()",
+      "level": "inferred",
+      "span": {
+        "path": "Control.java",
+        "start": 1258,
+        "end": 1306
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.mixed(boolean,Publisher)::Publisher.newBuilder#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.mixed(boolean,Publisher)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 1258,
+        "end": 1298
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.opaque(boolean,Publisher)::client.publish#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.opaque(boolean,Publisher)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 1412,
+        "end": 1432
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.opaque(boolean,Publisher)::mixed#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.opaque(boolean,Publisher)",
+      "target": "local/gcp-sdk-controls::Control.java::Control.mixed(boolean,Publisher)",
+      "level": "exact",
+      "span": {
+        "path": "Control.java",
+        "start": 1390,
+        "end": 1410
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.reassigned(Publisher)::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.reassigned(Publisher)",
+      "target": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.build()",
+      "level": "inferred",
+      "span": {
+        "path": "Control.java",
+        "start": 1490,
+        "end": 1537
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.reassigned(Publisher)::Publisher.newBuilder#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.reassigned(Publisher)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 1490,
+        "end": 1529
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.reassigned(Publisher)::client.publish#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.reassigned(Publisher)",
+      "target": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.publish(Object)",
+      "level": "inferred",
+      "span": {
+        "path": "Control.java",
+        "start": 1557,
+        "end": 1577
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.second()::client.publish#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.second()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Control.java",
+        "start": 440,
+        "end": 460
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Control.java::Control.second()::make#0",
+      "caller": "local/gcp-sdk-controls::Control.java::Control.second()",
+      "target": "local/gcp-sdk-controls::Control.java::Control.make(String)",
+      "level": "exact",
+      "span": {
+        "path": "Control.java",
+        "start": 416,
+        "end": 438
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.newBuilder(String)::Publisher#0",
+      "caller": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.newBuilder(String)",
+      "target": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher",
+      "level": "exact",
+      "span": {
+        "path": "Hidden.java",
+        "start": 139,
+        "end": 154
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Hidden.java::Hidden.hidden()::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-controls::Hidden.java::Hidden.hidden()",
+      "target": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.build()",
+      "level": "exact",
+      "span": {
+        "path": "Hidden.java",
+        "start": 257,
+        "end": 303
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Hidden.java::Hidden.hidden()::Publisher.newBuilder#0",
+      "caller": "local/gcp-sdk-controls::Hidden.java::Hidden.hidden()",
+      "target": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.newBuilder(String)",
+      "level": "exact",
+      "span": {
+        "path": "Hidden.java",
+        "start": 257,
+        "end": 295
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::Hidden.java::Hidden.hidden()::client.publish#0",
+      "caller": "local/gcp-sdk-controls::Hidden.java::Hidden.hidden()",
+      "target": "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.publish(Object)",
+      "level": "exact",
+      "span": {
+        "path": "Hidden.java",
+        "start": 305,
+        "end": 325
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::Factory.makeClient::context.TODO#0",
+      "caller": "local/gcp-sdk-controls::control.go::Factory.makeClient",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1300,
+        "end": 1314
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::Factory.makeClient::pubsub.NewClient#0",
+      "caller": "local/gcp-sdk-controls::control.go::Factory.makeClient",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1283,
+        "end": 1323
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envBucket::(call_expression).NewReader#0",
+      "caller": "local/gcp-sdk-controls::control.go::envBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 926,
+        "end": 1005
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envBucket::(call_expression).Object#0",
+      "caller": "local/gcp-sdk-controls::control.go::envBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 926,
+        "end": 979
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envBucket::client.Bucket#0",
+      "caller": "local/gcp-sdk-controls::control.go::envBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 926,
+        "end": 963
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envBucket::context.TODO#0",
+      "caller": "local/gcp-sdk-controls::control.go::envBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 909,
+        "end": 923
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envBucket::context.TODO#1",
+      "caller": "local/gcp-sdk-controls::control.go::envBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 990,
+        "end": 1004
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envBucket::os.Getenv#0",
+      "caller": "local/gcp-sdk-controls::control.go::envBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 940,
+        "end": 962
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envBucket::storage.NewClient#0",
+      "caller": "local/gcp-sdk-controls::control.go::envBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 891,
+        "end": 924
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envReceive::(call_expression).Receive#0",
+      "caller": "local/gcp-sdk-controls::control.go::envReceive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 785,
+        "end": 856
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envReceive::client.Subscriber#0",
+      "caller": "local/gcp-sdk-controls::control.go::envReceive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 785,
+        "end": 823
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envReceive::context.TODO#0",
+      "caller": "local/gcp-sdk-controls::control.go::envReceive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 760,
+        "end": 774
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envReceive::context.TODO#1",
+      "caller": "local/gcp-sdk-controls::control.go::envReceive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 832,
+        "end": 846
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envReceive::os.Getenv#0",
+      "caller": "local/gcp-sdk-controls::control.go::envReceive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 803,
+        "end": 822
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envReceive::pubsub.NewClient#0",
+      "caller": "local/gcp-sdk-controls::control.go::envReceive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 743,
+        "end": 783
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envSecret::client.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-controls::control.go::envSecret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1081,
+        "end": 1198
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envSecret::context.TODO#0",
+      "caller": "local/gcp-sdk-controls::control.go::envSecret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1064,
+        "end": 1078
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envSecret::context.TODO#1",
+      "caller": "local/gcp-sdk-controls::control.go::envSecret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1108,
+        "end": 1122
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envSecret::os.Getenv#0",
+      "caller": "local/gcp-sdk-controls::control.go::envSecret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1174,
+        "end": 1196
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envSecret::secretmanager.NewClient#0",
+      "caller": "local/gcp-sdk-controls::control.go::envSecret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1040,
+        "end": 1079
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envSend::(call_expression).Publish#0",
+      "caller": "local/gcp-sdk-controls::control.go::envSend",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 638,
+        "end": 707
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envSend::client.Publisher#0",
+      "caller": "local/gcp-sdk-controls::control.go::envSend",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 638,
+        "end": 677
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envSend::context.TODO#0",
+      "caller": "local/gcp-sdk-controls::control.go::envSend",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 613,
+        "end": 627
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envSend::context.TODO#1",
+      "caller": "local/gcp-sdk-controls::control.go::envSend",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 686,
+        "end": 700
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envSend::os.Getenv#0",
+      "caller": "local/gcp-sdk-controls::control.go::envSend",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 655,
+        "end": 676
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::envSend::pubsub.NewClient#0",
+      "caller": "local/gcp-sdk-controls::control.go::envSend",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 596,
+        "end": 636
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::first::client.Publish#0",
+      "caller": "local/gcp-sdk-controls::control.go::first",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 435,
+        "end": 471
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::first::context.TODO#0",
+      "caller": "local/gcp-sdk-controls::control.go::first",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 450,
+        "end": 464
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::first::makeTopic#0",
+      "caller": "local/gcp-sdk-controls::control.go::first",
+      "target": "local/gcp-sdk-controls::control.go::makeTopic",
+      "level": "exact",
+      "span": {
+        "path": "control.go",
+        "start": 408,
+        "end": 433
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::guessed::(call_expression).Publish#0",
+      "caller": "local/gcp-sdk-controls::control.go::guessed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1409,
+        "end": 1472
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::guessed::client.Publisher#0",
+      "caller": "local/gcp-sdk-controls::control.go::guessed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1409,
+        "end": 1442
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::guessed::context.TODO#0",
+      "caller": "local/gcp-sdk-controls::control.go::guessed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1451,
+        "end": 1465
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::guessed::unknown.makeClient#0",
+      "caller": "local/gcp-sdk-controls::control.go::guessed",
+      "target": "local/gcp-sdk-controls::control.go::Factory.makeClient",
+      "level": "inferred",
+      "span": {
+        "path": "control.go",
+        "start": 1387,
+        "end": 1407
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::hidden::(call_expression).Publish#0",
+      "caller": "local/gcp-sdk-controls::control.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 2059,
+        "end": 2128
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::hidden::client.Publisher#0",
+      "caller": "local/gcp-sdk-controls::control.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 2059,
+        "end": 2098
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::hidden::context.TODO#0",
+      "caller": "local/gcp-sdk-controls::control.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 2034,
+        "end": 2048
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::hidden::context.TODO#1",
+      "caller": "local/gcp-sdk-controls::control.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 2107,
+        "end": 2121
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::hidden::pubsub.NewClient#0",
+      "caller": "local/gcp-sdk-controls::control.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 2017,
+        "end": 2057
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::injected::(call_expression).Publish#0",
+      "caller": "local/gcp-sdk-controls::control.go::injected",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 2170,
+        "end": 2238
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::injected::client.Publisher#0",
+      "caller": "local/gcp-sdk-controls::control.go::injected",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 2170,
+        "end": 2208
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::injected::context.TODO#0",
+      "caller": "local/gcp-sdk-controls::control.go::injected",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 2217,
+        "end": 2231
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::makeTopic::client.Publisher#0",
+      "caller": "local/gcp-sdk-controls::control.go::makeTopic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 358,
+        "end": 380
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::makeTopic::context.TODO#0",
+      "caller": "local/gcp-sdk-controls::control.go::makeTopic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 326,
+        "end": 340
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::makeTopic::pubsub.NewClient#0",
+      "caller": "local/gcp-sdk-controls::control.go::makeTopic",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 309,
+        "end": 349
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::mixed::context.TODO#0",
+      "caller": "local/gcp-sdk-controls::control.go::mixed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1578,
+        "end": 1592
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::mixed::pubsub.NewClient#0",
+      "caller": "local/gcp-sdk-controls::control.go::mixed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1561,
+        "end": 1601
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::opaque::(call_expression).Publish#0",
+      "caller": "local/gcp-sdk-controls::control.go::opaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1718,
+        "end": 1784
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::opaque::client.Publisher#0",
+      "caller": "local/gcp-sdk-controls::control.go::opaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1718,
+        "end": 1754
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::opaque::context.TODO#0",
+      "caller": "local/gcp-sdk-controls::control.go::opaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1763,
+        "end": 1777
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::opaque::mixed#0",
+      "caller": "local/gcp-sdk-controls::control.go::opaque",
+      "target": "local/gcp-sdk-controls::control.go::mixed",
+      "level": "exact",
+      "span": {
+        "path": "control.go",
+        "start": 1696,
+        "end": 1716
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::reassigned::(call_expression).Publish#0",
+      "caller": "local/gcp-sdk-controls::control.go::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1902,
+        "end": 1967
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::reassigned::client.Publisher#0",
+      "caller": "local/gcp-sdk-controls::control.go::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1902,
+        "end": 1937
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::reassigned::context.TODO#0",
+      "caller": "local/gcp-sdk-controls::control.go::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1859,
+        "end": 1873
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::reassigned::context.TODO#1",
+      "caller": "local/gcp-sdk-controls::control.go::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1946,
+        "end": 1960
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::reassigned::pubsub.NewClient#0",
+      "caller": "local/gcp-sdk-controls::control.go::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 1842,
+        "end": 1882
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::second::client.Publish#0",
+      "caller": "local/gcp-sdk-controls::control.go::second",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 527,
+        "end": 563
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::second::context.TODO#0",
+      "caller": "local/gcp-sdk-controls::control.go::second",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.go",
+        "start": 542,
+        "end": 556
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.go::second::makeTopic#0",
+      "caller": "local/gcp-sdk-controls::control.go::second",
+      "target": "local/gcp-sdk-controls::control.go::makeTopic",
+      "level": "exact",
+      "span": {
+        "path": "control.go",
+        "start": 500,
+        "end": 525
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::Factory.makeClient::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.js::Factory.makeClient",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 950,
+        "end": 962
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.js",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 424,
+        "end": 436
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-controls::control.js",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 483,
+        "end": 515
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::Storage#0",
+      "caller": "local/gcp-sdk-controls::control.js",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 452,
+        "end": 465
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::caught::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.js::caught",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1801,
+        "end": 1855
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::caught::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.js::caught",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1787,
+        "end": 1799
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::caught::client.topic#0",
+      "caller": "local/gcp-sdk-controls::control.js::caught",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1801,
+        "end": 1832
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::caught::run#0",
+      "caller": "local/gcp-sdk-controls::control.js::caught",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1746,
+        "end": 1751
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::destructured::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.js::destructured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1649,
+        "end": 1709
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::destructured::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.js::destructured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1635,
+        "end": 1647
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::destructured::client.topic#0",
+      "caller": "local/gcp-sdk-controls::control.js::destructured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1649,
+        "end": 1686
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::envBucket::(call_expression).download#0",
+      "caller": "local/gcp-sdk-controls::control.js::envBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 727,
+        "end": 787
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::envBucket::(call_expression).file#0",
+      "caller": "local/gcp-sdk-controls::control.js::envBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 727,
+        "end": 776
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::envBucket::store.bucket#0",
+      "caller": "local/gcp-sdk-controls::control.js::envBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 727,
+        "end": 762
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::envReceive::(call_expression).on#0",
+      "caller": "local/gcp-sdk-controls::control.js::envReceive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 634,
+        "end": 693
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::envReceive::bus.subscription#0",
+      "caller": "local/gcp-sdk-controls::control.js::envReceive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 634,
+        "end": 670
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::envSecret::secrets.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-controls::control.js::envSecret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 821,
+        "end": 879
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::envSend::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.js::envSend",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 545,
+        "end": 599
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::envSend::bus.topic#0",
+      "caller": "local/gcp-sdk-controls::control.js::envSend",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 545,
+        "end": 576
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::first::a.publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.js::first",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 329,
+        "end": 353
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::firstStructured::structuredA.publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.js::firstStructured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 2287,
+        "end": 2321
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::guessed::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.js::guessed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1040,
+        "end": 1092
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::guessed::client.topic#0",
+      "caller": "local/gcp-sdk-controls::control.js::guessed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1040,
+        "end": 1069
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::guessed::unknown.makeClient#0",
+      "caller": "local/gcp-sdk-controls::control.js::guessed",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "local/gcp-sdk-controls::control.js::Factory.makeClient",
+        "local/gcp-sdk-controls::control.ts::Factory.makeClient"
+      ],
+      "span": {
+        "path": "control.js",
+        "start": 1018,
+        "end": 1038
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::inline::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.js::inline",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 2006,
+        "end": 2060
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::inline::(new_expression).topic#0",
+      "caller": "local/gcp-sdk-controls::control.js::inline",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 2006,
+        "end": 2037
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::inline::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.js::inline",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 2006,
+        "end": 2018
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::make#0",
+      "caller": "local/gcp-sdk-controls::control.js",
+      "target": "local/gcp-sdk-controls::control.js::make",
+      "level": "exact",
+      "span": {
+        "path": "control.js",
+        "start": 249,
+        "end": 269
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::make#1",
+      "caller": "local/gcp-sdk-controls::control.js",
+      "target": "local/gcp-sdk-controls::control.js::make",
+      "level": "exact",
+      "span": {
+        "path": "control.js",
+        "start": 281,
+        "end": 301
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::make::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.js::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 199,
+        "end": 211
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::make::bus.topic#0",
+      "caller": "local/gcp-sdk-controls::control.js::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 220,
+        "end": 235
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::mixed::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.js::mixed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1144,
+        "end": 1156
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::opaque::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.js::opaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1252,
+        "end": 1307
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::opaque::client.topic#0",
+      "caller": "local/gcp-sdk-controls::control.js::opaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1252,
+        "end": 1284
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::opaque::mixed#0",
+      "caller": "local/gcp-sdk-controls::control.js::opaque",
+      "target": "local/gcp-sdk-controls::control.js::mixed",
+      "level": "exact",
+      "span": {
+        "path": "control.js",
+        "start": 1230,
+        "end": 1250
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::parameter::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.js::parameter",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1517,
+        "end": 1575
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::parameter::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.js::parameter",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1503,
+        "end": 1515
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::parameter::client.topic#0",
+      "caller": "local/gcp-sdk-controls::control.js::parameter",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1517,
+        "end": 1552
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::reassigned::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.js::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1394,
+        "end": 1448
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::reassigned::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.js::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1362,
+        "end": 1374
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::reassigned::client.topic#0",
+      "caller": "local/gcp-sdk-controls::control.js::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1394,
+        "end": 1425
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::second::b.publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.js::second",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 384,
+        "end": 408
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::secondStructured::structuredB.publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.js::secondStructured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 2362,
+        "end": 2396
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::structured#0",
+      "caller": "local/gcp-sdk-controls::control.js",
+      "target": "local/gcp-sdk-controls::control.js::structured",
+      "level": "exact",
+      "span": {
+        "path": "control.js",
+        "start": 2151,
+        "end": 2189
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::structured#1",
+      "caller": "local/gcp-sdk-controls::control.js",
+      "target": "local/gcp-sdk-controls::control.js::structured",
+      "level": "exact",
+      "span": {
+        "path": "control.js",
+        "start": 2211,
+        "end": 2249
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::structured::(new_expression).topic#0",
+      "caller": "local/gcp-sdk-controls::control.js::structured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 2102,
+        "end": 2127
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::structured::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.js::structured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 2102,
+        "end": 2114
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::withoutNew::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.js::withoutNew",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1916,
+        "end": 1975
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::withoutNew::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.js::withoutNew",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1906,
+        "end": 1914
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::withoutNew::value.topic#0",
+      "caller": "local/gcp-sdk-controls::control.js::withoutNew",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.js",
+        "start": 1916,
+        "end": 1952
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::Factory.make_client::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-controls::control.py::Factory.make_client",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 947,
+        "end": 968
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-controls::control.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 370,
+        "end": 391
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::bus.SubscriberClient#0",
+      "caller": "local/gcp-sdk-controls::control.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 405,
+        "end": 427
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::comprehension::(call).publish#0",
+      "caller": "local/gcp-sdk-controls::control.py::comprehension",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1873,
+        "end": 1935
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::comprehension::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-controls::control.py::comprehension",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1873,
+        "end": 1894
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::env_bucket::(call).blob#0",
+      "caller": "local/gcp-sdk-controls::control.py::env_bucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 681,
+        "end": 738
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::env_bucket::(call).download_as_bytes#0",
+      "caller": "local/gcp-sdk-controls::control.py::env_bucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 681,
+        "end": 758
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::env_bucket::storage.bucket#0",
+      "caller": "local/gcp-sdk-controls::control.py::env_bucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 681,
+        "end": 724
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::env_receive::subscriber.subscribe#0",
+      "caller": "local/gcp-sdk-controls::control.py::env_receive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 594,
+        "end": 658
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::env_secret::secrets.access_secret_version#0",
+      "caller": "local/gcp-sdk-controls::control.py::env_secret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 781,
+        "end": 857
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::env_send::publisher.publish#0",
+      "caller": "local/gcp-sdk-controls::control.py::env_send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 519,
+        "end": 570
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::except_name::(call).publish#0",
+      "caller": "local/gcp-sdk-controls::control.py::except_name",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1667,
+        "end": 1722
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::except_name::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-controls::control.py::except_name",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1667,
+        "end": 1688
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::except_name::run#0",
+      "caller": "local/gcp-sdk-controls::control.py::except_name",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1624,
+        "end": 1629
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::first::a.upload_from_string#0",
+      "caller": "local/gcp-sdk-controls::control.py::first",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 286,
+        "end": 312
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::guessed::client.publish#0",
+      "caller": "local/gcp-sdk-controls::control.py::guessed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1030,
+        "end": 1067
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::guessed::unknown.make_client#0",
+      "caller": "local/gcp-sdk-controls::control.py::guessed",
+      "target": "local/gcp-sdk-controls::control.py::Factory.make_client",
+      "level": "inferred",
+      "span": {
+        "path": "control.py",
+        "start": 1004,
+        "end": 1025
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::imported::(call).publish#0",
+      "caller": "local/gcp-sdk-controls::control.py::imported",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 2227,
+        "end": 2282
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::imported::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-controls::control.py::imported",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 2227,
+        "end": 2248
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::lam::(call).publish#0",
+      "caller": "local/gcp-sdk-controls::control.py::lam",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1990,
+        "end": 2045
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::lam::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-controls::control.py::lam",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1990,
+        "end": 2011
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::make#0",
+      "caller": "local/gcp-sdk-controls::control.py",
+      "target": "local/gcp-sdk-controls::control.py::make",
+      "level": "exact",
+      "span": {
+        "path": "control.py",
+        "start": 215,
+        "end": 239
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::make#1",
+      "caller": "local/gcp-sdk-controls::control.py",
+      "target": "local/gcp-sdk-controls::control.py::make",
+      "level": "exact",
+      "span": {
+        "path": "control.py",
+        "start": 244,
+        "end": 268
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::make::(call).blob#0",
+      "caller": "local/gcp-sdk-controls::control.py::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 171,
+        "end": 210
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::make::(call).bucket#0",
+      "caller": "local/gcp-sdk-controls::control.py::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 171,
+        "end": 198
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::make::store.Client#0",
+      "caller": "local/gcp-sdk-controls::control.py::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 171,
+        "end": 185
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::matched::(call).publish#0",
+      "caller": "local/gcp-sdk-controls::control.py::matched",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 2129,
+        "end": 2183
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::matched::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-controls::control.py::matched",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 2129,
+        "end": 2150
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::mixed::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-controls::control.py::mixed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1122,
+        "end": 1143
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::opaque::client.publish#0",
+      "caller": "local/gcp-sdk-controls::control.py::opaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1228,
+        "end": 1268
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::opaque::mixed#0",
+      "caller": "local/gcp-sdk-controls::control.py::opaque",
+      "target": "local/gcp-sdk-controls::control.py::mixed",
+      "level": "exact",
+      "span": {
+        "path": "control.py",
+        "start": 1203,
+        "end": 1223
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::parameter::(call).publish#0",
+      "caller": "local/gcp-sdk-controls::control.py::parameter",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1418,
+        "end": 1476
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::parameter::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-controls::control.py::parameter",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1418,
+        "end": 1439
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::reassigned::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-controls::control.py::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1307,
+        "end": 1328
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::reassigned::client.publish#0",
+      "caller": "local/gcp-sdk-controls::control.py::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1354,
+        "end": 1393
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::second::b.upload_from_string#0",
+      "caller": "local/gcp-sdk-controls::control.py::second",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 331,
+        "end": 357
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::secret.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-controls::control.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 463,
+        "end": 498
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::store.Client#0",
+      "caller": "local/gcp-sdk-controls::control.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 438,
+        "end": 452
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::walrus::(call).publish#0",
+      "caller": "local/gcp-sdk-controls::control.py::walrus",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1777,
+        "end": 1832
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::walrus::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-controls::control.py::walrus",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1777,
+        "end": 1798
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::with_name::(call).publish#0",
+      "caller": "local/gcp-sdk-controls::control.py::with_name",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1534,
+        "end": 1587
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.py::with_name::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-controls::control.py::with_name",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.py",
+        "start": 1534,
+        "end": 1555
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::Factory.makeClient::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.ts::Factory.makeClient",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 950,
+        "end": 962
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 424,
+        "end": 436
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-controls::control.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 483,
+        "end": 515
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::Storage#0",
+      "caller": "local/gcp-sdk-controls::control.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 452,
+        "end": 465
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::caught::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.ts::caught",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1801,
+        "end": 1855
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::caught::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.ts::caught",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1787,
+        "end": 1799
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::caught::client.topic#0",
+      "caller": "local/gcp-sdk-controls::control.ts::caught",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1801,
+        "end": 1832
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::caught::run#0",
+      "caller": "local/gcp-sdk-controls::control.ts::caught",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1746,
+        "end": 1751
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::destructured::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.ts::destructured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1649,
+        "end": 1709
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::destructured::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.ts::destructured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1635,
+        "end": 1647
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::destructured::client.topic#0",
+      "caller": "local/gcp-sdk-controls::control.ts::destructured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1649,
+        "end": 1686
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::envBucket::(call_expression).download#0",
+      "caller": "local/gcp-sdk-controls::control.ts::envBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 727,
+        "end": 787
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::envBucket::(call_expression).file#0",
+      "caller": "local/gcp-sdk-controls::control.ts::envBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 727,
+        "end": 776
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::envBucket::store.bucket#0",
+      "caller": "local/gcp-sdk-controls::control.ts::envBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 727,
+        "end": 762
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::envReceive::(call_expression).on#0",
+      "caller": "local/gcp-sdk-controls::control.ts::envReceive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 634,
+        "end": 693
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::envReceive::bus.subscription#0",
+      "caller": "local/gcp-sdk-controls::control.ts::envReceive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 634,
+        "end": 670
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::envSecret::secrets.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-controls::control.ts::envSecret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 821,
+        "end": 879
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::envSend::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.ts::envSend",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 545,
+        "end": 599
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::envSend::bus.topic#0",
+      "caller": "local/gcp-sdk-controls::control.ts::envSend",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 545,
+        "end": 576
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::first::a.publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.ts::first",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 329,
+        "end": 353
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::firstStructured::structuredA.publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.ts::firstStructured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 2287,
+        "end": 2321
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::guessed::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.ts::guessed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1040,
+        "end": 1092
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::guessed::client.topic#0",
+      "caller": "local/gcp-sdk-controls::control.ts::guessed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1040,
+        "end": 1069
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::guessed::unknown.makeClient#0",
+      "caller": "local/gcp-sdk-controls::control.ts::guessed",
+      "target": null,
+      "level": "ambiguous",
+      "candidates": [
+        "local/gcp-sdk-controls::control.js::Factory.makeClient",
+        "local/gcp-sdk-controls::control.ts::Factory.makeClient"
+      ],
+      "span": {
+        "path": "control.ts",
+        "start": 1018,
+        "end": 1038
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::inline::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.ts::inline",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 2006,
+        "end": 2060
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::inline::(new_expression).topic#0",
+      "caller": "local/gcp-sdk-controls::control.ts::inline",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 2006,
+        "end": 2037
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::inline::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.ts::inline",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 2006,
+        "end": 2018
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::make#0",
+      "caller": "local/gcp-sdk-controls::control.ts",
+      "target": "local/gcp-sdk-controls::control.ts::make",
+      "level": "exact",
+      "span": {
+        "path": "control.ts",
+        "start": 249,
+        "end": 269
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::make#1",
+      "caller": "local/gcp-sdk-controls::control.ts",
+      "target": "local/gcp-sdk-controls::control.ts::make",
+      "level": "exact",
+      "span": {
+        "path": "control.ts",
+        "start": 281,
+        "end": 301
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::make::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.ts::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 199,
+        "end": 211
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::make::bus.topic#0",
+      "caller": "local/gcp-sdk-controls::control.ts::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 220,
+        "end": 235
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::mixed::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.ts::mixed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1144,
+        "end": 1156
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::opaque::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.ts::opaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1252,
+        "end": 1307
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::opaque::client.topic#0",
+      "caller": "local/gcp-sdk-controls::control.ts::opaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1252,
+        "end": 1284
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::opaque::mixed#0",
+      "caller": "local/gcp-sdk-controls::control.ts::opaque",
+      "target": "local/gcp-sdk-controls::control.ts::mixed",
+      "level": "exact",
+      "span": {
+        "path": "control.ts",
+        "start": 1230,
+        "end": 1250
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::parameter::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.ts::parameter",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1517,
+        "end": 1575
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::parameter::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.ts::parameter",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1503,
+        "end": 1515
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::parameter::client.topic#0",
+      "caller": "local/gcp-sdk-controls::control.ts::parameter",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1517,
+        "end": 1552
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::reassigned::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.ts::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1394,
+        "end": 1448
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::reassigned::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.ts::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1362,
+        "end": 1374
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::reassigned::client.topic#0",
+      "caller": "local/gcp-sdk-controls::control.ts::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1394,
+        "end": 1425
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::second::b.publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.ts::second",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 384,
+        "end": 408
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::secondStructured::structuredB.publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.ts::secondStructured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 2362,
+        "end": 2396
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::structured#0",
+      "caller": "local/gcp-sdk-controls::control.ts",
+      "target": "local/gcp-sdk-controls::control.ts::structured",
+      "level": "exact",
+      "span": {
+        "path": "control.ts",
+        "start": 2151,
+        "end": 2189
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::structured#1",
+      "caller": "local/gcp-sdk-controls::control.ts",
+      "target": "local/gcp-sdk-controls::control.ts::structured",
+      "level": "exact",
+      "span": {
+        "path": "control.ts",
+        "start": 2211,
+        "end": 2249
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::structured::(new_expression).topic#0",
+      "caller": "local/gcp-sdk-controls::control.ts::structured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 2102,
+        "end": 2127
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::structured::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.ts::structured",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 2102,
+        "end": 2114
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::withoutNew::(call_expression).publishMessage#0",
+      "caller": "local/gcp-sdk-controls::control.ts::withoutNew",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1916,
+        "end": 1975
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::withoutNew::PubSub#0",
+      "caller": "local/gcp-sdk-controls::control.ts::withoutNew",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1906,
+        "end": 1914
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::withoutNew::value.topic#0",
+      "caller": "local/gcp-sdk-controls::control.ts::withoutNew",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "control.ts",
+        "start": 1916,
+        "end": 1952
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::global.py::outer.inner::(call).publish#0",
+      "caller": "local/gcp-sdk-controls::global.py::outer.inner",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "global.py",
+        "start": 297,
+        "end": 356
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::global.py::outer.inner::local.PublisherClient#0",
+      "caller": "local/gcp-sdk-controls::global.py::outer.inner",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "global.py",
+        "start": 297,
+        "end": 320
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::global.py::rebound::(call).publish#0",
+      "caller": "local/gcp-sdk-controls::global.py::rebound",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "global.py",
+        "start": 101,
+        "end": 156
+      }
+    },
+    {
+      "id": "local/gcp-sdk-controls::global.py::rebound::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-controls::global.py::rebound",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "global.py",
+        "start": 101,
+        "end": 122
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-controls::Control.cs::Control.EnvSend()::client.PublishAsync#0",
+      "via": "env:TOPIC_CSHARP"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-controls::Control.java::Control.envSend()::client.publish#0",
+      "via": "env:TOPIC_JAVA"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-controls::control.go::envSend::(call_expression).Publish#0",
+      "via": "env:TOPIC_GO"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-controls::control.js::envSend::(call_expression).publishMessage#0",
+      "via": "env:TOPIC_JS"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-controls::control.py::env_send::publisher.publish#0",
+      "via": "env:TOPIC_PYTHON"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-controls::control.ts::envSend::(call_expression).publishMessage#0",
+      "via": "env:TOPIC_TS"
+    },
+    {
+      "contract": "channel::pubsub::factory-csharp-a",
+      "site": "local/gcp-sdk-controls::Control.cs::Control.First()::client.PublishAsync#0"
+    },
+    {
+      "contract": "channel::pubsub::factory-csharp-b",
+      "site": "local/gcp-sdk-controls::Control.cs::Control.Second()::client.PublishAsync#0"
+    },
+    {
+      "contract": "channel::pubsub::factory-go-a",
+      "site": "local/gcp-sdk-controls::control.go::first::client.Publish#0"
+    },
+    {
+      "contract": "channel::pubsub::factory-go-b",
+      "site": "local/gcp-sdk-controls::control.go::second::client.Publish#0"
+    },
+    {
+      "contract": "channel::pubsub::factory-java-a",
+      "site": "local/gcp-sdk-controls::Control.java::Control.first()::client.publish#0"
+    },
+    {
+      "contract": "channel::pubsub::factory-java-b",
+      "site": "local/gcp-sdk-controls::Control.java::Control.second()::client.publish#0"
+    },
+    {
+      "contract": "channel::pubsub::factory-js-a",
+      "site": "local/gcp-sdk-controls::control.js::first::a.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::factory-js-b",
+      "site": "local/gcp-sdk-controls::control.js::second::b.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::factory-ts-a",
+      "site": "local/gcp-sdk-controls::control.ts::first::a.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::factory-ts-b",
+      "site": "local/gcp-sdk-controls::control.ts::second::b.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::inline-js",
+      "site": "local/gcp-sdk-controls::control.js::inline::(call_expression).publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::inline-ts",
+      "site": "local/gcp-sdk-controls::control.ts::inline::(call_expression).publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::structured-js-a",
+      "site": "local/gcp-sdk-controls::control.js::firstStructured::structuredA.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::structured-js-b",
+      "site": "local/gcp-sdk-controls::control.js::secondStructured::structuredB.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::structured-ts-a",
+      "site": "local/gcp-sdk-controls::control.ts::firstStructured::structuredA.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::structured-ts-b",
+      "site": "local/gcp-sdk-controls::control.ts::secondStructured::structuredB.publishMessage#0"
+    },
+    {
+      "contract": "resource::gcs::factory-python-a",
+      "site": "local/gcp-sdk-controls::control.py::first::a.upload_from_string#0"
+    },
+    {
+      "contract": "resource::gcs::factory-python-b",
+      "site": "local/gcp-sdk-controls::control.py::second::b.upload_from_string#0"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::gcs",
+      "site": "local/gcp-sdk-controls::Control.cs::Control.EnvBucket()",
+      "via": "env:BUCKET_CSHARP"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-controls::Control.cs::Control.EnvReceive()",
+      "via": "env:SUB_CSHARP"
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-controls::Control.cs::Control.EnvSecret()",
+      "via": "env:SECRET_CSHARP"
+    },
+    {
+      "contract": "resource::gcs",
+      "site": "local/gcp-sdk-controls::Control.java::Control.envBucket()",
+      "via": "env:BUCKET_JAVA"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-controls::Control.java::Control.envReceive()",
+      "via": "env:SUB_JAVA"
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-controls::Control.java::Control.envSecret()",
+      "via": "env:SECRET_JAVA"
+    },
+    {
+      "contract": "resource::gcs",
+      "site": "local/gcp-sdk-controls::control.go::envBucket",
+      "via": "env:BUCKET_GO"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-controls::control.go::envReceive",
+      "via": "env:SUB_GO"
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-controls::control.go::envSecret",
+      "via": "env:SECRET_GO"
+    },
+    {
+      "contract": "resource::gcs",
+      "site": "local/gcp-sdk-controls::control.js::envBucket",
+      "via": "env:BUCKET_JS"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-controls::control.js::envReceive",
+      "via": "env:SUB_JS"
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-controls::control.js::envSecret",
+      "via": "env:SECRET_JS"
+    },
+    {
+      "contract": "resource::gcs",
+      "site": "local/gcp-sdk-controls::control.py::env_bucket",
+      "via": "env:BUCKET_PYTHON"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-controls::control.py::env_receive",
+      "via": "env:SUB_PYTHON"
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-controls::control.py::env_secret",
+      "via": "env:SECRET_PYTHON"
+    },
+    {
+      "contract": "resource::gcs",
+      "site": "local/gcp-sdk-controls::control.ts::envBucket",
+      "via": "env:BUCKET_TS"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-controls::control.ts::envReceive",
+      "via": "env:SUB_TS"
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-controls::control.ts::envSecret",
+      "via": "env:SECRET_TS"
+    }
+  ],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "local/gcp-sdk-controls::Control.cs::Control.First()",
+        "local/gcp-sdk-controls::Control.cs::Control.Make(string)",
+        "local/gcp-sdk-controls::Control.cs::Control.Second()"
+      ]
+    },
+    {
+      "name": ".#10",
+      "members": [
+        "local/gcp-sdk-controls::control.go::mixed",
+        "local/gcp-sdk-controls::control.go::opaque"
+      ]
+    },
+    {
+      "name": ".#11",
+      "members": [
+        "local/gcp-sdk-controls::control.js::make"
+      ]
+    },
+    {
+      "name": ".#12",
+      "members": [
+        "local/gcp-sdk-controls::control.js::mixed",
+        "local/gcp-sdk-controls::control.js::opaque"
+      ]
+    },
+    {
+      "name": ".#13",
+      "members": [
+        "local/gcp-sdk-controls::control.js::structured"
+      ]
+    },
+    {
+      "name": ".#14",
+      "members": [
+        "local/gcp-sdk-controls::control.py::Factory.make_client",
+        "local/gcp-sdk-controls::control.py::guessed"
+      ]
+    },
+    {
+      "name": ".#15",
+      "members": [
+        "local/gcp-sdk-controls::control.py::make"
+      ]
+    },
+    {
+      "name": ".#16",
+      "members": [
+        "local/gcp-sdk-controls::control.py::mixed",
+        "local/gcp-sdk-controls::control.py::opaque"
+      ]
+    },
+    {
+      "name": ".#17",
+      "members": [
+        "local/gcp-sdk-controls::control.ts::make"
+      ]
+    },
+    {
+      "name": ".#18",
+      "members": [
+        "local/gcp-sdk-controls::control.ts::mixed",
+        "local/gcp-sdk-controls::control.ts::opaque"
+      ]
+    },
+    {
+      "name": ".#19",
+      "members": [
+        "local/gcp-sdk-controls::control.ts::structured"
+      ]
+    },
+    {
+      "name": ".#2",
+      "members": [
+        "local/gcp-sdk-controls::Control.cs::Control.Guessed(object)",
+        "local/gcp-sdk-controls::Control.cs::Control.MakeClient()"
+      ]
+    },
+    {
+      "name": ".#3",
+      "members": [
+        "local/gcp-sdk-controls::Control.cs::Control.Mixed(bool,PublisherClient)",
+        "local/gcp-sdk-controls::Control.cs::Control.Opaque(bool,PublisherClient)"
+      ]
+    },
+    {
+      "name": ".#4",
+      "members": [
+        "local/gcp-sdk-controls::Control.java::Control.envBucket()",
+        "local/gcp-sdk-controls::Control.java::Control.envReceive()",
+        "local/gcp-sdk-controls::Control.java::Control.envSend()",
+        "local/gcp-sdk-controls::Control.java::Control.guessed()",
+        "local/gcp-sdk-controls::Control.java::Control.makeClient()",
+        "local/gcp-sdk-controls::Control.java::Control.reassigned(Publisher)",
+        "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.build()",
+        "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.publish(Object)"
+      ]
+    },
+    {
+      "name": ".#5",
+      "members": [
+        "local/gcp-sdk-controls::Control.java::Control.first()",
+        "local/gcp-sdk-controls::Control.java::Control.make(String)",
+        "local/gcp-sdk-controls::Control.java::Control.second()"
+      ]
+    },
+    {
+      "name": ".#6",
+      "members": [
+        "local/gcp-sdk-controls::Control.java::Control.mixed(boolean,Publisher)",
+        "local/gcp-sdk-controls::Control.java::Control.opaque(boolean,Publisher)"
+      ]
+    },
+    {
+      "name": ".#7",
+      "members": [
+        "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher",
+        "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.newBuilder(String)",
+        "local/gcp-sdk-controls::Hidden.java::Hidden.hidden()"
+      ]
+    },
+    {
+      "name": ".#8",
+      "members": [
+        "local/gcp-sdk-controls::control.go::Factory.makeClient",
+        "local/gcp-sdk-controls::control.go::guessed"
+      ]
+    },
+    {
+      "name": ".#9",
+      "members": [
+        "local/gcp-sdk-controls::control.go::first",
+        "local/gcp-sdk-controls::control.go::makeTopic",
+        "local/gcp-sdk-controls::control.go::second"
+      ]
+    }
+  ],
+  "links": []
+}
