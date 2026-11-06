@@ -280,6 +280,8 @@ a `fits` line and one line per node, with what to pass for it. Declared resource
 node add the same `provides`, `consumes`, `reader:` and `writer:` lines as a declared key.
 Workload context also lists environment names, their targets and available checked-in values.
 Secret targets are marked `redacted`; absent, secret or unresolved values print `unresolved`.
+A decided physical-name pattern adds `resolved names:` with
+`<contract> [decided: <reason>]` for each selected name.
 
 **Nothing.** A `no symbol` or `no contract` line.
 

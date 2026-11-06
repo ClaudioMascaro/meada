@@ -1,0 +1,3 @@
+example.com/pattern/infra main.tf:2 aws_s3_bucket.several
+  provisions resource::s3::archive-prod [decided: decided by human] example.com/pattern/app (repository-level)
+chain: decided · 1 hops · 2 repos · 55 tokens

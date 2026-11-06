@@ -512,10 +512,39 @@ pub trait ContractKind {
         true
     }
 
+    /// Whether an ambiguous link belongs to a consumer item, rather than a kind-owned
+    /// source item (a patterned image builder, for example).
+    fn consumer_item(&self, _link: &Link, _exports: &[Export]) -> bool {
+        self.decidable()
+    }
+
+    /// Decisions for source items that the kind replays itself.
+    fn owns_decision(&self, _decision: &crate::decisions::Decision) -> bool {
+        false
+    }
+
+    fn decision_items(&self, _exports: &[Export]) -> Vec<(crate::items::OpenItem, bool)> {
+        Vec::new()
+    }
+
+    fn decision_reports(
+        &self,
+        _workspace: &crate::workspace::Workspace,
+        _exports: &[Export],
+    ) -> Vec<crate::decisions::Evaluation> {
+        Vec::new()
+    }
+
     /// Whether `provider` serves `contract`, aliases included (HTTP: a gateway path, any
     /// method).
     fn serves(&self, provider: &Provider, contract: &str) -> bool {
         provider.contract == contract
+    }
+
+    /// Whether this provider is a current candidate of the link, including query-local
+    /// selections. The default keeps the kind's ordinary alias matching.
+    fn link_candidate(&self, provider: &Provider, link: &Link, _exports: &[Export]) -> bool {
+        provider.site == link.provider && serves(provider, &link.contract)
     }
 
     /// Whether `provider` is a candidate for `consumer`, which has no contract.
@@ -658,6 +687,20 @@ pub fn serves(provider: &Provider, contract: &str) -> bool {
     kind_of(contract).map_or(provider.contract == contract, |k| {
         k.serves(provider, contract)
     })
+}
+
+/// Whether an ambiguous link belongs to a consumer item under its kind's current rules.
+pub(crate) fn consumer_item(link: &Link, exports: &[Export]) -> bool {
+    link.level == Level::Ambiguous
+        && kind_of(&link.contract).is_none_or(|kind| kind.consumer_item(link, exports))
+}
+
+/// Whether this provider remains a candidate of the link in the current query.
+pub(crate) fn link_candidate(provider: &Provider, link: &Link, exports: &[Export]) -> bool {
+    kind_of(&link.contract).map_or(
+        provider.site == link.provider && provider.contract == link.contract,
+        |kind| kind.link_candidate(provider, link, exports),
+    )
 }
 
 /// Which entry point kind a `role` side of `contract` makes, by the rule of its kind.

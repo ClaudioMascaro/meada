@@ -18,6 +18,11 @@ All notable changes to Meada are recorded here. The format follows
   inferred; route context includes the receiver, trace walks both ways, and export and
   scope-aware orphan reports carry the kind. Helm values are not alert emitters. Included in
   the minor development release of meada and meada-core 1.4.0 (#672).
+- Anchored unresolved names across channel, resource and image contracts (#674): only
+  literal counterparts with sufficient anchor evidence and whole-segment wildcards link.
+  Several names remain ambiguous open items; human or optional decider choices replay through
+  `meada.decisions.toml`, including provisioning links and stale-choice reporting. Release
+  level: minor, included in meada and meada-core 1.4.0.
 
 - Constructor-backed AWS SDK sides in Java 2.x, Go v2 and .NET: SQS, SNS, EventBridge,
   Kinesis, S3, DynamoDB, SSM Parameter Store and Secrets Manager. Literal names and ARNs join

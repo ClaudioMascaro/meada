@@ -1,0 +1,16 @@
+example.com/pattern/infra main.tf:2-2 aws_s3_bucket.several
+type: aws_s3_bucket
+name: "archive-*" (pattern)
+root: .
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/pattern/infra main.tf:2 resource.aws_s3_bucket.several.bucket = "archive-${terraform.workspace}"
+resolved names:
+resource::s3::archive-prod [decided: decided by human]
+resource::s3::archive-*
+  example.com/pattern/infra provisioner main.tf:2 aws_s3_bucket.several (root .)
+resource::s3::archive-prod
+  example.com/pattern/app reader (repository-level)
+  example.com/pattern/infra provisioner main.tf:2 aws_s3_bucket.several (root .)

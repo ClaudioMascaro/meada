@@ -5,7 +5,7 @@
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
-use crate::contract::{self, Level, Link, kind_of};
+use crate::contract::{self, Link, kind_of};
 use crate::index::{Consumer, Export, Provider};
 use crate::render::{Files, callee};
 use crate::workspace::Repository;
@@ -34,7 +34,7 @@ impl ItemKind {
 }
 
 /// A provider a decision may pick for an open item.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Candidate {
     /// The identity of the repository that holds the provider.
     pub repository: String,
@@ -42,6 +42,15 @@ pub struct Candidate {
     pub contract: String,
     /// The provider's site, such as `example.com/web::app/api/health/route.ts::GET`.
     pub site: String,
+}
+
+/// Query-local candidate names prepared by a kind before linking its sides.
+#[derive(Default)]
+pub(crate) struct NameCandidates {
+    pub candidates: Vec<Candidate>,
+    pub distinct: usize,
+    /// The chosen literal name and its decision's position in the repository input.
+    pub selected: Option<(String, usize)>,
 }
 
 impl Candidate {
@@ -74,10 +83,10 @@ pub struct OpenItem {
     pub repository: String,
     /// Repository-relative path of the call's file.
     pub path: String,
-    /// 1-based line of the call, from the file as it is now; `None` when it cannot be read.
+    /// 1-based line from the source or indexed declaration; `None` when unknown.
     pub line: Option<usize>,
-    /// The call (or the definition) as written, on one line; the callee when the file cannot be
-    /// read.
+    /// The call or definition on one line; repository-level and configuration-key items use
+    /// contract/location metadata instead of scalar values.
     pub expression: String,
     /// `None` for a call at the top level of its file.
     pub enclosing: Option<Enclosing>,
@@ -95,16 +104,11 @@ impl OpenItem {
     }
 }
 
-/// Whether `link` is an ambiguous link a person can decide, as its kind says.
-fn decidable(link: &Link) -> bool {
-    link.level == Level::Ambiguous && kind_of(&link.contract).is_none_or(|k| k.decidable())
-}
-
 /// The sites `list` places, each with the position of its repository: the unresolved
 /// consumers and those an ambiguous link of `links` leaves from (a call, or a definition).
 pub(crate) fn sites(exports: &[Export], links: &[Link]) -> Vec<(usize, String)> {
     let ambiguous: HashSet<String> = (links.iter())
-        .filter(|l| decidable(l))
+        .filter(|l| contract::consumer_item(l, exports))
         .map(|l| l.item_site().into_owned())
         .collect();
     let items = exports.iter().enumerate().flat_map(|(n, e)| {
@@ -122,7 +126,7 @@ pub(crate) fn sites(exports: &[Export], links: &[Link]) -> Vec<(usize, String)> 
 /// (HTTP: by method and literal URL fragments).
 pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> Vec<OpenItem> {
     let mut ambiguous: HashMap<String, Vec<&Link>> = HashMap::new();
-    for link in links.iter().filter(|l| decidable(l)) {
+    for link in links.iter().filter(|l| contract::consumer_item(l, exports)) {
         ambiguous
             .entry(link.item_site().into_owned())
             .or_default()
@@ -164,7 +168,7 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                         .filter(|(_, p)| {
                             links
                                 .iter()
-                                .any(|l| p.site == l.provider && contract::serves(p, &l.contract))
+                                .any(|l| contract::link_candidate(p, l, exports))
                         })
                         .map(candidate);
                     (ItemKind::Ambiguous, listed.collect())
@@ -239,6 +243,7 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::contract::Level;
 
     fn ambiguous(contract: &str) -> Link {
         Link::new(
@@ -255,9 +260,12 @@ mod tests {
 
     #[test]
     fn only_an_ambiguous_link_of_a_decidable_kind_is_an_item() {
-        assert!(decidable(&ambiguous("http::GET::/users")));
+        assert!(contract::consumer_item(
+            &ambiguous("http::GET::/users"),
+            &[]
+        ));
         let mut exact = ambiguous("http::GET::/users");
         exact.level = Level::Exact;
-        assert!(!decidable(&exact));
+        assert!(!contract::consumer_item(&exact, &[]));
     }
 }

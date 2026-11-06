@@ -378,7 +378,7 @@ ruta (`.` en la raíz).
   `jsonencode`. Data sources, atributos de resources, módulos del registro, `terraform.workspace`,
   `-var`, `-var-file`, `TF_VAR_`, variables sensibles y cualquier otra función nunca se evalúan: esa
   parte del nombre es un `*` y el nombre un **patrón** (`"orders-${terraform.workspace}"` es
-  `orders-*`), que por ahora no enlaza nada. Un nombre que pasó por una variable del módulo raíz la
+  `orders-*`), que enlaza nombres literales según las reglas de patrones de abajo. Un nombre que pasó por una variable del módulo raíz la
   lista en `overridable:`, ya que quien despliega puede pasar otro valor. Un archivo Terraform o de
   variables cambiado evalúa de nuevo solo los módulos raíz cuya unidad (la raíz y los módulos
   locales que llama) lo contiene.
@@ -2109,6 +2109,21 @@ para teléfonos o endpoints, los clientes de alto nivel `boto3.resource` y `Dyna
 y las operaciones fuera de la tabla no se reconocen por estas formas.
 
 `GetParametersByPath` consulta una jerarquía, por lo que su lado queda sin resolver; la ruta no se trata como nombre de parámetro. Un `ConditionCheck` de `TransactWriteItems` es lector, aunque la transacción también escriba otras tablas. Las claves calculadas de `RequestItems` conservan el literal o el nombre de la variable de entorno.
+
+### Nombres parcialmente resueltos
+
+Un canal, recurso o imagen con partes desconocidas conserva un patrón como `*-orders`.
+`${terraform.workspace}-orders` coincide con `prod-orders` en `inferred`: se requieren
+al menos tres caracteres literales y cada `*` debe ocupar segmentos completos delimitados
+por `-`, `_`, `.` o `/`. Un patrón nunca coincide con otro patrón. Varios nombres literales
+compatibles quedan `ambiguous`, todos enumerados, y se convierten en elementos abiertos.
+`meada decide` guarda la elección en `meada.decisions.toml`; el vínculo elegido queda
+`decided`. Las decisiones de aprovisionamiento pertenecen al lado que contiene el patrón
+y conservan su raíz de evaluación.
+
+Los elementos de claves de configuración usan metadatos del archivo, la línea, la clave y el contrato, también cuando el valor está marcado `redacted` o recortado.
+
+Un patrón de builder de imagen con varios nombres literales de runners también mantiene su propio elemento abierto en el repositorio que construye la imagen.
 
 ## Ubicaciones de recursos declarados
 

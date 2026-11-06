@@ -371,8 +371,8 @@ raiz).
   `merge`, `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber` e `jsonencode`. Data
   sources, atributos de resources, módulos do registro, `terraform.workspace`, `-var`, `-var-file`,
   `TF_VAR_`, variáveis sensíveis e qualquer outra função nunca são avaliados: essa parte do nome
-  vira um `*` e o nome um **padrão** (`"orders-${terraform.workspace}"` é `orders-*`), que por
-  enquanto não liga nada. Um nome que passou por uma variável do módulo raiz a lista em
+  vira um `*` e o nome um **padrão** (`"orders-${terraform.workspace}"` é `orders-*`), que liga
+  nomes literais pelas regras de padrões abaixo. Um nome que passou por uma variável do módulo raiz a lista em
   `overridable:`, já que quem faz o deploy pode passar outro valor. Um arquivo Terraform ou de
   variáveis alterado avalia de novo só os módulos raiz cuja unidade (a raiz e os módulos locais que
   ela chama) o contém.
@@ -2078,6 +2078,20 @@ telefone ou endpoint, os clientes de alto nível `boto3.resource` e `DynamoDBDoc
 e operações fora da tabela não são reconhecidos por estas formas.
 
 `GetParametersByPath` consulta uma hierarquia, por isso seu lado fica não resolvido; o caminho não é tratado como nome de um parâmetro. Um `ConditionCheck` de `TransactWriteItems` é leitor, mesmo quando a transação também escreve outras tabelas. Chaves computadas de `RequestItems` preservam o literal ou o nome da variável de ambiente.
+
+### Nomes parcialmente resolvidos
+
+Um canal, recurso ou imagem com partes desconhecidas preserva um padrão como `*-orders`.
+`${terraform.workspace}-orders` corresponde a `prod-orders` em `inferred`: são necessários
+ao menos três caracteres literais, e cada `*` deve ocupar segmentos inteiros delimitados por
+`-`, `_`, `.` ou `/`. Um padrão nunca corresponde a outro padrão. Vários nomes literais
+compatíveis ficam `ambiguous`, todos listados, e viram itens abertos. `meada decide` grava
+a escolha em `meada.decisions.toml`; o vínculo escolhido fica `decided`. Decisões de
+provisionamento pertencem ao lado que contém o padrão e conservam sua raiz de avaliação.
+
+Itens em chaves de configuração usam metadados de arquivo, linha, chave e contrato, inclusive quando o valor é `redacted` ou cortado.
+
+Um builder de imagem com padrão e vários nomes literais de runners também mantém seu próprio item aberto no repositório que faz o build.
 
 ## Locais de recursos declarados
 

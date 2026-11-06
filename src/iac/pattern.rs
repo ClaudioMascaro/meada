@@ -83,4 +83,25 @@ mod tests {
             &format!("abc-{}", "x".repeat(PATTERN_TEXT_MAX))
         ));
     }
+
+    #[test]
+    fn literal_and_segment_ceilings_reject_inputs_beyond_their_allowed_values() {
+        // Below the three-character anchor: a separator is literal too.
+        assert!(!supported("*-a"));
+        assert!(supported("*-ab"));
+        assert!(matches("*-ab", "prod-ab"));
+        // Colon and letter boundaries are outside the four accepted separators.
+        for pattern in ["orders:*", "*:orders", "orders*", "*orders", "orders-**"] {
+            assert!(!supported(pattern), "{pattern}");
+        }
+        for separator in ['-', '_', '.', '/'] {
+            let pattern = format!("orders{separator}*{separator}archive");
+            assert!(matches(
+                &pattern,
+                &format!("orders{separator}prod{separator}archive")
+            ));
+        }
+        assert!(!matches("*-orders", "prod-orders-*"));
+        assert!(!matches("*-orders", "prefix-prod-orders-suffix"));
+    }
 }

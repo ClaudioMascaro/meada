@@ -2851,6 +2851,8 @@ mod tests {
         };
         Export {
             configurations: Vec::new(),
+            decisions: crate::decisions::Decisions::default(),
+            name_candidates: std::collections::BTreeMap::new(),
             iac: Vec::new(),
             workload_images: Vec::new(),
             executions: Vec::new(),

@@ -7,7 +7,7 @@ Each line names what a module owns and links the file in `map/` with its detail.
 for the area a change touches.
 
 - `engine.rs`: `Engine`, the one query seam (`open`, `refresh`, `export`, `search`, `context`, `trace`, open items, decisions, `status`); it builds the results `meada-core` renders. [queries](../queries.md)
-- `items.rs`: open items, derived in one place. [queries](../queries.md)
+- `items.rs`: consumer open items; `iac/provision.rs` supplies patterned provisioning items through the same decision transport. [queries](../queries.md)
 - `trace.rs`: the `Graph`, the walk and the process walk (`Graph::process`). [queries](../queries.md)
 - `partial.rs`: the partial export a query reads (#396): the contract rows whole, the code rows the answer needs. [queries](../queries.md)
 - `drift_view.rs`: places the links `context`, `search` and `status` show with their drift. [queries](../queries.md)
@@ -28,7 +28,7 @@ for the area a change touches.
 - `http.rs`, `http/`: the HTTP kind: the contract and path rules, mounts, and one submodule per language for providers and consumers. [contracts](../contracts.md)
 - `resource.rs`, `resource/`: the resource kind, declared in `meada.toml` at symbols, IaC addresses or indexed config keys (`resource/via.rs`, #641), or read from SDK calls; `resource/aws.rs` owns its AWS operation table. [contracts](../contracts.md)
 - `alert.rs`, `alert/`: alert labels as emitters, monitoring readers, bounded Go/RE2 matching, receiver context and two-role orphans. [contracts](../contracts.md)
-- `image.rs`, `image/config.rs`: image builders/runners, normalized names, checked-in build configuration, workload execution, scoped environment resolution (`image/environment.rs`, #663), and two-role orphans. [contracts](../contracts.md)
+- `image.rs`, `image/config.rs`, `image/patterns.rs`: image builders/runners, normalized names, checked-in build configuration, builder-pattern choices, workload execution, scoped environment resolution (`image/environment.rs`, #663), and two-role orphans. [contracts](../contracts.md)
 - `channel.rs`, `channel/`: the channel kind (queues and topics), one module per language for message libraries. [contracts](../contracts.md)
 - `package.rs`, `package/`: packages as contracts, one module per ecosystem behind the `Ecosystem` trait. [contracts](../contracts.md)
 - `names.rs`, `names/`: external constructor origins shared by kind-owned language forms (`names/python/arguments.rs` checks complete factory evidence), and the questions the contract kinds ask of a name: what a library outside the repository is. [languages](../languages.md)

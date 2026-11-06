@@ -43,7 +43,7 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   | `flows_to_consumer` | whether data travels provider to consumer (resource writes to reads, channel producers to handlers), including consumers at call sites |
   | `status`, `scope_status` | the lines `meada status` prints per repository, optionally considering the visible workspace |
   | `workspace_status` | optional per-query status rows in repository order, with `None` preserving the ordinary status hooks and call order |
-  | `decidable`, `serves`, `candidate` | whether an ambiguous link is an open item, whether a provider serves a contract (aliases included), whether a provider is a candidate for a consumer with no contract |
+  | `decidable`, `consumer_item`, `link_candidate`, `serves`, `candidate` | whether a consumer ambiguity remains an open item, whether a provider remains a current link candidate, alias matching and candidates for a consumer with no contract |
 
   The engine fixes the phase order: each kind's `read_declarations` then `declare`, followed by every `workspace_step`, then `link`,
   then the decisions replay, then every `after_links`, each in `KINDS` order (decisions are
@@ -128,9 +128,9 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   of its own and reads no kind: it reads `Link::drift`, the exports' consumer shapes (which
   consumers read fields), their calls (where each consumer is) and the seam's `parts` (the part
   of a contract `search` ranks against).
-- New **match rule** (a path rewrite, a new provider source): the kind's `link`, its `serves`
-  and its `candidate` (the questions `items.rs` and `decisions.rs` ask) and each candidate's
-  contract must agree.
+- New **match rule** (a path rewrite, a new provider source): the kind's `link`, `link_candidate`,
+  `serves` and `candidate` and each candidate's contract must agree. Item listing and ordinary
+  replay share `consumer_item` eligibility and the query-aware `link_candidate` rule.
   `meada decide` writes the candidate's contract as the decision's target and
   `decisions::evaluate` checks it against the link's candidates, so a candidate carrying the
   consumer's contract instead of the provider's own makes every decision on it stale.

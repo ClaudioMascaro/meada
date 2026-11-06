@@ -37,7 +37,9 @@
   `.tf` and `.tofu` resource blocks only. Data blocks and unlisted types make no provisioner.
   `iac/pattern.rs`: `PATTERN_LITERAL_MIN` (3 literal characters), `PATTERN_SEGMENTS` (`-_./`)
   and `PATTERN_TEXT_MAX` (1,024 bytes for either name): a pattern outside these bounds matches
-  nothing. These bounds keep the evidence meaningful and the matching work bounded.
+  nothing. Literal characters include written separators. Tests reject anchors below three
+  characters, wildcard boundaries outside those four separators, and text above the byte
+  ceiling. These bounds keep the evidence meaningful and the matching work bounded.
   `crate::iac::provision::links` scans contract sides for each provisioner;
   IaC traces hydrate all provisioned sides before following the selected node's references.
 

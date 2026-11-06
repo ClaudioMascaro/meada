@@ -273,7 +273,7 @@ order, a later file winning), locals, a local module's inputs and outputs per ca
 `count.index`, templates and the pure string, collection and conversion functions of ADR 0025 with
 `jsonencode`. Data sources, resource attributes, registry modules, `terraform.workspace`, `-var`,
 `-var-file`, `TF_VAR_`, sensitive variables and any other function are never evaluated: such a part
-becomes a `*` and the name a pattern (`orders-*`), linked by nothing yet. A name that went through a
+becomes a `*` and the name a pattern (`orders-*`), matching literal names under the pattern rules below. A name that went through a
 root module's variable, by its default or a var file, records it, since a deployer can override it.
 A value over 64 KiB, an expression whose evaluation could make over 1 MiB and what a root evaluates
 past 64 MiB stay unresolved. A changed Terraform file or var file evaluates again only the root
@@ -496,6 +496,20 @@ image orphans only when the visible scope contains builders and runners. Otherwi
 and `context` mark the side with no counterpart. Export stays at format 1, adding builder `at`
 locations and direct-path `executions`; the console graph shows image contracts, their links
 and workload code.
+
+### Partially resolved names
+
+A channel, resource or image with unknown parts retains a pattern such as `*-orders`.
+`${terraform.workspace}-orders` matches `prod-orders` at `inferred`: at least three literal
+characters are required, and each `*` must occupy whole segments bounded by `-`, `_`, `.`
+or `/`. A pattern never matches another pattern. Several matching literal names stay
+`ambiguous`, all listed, and become open items. `meada decide` records the choice in
+`meada.decisions.toml`; the chosen link becomes `decided`. Provisioning decisions belong
+to the side containing the pattern and retain its evaluation root.
+
+Configuration-key items use file, line, key and contract metadata, including when the value is redacted or cut.
+
+An image builder pattern with several literal runner names also keeps its own open item in the repository that builds the image.
 
 ## Locations of declared resources
 

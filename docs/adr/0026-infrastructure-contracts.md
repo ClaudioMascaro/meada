@@ -326,3 +326,26 @@ resolve; null values and empty containers have no row and remain stale (ADR 0025
 An IaC declaration names a source address, optionally file-qualified; the
 ` (root ...)` qualifier accepted by IaC queries is not a declaration form. A bare address
 matching several source identities is stale until qualified with its file.
+
+
+### Anchored provisioning choices (#674)
+
+An ambiguous physical name is an open item at the side holding the pattern. For a provisioner,
+the decision call identity is `provision::<IaC identity>::root=<evaluation root>`; its candidate
+target remains `<repository>::<literal contract>`, using the existing `ambiguous-link` decision
+kind. For a patterned use the call identity is `provision-use::<site>::<pattern contract>`
+and the target is the literal provisioner contract in its repository. The chosen name retains
+all its counterpart sites, while independent roots remain independent.
+The result is a provisioning link at `decided`, with the decision's author in its reason.
+A removed source, closed ambiguity, removed target or changed candidate is stale; a target in
+a missing named peer waits. The export keeps its existing provisioning shape and format 1.
+
+For a use declared at a configuration key, the item keeps the indexed path, key and line.
+Its expression contains contract and location metadata, never the key's scalar value or raw
+source line, preserving ADR 0025 redaction and truncation when shown to a person or decider.
+
+An image builder pattern with several distinct literal runner names is likewise an open item
+in its builder repository, identified as `image-builder::<repository>::<pattern contract>`.
+Its candidates name runner repositories and literal image contracts. Several runners of one
+literal image are one name, and choosing that name retains them all. This is independent of a
+runner's ambiguity among several builders, whose existing decision identity is unchanged.

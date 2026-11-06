@@ -10,6 +10,7 @@ use serde_json::Value;
 mod config;
 pub(crate) mod environment;
 mod jib;
+mod patterns;
 
 pub struct Image;
 
@@ -154,6 +155,7 @@ impl ContractKind for Image {
         });
     }
     fn workspace_step(&self, exports: &mut [Export], repositories: &[Repository]) {
+        patterns::prepare(exports);
         environment::resolve(exports, repositories);
     }
     fn link(
@@ -189,7 +191,7 @@ impl ContractKind for Image {
                 .chain(p.evidence.as_deref())
                 .collect::<Vec<_>>();
             let pattern = p.contract.contains('*') || contract.contains('*');
-            let level = if evidence.is_empty() && !pattern {
+            let mut level = if evidence.is_empty() && !pattern {
                 Level::Exact
             } else {
                 Level::Inferred
@@ -202,6 +204,23 @@ impl ContractKind for Image {
             if pattern {
                 reason.push_str(&format!("; pattern {} on {contract}", p.contract));
             }
+            let mut attribution = None;
+            if let Some(choice) = patterns::builder(exports, p) {
+                match choice.selected() {
+                    Some((selected, decision)) => {
+                        if selected != contract {
+                            continue;
+                        }
+                        level = Level::Decided;
+                        reason = decision.reason();
+                        attribution = Some((decision.by.clone(), decision.p));
+                    }
+                    None => {
+                        level = Level::Ambiguous;
+                        reason.push_str("; multiple literal runner names");
+                    }
+                }
+            }
             let mut link = Link::new(
                 consumer.site.clone(),
                 p.site.clone(),
@@ -213,6 +232,10 @@ impl ContractKind for Image {
                 None,
             );
             link.root = consumer.root.clone();
+            if let Some((by, p)) = attribution {
+                link.by = Some(by);
+                link.p = p;
+            }
             let key = (p.site.clone(), p.contract.clone());
             let prior = candidates.entry(key).or_insert_with(|| link.clone());
             if (link.level, &link.reason) < (prior.level, &prior.reason) {
@@ -223,6 +246,8 @@ impl ContractKind for Image {
         if links.len() > 1 {
             for l in &mut links {
                 l.level = Level::Ambiguous;
+                l.by = None;
+                l.p = None;
                 l.reason.push_str("; multiple builder repositories");
             }
         }
@@ -233,8 +258,27 @@ impl ContractKind for Image {
             .strip_prefix("image::")
             .is_some_and(|name| name.contains('*') && !crate::iac::pattern::supported(name))
     }
+    fn consumer_item(&self, link: &Link, exports: &[Export]) -> bool {
+        patterns::consumer_item(link, exports)
+    }
+    fn owns_decision(&self, decision: &crate::decisions::Decision) -> bool {
+        patterns::handles(decision)
+    }
+    fn decision_items(&self, exports: &[Export]) -> Vec<(crate::items::OpenItem, bool)> {
+        patterns::items(exports)
+    }
+    fn decision_reports(
+        &self,
+        workspace: &crate::workspace::Workspace,
+        exports: &[Export],
+    ) -> Vec<crate::decisions::Evaluation> {
+        patterns::reports(workspace, exports)
+    }
     fn serves(&self, provider: &Provider, contract: &str) -> bool {
         matches(&provider.contract, contract)
+    }
+    fn link_candidate(&self, provider: &Provider, link: &Link, exports: &[Export]) -> bool {
+        provider.site == link.provider && patterns::active_match(exports, provider, &link.contract)
     }
     fn side_note(&self, exports: &[Export], _: &str, role: Role) -> &'static str {
         let (built, run) = roles(exports);
@@ -263,7 +307,7 @@ impl ContractKind for Image {
             if !exports.iter().flat_map(|e| &e.consumers).any(|c| {
                 c.contract
                     .as_deref()
-                    .is_some_and(|c| matches(c, &p.contract))
+                    .is_some_and(|c| patterns::active_match(exports, p, c))
             }) {
                 rows.insert(
                     crate::msg::Msg::OrphanCounterpart {
@@ -284,7 +328,7 @@ impl ContractKind for Image {
             if !exports
                 .iter()
                 .flat_map(|e| &e.providers)
-                .any(|p| matches(&p.contract, contract))
+                .any(|p| patterns::active_match(exports, p, contract))
             {
                 rows.insert(
                     crate::msg::Msg::OrphanCounterpart {

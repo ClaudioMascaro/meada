@@ -183,7 +183,7 @@ impl Decision {
     }
 
     /// `decided by <by> (p=<p>)`, or `decided by human`.
-    fn reason(&self) -> String {
+    pub(crate) fn reason(&self) -> String {
         match self.p {
             Some(p) => format!("decided by {} (p={p:.2})", self.by),
             None => format!("decided by {}", self.by),
@@ -267,7 +267,7 @@ fn evaluate(
     core: &[Link],
     missing: &[Missing],
 ) -> Fate {
-    let at = |l: &&Link| l.item_site() == d.call && l.level == Level::Ambiguous;
+    let at = |l: &&Link| l.item_site() == d.call && contract::consumer_item(l, exports);
     if !(export.calls.iter().any(|c| c.id == d.call)
         || export.consumers.iter().any(|c| c.item_site() == d.call))
     {
@@ -310,9 +310,7 @@ fn evaluate(
         Kind::AmbiguousLink => core
             .iter()
             .filter(at)
-            .find(|l| {
-                (served.iter()).any(|p| p.site == l.provider && contract::serves(p, &l.contract))
-            })
+            .find(|l| (served.iter()).any(|p| contract::link_candidate(p, l, exports)))
             .map_or(Fate::Stale(Cause::NotCandidate), |l| {
                 Fate::Applies(l.provider.clone(), l.contract.clone())
             }),
@@ -328,6 +326,7 @@ pub(crate) fn replay(
     mut links: Vec<Link>,
     workspace: &Workspace,
     exports: &[Export],
+    include: impl Fn(&Decision) -> bool,
 ) -> (Vec<Link>, Vec<Evaluation>) {
     let mut evaluations = Vec::new();
     let mut applied = Vec::new();
@@ -337,7 +336,7 @@ pub(crate) fn replay(
             stale: Vec::new(),
             waiting: Vec::new(),
         };
-        for d in &repo.decisions.items {
+        for d in repo.decisions.items.iter().filter(|d| include(d)) {
             let fate = evaluate(d, export, exports, &links, &workspace.missing);
             let (call, target) = (d.call.clone(), d.target.clone());
             match fate {

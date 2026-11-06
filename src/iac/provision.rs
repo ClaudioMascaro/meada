@@ -1,12 +1,14 @@
 //! Provisioner sides and their links (ADR 0026): derived from stored IaC names and the
 //! workspace's contract sides, never mixed with consumer-to-provider links.
 
+use std::collections::HashMap;
+
 use meada_core::export::{IacNode, Level, Provision, Provisioner};
 use rusqlite::Connection;
 
 use super::{Node, types};
 use crate::Result;
-use crate::index::Export;
+use crate::index::{Export, Span};
 
 /// A provisioner with the evaluated name's evidence, kept only during a query.
 pub(crate) struct Side {
@@ -17,7 +19,9 @@ pub(crate) struct Side {
 
 impl Side {
     pub(crate) fn matches(&self, contract: &str) -> bool {
-        if !self.node.pattern {
+        // A written asterisk is not an unresolved part when evaluation says the name is
+        // literal. Preserve its literal identity instead of inventing wildcard evidence.
+        if !self.node.pattern && self.contract.contains('*') {
             return self.contract == contract;
         }
         let (Some((kind, pattern)), Some((other, name))) =
@@ -25,7 +29,13 @@ impl Side {
         else {
             return false;
         };
-        kind == other && super::pattern::matches(pattern, name)
+        kind == other
+            && match (pattern.contains('*'), name.contains('*')) {
+                (true, false) => super::pattern::matches(pattern, name),
+                (false, true) => super::pattern::matches(name, pattern),
+                (false, false) => pattern == name,
+                (true, true) => false,
+            }
     }
 
     pub(crate) fn place(&self, repository: &str) -> String {
@@ -127,6 +137,38 @@ fn directed_uses(export: &Export) -> impl Iterator<Item = (&str, &str, Level)> {
 /// Every use of the same contract reaches every provisioner, including one in its repository.
 /// Several roots are independent sides, never ambiguous candidates of one another.
 pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
+    let mut links = raw_links(exports);
+    if !exports.iter().flat_map(|e| &e.decisions.items).any(handles) {
+        return links;
+    }
+    let choices = Choices::new(exports, &links);
+    let mut selected = std::collections::BTreeMap::new();
+    for export in exports {
+        for decision in export.decisions.items.iter().filter(|d| handles(d)) {
+            if let Ok(contract) = choices.choose(decision, export, exports) {
+                selected.insert(decision.call.as_str(), (contract, decision.reason()));
+            }
+        }
+    }
+    links.retain_mut(|link| {
+        let Some((id, literal)) = choices.source_of(link) else {
+            return true;
+        };
+        let Some((chosen, reason)) = selected.get(id.as_str()) else {
+            return true;
+        };
+        if literal != *chosen {
+            return false;
+        }
+        link.level = Level::Decided;
+        link.reason = reason.clone();
+        true
+    });
+    links.sort();
+    links
+}
+
+fn raw_links(exports: &[Export]) -> Vec<Provision> {
     let sides = exports
         .iter()
         .flat_map(|export| {
@@ -158,6 +200,8 @@ pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
         })
         .collect::<std::collections::BTreeMap<_, _>>();
     let mut links = Vec::new();
+    let mut pattern_names =
+        std::collections::BTreeMap::<&str, std::collections::BTreeSet<&str>>::new();
     for export in exports {
         for p in &export.provisioners {
             let mut level = Level::Exact;
@@ -166,6 +210,14 @@ pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
                 .map(|(_, c, _)| *c)
                 .filter(|c| p.matches(c))
                 .collect::<std::collections::BTreeSet<_>>();
+            for contract in &contracts {
+                if contract.contains('*') && !p.contract.contains('*') {
+                    pattern_names
+                        .entry(contract)
+                        .or_default()
+                        .insert(&p.contract);
+                }
+            }
             let mut reason = p.contract.clone();
             if p.node.pattern {
                 level = if contracts.len() > 1 {
@@ -217,9 +269,414 @@ pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
             }
         }
     }
+    for link in &mut links {
+        if !pattern_names.contains_key(link.contract.as_str()) {
+            continue;
+        }
+        link.level = link.level.max(
+            if pattern_names
+                .get(link.contract.as_str())
+                .is_some_and(|names| names.len() > 1)
+            {
+                Level::Ambiguous
+            } else {
+                Level::Inferred
+            },
+        );
+        link.reason += &format!("; pattern {}", link.contract);
+    }
     links.sort();
     links.dedup();
     links
+}
+
+/// Either side can hold the unresolved name; the decision belongs to that side.
+#[derive(Clone, Copy)]
+enum Source<'a> {
+    Provisioner(&'a Side),
+    Use { site: &'a str, contract: &'a str },
+}
+
+/// Source locations are indexed once per repository, before placing any patterned item.
+struct Locations<'a> {
+    spans: HashMap<&'a str, &'a Span>,
+    nodes: HashMap<String, &'a Node>,
+    keys: HashMap<&'a str, &'a crate::config_values::sites::Site>,
+}
+
+impl<'a> Locations<'a> {
+    fn new(export: &'a Export) -> Self {
+        let mut spans = HashMap::new();
+        for (id, span) in export
+            .calls
+            .iter()
+            .map(|call| (call.id.as_str(), &call.span))
+            .chain(
+                export
+                    .symbols
+                    .iter()
+                    .map(|symbol| (symbol.id.as_str(), &symbol.span)),
+            )
+        {
+            spans.entry(id).or_insert(span);
+        }
+        let mut nodes = HashMap::new();
+        for node in &export.iac {
+            nodes
+                .entry(node.identity(&export.repository))
+                .or_insert(node);
+        }
+        let mut keys = HashMap::new();
+        for key in &export.config_sites {
+            keys.entry(key.id.as_str()).or_insert(key);
+        }
+        Self { spans, nodes, keys }
+    }
+}
+
+impl Source<'_> {
+    fn id(self) -> String {
+        match self {
+            Self::Provisioner(p) => format!("provision::{}::root={}", p.identity, p.node.root),
+            Self::Use { site, contract } => format!("provision-use::{site}::{contract}"),
+        }
+    }
+
+    fn target_exists(self, export: &Export, contract: &str) -> bool {
+        match self {
+            Self::Provisioner(_) => uses(export).any(|(_, c)| c == contract),
+            Self::Use { .. } => export.provisioners.iter().any(|p| p.contract == contract),
+        }
+    }
+
+    fn span(self, locations: &Locations<'_>, files: &mut crate::render::Files) -> Span {
+        let site = match self {
+            Self::Provisioner(p) => return p.node.span(files.get(&p.node.path)),
+            Self::Use { site, .. } => site,
+        };
+        if let Some(&span) = locations.spans.get(site) {
+            return span.clone();
+        }
+        if let Some(node) = locations.nodes.get(site) {
+            return node.span(files.get(&node.path));
+        }
+        let mut span = Span::default();
+        span.path = "meada.toml".into();
+        span
+    }
+
+    fn placement(
+        self,
+        locations: &Locations<'_>,
+        files: &mut crate::render::Files,
+    ) -> (String, Option<usize>, String) {
+        if let Self::Use { site, contract } = self
+            && let Some(key) = locations.keys.get(site)
+        {
+            // A source line can contain redacted/cut values, even beside an ordinary key.
+            // Keep declaration metadata without rereading any configuration payload.
+            return (
+                key.path.clone(),
+                Some(key.line),
+                format!("{contract} at {}#{}", key.path, key.key),
+            );
+        }
+        let span = self.span(locations, files);
+        let expression = files
+            .get(&span.path)
+            .and_then(|s| s.get(span.start as usize..span.end as usize))
+            .filter(|s| !s.is_empty())
+            .map(|s| {
+                String::from_utf8_lossy(s)
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            })
+            .unwrap_or_else(|| match self {
+                Self::Use { contract, .. } => contract.into(),
+                Self::Provisioner(p) => p.node.address.clone(),
+            });
+        let line = files
+            .get(&span.path)
+            .filter(|_| span.end > span.start)
+            .map(|s| crate::render::line_of(s, span.start));
+        (span.path, line, expression)
+    }
+}
+
+fn sources(export: &Export) -> Vec<Source<'_>> {
+    let mut sources: Vec<_> = export
+        .provisioners
+        .iter()
+        .map(Source::Provisioner)
+        .collect();
+    let uses = uses(export)
+        .filter(|(_, c)| c.contains('*'))
+        .collect::<std::collections::BTreeSet<_>>();
+    sources.extend(
+        uses.into_iter()
+            .map(|(site, contract)| Source::Use { site, contract }),
+    );
+    sources
+}
+
+pub(crate) fn handles(decision: &crate::decisions::Decision) -> bool {
+    decision.call.starts_with("provision::") || decision.call.starts_with("provision-use::")
+}
+
+pub(crate) fn decision_context(links: &[Provision], identity: &str, root: &str) -> Vec<String> {
+    let choices = links
+        .iter()
+        .filter(|l| l.provisioner == identity && l.root == root && l.level == Level::Decided)
+        .map(|l| format!("{} [decided: {}]", l.contract, l.reason))
+        .collect::<std::collections::BTreeSet<_>>();
+    crate::render::section("resolved names", choices.into_iter().collect())
+}
+
+/// Build source and literal-candidate indexes once, shared by every decision in this pass.
+struct Choices<'a> {
+    sources: std::collections::BTreeMap<String, (&'a str, Source<'a>)>,
+    targets: std::collections::BTreeMap<(&'a str, &'a str), (&'a str, &'a Side)>,
+    candidates: std::collections::BTreeMap<String, Vec<crate::items::Candidate>>,
+    ambiguous: std::collections::BTreeSet<String>,
+}
+
+impl<'a> Choices<'a> {
+    fn new(exports: &'a [Export], links: &[Provision]) -> Self {
+        let mut choices = Self {
+            sources: exports
+                .iter()
+                .flat_map(|e| {
+                    sources(e)
+                        .into_iter()
+                        .map(|s| (s.id(), (e.repository.as_str(), s)))
+                })
+                .collect(),
+            targets: exports
+                .iter()
+                .flat_map(|e| {
+                    e.provisioners.iter().map(|p| {
+                        (
+                            (p.identity.as_str(), p.node.root.as_str()),
+                            (e.repository.as_str(), p),
+                        )
+                    })
+                })
+                .collect(),
+            candidates: std::collections::BTreeMap::new(),
+            ambiguous: std::collections::BTreeSet::new(),
+        };
+        for link in links {
+            let Some((id, literal)) = choices.source_of(link) else {
+                continue;
+            };
+            let Some((repository, target)) = choices
+                .targets
+                .get(&(link.provisioner.as_str(), link.root.as_str()))
+            else {
+                continue;
+            };
+            let (repository, site) = if target.node.pattern {
+                (
+                    link.side
+                        .split_once("::")
+                        .map_or(link.side.as_str(), |(r, _)| r),
+                    link.side.as_str(),
+                )
+            } else {
+                (*repository, target.identity.as_str())
+            };
+            let candidate = crate::items::Candidate {
+                repository: repository.into(),
+                contract: literal.into(),
+                site: site.into(),
+            };
+            if link.level == Level::Ambiguous {
+                choices.ambiguous.insert(id.clone());
+            }
+            choices.candidates.entry(id).or_default().push(candidate);
+        }
+        for candidates in choices.candidates.values_mut() {
+            candidates.sort_by(|a, b| {
+                (&a.repository, &a.contract, &a.site).cmp(&(&b.repository, &b.contract, &b.site))
+            });
+            candidates.dedup_by(|a, b| a.repository == b.repository && a.contract == b.contract);
+        }
+        choices
+    }
+
+    fn source_of<'b>(&'b self, link: &'b Provision) -> Option<(String, &'b str)> {
+        let (_, target) = self
+            .targets
+            .get(&(link.provisioner.as_str(), link.root.as_str()))?;
+        if target.node.pattern {
+            Some((Source::Provisioner(target).id(), &link.contract))
+        } else if link.contract.contains('*') && !target.contract.contains('*') {
+            Some((
+                Source::Use {
+                    site: &link.side,
+                    contract: &link.contract,
+                }
+                .id(),
+                &target.contract,
+            ))
+        } else {
+            None
+        }
+    }
+
+    fn choose<'d>(
+        &self,
+        decision: &'d crate::decisions::Decision,
+        export: &Export,
+        exports: &[Export],
+    ) -> std::result::Result<&'d str, crate::decisions::Cause> {
+        use crate::decisions::{Cause, Kind};
+        let (_, source) = self
+            .sources
+            .get(&decision.call)
+            .filter(|(owner, _)| *owner == export.repository)
+            .ok_or(Cause::CallGone)?;
+        if decision.kind != Kind::AmbiguousLink || !self.ambiguous.contains(&decision.call) {
+            return Err(Cause::ItemNotOpen);
+        }
+        let (repository, contract) = decision.target.split_once("::").ok_or(Cause::TargetGone)?;
+        if self
+            .candidates
+            .get(&decision.call)
+            .is_some_and(|candidates| {
+                candidates
+                    .binary_search_by(|c| {
+                        (c.repository.as_str(), c.contract.as_str()).cmp(&(repository, contract))
+                    })
+                    .is_ok()
+            })
+        {
+            return Ok(contract);
+        }
+        if !exports
+            .iter()
+            .filter(|e| e.repository == repository)
+            .any(|e| source.target_exists(e, contract))
+        {
+            return Err(Cause::TargetGone);
+        }
+        Err(Cause::NotCandidate)
+    }
+}
+
+/// Existing decision transport and stale causes also cover pattern-to-use choices.
+pub(crate) fn reports(
+    workspace: &crate::workspace::Workspace,
+    exports: &[Export],
+) -> Vec<crate::decisions::Evaluation> {
+    if !exports.iter().flat_map(|e| &e.decisions.items).any(handles) {
+        return exports
+            .iter()
+            .map(|e| crate::decisions::Evaluation {
+                repository: e.repository.clone(),
+                stale: Vec::new(),
+                waiting: Vec::new(),
+            })
+            .collect();
+    }
+    let core = raw_links(exports);
+    let choices = Choices::new(exports, &core);
+    exports
+        .iter()
+        .map(|export| {
+            let mut report = crate::decisions::Evaluation {
+                repository: export.repository.clone(),
+                stale: Vec::new(),
+                waiting: Vec::new(),
+            };
+            for d in export.decisions.items.iter().filter(|d| handles(d)) {
+                let source_exists = choices
+                    .sources
+                    .get(&d.call)
+                    .is_some_and(|(owner, _)| *owner == export.repository);
+                let missing = d
+                    .target
+                    .split_once("::")
+                    .and_then(|(repo, _)| workspace.missing.iter().find(|m| m.repo == repo));
+                if let Some(peer) = missing.filter(|_| source_exists) {
+                    report.waiting.push(crate::decisions::Waiting {
+                        call: d.call.clone(),
+                        target: d.target.clone(),
+                        peer: peer.repo.clone(),
+                    });
+                } else if let Err(cause) = choices.choose(d, export, exports) {
+                    report.stale.push(crate::decisions::Stale::new(
+                        d.call.clone(),
+                        d.target.clone(),
+                        cause,
+                    ));
+                }
+            }
+            report
+        })
+        .collect()
+}
+
+/// The decision transport places the patterned source, whichever direction it participates in.
+pub(crate) fn item_sites(exports: &[Export]) -> Vec<(usize, String)> {
+    exports
+        .iter()
+        .enumerate()
+        .flat_map(|(n, e)| {
+            uses(e)
+                .filter(|(_, c)| c.contains('*'))
+                .map(move |(site, _)| (n, site.to_owned()))
+        })
+        .collect()
+}
+
+pub(crate) fn items(
+    workspace: &crate::workspace::Workspace,
+    exports: &[Export],
+) -> Vec<(crate::items::OpenItem, bool)> {
+    use crate::items::{ItemKind, OpenItem};
+    if !exports.iter().any(|e| {
+        e.provisioners.iter().any(|p| p.node.pattern) || uses(e).any(|(_, c)| c.contains('*'))
+    }) {
+        return Vec::new();
+    }
+    let core = raw_links(exports);
+    let choices = Choices::new(exports, &core);
+    let decided = exports
+        .iter()
+        .flat_map(|e| {
+            e.decisions
+                .items
+                .iter()
+                .filter(|d| choices.choose(d, e, exports).is_ok())
+                .map(|d| d.call.as_str())
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut items = Vec::new();
+    for (export, repo) in exports.iter().zip(&workspace.repos) {
+        let locations = Locations::new(export);
+        let mut files = crate::render::Files::new(&repo.root);
+        for (id, (_, source)) in choices.sources.iter().filter(|(id, (owner, _))| {
+            *owner == export.repository && choices.ambiguous.contains(*id)
+        }) {
+            let (path, line, expression) = source.placement(&locations, &mut files);
+            items.push((
+                OpenItem {
+                    id: id.clone(),
+                    kind: ItemKind::Ambiguous,
+                    repository: export.repository.clone(),
+                    line,
+                    path,
+                    expression,
+                    enclosing: None,
+                    candidates: choices.candidates.get(id).cloned().unwrap_or_default(),
+                },
+                decided.contains(id.as_str()),
+            ));
+        }
+    }
+    items
 }
 
 /// A key is independently traceable; its repository-level site aggregates its config uses.

@@ -7,7 +7,8 @@
   kind appends to the list. A side is unresolved when its contract is absent (an unresolved
   consumer) or when `unresolved` says so of the identifier (an unresolved side). The seam's free
   functions (`kind_of`, `unresolved`, `shown`, `typed`, `label`, `parts`, `place`, `serves`,
-  `entry`, `searched`, `explain_inferred`) are what the rest of the crate calls. The
+  `consumer_item`, `link_candidate`, `entry`, `searched`, `explain_inferred`) are what the rest
+  of the crate calls. The
   `explain_inferred` display policy defaults to false and receives the consumer's repository.
   HTTP enables it only when the recorded `env:` base selects a peer declared by `base_url_env`,
   using the same `Config::peers_reading` lookup as its links after stripping a proxy endpoint

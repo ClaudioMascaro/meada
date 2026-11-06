@@ -449,3 +449,17 @@
 - `alerts.rs` (#672): alert labels and Alertmanager routes over sibling `alert-monitoring` and
   `alert-app` fixtures, equality and regex levels, conjunctions, receiver context, bidirectional
   traces, Helm negatives and scope-aware orphan refresh, with complete export goldens.
+
+- `patterns.rs` (#674): sibling `pattern-infra`/`pattern-app` fixtures cover channel and
+  resource anchors, ambiguous literal names, short/interior and pattern-to-pattern negatives,
+  export/context/trace goldens, both provisioning orientations, real human CLI decisions,
+  independent roots and target/source staleness. Image builder-pattern choices complement
+  `images.rs`'s runner patterns. Literal asterisks, retained runner decisions after a builder
+  choice and overlapping literal/pattern providers are controls;
+  partial/full items preserve SDK source locations. Config-key choices retain indexed locations
+  through human replay; redacted keys, cut values and ordinary keys sharing a JSON line with a
+  Secret keep their payloads out of items and CLI model previews. Query growth cases list 2,000 runner
+  names, 5,000 provisioner names and 10,000 selector-resolved config-key sources with two fixed
+  provisioners under a time bound. The latter asserts the complete source and candidate sets.
+  `iac::pattern` unit tests cross each
+  named matcher limit.

@@ -274,7 +274,7 @@ entradas y salidas de un módulo local por llamada, `each`, `count.index`, plant
 puras de texto, colección y conversión del ADR 0025 con `jsonencode`. Data sources, atributos de
 resources, módulos del registro, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_`, variables
 sensibles y cualquier otra función nunca se evalúan: esa parte es un `*` y el nombre un patrón
-(`orders-*`), que por ahora no enlaza nada. Un nombre que pasó por una variable del módulo raíz, por
+(`orders-*`), que enlaza nombres literales según las reglas de patrones de abajo. Un nombre que pasó por una variable del módulo raíz, por
 su default o por un archivo de variables, la registra, ya que quien despliega puede cambiarla. Un
 valor de más de 64 KiB, una expresión cuya evaluación podría pasar de 1 MiB y lo que una raíz evalúa
 más allá de 64 MiB quedan sin resolver. Un archivo Terraform o de variables cambiado evalúa de nuevo
@@ -501,6 +501,21 @@ literales en límites de segmentos; varios candidatos quedan `ambiguous` y admit
 ejecutores. En caso contrario, `search` y `context` marcan el lado sin contraparte. La
 exportación mantiene el formato 1, con ubicaciones `at` y `executions` para rutas directas;
 el grafo del console muestra contratos de imagen, enlaces y código de cargas de trabajo.
+
+### Nombres parcialmente resueltos
+
+Un canal, recurso o imagen con partes desconocidas conserva un patrón como `*-orders`.
+`${terraform.workspace}-orders` coincide con `prod-orders` en `inferred`: se requieren
+al menos tres caracteres literales y cada `*` debe ocupar segmentos completos delimitados
+por `-`, `_`, `.` o `/`. Un patrón nunca coincide con otro patrón. Varios nombres literales
+compatibles quedan `ambiguous`, todos enumerados, y se convierten en elementos abiertos.
+`meada decide` guarda la elección en `meada.decisions.toml`; el vínculo elegido queda
+`decided`. Las decisiones de aprovisionamiento pertenecen al lado que contiene el patrón
+y conservan su raíz de evaluación.
+
+Los elementos de claves de configuración usan metadatos del archivo, la línea, la clave y el contrato, también cuando el valor está marcado `redacted` o recortado.
+
+Un patrón de builder de imagen con varios nombres literales de runners también mantiene su propio elemento abierto en el repositorio que construye la imagen.
 
 ## Ubicaciones de recursos declarados
 

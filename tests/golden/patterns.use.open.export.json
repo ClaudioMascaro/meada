@@ -1,0 +1,49 @@
+{
+  "format": 1,
+  "repository": "example.com/pattern/app",
+  "commit": "d9c4c26158d049ee0d9a56098f92855bff5923e3",
+  "dirty": true,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "resource::s3::backup-*",
+      "site": "example.com/pattern/app",
+      "via": null
+    },
+    {
+      "contract": "resource::s3::receipts-*",
+      "site": "example.com/pattern/app",
+      "via": null
+    }
+  ],
+  "links": [],
+  "provisions": [
+    {
+      "side": "example.com/pattern/app",
+      "provisioner": "example.com/pattern/infra::main.tf::aws_s3_bucket.east",
+      "root": ".",
+      "contract": "resource::s3::receipts-*",
+      "level": "ambiguous",
+      "reason": "resource::s3::receipts-east; pattern resource::s3::receipts-*"
+    },
+    {
+      "side": "example.com/pattern/app",
+      "provisioner": "example.com/pattern/infra::main.tf::aws_s3_bucket.single",
+      "root": ".",
+      "contract": "resource::s3::backup-*",
+      "level": "inferred",
+      "reason": "resource::s3::backup-east; pattern resource::s3::backup-*"
+    },
+    {
+      "side": "example.com/pattern/app",
+      "provisioner": "example.com/pattern/infra::main.tf::aws_s3_bucket.west",
+      "root": ".",
+      "contract": "resource::s3::receipts-*",
+      "level": "ambiguous",
+      "reason": "resource::s3::receipts-west; pattern resource::s3::receipts-*"
+    }
+  ]
+}

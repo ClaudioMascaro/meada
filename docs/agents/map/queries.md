@@ -200,7 +200,8 @@ this file, and a change to these modules updates it.
   (`Engine::status_report`), nothing
   otherwise, so no repository without drift changes.
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
-  the one place that derives them. `list` takes the exports and the core's links (before any
+  which derives consumer items. Kind-owned source items and provisioning items join them in
+  `Engine::items`. `list` takes the exports and the core's links (before any
   decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
   candidates sort by repository, method, path, as if undecided. The routes a dynamic URL may
   reach come from each provider's kind (`ContractKind::candidate`; for HTTP, `route_fits`: method,
@@ -210,9 +211,12 @@ this file, and a change to these modules updates it.
   decision applies (its call has a `Level::Decided` link after replay); `open_items` and
   `local_items` drop those, so `search` with kind `ambiguous` or `unresolved` and `meada
   decide` never offer a decided call, while `local_item(id)` keeps it, for `--item` to redo.
-  `list` skips the ambiguous links of a kind that says `decidable` is false (packages): several
-  providers of a package name are no call for a person to decide. Decision replay asks the
-  seam's `serves` whether a provider serves a decided contract.
+  Item-site hydration, `list` and ordinary replay share `contract::consumer_item`, whose
+  default follows `decidable` (false for packages): several
+  providers of a package name are no call for a person to decide, while a patterned image
+  builder can own its ambiguity instead of the runner. Candidate reconstruction and replay
+  share `link_candidate`; its default uses the kind's `serves` alias rule, while a kind can
+  account for current query-local selections.
 - `search` kind `duplicate` (`search_duplicates`, an early branch, #254) groups the symbols of the
   workspace by `Symbol::hash` (the BLAKE3 of the span's exact bytes, set by `lang::hash_spans`
   when a file is parsed and kept in `Def::hash`, `symbols.hash` and the export). A group of two
@@ -340,3 +344,29 @@ resource kind owns which declarations resolve and how their contract sections ar
 Unqualified key queries union declared and automatic-use locations across the visible scope;
 trace deduplicates their canonical identities. A key with both keeps its inferred-use context
 and can continue through a declared read-write side.
+
+## Anchored provisioning decisions (#674)
+
+`iac::provision` keeps infrastructure choices separate from consumer/provider links. Its
+`items` adapter places an ambiguous pattern at its IaC or use site and lists the literal contracts
+used by producers, consumers or directionless configuration sides. The decision identity
+includes the provisioner and evaluation root, or the use site and pattern contract; choosing a literal name retains every use of
+that name. `links` replays valid choices at `decided` for export, context, trace and orphans.
+`reports` follows the existing missing-peer and stale-decision causes. The engine combines
+these items and evaluations with ordinary contract decisions; `decisions::replay` accepts a
+predicate selecting its decisions. Query-only `Export::decisions` comes from the workspace
+and is never written into the index or canonical export.
+
+Before placing items, the partial query hydrates patterned provisioning use sites as well
+as consumer/provider items, so SDK calls retain their source path, line and excerpt even
+without a producer or writer. Repository-level declarations fall back to their contract text.
+`Source::placement` uses indexed file/key/line and contract metadata for declared config keys,
+without reading source lines that could reintroduce redacted or cut scalar values.
+
+Provisioning candidate groups and provisioner identities are indexed once per adapter pass.
+Source placement indexes config-key metadata and hydrated call, symbol and IaC locations once
+per repository, without rescanning them for each ambiguous source.
+Replay applies the valid choices in one traversal of the links, and literal-only workspaces
+with no provisioning decisions avoid building those groups. Reverse-pattern ambiguity uses
+names accumulated during the existing provisioner scan, without rescanning provisioners for
+each resulting link.

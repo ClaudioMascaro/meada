@@ -50,6 +50,7 @@ mod oidc;
 mod overloads;
 mod packages;
 mod partial;
+mod patterns;
 mod postgres;
 mod processes;
 mod provision;

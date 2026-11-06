@@ -35,3 +35,7 @@ topic leaves within 24 KiB; the code wins over these entries.
 <a id="alert-contracts-672"></a>
 
 - [Alert contracts (#672)](contracts/alert-contracts-672.md)
+
+<a id="image-pattern-choices-674"></a>
+
+- [Image pattern choices (#674)](contracts/image-contracts-662.md#image-pattern-choices-674)

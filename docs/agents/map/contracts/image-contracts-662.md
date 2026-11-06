@@ -54,3 +54,26 @@ to a single side. Workspaces with no environment entries avoid the extra image-l
 Construction indexes executions by workload/root and builders by workload/root/image, reusing
 each image match for its container entries. Queries index repository, variable and build path,
 visiting only the source file and its ancestor paths.
+
+## Image pattern choices (#674)
+
+`image/patterns.rs` owns choices for an unresolved builder name that matches several literal
+runner names (#674). Their `image-builder::<repository>::<pattern contract>` identity belongs
+to the builder repository. Duplicate runner sites of one literal name remain one name;
+choosing it retains every runner of that name. `ContractKind::consumer_item` distinguishes
+these source items from a runner's ordinary ambiguity among builders. `owns_decision`,
+`decision_items` and `decision_reports` keep source-item rules within the kind while the engine
+combines their transport with ordinary decisions. Pattern matching remains shared with IaC;
+NATS and RabbitMQ routing patterns retain their existing broker semantics.
+
+`Image::workspace_step` prepares distinct runner candidates once for each builder pattern in
+query-only `Export::name_candidates`, including a valid selection's decision position.
+Linking, open items, replay and orphan checks reuse that cache. It is rebuilt per query, so
+changed or hidden runners cannot persist as candidates. `patterns.rs` exercises 2,000 runner
+names through `Engine::open_items` under a time bound.
+
+Item hydration, listing and ordinary replay share the seam's `consumer_item` eligibility.
+Candidate reconstruction and replay share `link_candidate`, which checks the builder's active
+name, so an inactive pattern cannot return through another contract at the same repository
+site. A runner choice becomes `item-not-open` when its remaining ambiguity belongs to the
+builder; an inactive target of a still-open runner item becomes `not-candidate`.

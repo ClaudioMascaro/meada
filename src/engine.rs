@@ -263,6 +263,7 @@ impl Engine {
             .map(|(db, m)| {
                 let mut export = index::export(db, &m.identity)?;
                 export.root = m.root.clone();
+                export.decisions = m.decisions.clone();
                 for kind in contract::KINDS {
                     kind.read_declarations(m, db, &mut export)?;
                     kind.declare(m, &mut export);
@@ -284,6 +285,7 @@ impl Engine {
     fn partial(&self) -> Result<Partial<'_>> {
         let mut partial = Partial::open(&self.dbs, &self.workspace.repos)?;
         for (n, repo) in self.workspace.repos.iter().enumerate() {
+            partial.exports[n].decisions = repo.decisions.clone();
             for kind in contract::KINDS {
                 match kind.symbols_read(repo, &partial.exports[n]) {
                     None => partial.every_symbol(n)?,
@@ -314,9 +316,25 @@ impl Engine {
     /// kinds after them (`ContractKind::after_links`), and the decisions of each repository
     /// that did not apply, in workspace order.
     fn links_and_decisions(&self, exports: &[Export]) -> (Vec<Link>, Vec<Evaluation>) {
-        let (mut links, evaluations) =
-            decisions::replay(self.core_links(exports), &self.workspace, exports);
+        let (mut links, mut evaluations) =
+            decisions::replay(self.core_links(exports), &self.workspace, exports, |d| {
+                !iac::provision::handles(d) && !KINDS.iter().any(|k| k.owns_decision(d))
+            });
+        for (evaluation, provisioning) in evaluations
+            .iter_mut()
+            .zip(iac::provision::reports(&self.workspace, exports))
+        {
+            evaluation.stale.extend(provisioning.stale);
+            evaluation.waiting.extend(provisioning.waiting);
+        }
         for kind in contract::KINDS {
+            for (evaluation, extra) in evaluations
+                .iter_mut()
+                .zip(kind.decision_reports(&self.workspace, exports))
+            {
+                evaluation.stale.extend(extra.stale);
+                evaluation.waiting.extend(extra.waiting);
+            }
             kind.after_links(&mut links, exports);
         }
         (links, evaluations)
@@ -486,21 +504,30 @@ impl Engine {
         self.refresh()?;
         let mut partial = self.partial()?;
         let core = self.core_links(&partial.exports);
-        let sites = items::sites(&partial.exports, &core);
+        let mut sites = items::sites(&partial.exports, &core);
+        sites.extend(iac::provision::item_sites(&partial.exports));
         partial.sites(sites)?;
         let exports = partial.exports;
         let items = items::list(&self.workspace.repos, &exports, &core);
-        let (links, _) = decisions::replay(core, &self.workspace, &exports);
+        let (links, _) = decisions::replay(core, &self.workspace, &exports, |d| {
+            !iac::provision::handles(d) && !KINDS.iter().any(|k| k.owns_decision(d))
+        });
         let decided: HashSet<String> = (links.iter())
             .filter(|l| l.level == Level::Decided)
             .map(|l| l.item_site().into_owned())
             .collect();
-        Ok((items.into_iter())
+        let mut items: Vec<_> = (items.into_iter())
             .map(|item| {
                 let applied = decided.contains(item.id.as_str());
                 (item, applied)
             })
-            .collect())
+            .collect();
+        items.extend(iac::provision::items(&self.workspace, &exports));
+        for kind in KINDS {
+            items.extend(kind.decision_items(&exports));
+        }
+        items.sort_by(|a, b| a.0.id.cmp(&b.0.id));
+        Ok(items)
     }
 
     /// The chain from `start`, followed `direction` through calls inside repositories and
@@ -1234,6 +1261,11 @@ impl Engine {
                             ));
                         }
                         let provisions = iac::provision::links(&partial.exports);
+                        lines.extend(iac::provision::decision_context(
+                            &provisions,
+                            &identity,
+                            &node.root,
+                        ));
                         let contracts = partial.exports[*n]
                             .provisioners
                             .iter()

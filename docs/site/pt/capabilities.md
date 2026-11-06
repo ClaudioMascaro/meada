@@ -273,8 +273,8 @@ acessar a rede, a partir dos valores do próprio repositório: os defaults das v
 chamada, `each`, `count.index`, templates e as funções puras de texto, coleção e conversão do ADR
 0025 com `jsonencode`. Data sources, atributos de resources, módulos do registro,
 `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_`, variáveis sensíveis e qualquer outra função
-nunca são avaliados: essa parte vira um `*` e o nome um padrão (`orders-*`), que por enquanto não
-liga nada. Um nome que passou por uma variável do módulo raiz, pelo default ou por um arquivo de
+nunca são avaliados: essa parte vira um `*` e o nome um padrão (`orders-*`), que liga nomes
+literais pelas regras de padrões abaixo. Um nome que passou por uma variável do módulo raiz, pelo default ou por um arquivo de
 variáveis, a registra, já que quem faz o deploy pode trocá-la. Um valor acima de 64 KiB, uma
 expressão cuja avaliação poderia passar de 1 MiB e o que uma raiz avalia além de 64 MiB ficam sem
 resolver. Um arquivo Terraform ou de variáveis alterado avalia de novo só os módulos raiz cuja
@@ -499,6 +499,20 @@ limites de segmentos; vários candidatos ficam `ambiguous` e podem receber uma d
 Sem um desses lados, `search` e `context` marcam o lado sem contraparte. A exportação mantém
 formato 1, com `at` nos construtores e `executions` para os caminhos diretos; o grafo do console
 mostra os contratos de imagem, as ligações e o código das cargas de trabalho.
+
+### Nomes parcialmente resolvidos
+
+Um canal, recurso ou imagem com partes desconhecidas preserva um padrão como `*-orders`.
+`${terraform.workspace}-orders` corresponde a `prod-orders` em `inferred`: são necessários
+ao menos três caracteres literais, e cada `*` deve ocupar segmentos inteiros delimitados por
+`-`, `_`, `.` ou `/`. Um padrão nunca corresponde a outro padrão. Vários nomes literais
+compatíveis ficam `ambiguous`, todos listados, e viram itens abertos. `meada decide` grava
+a escolha em `meada.decisions.toml`; o vínculo escolhido fica `decided`. Decisões de
+provisionamento pertencem ao lado que contém o padrão e conservam sua raiz de avaliação.
+
+Itens em chaves de configuração usam metadados de arquivo, linha, chave e contrato, inclusive quando o valor é `redacted` ou cortado.
+
+Um builder de imagem com padrão e vários nomes literais de runners também mantém seu próprio item aberto no repositório que faz o build.
 
 ## Locais de recursos declarados
 

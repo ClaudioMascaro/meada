@@ -2402,6 +2402,9 @@ pub(crate) struct Export {
     pub(crate) repository: String,
     /// Where the repository stands in the workspace; set by the engine, never stored or shown.
     pub(crate) root: PathBuf,
+    /// Query-time decisions, supplied by the workspace, never stored in the index.
+    pub(crate) decisions: crate::decisions::Decisions,
+    pub(crate) name_candidates: std::collections::BTreeMap<String, crate::items::NameCandidates>,
     pub(crate) files: Vec<File>,
     /// The files a pack dropped for passing a limit (`Facts::budget`, `Facts::usings`) or because
     /// the grammar misread them (`Facts::misparsed`), each with the limit or the reason, in path
@@ -3013,6 +3016,8 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         executions: Vec::new(),
         subscriptions: iac::subscription::read(db, identity)?,
         provisions: Vec::new(),
+        decisions: crate::decisions::Decisions::default(),
+        name_candidates: std::collections::BTreeMap::new(),
         entry_points,
         processes: Vec::new(),
         documents,

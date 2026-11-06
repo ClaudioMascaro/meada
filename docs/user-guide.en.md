@@ -372,7 +372,7 @@ by its path (`.` at the root).
   `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber` and `jsonencode`. Data sources,
   resource attributes, registry modules, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_`,
   sensitive variables and any other function are never evaluated: such a part of a name is a `*` and
-  the name a **pattern** (`"orders-${terraform.workspace}"` is `orders-*`), linked by nothing yet. A
+  the name a **pattern** (`"orders-${terraform.workspace}"` is `orders-*`), matching literal names under the pattern rules below. A
   name that went through a root module's variable lists it under `overridable:`, since a deployer
   can set another value. A changed Terraform file or var file evaluates again only the root modules
   whose unit (the root and the local modules it calls) holds it.
@@ -2077,6 +2077,20 @@ phone numbers or endpoints, high-level `boto3.resource` and `DynamoDBDocumentCli
 and operations outside this table are not recognized by these forms.
 
 `GetParametersByPath` queries a hierarchy, so its side stays unresolved; the path is not treated as a parameter name. A `ConditionCheck` in `TransactWriteItems` is a reader, even when the transaction also writes other tables. Computed `RequestItems` keys retain a literal or the environment variable name.
+
+### Partially resolved names
+
+A channel, resource or image with unknown parts retains a pattern such as `*-orders`.
+`${terraform.workspace}-orders` matches `prod-orders` at `inferred`: at least three literal
+characters are required, and each `*` must occupy whole segments bounded by `-`, `_`, `.`
+or `/`. A pattern never matches another pattern. Several matching literal names stay
+`ambiguous`, all listed, and become open items. `meada decide` records the choice in
+`meada.decisions.toml`; the chosen link becomes `decided`. Provisioning decisions belong
+to the side containing the pattern and retain its evaluation root.
+
+Configuration-key items use file, line, key and contract metadata, including when the value is redacted or cut.
+
+An image builder pattern with several literal runner names also keeps its own open item in the repository that builds the image.
 
 ## Locations of declared resources
 
