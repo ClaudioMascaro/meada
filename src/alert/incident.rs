@@ -6,6 +6,13 @@ use hcl_edit::expr::{Expression, ObjectKey};
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
 
+struct Source<'a> {
+    path: &'a str,
+    line: usize,
+    end_line: usize,
+    locations: &'a BTreeMap<String, (usize, usize)>,
+}
+
 pub(super) fn terraform(
     path: &str,
     body: &hcl_edit::structure::Body,
@@ -32,13 +39,15 @@ pub(super) fn terraform(
         let mut locations = BTreeMap::new();
         let value = literal_body(&resource.body, "", &line, &mut locations);
         read(
-            path,
+            Source {
+                path,
+                line: line(span.start),
+                end_line: line(span.end.saturating_sub(1)),
+                locations: &locations,
+            },
             ty,
             name,
             &value,
-            line(span.start),
-            line(span.end.saturating_sub(1)),
-            &locations,
             out,
             bytes,
         );
@@ -85,11 +94,13 @@ fn literal_body(
             );
         }
         let value = literal_body(&block.body, &at, line, locations);
-        object
+        if let Some(array) = object
             .entry(key.to_string())
             .or_insert_with(|| Value::Array(Vec::new()))
             .as_array_mut()
-            .map(|array| array.push(value));
+        {
+            array.push(value);
+        }
     }
     Value::Object(object)
 }
@@ -181,7 +192,19 @@ pub(super) fn json(
                                 }
                             }
                         }
-                        read(path, ty, name, value, line, end, &locations, out, bytes);
+                        read(
+                            Source {
+                                path,
+                                line,
+                                end_line: end,
+                                locations: &locations,
+                            },
+                            ty,
+                            name,
+                            value,
+                            out,
+                            bytes,
+                        );
                         if out.truncated {
                             return;
                         }
@@ -255,13 +278,10 @@ fn block<'a>(value: &'a Value, key: &str) -> Option<&'a Value> {
 }
 
 fn read(
-    path: &str,
+    source: Source<'_>,
     ty: &str,
     name: &str,
     value: &Value,
-    line: usize,
-    end_line: usize,
-    locations: &BTreeMap<String, (usize, usize)>,
     out: &mut Summary,
     bytes: &mut usize,
 ) {
@@ -271,9 +291,15 @@ fn read(
     }
     let key = format!("{ty}.{name}");
     if ty.starts_with("pagerduty_event_orchestration_") {
-        pagerduty(path, ty, &key, value, line, end_line, locations, out, bytes);
+        pagerduty(source, ty, &key, value, out, bytes);
         return;
     }
+    let Source {
+        path,
+        line,
+        end_line,
+        ..
+    } = source;
     if ty == "datadog_monitor" {
         let Some(title) = text(value, "name") else {
             return;
@@ -396,17 +422,20 @@ fn read(
 }
 
 fn pagerduty(
-    path: &str,
+    source: Source<'_>,
     ty: &str,
     key: &str,
     value: &Value,
-    line: usize,
-    end_line: usize,
-    locations: &BTreeMap<String, (usize, usize)>,
     out: &mut Summary,
     bytes: &mut usize,
 ) {
     use super::pcl::{self, Test};
+    let Source {
+        path,
+        line,
+        end_line,
+        locations,
+    } = source;
     let router = ty == "pagerduty_event_orchestration_router";
     let scope_value = scope(
         value,
