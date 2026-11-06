@@ -58,7 +58,8 @@ root: worker/serverless.yml
 handler: "handler.send"
 event: "http GET /mail/send"
 event: "sqs arn:aws:sqs:us-east-1:123456789012:mail-outbox"
-overridable: none
+overridable:
+example.com/acme/infra worker/serverless.yml:6 opt:stage (default)
 references: none
 referenced by: none
 values:

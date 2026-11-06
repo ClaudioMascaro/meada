@@ -340,9 +340,10 @@ matches. They stay out of `meada export`.
 - **Secrets**: the values of `data` and `stringData` of a Kubernetes `Secret` (a document with
   `apiVersion` and `kind: Secret`, or such an item of a list's `items`), the `default` of a
   Terraform `variable` with `sensitive = true` and every value a `.tfvars` file gives a variable
-  of that name (every value, when a Terraform file in its directory or above does not parse) are
-  stored as `redacted`,
-  with their key path, type and line. Nothing else is filtered: the index holds what the checkout
+  of that name (every value, when a Terraform file in its directory or above does not parse), and
+  the `value` of an `aws_ssm_parameter` resource with literal `type = "SecureString"`, in HCL
+  or Terraform JSON, are stored as `redacted`, with their key path, type and line.
+  Nothing else is filtered: the index holds what the checkout
   already does. List in `.meadaignore` the files that must stay out of the index (`secrets/`,
   `*.env.json`).
 
@@ -454,6 +455,8 @@ of type `service`.
 
 ### CloudFormation and SAM
 
+A qualifying template named `compose.yaml` keeps its nodes and references through cold indexing and warm refreshes; its filename does not make it Compose.
+
 A YAML template (the short-form tags `!Ref`, `!Sub`, `!GetAtt`, `!Join` and the rest are read) or a
 JSON one with a `Resources` mapping that carries `AWSTemplateFormatVersion` or the SAM transform
 (`AWS::Serverless-2016-10-31`) is read as one evaluation unit, rooted at its path. Each resource
@@ -479,7 +482,8 @@ evaluation unit, rooted at its path. Each function is an IaC node `functions.<na
 `Serverless::Function`.
 
 - **Function**: the physical name is the function's `name` or `<service>-<stage>-<function>` (the
-  stage is `provider.stage` or `dev`). `context` shows `handler:` and `event:` (`"http GET
+  stage is `provider.stage` or `dev`, listed under `overridable:` as `opt:stage`, since Serverless
+  names the function after `--stage` first). `context` shows `handler:` and `event:` (`"http GET
   /orders"`, `"sqs Queue.Arn"`, `"schedule rate(5 minutes)"`) and the references to the resources
   its body names with `Ref`, `Fn::GetAtt` or `Fn::Sub`.
 - **Resources**: the `resources` section is read as CloudFormation (nodes at the logical id, as
@@ -1249,6 +1253,10 @@ top-level `const` define `o.m`.
 
 **HTTP.**
 
+URLs built with `new URL(x)` or `new URL(ref, base)` are read only for the unassigned global
+`URL` or the named `URL` export of `url` or `node:url` through an import or unshadowed
+`require`. Unknown packages, repository aliases and other exports stay opaque.
+
 | Role | Library |
 | --- | --- |
 | Consumer | global `fetch`, and a call to a parameter whose default is `fetch` |
@@ -1287,7 +1295,11 @@ says so. `ignorePath`, `prependPath: false` and an endpoint the `app-config*.yam
 different values (which one a deployment loads is not known) are read the same way. As Backstage's
 proxy reads the configuration, the endpoints are those of `proxy.endpoints` and, when no file has
 that key, the keys of `proxy` that start with `/` (the legacy shape, accepted from before Backstage
-1.17); with both shapes, in one file or across files, only `endpoints` counts. An endpoint written
+1.17); with both shapes, in one file or across files, only `endpoints` counts, and so does a
+`proxy.endpoints`, a whole `proxy` or a whole `app-config` behind an `$include` Meada does not
+follow (Backstage reads whatever it gives), so the legacy keys are not read then; an `$include`
+whose `#` key path ends at an absent key does not count, as Backstage leaves that key out. An
+endpoint written
 as a string (`'/<endpoint>': https://...`) is `{ target }` with the default `pathRewrite`, in both
 shapes, and the rules above apply to it. An endpoint inside a partial included through `$include`
 counts as if it were in the file.
@@ -1302,13 +1314,15 @@ holds leaves the base unresolved. A block moved to a partial file with
 `{ $include: ./partials/a.yaml }` (or `./partials/a.yaml#a.b`, for its key `a.b` alone) and a
 value `{ $env: VAR }` are read as if written in the file itself, as Backstage applies them: the
 path starts from the including file's directory, only `.json`, `.yaml` and `.yml` files are read,
-and a partial may include another, from its own directory. A partial is an input of the index:
+a partial may include another, from its own directory, and an `app-config` that is one
+`$include` is the file it names. A partial is an input of the index:
 editing it alone changes the answer on the next query. Not followed: an absolute path, one that
 leaves the repository, a symbolic link, a `${` in the path, another extension, a file or key path
 that does not exist, an object with another key beside `$include`, a cycle, more than 8 includes
 deep, more than 64 includes from one `app-config` and more than 1 MiB of partials grafted into
 it: the keys under that `$include` stay unread, and `meada status` names each with its reason.
-`$file` is not read, and an `app-config` or partial over 1 MiB is ignored.
+`$file` is not read, and an `app-config` or partial over 1 MiB, or of more than one YAML
+document (Backstage refuses it), is ignored.
 
 **Manifests.** `package.json` (`name`, `version`, the four dependency fields, `exports`, `types`,
 `module` and `main`) and `tsconfig.json` (`paths`, `baseUrl`, `outDir`, `rootDir`). See npm in

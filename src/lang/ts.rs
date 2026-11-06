@@ -661,7 +661,7 @@ struct Parents<'t> {
     /// `search` and `hash`, which keep the path of a URL (WHATWG URL Standard).
     // ponytail: per name across the whole file, whichever function writes it; see `docs/agents/ceilings.md`.
     written: HashSet<String>,
-    /// Whether the file declares a `URL` or imports one from a relative path: `new URL(x)` is then
+    /// Whether the file binds a `URL` other than the runtime constructor: `new URL(x)` is then
     /// no runtime global.
     url_declared: bool,
 }
@@ -672,9 +672,13 @@ impl<'t> Parents<'t> {
         let mut assigned = HashSet::new();
         let mut written = HashSet::new();
         let mut url_declared = false;
+        let mut url_required = false;
+        let mut require_declared = false;
         let mut stack = vec![root];
         while let Some(node) = stack.pop() {
-            url_declared |= declares_url(node, src);
+            url_declared |= shadows_runtime(node, src, "URL");
+            url_required |= runtime_url_require(node, src);
+            require_declared |= shadows_runtime(node, src, "require");
             written.extend(member_written(node, src));
             let target = match node.kind() {
                 "assignment_expression" | "augmented_assignment_expression" => {
@@ -693,6 +697,8 @@ impl<'t> Parents<'t> {
                 stack.push(child);
             }
         }
+        url_declared |= assigned.contains("URL")
+            || (url_required && (require_declared || assigned.contains("require")));
         Self {
             up,
             assigned,
@@ -706,48 +712,88 @@ impl<'t> Parents<'t> {
     }
 }
 
-/// Whether `node` declares the name `URL` as a value of the file: a class, function or variable
-/// of that name, or an import of it from a relative path.
-fn declares_url(node: Node, src: &[u8]) -> bool {
+/// Whether `node` binds `name`, hiding the runtime name. Only the named `URL` export of Node's
+/// `url` and `node:url` modules proves that a binding named `URL` is the runtime constructor.
+fn shadows_runtime(node: Node, src: &[u8], name: &str) -> bool {
     match node.kind() {
         "class_declaration"
         | "abstract_class_declaration"
+        | "class"
         | "function_declaration"
         | "generator_function_declaration"
+        | "function_expression"
+        | "function"
+        | "generator_function"
         | "enum_declaration" => node
             .child_by_field_name("name")
-            .is_some_and(|n| text(n, src) == "URL"),
-        // `const { URL } = require("url")` binds the global itself; only a relative `require`
-        // (or any other initializer) is the repository's.
+            .is_some_and(|n| text(n, src) == name),
         "variable_declarator" => {
-            let package = (node.child_by_field_name("value")).is_some_and(|v| {
-                v.kind() == "call_expression"
-                    && (v.child_by_field_name("function"))
-                        .is_some_and(|f| text(f, src) == "require")
-                    && (v.child_by_field_name("arguments"))
-                        .and_then(|a| named(a).next())
-                        .is_some_and(|a| a.kind() == "string" && !unquote(a, src).starts_with('.'))
-            });
-            !package
+            !(name == "URL" && runtime_url_require(node, src))
                 && (node.child_by_field_name("name"))
-                    .is_some_and(|n| bound(n, src).iter().any(|name| name == "URL"))
+                    .is_some_and(|n| bound(n, src).iter().any(|n| n == name))
         }
         // A parameter or a `catch` binding of that name hides the global as well.
-        "formal_parameters" => bound(node, src).iter().any(|name| name == "URL"),
+        "formal_parameters" => bound(node, src).iter().any(|n| n == name),
+        "for_in_statement" => node
+            .child_by_field_name("left")
+            .is_some_and(|n| bound(n, src).iter().any(|n| n == name)),
+        "import_alias" | "import_require_clause" => named(node)
+            .next()
+            .is_some_and(|n| n.kind() == "identifier" && text(n, src) == name),
         "catch_clause" => (node.child_by_field_name("parameter"))
-            .is_some_and(|n| bound(n, src).iter().any(|name| name == "URL")),
+            .is_some_and(|n| bound(n, src).iter().any(|n| n == name)),
         "arrow_function" => {
-            (node.child_by_field_name("parameter")).is_some_and(|n| text(n, src) == "URL")
+            (node.child_by_field_name("parameter")).is_some_and(|n| text(n, src) == name)
         }
         "import_statement" => {
             let mut bindings = Vec::new();
             imports(node, src, &mut bindings);
-            bindings
-                .iter()
-                .any(|i| i.local == "URL" && i.source.starts_with('.'))
+            bindings.iter().any(|i| {
+                i.local == name
+                    && !(name == "URL"
+                        && matches!(i.source.as_str(), "url" | "node:url")
+                        && matches!(&i.name, Imported::Name(n) if n == "URL"))
+            })
         }
         _ => false,
     }
+}
+
+/// `const { URL } = require('url')` (or `node:url`), including an explicit `URL: URL` binding.
+/// A module object, another export, a rest or nested pattern does not prove a constructor.
+fn runtime_url_require(node: Node, src: &[u8]) -> bool {
+    if node.kind() != "variable_declarator" {
+        return false;
+    }
+    let Some(pattern) = node
+        .child_by_field_name("name")
+        .filter(|n| n.kind() == "object_pattern")
+    else {
+        return false;
+    };
+    let binds_url = named(pattern).any(|n| match n.kind() {
+        "shorthand_property_identifier_pattern" => text(n, src) == "URL",
+        "pair_pattern" => {
+            n.child_by_field_name("key")
+                .is_some_and(|k| text(k, src) == "URL")
+                && n.child_by_field_name("value")
+                    .is_some_and(|v| v.kind() == "identifier" && text(v, src) == "URL")
+        }
+        _ => false,
+    });
+    binds_url
+        && node.child_by_field_name("value").is_some_and(|v| {
+            v.kind() == "call_expression"
+                && v.child_by_field_name("function")
+                    .is_some_and(|f| f.kind() == "identifier" && text(f, src) == "require")
+                && v.child_by_field_name("arguments").is_some_and(|args| {
+                    let mut args = named(args);
+                    args.next().is_some_and(|a| {
+                        a.kind() == "string"
+                            && matches!(unquote(a, src).as_str(), "url" | "node:url")
+                    }) && args.next().is_none()
+                })
+        })
 }
 
 /// The callee of a `new URL(reference, base)` of the runtime global, as a `Value::New` names it.

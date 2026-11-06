@@ -5,7 +5,8 @@
 //! (`cloudformation::nodes`). The file is one evaluation unit, rooted at its path.
 //!
 //! A function's physical name is its `name`, else `<service>-<stage>-<function>`, the stage being
-//! `provider.stage` or `dev`. Variables are resolved over the file alone: `${self:a.b}` is the
+//! `provider.stage` or `dev`, overridable by `--stage` (`opt:stage`), which Serverless names such a
+//! function after first. Variables are resolved over the file alone: `${self:a.b}` is the
 //! value at that path (itself expanded), and `${opt:name, default}` is its default with the name
 //! marked overridable, since a deployer passes `--name`. Alternatives (`${self:x, 'y'}`) are tried
 //! in order. Every other source (`env`, `ssm`, `sls`, `aws`, `cf`, `file(...)`, ...) is an
@@ -179,6 +180,24 @@ fn overridable(segs: Vec<Seg>, expr: &str, line: usize) -> Vec<Seg> {
         }
         _ => vec![Seg::Unknown(expr.to_string())],
     }
+}
+
+/// The stage of a function's default name, `stage` as the file gives it: Serverless names such a
+/// function after `--stage` first, then `provider.stage`, then `dev` (`setFunctionNames` of its
+/// `Service`), whatever the stage holds, so the name is overridable by `opt:stage`, at `line`. A
+/// stage that already goes through an `opt:stage`, or has an unresolved part, stays as it is.
+// ponytail: a stage with an unresolved part (`${env:STAGE}`) makes the name a pattern, `*` where
+// `--stage` goes too, so `opt:stage` is not listed beside it; list it if a reason needs it.
+fn stage_of_default_name(stage: &[Seg], line: usize) -> Vec<Seg> {
+    let staged = |s: &Seg| match s {
+        Seg::Opt { expr, .. } => expr.split(',').next().map(str::trim) == Some("opt:stage"),
+        Seg::Lit(_) => false,
+        Seg::Unknown(_) => true,
+    };
+    if stage.iter().any(staged) {
+        return stage.to_vec();
+    }
+    overridable(finish(stage.to_vec()), "opt:stage", line)
 }
 
 /// The bytes a piece counts for against `PHYSICAL_NAME_MAX` and `VARIABLE_BYTES_MAX`.
@@ -751,9 +770,14 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
     let mut spans: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     let mut resource_spans: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     let mut lines: HashMap<String, usize> = HashMap::new();
+    // The line of `provider.stage`, where a default name's `--stage` stands.
+    let mut stage_line = None;
     let documents = events::read_keyed(Syntax::of(path), src, true, |scalar| {
         if scalar.document != 0 {
             return;
+        }
+        if matches!(scalar.path, [Step::Key(p), Step::Key(s)] if p == "provider" && s == "stage") {
+            stage_line.get_or_insert(scalar.line);
         }
         if scalar.value.as_str().is_some_and(|s| s.contains("${")) {
             lines
@@ -845,6 +869,8 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
         for (key, f) in functions.iter().take(NODES_MAX) {
             let body = f.as_object().unwrap_or(&empty);
             let mut at = vec![Step::Key("functions".into()), Step::Key(key.clone())];
+            let (first, last) = spans.get(key).copied().unwrap_or((1, 1));
+            let line = key_line.of(key, first);
             let name_segs = match body.get("name") {
                 Some(Value::String(s)) => {
                     at.push(Step::Key("name".into()));
@@ -856,7 +882,11 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
                 None => {
                     let mut all = service_segs.clone();
                     all.push(Seg::Lit("-".into()));
-                    all.extend(stage_segs.clone());
+                    // `--stage` stands at `provider.stage`, or at the function with none.
+                    all.extend(stage_of_default_name(
+                        &stage_segs,
+                        stage_line.unwrap_or(line),
+                    ));
                     all.push(Seg::Lit(format!("-{key}")));
                     Some(finish(all))
                 }
@@ -891,8 +921,6 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
             if !take(size) {
                 break;
             }
-            let (first, last) = spans.get(key).copied().unwrap_or((1, 1));
-            let line = key_line.of(key, first);
             let address = format!("functions.{key}");
             nodes.push(Node {
                 address: address.clone(),
@@ -1214,6 +1242,56 @@ mod tests {
         let name = |a: &str| nodes.iter().find(|n| n.address == a).unwrap().name.clone();
         assert_eq!(name("functions.f").as_deref(), Some("s-dev-f"));
         assert_eq!(name("functions.g").as_deref(), Some("s-dev-orders"));
+    }
+
+    #[test]
+    fn a_default_name_is_overridable_by_the_stage_option() {
+        let listed = |n: &Node| -> Vec<(String, usize, bool)> {
+            (n.overridable.iter())
+                .map(|o| (o.variable.clone(), o.line, o.tfvars))
+                .collect()
+        };
+        // A literal stage: `--stage` comes first in the name, at `provider.stage`'s line.
+        let (nodes, _) = unit(
+            "service: s\nprovider:\n  stage: prod\nfunctions:\n  f:\n    handler: h\n  g:\n    name: s-${self:provider.stage}-g\n",
+        );
+        let by = |a: &str| nodes.iter().find(|n| n.address == a).unwrap();
+        let f = by("functions.f");
+        assert_eq!((f.name.as_deref(), f.pattern), (Some("s-prod-f"), false));
+        assert_eq!(listed(f), [("opt:stage".to_string(), 3, false)]);
+        // `${self:provider.stage}` reads the file, never `--stage`: a name that writes it is none.
+        let g = by("functions.g");
+        assert_eq!((g.name.as_deref(), listed(g)), (Some("s-prod-g"), vec![]));
+        // No stage in the file: `dev`, at the function's line.
+        let (nodes, _) = unit("service: s\nfunctions:\n  f:\n    handler: h\n");
+        assert_eq!(nodes[0].name.as_deref(), Some("s-dev-f"));
+        assert_eq!(listed(&nodes[0]), [("opt:stage".to_string(), 3, false)]);
+        // A stage another `opt:` gives is overridable by both; one `opt:stage` gives names that
+        // one alone; an unresolved one has none.
+        let (nodes, _) = unit(
+            "service: s\nprovider:\n  stage: ${opt:env, 'qa'}\nfunctions:\n  f:\n    handler: h\n",
+        );
+        assert_eq!(nodes[0].name.as_deref(), Some("s-qa-f"));
+        let both = [
+            ("opt:env, 'qa'".to_string(), 3, false),
+            ("opt:stage".to_string(), 3, false),
+        ];
+        assert_eq!(listed(&nodes[0]), both);
+        let (nodes, _) = unit(
+            "service: s\nprovider:\n  stage: ${opt:stage , 'qa'}\nfunctions:\n  f:\n    handler: h\n",
+        );
+        assert_eq!(
+            listed(&nodes[0]),
+            [("opt:stage , 'qa'".to_string(), 3, false)]
+        );
+        let (nodes, _) = unit(
+            "service: s\nprovider:\n  stage: ${env:STAGE}\nfunctions:\n  f:\n    handler: h\n",
+        );
+        let n = &nodes[0];
+        assert_eq!(
+            (n.name.as_deref(), n.pattern, listed(n)),
+            (Some("s-*-f"), true, vec![])
+        );
     }
 
     #[test]

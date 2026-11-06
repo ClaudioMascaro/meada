@@ -1,0 +1,7 @@
+# A `proxy.endpoints` behind an include Meada does not follow (no such file) may hold the table
+# Backstage reads, so the legacy keys beside it are no endpoints.
+proxy:
+  endpoints:
+    $include: ./proxy-endpoints.yaml
+  '/inventory':
+    target: ${INVENTORY_URL}

@@ -14,6 +14,198 @@ fn api(case: &str) -> PathBuf {
     fixture_repo(case, "http-api", Some("https://example.com/acme/api.git"))
 }
 
+/// A binding named URL is the runtime constructor only when its export proves it. Unknown
+/// packages, repository aliases and other exports must not invent consumers or links (#709).
+#[test]
+fn only_proven_runtime_url_bindings_produce_http_contracts() {
+    let case = "urls_runtime_bindings";
+    let repo = fixture_repo(
+        case,
+        "http-url-builder",
+        Some("https://example.com/acme/vets-web.git"),
+    );
+    fixture_repo(
+        case,
+        "http-url-builder-api",
+        Some("https://example.com/acme/vets-api.git"),
+    );
+    std::fs::remove_dir_all(repo.join("src")).unwrap();
+    std::fs::create_dir(repo.join("src")).unwrap();
+    std::fs::write(
+        repo.join("tsconfig.json"),
+        r#"{"compilerOptions":{"baseUrl":".","paths":{"@app/*":["src/*"]}}}"#,
+    )
+    .unwrap();
+    std::fs::write(repo.join("src/builder.ts"), "export class URL {}\n").unwrap();
+    let cases = [
+        ("global.ts", "", true),
+        ("node.ts", "import { URL } from 'node:url';", true),
+        ("url.ts", "import { URL } from 'url';", true),
+        ("require.js", "const { URL } = require('node:url');", true),
+        ("require_url.ts", "const { URL } = require('url');", true),
+        (
+            "require_pair.ts",
+            "const { URL: URL } = require('url');",
+            true,
+        ),
+        ("unknown.ts", "import { URL } from 'unknown-url';", false),
+        (
+            "unknown_alias.ts",
+            "import { Builder as URL } from 'unknown-url';",
+            false,
+        ),
+        ("alias.ts", "import { URL } from '@app/builder';", false),
+        ("relative.ts", "import { URL } from './builder';", false),
+        (
+            "wrong_export.ts",
+            "import { parse as URL } from 'url';",
+            false,
+        ),
+        ("default.ts", "import URL from 'node:url';", false),
+        ("namespace.ts", "import * as URL from 'url';", false),
+        (
+            "unknown_require.js",
+            "const { URL } = require('unknown-url');",
+            false,
+        ),
+        (
+            "alias_require.ts",
+            "const { URL } = require('@app/builder');",
+            false,
+        ),
+        (
+            "wrong_require.ts",
+            "const { parse: URL } = require('node:url');",
+            false,
+        ),
+        ("module_require.ts", "const URL = require('url');", false),
+        (
+            "shadow_require.ts",
+            "function require(name) { return {}; } const { URL } = require('url');",
+            false,
+        ),
+        (
+            "import_require.ts",
+            "import require from 'unknown-loader'; const { URL } = require('url');",
+            false,
+        ),
+        ("assigned.ts", "URL = other;", false),
+        ("parameter.ts", "function hidden({ URL }) {}", false),
+        ("catch.ts", "try { run(); } catch ({ URL }) {}", false),
+    ];
+    for (file, binding, _) in cases {
+        std::fs::write(
+            repo.join("src").join(file),
+            format!(
+                "{binding}\nexport function single() {{ return fetch(new URL('https://api.example.com/api/vets').toString()); }}\nexport function joined() {{ return fetch(new URL('/api/vets', 'https://api.example.com')); }}\n"
+            ),
+        )
+        .unwrap();
+    }
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), cases.len() * 2);
+    for consumer in consumers {
+        let file = consumer["site"]
+            .as_str()
+            .unwrap()
+            .split("::")
+            .nth(1)
+            .unwrap();
+        let runtime = cases
+            .iter()
+            .find(|(f, _, _)| file == format!("src/{f}"))
+            .unwrap()
+            .2;
+        assert_eq!(
+            consumer["contract"].as_str(),
+            runtime.then_some("http::GET::/api/vets"),
+            "{consumer}"
+        );
+    }
+    let links = json["links"].as_array().unwrap();
+    assert_eq!(
+        links.len(),
+        cases.iter().filter(|(_, _, runtime)| *runtime).count() * 2
+    );
+    for link in links {
+        let file = link["consumer"]
+            .as_str()
+            .unwrap()
+            .split("::")
+            .nth(1)
+            .unwrap();
+        assert!(
+            cases
+                .iter()
+                .any(|(f, _, runtime)| *runtime && file == format!("src/{f}")),
+            "{link}"
+        );
+        assert_eq!(link["level"], "exact");
+    }
+}
+
+/// Less common binding syntax must hide the runtime just like a parameter or declaration.
+#[test]
+fn loop_import_equals_and_named_expression_url_bindings_stay_opaque() {
+    let repo = fixture_repo(
+        "urls_hidden_runtime_bindings",
+        "http-url-builder",
+        Some("https://example.com/acme/vets-web.git"),
+    );
+    std::fs::remove_dir_all(repo.join("src")).unwrap();
+    std::fs::create_dir(repo.join("src")).unwrap();
+    let call = "fetch(new URL('https://api.example.com/api/vets').toString()); fetch(new URL('/api/vets', 'https://api.example.com'));";
+    let cases = [
+        (
+            "import_equals",
+            format!("import URL = require('unknown-url'); export function run() {{ {call} }}"),
+        ),
+        (
+            "import_alias",
+            format!("import URL = Unknown.Constructor; export function run() {{ {call} }}"),
+        ),
+        (
+            "loop_url",
+            format!("export function run(ctors) {{ for (const URL of ctors) {{ {call} }} }}"),
+        ),
+        (
+            "loop_require",
+            format!(
+                "export function run(loaders) {{ for (const require of loaders) {{ const {{ URL }} = require('url'); {call} }} }}"
+            ),
+        ),
+        (
+            "named_function",
+            format!(
+                "export const run = function require(name) {{ const {{ URL }} = require('url'); {call} }};"
+            ),
+        ),
+        (
+            "named_class",
+            format!("export const run = class URL {{ method() {{ {call} }} }};"),
+        ),
+        (
+            "alias_require",
+            format!(
+                "import require = Unknown.Loader; const {{ URL }} = require('url'); export function run() {{ {call} }}"
+            ),
+        ),
+    ];
+    for (name, source) in &cases {
+        std::fs::write(repo.join("src").join(format!("{name}.ts")), source).unwrap();
+    }
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), cases.len() * 2);
+    for consumer in consumers {
+        assert!(consumer["contract"].is_null(), "{consumer}");
+    }
+    assert!(json["links"].as_array().unwrap().is_empty());
+}
+
 #[test]
 fn constants_fold_into_urls_across_files() {
     let case = "urls_constants";
@@ -970,6 +1162,149 @@ fn an_empty_endpoints_table_still_hides_the_legacy_keys_of_another_file() {
         );
         assert!(json["links"].as_array().unwrap().is_empty(), "{fixture}");
     }
+}
+
+/// A `proxy.endpoints`, a whole `proxy` or a whole root behind an include Meada does not follow
+/// may hold the table Backstage's proxy backend reads, and Backstage reads it (or refuses to
+/// start) whatever it gives (#709): the legacy keys beside it or in another file are no
+/// endpoints, the call stays unlinked and `meada status` names the include.
+#[test]
+fn an_endpoints_table_behind_an_include_not_followed_hides_the_legacy_keys() {
+    for (n, (fixture, include)) in [
+        ("ts-backstage-proxy-unfollowed", "./proxy-endpoints.yaml"),
+        ("ts-backstage-proxy-unfollowed", "/etc/backstage/proxy.yaml"),
+        (
+            "ts-backstage-proxy-unfollowed-proxy",
+            "/etc/backstage/proxy.yaml",
+        ),
+        (
+            "ts-backstage-proxy-unfollowed-root",
+            "/etc/backstage/app-config.yaml",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let case = format!("urls_{}_{n}", fixture.replace('-', "_"));
+        let web = fixture_repo(
+            &case,
+            fixture,
+            Some("https://example.com/backstage/web.git"),
+        );
+        let config = web.join("app-config.yaml");
+        std::fs::write(
+            &config,
+            std::fs::read_to_string(&config)
+                .unwrap()
+                .replace("./proxy-endpoints.yaml", include),
+        )
+        .unwrap();
+        fixture_repo(
+            &case,
+            "go-backstage-inventory",
+            Some("https://example.com/backstage/inventory.git"),
+        );
+        let export = Engine::open(&web).unwrap().export().unwrap();
+        let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+        let consumers: Vec<_> = (json["consumers"].as_array().unwrap())
+            .iter()
+            .map(|c| c["contract"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            consumers,
+            ["http::GET::/api/proxy/inventory/clusters"],
+            "{fixture}"
+        );
+        assert!(json["links"].as_array().unwrap().is_empty(), "{fixture}");
+        let status = meada::engine::status(&web).unwrap();
+        assert!(status.contains(include), "{fixture}: {status}");
+    }
+}
+
+/// Backstage transforms only the children of an included value. Including that same value at
+/// the root or at `proxy` is not a cycle and must not hide a legacy table from another file.
+#[test]
+fn a_self_include_at_the_root_or_proxy_keeps_legacy_endpoints() {
+    for (n, config) in [
+        "$include: ./app-config.yaml\n",
+        "proxy: { $include: ./app-config.yaml#proxy }\n",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let case = format!("urls_proxy_self_include_{n}");
+        let web = fixture_repo(
+            &case,
+            "ts-backstage-proxy-unfollowed",
+            Some("https://example.com/backstage/web.git"),
+        );
+        fixture_repo(
+            &case,
+            "go-backstage-inventory",
+            Some("https://example.com/backstage/inventory.git"),
+        );
+        std::fs::write(web.join("app-config.yaml"), config).unwrap();
+        std::fs::write(
+            web.join("app-config.local.yaml"),
+            "proxy:\n  '/inventory':\n    target: ${INVENTORY_URL}\n",
+        )
+        .unwrap();
+        let export = Engine::open(&web).unwrap().export().unwrap();
+        let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+        let consumers: Vec<_> = json["consumers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c["contract"].as_str())
+            .collect();
+        assert_eq!(consumers, [Some("http::GET::/clusters")], "{config}");
+        let links = json["links"].as_array().unwrap();
+        assert_eq!(links.len(), 1, "{config}: {links:?}");
+        assert_eq!(links[0]["level"], "inferred");
+        assert!(
+            links[0]["provider"]
+                .as_str()
+                .unwrap()
+                .starts_with("example.com/backstage/inventory::")
+        );
+        assert!(
+            !meada::engine::status(&web)
+                .unwrap()
+                .contains("not followed")
+        );
+    }
+}
+
+/// An include at `proxy.endpoints` whose `#` key path ends at a key the partial lacks gives
+/// Backstage `undefined`, a key its loader leaves out rather than a failed load (#709): no table
+/// stands there, so the legacy key beside it links the call, and `meada status` names the include.
+#[test]
+fn an_endpoints_include_whose_last_key_is_absent_leaves_the_legacy_keys_read() {
+    let case = "urls_backstage_proxy_keypath";
+    let web = fixture_repo(
+        case,
+        "ts-backstage-proxy-keypath",
+        Some("https://example.com/backstage/web.git"),
+    );
+    fixture_repo(
+        case,
+        "go-backstage-inventory",
+        Some("https://example.com/backstage/inventory.git"),
+    );
+    let export = Engine::open(&web).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let consumers: Vec<_> = (json["consumers"].as_array().unwrap())
+        .iter()
+        .map(|c| c["contract"].as_str().unwrap())
+        .collect();
+    assert_eq!(consumers, ["http::GET::/clusters"]);
+    let links: Vec<_> = (json["links"].as_array().unwrap())
+        .iter()
+        .map(|l| l["level"].as_str().unwrap())
+        .collect();
+    assert_eq!(links, ["inferred"]);
+    let status = meada::engine::status(&web).unwrap();
+    assert!(status.contains("./partials/proxy.yaml#nope"), "{status}");
 }
 
 /// Backstage's `$include` (#689): an include Meada does not follow leaves its subtree unread, and

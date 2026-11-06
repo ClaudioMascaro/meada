@@ -14,6 +14,7 @@
 //!
 //! A `variable` with `sensitive = true` keeps its `default` redacted, and a `.tfvars` file every
 //! value it gives to a sensitive variable (`Sensitive`): key path, type and line, no value.
+//! An `aws_ssm_parameter` resource with literal `type = "SecureString"` redacts its `value`.
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -121,7 +122,7 @@ pub(crate) fn nested_past(text: &str) -> Option<usize> {
 #[derive(Clone, Copy)]
 enum Hide<'a> {
     Nothing,
-    /// The attribute of this name: a sensitive variable's `default`.
+    /// The attribute of this name: a sensitive variable's `default` or a SecureString's `value`.
     Attribute(&'a str),
     /// Every attribute named in the set: the values a `.tfvars` file gives sensitive variables.
     Names(&'a BTreeSet<String>),
@@ -230,8 +231,17 @@ impl Walk<'_> {
                         && b.labels.len() == 1
                         && (b.body.get_attribute("sensitive"))
                             .is_some_and(|a| matches!(&a.value, Expression::Bool(v) if *v.value()));
+                    let secure = depth == 0
+                        && b.ident.as_str() == "resource"
+                        && b.labels.len() == 2
+                        && b.labels[0].as_str() == "aws_ssm_parameter"
+                        && (b.body.get_attribute("type")).is_some_and(
+                            |a| matches!(&a.value, Expression::String(v) if v.value() == "SecureString"),
+                        );
                     let inner = if sensitive {
                         Hide::Attribute("default")
+                    } else if secure {
+                        Hide::Attribute("value")
                     } else {
                         Hide::Nothing
                     };

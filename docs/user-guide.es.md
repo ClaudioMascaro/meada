@@ -346,7 +346,8 @@ hay clave para activarlo: la búsqueda con `kind = "value"` los encuentra, y la 
   con `apiVersion` y `kind: Secret`, o un elemento así de una lista `items`), el `default` de una
   `variable` de Terraform con `sensitive = true` y todo valor que un archivo `.tfvars` da a una
   variable de ese nombre (todo valor, cuando un archivo Terraform en su carpeta o por encima no se
-  lee) se guardan como `redacted`, con su ruta de la clave, su tipo y su línea. Nada más se filtra: el índice guarda lo
+  lee), y el `value` de un recurso `aws_ssm_parameter` con `type = "SecureString"` literal,
+  en HCL o Terraform JSON, se guardan como `redacted`, con su ruta de la clave, su tipo y su línea. Nada más se filtra: el índice guarda lo
   que el checkout ya tiene. Pon en `.meadaignore` los archivos que no deben entrar en el índice
   (`secrets/`, `*.env.json`).
 
@@ -460,6 +461,8 @@ Cada servicio es un nodo IaC `services.<nombre>` de tipo `service`.
 
 ### CloudFormation y SAM
 
+Una plantilla válida llamada `compose.yaml` conserva sus nodos y referencias en el índice inicial y las actualizaciones; el nombre del archivo no la convierte en Compose.
+
 Una plantilla YAML (las etiquetas cortas `!Ref`, `!Sub`, `!GetAtt`, `!Join` y las demás se leen) o
 JSON con un mapa `Resources` que lleve `AWSTemplateFormatVersion` o la transformación SAM
 (`AWS::Serverless-2016-10-31`) se lee como una unidad de evaluación, con raíz en su ruta. Cada
@@ -485,7 +488,8 @@ unidad de evaluación, con raíz en su ruta. Cada función es un nodo IaC `funct
 tipo `Serverless::Function`.
 
 - **Función**: el nombre físico es el `name` de la función o `<service>-<stage>-<función>` (el
-  `stage` es `provider.stage` o `dev`). `context` muestra `handler:` y `event:` (`"http GET
+  `stage` es `provider.stage` o `dev`, listado en `overridable:` como `opt:stage`, porque Serverless
+  nombra la función por `--stage` primero). `context` muestra `handler:` y `event:` (`"http GET
   /orders"`, `"sqs Queue.Arn"`, `"schedule rate(5 minutes)"`) y las referencias a los recursos
   que su cuerpo nombra con `Ref`, `Fn::GetAtt` o `Fn::Sub`.
 - **Recursos**: la sección `resources` se lee como CloudFormation (nodos en el id lógico, como
@@ -1270,6 +1274,10 @@ asignar el nombre. Las funciones del objeto literal de un `const` de nivel super
 
 **HTTP.**
 
+Las URLs construidas con `new URL(x)` o `new URL(ref, base)` se leen solo para el `URL` global
+sin reasignación o el export nombrado `URL` de `url` o `node:url` por `import` o
+`require` no ocultado. Paquetes desconocidos, aliases de repositorio y otros exports quedan opacos.
+
 | Papel | Biblioteca |
 | --- | --- |
 | Consumidor | `fetch` global, y una llamada a un parámetro cuyo valor predeterminado es `fetch` |
@@ -1309,7 +1317,11 @@ el proxy hace de todos modos, así que el resto de la URL va al destino; cualqui
 el proxy de Backstage lee la configuración, los endpoints son los de `proxy.endpoints` y, cuando
 ningún archivo tiene esa clave, las claves de `proxy` que empiezan por `/` (la forma antigua,
 aceptada desde antes de Backstage 1.17); con las dos formas, en un archivo o en varios, solo vale
-`endpoints`. Un endpoint escrito como texto (`'/<endpoint>': https://...`) es `{ target }` con el
+`endpoints`, y también un `proxy.endpoints`, un `proxy` entero o un `app-config` entero detrás
+de un `$include` que Meada no sigue (Backstage lee lo que traiga), y entonces las claves antiguas
+no se leen; un `$include` cuya ruta de clave tras `#` termina en una clave ausente no cuenta,
+porque Backstage deja esa clave fuera. Un endpoint escrito como texto
+(`'/<endpoint>': https://...`) es `{ target }` con el
 `pathRewrite` por defecto, en las dos formas, y las reglas de arriba valen para él. Un endpoint
 dentro de un parcial incluido por `$include` vale como si estuviera en el archivo.
 
@@ -1324,13 +1336,15 @@ resolver. Un bloque llevado a un archivo parcial con `{ $include: ./parciales/a.
 `./parciales/a.yaml#a.b`, para solo su clave `a.b`) y un valor `{ $env: VAR }` se leen como si
 estuvieran en el propio archivo, como Backstage los aplica: la ruta parte de la carpeta del
 archivo que incluye, solo se leen archivos `.json`, `.yaml` y `.yml`, y un parcial puede incluir
-otro, desde su propia carpeta. Un parcial es entrada del índice: editar solo él cambia la
+otro, desde su propia carpeta, y un `app-config` que es un único `$include` es el archivo que
+nombra. Un parcial es entrada del índice: editar solo él cambia la
 respuesta en la próxima consulta. No se siguen una ruta absoluta, una que sale del repositorio, un
 enlace simbólico, un `${` en la ruta, otra extensión, un archivo o ruta de clave que no existe, un
 objeto con otra clave junto a `$include`, un ciclo, más de 8 inclusiones de profundidad, más de 64
 inclusiones desde un `app-config` y más de 1 MiB de parciales injertados en él: las claves bajo
 ese `$include` quedan sin leer, y `meada status` nombra cada uno con su motivo. `$file` no se lee,
-y un `app-config` o parcial de más de 1 MiB se ignora.
+y un `app-config` o parcial de más de 1 MiB, o de más de un documento YAML (Backstage lo rechaza),
+se ignora.
 
 **Manifiestos.** `package.json` (`name`, `version`, los cuatro campos de dependencias, `exports`,
 `types`, `module` y `main`) y `tsconfig.json` (`paths`, `baseUrl`, `outDir`, `rootDir`). Vea npm

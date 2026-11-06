@@ -471,7 +471,9 @@
   list's `items`; a `Secret` with no `apiVersion`, or nested anywhere else (a Helm value, a
   Crossplane composition's base), keeps its values (the other secret markers of ADR 0025 belong
   to the IaC formats, #640). The hidden CI paths are read at the repository root only, and only
-  their YAML and JSON files.
+  their config files: YAML and JSON, and since #640 Terraform too, so a Terraform root kept under
+  `.github/` (boutique's `.github/terraform`) gives values and nodes, and its `sensitive`
+  variables redact what var files anywhere give them (#709 kept it for that redaction).
   Terraform and OpenTofu (#640, `config_values/hcl.rs`): `NESTING_MAX` (64 brackets open inside
   each other in one file, counted by a scan that includes the ones inside strings, so a file
   with many unbalanced brackets in strings can be unreadable; past it the file is unreadable and
@@ -485,7 +487,10 @@
   var-file, whichever module it goes to), and wholly when a Terraform file at or above its
   directory is unreadable (`config_values::ANY_VARIABLE`); a variable marked sensitive by an
   expression keeps its values, and `sensitive` is read as the literal `true` of a top-level
-  `variable` (JSON: the object form of `variable`, not the array form). A `//` comment
+  `variable` (JSON: the object form of `variable`, not the array form).
+  An `aws_ssm_parameter` resource with literal
+  `type = "SecureString"` redacts its `value`, regardless of attribute order, in HCL and the
+  object form of Terraform JSON. An unresolved type expression is no secret marker. A `//` comment
   property of a Terraform JSON file is a value, and a block written as an array of one is
   indexed `[0]` there. A number is stored as
   written. A block repeated in one body is indexed from its second occurrence on, so adding a
@@ -588,9 +593,10 @@
   nodes. Only `serverless.yml`, `.yaml` and `.json` are read: `serverless.ts`, `serverless.js`,
   `${file(...)}` values, `serverless.*.yml` variants, values from other files, `provider` defaults
   (`environment`, `iam`), plugins and a `functions` list (the v1 form) are not, and a function given
-  by `${file(...)}` is a node with no handler or events. `--stage` is not modelled over a literal or
-  absent `provider.stage` (the name keeps `dev` or the literal, not overridable); only an `opt:` in
-  the file marks a value overridable, and an `opt:` whose fallback is anything but one text is
+  by `${file(...)}` is a node with no handler or events. `--stage` is modelled only in a function's
+  default name (`opt:stage`, #709; a stage with an unresolved part, a pattern, lists it not):
+  `${self:provider.stage}` reads the file, as Serverless v3's `self:` source does, so a name
+  through it is no override; besides that only an `opt:` in the file marks a value overridable, and an `opt:` whose fallback is anything but one text is
   unresolved. Serverless's own logical ids for functions and its generated resources (roles, API
   gateway, log groups) are not nodes, so a `Ref` of `HelloLambdaFunction` references nothing. A
   string with an unresolved part that sits where the CloudFormation reader needs plain text (`Type`,

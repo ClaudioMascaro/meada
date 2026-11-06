@@ -364,9 +364,11 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   names are not read.
 - **Nodes.** Each entry of `functions` is a node `functions.<name>` of type
   `Serverless::Function`, at the lines of its block, with its physical name (its `name`, else
-  `<service>-<stage>-<name>`, the stage `provider.stage` or `dev`), its `handler` and its `events`
-  recorded (`iac::Node::handler`, `events`; `iac_nodes` gains the columns). An event is its type,
-  then what identifies it: `http GET /users` (method upper-cased, path with its leading slash),
+  `<service>-<stage>-<name>`, the stage `provider.stage` or `dev`, overridable as `opt:stage` at
+  `provider.stage`'s line or the function's, since Serverless names such a function after
+  `--stage` first, #709), its `handler` and its `events` recorded (`iac::Node::handler`,
+  `events`; `iac_nodes` gains the columns). An event is its type, then what identifies it:
+  `http GET /users` (method upper-cased, path with its leading slash),
   `httpApi ANY /v2`, `sqs Queue.Arn` (a `Fn::GetAtt` as `Resource.Attribute`, a `Ref` as the
   name), `sns <topic>`, `schedule rate(5 minutes)`, `s3 <bucket>`, `websocket <route>`; an
   intrinsic it cannot read is a `*`. The `resources.Resources` mapping is read as the
@@ -382,9 +384,10 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   unresolved part and ends the chain, whatever follows it: a `*` in a name, `${expr}` in a
   recorded text. A variable inside a variable is expanded first, within its alternative, and must
   give a text, read as one source (a comma in it is no alternative); `provider.stage` left out is
-  `dev` to `${self:provider.stage}` as to a name. A value that names itself, directly or around a
-  cycle, is unresolved whole, whichever value of the cycle is met first. `${...}` with no source,
-  or with `::` (`${AWS::Region}`), is CloudFormation's and stays.
+  `dev` to `${self:provider.stage}` as to a name, and is no override there, since `self:` reads
+  the file and never `--stage`. A value that names itself, directly or around a cycle, is
+  unresolved whole, whichever value of the cycle is met first. `${...}` with no source, or with
+  `::` (`${AWS::Region}`), is CloudFormation's and stays.
 - **Resources.** The section's strings are expanded before the CloudFormation reader sees them: a
   string that resolves is that text; one with an `opt:` default becomes a `Ref` to a synthetic
   parameter holding it (shown as the `opt:` expression), one with an unresolved part an

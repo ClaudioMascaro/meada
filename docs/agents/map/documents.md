@@ -125,7 +125,9 @@ this file, and a change to these modules updates it.
   and `.tfvars.json` go through the event reader (their key paths are the same), their strings
   with an interpolation typed by `json_kind` and stored as the quoted JSON string. Sensitive:
   a top-level `variable` with `sensitive = true` hides its `default` (`SecretPlace::Variable`
-  in JSON, `Hide::Attribute` in HCL); `Sensitive` collects, once per refresh from the rows
+  in JSON, `Hide::Attribute` in HCL); an `aws_ssm_parameter` resource with literal
+  `type = "SecureString"` hides its `value` (`SecretPlace::SsmParameter` in JSON,
+  `Hide::Attribute` in HCL), regardless of attribute order. `Sensitive` collects, once per refresh from the rows
   already stored (`variable.<name>.sensitive` = true, of the files found), the sensitive
   variable names of the repository and the directories holding an unreadable Terraform file,
   and `read_with` redacts the values a `.tfvars` file gives those names (`Sensitive::of`; all
@@ -230,15 +232,17 @@ this file, and a change to these modules updates it.
   `Fn::Join` (a parameter's default is an `iac::Overridable`; `no_echo` is also what
   `config_values` redacts a default by). The index rewrites a template's own rows
   (`iac::template_changed`, `iac::refresh_template`) as the closure reading its config file runs,
-  and `iac::Owner` keeps each refresh to its own rows: Terraform and Compose by file name,
-  Kubernetes by a type with no `::`, CloudFormation by one with it.
+  and `iac::Owner` keeps each refresh to its own rows: CloudFormation by a type with `::`,
+  regardless of filename; among the other types, Terraform and Compose by file name,
+  Kubernetes by any other file name.
 - `iac/serverless.rs` (#654, ADR 0025): Serverless Framework services as IaC nodes, one unit per
   `serverless.{yml,yaml,json}` (root: its path). `wanted`, `is_file` and `is_service` decide,
   `evaluate(path, bytes)` reads it with `document::events::read_keyed`, expands the file's
   variables (`Vars`: `self:` by path, an `opt:` default as `Seg::Opt`, any other source
   `Seg::Unknown`), records each function as an `iac::Node` with `handler` and `events`
-  (`event_text`), takes the references of its body with `cloudformation::referenced`, and hands
-  `resources.Resources`, expanded by `substitute` into a template with synthetic `opt:N`
+  (`event_text`; a default name's stage overridable as `opt:stage`, `stage_of_default_name`, #709), takes the
+  references of its body with `cloudformation::referenced`, and hands `resources.Resources`,
+  expanded by `substitute` into a template with synthetic `opt:N`
   parameters, to `cloudformation::nodes` (`Unit`: the path, the document, the spans, the key
   lines, the block prefix, the node and byte room left). `iac::template_wanted` and
   `iac::template_evaluate` pick between a template and a service by file name, so

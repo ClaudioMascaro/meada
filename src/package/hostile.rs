@@ -687,6 +687,17 @@ fn probes() -> Vec<Probe> {
                 ("b.yaml", file(b)),
             ])
         }),
+        // Many values left unread (an `$env` beside another key) under one key of half the file:
+        // where each sits is compared with the proxy table's key paths (#709), never copied.
+        (
+            "app-config: many values left unread under a long key",
+            || {
+                let key = "k".repeat(MAX_BYTES / 2);
+                let unread = fill(4, |i| format!("  e{i}: {{ $env: A, x: 1 }}\n"));
+                let root = format!("? {key}\n:\n{unread}");
+                crate::http::app_config_probe(&[("app-config.yaml", file(root))])
+            },
+        ),
         // Spring: `application.properties`, `application.yml`
         ("spring: many properties", || {
             configured(
