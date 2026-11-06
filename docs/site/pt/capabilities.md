@@ -687,3 +687,27 @@ roteamento. Um matcher compatível não comprova entrega nem uma notificação f
 uma equipe. No exemplo público #638, a regra testa `service:app`: o monitor também
 emite `support:team-b`, mas não existe ali um matcher para `support`. O YAML de
 monitor não padronizado e os valores Helm originais continuam apenas configuração.
+
+## Azure: contratos e Functions
+
+A tabela Terraform/OpenTofu lê `azurerm_servicebus_queue`, `azurerm_servicebus_topic` e
+`azurerm_servicebus_subscription` como canais `servicebus`; `azurerm_eventhub` como
+`eventhubs`; `azurerm_storage_account` como recurso `azurestorage`,
+`azurerm_storage_container` como `azureblob` e `azurerm_key_vault_secret` como `keyvault`.
+A conta e o container com o mesmo nome continuam contratos distintos.
+
+Uma assinatura tem identidade `channel::servicebus::subscription:<tópico>/<assinatura>`.
+Ela liga seus consumidores aos produtores do tópico, com `exact` sem regra de filtro e
+`inferred` quando uma regra é declarada. Filas e tópicos preservam `/` no nome. Os processors
+C# já suportados continuam vinculados ao tópico, inclusive quando recebem uma assinatura.
+IDs ARM completos e URLs de blob ou segredo reconhecidos dão usos `exact`; chaves finais
+`servicebus_queue`, `servicebus_topic`, `servicebus_subscription` (valor `tópico/assinatura`),
+`eventhubs_hub`, `azurestorage_account`, `azureblob_container` e `keyvault_secret` dão
+`inferred`. Valores iguais sem essa evidência não ligam.
+
+`azurerm_linux_function_app` lê o bloco Docker de `site_config.application_stack`, e ambos
+os tipos Linux e Windows leem `zip_deploy_file` local e `app_settings`. O arquivo local
+permanece dentro do repositório, sem `..` nem symlink; arquivos ZIP não são abertos. Um
+pacote remoto não identifica código local. Referências Key Vault em app settings continuam
+ocultas e sem valor resolvido. Os contratos e workloads participam de `context`, `trace`,
+órfãos, provisionamento e export.

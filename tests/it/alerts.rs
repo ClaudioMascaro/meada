@@ -992,7 +992,10 @@ fn incident_receiver_filters_templates_grouping_and_team_scope_never_invent_forw
         [am.clone(), og.clone(), pd.clone()]
     );
     std::fs::write(repo.join(".meadaignore"), "main.tf\n").unwrap();
-    assert_eq!(rows(engine.export().unwrap()), [am.clone()]);
+    assert_eq!(
+        rows(engine.export().unwrap()).as_slice(),
+        std::slice::from_ref(&am)
+    );
     std::fs::remove_file(repo.join(".meadaignore")).unwrap();
     std::fs::write(repo.join("alertmanager.yaml"), &original).unwrap();
     assert_eq!(

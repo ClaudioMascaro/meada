@@ -1084,3 +1084,73 @@ fn unread_sam_image_never_invents_a_registry_or_supplies_builder_environment() {
         "{exported}"
     );
 }
+
+#[test]
+fn lambda_environment_evaluates_computed_keys_and_refuses_unread_or_duplicate_maps() {
+    let repo = fixture_repo(
+        "aws_workloads_lambda_computed_keys",
+        "aws-workload-lambda",
+        Some("https://example.com/acme/lambda.git"),
+    );
+    for (variables, contract) in [
+        (r#"(var.key) = "orders""#, "channel::sqs::orders"),
+        ("(var.key) = aws_sqs_queue.jobs.url", "channel::sqs::jobs"),
+        (
+            r#"QUEUE_NAME = "must-not-survive", (var.unknown) = "other""#,
+            "channel::sqs",
+        ),
+        (
+            r#"QUEUE_NAME = "must-not-survive", (var.key) = "other""#,
+            "channel::sqs",
+        ),
+        (
+            r#"QUEUE_NAME = "must-not-survive", ("QUEUE_${var.unknown}") = "other""#,
+            "channel::sqs",
+        ),
+    ] {
+        std::fs::write(
+            repo.join("main.tf"),
+            format!(
+                r#"
+variable "key" {{ default = "QUEUE_NAME" }}
+variable "unknown" {{}}
+resource "aws_sqs_queue" "jobs" {{ name = "jobs" }}
+resource "aws_lambda_function" "worker" {{
+  function_name = "worker"
+  filename = "worker"
+  handler = "send.dispatch"
+  image_uri = "ghcr.io/acme/aws-worker:1"
+  environment {{ variables = {{ {variables} }} }}
+}}
+"#
+            ),
+        )
+        .unwrap();
+        let exported = Engine::open(&repo).unwrap().export().unwrap();
+        let data: Value = serde_json::from_str(&exported).unwrap();
+        assert_eq!(
+            data["providers"].as_array().map(Vec::len),
+            Some(1),
+            "{exported}"
+        );
+        assert_eq!(
+            data["providers"][0]["contract"], contract,
+            "{variables}\n{exported}"
+        );
+        assert_eq!(
+            data["consumers"].as_array().map(Vec::len),
+            Some(1),
+            "{exported}"
+        );
+        assert_eq!(
+            data["consumers"][0]["contract"],
+            "image::ghcr.io/acme/aws-worker"
+        );
+        assert_eq!(
+            data["executions"].as_array().map(Vec::len),
+            Some(1),
+            "{exported}"
+        );
+        assert_eq!(data["executions"][0]["path"], "worker");
+    }
+}

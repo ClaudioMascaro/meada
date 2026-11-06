@@ -1,4 +1,4 @@
-//! AWS/PubSub subscriptions (#658, #667): evaluated in their root and instance, then routed by
+//! Cloud subscription summaries: evaluated in their root and instance, then routed by
 //! the channel kind. Resource attributes name only a known node, never a cloud API value.
 use super::*;
 
@@ -18,6 +18,8 @@ pub(crate) fn reads(ty: &str) -> bool {
         "aws_sns_topic_subscription"
             | "aws_cloudwatch_event_rule"
             | "aws_cloudwatch_event_target"
+            | "azurerm_servicebus_subscription"
+            | "azurerm_servicebus_subscription_rule"
             | "google_pubsub_subscription"
     )
 }
@@ -56,6 +58,7 @@ struct Rule {
 pub(super) struct Inputs {
     nodes: HashMap<String, usize>,
     rules: HashMap<(String, String), Option<Rule>>,
+    pub(super) azure_filters: HashMap<String, String>,
 }
 
 /// Only known identity attributes, never resource contents such as a secret's value.
@@ -123,7 +126,7 @@ impl<'m> Eval<'m> {
         let found = self.value(at, each, expr, depth);
         if let Val::Known(Value::String(raw)) = found.val {
             let name = match types::entry("terraform", ty) {
-                Some(e) => e.project(&raw)?,
+                Some(entry) => entry.project(&raw)?,
                 None => raw,
             };
             if name.is_empty()
@@ -301,6 +304,24 @@ impl<'m> Eval<'m> {
             return None;
         }
         let (source, target, filtered, via) = match block.ty.as_str() {
+            "azurerm_servicebus_subscription" => {
+                let source =
+                    self.endpoint_arg(at, each, block, "topic_id", "azurerm_servicebus_topic")?;
+                let projected = self.nodes[node].provisioned.as_ref()?;
+                if projected.pattern {
+                    return None;
+                }
+                let target = Endpoint {
+                    name: projected.name.clone()?,
+                    through: projected.through.iter().cloned().collect(),
+                };
+                let rule = self
+                    .subscription_inputs
+                    .azure_filters
+                    .get(&target.name)
+                    .cloned();
+                (source, target, rule.is_some(), rule)
+            }
             "aws_sns_topic_subscription" => {
                 let protocol = self.value(at, each, &block.args.get("protocol")?.expr, 0);
                 if protocol.val != Val::Known(Value::String("sqs".into())) {
@@ -366,15 +387,18 @@ impl<'m> Eval<'m> {
             }
             _ => return None,
         };
-        let broker = if block.ty == "aws_sns_topic_subscription" {
-            "sns"
-        } else if block.ty == "google_pubsub_subscription" {
-            "pubsub"
-        } else {
-            "eventbridge"
+        let broker = match block.ty.as_str() {
+            "aws_sns_topic_subscription" => "sns",
+            "azurerm_servicebus_subscription" => "servicebus",
+            "google_pubsub_subscription" => "pubsub",
+            _ => "eventbridge",
         };
         let source_contract = format!("channel::{broker}::{}", source.name);
-        let target_broker = if broker == "pubsub" { "pubsub" } else { "sqs" };
+        let target_broker = if matches!(broker, "servicebus" | "pubsub") {
+            broker
+        } else {
+            "sqs"
+        };
         let target_contract = format!("channel::{target_broker}::{}", target.name);
         let mut reason = format!(
             "{target_contract} subscription {} (root {})",

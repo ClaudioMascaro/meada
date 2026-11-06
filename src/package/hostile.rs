@@ -119,6 +119,7 @@ fn tree(files: Vec<(String, String)>) -> usize {
     let nodes = (nodes.iter()).map(|n| {
         n.address.len()
             + n.name.as_ref().map_or(0, String::len)
+            + n.workload_size()
             + n.subscription
                 .as_ref()
                 .map_or(0, |s| serde_json::to_vec(s).unwrap().len())
@@ -1103,6 +1104,20 @@ fn probes() -> Vec<Probe> {
                 ))
             },
         ),
+        (
+            "iac: Azure subscription rules and Function app settings",
+            || {
+                let attributes = fill(2, |i| format!(" K{i} = \"literal-value\"\n"));
+                let subscriptions = fill(3, |i| {
+                    format!(
+                        "resource \"azurerm_servicebus_subscription\" \"s{i}\" {{\n name = \"audit-{i}\"\n topic_id = azurerm_servicebus_topic.source.id\n}}\nresource \"azurerm_servicebus_subscription_rule\" \"r{i}\" {{\n name = \"filter\"\n subscription_id = azurerm_servicebus_subscription.s{i}.id\n filter_type = \"SqlFilter\"\n sql_filter = \"x = 1\"\n}}\n"
+                    )
+                });
+                nodes(format!(
+                    "resource \"azurerm_servicebus_topic\" \"source\" {{ name = \"source\" }}\nresource \"azurerm_linux_function_app\" \"worker\" {{\n name = \"worker\"\n app_settings = {{\n{attributes} }}\n}}\n{subscriptions}"
+                ))
+            },
+        ),
         ("iac: AWS EventBridge rules and targets", || {
             let routes = fill(1, |i| {
                 format!(
@@ -1622,6 +1637,20 @@ fn swift_modules(text: String) -> usize {
             facts.imports.len() + facts.unit.len()
         })
         .sum()
+}
+
+#[test]
+fn azure_reader_stays_bounded_on_a_full_file() {
+    let (_, probe) = probes()
+        .into_iter()
+        .find(|(name, _)| name.starts_with("iac: Azure"))
+        .unwrap();
+    let start = Instant::now();
+    let size = probe();
+    let elapsed = start.elapsed();
+    eprintln!("Azure IaC hostile probe: {elapsed:?}, {size} stored bytes");
+    assert!(size > 1000 && size <= MAX_OUT, "{size}");
+    assert!(elapsed < BUDGET, "{elapsed:?}");
 }
 
 /// Every reader, given a file built to explode, returns within `BUDGET` of its start and gives

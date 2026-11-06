@@ -20,6 +20,7 @@ use crate::workspace::Repository;
 
 pub use meada_core::export::{Level, Link};
 
+pub(crate) mod azure;
 pub(crate) mod gcp;
 pub(crate) mod sdk;
 

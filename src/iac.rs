@@ -52,6 +52,7 @@ use crate::trace::Direction;
 use meada_core::export::Level;
 use meada_core::trace::{Chain, Row};
 
+mod azure;
 pub(crate) mod cloudformation;
 pub(crate) mod compose;
 pub(crate) mod config_uses;
@@ -1094,11 +1095,11 @@ impl<'m> Eval<'m> {
         self.evaluating.clear();
         self.outputs = true;
         let pending = std::mem::take(&mut self.pending);
-        // Even if a later budget stops projection, a GCP multi-field identity must not
-        // fall back to a short physical name and impersonate another contract.
+        // An unknown composite must never fall back to its physical short name, even if
+        // the root exhausts its evaluation/storage budget before projection runs.
         for &(node, _, block, _) in &pending {
             if block.kind == Kind::Resource
-                && block.ty.starts_with("google_")
+                && (block.ty.starts_with("azurerm_") || block.ty.starts_with("google_"))
                 && types::entry("terraform", &block.ty).is_some()
             {
                 self.nodes[node].provisioned = Some(Projection::default());
@@ -1143,15 +1144,16 @@ impl<'m> Eval<'m> {
         }
         self.prepare_subscriptions(&pending);
         for &(node, _, block, _) in &pending {
+            self.azure_projection(node, block);
             self.gcp_projection(node, block);
         }
+        self.azure_subscriptions(&pending);
         for &(node, instance, block, ref each) in &pending {
             self.gcp_database(node, instance, each.as_ref(), block);
         }
         for &(node, instance, block, ref each) in &pending {
             self.gcp_workload(node, instance, each.as_ref(), block);
-        }
-        for &(node, instance, block, ref each) in &pending {
+            self.azure_workload(node, instance, each.as_ref(), block);
             self.workload(node, instance, each.as_ref(), block);
         }
         for &(node, instance, block, ref each) in &pending {

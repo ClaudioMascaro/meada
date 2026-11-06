@@ -2270,3 +2270,28 @@ roteamento. Um matcher compatível não comprova entrega nem uma notificação f
 uma equipe. No exemplo público #638, a regra testa `service:app`: o monitor também
 emite `support:team-b`, mas não existe ali um matcher para `support`. O YAML de
 monitor não padronizado e os valores Helm originais continuam apenas configuração.
+
+## Infraestrutura Azure
+
+Terraform e OpenTofu provisionam canais Service Bus (filas, tópicos e assinaturas) e Event
+Hubs, além de recursos Storage Account (`azurestorage`), container Blob (`azureblob`) e
+segredo Key Vault (`keyvault`). Uma assinatura se chama
+`channel::servicebus::subscription:orders/audit`, distinta da fila legal
+`orders/subscriptions/audit`. Regras da assinatura enfraquecem a entrega para `inferred`;
+sem regra, ela é `exact`. Processors C# existentes mantêm o vínculo pelo tópico.
+
+Um ID ARM completo ou URL reconhecida de blob/segredo é uso `exact`. Chaves finais
+`servicebus_queue`, `servicebus_topic`, `servicebus_subscription`, `eventhubs_hub`,
+`azurestorage_account`, `azureblob_container` e `keyvault_secret` são usos `inferred`;
+a assinatura exige valor `tópico/assinatura`. `queue`, `topic`, `bucket` e `table` mantêm
+os significados AWS. Conta, namespace, vault, versão e objeto não entram na identidade,
+mas o identificador completo é validado antes de removê-los.
+
+Functions Linux leem `site_config.application_stack.docker` com `registry_url`,
+`image_name` e `image_tag`. Functions Linux e Windows leem `zip_deploy_file` e
+`app_settings`; só um arquivo local seguro fornece execução direta, sem abrir o ZIP.
+Um caminho ausente, remoto, com `..` ou symlink não fornece código. App settings resolvem
+leituras somente no código executado pela imagem ou caminho correspondente, com nível
+`inferred`. Referências a segredos e valores desconhecidos ficam sem resolução. Consulte
+[as capacidades](site/pt/capabilities.md#azure-contratos-e-functions) para os tipos e
+limites; `context`, `trace`, export e órfãos seguem as mesmas regras de provisionamento.

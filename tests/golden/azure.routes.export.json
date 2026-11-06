@@ -1,0 +1,145 @@
+{
+  "format": 1,
+  "repository": "example.com/azure/app",
+  "commit": "f60c2181588078de2f21915469ff05c06641e172",
+  "dirty": true,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "channel::eventhubs::events",
+      "site": "example.com/azure/app::asyncapi.yaml::eventhubs send events"
+    },
+    {
+      "contract": "channel::servicebus::orders",
+      "site": "example.com/azure/app::asyncapi.yaml::servicebus send orders"
+    },
+    {
+      "contract": "channel::servicebus::orders/subscriptions/audit",
+      "site": "example.com/azure/app::asyncapi.yaml::servicebus send orders/subscriptions/audit"
+    },
+    {
+      "contract": "channel::servicebus::other",
+      "site": "example.com/azure/app::asyncapi.yaml::servicebus send other"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "channel::eventhubs::events",
+      "site": "example.com/azure/app::asyncapi.yaml::eventhubs receive events",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::subscription:orders/audit",
+      "site": "example.com/azure/app::asyncapi.yaml::servicebus receive subscription:orders/audit",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::subscription:orders/orders",
+      "site": "example.com/azure/app::asyncapi.yaml::servicebus receive subscription:orders/orders",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::subscription:other/audit",
+      "site": "example.com/azure/app::asyncapi.yaml::servicebus receive subscription:other/audit",
+      "via": null
+    }
+  ],
+  "documents": [
+    {
+      "path": "asyncapi.yaml",
+      "format": "asyncapi",
+      "version": "2.6.0",
+      "contracts": [
+        "channel::eventhubs::events",
+        "channel::servicebus::orders",
+        "channel::servicebus::orders/subscriptions/audit",
+        "channel::servicebus::other",
+        "channel::servicebus::subscription:orders/audit",
+        "channel::servicebus::subscription:orders/orders",
+        "channel::servicebus::subscription:other/audit"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/azure/app::asyncapi.yaml::eventhubs receive events",
+      "provider": "example.com/azure/app::asyncapi.yaml::eventhubs send events",
+      "contract": "channel::eventhubs::events",
+      "level": "exact",
+      "reason": "channel::eventhubs::events"
+    },
+    {
+      "consumer": "example.com/azure/app::asyncapi.yaml::servicebus receive subscription:orders/audit",
+      "provider": "example.com/azure/app::asyncapi.yaml::servicebus send orders",
+      "contract": "channel::servicebus::subscription:orders/audit",
+      "level": "exact",
+      "reason": "channel::servicebus::subscription:orders/audit subscription azurerm_servicebus_subscription.audit (root .)"
+    },
+    {
+      "consumer": "example.com/azure/app::asyncapi.yaml::servicebus receive subscription:orders/orders",
+      "provider": "example.com/azure/app::asyncapi.yaml::servicebus send orders",
+      "contract": "channel::servicebus::subscription:orders/orders",
+      "level": "inferred",
+      "reason": "channel::servicebus::subscription:orders/orders subscription azurerm_servicebus_subscription.same (root .) via azurerm_servicebus_subscription_rule.filter; filter"
+    },
+    {
+      "consumer": "example.com/azure/app::asyncapi.yaml::servicebus receive subscription:other/audit",
+      "provider": "example.com/azure/app::asyncapi.yaml::servicebus send other",
+      "contract": "channel::servicebus::subscription:other/audit",
+      "level": "exact",
+      "reason": "channel::servicebus::subscription:other/audit subscription azurerm_servicebus_subscription.other (root .)"
+    }
+  ],
+  "provisions": [
+    {
+      "side": "example.com/azure/app::asyncapi.yaml::servicebus receive subscription:orders/audit",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_servicebus_subscription.audit",
+      "root": ".",
+      "contract": "channel::servicebus::subscription:orders/audit",
+      "level": "exact",
+      "reason": "channel::servicebus::subscription:orders/audit"
+    },
+    {
+      "side": "example.com/azure/app::asyncapi.yaml::servicebus receive subscription:orders/orders",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_servicebus_subscription.same",
+      "root": ".",
+      "contract": "channel::servicebus::subscription:orders/orders",
+      "level": "exact",
+      "reason": "channel::servicebus::subscription:orders/orders"
+    },
+    {
+      "side": "example.com/azure/app::asyncapi.yaml::servicebus receive subscription:other/audit",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_servicebus_subscription.other",
+      "root": ".",
+      "contract": "channel::servicebus::subscription:other/audit",
+      "level": "exact",
+      "reason": "channel::servicebus::subscription:other/audit"
+    },
+    {
+      "side": "example.com/azure/app::asyncapi.yaml::servicebus send orders",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_servicebus_topic.orders",
+      "root": ".",
+      "contract": "channel::servicebus::orders",
+      "level": "exact",
+      "reason": "channel::servicebus::orders"
+    },
+    {
+      "side": "example.com/azure/app::asyncapi.yaml::servicebus send orders/subscriptions/audit",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_servicebus_queue.slash",
+      "root": ".",
+      "contract": "channel::servicebus::orders/subscriptions/audit",
+      "level": "exact",
+      "reason": "channel::servicebus::orders/subscriptions/audit"
+    },
+    {
+      "side": "example.com/azure/app::asyncapi.yaml::servicebus send other",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_servicebus_topic.other",
+      "root": ".",
+      "contract": "channel::servicebus::other",
+      "level": "exact",
+      "reason": "channel::servicebus::other"
+    }
+  ]
+}

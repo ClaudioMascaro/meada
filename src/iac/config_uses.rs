@@ -81,6 +81,18 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
             })
             .map(|c| (c, Level::Exact))
             .or_else(|| {
+                crate::contract::azure::ALIASES
+                    .iter()
+                    .find_map(|alias| {
+                        (key == *alias
+                            || key.ends_with(&format!(".{alias}"))
+                            || key.ends_with(&format!("[\"{alias}\"]")))
+                        .then(|| crate::contract::azure::typed(alias, &value))
+                        .flatten()
+                    })
+                    .map(|contract| (contract, Level::Inferred))
+            })
+            .or_else(|| {
                 let alias = [
                     "pubsub_topic",
                     "pubsub_subscription",

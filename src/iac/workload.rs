@@ -6,6 +6,7 @@ use super::environment::{self, Entry};
 use super::{Block, Each, Eval, Evaluated, Kind, Resolved, Val, WorkloadImage};
 use hcl::Value;
 use hcl_edit::expr::{Expression, ObjectKey, TraversalOperator};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 /// New workload code paths reject parent steps before normalization, even if still in-root.
@@ -181,32 +182,43 @@ impl<'m> Eval<'m> {
                 .min(self.left)
                 .saturating_sub(candidate.workload_size()),
         );
-        let mut put =
-            |name: &str, (target, value, contract): (String, Option<String>, Option<String>)| {
-                let bytes = block.name.len()
-                    + image.map_or(0, str::len)
-                    + 2 * name.len()
-                    + target.len()
-                    + value.as_ref().map_or(0, String::len)
-                    + contract.as_ref().map_or(0, String::len);
-                let Some(left) = room.checked_sub(bytes) else {
-                    entries.clear();
-                    return false;
-                };
-                room = left;
-                entries.insert(
-                    name.to_string(),
-                    Entry {
-                        container: block.name.clone(),
-                        image: image.map(str::to_string),
-                        name: name.into(),
-                        target,
-                        value,
-                        contract,
-                    },
-                );
-                true
+        let mut put = |name: &str, found: (String, Option<String>, Option<String>)| {
+            // An unread or duplicate key can replace any literal entry. Preserve its
+            // unknown scope for HTTP too, without retaining a partial environment.
+            let complete = name != "*" && !entries.contains_key(name);
+            let (name, (target, value, contract)) = if complete {
+                (name, found)
+            } else {
+                entries.clear();
+                (
+                    "*",
+                    ("Terraform environment (unresolved)".into(), None, None),
+                )
             };
+            let bytes = block.name.len()
+                + image.map_or(0, str::len)
+                + 2 * name.len()
+                + target.len()
+                + value.as_ref().map_or(0, String::len)
+                + contract.as_ref().map_or(0, String::len);
+            let Some(left) = room.checked_sub(bytes) else {
+                entries.clear();
+                return false;
+            };
+            room = left;
+            entries.insert(
+                name.to_string(),
+                Entry {
+                    container: block.name.clone(),
+                    image: image.map(str::to_string),
+                    name: name.into(),
+                    target,
+                    value,
+                    contract,
+                },
+            );
+            complete
+        };
         'environment: for body in block
             .nested
             .iter()
@@ -218,11 +230,21 @@ impl<'m> Eval<'m> {
             if let Expression::Object(values) = &arg.value {
                 for (key, value) in values {
                     let name = match key {
-                        ObjectKey::Ident(id) => id.as_str(),
-                        ObjectKey::Expression(Expression::String(s)) => s.value().as_str(),
-                        _ => continue,
+                        ObjectKey::Ident(id) => Cow::Borrowed(id.as_str()),
+                        ObjectKey::Expression(Expression::String(s)) => {
+                            Cow::Borrowed(s.value().as_str())
+                        }
+                        ObjectKey::Expression(expr) => {
+                            let Val::Known(Value::String(name)) =
+                                self.value(instance, each, expr, 0).val
+                            else {
+                                put("*", (String::new(), None, None));
+                                break 'environment;
+                            };
+                            Cow::Owned(name)
+                        }
                     };
-                    if !put(name, self.tf_environment(instance, each, value.expr())) {
+                    if !put(&name, self.tf_environment(instance, each, value.expr())) {
                         break 'environment;
                     }
                 }
@@ -232,7 +254,8 @@ impl<'m> Eval<'m> {
                     ..
                 } = self.value(instance, each, &arg.value, 0)
                 else {
-                    continue;
+                    put("*", (String::new(), None, None));
+                    break 'environment;
                 };
                 for (name, value) in values {
                     if !put(

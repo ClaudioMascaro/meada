@@ -8,6 +8,7 @@ mod asyncapi;
 mod aws;
 mod aws_sdk;
 mod aws_workloads;
+mod azure;
 mod benchmark;
 mod cargo;
 mod channel_queries;

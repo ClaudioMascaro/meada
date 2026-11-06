@@ -682,3 +682,27 @@ block. A compatible matcher does not establish delivery or a final team notifica
 In public example #638 the rule tests `service:app`: the same monitor also emits
 `support:team-b`, but there is no `support` matcher there. The original nonstandard
 monitor YAML and Helm values remain configuration only.
+
+## Azure contracts and Functions
+
+The Terraform/OpenTofu table reads `azurerm_servicebus_queue`, `azurerm_servicebus_topic`
+and `azurerm_servicebus_subscription` as `servicebus` channels; `azurerm_eventhub` as
+`eventhubs`; `azurerm_storage_account` as resource `azurestorage`,
+`azurerm_storage_container` as `azureblob` and `azurerm_key_vault_secret` as `keyvault`.
+An account and container with the same name remain distinct contracts.
+
+A subscription has identity `channel::servicebus::subscription:<topic>/<subscription>`.
+It joins its consumers to the topic's producers, at `exact` without a filter rule and
+`inferred` when a rule is declared. Queue/topic names retain `/`. Existing C# processors
+retain topic identity, including overloads taking a subscription. Complete supported ARM
+IDs and blob/secret URLs give `exact` uses; final keys `servicebus_queue`, `servicebus_topic`,
+`servicebus_subscription` (value `topic/subscription`), `eventhubs_hub`,
+`azurestorage_account`, `azureblob_container` and `keyvault_secret` give `inferred`.
+Equal values without that evidence create no link.
+
+`azurerm_linux_function_app` reads the Docker block under `site_config.application_stack`;
+both Linux and Windows types read local `zip_deploy_file` and `app_settings`. A local file
+stays inside the repository with no `..` or symlink; ZIP archives are never opened. A remote
+package identifies no local code. Key Vault app-setting references stay redacted and
+unresolved. Contracts and workloads participate in `context`, `trace`, orphans,
+provisioning and export.

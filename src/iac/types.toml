@@ -23,7 +23,7 @@
 #
 # GCP structured identities use the contract kind's validated projection: subscriptions keep
 # `subscriptions/<id>`, and Cloud SQL databases combine their instance and name.
-# Every entry has a fixture case in `tests/fixtures/{provision-infra,aws-infra,gcp-infra}/`
+# Every entry has a fixture case in `tests/fixtures/{provision-infra,aws-infra,gcp-infra,azure-infra}/`
 # (`types::tests::every_entry_has_a_fixture_case`).
 
 [[entry]]
@@ -365,3 +365,66 @@ format = "terraform"
 type = "aws_ecs_task_definition"
 images = ["container_definitions[].image"]
 name = "family"
+
+[[entry]]
+format = "terraform"
+type = "azurerm_servicebus_queue"
+contract = "channel"
+kind = "servicebus"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "azurerm_servicebus_topic"
+contract = "channel"
+kind = "servicebus"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "azurerm_servicebus_subscription"
+contract = "channel"
+kind = "servicebus"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "azurerm_eventhub"
+contract = "channel"
+kind = "eventhubs"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "azurerm_storage_account"
+contract = "resource"
+kind = "azurestorage"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "azurerm_storage_container"
+contract = "resource"
+kind = "azureblob"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "azurerm_key_vault_secret"
+contract = "resource"
+kind = "keyvault"
+name = "name"
+
+[[workload]]
+format = "terraform"
+type = "azurerm_linux_function_app"
+images = ["site_config.application_stack.docker[].registry_url", "site_config.application_stack.docker[].image_name", "site_config.application_stack.docker[].image_tag"]
+code = "zip_deploy_file"
+code_file = true
+
+[[workload]]
+format = "terraform"
+type = "azurerm_windows_function_app"
+images = []
+code = "zip_deploy_file"
+code_file = true

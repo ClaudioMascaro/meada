@@ -11,6 +11,7 @@ topic leaves within 24 KiB; the code wins over these entries.
 - [HTTP extraction and linking](contracts/http-extraction-and-linking.md)
 - [HTTP through Services, Compose and Ingress (#665)](contracts/http-infrastructure-665.md)
 - [Resource declarations](contracts/resource-declarations.md)
+- [Azure contracts and Functions (#669)](contracts/azure-iac-669.md)
 - [Channel extraction and linking](contracts/channel-extraction-and-linking.md)
 - [Package contracts and source imports](contracts/package-contracts-and-source-imports.md)
 - [JVM artifacts](contracts/jvm-artifacts.md)

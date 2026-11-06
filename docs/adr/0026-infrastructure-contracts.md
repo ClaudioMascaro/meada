@@ -59,6 +59,7 @@ curated kinds:
 | `s3` | an S3 bucket | the bucket name |
 | `gcs` | a Cloud Storage bucket | the bucket name |
 | `azureblob` | an Azure Storage blob container | the container name |
+| `azurestorage` | an Azure Storage account | the account name, distinct from any container |
 | `dynamodb` | a DynamoDB table | the table name |
 | `rds` | an RDS instance or cluster | the instance or cluster identifier |
 | `cloudsql` | a Cloud SQL instance | the instance name |
@@ -400,3 +401,43 @@ A known IaC resource reference can carry an optional typed contract identity wit
 URL/ARN; it resolves only a matching unresolved contract kind through the same scope index
 as literals. Secret contents, dynamic references and external values remain unavailable.
 Environment-derived names stay inferred with workload and variable provenance.
+
+### Azure identifiers, subscriptions and Functions (#669)
+
+The AzureRM Terraform/OpenTofu entries are Service Bus queues, topics and subscriptions,
+Event Hubs, Storage accounts and containers, Key Vault secrets, and Linux/Windows Function
+apps. Accounts use `resource::azurestorage::<account>`; containers retain
+`resource::azureblob::<container>`. A subscription target is
+`channel::servicebus::subscription:<topic>/<subscription>`. The colon marker is impossible
+in an Azure queue/topic name, whereas slash is legal. Thus neither a same-name topic nor
+the queue `orders/subscriptions/audit` impersonates a subscription. Physical node names
+remain available beside their separately stored projected target and evaluation evidence;
+an explicitly unresolved projection forbids falling back to an incomplete physical name.
+
+Complete ARM IDs validate subscription/resource-group/provider/type segments before
+discarding deployment selectors. Provider and type labels are case-insensitive; physical
+names retain their case. Blob URLs identify their container, ignoring the object suffix;
+versioned vault URLs identify their secret. Malformed/wrong-service identifiers and
+namespace-only Service Bus URLs identify nothing. Provider-specific final typed keys are
+the bounded inventory `servicebus_queue`, `servicebus_topic`, `servicebus_subscription`
+(topic-qualified value), `eventhubs_hub`, `azurestorage_account`, `azureblob_container`
+and `keyvault_secret`, always inferred. The generic AWS key inventory remains unchanged.
+The kind owns this normalization in `contract/azure.rs`, shared with future SDK readers.
+
+A Service Bus subscription joins its topic like a binding. An observed subscription rule,
+including an unread filter, weakens that route to inferred and names the rule. An absence
+of declared rules gives exact routing, subject to name evaluation evidence. This models
+repository configuration; it makes no claim that a deployment removed the broker's default
+rule. Existing C# `CreateProcessor` forms retain their established topic-based identity and
+origins, independently of these subscription-aware structured identifiers. AsyncAPI's
+`servicebus` and `eventhubs` protocol labels provide the same channel identities; subscription
+addresses use their full ARM ID.
+
+Linux Functions read the single Docker application-stack block's registry/name/tag and
+app settings. Linux and Windows Functions also support local `zip_deploy_file`, validated
+through the image kind's indexing hook with the same path/symlink rules as other workloads.
+Archives are execution locations, never opened and never widened to their parent directory.
+Remote package settings identify no local code. Literal/evaluated app settings and known
+resource attribute targets use the common workload-scoped environment mechanism. Key Vault
+references and secret-content attributes retain no resolved value. This addition shares
+the synchronized 1.4.0 minor release and export format 1.

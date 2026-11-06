@@ -18,7 +18,7 @@
   ...`, often of `${file(...)}` parts) is not read: only the mapping `resources.Resources` gives
   nodes. Only `serverless.yml`, `.yaml` and `.json` are read: `serverless.ts`, `serverless.js`,
   `${file(...)}` values, `serverless.*.yml` variants, values from other files, `provider` defaults
-  (`environment`, `iam`), plugins and a `functions` list (the v1 form) are not, and a function given
+  other than `environment` (such as `iam`), plugins and a `functions` list (the v1 form) are not, and a function given
   by `${file(...)}` is a node with no handler or events. `--stage` is modelled only in a function's
   default name (`opt:stage`, #709; a stage with an unresolved part, a pattern, lists it not):
   `${self:provider.stage}` reads the file, as Serverless v3's `self:` source does, so a name
@@ -52,7 +52,7 @@
   quoted or not (YAML 1.1 types the plain ones as booleans, this reader cannot tell), and no other
   YAML 1.1 boolean is typed (a parameter `Default: yes` is the text `yes`). A parameter of an
   `AWS::SSM::Parameter::Value<...>` type or a list type gives no name. Nested stacks, SAM's
-  implicit `ServerlessRestApi` and its generated roles, `Globals`, `Fn::Transform` macros and
+  implicit `ServerlessRestApi` and its generated roles, `Globals` outside function environment defaults, `Fn::Transform` macros and
   `AWS::Include` are not expanded, and a `Transform` that names only another macro makes no
   template. A YAML template needs `AWSTemplateFormatVersion` or the SAM transform, as a JSON one
   does. A template past `lang::MAX_BYTES` is no template (config values count it as unreadable). A

@@ -2265,3 +2265,27 @@ block. A compatible matcher does not establish delivery or a final team notifica
 In public example #638 the rule tests `service:app`: the same monitor also emits
 `support:team-b`, but there is no `support` matcher there. The original nonstandard
 monitor YAML and Helm values remain configuration only.
+
+## Azure infrastructure
+
+Terraform/OpenTofu provision Service Bus queues, topics and subscriptions, Event Hubs,
+Storage accounts (`azurestorage`), Blob containers (`azureblob`) and Key Vault secrets
+(`keyvault`). A subscription is `channel::servicebus::subscription:orders/audit`, distinct
+from the legal queue `orders/subscriptions/audit`. Declared subscription rules weaken
+delivery to `inferred`; no rule gives `exact`. Existing C# processors keep topic identity.
+
+A complete supported ARM ID or blob/secret URL is an `exact` use. Final keys
+`servicebus_queue`, `servicebus_topic`, `servicebus_subscription`, `eventhubs_hub`,
+`azurestorage_account`, `azureblob_container` and `keyvault_secret` give `inferred` uses;
+a subscription value is `topic/subscription`. Generic `queue`, `topic`, `bucket` and
+`table` retain their AWS meanings. Account, namespace, vault, version and object selectors
+are discarded only after validating the complete identifier.
+
+Linux Functions read `site_config.application_stack.docker` fields `registry_url`,
+`image_name` and `image_tag`. Both Linux and Windows Functions read `zip_deploy_file` and
+`app_settings`; only a safe existing local archive gives direct execution, without opening
+the ZIP. Missing, remote, parent-step and symlink paths give no code. App settings resolve
+reads only in code run by the corresponding image or path, at `inferred`. Secret references
+and unknown values stay unresolved. See [capabilities](site/en/capabilities.md#azure-contracts-and-functions)
+for the types and limits; `context`, `trace`, export and orphans follow the existing
+provisioning rules.

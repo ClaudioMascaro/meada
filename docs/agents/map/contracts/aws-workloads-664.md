@@ -16,6 +16,8 @@ copying it, without evaluating resource names twice. Known resource references c
 typed contract targets without inventing a deployment-time ARN or URL. The curated AWS
 CloudFormation/SAM aliases share `types::provision_entry` and `Entry::defining_key`, so a
 resource's defining property is its provisioner rather than an automatic config use.
+Lambda environment keys also use the existing evaluator; an unread or duplicate key retains
+an unknown environment scope instead of partial literals, without discarding image/code facts.
 
 `Node.images` retains each container's evaluated image and override evidence; `image.rs`
 projects it with legacy Compose and Kubernetes images through one runner inventory. The
