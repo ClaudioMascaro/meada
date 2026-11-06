@@ -45,3 +45,16 @@ fn string_pointer(value: &Value) -> &Value {
     }
     value
 }
+
+/// Import aliases remain verified runtime reads after the pack leaves them as a call.
+pub(super) fn environment(call: &Invocation) -> Option<String> {
+    if crate::resolve::method(&call.callee) != "Getenv"
+        || !matches!(call.receiver.as_deref(), Some(Value::External(names)) if crate::names::one(names, |s| s == "os").is_some())
+    {
+        return None;
+    }
+    let [Value::Str(parts)] = call.args.as_slice() else {
+        return None;
+    };
+    crate::lang::literal(parts).filter(|s| !s.is_empty())
+}

@@ -373,3 +373,45 @@ fn assert_export_golden(name: &str, text: &str) {
     export.processes.clear();
     assert_golden(name, &export.write().unwrap());
 }
+
+#[test]
+fn sdk_environment_aliases_keep_provenance_and_hidden_java_collections_stay_unknown() {
+    let repo = fixture_repo("sdk_alias_environment", "aws-sdk-alias-env", None);
+    let text = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&text).unwrap();
+    let writers = json["providers"].as_array().unwrap();
+    let readers = json["consumers"].as_array().unwrap();
+    assert_eq!(writers.len(), 2, "{text}");
+    assert_eq!(readers.len(), 7, "{text}");
+    assert!(
+        writers.iter().all(|w| w["contract"] == "resource::s3"),
+        "{text}"
+    );
+    for variable in ["env:GO_BUCKET", "env:CS_BUCKET"] {
+        assert!(writers.iter().any(|w| w["via"] == variable), "{text}");
+        assert!(
+            readers
+                .iter()
+                .any(|r| r["contract"] == "resource::s3" && r["via"] == variable),
+            "{text}"
+        );
+    }
+    assert_eq!(
+        readers
+            .iter()
+            .filter(|r| r["contract"] == "resource::dynamodb" && r["via"].is_null())
+            .count(),
+        3,
+        "{text}"
+    );
+    assert!(json["links"].as_array().unwrap().is_empty(), "{text}");
+    assert_eq!(
+        readers
+            .iter()
+            .filter(|r| r["contract"] == "resource::s3" && r["via"].is_null())
+            .count(),
+        2,
+        "{text}"
+    );
+    assert_export_golden("aws-sdk-alias-env.export.json", &text);
+}

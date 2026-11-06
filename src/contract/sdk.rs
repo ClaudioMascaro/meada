@@ -4,6 +4,7 @@
 use super::{Found, Role, Site};
 use crate::lang::{Part, Value, literal};
 use crate::resolve::{Code, Expand};
+use std::collections::{BTreeMap, BTreeSet};
 
 mod csharp;
 mod go;
@@ -83,6 +84,7 @@ pub(crate) fn extract<'a>(
         return Vec::new();
     };
     let mut found = Vec::new();
+    let written = std::cell::OnceCell::new();
     let configs = std::cell::OnceCell::new();
     let inject = |code: &Code<'a>, path: &'a str, on: crate::resolve::Injected<'a>| {
         let indexed = indexed?;
@@ -95,6 +97,15 @@ pub(crate) fn extract<'a>(
             continue;
         }
         let mut origins = origins::Origins::new(code, language);
+        let aliases: BTreeMap<_, _> = if language == Language::Csharp {
+            facts
+                .imports
+                .iter()
+                .map(|i| (i.local.as_str(), i.local.as_str()))
+                .collect()
+        } else {
+            BTreeMap::new()
+        };
         for (index, stored) in facts.calls.iter().enumerate() {
             let method = crate::resolve::method(&stored.callee);
             for service in services {
@@ -108,6 +119,8 @@ pub(crate) fn extract<'a>(
                 if !origins.call(path, index, &service.client) {
                     continue;
                 }
+                let changed =
+                    changed_request(code, path, index, operation.field, language, &written);
                 let read = |args: &[Value], keywords: &crate::resolve::Keywords| {
                     let [Value::Call(call)] = args else {
                         return Some(vec![Name::default()]);
@@ -115,7 +128,13 @@ pub(crate) fn extract<'a>(
                     let values = request(call, keywords, operation.field, language)?;
                     values
                         .iter()
-                        .map(|v| name(code, path, Some(v), service.kind))
+                        .map(|v| {
+                            if changed {
+                                Some(Name::default())
+                            } else {
+                                name(code, path, Some(v), service.kind, &aliases)
+                            }
+                        })
                         .collect::<Option<Vec<_>>>()
                 };
                 let injected = (language == Language::Java)
@@ -155,6 +174,54 @@ pub(crate) fn extract<'a>(
         }
     }
     found
+}
+
+/// A named request can change after construction; inline literals cannot change before the call.
+fn changed_request<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    index: usize,
+    selector: &str,
+    language: Language,
+    written: &std::cell::OnceCell<BTreeSet<&'a str>>,
+) -> bool {
+    let Some(call) = code.call(path, index) else {
+        return false;
+    };
+    let field = selector
+        .split('.')
+        .next()
+        .unwrap_or(selector)
+        .trim_end_matches("[]");
+    let (request, field) = match language {
+        Language::Go => (call.args.get(1), field),
+        Language::Csharp => (
+            call.keyword("request").or_else(|| call.args.first()),
+            csharp::field_name(field),
+        ),
+        Language::Java => return false,
+    };
+    let Some(Value::Ref(_)) = request else {
+        return false;
+    };
+    code.field_written(field)
+        || language == Language::Csharp
+            && written
+                .get_or_init(|| {
+                    // C# keeps selector writes as bound paths. Index their last member once,
+                    // across files, so a write through any alias invalidates a named request.
+                    code.files()
+                        .keys()
+                        .flat_map(|&path| code.bindings(path))
+                        .filter_map(|bound| {
+                            bound
+                                .name
+                                .rsplit_once('.')
+                                .map(|(_, field)| field.trim_end_matches('='))
+                        })
+                        .collect()
+                })
+                .contains(field)
 }
 
 /// Read scalar fields, name lists, event entries and table-keyed batch requests. Each value is
@@ -261,7 +328,13 @@ struct Name {
     env: Option<String>,
 }
 
-fn name<'a>(code: &Code<'a>, path: &'a str, value: Option<&Value>, kind: &str) -> Option<Name> {
+fn name<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    value: Option<&Value>,
+    kind: &str,
+    aliases: &BTreeMap<&'a str, &'a str>,
+) -> Option<Name> {
     match value {
         Some(Value::Ref(_)) => None,
         Some(Value::Str(parts)) if parts.iter().any(|p| matches!(p, Part::Ref(_))) => None,
@@ -273,7 +346,7 @@ fn name<'a>(code: &Code<'a>, path: &'a str, value: Option<&Value>, kind: &str) -
                     callee,
                     key,
                     then,
-                } if then.is_empty() && csharp::environment(code, path, scope, callee) => {
+                } if then.is_empty() && csharp::environment(code, path, scope, callee, aliases) => {
                     Some(key.clone())
                 }
                 _ => None,
@@ -307,6 +380,10 @@ fn name<'a>(code: &Code<'a>, path: &'a str, value: Option<&Value>, kind: &str) -
                 literal,
             })
         }
+        Some(Value::Call(call)) if code.pack().extensions().contains(&"go") => Some(Name {
+            literal: None,
+            env: go::environment(call),
+        }),
         _ => Some(Name::default()),
     }
 }

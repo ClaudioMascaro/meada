@@ -15,10 +15,7 @@ pub(super) fn names<'v>(
     match request {
         Some(Value::New(_, _) | Value::Object(_)) => field_of(request?, field).map(|v| vec![v]),
         value => {
-            let field = match field {
-                "Bucket" => "BucketName",
-                other => other,
-            };
+            let field = field_name(field);
             let key = format!("{}{}", field[..1].to_ascii_lowercase(), &field[1..]);
             Some(vec![
                 keywords
@@ -32,10 +29,7 @@ pub(super) fn names<'v>(
 }
 
 pub(super) fn field_of<'v>(value: &'v Value, field: &str) -> Option<Option<&'v Value>> {
-    let field = match field {
-        "Bucket" => "BucketName",
-        other => other,
-    };
+    let field = field_name(field);
     super::go::field_of(value, field)
 }
 
@@ -48,7 +42,13 @@ pub(super) fn method(method: &str, canonical: &str) -> bool {
     method == canonical
 }
 
-pub(super) fn environment<'a>(code: &Code<'a>, path: &'a str, scope: &str, callee: &str) -> bool {
+pub(super) fn environment<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &str,
+    callee: &str,
+    aliases: &std::collections::BTreeMap<&'a str, &'a str>,
+) -> bool {
     let Some((head, "GetEnvironmentVariable")) = callee.rsplit_once('.') else {
         return false;
     };
@@ -62,13 +62,21 @@ pub(super) fn environment<'a>(code: &Code<'a>, path: &'a str, scope: &str, calle
     }) else {
         return false;
     };
-    // Use the source's scope, so a repository Environment type or local hides System's.
-    head == "Environment"
-        && crate::names::one(
-            &crate::names::spellings(code, path, scope, "Environment"),
-            |s| s == "System.Environment",
-        )
-        .is_some()
-        || head == "System.Environment"
-            && code.definition(path, scope, "System.Environment").is_none()
+    let head = match head {
+        "Environment" => "Environment",
+        "System.Environment" => "System.Environment",
+        other => match aliases.get(other) {
+            Some(head) => head,
+            None => return false,
+        },
+    };
+    // Resolve in the original scope, so a local/type hiding an imported alias wins.
+    crate::names::known(code, path, scope, head, |s| s == "System.Environment").is_some()
+}
+
+pub(super) fn field_name(field: &str) -> &str {
+    match field {
+        "Bucket" => "BucketName",
+        other => other,
+    }
 }

@@ -19,7 +19,11 @@ this file, and a change to these modules updates it.
   records a written SDK operation for both directions; `ContractKind::use_level` keeps SDK uses
   exact and declarations declared when linking each other or a provisioner. Unresolved resource
   sides never link. Java SDK
-  request folding shares Spring annotation injection with the existing channel forms.
+  request folding shares Spring annotation injection with the existing channel forms. Runtime
+  environment aliases keep verified provenance. C# selector writes are indexed lazily once
+  across the group to invalidate named request objects even through another receiver alias;
+  Go shares the existing field-write index. The folded Java name reader rejects a value-bound
+  head before considering on-demand type candidates.
 
 - `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs` and its `channel/` submodules
   (`channel/message.rs`: the message types and broker helpers; `channel/{ts,python,rust,go,java,csharp}.rs`:

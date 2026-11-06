@@ -1,0 +1,727 @@
+{
+  "format": 1,
+  "repository": "local/aws-sdk-alias-env",
+  "files": [
+    {
+      "path": "Aliases.cs",
+      "hash": "f57f47d789736d9d1cbc7e2045cb81f87cd7eb5edca58ce9d971c6743ee97678"
+    },
+    {
+      "path": "ImportShadow.java",
+      "hash": "9fb22d66256ee823cd602d9eed268c817040f2ce7a4dead70aed1a89b35c0a51"
+    },
+    {
+      "path": "ParameterShadow.java",
+      "hash": "3fb3effabca8e15a137bcc6fe38f70bf416ce3efebb4246ea1806c3ef397f4f7"
+    },
+    {
+      "path": "TypeShadow.java",
+      "hash": "0ee30a9745c8b4b9202942f970b0ae427b19464e2e09711b1688dda251f1b583"
+    },
+    {
+      "path": "aliases.go",
+      "hash": "fa4c28ed970d2079413d95fb33583d8713371890b47c75f6f3b6035345ff562c"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/aws-sdk-alias-env::Aliases.cs::Aliases",
+      "span": {
+        "path": "Aliases.cs",
+        "start": 102,
+        "end": 644
+      },
+      "hash": "ccd2824e72ea178d056800509f3f71a3211ef6a0b3cc9b7447135121ac45dea1"
+    },
+    {
+      "id": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()",
+      "span": {
+        "path": "Aliases.cs",
+        "start": 122,
+        "end": 642
+      },
+      "hash": "12ba333afe7cfd91a655a602c2080e99a27e5e7ef10143a9eb613304f6f53b9b"
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow",
+      "span": {
+        "path": "ImportShadow.java",
+        "start": 232,
+        "end": 449
+      },
+      "hash": "117f9624dbae3b65f3c41df69fecbb2f773e3bd654cc802f93e1d51ee9f11a24"
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()",
+      "span": {
+        "path": "ImportShadow.java",
+        "start": 254,
+        "end": 447
+      },
+      "hash": "d46c450772c29977632ff0a7392c5f07f543a6b5e40443d364564946e2b3b388"
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow",
+      "span": {
+        "path": "ParameterShadow.java",
+        "start": 232,
+        "end": 461
+      },
+      "hash": "e34b2a5c44c620a80b8b98d704f335a9b4a23bc59b91569e6e8d1c395563720a"
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)",
+      "span": {
+        "path": "ParameterShadow.java",
+        "start": 257,
+        "end": 459
+      },
+      "hash": "7abad640e79cd65717fae99ec52eac52e4e904eb6214bfd350c784e6e1d15952"
+    },
+    {
+      "id": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow",
+      "span": {
+        "path": "TypeShadow.java",
+        "start": 212,
+        "end": 490
+      },
+      "hash": "74250f09903275cd101413e1a8e9aa983981cb1f96762fc06b87ceacc9095fc0"
+    },
+    {
+      "id": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.java",
+      "span": {
+        "path": "TypeShadow.java",
+        "start": 231,
+        "end": 294
+      },
+      "hash": "9d93dd374adf900256515c81253094b60b00d73755b858a40741429475935b40"
+    },
+    {
+      "id": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.java.util",
+      "span": {
+        "path": "TypeShadow.java",
+        "start": 251,
+        "end": 292
+      },
+      "hash": "4663f6676d891ee5c39212acef3f6a7e2f0fef46e2787156ed01d281a06acab9"
+    },
+    {
+      "id": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.java.util.Map",
+      "span": {
+        "path": "TypeShadow.java",
+        "start": 271,
+        "end": 290
+      },
+      "hash": "06eb961fc69a3b65d3c335c7d2201958b268481c6d103ed9b1ba02b351c579c3"
+    },
+    {
+      "id": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()",
+      "span": {
+        "path": "TypeShadow.java",
+        "start": 295,
+        "end": 488
+      },
+      "hash": "d46c450772c29977632ff0a7392c5f07f543a6b5e40443d364564946e2b3b388"
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use",
+      "span": {
+        "path": "aliases.go",
+        "start": 168,
+        "end": 717
+      },
+      "hash": "1a5f5b7046f9585d75b3e0ddbd1a2d1290f72b2ea7eed11d96e7328185c757a4"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()::AmazonS3Client#0",
+      "caller": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Aliases.cs",
+        "start": 162,
+        "end": 182
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()::Env.GetEnvironmentVariable#0",
+      "caller": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Aliases.cs",
+        "start": 256,
+        "end": 295
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()::Env.GetEnvironmentVariable#1",
+      "caller": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Aliases.cs",
+        "start": 385,
+        "end": 424
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()::GetObjectRequest#0",
+      "caller": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Aliases.cs",
+        "start": 349,
+        "end": 439
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()::GetObjectRequest#1",
+      "caller": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Aliases.cs",
+        "start": 464,
+        "end": 522
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()::PutObjectRequest#0",
+      "caller": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Aliases.cs",
+        "start": 220,
+        "end": 310
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()::client.GetObjectAsync#0",
+      "caller": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Aliases.cs",
+        "start": 327,
+        "end": 440
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()::client.GetObjectAsync#1",
+      "caller": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Aliases.cs",
+        "start": 605,
+        "end": 635
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()::client.PutObjectAsync#0",
+      "caller": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Aliases.cs",
+        "start": 198,
+        "end": 311
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()::(method_invocation).build#0",
+      "caller": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ImportShadow.java",
+        "start": 326,
+        "end": 443
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()::(method_invocation).build#1",
+      "caller": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ImportShadow.java",
+        "start": 398,
+        "end": 433
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()::(method_invocation).requestItems#0",
+      "caller": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ImportShadow.java",
+        "start": 326,
+        "end": 435
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()::BatchGetItemRequest.builder#0",
+      "caller": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ImportShadow.java",
+        "start": 326,
+        "end": 355
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()::DynamoDbClient.create#0",
+      "caller": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ImportShadow.java",
+        "start": 281,
+        "end": 304
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()::KeysAndAttributes.builder#0",
+      "caller": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ImportShadow.java",
+        "start": 398,
+        "end": 425
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()::client.batchGetItem#0",
+      "caller": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ImportShadow.java",
+        "start": 306,
+        "end": 444
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()::java.util.Map.of#0",
+      "caller": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ImportShadow.java",
+        "start": 369,
+        "end": 434
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)::(method_invocation).build#0",
+      "caller": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ParameterShadow.java",
+        "start": 338,
+        "end": 455
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)::(method_invocation).build#1",
+      "caller": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ParameterShadow.java",
+        "start": 410,
+        "end": 445
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)::(method_invocation).requestItems#0",
+      "caller": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ParameterShadow.java",
+        "start": 338,
+        "end": 447
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)::BatchGetItemRequest.builder#0",
+      "caller": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ParameterShadow.java",
+        "start": 338,
+        "end": 367
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)::DynamoDbClient.create#0",
+      "caller": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ParameterShadow.java",
+        "start": 293,
+        "end": 316
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)::KeysAndAttributes.builder#0",
+      "caller": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ParameterShadow.java",
+        "start": 410,
+        "end": 437
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)::client.batchGetItem#0",
+      "caller": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ParameterShadow.java",
+        "start": 318,
+        "end": 456
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)::java.util.Map.of#0",
+      "caller": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ParameterShadow.java",
+        "start": 381,
+        "end": 446
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()::(method_invocation).build#0",
+      "caller": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "TypeShadow.java",
+        "start": 367,
+        "end": 484
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()::(method_invocation).build#1",
+      "caller": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "TypeShadow.java",
+        "start": 439,
+        "end": 474
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()::(method_invocation).requestItems#0",
+      "caller": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "TypeShadow.java",
+        "start": 367,
+        "end": 476
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()::BatchGetItemRequest.builder#0",
+      "caller": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "TypeShadow.java",
+        "start": 367,
+        "end": 396
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()::DynamoDbClient.create#0",
+      "caller": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "TypeShadow.java",
+        "start": 322,
+        "end": 345
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()::KeysAndAttributes.builder#0",
+      "caller": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "TypeShadow.java",
+        "start": 439,
+        "end": 466
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()::client.batchGetItem#0",
+      "caller": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "TypeShadow.java",
+        "start": 347,
+        "end": 485
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()::java.util.Map.of#0",
+      "caller": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "TypeShadow.java",
+        "start": 410,
+        "end": 475
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::client.GetObject#0",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 375,
+        "end": 519
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::client.GetObject#1",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 674,
+        "end": 715
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::client.PutObject#0",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 226,
+        "end": 370
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::context.TODO#0",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 243,
+        "end": 257
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::context.TODO#1",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 392,
+        "end": 406
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::context.TODO#2",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 691,
+        "end": 705
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::environment.Getenv#0",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 307,
+        "end": 338
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::environment.Getenv#1",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 456,
+        "end": 487
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::pointers.String#0",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 291,
+        "end": 339
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::pointers.String#1",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 346,
+        "end": 368
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::pointers.String#2",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 440,
+        "end": 488
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::pointers.String#3",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 495,
+        "end": 517
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::pointers.String#4",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 567,
+        "end": 591
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::pointers.String#5",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 598,
+        "end": 620
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::pointers.String#6",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 643,
+        "end": 669
+      }
+    },
+    {
+      "id": "local/aws-sdk-alias-env::aliases.go::use::storage.NewFromConfig#0",
+      "caller": "local/aws-sdk-alias-env::aliases.go::use",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "aliases.go",
+        "start": 195,
+        "end": 221
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "resource::s3",
+      "site": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()::client.PutObjectAsync#0",
+      "via": "env:CS_BUCKET"
+    },
+    {
+      "contract": "resource::s3",
+      "site": "local/aws-sdk-alias-env::aliases.go::use::client.PutObject#0",
+      "via": "env:GO_BUCKET"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::s3",
+      "site": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()::client.GetObjectAsync#0",
+      "via": "env:CS_BUCKET"
+    },
+    {
+      "contract": "resource::s3",
+      "site": "local/aws-sdk-alias-env::Aliases.cs::Aliases.Use()::client.GetObjectAsync#1",
+      "via": null
+    },
+    {
+      "contract": "resource::dynamodb",
+      "site": "local/aws-sdk-alias-env::ImportShadow.java::ImportShadow.read()::client.batchGetItem#0",
+      "via": null
+    },
+    {
+      "contract": "resource::dynamodb",
+      "site": "local/aws-sdk-alias-env::ParameterShadow.java::ParameterShadow.read(Root)::client.batchGetItem#0",
+      "via": null
+    },
+    {
+      "contract": "resource::dynamodb",
+      "site": "local/aws-sdk-alias-env::TypeShadow.java::TypeShadow.read()::client.batchGetItem#0",
+      "via": null
+    },
+    {
+      "contract": "resource::s3",
+      "site": "local/aws-sdk-alias-env::aliases.go::use::client.GetObject#0",
+      "via": "env:GO_BUCKET"
+    },
+    {
+      "contract": "resource::s3",
+      "site": "local/aws-sdk-alias-env::aliases.go::use::client.GetObject#1",
+      "via": null
+    }
+  ],
+  "links": []
+}

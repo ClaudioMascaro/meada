@@ -88,7 +88,8 @@
   a reassigned local and a hidden constructor yield no side. Existing `EVAL_DEPTH` and
   `EVAL_BUDGET` bound the memoized walk; the SDK lattice test drives a full 1 MiB source file
   in each language. Java builder requests, Go input literals, .NET request initializers,
-  lists, table-keyed maps and supported named/string overloads name sides. Operations not in
+  lists, table-keyed maps and supported named/string overloads name sides. A named request
+  whose name field is written is opaque, with C# writes followed through receiver aliases. Operations not in
   the documented table do not. A hierarchy query (`GetParametersByPath`) has no physical
   parameter name and stays unresolved. RDS and ElastiCache control-plane clients establish
   no data uses. Kotlin keeps the earlier typed SQS reader.

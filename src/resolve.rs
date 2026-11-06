@@ -7058,8 +7058,27 @@ impl<'a> Code<'a> {
                 injected.unwrap_or_else(|| self.field_read(field, fold.field_depth, fold.nested))
             }
             Binding::External(..) | Binding::Unknown if fold.chain => {
+                // An opaque member of a value is not a package path. On-demand type imports
+                // must not turn a parameter such as `java` into `java.util.Map` evidence.
+                let hidden_head = self.resolver.unordered_globs
+                    && name.split_once('.').is_some_and(|(head, _)| {
+                        matches!(
+                            self.resolver.lexical(
+                                path,
+                                scope,
+                                head,
+                                &mut self.resolver.seen(path, scope)
+                            ),
+                            Binding::Param(..)
+                                | Binding::Local(..)
+                                | Binding::Const(..)
+                                | Binding::Hidden
+                        )
+                    });
                 match self.outside(path, scope, name, false) {
-                    Some(o) if !o.candidates.is_empty() => Value::External(o.candidates),
+                    Some(o) if !o.candidates.is_empty() && !hidden_head => {
+                        Value::External(o.candidates)
+                    }
                     Some(o) if o.direct => Value::External(vec![o.spelled]),
                     _ => Value::Unknown,
                 }
