@@ -1,0 +1,7 @@
+apiVersion: sqs.services.k8s.aws/v1beta1
+kind: Queue
+metadata:
+  name: operator-02
+  namespace: platform
+spec:
+  queueName: ack-parcels

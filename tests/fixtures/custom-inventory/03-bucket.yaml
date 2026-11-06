@@ -1,0 +1,7 @@
+apiVersion: s3.services.k8s.aws/v1beta1
+kind: Bucket
+metadata:
+  name: operator-03
+  namespace: platform
+spec:
+  name: ack-assets

@@ -253,3 +253,5 @@ example.com/acme/platform platform/bucket.yaml:4 [0].metadata.name = "shared-ass
 example.com/acme/platform platform/bucket.yaml:6 [0].metadata.annotations["crossplane.io/external-name"] = "acme-shared-assets"
 example.com/acme/platform platform/bucket.yaml:9 [0].spec.forProvider.region = "us-east-1"
 example.com/acme/platform platform/bucket.yaml:11 [0].spec.providerConfigRef.name = "default"
+resource::s3::acme-shared-assets
+  example.com/acme/platform provisioner platform/bucket.yaml:1 Bucket.s3.aws.upbound.io/shared-assets (root platform) (no use in the workspace)

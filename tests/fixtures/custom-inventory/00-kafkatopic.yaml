@@ -1,0 +1,7 @@
+apiVersion: kafka.strimzi.io/v1beta1
+kind: KafkaTopic
+metadata:
+  name: operator-00
+  namespace: platform
+spec:
+  topicName: parcel-events

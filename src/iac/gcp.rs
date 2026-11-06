@@ -52,6 +52,7 @@ impl<'m> Eval<'m> {
             name,
             pattern,
             through: self.nodes[node].overridable.clone(),
+            ..Default::default()
         });
     }
 
@@ -293,6 +294,7 @@ impl<'m> Eval<'m> {
             name: Some(name),
             pattern,
             through: through.into_iter().collect(),
+            ..Default::default()
         });
     }
 }

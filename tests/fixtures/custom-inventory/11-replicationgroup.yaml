@@ -1,0 +1,7 @@
+apiVersion: elasticache.services.k8s.aws/v1beta1
+kind: ReplicationGroup
+metadata:
+  name: operator-11
+  namespace: platform
+spec:
+  replicationGroupID: ack-replicas

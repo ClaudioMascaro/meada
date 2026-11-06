@@ -1,0 +1,20 @@
+[[iac.module]]
+source_prefix = "git::https://example.com/platform/modules"
+entry = "terraform:aws_sqs_queue"
+input = "queue_name"
+
+[[iac.module]]
+source = "git::https://example.com/platform/modules/priority"
+entry = "terraform:aws_sns_topic"
+input = "topic_name"
+
+[[iac.module]]
+source_prefix = "git::https://example.com/platform/modules/storage"
+entry = "terraform:aws_s3_bucket"
+input = "settings.bucket"
+
+[[iac.custom_resource]]
+group = "platform.example.com"
+kind = "MessageQueue"
+entry = "terraform:aws_sqs_queue"
+key_path = "spec.endpoints[0].name"

@@ -718,6 +718,12 @@ fn refresh_keeping(
             None
         }
     };
+    let mappings = crate::config::load(root)?.iac;
+    let mapping_stamp = mappings.stamp()?;
+    let mappings_changed = known_configs
+        .as_deref()
+        .and_then(|stamp| stamp.rsplit_once(':'))
+        .is_none_or(|(_, stamp)| stamp != mapping_stamp);
     let stored = stored_files(&tx)?;
 
     let all = walk(root);
@@ -786,6 +792,14 @@ fn refresh_keeping(
         config_values::forget(&tx, path)?;
     }
     let mut dirs = terraform.into_inner();
+    if mappings_changed {
+        dirs.extend(
+            configs
+                .iter()
+                .filter(|(p, _)| iac::is_input(p))
+                .map(|(p, _)| config_values::parent(p).to_string()),
+        );
+    }
     let left = gone.iter().filter(|p| iac::is_input(p));
     dirs.extend(left.map(|p| config_values::parent(p).to_string()));
     // ponytail: a changed Terraform file reads every Terraform file of the repository again to
@@ -799,12 +813,12 @@ fn refresh_keeping(
                 files.push((path.clone(), src));
             }
         }
-        iac::refresh(&tx, &iac::Repository::read(&files), &dirs)?;
+        iac::refresh(&tx, &iac::Repository::read_with(&files, &mappings), &dirs)?;
     }
     // ponytail: one changed Kubernetes file evaluates every overlay and directory of manifests of
     // the repository again, not only the units it belongs to; a repository of many overlays
     // would make that slow.
-    if kubernetes.get() || kube_left {
+    if kubernetes.get() || kube_left || mappings_changed {
         let mut files = Vec::new();
         for (path, abs) in configs.iter().filter(|(p, _)| kube::is_source(p)) {
             let Ok(src) = read_up_to(abs, lang::MAX_BYTES) else {
@@ -820,7 +834,7 @@ fn refresh_keeping(
             };
             files.push((path.clone(), src));
         }
-        kube::refresh(&tx, &kube::evaluate(&files))?;
+        kube::refresh(&tx, &kube::evaluate_with(&files, &mappings))?;
     }
     // Kinds receive evaluated IaC facts once per file; path dependencies can change alone.
     let configuration_nodes = iac::nodes(&tx)?;
@@ -907,7 +921,7 @@ fn refresh_keeping(
     // so it extracts again. Folding them in also forces that on an index of this version written
     // before the `shape` rows and constant `exports` targets existed (issue #175), which the
     // schema golden does not cover.
-    let digest = configs_digest(digest, &manifest_rows);
+    let digest = configs_digest(digest, &manifest_rows, &mapping_stamp);
     if changed.is_empty() && deleted.is_empty() && known_configs.as_deref() == Some(&digest) {
         tx.commit()?;
         return Ok(());
@@ -1646,12 +1660,16 @@ fn through_link(root: &Path, path: &str) -> bool {
 
 /// `meta.configs`: the config files' digest with the stored manifests folded in, and the
 /// version of Meada, whose kinds a refresh trusts to keep a group's rows (`refresh`).
-fn configs_digest(mut digest: blake3::Hasher, manifest_rows: &[(String, String)]) -> String {
+fn configs_digest(
+    mut digest: blake3::Hasher,
+    manifest_rows: &[(String, String)],
+    mappings: &str,
+) -> String {
     for (path, summary) in manifest_rows {
         digest.update(format!("{path}\0{summary}\0").as_bytes());
     }
     digest.update(env!("CARGO_PKG_VERSION").as_bytes());
-    digest.finalize().to_hex().to_string()
+    format!("{}:{mappings}", digest.finalize().to_hex())
 }
 
 /// The groups of packs that resolve together that may keep their rows: the files of every group
@@ -1844,7 +1862,8 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
     if stored.keys().any(|p| !packs.contains_key(p.as_str())) {
         return Ok(false);
     }
-    Ok(configs_digest(digest, &manifest_rows(db)?) == configs)
+    let mappings = crate::config::load(root)?.iac.stamp()?;
+    Ok(configs_digest(digest, &manifest_rows(db)?, &mappings) == configs)
 }
 
 /// What communities read of a file's rows (`write_communities`): its symbols, and the caller and

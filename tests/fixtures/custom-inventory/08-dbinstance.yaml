@@ -1,0 +1,7 @@
+apiVersion: rds.services.k8s.aws/v1beta1
+kind: DBInstance
+metadata:
+  name: operator-08
+  namespace: platform
+spec:
+  dbInstanceIdentifier: ack-primary

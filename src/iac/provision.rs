@@ -83,7 +83,7 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
     let mut sides = Vec::new();
     for node in statement.query_map([], super::row)? {
         let node = node?;
-        let Some(entry) = types::provision_entry(&node.path, &node.block, &node.ty) else {
+        let Some(entry) = types::node_entry(&node) else {
             continue;
         };
         let target = node

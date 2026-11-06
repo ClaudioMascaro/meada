@@ -33,6 +33,7 @@ impl<'m> Eval<'m> {
             },
             pattern: self.nodes[node].pattern,
             through: self.nodes[node].overridable.clone(),
+            ..Default::default()
         };
         self.nodes[node].provisioned = Some(projection);
     }
@@ -260,6 +261,7 @@ impl<'m> Eval<'m> {
                 name: target,
                 pattern,
                 through: through.into_iter().collect(),
+                ..Default::default()
             });
         }
         for &(rule, at, block, ref each) in pending {

@@ -1,0 +1,10 @@
+apiVersion: cloudwatchevents.aws.upbound.io/v1beta1
+kind: Bus
+metadata:
+  name: operator-23
+  namespace: platform
+  annotations:
+    crossplane.io/external-name: xp-events
+spec:
+  forProvider:
+    region: us-east-1

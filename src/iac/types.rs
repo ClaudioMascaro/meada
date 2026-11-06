@@ -34,6 +34,17 @@ pub(crate) struct Entry {
     pub kind: String,
     /// The argument that holds the physical name.
     pub name: String,
+    /// A format-defined default, used only when the primary property is absent.
+    pub fallback: Option<String>,
+    /// An alias reuses the canonical entry's identifier policy, without guessing from its kind.
+    pub basis: Option<String>,
+    pub qualifier: Option<String>,
+    pub qualifier_ref: Option<String>,
+    pub qualifier_type: Option<String>,
+    pub source: Option<String>,
+    pub source_ref: Option<String>,
+    pub source_type: Option<String>,
+    pub filter: Option<String>,
     #[serde(default)]
     pub forms: Vec<String>,
 }
@@ -68,6 +79,11 @@ pub(crate) fn workload(format: &str, ty: &str) -> Option<&'static Workload> {
     WORKLOADS.iter().find(|w| w.format == format && w.ty == ty)
 }
 
+pub(crate) fn named_workload(id: &str) -> Option<&'static Workload> {
+    let (format, ty) = id.split_once(':')?;
+    workload(format, ty)
+}
+
 static ENTRIES: LazyLock<Vec<Entry>> = LazyLock::new(|| {
     // The table is the repository's own file, checked by `the_table_parses`.
     toml::from_str::<Table>(TABLE).map_or_else(|_| Vec::new(), |t| t.entry)
@@ -78,8 +94,26 @@ pub(crate) fn entry(format: &str, ty: &str) -> Option<&'static Entry> {
     ENTRIES.iter().find(|e| e.format == format && e.ty == ty)
 }
 
+/// A configuration or stored mapping names an entry by its complete `format:type` identity.
+pub(crate) fn named(id: &str) -> Option<&'static Entry> {
+    let (format, ty) = id.split_once(':')?;
+    entry(format, ty)
+}
+
+/// Mapped nodes retain their physical type; their projection selects the curated entry.
+pub(crate) fn node_entry(node: &super::Node) -> Option<&'static Entry> {
+    match node.provisioned.as_ref().and_then(|p| p.entry.as_deref()) {
+        Some(id) => named(id),
+        None => provision_entry(&node.path, &node.block, &node.ty),
+    }
+}
+
 pub(crate) fn entries(format: &str) -> impl Iterator<Item = &'static Entry> + '_ {
     ENTRIES.iter().filter(move |e| e.format == format)
+}
+
+pub(crate) fn stamp() -> blake3::Hash {
+    blake3::hash(TABLE.as_bytes())
 }
 
 /// A type-table entry is a provisioner only in the format's resource declaration section.
@@ -141,6 +175,44 @@ pub(crate) fn identified(text: &str) -> Option<String> {
 }
 
 impl Entry {
+    pub(crate) fn canonical(&self) -> Option<&Entry> {
+        match self.basis.as_deref() {
+            Some(id) => named(id).filter(|entry| entry.basis.is_none()),
+            None => Some(self),
+        }
+    }
+    /// A mapped input cannot fall back to a malformed structured identifier or bare composite.
+    pub(crate) fn mapped(&self, text: &str, pattern: bool) -> Option<String> {
+        if self.basis.is_some() {
+            return self.canonical()?.mapped(text, pattern);
+        }
+        if pattern {
+            if self.ty.starts_with("google_") {
+                return crate::contract::gcp::pattern(&self.ty, text);
+            }
+            if self.ty.starts_with("azurerm_") {
+                return crate::contract::azure::pattern(&self.ty, text);
+            }
+            return super::pattern::supported(text).then(|| text.into());
+        }
+        if text.is_empty() || text.len() > crate::config_values::VALUE_MAX {
+            return None;
+        }
+        if self.ty == "google_sql_database" {
+            let (instance, database) = text.split_once('/')?;
+            return crate::contract::gcp::database(instance, database);
+        }
+        if self.ty == "azurerm_servicebus_subscription" {
+            return crate::contract::azure::subscription(text);
+        }
+        let target = self.project(text)?;
+        (!target.starts_with("arn:")
+            && !target.contains("://")
+            && !target.starts_with("projects/")
+            && !target.contains(['$', '{', '}', '?', '#'])
+            && !target.chars().any(char::is_whitespace))
+        .then_some(target)
+    }
     pub(crate) fn defining_key(&self, block: &str) -> String {
         if self.format == "cloudformation" {
             format!("{block}.Properties.{}", self.name)
@@ -151,6 +223,9 @@ impl Entry {
 
     /// Provider-specific identity validation belongs to the kind, shared with SDK/config readers.
     pub(crate) fn project(&self, text: &str) -> Option<String> {
+        if self.basis.is_some() {
+            return self.canonical()?.project(text);
+        }
         use crate::contract::gcp;
         match self.ty.as_str() {
             "azurerm_servicebus_queue" | "azurerm_servicebus_topic" => {
@@ -329,6 +404,8 @@ mod tests {
             fixtures.join("aws-workload-aliases"),
             fixtures.join("azure-infra"),
             fixtures.join("gcp-infra"),
+            fixtures.join("custom-strimzi"),
+            fixtures.join("custom-inventory"),
         ];
         while let Some(dir) = dirs.pop() {
             for e in std::fs::read_dir(&dir).unwrap() {
@@ -346,13 +423,16 @@ mod tests {
                 }
             }
         }
-        let (nodes, _) = crate::iac::evaluate(&files);
+        let (mut nodes, _) = crate::iac::evaluate(&files);
+        nodes.extend(crate::kube::evaluate(&files).nodes);
         for e in ENTRIES.iter() {
             assert!(
-                nodes.iter().any(|n| n.ty == e.ty
-                    && format_of(&n.path) == Some(e.format.as_str())
-                    && provision_entry(&n.path, &n.block, &n.ty).is_some()
-                    && n.name.as_deref().is_some_and(|name| !name.is_empty())),
+                nodes.iter().any(|n| node_entry(n)
+                    .is_some_and(|known| known.format == e.format && known.ty == e.ty)
+                    && n.provisioned
+                        .as_ref()
+                        .map_or(n.name.as_deref(), |p| p.name.as_deref())
+                        .is_some_and(|name| !name.is_empty())),
                 "no evaluated fixture case for {} {}",
                 e.format,
                 e.ty

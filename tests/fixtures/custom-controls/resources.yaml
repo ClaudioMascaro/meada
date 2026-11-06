@@ -1,0 +1,106 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata: { name: fallback-topic }
+spec: {}
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata: { name: unknown-override }
+spec: { topicName: '${MISSING}' }
+---
+apiVersion: pubsub.cnrm.cloud.google.com/v1beta1
+kind: PubSubTopic
+metadata: { name: topic-object }
+spec: { resourceID: same-channel }
+---
+apiVersion: pubsub.cnrm.cloud.google.com/v1beta1
+kind: PubSubSubscription
+metadata: { name: subscription-object }
+spec:
+  resourceID: same-channel
+  topicRef: { name: topic-object }
+---
+apiVersion: sql.cnrm.cloud.google.com/v1beta1
+kind: SQLInstance
+metadata: { name: instance-object }
+spec: { resourceID: primary-db }
+---
+apiVersion: sql.cnrm.cloud.google.com/v1beta1
+kind: SQLDatabase
+metadata: { name: database-object }
+spec:
+  resourceID: ledger
+  instanceRef: { name: instance-object }
+---
+apiVersion: sql.cnrm.cloud.google.com/v1beta1
+kind: SQLDatabase
+metadata: { name: unresolved-db }
+spec:
+  resourceID: ledger
+  instanceRef: { name: missing-instance }
+---
+apiVersion: sqs.aws.upbound.io/v1beta1
+kind: Queue
+metadata: { name: unconfigured-external }
+spec: { forProvider: { region: us-east-1, name: guessed-queue } }
+---
+apiVersion: sqs.aws.upbound.io/v1beta1
+kind: Queue
+metadata:
+  name: wrong-service
+  annotations:
+    crossplane.io/external-name: arn:aws:sns:us-east-1:123456789012:not-a-queue
+spec: { forProvider: { region: us-east-1 } }
+---
+apiVersion: servicebus.azure.upbound.io/v1beta1
+kind: Queue
+metadata:
+  name: wrong-provider
+  annotations:
+    crossplane.io/external-name: /subscriptions/proof/resourceGroups/r/providers/Microsoft.Storage/storageAccounts/assets
+spec: { forProvider: {} }
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata: { name: inventory }
+spec:
+  compositeTypeRef: { apiVersion: platform.example.com/v1, kind: Platform }
+  resources:
+    - name: known
+      base:
+        apiVersion: sqs.aws.upbound.io/v1beta1
+        kind: Queue
+        metadata:
+          annotations: { crossplane.io/external-name: composed-inbox }
+        spec: { forProvider: { region: us-east-1 } }
+    - name: patched
+      base:
+        apiVersion: sqs.aws.upbound.io/v1beta1
+        kind: Queue
+        metadata:
+          annotations: { crossplane.io/external-name: before-patch }
+        spec: { forProvider: { region: us-east-1 } }
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.queueName
+          toFieldPath: metadata.annotations[crossplane.io/external-name]
+    - name: database
+      base:
+        apiVersion: sql.cnrm.cloud.google.com/v1beta1
+        kind: SQLDatabase
+        metadata: { name: composed-database }
+        spec:
+          resourceID: ledger
+          instanceRef: { external: composite-db }
+    - name: patched-database
+      base:
+        apiVersion: sql.cnrm.cloud.google.com/v1beta1
+        kind: SQLDatabase
+        metadata: { name: composed-unresolved }
+        spec:
+          resourceID: ledger
+          instanceRef: { external: before-instance }
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.instance
+          toFieldPath: spec.instanceRef.external

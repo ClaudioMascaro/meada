@@ -1,0 +1,7 @@
+apiVersion: elasticache.services.k8s.aws/v1beta1
+kind: CacheCluster
+metadata:
+  name: operator-10
+  namespace: platform
+spec:
+  cacheClusterID: ack-cache

@@ -120,17 +120,37 @@ fn a_changed_composition_or_definition_changes_the_nodes_at_the_next_query() {
     assert!(!gone.contains("role:"), "{gone}");
 }
 
-/// Crossplane objects stay out of `meada export`.
+/// Only curated resources with complete identities enter the contract graph (#671).
 #[test]
-fn crossplane_objects_stay_out_of_the_export() {
+fn only_named_curated_crossplane_resources_enter_the_export() {
     let repo = fixture_repo("xp_export", "crossplane-nodes", ORIGIN);
     let text = Engine::open(&repo).unwrap().export().unwrap();
-    for name in [
-        "orders-db",
-        "XPostgreSQLInstance",
-        "Composition",
-        "shared-assets",
-    ] {
-        assert!(!text.contains(name), "{name} in {text}");
-    }
+    let mut value: serde_json::Value = serde_json::from_str(&text).unwrap();
+    value.as_object_mut().unwrap().remove("commit");
+    value.as_object_mut().unwrap().remove("dirty");
+    assert_eq!(
+        value,
+        serde_json::json!({
+            "format": 1,
+            "repository": "example.com/acme/platform",
+            "files": [], "symbols": [], "calls": [], "providers": [], "consumers": [],
+            "iac_nodes": [
+                {
+                    "identity": "example.com/acme/platform::platform/bucket.yaml::Bucket.s3.aws.upbound.io/shared-assets",
+                    "address": "Bucket.s3.aws.upbound.io/shared-assets", "type": "Bucket",
+                    "root": "platform", "path": "platform/bucket.yaml", "line": 1, "end_line": 11
+                },
+                {
+                    "identity": "example.com/acme/platform::platform/pipeline.yaml::Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws-pipeline/events",
+                    "address": "Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws-pipeline/events", "type": "Queue",
+                    "root": "platform", "path": "platform/pipeline.yaml", "line": 18, "end_line": 27
+                }
+            ],
+            "provisioners": [
+                { "contract": "channel::sqs::orders-events", "node": "example.com/acme/platform::platform/pipeline.yaml::Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws-pipeline/events", "root": "platform" },
+                { "contract": "resource::s3::acme-shared-assets", "node": "example.com/acme/platform::platform/bucket.yaml::Bucket.s3.aws.upbound.io/shared-assets", "root": "platform" }
+            ],
+            "links": []
+        })
+    );
 }

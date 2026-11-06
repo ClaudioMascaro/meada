@@ -1,0 +1,7 @@
+apiVersion: ssm.services.k8s.aws/v1beta1
+kind: Parameter
+metadata:
+  name: operator-12
+  namespace: platform
+spec:
+  name: /ack/config

@@ -32,6 +32,7 @@ use crate::lang::MAX_BYTES;
 use crate::msg::Msg;
 
 mod crossplane;
+mod custom;
 mod environment;
 mod routing;
 
@@ -145,6 +146,7 @@ struct Facts {
     xp: crossplane::Facts,
     environment: Vec<environment::Input>,
     data: BTreeMap<String, Option<String>>,
+    custom: Option<custom::Name>,
 }
 
 /// One Kubernetes object, as read and as a kustomization on the way changed it.
@@ -368,6 +370,7 @@ fn object(
     block: &str,
     value: &Value,
     span: Span,
+    mappings: &crate::iac::mapping::Config,
 ) -> Option<Obj> {
     let api = text(value, &["apiVersion"])?;
     let kind = text(value, &["kind"])?;
@@ -385,7 +388,8 @@ fn object(
         .filter(|_| !cluster_scoped(kind, group))
         .map(String::from);
     let mut facts = facts(value, kind, group);
-    facts.xp = crossplane::facts(value, kind, group, block, span);
+    facts.xp = crossplane::facts(value, kind, group, block, span, mappings);
+    facts.custom = custom::read(value, kind, group, mappings);
     Some(Obj {
         group: group.into(),
         kind: kind.into(),
@@ -469,7 +473,7 @@ fn resource(path: &[Step]) -> Option<(Option<usize>, usize)> {
 /// Reads the file at `path`. A file that does not parse, holds more than `DOCUMENTS_MAX`
 /// documents or is no UTF-8 holds nothing (config values count it unreadable); an empty `src` is
 /// a file that exists and holds nothing.
-fn read(path: &str, src: &[u8]) -> Parsed {
+fn read(path: &str, src: &[u8], mappings: &crate::iac::mapping::Config) -> Parsed {
     let mut parsed = Parsed::default();
     if src.is_empty() || std::str::from_utf8(src).is_err() {
         return parsed;
@@ -513,7 +517,7 @@ fn read(path: &str, src: &[u8]) -> Parsed {
         let span = |step: Option<usize>, i: usize| resources.get(&(n, step, i)).copied();
         parsed
             .objects
-            .extend(object(path, lines, &block, value, &span));
+            .extend(object(path, lines, &block, value, &span, mappings));
     }
     parsed
 }
@@ -736,6 +740,7 @@ impl<'m> Eval<'m> {
         let roles: Vec<Option<crossplane::Role>> =
             objs.iter().map(|o| self.kinds.role(o)).collect();
         let configs = environment::configs(&objs);
+        let customs = custom::Targets::new(&objs);
         let mut kept = 0;
         for (o, address) in objs.iter().zip(&addresses) {
             let environment = environment::resolve(o, &configs);
@@ -758,6 +763,9 @@ impl<'m> Eval<'m> {
             if !self.charge(
                 address.len()
                     + o.path.len()
+                    + o.facts.custom.as_ref().map_or(0, |c| {
+                        c.size(&o.block, &o.name) + self.root.len() + address.len()
+                    })
                     + ingress
                         .iter()
                         .map(|(r, s)| r.host.len() + r.prefix.len() + s.len())
@@ -770,6 +778,20 @@ impl<'m> Eval<'m> {
                 break;
             }
             kept += 1;
+            let projection = o
+                .facts
+                .custom
+                .as_ref()
+                .map(|c| c.projection(&o.block, &o.name, o.ns.as_deref(), &customs));
+            let subscription = o.facts.custom.as_ref().and_then(|c| {
+                c.subscription(
+                    projection.as_ref()?,
+                    o.ns.as_deref(),
+                    &customs,
+                    address,
+                    &self.root,
+                )
+            });
             self.out.nodes.push(Node {
                 address: address.clone(),
                 root: self.root.clone(),
@@ -777,10 +799,17 @@ impl<'m> Eval<'m> {
                 // A managed resource's name in the provider's API is its external name.
                 name: Some(
                     o.facts
-                        .xp
-                        .external
-                        .clone()
-                        .unwrap_or_else(|| o.name.clone()),
+                        .custom
+                        .as_ref()
+                        .and_then(|custom| custom.physical(&o.name))
+                        .map(String::from)
+                        .unwrap_or_else(|| {
+                            o.facts
+                                .xp
+                                .external
+                                .clone()
+                                .unwrap_or_else(|| o.name.clone())
+                        }),
                 ),
                 pattern: false,
                 overridable: Vec::new(),
@@ -794,10 +823,10 @@ impl<'m> Eval<'m> {
                 role: roles[kept - 1].map(|r| r.text().into()),
                 handler: None,
                 events: Vec::new(),
-                subscription: None,
+                subscription,
                 environment,
                 images: Vec::new(),
-                provisioned: None,
+                provisioned: projection,
                 ingress: ingress
                     .into_iter()
                     .map(|(route, service)| crate::iac::Ingress {
@@ -809,6 +838,7 @@ impl<'m> Eval<'m> {
             });
         }
         let (objs, addresses, roles) = (&objs[..kept], &addresses[..kept], &roles[..kept]);
+        let customs = custom::Targets::new(objs);
         // The resources each composition creates, under its address: its index, the address, and
         // the resource.
         let mut composed: Vec<(usize, String, &crossplane::Base)> = Vec::new();
@@ -818,14 +848,46 @@ impl<'m> Eval<'m> {
         for (i, o) in objs.iter().enumerate() {
             for b in &o.facts.xp.bases {
                 let address = format!("{}/{}", addresses[i], b.resource);
-                if !seen.insert(address.clone()) || !self.charge(address.len() + o.path.len()) {
+                let base_name = b.name.as_deref().unwrap_or("*");
+                if !seen.insert(address.clone())
+                    || !self.charge(
+                        address.len()
+                            + o.path.len()
+                            + b.custom.as_ref().map_or(0, |c| {
+                                c.size(&b.block, base_name) + address.len() + self.root.len() + 5
+                            }),
+                    )
+                {
                     continue;
                 }
+                let projection = b.custom.as_ref().map(|c| {
+                    c.projection(
+                        &format!("{}.base", b.block),
+                        base_name,
+                        b.namespace.as_deref(),
+                        &customs,
+                    )
+                });
+                let subscription = b.custom.as_ref().and_then(|c| {
+                    c.subscription(
+                        projection.as_ref()?,
+                        b.namespace.as_deref(),
+                        &customs,
+                        &address,
+                        &self.root,
+                    )
+                });
                 self.out.nodes.push(Node {
                     address: address.clone(),
                     root: self.root.clone(),
                     ty: b.kind.1.clone(),
-                    name: Some(b.name.clone().unwrap_or_else(|| "*".into())),
+                    name: Some(
+                        b.custom
+                            .as_ref()
+                            .and_then(|c| c.physical(base_name))
+                            .unwrap_or(base_name)
+                            .into(),
+                    ),
                     pattern: b.name.is_none(),
                     overridable: Vec::new(),
                     path: o.path.clone(),
@@ -838,10 +900,10 @@ impl<'m> Eval<'m> {
                     role: Some(crossplane::Role::Composed.text().into()),
                     handler: None,
                     events: Vec::new(),
-                    subscription: None,
+                    subscription,
                     environment: Vec::new(),
                     images: Vec::new(),
-                    provisioned: None,
+                    provisioned: projection,
                     ingress: Vec::new(),
                 });
                 held.entry(i).or_default().push(composed.len());
@@ -928,6 +990,11 @@ impl<'m> Eval<'m> {
             for (j, via) in found {
                 targets.insert((&addresses[j], via));
             }
+            if let Some(mapped) = &o.facts.custom {
+                for (j, via) in customs.references(mapped, ns) {
+                    targets.insert((&addresses[j], via));
+                }
+            }
             // Each resource a composition creates is one reference past the ceiling's.
             let own = held.get(&i).map_or(&[][..], Vec::as_slice);
             for &c in own {
@@ -963,11 +1030,11 @@ impl<'m> Eval<'m> {
             }
         }
         for (_, address, b) in &composed {
-            for (j, via) in crossplane
-                .of_base(b)
-                .into_iter()
-                .take(OBJECT_REFERENCES_MAX)
-            {
+            let mut targets = crossplane.of_base(b).into_iter().collect::<BTreeSet<_>>();
+            if let Some(mapped) = &b.custom {
+                targets.extend(customs.references(mapped, b.namespace.as_deref()));
+            }
+            for (j, via) in targets.into_iter().take(OBJECT_REFERENCES_MAX) {
                 if !self.charge(address.len() + addresses[j].len() + via.len()) {
                     return;
                 }
@@ -992,9 +1059,17 @@ impl<'m> Eval<'m> {
 /// The IaC nodes, references, images and unresolved entries of the YAML and JSON files `files`
 /// (path and bytes; empty bytes for a file that exists and cannot hold an object) of one
 /// repository, each overlay and each directory of plain manifests evaluated alone, in label order.
+#[cfg(test)]
 pub(crate) fn evaluate(files: &[(String, Vec<u8>)]) -> Output {
+    evaluate_with(files, &crate::iac::mapping::Config::default())
+}
+
+pub(crate) fn evaluate_with(
+    files: &[(String, Vec<u8>)],
+    mappings: &crate::iac::mapping::Config,
+) -> Output {
     let parsed: BTreeMap<String, Parsed> = (files.iter())
-        .map(|(path, src)| (path.clone(), read(path, src)))
+        .map(|(path, src)| (path.clone(), read(path, src, mappings)))
         .collect();
     let dirs: BTreeMap<&str, (&str, &Kustomization)> = (parsed.iter())
         .filter_map(|(path, p)| {

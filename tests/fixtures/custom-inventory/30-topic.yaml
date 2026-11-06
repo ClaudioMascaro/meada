@@ -1,0 +1,9 @@
+apiVersion: pubsub.gcp.upbound.io/v1beta1
+kind: Topic
+metadata:
+  name: operator-30
+  namespace: platform
+  annotations:
+    crossplane.io/external-name: xp-notices
+spec:
+  forProvider: {}

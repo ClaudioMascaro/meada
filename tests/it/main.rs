@@ -20,6 +20,7 @@ mod config_uses;
 mod config_values;
 mod conformance;
 mod crossplane;
+mod custom_iac;
 mod decide;
 mod decider;
 mod decisions;
