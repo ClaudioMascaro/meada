@@ -689,7 +689,7 @@ Repeatable. A resource that no code names, such as a table or a bucket, goes her
 | `kind` | text | yes | The kind, a lowercase identifier (letters, digits and hyphens, starting with a letter) with no meaning to Meada: `postgres`, `s3-bucket` |
 | `id` | text | yes | The resource's id, not empty |
 | `role` | `read`, `write` or `read-write` | yes | What this repository does with it |
-| `via` | list of text | no (empty) | The symbols that do the access, as `<path>::<qualified name>` |
+| `via` | list of text | no (empty) | Symbols, IaC addresses or `<file>#<key path>` with `[key=value]` selectors |
 
 ```toml
 [[resource]]
@@ -700,8 +700,8 @@ via = ["src/orders.ts::cancelOrder"]
 ```
 
 Each writer links to each reader of the same resource in another repository, at level `declared`.
-Without `via`, or if no `via` matches a symbol, the side is the whole repository. `meada status`
-shows, under each repository, the unlinked resources and the `via` entries that match no symbol.
+Without `via`, or if no `via` matches a symbol, IaC node or key, the side is the whole repository. `meada status`
+shows, under each repository, the unlinked resources and the `via` entries that match no symbol, IaC node or key.
 The resource's identity in `search` and `context` is `resource::postgres::orders`.
 
 ### A complete example: `web`, `api` and `worker`
@@ -938,7 +938,7 @@ meada status [--workspace <manifest>]
 ```
 
 Shows the workspace's repositories and the state of each index. Under each repository, it shows
-the unlinked resources, the `via` entries that match no symbol, the stale decisions or those
+the unlinked resources, the `via` entries that match no symbol, IaC node or key, the stale decisions or those
 waiting on a peer, and each source file a language pack dropped for going over its budget. Peers
 that were not found appear as `missing peer`.
 
@@ -1169,10 +1169,10 @@ id = "orders"
 role = "read"
 ```
 
-With `via`, the side is the symbol; without `via`, or if no symbol matches, the side is the whole
+With `via`, the side is the symbol, IaC node or key; without `via`, or if no location matches, the side is the whole
 repository and appears as `(repository-level)`: a `trace` shows the link but does not enter that
 side. `meada status` lists, under each repository, the unlinked resources and the `via` entries
-with no symbol. Since Meada does not interpret `kind`, nothing guarantees that `postgres` and
+with no matching location. Since Meada does not interpret `kind`, nothing guarantees that `postgres` and
 `postgresql` are the same resource: write it the same way on both sides.
 
 **Gateway prefixes.** When a gateway rewrites paths, the consumer calls a path the provider's code
@@ -2077,3 +2077,37 @@ phone numbers or endpoints, high-level `boto3.resource` and `DynamoDBDocumentCli
 and operations outside this table are not recognized by these forms.
 
 `GetParametersByPath` queries a hierarchy, so its side stays unresolved; the path is not treated as a parameter name. A `ConditionCheck` in `TransactWriteItems` is a reader, even when the transaction also writes other tables. Computed `RequestItems` keys retain a literal or the environment variable name.
+
+## Locations of declared resources
+
+A `[[resource]]` `via` accepts symbols (`src/orders.ts::cancelOrder`), IaC addresses and
+`<file>#<key path>`. The side belongs to the block or key, reachable through `context` and
+`trace`, and its links stay `declared`. Addresses include Terraform/OpenTofu
+(`aws_sqs_queue.orders`), Kubernetes/Crossplane (`Deployment.apps/shop/api`), Compose
+(`services.api`), CloudFormation/SAM (`template.yaml::Orders`) and Serverless
+(`serverless.yml::functions.api`). Use `<file>::<address>` to distinguish files. The location identifies the source block;
+the ` (root ...)` qualifier of IaC queries is not a `via` form.
+An address matching several source blocks needs the file qualifier; without it the `via`
+is stale.
+
+Key paths use dots, indexes (`groups[0].name`) and JSON-quoted keys
+(`metadata.labels["app.kubernetes.io/name"]`). In lists, `[key=value]` selects items by exact,
+complete value equality, for example
+`values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support`.
+Locations come from indexed values and their parent key paths.
+Null values and empty containers have no indexed value; their `via` is stale.
+A selector can match several items; each matching key gets a side. Redacted or cut values
+cannot select an item. HCL expressions and templates cannot satisfy selector equality. Files follow the index's rules, including `.meadaignore`; a `via`
+never opens a file on its own.
+
+An unmatched `via` is stale and appears in the existing `meada status` lines. With no valid
+`via`, the side falls back to the whole repository. This connects labels in Helm values to
+routing rules through declarations without rendering templates.
+
+```toml
+[[resource]]
+kind = "routing"
+id = "team-b"
+role = "write"
+via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
+```

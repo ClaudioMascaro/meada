@@ -2451,6 +2451,8 @@ pub(crate) struct Export {
     pub(crate) links: Vec<Link>,
     pub(crate) provisioners: Vec<iac::provision::Side>,
     pub(crate) config_uses: Vec<iac::config_uses::Side>,
+    /// Declared key locations read at query time, without the config values themselves.
+    pub(crate) config_sites: Vec<config_values::sites::Site>,
     pub(crate) configurations: Vec<(String, serde_json::Value)>,
     pub(crate) iac: Vec<iac::Node>,
     pub(crate) workload_images: Vec<(String, String, String)>,
@@ -2544,6 +2546,7 @@ impl Export {
                 .consumers
                 .iter()
                 .any(|c| c.site == identity && c.root.as_deref().is_none_or(|r| r == node.root))
+                || out.providers.iter().any(|p| p.site == identity)
                 || self.executions.iter().any(|x| x.workload == identity)
             {
                 let mut written = written::IacNode::default();
@@ -2989,6 +2992,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         links: Vec::new(),
         provisioners: iac::provision::read(db, identity)?,
         config_uses: iac::config_uses::read(db, identity)?,
+        config_sites: Vec::new(),
         configurations: db
             .prepare("SELECT path, summary FROM contract_configs ORDER BY path")?
             .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?

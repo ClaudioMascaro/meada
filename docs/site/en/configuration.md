@@ -30,11 +30,11 @@ A shared resource no code names, such as a table or a bucket, goes in as `[[reso
 kind = "postgres"                        # lowercase identifier
 id = "orders"
 role = "write"                           # read, write or read-write
-via = ["src/orders.ts::cancelOrder"]     # optional: the symbols that do the access
+via = ["src/orders.ts::cancelOrder"]     # optional: the locations that do the access
 ```
 
 Every writer links to every reader of the same resource in another repository, at the level
-`declared`. Without `via`, or when no `via` matches a symbol, the side is the whole repository.
+`declared`. Without `via`, or when no `via` matches a symbol, IaC node or key, the side is the whole repository.
 
 Java 2.x, Go v2 and .NET AWS SDKs also name resources directly in code: for example, `PutObject` on `uploads` writes `resource::s3::uploads`, and `GetObject` on that bucket reads the same contract. Written SDK uses link at `exact`; an explicit declaration remains `declared`. A same-named Terraform `aws_s3_bucket` links to all those uses as their provisioner. The uses need no repeated `[[resource]]` entries. Construct the client in code or pass it through exact calls; an injected interface type alone is insufficient. Environment names remain unresolved, with the variable in the export. See the [recognized operations](capabilities.md#aws-sdks-in-java-go-and-c).
 
@@ -92,3 +92,37 @@ Migrations/
 ```
 
 A file a new default or a new entry excludes leaves the index on the next refresh, as a deleted file does.
+
+## Locations of declared resources
+
+A `[[resource]]` `via` accepts symbols (`src/orders.ts::cancelOrder`), IaC addresses and
+`<file>#<key path>`. The side belongs to the block or key, reachable through `context` and
+`trace`, and its links stay `declared`. Addresses include Terraform/OpenTofu
+(`aws_sqs_queue.orders`), Kubernetes/Crossplane (`Deployment.apps/shop/api`), Compose
+(`services.api`), CloudFormation/SAM (`template.yaml::Orders`) and Serverless
+(`serverless.yml::functions.api`). Use `<file>::<address>` to distinguish files. The location identifies the source block;
+the ` (root ...)` qualifier of IaC queries is not a `via` form.
+An address matching several source blocks needs the file qualifier; without it the `via`
+is stale.
+
+Key paths use dots, indexes (`groups[0].name`) and JSON-quoted keys
+(`metadata.labels["app.kubernetes.io/name"]`). In lists, `[key=value]` selects items by exact,
+complete value equality, for example
+`values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support`.
+Locations come from indexed values and their parent key paths.
+Null values and empty containers have no indexed value; their `via` is stale.
+A selector can match several items; each matching key gets a side. Redacted or cut values
+cannot select an item. HCL expressions and templates cannot satisfy selector equality. Files follow the index's rules, including `.meadaignore`; a `via`
+never opens a file on its own.
+
+An unmatched `via` is stale and appears in the existing `meada status` lines. With no valid
+`via`, the side falls back to the whole repository. This connects labels in Helm values to
+routing rules through declarations without rendering templates.
+
+```toml
+[[resource]]
+kind = "routing"
+id = "team-b"
+role = "write"
+via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
+```

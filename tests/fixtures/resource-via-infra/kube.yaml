@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: routing
+  namespace: shop
+data:
+  support: team-b

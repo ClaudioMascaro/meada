@@ -1962,7 +1962,7 @@ pub(crate) fn hits(
 
 /// The nodes `text` names in `db` (repository `identity`): `<address>`, `<path>::<address>` or
 /// `<identity>::<path>::<address>`, any of them followed by ` (root <root>)` to pick a root.
-fn named(identity: &str, nodes: &[Node], text: &str) -> Vec<Node> {
+pub(crate) fn named(identity: &str, nodes: &[Node], text: &str) -> Vec<Node> {
     let (text, root) = match text
         .strip_suffix(')')
         .and_then(|t| t.rsplit_once(" (root "))
@@ -2144,7 +2144,7 @@ pub(crate) fn trace(
     text: &str,
     direction: Direction,
     budget: Option<usize>,
-    mut provisioned: impl FnMut(usize, &Node, usize) -> Vec<Row>,
+    mut attached: impl FnMut(usize, &Node, usize) -> Vec<Row>,
 ) -> Result<Option<String>> {
     let found = found(exports, text);
     let [(r, start)] = &found[..] else {
@@ -2174,9 +2174,7 @@ pub(crate) fn trace(
         if !mark.is_empty() {
             continue;
         }
-        if direction == Direction::Down {
-            rows.extend(provisioned(*r, &n, depth + 1));
-        }
+        rows.extend(attached(*r, &n, depth + 1));
         expanded.insert(n.address.clone());
         path.push(n.address.clone());
         let next = references(db, &n, direction)?;

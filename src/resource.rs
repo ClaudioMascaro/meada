@@ -1,5 +1,6 @@
 //! Resources: shared things a repository reads or writes, such as a database table or bucket.
-//! Declarations in `meada.toml` (#19) name `via` symbols, else the repository as a whole, and
+//! Declarations in `meada.toml` (#19, #641) name symbols, IaC addresses or config key paths,
+//! else the repository as a whole, and
 //! link writers to readers in other repositories at `declared`. AWS SDK forms (#659) supply
 //! code sides through their client origins and name arguments; literal SDK writers and readers
 //! link at `exact`, in the same repository too. Both use `resource::<kind>::<id>` contracts.
@@ -15,6 +16,7 @@ use crate::resolve::Code;
 mod aws;
 mod python;
 mod ts;
+mod via;
 use crate::workspace::Repository;
 
 pub struct Resource;
@@ -37,18 +39,54 @@ fn site(repo: &Repository, via: &str) -> String {
     format!("{}::{via}", repo.identity)
 }
 
-/// The `via` sites of `resource` that are symbols of the repository.
-fn matched(repo: &Repository, export: &Export, resource: &config::Resource) -> Vec<String> {
-    let found = |site: &String| export.symbols.iter().any(|s| s.id == *site);
-    resource
-        .via
+/// The exact symbols and IaC nodes a declaration names in its own repository.
+fn resolved(repo: &Repository, export: &Export, via: &str) -> Vec<String> {
+    let symbol = site(repo, via);
+    if export.symbols.iter().any(|s| s.id == symbol) {
+        return vec![symbol];
+    }
+    let mut nodes: Vec<_> = crate::iac::named(&repo.identity, &export.iac, via)
         .iter()
-        .map(|via| site(repo, via))
-        .filter(found)
-        .collect()
+        .filter(|n| {
+            via == n.address
+                || via == format!("{}::{}", n.path, n.address)
+                || via == n.identity(&repo.identity)
+        })
+        .map(|n| n.identity(&repo.identity))
+        .collect();
+    nodes.sort();
+    nodes.dedup();
+    if nodes.len() == 1 {
+        return nodes;
+    }
+    // An address shared by different source blocks needs its file qualifier.
+    if !nodes.is_empty() {
+        return Vec::new();
+    }
+    if via.contains('#') {
+        return export
+            .config_sites
+            .iter()
+            .filter(|s| s.via == via)
+            .map(|s| s.id.clone())
+            .collect();
+    }
+    Vec::new()
 }
 
-/// The sides of `resource`: its matched `via` symbols, else the repository as a whole.
+/// Every existing location named by the resource, once in identity order.
+fn matched(repo: &Repository, export: &Export, resource: &config::Resource) -> Vec<String> {
+    let mut sites: Vec<_> = resource
+        .via
+        .iter()
+        .flat_map(|v| resolved(repo, export, v))
+        .collect();
+    sites.sort();
+    sites.dedup();
+    sites
+}
+
+/// The sides of `resource`: its matched locations, else the repository as a whole.
 fn sites(repo: &Repository, export: &Export, resource: &config::Resource) -> Vec<String> {
     match matched(repo, export, resource) {
         sites if sites.is_empty() => vec![repo.identity.clone()],
@@ -57,7 +95,7 @@ fn sites(repo: &Repository, export: &Export, resource: &config::Resource) -> Vec
 }
 
 /// The status lines of `repo` (whose index content is `export`) about its resources: each
-/// `via` that names no symbol, the fallback to the repository as a whole, and each resource
+/// `via` that names no location, the fallback to the repository as a whole, and each resource
 /// no link of the workspace (`links`) reaches.
 fn report(repo: &Repository, export: &Export, links: &[Link]) -> Vec<String> {
     let mut lines = Vec::new();
@@ -66,7 +104,7 @@ fn report(repo: &Repository, export: &Export, links: &[Link]) -> Vec<String> {
         let contract = contract(resource);
         let found = matched(repo, export, resource);
         for via in &resource.via {
-            if !found.contains(&site(repo, via)) {
+            if resolved(repo, export, via).is_empty() {
                 let msg = Msg::ViaUnmatched {
                     contract: &contract,
                     via,
@@ -154,9 +192,15 @@ impl ContractKind for Resource {
         name.filter(|n| !n.is_empty()).and(kind)
     }
 
-    /// One side per `via` symbol the repository has; a `via` entry that names no symbol is
-    /// ignored. An entry with no `via`, or none that names a symbol, makes the repository as a
-    /// whole its side: the site is the repository identity.
+    fn read_declarations(
+        &self,
+        repo: &Repository,
+        db: &rusqlite::Connection,
+        export: &mut Export,
+    ) -> crate::Result<()> {
+        via::read(repo, db, export)
+    }
+
     fn declare(&self, repo: &Repository, export: &mut Export) {
         for resource in &repo.config.resources {
             let contract = contract(resource);
@@ -190,6 +234,17 @@ impl ContractKind for Resource {
         let key = |c: &Consumer| (c.site.clone(), c.contract.clone(), c.via.clone());
         consumers.sort_by_key(key);
         consumers.dedup_by(|a, b| key(a) == key(b));
+    }
+
+    fn context_at(
+        &self,
+        exports: &[Export],
+        _: &[Repository],
+        links: &[Link],
+        site: &str,
+        _: Option<&str>,
+    ) -> Vec<String> {
+        via::context(exports, links, site)
     }
 
     /// The `via` symbols of every resource the repository declares (`matched`).

@@ -342,3 +342,16 @@ this file, and a change to these modules updates it.
   provider takes fields, open parts and scalars, a consumer the declared paths, optional only
   when every type says so and never when read); unresolved, a provider's part is open and a
   consumer's adds nothing. `under(prefix, path)` joins paths (the root below `a` is `a`).
+
+## Declaration key paths (#641)
+
+`config_values/sites.rs` parses jq-style paths and `[key=value]` list selectors iteratively.
+It matches only indexed keys in the specified file and compares complete, nonredacted scalar
+values of type string/number/boolean (never HCL expressions/templates). Quoted keys and
+selector values use JSON escaping; nested list selectors retain their
+own item's prefix. A selector matching several keys yields each canonical location once.
+Missing, ignored and unreadable paths have no indexed row, including absolute/escaping paths.
+Null values and empty containers remain absent under ADR 0025, so their declarations are stale.
+The existing value and reader ceilings bound inputs; selectors introduce no recursive file
+walk or expansion. `Site` holds only the query spelling, identity, path, key and line and lives
+for one query, never as another stored copy of config text.

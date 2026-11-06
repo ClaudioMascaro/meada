@@ -260,6 +260,18 @@ pub trait ContractKind {
     /// derive at query time, so an edit to `meada.toml` needs no reindex.
     fn declare(&self, _repo: &Repository, _export: &mut Export) {}
 
+    /// Reads indexed locations needed by declarations before `declare` runs. Query-time
+    /// configuration may change independently of the index; server-mode callers use the same
+    /// indexed rows and never open source through this hook.
+    fn read_declarations(
+        &self,
+        _repo: &Repository,
+        _db: &rusqlite::Connection,
+        _export: &mut Export,
+    ) -> crate::Result<()> {
+        Ok(())
+    }
+
     /// The symbols of `repo` that `declare`, `workspace_step`, `link` and `status` look up in
     /// its export, given the export's contract rows: a query reads only some code rows of an
     /// index (#396, `partial.rs`), these before any kind declares. `None` is every symbol of

@@ -74,6 +74,8 @@ file whose path holds a space reads as more fields than it has.
 | `<callee>` | `<text>` | What a call names, as written (`fetch`, `requests.get`). |
 | `<identity>` | `<repository>::<path>::<name>` | A symbol's identity. |
 | `<identity>` | `<repository>::<path>` | A file's identity: a route file, or the top level of a file. |
+| `<identity>` | `<repository>::<path>#<key-path>` | A declared config key's canonical identity, with resolved list indexes. |
+| `<identity>` | `<repository>::<path>::<address>` | An IaC node's source identity. |
 | `<n>` | `<number>` | A count. |
 | `<query>` | `<text>` | What the call was given, echoed. |
 | `<orphan-note>` | ` (no provisioner in the workspace)` | The visible scope has uses but no provisioner of this contract kind and broker or resource kind. |
@@ -198,6 +200,7 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 | `<site>` | `<path> (documented only)` | A side only a provider document lists. |
 | `<site>` | `<path> <manifest-field>` | A dependency entry of a manifest, such as `package.json dependencies`. |
 | `<site>` | `use <config-place> [<level>]` | A directionless config use, with its key locator and evidence level. |
+| `<site>` | `<config-place>` | A declared resource side at an indexed config key. |
 | `<config-place>` | `<path>#<key-path> (line <line>)` | A config key's repository-relative locator and 1-based line. |
 | `<manifest-field>` | `<word>` | The manifest's field holding the entry. |
 | `<summary>` | `openapi <version>, routes: <n>` | An OpenAPI document and how many routes it lists. |
@@ -258,13 +261,19 @@ symbol, its name as `<path>::<name>` (or its identity when another repository ha
 **A contract.** Its identifier, then one line per side across the workspace, providers first,
 each followed by the shape the side carries and, for a route's consumers, its drift.
 
+**A declared resource key.** Its repository and canonical key locator, then `provides` and
+`consumes` lines for its directed sides. Each side lists linked `reader:` or `writer:`
+identities with the link's level and reason. A key may also retain its directionless config
+use and provisioning lines. A selector query locates its resolved list indexes.
+
 **An IaC node.** Its head (the node and the lines of its block), its `type:`, `name:` and
 `root:` lines (then `role:` for a Crossplane object, #655, and `image:` and `build:` for a Compose service), then `overridable:` (the values a deployer can override that its name went
 through), `references:` (the nodes it references), `referenced by:` (those that reference it),
 `images:` (a Kubernetes workload's images once its overlay's `images` applied; absent for any
 other node) and `values:` (the config values of its block), each followed by its lines or
 printing `none`. An address several nodes have (one per root module that instantiates it) gives
-a `fits` line and one line per node, with what to pass for it.
+a `fits` line and one line per node, with what to pass for it. Declared resource sides at the
+node add the same `provides`, `consumes`, `reader:` and `writer:` lines as a declared key.
 
 **Nothing.** A `no symbol` or `no contract` line.
 
@@ -309,6 +318,11 @@ words:
 | fits | ``` `<query>` fits <n> symbols; pass one of: ``` | The name fits several symbols, listed after it. |
 | no symbol | `` no symbol matches `<query>` `` | No symbol has the name. |
 | config use | `<repository> use <config-place> [<level>] <contract><orphan-note?>` | A directionless config use named by its key locator. |
+| config key | `<repository> <config-place>` | A declared resource key's canonical location. |
+| located provides | `provides <contract>` | The selected key or IaC node writes the declared resource. |
+| located consumes | `consumes <contract>` | The selected key or IaC node reads the declared resource. |
+| linked reader | `  reader: <identity><mark>` | A reader linked to the selected resource writer. |
+| linked writer | `  writer: <identity><mark>` | A writer linked to the selected resource reader. |
 | contract head | `<shown-contract>` | The contract the sides below belong to. |
 | side | `  <repository> <role> <side><mark?><orphan-note?>` | A side of the contract; a side linked through another name carries its mark. |
 | drift | `    drift: missing <missing>` | Under a consumer: the field paths it reads that the provider lacks, each with its level. |
@@ -397,8 +411,9 @@ words:
 | `<role>` | `binding <exchange> <binding-pattern>` | A binding that routes the exchange's messages to the queue. |
 | `<binding-pattern>` | `<word>` | The binding's routing pattern. |
 | `<side>` | `<config-place> [<level>]` | A directionless config use at its key, with its evidence level. |
+| `<side>` | `<config-place>` | A declared resource side at its canonical key. |
 | `<side>` | `<place> <address> (root <iac-root>)` | A provisioner and its root. |
-| `<side>` | `<place> <caller>` | A side in code: the line and the symbol around it. |
+| `<side>` | `<place> <caller>` | A side in code or IaC: the line and the symbol or source address. |
 | `<side>` | `<path>` | A manifest. |
 | `<side>` | `<path> (top level)` | A route file serving with no function of its own. |
 | `<side>` | `(repository-level)` | A side declared with no `via`. |
@@ -415,6 +430,9 @@ words:
 ## `trace`
 
 Resource and channel data flows from provider to consumer downstream and back upstream.
+A declared key or IaC node participates in the same directed links; a declared read-write
+key can continue through its next link. An automatic directionless config use keeps its
+terminal behavior unless the same key also has a declared side.
 A receiving call keeps its identity in links and process steps; its label gives the actual
 call location and owning function. Downstream traversal continues through that owner's body,
 including when the receiving call is the start and has no linked writer. Module-level reads
@@ -474,6 +492,7 @@ carries its level with no reason.
 | Field | Form | Meaning |
 | --- | --- | --- |
 | `<node>` | `<repository> use <config-place> [<level>]` | A config key; down ends here, up follows only provisioning links. |
+| `<node>` | `<repository> <config-place>` | A declared resource key at its canonical location; directed links can continue through it. |
 | `<node>` | `<repository> <place> <name>` | A symbol at its definition, or a call site and the name it calls. |
 | `<node>` | `<repository> <path> (top level)` | A file: the top level of a file making calls, or a route file serving with no function of its own. |
 | `<node>` | `<repository> (repository-level)` | A side declared with no `via`; the branch ends there. |

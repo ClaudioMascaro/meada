@@ -32,7 +32,7 @@ lands it writes the check.
 | Workload environment entries | 47 to 49 | CLI export, MCP | `boutique`, `sam-rust` | to write | pending |
 | HTTP through IaC: Services, Ingress, IaC-declared routes | 50 to 52 | CLI export, MCP | `boutique`, `sam-rust` | to write | pending |
 | Alert routing | 53 to 56 | CLI export, MCP | `kube-prometheus` | to write | pending |
-| `via` to an IaC address or a key path | 61, 62 | CLI status | `a7-probe` with an overlay | to write (#641) | pending |
+| `via` to an IaC address or a key path | 61, 62 | CLI export/status, MCP stdio/HTTP | neutral sibling repositories in `resource-via.py` | #641/#642, exact declared sites, all formats, selectors, stale remove/restore; [recipe](resource-via.md) | `resource-via.py --http` |
 | Export and console graph additions | 63, 64 | CLI export, console | every IaC entry | to write | pending |
 
 ## `images.py`: #662

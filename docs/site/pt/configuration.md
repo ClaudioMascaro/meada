@@ -32,11 +32,11 @@ Um recurso compartilhado que nenhum código nomeia, como uma tabela ou um bucket
 kind = "postgres"                        # identificador em minúsculas
 id = "orders"
 role = "write"                           # read, write ou read-write
-via = ["src/orders.ts::cancelOrder"]     # opcional: os símbolos que fazem o acesso
+via = ["src/orders.ts::cancelOrder"]     # opcional: os locais que fazem o acesso
 ```
 
 Cada escritor liga a cada leitor do mesmo recurso em outro repositório, no nível `declared`.
-Sem `via`, ou se nenhum `via` corresponde a um símbolo, o lado é o repositório inteiro.
+Sem `via`, ou se nenhum `via` corresponde a um símbolo, nó IaC ou chave, o lado é o repositório inteiro.
 
 Os SDKs AWS de Java 2.x, Go v2 e .NET também nomeiam recursos diretamente pelo código: por exemplo, `PutObject` em `uploads` escreve `resource::s3::uploads`, e `GetObject` no mesmo bucket lê esse contrato. A ligação entre usos escritos é `exact`; uma declaração explícita continua `declared`. O bloco Terraform `aws_s3_bucket` do mesmo nome liga a todos esses usos como provisionador. Não é preciso repetir os usos como `[[resource]]`. Construa o cliente no código ou passe-o por chamadas exatas; o tipo de uma interface injetada sozinho não basta. Nomes lidos do ambiente ficam sem resolução, com a variável no export. Consulte as [operações reconhecidas](capabilities.md#sdks-aws-em-java-go-e-c).
 
@@ -94,3 +94,38 @@ Migrations/
 ```
 
 Um arquivo que um novo padrão ou uma nova entrada exclui sai do índice no próximo refresh, como um arquivo apagado.
+
+## Locais de recursos declarados
+
+O `via` de `[[resource]]` aceita símbolos (`src/orders.ts::cancelOrder`), endereços IaC e
+`<arquivo>#<caminho da chave>`. O lado fica no bloco ou na chave, alcançável por `context` e
+`trace`, e suas ligações continuam `declared`. Os endereços incluem Terraform/OpenTofu
+(`aws_sqs_queue.orders`), Kubernetes/Crossplane (`Deployment.apps/shop/api`), Compose
+(`services.api`), CloudFormation/SAM (`template.yaml::Orders`) e Serverless
+(`serverless.yml::functions.api`). Use `<arquivo>::<endereço>` para distinguir arquivos. O local identifica o bloco de origem;
+o qualificador ` (root ...)` das consultas IaC não é uma forma de `via`.
+Um endereço que corresponde a vários blocos de origem precisa do qualificador de arquivo;
+sem ele, o `via` é obsoleto.
+
+Caminhos de chave usam pontos, índices (`groups[0].name`) e chaves entre aspas JSON
+(`metadata.labels["app.kubernetes.io/name"]`). Em listas, `[chave=valor]` seleciona os itens
+pela igualdade do valor completo, por exemplo
+`values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support`.
+A localização vem de valores indexados e seus caminhos pais.
+Valores nulos e contêineres vazios não têm valor indexado; seu `via` é obsoleto.
+Um seletor pode encontrar vários itens; cada chave encontrada recebe um lado. Valores
+marcados como `redacted` ou cortados não servem para selecionar um item. Expressões e templates
+HCL não satisfazem a igualdade de um seletor. Os arquivos seguem as regras do
+índice, incluindo `.meadaignore`; nenhum arquivo é aberto por causa de um `via`.
+
+Um `via` sem correspondência é obsoleto e aparece nas linhas existentes de `meada status`.
+Sem nenhum `via` válido, o lado volta ao repositório inteiro. Isso permite declarar o vínculo
+entre rótulos em valores Helm e regras de roteamento sem renderizar templates.
+
+```toml
+[[resource]]
+kind = "routing"
+id = "team-b"
+role = "write"
+via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
+```

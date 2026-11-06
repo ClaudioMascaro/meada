@@ -264,6 +264,7 @@ impl Engine {
                 let mut export = index::export(db, &m.identity)?;
                 export.root = m.root.clone();
                 for kind in contract::KINDS {
+                    kind.read_declarations(m, db, &mut export)?;
                     kind.declare(m, &mut export);
                 }
                 Ok(export)
@@ -294,6 +295,7 @@ impl Engine {
                 .collect();
             partial.calls(Some(n), &decided)?;
             for kind in contract::KINDS {
+                kind.read_declarations(repo, &self.dbs[n], &mut partial.exports[n])?;
                 kind.declare(repo, &mut partial.exports[n]);
             }
         }
@@ -493,6 +495,17 @@ impl Engine {
         let starts = trace::starts(&mut partial, start, changes.as_deref(), direction)?;
         let none = starts.is_empty();
         trace::read(&mut partial, &links, starts, direction, true)?;
+        if none
+            && let Start::From(from) = start
+            && !iac::found(&partial.exports, from).is_empty()
+        {
+            let sites = partial
+                .exports
+                .iter()
+                .flat_map(|e| e.iac.iter().map(|n| n.identity(&e.repository)))
+                .collect();
+            trace::read(&mut partial, &links, sites, direction, true)?;
+        }
         if none && direction == Direction::Down {
             if let Start::From(from) = start
                 && !iac::found(&partial.exports, from).is_empty()
@@ -525,7 +538,7 @@ impl Engine {
                 from,
                 direction,
                 budget,
-                |r, n, depth| graph.provisioned_rows(r, n, depth),
+                |r, n, depth| graph.attached_rows(r, n, depth, direction),
             )?
         {
             return Ok(iac);
@@ -666,6 +679,12 @@ impl Engine {
             for (r, contract, site, role) in ranked {
                 let location = match spans.get(site.as_str()) {
                     Some(span) => files.at(&span.path, span.start),
+                    None if export.config_sites.iter().any(|s| &s.id == site) => export
+                        .config_sites
+                        .iter()
+                        .find(|s| &s.id == site)
+                        .unwrap()
+                        .place(),
                     None if export.config_uses.iter().any(|u| &u.site == site) => {
                         let u = export.config_uses.iter().find(|u| &u.site == site).unwrap();
                         format!("use {} [{}]", u.place(), u.level.name())
@@ -963,6 +982,14 @@ impl Engine {
                     let at = files.at(&c.span.path, c.span.start);
                     let name = export.symbols.iter().find(|s| s.id == c.caller);
                     format!("{at} {}", name.map_or("(top level)", |s| label(&s.id)))
+                } else if let Some(s) = export.config_sites.iter().find(|s| s.id == site) {
+                    s.place()
+                } else if let Some(node) = export
+                    .iac
+                    .iter()
+                    .find(|n| n.identity(&repo.identity) == site)
+                {
+                    format!("{}:{} {}", node.path, node.line, node.address)
                 } else if site == repo.identity {
                     REPOSITORY_LEVEL.into()
                 } else if let Some(doc) = export.document_of(site) {
@@ -1090,11 +1117,38 @@ impl Engine {
             }
             return Ok(render::budgeted(&lines, budget));
         }
+        let located = config_values::sites::found(&partial.exports, symbol);
         let configured = iac::config_uses::found(&partial.exports, symbol);
-        if !configured.is_empty() {
-            let mut lines = Vec::new();
+        if !located.is_empty() || !configured.is_empty() {
+            let links = self.links(&partial.exports);
             let scope = iac::orphans::Scope::new(&partial.exports);
-            for (n, u) in configured {
+            let ids: HashSet<_> = located.iter().map(|(_, s)| s.id.as_str()).collect();
+            let mut lines = Vec::new();
+            for (n, site) in located {
+                lines.push(format!("{} {}", repos[n].identity, site.place()));
+                for u in partial.exports[n]
+                    .config_uses
+                    .iter()
+                    .filter(|u| u.site == site.id)
+                {
+                    lines.push(format!(
+                        "{} use {} [{}] {}{}",
+                        repos[n].identity,
+                        u.place(),
+                        u.level.name(),
+                        u.contract,
+                        scope.use_note(&u.contract)
+                    ));
+                }
+                for kind in KINDS {
+                    lines.extend(kind.context_at(&partial.exports, repos, &links, &site.id, None));
+                }
+                lines.extend(iac::provision::context(&partial.exports, &site.id));
+            }
+            for (n, u) in configured
+                .into_iter()
+                .filter(|(_, u)| !ids.contains(u.site.as_str()))
+            {
                 lines.push(format!(
                     "{} use {} [{}] {}{}",
                     repos[n].identity,

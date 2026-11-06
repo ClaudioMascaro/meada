@@ -690,7 +690,7 @@ Repetível. Um recurso que nenhum código nomeia, como uma tabela ou um bucket, 
 | `kind` | texto | sim | O tipo, um identificador em minúsculas (letras, dígitos e hífens, começando por letra) sem significado para o Meada: `postgres`, `s3-bucket` |
 | `id` | texto | sim | O id do recurso, não vazio |
 | `role` | `read`, `write` ou `read-write` | sim | O que este repositório faz com ele |
-| `via` | lista de textos | não (vazia) | Os símbolos que fazem o acesso, como `<caminho>::<nome qualificado>` |
+| `via` | lista de textos | não (vazia) | Símbolos, endereços IaC ou `<arquivo>#<chave>` com seletores `[chave=valor]` |
 
 ```toml
 [[resource]]
@@ -701,9 +701,9 @@ via = ["src/orders.ts::cancelOrder"]
 ```
 
 Cada escritor liga a cada leitor do mesmo recurso em outro repositório, no nível `declared`. Sem
-`via`, ou se nenhum `via` corresponde a um símbolo, o lado é o repositório inteiro. O `meada
+`via`, ou se nenhum `via` corresponde a um símbolo, nó IaC ou chave, o lado é o repositório inteiro. O `meada
 status` mostra, sob cada repositório, os recursos sem ligação e os `via` que não correspondem a
-nenhum símbolo. A identidade do recurso no `search` e no `context` é `resource::postgres::orders`.
+nenhum símbolo, nó IaC ou chave. A identidade do recurso no `search` e no `context` é `resource::postgres::orders`.
 
 ### Um exemplo completo: `web`, `api` e `worker`
 
@@ -940,7 +940,7 @@ meada status [--workspace <manifesto>]
 ```
 
 Mostra os repositórios do workspace e o estado de cada índice. Sob cada repositório, mostra os
-recursos sem ligação, os `via` que não correspondem a nenhum símbolo, as decisões obsoletas ou à
+recursos sem ligação, os `via` que não correspondem a nenhum símbolo, nó IaC ou chave, as decisões obsoletas ou à
 espera de um par e cada arquivo-fonte que um language pack descartou por passar do seu
 orçamento. Os pares que não foram encontrados aparecem como `missing peer`.
 
@@ -1172,10 +1172,10 @@ id = "orders"
 role = "read"
 ```
 
-Com `via`, o lado é o símbolo; sem `via`, ou se nenhum símbolo corresponde, o lado é o
+Com `via`, o lado é o símbolo, nó IaC ou chave; sem `via`, ou se nenhum local corresponde, o lado é o
 repositório inteiro e aparece como `(repository-level)`: um `trace` mostra o elo, mas não entra
 nesse lado. O `meada status` lista, sob cada repositório, os recursos sem ligação e os `via` sem
-símbolo. Como o Meada não interpreta `kind`, nada garante que `postgres` e `postgresql` sejam o
+local correspondente. Como o Meada não interpreta `kind`, nada garante que `postgres` e `postgresql` sejam o
 mesmo recurso: escreva do mesmo jeito nos dois lados.
 
 **Prefixos de gateway.** Quando um gateway reescreve os caminhos, o consumidor chama um caminho
@@ -2077,3 +2077,38 @@ telefone ou endpoint, os clientes de alto nível `boto3.resource` e `DynamoDBDoc
 e operações fora da tabela não são reconhecidos por estas formas.
 
 `GetParametersByPath` consulta uma hierarquia, por isso seu lado fica não resolvido; o caminho não é tratado como nome de um parâmetro. Um `ConditionCheck` de `TransactWriteItems` é leitor, mesmo quando a transação também escreve outras tabelas. Chaves computadas de `RequestItems` preservam o literal ou o nome da variável de ambiente.
+
+## Locais de recursos declarados
+
+O `via` de `[[resource]]` aceita símbolos (`src/orders.ts::cancelOrder`), endereços IaC e
+`<arquivo>#<caminho da chave>`. O lado fica no bloco ou na chave, alcançável por `context` e
+`trace`, e suas ligações continuam `declared`. Os endereços incluem Terraform/OpenTofu
+(`aws_sqs_queue.orders`), Kubernetes/Crossplane (`Deployment.apps/shop/api`), Compose
+(`services.api`), CloudFormation/SAM (`template.yaml::Orders`) e Serverless
+(`serverless.yml::functions.api`). Use `<arquivo>::<endereço>` para distinguir arquivos. O local identifica o bloco de origem;
+o qualificador ` (root ...)` das consultas IaC não é uma forma de `via`.
+Um endereço que corresponde a vários blocos de origem precisa do qualificador de arquivo;
+sem ele, o `via` é obsoleto.
+
+Caminhos de chave usam pontos, índices (`groups[0].name`) e chaves entre aspas JSON
+(`metadata.labels["app.kubernetes.io/name"]`). Em listas, `[chave=valor]` seleciona os itens
+pela igualdade do valor completo, por exemplo
+`values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support`.
+A localização vem de valores indexados e seus caminhos pais.
+Valores nulos e contêineres vazios não têm valor indexado; seu `via` é obsoleto.
+Um seletor pode encontrar vários itens; cada chave encontrada recebe um lado. Valores
+marcados como `redacted` ou cortados não servem para selecionar um item. Expressões e templates
+HCL não satisfazem a igualdade de um seletor. Os arquivos seguem as regras do
+índice, incluindo `.meadaignore`; nenhum arquivo é aberto por causa de um `via`.
+
+Um `via` sem correspondência é obsoleto e aparece nas linhas existentes de `meada status`.
+Sem nenhum `via` válido, o lado volta ao repositório inteiro. Isso permite declarar o vínculo
+entre rótulos em valores Helm e regras de roteamento sem renderizar templates.
+
+```toml
+[[resource]]
+kind = "routing"
+id = "team-b"
+role = "write"
+via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
+```

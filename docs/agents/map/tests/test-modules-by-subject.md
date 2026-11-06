@@ -436,3 +436,12 @@
   Compose and Helm evidence, Kustomize image overrides, direct code paths without images,
   trace in both directions, scope-aware orphans, segment-bounded patterns, ambiguous image
   open items, safe-path and symlink refresh, plus export/context/trace goldens.
+
+- `resources.rs` (#641): sibling `resource-via-app` and `resource-via-infra` fixtures place
+  declarations at indexed IaC addresses and exact keys, including nested/quoted selectors and
+  document indexes. Whole exported side/node/link sets cover all IaC formats, template
+  qualification, instance keys containing `#`, stale/missing/ambiguous locations, secret/cut
+  selector guards and ignored/out-of-repository paths. Context, both trace directions,
+  removal/restoration and read-only server manifest scope use the Engine seam and goldens.
+  Controls reject null/empty locations and HCL expression/template selector equality, retain
+  inferred matches alongside declared keys across repositories, and continue read-write keys.

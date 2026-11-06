@@ -1,0 +1,240 @@
+{
+  "format": 1,
+  "repository": "example.com/resource-via/infra",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::compose.yaml::services.router"
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::crossplane.yaml::Bucket.s3.aws.upbound.io/archive"
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::kube.yaml::ConfigMap/shop/routing"
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::main.tf::custom_rule.hashed[\"route#b\"]"
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::main.tf::opsgenie_team_routing_rule.team_b"
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::open.tofu::custom_rule.open"
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::sam.yaml::Routing"
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::serverless.yml::functions.route"
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::stack.yaml::Routing"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::compose.yaml::services.router",
+      "via": null
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::crossplane.yaml::Bucket.s3.aws.upbound.io/archive",
+      "via": null
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::kube.yaml::ConfigMap/shop/routing",
+      "via": null
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::main.tf::custom_rule.hashed[\"route#b\"]",
+      "via": null
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::main.tf::opsgenie_team_routing_rule.team_b",
+      "via": null
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::open.tofu::custom_rule.open",
+      "via": null
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::sam.yaml::Routing",
+      "via": null
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::serverless.yml::functions.route",
+      "via": null
+    },
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/infra::stack.yaml::Routing",
+      "via": null
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "example.com/resource-via/infra::compose.yaml::services.router",
+      "address": "services.router",
+      "type": "service",
+      "root": ".",
+      "path": "compose.yaml",
+      "line": 2,
+      "end_line": 3
+    },
+    {
+      "identity": "example.com/resource-via/infra::crossplane.yaml::Bucket.s3.aws.upbound.io/archive",
+      "address": "Bucket.s3.aws.upbound.io/archive",
+      "type": "Bucket",
+      "root": ".",
+      "path": "crossplane.yaml",
+      "line": 1,
+      "end_line": 7
+    },
+    {
+      "identity": "example.com/resource-via/infra::kube.yaml::ConfigMap/shop/routing",
+      "address": "ConfigMap/shop/routing",
+      "type": "ConfigMap",
+      "root": ".",
+      "path": "kube.yaml",
+      "line": 1,
+      "end_line": 7
+    },
+    {
+      "identity": "example.com/resource-via/infra::main.tf::custom_rule.hashed[\"route#b\"]",
+      "address": "custom_rule.hashed[\"route#b\"]",
+      "type": "custom_rule",
+      "root": ".",
+      "path": "main.tf",
+      "line": 5,
+      "end_line": 8
+    },
+    {
+      "identity": "example.com/resource-via/infra::main.tf::opsgenie_team_routing_rule.team_b",
+      "address": "opsgenie_team_routing_rule.team_b",
+      "type": "opsgenie_team_routing_rule",
+      "root": ".",
+      "path": "main.tf",
+      "line": 1,
+      "end_line": 3
+    },
+    {
+      "identity": "example.com/resource-via/infra::open.tofu::custom_rule.open",
+      "address": "custom_rule.open",
+      "type": "custom_rule",
+      "root": ".",
+      "path": "open.tofu",
+      "line": 1,
+      "end_line": 3
+    },
+    {
+      "identity": "example.com/resource-via/infra::sam.yaml::Routing",
+      "address": "Routing",
+      "type": "AWS::Serverless::Function",
+      "root": "sam.yaml",
+      "path": "sam.yaml",
+      "line": 3,
+      "end_line": 7
+    },
+    {
+      "identity": "example.com/resource-via/infra::serverless.yml::functions.route",
+      "address": "functions.route",
+      "type": "Serverless::Function",
+      "root": "serverless.yml",
+      "path": "serverless.yml",
+      "line": 3,
+      "end_line": 4
+    },
+    {
+      "identity": "example.com/resource-via/infra::stack.yaml::Routing",
+      "address": "Routing",
+      "type": "Custom::Routing",
+      "root": "stack.yaml",
+      "path": "stack.yaml",
+      "line": 3,
+      "end_line": 4
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/resource-via/infra::compose.yaml::services.router",
+      "provider": "example.com/resource-via/app::values.yaml#groups[1].rules[0].labels.support",
+      "contract": "resource::routing::team-b",
+      "level": "declared",
+      "reason": "resource::routing::team-b"
+    },
+    {
+      "consumer": "example.com/resource-via/infra::crossplane.yaml::Bucket.s3.aws.upbound.io/archive",
+      "provider": "example.com/resource-via/app::values.yaml#groups[1].rules[0].labels.support",
+      "contract": "resource::routing::team-b",
+      "level": "declared",
+      "reason": "resource::routing::team-b"
+    },
+    {
+      "consumer": "example.com/resource-via/infra::kube.yaml::ConfigMap/shop/routing",
+      "provider": "example.com/resource-via/app::values.yaml#groups[1].rules[0].labels.support",
+      "contract": "resource::routing::team-b",
+      "level": "declared",
+      "reason": "resource::routing::team-b"
+    },
+    {
+      "consumer": "example.com/resource-via/infra::main.tf::custom_rule.hashed[\"route#b\"]",
+      "provider": "example.com/resource-via/app::values.yaml#groups[1].rules[0].labels.support",
+      "contract": "resource::routing::team-b",
+      "level": "declared",
+      "reason": "resource::routing::team-b"
+    },
+    {
+      "consumer": "example.com/resource-via/infra::main.tf::opsgenie_team_routing_rule.team_b",
+      "provider": "example.com/resource-via/app::values.yaml#groups[1].rules[0].labels.support",
+      "contract": "resource::routing::team-b",
+      "level": "declared",
+      "reason": "resource::routing::team-b"
+    },
+    {
+      "consumer": "example.com/resource-via/infra::open.tofu::custom_rule.open",
+      "provider": "example.com/resource-via/app::values.yaml#groups[1].rules[0].labels.support",
+      "contract": "resource::routing::team-b",
+      "level": "declared",
+      "reason": "resource::routing::team-b"
+    },
+    {
+      "consumer": "example.com/resource-via/infra::sam.yaml::Routing",
+      "provider": "example.com/resource-via/app::values.yaml#groups[1].rules[0].labels.support",
+      "contract": "resource::routing::team-b",
+      "level": "declared",
+      "reason": "resource::routing::team-b"
+    },
+    {
+      "consumer": "example.com/resource-via/infra::serverless.yml::functions.route",
+      "provider": "example.com/resource-via/app::values.yaml#groups[1].rules[0].labels.support",
+      "contract": "resource::routing::team-b",
+      "level": "declared",
+      "reason": "resource::routing::team-b"
+    },
+    {
+      "consumer": "example.com/resource-via/infra::stack.yaml::Routing",
+      "provider": "example.com/resource-via/app::values.yaml#groups[1].rules[0].labels.support",
+      "contract": "resource::routing::team-b",
+      "level": "declared",
+      "reason": "resource::routing::team-b"
+    }
+  ]
+}

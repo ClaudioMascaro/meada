@@ -499,3 +499,38 @@ limites de segmentos; vários candidatos ficam `ambiguous` e podem receber uma d
 Sem um desses lados, `search` e `context` marcam o lado sem contraparte. A exportação mantém
 formato 1, com `at` nos construtores e `executions` para os caminhos diretos; o grafo do console
 mostra os contratos de imagem, as ligações e o código das cargas de trabalho.
+
+## Locais de recursos declarados
+
+O `via` de `[[resource]]` aceita símbolos (`src/orders.ts::cancelOrder`), endereços IaC e
+`<arquivo>#<caminho da chave>`. O lado fica no bloco ou na chave, alcançável por `context` e
+`trace`, e suas ligações continuam `declared`. Os endereços incluem Terraform/OpenTofu
+(`aws_sqs_queue.orders`), Kubernetes/Crossplane (`Deployment.apps/shop/api`), Compose
+(`services.api`), CloudFormation/SAM (`template.yaml::Orders`) e Serverless
+(`serverless.yml::functions.api`). Use `<arquivo>::<endereço>` para distinguir arquivos. O local identifica o bloco de origem;
+o qualificador ` (root ...)` das consultas IaC não é uma forma de `via`.
+Um endereço que corresponde a vários blocos de origem precisa do qualificador de arquivo;
+sem ele, o `via` é obsoleto.
+
+Caminhos de chave usam pontos, índices (`groups[0].name`) e chaves entre aspas JSON
+(`metadata.labels["app.kubernetes.io/name"]`). Em listas, `[chave=valor]` seleciona os itens
+pela igualdade do valor completo, por exemplo
+`values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support`.
+A localização vem de valores indexados e seus caminhos pais.
+Valores nulos e contêineres vazios não têm valor indexado; seu `via` é obsoleto.
+Um seletor pode encontrar vários itens; cada chave encontrada recebe um lado. Valores
+marcados como `redacted` ou cortados não servem para selecionar um item. Expressões e templates
+HCL não satisfazem a igualdade de um seletor. Os arquivos seguem as regras do
+índice, incluindo `.meadaignore`; nenhum arquivo é aberto por causa de um `via`.
+
+Um `via` sem correspondência é obsoleto e aparece nas linhas existentes de `meada status`.
+Sem nenhum `via` válido, o lado volta ao repositório inteiro. Isso permite declarar o vínculo
+entre rótulos em valores Helm e regras de roteamento sem renderizar templates.
+
+```toml
+[[resource]]
+kind = "routing"
+id = "team-b"
+role = "write"
+via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
+```

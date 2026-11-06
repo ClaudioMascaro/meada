@@ -496,3 +496,37 @@ image orphans only when the visible scope contains builders and runners. Otherwi
 and `context` mark the side with no counterpart. Export stays at format 1, adding builder `at`
 locations and direct-path `executions`; the console graph shows image contracts, their links
 and workload code.
+
+## Locations of declared resources
+
+A `[[resource]]` `via` accepts symbols (`src/orders.ts::cancelOrder`), IaC addresses and
+`<file>#<key path>`. The side belongs to the block or key, reachable through `context` and
+`trace`, and its links stay `declared`. Addresses include Terraform/OpenTofu
+(`aws_sqs_queue.orders`), Kubernetes/Crossplane (`Deployment.apps/shop/api`), Compose
+(`services.api`), CloudFormation/SAM (`template.yaml::Orders`) and Serverless
+(`serverless.yml::functions.api`). Use `<file>::<address>` to distinguish files. The location identifies the source block;
+the ` (root ...)` qualifier of IaC queries is not a `via` form.
+An address matching several source blocks needs the file qualifier; without it the `via`
+is stale.
+
+Key paths use dots, indexes (`groups[0].name`) and JSON-quoted keys
+(`metadata.labels["app.kubernetes.io/name"]`). In lists, `[key=value]` selects items by exact,
+complete value equality, for example
+`values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support`.
+Locations come from indexed values and their parent key paths.
+Null values and empty containers have no indexed value; their `via` is stale.
+A selector can match several items; each matching key gets a side. Redacted or cut values
+cannot select an item. HCL expressions and templates cannot satisfy selector equality. Files follow the index's rules, including `.meadaignore`; a `via`
+never opens a file on its own.
+
+An unmatched `via` is stale and appears in the existing `meada status` lines. With no valid
+`via`, the side falls back to the whole repository. This connects labels in Helm values to
+routing rules through declarations without rendering templates.
+
+```toml
+[[resource]]
+kind = "routing"
+id = "team-b"
+role = "write"
+via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
+```

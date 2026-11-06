@@ -311,3 +311,18 @@ Combining the SDK and image slices keeps the SDK slice's synchronized 1.4.0 mino
 for both crates, and export format 1. The earlier image tier's 1.3.0 release note describes
 its starting tier. Optional provider `via` records SDK provenance while optional `at` records
 image build configuration locations; neither replaces the other.
+
+### Declared key locations (#641, 2026-11-06)
+
+An explicit `[[resource]]` key `via` attaches a directed side to the key itself. Its internal
+and exported site is `<repository>::<file>#<canonical key path>`, preserving distinct declared
+keys in ordinary provider/consumer links. This is separate from the automatically recognized,
+directionless config-use rows whose repository site and optional `at` remain as described
+above. The string identity is additive within export format 1; no config scalar text is
+exported. A key declaration may resolve through list selectors, but its site uses the resolved
+indexes so context and trace identify the actual key. Secret/cut values and HCL expressions/templates cannot establish selector equality.
+Selectors require a complete literal string, number or boolean. Only indexed values and their parent key paths
+resolve; null values and empty containers have no row and remain stale (ADR 0025).
+An IaC declaration names a source address, optionally file-qualified; the
+` (root ...)` qualifier accepted by IaC queries is not a declaration form. A bare address
+matching several source identities is stale until qualified with its file.

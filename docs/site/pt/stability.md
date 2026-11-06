@@ -75,7 +75,7 @@ Todas as tabelas e chaves. Uma chave desconhecida é erro, com o arquivo, a linh
 | `[[resource]]` | `kind` | texto, obrigatório | Identificador em minúsculas (letras, dígitos e hifens, começando por letra). |
 | `[[resource]]` | `id` | texto, obrigatório | Não vazio. |
 | `[[resource]]` | `role` | texto, obrigatório | `read`, `write` ou `read-write`. |
-| `[[resource]]` | `via` | lista de textos, opcional | Símbolos que fazem o acesso, como `<caminho>::<nome qualificado>`. |
+| `[[resource]]` | `via` | lista de textos, opcional | Símbolos (`<caminho>::<nome qualificado>`), endereços IaC ou `<arquivo>#<chave>`, com seletores `[chave=valor]`. |
 
 Veja a [configuração](configuration.md).
 

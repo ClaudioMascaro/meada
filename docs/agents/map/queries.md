@@ -25,8 +25,8 @@ this file, and a change to these modules updates it.
 
 - Provisioning (#656): `crate::iac::provision::context` lists a symbol's provisioners from its
   own sides and its calls. `crate::engine::Engine::context_fresh` hydrates every side of a
-  selected IaC node before listing contracts; `crate::trace::Graph::provisioned_rows` continues
-  a downward IaC trace into code, while `crate::trace::Walk::provisioners_up` crosses back.
+  selected IaC node before listing contracts; `crate::trace::Graph::attached_rows` continues
+  an IaC trace through ordinary links in either direction, and downward into provisioned code, while `crate::trace::Walk::provisioners_up` crosses back.
   Provisioning links retain root labels, never enter consumer links or decision replay, and
   do not change process membership. `crate::index::contracts` loads the same provisioner facts
   for full and partial exports; `crate::engine::Engine::export` includes links touching the
@@ -327,3 +327,14 @@ this file, and a change to these modules updates it.
   checks `meada-core` holds are `meada_core::msg`'s (a few arms delegate to it), and so is the
   language setting: `msg::init` sets it for both. Only `main.rs` calls
   `msg::init`; `meada mcp` forces English, so the MCP surface and library tests are English.
+
+## Declared key sites (#641)
+
+Before each kind declares, `Engine::exports` and `partial` call `read_declarations` against the
+repository's own index. `Export::config_sites` keeps only resolved locations. Context accepts
+both a canonical key locator and its declared selector; contract context and search print the
+actual key and line. Trace starts from the same locations and traverses directed links. The
+resource kind owns which declarations resolve and how their contract sections are described.
+Unqualified key queries union declared and automatic-use locations across the visible scope;
+trace deduplicates their canonical identities. A key with both keeps its inferred-use context
+and can continue through a declared read-write side.

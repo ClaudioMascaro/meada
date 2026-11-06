@@ -86,7 +86,7 @@ for the area a change touches.
 - `entry.rs`: entry points (spec #31), found when an index is written. [indexing](map/indexing.md)
 - `contract.rs`, `contract/`: the `ContractKind` trait, `KINDS`, the free functions the engine asks, and shared SDK constructor/request mechanics in `contract/sdk/`. [contracts](map/contracts.md)
 - `http.rs`, `http/`: the HTTP kind: the contract and path rules, mounts, and one submodule per language for providers and consumers. [contracts](map/contracts.md)
-- `resource.rs`, `resource/`: the resource kind, declared in `meada.toml` or read from SDK calls; `resource/aws.rs` owns its AWS operation table. [contracts](map/contracts.md)
+- `resource.rs`, `resource/`: the resource kind, declared in `meada.toml` at symbols, IaC addresses or indexed config keys (`resource/via.rs`, #641), or read from SDK calls; `resource/aws.rs` owns its AWS operation table. [contracts](map/contracts.md)
 - `image.rs`, `image/config.rs`: image builders/runners, normalized names, checked-in build configuration, workload execution and two-role orphans. [contracts](map/contracts.md)
 - `channel.rs`, `channel/`: the channel kind (queues and topics), one module per language for message libraries. [contracts](map/contracts.md)
 - `package.rs`, `package/`: packages as contracts, one module per ecosystem behind the `Ecosystem` trait. [contracts](map/contracts.md)
@@ -95,7 +95,7 @@ for the area a change touches.
 - `dotnet/`: what the .NET pack and ecosystems share (spec #28): the MSBuild project reader and what builds on it. [seams](map/seams.md)
 - `xml.rs`: the bounds the XML build readers of `jvm/` and `dotnet/` share. [seams](map/seams.md)
 - `document/`: OpenAPI and AsyncAPI provider documents, read into a `Summary` (spec #21), and `events.rs`, the one YAML and JSON event reader every YAML or JSON reader goes through (#646). [documents](map/documents.md)
-- `config_values.rs`, `config_values/hcl.rs`: config values (#639, #640, ADR 0025): every scalar of the YAML, JSON and Terraform files the walk visits and of the hidden CI paths, with its key path, `search` kind `value` and the `meada status` counts. [documents](map/documents.md)
+- `config_values.rs`, `config_values/hcl.rs`, `config_values/sites.rs`: config values and indexed key-path locations for declarations (#641); config values (#639, #640, ADR 0025): every scalar of the YAML, JSON and Terraform files the walk visits and of the hidden CI paths, with its key path, `search` kind `value` and the `meada status` counts. [documents](map/documents.md)
 - `iac.rs`, `iac/`: the embedded AWS type table, provisioning sides/links and subscription
   summaries (`iac/subscription.rs`, #656, #658), directionless config uses
   (`iac/config_uses.rs`, #661), and `iac/orphans.rs`, scope-aware orphan
@@ -295,6 +295,7 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   |---|---|
   | `use_level` | the strength of a directed side before an evaluated provisioner name weakens it (resources distinguish SDK and declared sides) |
   | `entry` | which entry point kind a side of a contract makes (a pure function of the contract: entry points are stored) |
+  | `read_declarations` | indexed locations needed by a declaration, loaded immediately before its `declare`, without opening source files |
   | `declare` | the sides `meada.toml` declares, run at query time (a config edit needs no reindex) |
   | `symbols_read` | the symbols `declare`, `workspace_step`, `link` and `status` look up, which a partial export reads before declaring (resources: their `via` symbols; packages: every symbol of a repository with a named manifest) |
   | `workspace_step` | a step over every repository after every `declare` (the package provider index, dependency entries, imports, shapes) |
@@ -311,7 +312,7 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   | `status` | the lines `meada status` prints |
   | `decidable`, `serves`, `candidate` | whether an ambiguous link is an open item, whether a provider serves a contract (aliases included), whether a provider is a candidate for a consumer with no contract |
 
-  The engine fixes the phase order: every `declare`, then every `workspace_step`, then `link`,
+  The engine fixes the phase order: each kind's `read_declarations` then `declare`, followed by every `workspace_step`, then `link`,
   then the decisions replay, then every `after_links`, each in `KINDS` order (decisions are
   kind-free and a pass over the links must see decided links). A side is unresolved when its
   contract is absent (skipped by `link`, an open item whose candidates come from each provider's

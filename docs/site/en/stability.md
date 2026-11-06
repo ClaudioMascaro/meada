@@ -75,7 +75,7 @@ Every table and key. An unknown key is an error naming the file, the line and th
 | `[[resource]]` | `kind` | string, required | Lowercase identifier (letters, digits and hyphens, starting with a letter). |
 | `[[resource]]` | `id` | string, required | Not empty. |
 | `[[resource]]` | `role` | string, required | `read`, `write` or `read-write`. |
-| `[[resource]]` | `via` | list of strings, optional | The symbols that do the access, as `<path>::<qualified name>`. |
+| `[[resource]]` | `via` | list of strings, optional | Symbols (`<path>::<qualified name>`), IaC addresses or `<file>#<key path>`, with `[key=value]` selectors. |
 
 See the [configuration](configuration.md).
 

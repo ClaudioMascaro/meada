@@ -20,6 +20,7 @@ use crate::lang;
 use crate::msg::Msg;
 
 mod hcl;
+pub(crate) mod sites;
 
 pub(crate) use hcl::nested_past;
 

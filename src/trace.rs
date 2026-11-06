@@ -48,6 +48,7 @@ pub(crate) struct Graph<'a> {
     provisions: Vec<meada_core::export::Provision>,
     executions: Vec<meada_core::export::Execution>,
     symbols: HashMap<&'a str, (usize, &'a Symbol)>,
+    iac: HashMap<String, (usize, &'a crate::iac::Node)>,
     calls: HashMap<&'a str, Call<'a>>,
     /// The calls each symbol (or file, for top-level calls) makes, in source order.
     callees: HashMap<&'a str, Vec<Call<'a>>>,
@@ -103,6 +104,7 @@ impl<'a> Graph<'a> {
                 .flat_map(|k| k.executions(exports, links))
                 .collect(),
             symbols: HashMap::new(),
+            iac: HashMap::new(),
             calls: HashMap::new(),
             callees: HashMap::new(),
             callers: HashMap::new(),
@@ -115,6 +117,12 @@ impl<'a> Graph<'a> {
             entry_points: HashMap::new(),
         };
         for (n, export) in exports.iter().enumerate() {
+            for node in &export.iac {
+                graph
+                    .iac
+                    .entry(node.identity(&export.repository))
+                    .or_insert((n, node));
+            }
             for e in &export.entry_points {
                 graph.entry_points.insert(&e.identity, (n, e));
             }
@@ -219,12 +227,14 @@ impl<'a> Graph<'a> {
         walk.finish(budget)
     }
 
-    /// Continue a provisioning hop into the ordinary code walk, without a second footer.
-    pub(crate) fn provisioned_rows(
+    /// Continue an IaC node through its ordinary links and downward provisioning/execution
+    /// hops, without repeating the node or adding a second footer.
+    pub(crate) fn attached_rows(
         &self,
         repository: usize,
         node: &crate::iac::Node,
         depth: usize,
+        direction: Direction,
     ) -> Vec<Row> {
         let identity = format!(
             "{}::{}::{}",
@@ -232,7 +242,7 @@ impl<'a> Graph<'a> {
         );
         let mut walk = Walk {
             graph: self,
-            direction: Direction::Down,
+            direction,
             files: self
                 .workspace
                 .repos
@@ -243,6 +253,23 @@ impl<'a> Graph<'a> {
             ancestors: Vec::new(),
             expanded: HashSet::new(),
         };
+        // The borrowed link endpoints carry the same identity as the IaC node. Entering
+        // it uses the ordinary kind-directed traversal; omit the already-rendered root.
+        if let Some((&site, _)) = self
+            .into
+            .get_key_value(identity.as_str())
+            .or_else(|| self.out.get_key_value(identity.as_str()))
+        {
+            walk.enter(
+                site,
+                depth.saturating_sub(1),
+                Row::call(String::new(), repository, None),
+            );
+            walk.rows.remove(0);
+        }
+        if direction == Direction::Up {
+            return walk.rows;
+        }
         for link in self
             .provisions
             .iter()
@@ -360,14 +387,9 @@ impl<'a> Graph<'a> {
                 kind.prefix()
             )]);
         }
-        let configured = crate::iac::config_uses::found(self.exports, from);
-        if !configured.is_empty() {
-            return Lookup::Nodes(
-                configured
-                    .into_iter()
-                    .map(|(_, u)| u.site.as_str())
-                    .collect(),
-            );
+        let keys = config_starts(self.exports, from);
+        if !keys.is_empty() {
+            return Lookup::Nodes(keys);
         }
         if self.is_repo(from)
             && self
@@ -471,16 +493,30 @@ impl<'a> Graph<'a> {
     fn ends(&self, id: &str) -> bool {
         self.is_repo(id)
             || self.documented.contains_key(id)
-            || self
-                .exports
-                .iter()
-                .any(|e| e.config_uses.iter().any(|u| u.site == id))
+            || self.exports.iter().any(|e| {
+                e.config_uses.iter().any(|u| u.site == id)
+                    && !e.config_sites.iter().any(|s| s.id == id)
+            })
     }
 }
 
 /// The answer's line when `from` names no symbol, route or call site.
 pub(crate) fn no_start(from: &str) -> String {
     format!("no symbol, route or call site matches `{from}`")
+}
+
+/// A key can carry declared sides, automatic uses, or both. An unqualified query keeps
+/// every visible repository's match, with each canonical key entering the trace once.
+fn config_starts<'a>(exports: &'a [Export], from: &str) -> Vec<&'a str> {
+    let declared = crate::config_values::sites::found(exports, from);
+    let uses = crate::iac::config_uses::found(exports, from);
+    let mut seen = HashSet::new();
+    declared
+        .into_iter()
+        .map(|(_, s)| s.id.as_str())
+        .chain(uses.into_iter().map(|(_, u)| u.site.as_str()))
+        .filter(|site| seen.insert(*site))
+        .collect()
 }
 
 fn in_path(file: &str, directory: &str) -> bool {
@@ -569,12 +605,9 @@ pub(crate) fn starts(
     if contract::kind_of(from).is_some_and(|kind| kind.sides().is_some()) {
         return Ok(Vec::new());
     }
-    let configured = crate::iac::config_uses::found(&partial.exports, from);
-    if !configured.is_empty() {
-        return Ok(configured
-            .into_iter()
-            .map(|(_, u)| u.site.clone())
-            .collect());
+    let keys = config_starts(&partial.exports, from);
+    if !keys.is_empty() {
+        return Ok(keys.into_iter().map(str::to_string).collect());
     }
     if partial.exports.iter().any(|e| e.repository == from)
         && crate::iac::provision::links(&partial.exports)
@@ -808,6 +841,11 @@ impl<'a> Walk<'_, 'a> {
                     let reader = link.consumer.as_str();
                     let ends = graph.ends(reader);
                     if (ends
+                        || graph
+                            .exports
+                            .iter()
+                            .any(|e| e.config_sites.iter().any(|s| s.id == reader))
+                        || graph.iac.contains_key(reader)
                         || graph.symbols.contains_key(reader)
                         || graph.reader_call(reader).is_some())
                         && shown.insert((reader, true))
@@ -1052,6 +1090,18 @@ impl<'a> Walk<'_, 'a> {
             None if graph.calls.contains_key(id) => {
                 let call = graph.calls[id];
                 format!("{} {}", self.site(call), self.caller(call))
+            }
+            None if graph.iac.contains_key(id) => {
+                let (_, node) = graph.iac[id];
+                format!("{identity} {}:{} {}", node.path, node.line, node.address)
+            }
+            None if graph.exports[n].config_sites.iter().any(|s| s.id == id) => {
+                let site = graph.exports[n]
+                    .config_sites
+                    .iter()
+                    .find(|s| s.id == id)
+                    .unwrap();
+                format!("{identity} {}", site.place())
             }
             None if graph.exports[n].config_uses.iter().any(|u| u.site == id) => {
                 let u = graph.exports[n]

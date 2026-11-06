@@ -1,0 +1,11 @@
+groups:
+  - name: unrelated
+    rules:
+      - alert: ApiDown
+        labels:
+          support: team-a
+  - name: availability
+    rules:
+      - alert: ApiDown
+        labels:
+          support: team-b
