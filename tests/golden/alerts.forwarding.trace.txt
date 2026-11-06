@@ -1,0 +1,5 @@
+example.com/acme/forwarding rules.yaml:4 groups[0].rules[0]
+  →[exact: alert::support::team-b; matchers "support"="team-b"; receiver: incidents] example.com/acme/forwarding alertmanager.yaml:5 route.routes[0]
+  →[exact: alert::target::team-c; matchers "tags"="target:team-c"; receiver: team-c-id; forwarding: Alertmanager example.com/acme/forwarding::alertmanager.yaml::route.routes[0]; receiver: incidents; tags] example.com/acme/forwarding main.tf:1 opsgenie_team_routing_rule.transformed
+  →[exact: alert::support::team-b; matchers "event.custom_details.support"="team-b"; receiver: checkout-id; forwarding: Alertmanager example.com/acme/forwarding::alertmanager.yaml::route.routes[0]; receiver: incidents; details -> event.custom_details] example.com/acme/forwarding main.tf:17 pagerduty_event_orchestration_service.checkout.set[0].rule[0]
+chain: exact · 3 hops · 1 repos · 225 tokens

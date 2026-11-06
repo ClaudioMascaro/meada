@@ -338,6 +338,62 @@ fn probes() -> Vec<Probe> {
                 .to_string()
                 .len()
         }),
+        ("alert: many Datadog monitor tags", || {
+            use crate::contract::ContractKind;
+            let tags = fill(1, |i| format!("\"key{i}:team-b\",\n"));
+            let text = file(format!(
+                "resource \"datadog_monitor\" \"wide\" {{\n name = \"Wide\"\n tags = [{tags}]\n}}\n"
+            ));
+            crate::alert::Alert
+                .config_summary(
+                    "monitors.tf",
+                    &text,
+                    std::path::Path::new("."),
+                    &crate::contract::ConfigFacts::default(),
+                )
+                .to_string()
+                .len()
+        }),
+        ("alert: wide OpsGenie criteria", || {
+            use crate::contract::ContractKind;
+            let conditions = fill(1, |i| {
+                format!(
+                    "conditions {{\n field = \"tags\"\n operation = \"equals\"\n expected_value = \"key{i}:team-b\"\n}}\n"
+                )
+            });
+            let text = file(format!(
+                "resource \"opsgenie_team_routing_rule\" \"wide\" {{\n team_id = \"team\"\n criteria {{\n type = \"match-all-conditions\"\n{conditions} }}\n}}\n"
+            ));
+            crate::alert::Alert
+                .config_summary(
+                    "routes.tf",
+                    &text,
+                    std::path::Path::new("."),
+                    &crate::contract::ConfigFacts::default(),
+                )
+                .to_string()
+                .len()
+        }),
+        ("alert: deeply nested PagerDuty condition", || {
+            use crate::contract::ContractKind;
+            let expression = format!(
+                "{}event.custom_details.support matches 'team-b'{}",
+                "(".repeat(MAX_BYTES / 4),
+                ")".repeat(MAX_BYTES / 4)
+            );
+            let text = file(format!(
+                "resource \"pagerduty_event_orchestration_service\" \"wide\" {{\n service = \"wide\"\n set {{\n id = \"start\"\n rule {{\n condition {{ expression = \"{expression}\" }}\n actions {{}}\n }}\n }}\n}}\n"
+            ));
+            crate::alert::Alert
+                .config_summary(
+                    "pagerduty.tf",
+                    &text,
+                    std::path::Path::new("."),
+                    &crate::contract::ConfigFacts::default(),
+                )
+                .to_string()
+                .len()
+        }),
         ("image: repeated workflow keys", || {
             use crate::contract::ContractKind;
             let key = "j".repeat(900);
@@ -1627,4 +1683,20 @@ fn every_reader_stays_bounded_on_a_file_built_to_explode() {
 enum Run {
     Started(usize, Instant),
     Ended(usize, Option<usize>, Duration),
+}
+
+#[test]
+fn incident_readers_stay_bounded_on_their_hostile_inputs() {
+    for (name, probe) in probes().into_iter().filter(|(name, _)| {
+        name.starts_with("alert: many Datadog")
+            || name.starts_with("alert: wide OpsGenie")
+            || name.starts_with("alert: deeply nested PagerDuty")
+    }) {
+        let started = Instant::now();
+        let size = probe();
+        let elapsed = started.elapsed();
+        eprintln!("hostile {name}: {elapsed:?}, {size} bytes");
+        assert!(size <= MAX_OUT, "{name}: {size} bytes");
+        assert!(elapsed <= BUDGET, "{name}: {elapsed:?}");
+    }
 }

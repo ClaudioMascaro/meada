@@ -8,7 +8,16 @@ groups:
 ---
 route:
   receiver: fallback
+  group_by: [support]
   routes:
     - receiver: team-b
       matchers: ['support=~"team-.*"']
-receivers: [{name: fallback}, {name: team-b}]
+receivers:
+  - name: fallback
+  - name: team-b
+    opsgenie_configs:
+      - tags: 'support:{{ .CommonLabels.support }}'
+    pagerduty_configs:
+      - routing_key: schema-placeholder
+        details:
+          support: '{{ .GroupLabels.support }}'

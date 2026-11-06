@@ -4059,31 +4059,80 @@ sample.provision.tf
 sample.alert.yaml
 {
   "alert": {
-    "routes": [
+    "forwardings": [
       {
-        "continuing": false,
-        "end_line": 10,
-        "key": "[1].route",
-        "line": 10,
-        "matchers": [],
-        "parent": null,
-        "receiver": "fallback",
+        "details": {},
+        "document": 1,
+        "name": "team-b",
+        "scopes": [],
+        "stream": "Opsgenie",
+        "tags": "support:{{ .CommonLabels.support }}",
         "valid": true
       },
       {
+        "details": {
+          "support": "{{ .GroupLabels.support }}"
+        },
+        "document": 1,
+        "name": "team-b",
+        "scopes": [],
+        "stream": "Pagerduty",
+        "tags": null,
+        "valid": true
+      }
+    ],
+    "routes": [
+      {
+        "any": false,
         "continuing": false,
-        "end_line": 13,
+        "document": 1,
+        "end_line": 11,
+        "group": "",
+        "group_by": [
+          "support"
+        ],
+        "key": "[1].route",
+        "line": 10,
+        "logic": [],
+        "matchers": [],
+        "next": null,
+        "opaque": false,
+        "order": null,
+        "parent": null,
+        "receiver": "fallback",
+        "set": "",
+        "stream": "Labels",
+        "valid": true
+      },
+      {
+        "any": false,
+        "continuing": false,
+        "document": 1,
+        "end_line": 14,
+        "group": "",
+        "group_by": [
+          "support"
+        ],
         "key": "[1].route.routes[0]",
-        "line": 12,
+        "line": 13,
+        "logic": [],
         "matchers": [
           {
+            "field": "",
             "key": "support",
             "op": "Regex",
+            "tag_value": "",
+            "tags": false,
             "value": "team-.*"
           }
         ],
+        "next": null,
+        "opaque": false,
+        "order": null,
         "parent": 0,
         "receiver": "team-b",
+        "set": "",
+        "stream": "Labels",
         "valid": true
       }
     ],
@@ -4098,7 +4147,106 @@ sample.alert.yaml
         },
         "line": 5,
         "name": "ApiDown",
-        "unknown": []
+        "scopes": [],
+        "stream": "Labels",
+        "tags": [],
+        "unknown": [],
+        "unknown_tags": false
+      }
+    ],
+    "truncated": false
+  },
+  "image": {
+    "builders": [],
+    "code": [],
+    "paths": [],
+    "runners": []
+  }
+}
+
+sample.incident.tf
+{
+  "alert": {
+    "forwardings": [],
+    "routes": [
+      {
+        "any": false,
+        "continuing": false,
+        "document": 0,
+        "end_line": 16,
+        "group": "",
+        "group_by": [],
+        "key": "opsgenie_team_routing_rule.checkout",
+        "line": 5,
+        "logic": [],
+        "matchers": [
+          {
+            "field": "",
+            "key": "service",
+            "op": "Prefix",
+            "tag_value": "service:check",
+            "tags": true,
+            "value": "check"
+          }
+        ],
+        "next": null,
+        "opaque": false,
+        "order": null,
+        "parent": null,
+        "receiver": "platform-id",
+        "set": "",
+        "stream": "Opsgenie",
+        "valid": true
+      },
+      {
+        "any": false,
+        "continuing": false,
+        "document": 0,
+        "end_line": 24,
+        "group": "sample.incident.tf::pagerduty_event_orchestration_service.checkout",
+        "group_by": [],
+        "key": "pagerduty_event_orchestration_service.checkout.set[0].rule[0]",
+        "line": 21,
+        "logic": [
+          {
+            "Atom": 0
+          }
+        ],
+        "matchers": [
+          {
+            "field": "event.custom_details.support",
+            "key": "support",
+            "op": "Equal",
+            "tag_value": "",
+            "tags": false,
+            "value": "team-b"
+          }
+        ],
+        "next": null,
+        "opaque": false,
+        "order": 0,
+        "parent": null,
+        "receiver": "checkout-id",
+        "set": "start",
+        "stream": "Pagerduty",
+        "valid": true
+      }
+    ],
+    "rules": [
+      {
+        "end_line": 4,
+        "key": "datadog_monitor.checkout",
+        "labels": {},
+        "line": 1,
+        "name": "checkout",
+        "scopes": [],
+        "stream": "Opsgenie",
+        "tags": [
+          "service:checkout",
+          "support:team-b"
+        ],
+        "unknown": [],
+        "unknown_tags": false
       }
     ],
     "truncated": false

@@ -181,8 +181,9 @@ pending workload marker. The workspace resolution step replaces a matched marker
 evidence and removes an unmatched one before every query output. Existing SDK `env:` provenance
 keeps its earlier storage and output behavior.
 
-The `alert` entry of `contract_configs` (#672) stores rule names, explicit label maps,
-route conditions and receivers, key paths and line spans. It stores neither PromQL/LogQL
+The `alert` entry of `contract_configs` (#672, #673) stores rule names, explicit label
+maps and monitor tags, route conditions, native event-field paths, receivers, explicit
+receiver tag/detail templates and grouping/scope facts, key paths and line spans. It stores neither PromQL/LogQL
 expressions nor notification credentials. Rule and route nodes and their contract sides are
 derived at query time. A stored-format sample participates in the schema fingerprint.
 

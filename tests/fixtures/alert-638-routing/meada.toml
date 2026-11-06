@@ -1,0 +1,4 @@
+[[peer]]
+repo = "example.com/acme/app"
+[[peer]]
+repo = "example.com/acme/monitors"

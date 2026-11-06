@@ -1,4 +1,4 @@
-//! Alert labels connect monitoring rules to the Alertmanager routes that match them.
+//! Alert labels and explicit incident payloads connect monitors to native routing predicates.
 
 use crate::contract::{ContractKind, Found, Level, Link, Related, Role};
 use crate::index::{Consumer, Export, Indexed, Provider};
@@ -8,8 +8,11 @@ use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
 mod config;
+mod forwarding;
+mod incident;
+mod pcl;
 mod regexp;
-use config::{Matcher, Op, Route, Rule};
+use config::{Matcher, Op, Route, Rule, Stream};
 pub struct Alert;
 
 // ponytail: regex source length bounds compilation input and per-label matching work.
@@ -49,6 +52,15 @@ impl ContractKind for Alert {
     fn sides(&self) -> Option<(&'static str, &'static str)> {
         Some(("emitter", "matcher"))
     }
+    fn starts<'a>(&self, from: &str, providers: &[(&'a str, &'a str)]) -> Vec<&'a str> {
+        if split(from).is_none() {
+            return Vec::new();
+        }
+        providers
+            .iter()
+            .filter_map(|(contract, site)| (*contract == from).then_some(*site))
+            .collect()
+    }
     fn flows_to_consumer(&self) -> bool {
         true
     }
@@ -56,6 +68,11 @@ impl ContractKind for Alert {
         false
     }
     fn declare(&self, repo: &Repository, export: &mut Export) {
+        let mut identities = export
+            .iac
+            .iter()
+            .map(|n| n.identity(&repo.identity))
+            .collect::<BTreeSet<_>>();
         for (path, summary) in summaries(export) {
             for rule in summary.rules {
                 let node = node(
@@ -66,20 +83,26 @@ impl ContractKind for Alert {
                     rule.line,
                     rule.end_line,
                 );
-                for (key, value) in &rule.labels {
+                for (key, value) in rule.emissions() {
                     export.providers.push(Provider {
                         contract: contract(key, value),
                         site: node.identity(&repo.identity),
                         ..Provider::default()
                     });
                 }
-                export.iac.push(node);
+                if identities.insert(node.identity(&repo.identity)) {
+                    export.iac.push(node);
+                }
             }
             for (i, route) in summary.routes.iter().enumerate() {
                 let node = node(
                     &path,
                     &route.key,
-                    "AlertmanagerRoute",
+                    match route.stream {
+                        Stream::Labels => "AlertmanagerRoute",
+                        Stream::Opsgenie => "OpsgenieRoutingRule",
+                        Stream::Pagerduty => "PagerdutyOrchestrationRule",
+                    },
                     &route.receiver,
                     route.line,
                     route.end_line,
@@ -96,7 +119,9 @@ impl ContractKind for Alert {
                         root: None,
                     });
                 }
-                export.iac.push(node);
+                if identities.insert(node.identity(&repo.identity)) {
+                    export.iac.push(node);
+                }
             }
         }
         crate::index::sort_providers(&mut export.providers);
@@ -115,7 +140,7 @@ impl ContractKind for Alert {
         let level = if consumer
             .via
             .as_deref()
-            .is_some_and(|via| via.ends_with('~'))
+            .is_some_and(|via| !matches!(via, "alert matcher =" | "alert matcher !="))
         {
             Level::Inferred
         } else {
@@ -149,10 +174,14 @@ impl ContractKind for Alert {
             .collect::<Vec<_>>();
         let key = split(contract).map(|(key, _)| key);
         let mut providers: BTreeMap<&str, Vec<(usize, &Provider)>> = BTreeMap::new();
+        let mut emitters = BTreeMap::new();
         let mut exact = BTreeSet::new();
         let mut consumers = BTreeMap::new();
         for (n, export) in exports.iter().enumerate() {
             for provider in &export.providers {
+                if split(&provider.contract).is_some() {
+                    emitters.insert(provider.site.as_str(), (n, provider.site.as_str()));
+                }
                 if split(&provider.contract).map(|(key, _)| key) == key {
                     providers
                         .entry(&provider.site)
@@ -175,10 +204,16 @@ impl ContractKind for Alert {
         for link in links {
             let mut found = Vec::new();
             if link.contract == contract {
-                for &(n, provider) in providers.get(link.provider.as_str()).into_iter().flatten() {
-                    if provider.contract != contract {
-                        found.push((n, provider.site.as_str(), Role::Provider, "emitter"));
+                if let Some(providers) = providers.get(link.provider.as_str()) {
+                    for &(n, provider) in providers {
+                        if provider.contract != contract {
+                            found.push((n, provider.site.as_str(), Role::Provider, "emitter"));
+                        }
                     }
+                } else if let Some(&(n, site)) = emitters.get(link.provider.as_str()) {
+                    // An explicit receiver can rename a label key. Its proven link still
+                    // identifies the originating monitor, without inventing an emitted label.
+                    found.push((n, site, Role::Provider, "emitter"));
                 }
             } else if exact.contains(link.provider.as_str())
                 && let Some(&(n, site)) =
@@ -383,7 +418,7 @@ enum Limit {
     Work,
 }
 
-/// Compile a route tree once, evaluate each rule once, then materialize its matched sides.
+/// Compile each routing scope once; only explicit receiver mappings cross event streams.
 fn linked<'a>(
     exports: &[Export],
     providers: impl Iterator<Item = &'a Provider>,
@@ -415,108 +450,252 @@ fn linked<'a>(
         return Ok(Vec::new());
     }
     let mut out = Vec::new();
-    let mut retained = 0usize;
+    let mut retained = 0;
     let mut work = ALERT_MATCH_WORK_MAX;
+    let mut forwarded = Vec::new();
+    // Alertmanager selects receivers using labels directly. Those receivers alone can
+    // produce known incident fields; a matching value elsewhere is no forwarding.
     for (export, configs) in &inventories {
         for (path, summary) in configs {
-            if summary.routes.is_empty() {
+            if !summary.routes.iter().any(|r| r.stream == Stream::Labels) {
                 continue;
             }
-            let Some(routing) = Routing::new(&summary.routes) else {
+            let Some(routing) = Routing::new(summary.routes.iter().collect()) else {
                 continue;
             };
             let targets = summary
                 .routes
                 .iter()
                 .enumerate()
-                .map(|(i, route)| {
-                    let site = format!("{}::{path}::{}", export.repository, route.key);
-                    let effective = conditions(&summary.routes, i);
-                    let why = format!(
-                        "matchers {}; receiver: {}",
-                        effective
-                            .iter()
-                            .map(|m| m.expression())
-                            .collect::<Vec<_>>()
-                            .join(", "),
-                        route.receiver
-                    );
-                    let mut seen = BTreeSet::new();
-                    let matchers = effective
-                        .into_iter()
-                        .filter_map(|matcher| {
-                            let contract = matcher.contract();
-                            let via = matcher.via();
-                            if !consumers.contains(&(
-                                site.as_str(),
-                                contract.as_str(),
-                                via.as_str(),
-                            )) || !seen.insert((contract.clone(), via))
-                            {
-                                return None;
-                            }
-                            let level = if matcher.op.regex() {
-                                Level::Inferred
-                            } else {
-                                Level::Exact
-                            };
-                            Some((matcher, contract, level))
-                        })
-                        .collect::<Vec<_>>();
-                    (site, why, matchers)
+                .map(|(i, _)| {
+                    target(
+                        export,
+                        path,
+                        &summary.routes[i],
+                        conditions(&summary.routes, i),
+                        &consumers,
+                    )
                 })
                 .collect::<Vec<_>>();
             for (site, rule) in &rules {
+                if rule.stream != Stream::Labels {
+                    continue;
+                }
                 for index in routing.destinations(rule, &mut work)? {
-                    let (consumer, why, matchers) = &targets[index];
-                    for (matcher, name, level) in matchers {
-                        let Some(value) = rule.labels.get(&matcher.key) else {
-                            continue;
-                        };
-                        let emitted = contract(&matcher.key, value);
-                        if providers.contains(&(site.as_str(), emitted.as_str())) {
-                            // Charge every retained String and Link before cloning fields or
-                            // materializing the route's repeated explanation. Overflow fails
-                            // the whole alert pass, never a partial conjunction's link set.
-                            for bytes in [
-                                consumer.len(),
-                                site.len(),
-                                name.len(),
-                                name.len(),
-                                2,
-                                why.len(),
-                                std::mem::size_of::<Link>(),
-                            ] {
-                                retained = retained.checked_add(bytes).ok_or(Limit::Output)?;
-                            }
-                            if retained > ALERT_LINK_BYTES_MAX {
-                                return Err(Limit::Output);
-                            }
-                            out.push(Link::new(
-                                consumer.clone(),
-                                site.clone(),
-                                name.clone(),
-                                *level,
-                                format!("{name}; {why}"),
-                                None,
-                                None,
-                                None,
-                            ));
-                        }
+                    emit(
+                        &targets[index],
+                        &routing,
+                        rule,
+                        rule,
+                        site,
+                        None,
+                        &providers,
+                        &mut out,
+                        &mut retained,
+                        &mut work,
+                    )?;
+                    let at = format!(
+                        "{}::{path}::{}",
+                        export.repository, summary.routes[index].key
+                    );
+                    for event in forwarding::events(
+                        summary,
+                        &summary.routes[index],
+                        rule,
+                        &at,
+                        &mut retained,
+                        &mut work,
+                    )? {
+                        forwarded.push((site.as_str(), *rule, event));
                     }
                 }
             }
         }
     }
+    // Incident rules in one repository share their native scope even across Terraform files.
+    for (export, configs) in &inventories {
+        let mut routes = Vec::new();
+        let mut targets = Vec::new();
+        for (path, summary) in configs {
+            for route in summary.routes.iter().filter(|r| r.stream != Stream::Labels) {
+                routes.push(route);
+                targets.push(target(
+                    export,
+                    path,
+                    route,
+                    route.matchers.iter().collect(),
+                    &consumers,
+                ));
+            }
+        }
+        if routes.is_empty() {
+            continue;
+        }
+        let Some(routing) = Routing::new(routes) else {
+            continue;
+        };
+        for (site, rule) in &rules {
+            if rule.stream != Stream::Opsgenie {
+                continue;
+            }
+            for index in routing.destinations(rule, &mut work)? {
+                emit(
+                    &targets[index],
+                    &routing,
+                    rule,
+                    rule,
+                    site,
+                    Some("forwarding: Datadog monitor tags -> OpsGenie tags"),
+                    &providers,
+                    &mut out,
+                    &mut retained,
+                    &mut work,
+                )?;
+            }
+        }
+        for (site, origin, event) in &forwarded {
+            for index in routing.destinations(&event.rule, &mut work)? {
+                emit(
+                    &targets[index],
+                    &routing,
+                    &event.rule,
+                    origin,
+                    site,
+                    Some(&event.reason),
+                    &providers,
+                    &mut out,
+                    &mut retained,
+                    &mut work,
+                )?;
+            }
+        }
+    }
     out.sort_by(|a, b| {
-        (&a.consumer, &a.provider, &a.contract, a.level).cmp(&(
+        (&a.consumer, &a.provider, &a.contract, a.level, &a.reason).cmp(&(
             &b.consumer,
             &b.provider,
             &b.contract,
             b.level,
+            &b.reason,
         ))
     });
+    out.dedup_by(|a, b| {
+        a.consumer == b.consumer
+            && a.provider == b.provider
+            && a.contract == b.contract
+            && a.level == b.level
+            && a.reason == b.reason
+    });
     Ok(out)
+}
+struct Target<'a> {
+    site: String,
+    why: String,
+    matchers: Vec<(&'a Matcher, String, Level)>,
+}
+fn target<'a>(
+    export: &Export,
+    path: &str,
+    route: &Route,
+    effective: Vec<&'a Matcher>,
+    consumers: &BTreeSet<(&str, &str, &str)>,
+) -> Target<'a> {
+    let site = format!("{}::{path}::{}", export.repository, route.key);
+    let why = format!(
+        "matchers {}; receiver: {}",
+        effective
+            .iter()
+            .map(|m| m.expression())
+            .collect::<Vec<_>>()
+            .join(", "),
+        route.receiver
+    );
+    let mut seen = BTreeSet::new();
+    let matchers = effective
+        .into_iter()
+        .filter_map(|m| {
+            let contract = m.contract();
+            let via = m.via();
+            if !consumers.contains(&(site.as_str(), contract.as_str(), via.as_str()))
+                || !seen.insert((contract.clone(), via))
+            {
+                return None;
+            }
+            Some((
+                m,
+                contract,
+                if m.op.inferred() {
+                    Level::Inferred
+                } else {
+                    Level::Exact
+                },
+            ))
+        })
+        .collect();
+    Target {
+        site,
+        why,
+        matchers,
+    }
+}
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one bounded workspace pass shares its output and work budgets"
+)]
+fn emit(
+    target: &Target<'_>,
+    routing: &Routing<'_>,
+    event: &Rule,
+    origin: &Rule,
+    site: &str,
+    forwarding: Option<&str>,
+    providers: &BTreeSet<(&str, &str)>,
+    out: &mut Vec<Link>,
+    retained: &mut usize,
+    work: &mut usize,
+) -> Result<(), Limit> {
+    for (matcher, name, level) in &target.matchers {
+        *work = work.checked_sub(1).ok_or(Limit::Work)?;
+        if routing.condition(matcher).matches(event) != Some(true) {
+            continue;
+        }
+        let emitted = origin.emissions().any(|(key, value)| {
+            (forwarding.is_some() || key == matcher.key || (matcher.tags && matcher.key == "tags"))
+                && providers.contains(&(site, contract(key, value).as_str()))
+        });
+        if !emitted {
+            continue;
+        }
+        let extra = forwarding.map_or(0, |f| f.len() + 2);
+        for bytes in [
+            target.site.len(),
+            site.len(),
+            name.len(),
+            name.len(),
+            2,
+            target.why.len(),
+            extra,
+            std::mem::size_of::<Link>(),
+        ] {
+            forwarding::reserve(retained, bytes)?;
+        }
+        let mut reason = format!("{name}; {}", target.why);
+        if let Some(forwarding) = forwarding {
+            reason.push_str("; ");
+            reason.push_str(forwarding);
+        }
+        out.push(Link::new(
+            target.site.clone(),
+            site.into(),
+            name.clone(),
+            *level,
+            reason,
+            None,
+            None,
+            None,
+        ));
+    }
+    Ok(())
 }
 
 fn roles(exports: &[Export]) -> (bool, bool) {
@@ -599,126 +778,222 @@ struct Condition<'a> {
     regex: Option<std::sync::Arc<regex::Regex>>,
 }
 impl Condition<'_> {
+    fn positive(&self, value: &str) -> Option<bool> {
+        let matcher = self.matcher;
+        let expected = matcher.pattern();
+        Some(match matcher.op {
+            Op::Regex | Op::NotRegex => self.regex.as_ref()?.is_match(value),
+            Op::Equal | Op::NotEqual => value == expected,
+            Op::Prefix | Op::NotPrefix => value.starts_with(expected),
+            Op::Contains | Op::NotContains => value.contains(expected),
+            Op::Suffix | Op::NotSuffix => value.ends_with(expected),
+        })
+    }
     fn matches(&self, rule: &Rule) -> Option<bool> {
         let matcher = self.matcher;
-        if rule.unknown.contains(&matcher.key) {
+        if matcher.op.regex() && self.regex.is_none() {
             return None;
         }
-        // Expression-result labels may supply any unwritten key; absence is not an
-        // empty value. Only explicit literal labels can settle a condition.
-        let value = rule.labels.get(&matcher.key)?.as_str();
-        let matches = self
-            .regex
-            .as_ref()
-            .map_or(value == matcher.value, |r| r.is_match(value));
-        Some(matches != matches!(matcher.op, Op::NotEqual | Op::NotRegex))
+        if matcher.tags {
+            if rule.stream != Stream::Opsgenie {
+                return None;
+            }
+            let mut unknown = rule.unknown_tags;
+            for tag in &rule.tags {
+                match self.positive(tag) {
+                    Some(true) => return Some(!matcher.op.negative()),
+                    Some(false) => {}
+                    None => unknown = true,
+                }
+            }
+            return (!unknown).then_some(matcher.op.negative());
+        }
+        let field = if matcher.field.is_empty() {
+            &matcher.key
+        } else {
+            &matcher.field
+        };
+        if rule.unknown.contains(field) {
+            return None;
+        }
+        // Unwritten expression-result labels/event fields are unknown, not empty strings.
+        let value = rule.labels.get(field)?;
+        Some(self.positive(value)? != matcher.op.negative())
     }
 }
 struct Routing<'a> {
-    routes: &'a [Route],
+    routes: Vec<&'a Route>,
     conditions: Vec<Vec<Condition<'a>>>,
+    compiled: BTreeMap<&'a str, Option<std::sync::Arc<regex::Regex>>>,
     children: Vec<Vec<usize>>,
-    roots: Vec<usize>,
+    roots: Vec<Vec<usize>>,
 }
 impl<'a> Routing<'a> {
-    fn new(routes: &'a [Route]) -> Option<Self> {
+    fn new(routes: Vec<&'a Route>) -> Option<Self> {
         let patterns = routes
             .iter()
             .flat_map(|r| &r.matchers)
             .filter(|m| m.op.regex())
-            .map(|m| m.value.as_str())
+            .map(|m| m.pattern())
             .collect::<BTreeSet<_>>();
-        // Identical conditions share an automaton. Distinct expressions share one
-        // compilation budget, preventing many individually-small regexes from exploding.
         let budget = ALERT_REGEX_SIZE_MAX / patterns.len().max(1);
         let compiled = patterns
             .into_iter()
-            .map(|pattern| {
-                Some((
-                    pattern,
-                    std::sync::Arc::new(regexp::compile(pattern, budget)?),
-                ))
-            })
-            .collect::<Option<BTreeMap<_, _>>>()?;
+            .map(|p| (p, regexp::compile(p, budget).map(std::sync::Arc::new)))
+            .collect::<BTreeMap<_, _>>();
         let mut conditions = Vec::new();
         let mut children = vec![Vec::new(); routes.len()];
         let mut roots = Vec::new();
+        let mut groups: BTreeMap<(String, String), Vec<usize>> = BTreeMap::new();
+        let mut sets: BTreeMap<(&str, &str), Vec<usize>> = BTreeMap::new();
         for (i, route) in routes.iter().enumerate() {
-            if !route.valid {
-                return None;
-            }
-            if let Some(parent) = route.parent {
+            if route.stream == Stream::Pagerduty {
+                sets.entry((&route.group, &route.set)).or_default().push(i);
+                if route.set == "start" {
+                    groups
+                        .entry((route.group.clone(), "pagerduty".into()))
+                        .or_default()
+                        .push(i);
+                }
+            } else if let Some(parent) = route.parent {
                 if parent >= i {
                     return None;
                 }
                 children.get_mut(parent)?.push(i);
+            } else if route.stream == Stream::Opsgenie {
+                groups
+                    .entry((route.group.clone(), route.receiver.clone()))
+                    .or_default()
+                    .push(i);
             } else {
-                roots.push(i);
+                roots.push(vec![i]);
             }
-            let mut local = Vec::new();
-            for matcher in &route.matchers {
-                let regex = if matcher.op.regex() {
-                    Some(compiled.get(matcher.value.as_str())?.clone())
-                } else {
-                    None
-                };
-                local.push(Condition { matcher, regex });
+            conditions.push(
+                route
+                    .matchers
+                    .iter()
+                    .map(|matcher| Condition {
+                        matcher,
+                        regex: compiled.get(matcher.pattern()).cloned().flatten(),
+                    })
+                    .collect(),
+            );
+        }
+        for (i, route) in routes.iter().enumerate() {
+            if route.stream == Stream::Pagerduty
+                && let Some(next) = &route.next
+            {
+                children[i] = sets
+                    .get(&(route.group.as_str(), next.as_str()))
+                    .cloned()
+                    .unwrap_or_default();
             }
-            conditions.push(local);
+        }
+        for mut group in groups.into_values() {
+            if group.len() > 1 && routes[group[0]].stream == Stream::Opsgenie {
+                let order = group
+                    .iter()
+                    .filter_map(|&i| routes[i].order)
+                    .collect::<BTreeSet<_>>();
+                // Without a complete, unique native order no first match is certain.
+                if order.len() != group.len() {
+                    continue;
+                }
+            }
+            group.sort_by_key(|&i| routes[i].order.unwrap_or(0));
+            roots.push(group);
         }
         Some(Self {
             routes,
             conditions,
+            compiled,
             children,
             roots,
         })
     }
+    fn condition(&self, matcher: &'a Matcher) -> Condition<'a> {
+        Condition {
+            matcher,
+            regex: self.compiled.get(matcher.pattern()).cloned().flatten(),
+        }
+    }
     fn matches(&self, index: usize, rule: &Rule, work: &mut usize) -> Result<Option<bool>, Limit> {
         *work = work.checked_sub(1).ok_or(Limit::Work)?;
-        let mut known = true;
+        let route = self.routes[index];
+        if rule.stream != route.stream {
+            return Ok(Some(false));
+        }
+        if !rule.scopes.is_empty()
+            && route.stream == Stream::Opsgenie
+            && !rule.scopes.contains(&route.receiver)
+        {
+            return Ok(Some(false));
+        }
+        if !route.valid {
+            return Ok(None);
+        }
+        let mut known = !route.opaque;
+        let mut values = Vec::new();
         for condition in &self.conditions[index] {
             *work = work.checked_sub(1).ok_or(Limit::Work)?;
-            match condition.matches(rule) {
-                Some(false) => return Ok(Some(false)),
-                Some(true) => {}
+            let value = condition.matches(rule);
+            if !route.logic.is_empty() {
+                values.push(value);
+                continue;
+            }
+            match value {
+                Some(false) if !route.any => return Ok(Some(false)),
+                Some(true) if route.any => return Ok(Some(true)),
+                Some(_) => {}
                 None => known = false,
             }
         }
-        Ok(known.then_some(true))
+        if !route.logic.is_empty() {
+            return Ok(pcl::evaluate(&route.logic, &values));
+        }
+        Ok(known.then_some(!route.any))
+    }
+    fn siblings(
+        &self,
+        siblings: &[usize],
+        rule: &Rule,
+        work: &mut usize,
+    ) -> Result<(Vec<usize>, bool), Limit> {
+        let mut selected = Vec::new();
+        let mut unknown = false;
+        for &index in siblings {
+            match self.matches(index, rule, work)? {
+                Some(false) => continue,
+                None => unknown = true,
+                Some(true) => selected.push(index),
+            }
+            if !self.routes[index].continuing {
+                break;
+            }
+        }
+        Ok((selected, unknown))
     }
     fn destinations(&self, rule: &Rule, work: &mut usize) -> Result<BTreeSet<usize>, Limit> {
         let mut out = BTreeSet::new();
         let mut pending = Vec::new();
-        for &root in &self.roots {
-            if self.matches(root, rule, work)? == Some(true) {
-                pending.push(root);
-            }
+        for roots in &self.roots {
+            pending.extend(self.siblings(roots, rule, work)?.0);
         }
+        let mut visited = BTreeSet::new();
         while let Some(index) = pending.pop() {
-            let mut matched = false;
-            let mut unknown = false;
-            for &child in &self.children[index] {
-                match self.matches(child, rule, work)? {
-                    Some(false) => continue,
-                    None => unknown = true,
-                    Some(true) => {
-                        matched = true;
-                        pending.push(child);
-                    }
-                }
-                // An unknown earlier branch may consume the alert. A continuing branch
-                // cannot prevent a later known match, and keeps earlier known recipients.
-                if !self.routes[child].continuing {
-                    break;
-                }
+            if !visited.insert(index) {
+                continue;
             }
-            if !matched && !unknown {
+            let (selected, unknown) = self.siblings(&self.children[index], rule, work)?;
+            if self.routes[index].stream == Stream::Pagerduty || (selected.is_empty() && !unknown) {
                 out.insert(index);
             }
+            pending.extend(selected);
         }
         Ok(out)
     }
 }
+
 #[cfg(test)]
 fn regex(pattern: &str) -> Option<regex::Regex> {
     regexp::compile(pattern, ALERT_REGEX_SIZE_MAX)
@@ -727,6 +1002,88 @@ fn regex(pattern: &str) -> Option<regex::Regex> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nonselected_incident_receivers_use_the_shared_evaluation_ceiling() {
+        let rules = (0..1000)
+            .map(|i| serde_json::json!({"alert":format!("R{i}"), "expr":"up"}))
+            .collect::<Vec<_>>();
+        let receivers = std::iter::once(serde_json::json!({"name":"selected"})).chain((0..1000).map(|i| serde_json::json!({"name":format!("unused{i}"), "opsgenie_configs":[{"tags":"support:team-b"}]}))).collect::<Vec<_>>();
+        let source = serde_json::json!({"groups":[{"name":"many", "rules":rules}], "route":{"receiver":"selected"}, "receivers":receivers}).to_string();
+        assert!(source.len() < crate::lang::MAX_BYTES);
+        let repo = Repository {
+            identity: "example.com/forwarding-work".into(),
+            root: Default::default(),
+            config: Default::default(),
+            decisions: Default::default(),
+            index: Default::default(),
+        };
+        let mut export = Export {
+            repository: repo.identity.clone(),
+            configurations: vec![(
+                "alert.yaml".into(),
+                serde_json::json!({"alert":config::read("alert.yaml", source.as_bytes())}),
+            )],
+            ..Default::default()
+        };
+        Alert.declare(&repo, &mut export);
+        let exports = [export];
+        let providers = exports[0]
+            .providers
+            .iter()
+            .map(|p| (&repo, p))
+            .collect::<Vec<_>>();
+        let started = std::time::Instant::now();
+        let links = Alert.workspace_links(&exports, &providers).unwrap();
+        assert!(links.is_empty());
+        assert_eq!(
+            Alert.scope_status(&repo, &exports[0], &exports, &links),
+            ["alert routing skipped: evaluation limit"]
+        );
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    }
+
+    #[test]
+    fn receiver_template_expansion_uses_the_shared_output_ceiling_without_partial_links() {
+        let value = "b".repeat(4096);
+        let copies = ALERT_LINK_BYTES_MAX / value.len() + 1;
+        let source = serde_json::json!({
+            "groups":[{"name":"wide", "rules":[{"alert":"Wide", "expr":"up", "labels":{"owner":value}}]}],
+            "route":{"receiver":"incident", "group_by":["owner"]},
+            "receivers":[{"name":"incident", "opsgenie_configs":[{"tags":"target:{{ .CommonLabels.owner }},".repeat(copies)}]}]
+        }).to_string();
+        assert!(source.len() < crate::lang::MAX_BYTES);
+        let repo = Repository {
+            identity: "example.com/forwarding-limit".into(),
+            root: Default::default(),
+            config: Default::default(),
+            decisions: Default::default(),
+            index: Default::default(),
+        };
+        let mut export = Export {
+            repository: repo.identity.clone(),
+            configurations: vec![(
+                "alert.yaml".into(),
+                serde_json::json!({"alert":config::read("alert.yaml", source.as_bytes())}),
+            )],
+            ..Default::default()
+        };
+        Alert.declare(&repo, &mut export);
+        let exports = [export];
+        let providers = exports[0]
+            .providers
+            .iter()
+            .map(|p| (&repo, p))
+            .collect::<Vec<_>>();
+        let started = std::time::Instant::now();
+        let links = Alert.workspace_links(&exports, &providers).unwrap();
+        assert!(links.is_empty(), "{} links", links.len());
+        assert_eq!(
+            Alert.scope_status(&repo, &exports[0], &exports, &links),
+            ["alert routing skipped: link output limit"]
+        );
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    }
 
     #[test]
     fn wide_matched_conjunctions_stop_at_the_link_output_ceiling_without_partial_links() {

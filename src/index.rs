@@ -3990,6 +3990,18 @@ mod tests {
         .unwrap();
         actual += "\n";
 
+        // Native incident payloads and condition programs (#673) also live in summaries.
+        let src = fs::read(tests.join("fixtures/schema/sample.incident.tf")).unwrap();
+        actual += "\nsample.incident.tf\n";
+        actual += &serde_json::to_string_pretty(&crate::contract::config_summary(
+            "sample.incident.tf",
+            &src,
+            &tests.join("fixtures/schema"),
+            &[],
+        ))
+        .unwrap();
+        actual += "\n";
+
         let golden = tests.join("golden/schema.txt");
         if std::env::var_os("MEADA_BLESS").is_some_and(|v| v == "1") {
             fs::write(&golden, actual).unwrap();

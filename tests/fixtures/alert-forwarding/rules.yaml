@@ -1,0 +1,9 @@
+groups:
+  - name: checkout
+    rules:
+      - alert: ApiDown
+        expr: up == 0
+        labels: {support: team-b, owner: team-c}
+      - alert: NoForward
+        expr: up == 0
+        labels: {support: team-a, owner: team-c}

@@ -1,0 +1,7 @@
+alerts:
+  loki:
+    - alert: HealthCheckFailing
+      expr: count_over_time({app="health-monitor"} |= "FAILED" [5m]) > 0
+      labels:
+        support: team-b
+        owner: team-b

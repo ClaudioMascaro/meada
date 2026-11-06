@@ -621,3 +621,24 @@ Regras Grafana também são lidas de exports JSON e de blocos `rule` de `grafana
 Uma rota raiz sem matchers não cria um lado de alerta: não há chave e valor para o contrato. O grafo descreve os matchers escritos, sem calcular notificações finais, inibições ou horários.
 
 Prometheus e Loki também emitem o `alertname` literal do nome da regra, sobrescrevendo um rótulo com esse nome. Rótulos que possam vir da expressão permanecem desconhecidos, não vazios. Arquivos sob `templates/` não são renderizados nem tratados como emissores de alertas.
+
+### OpsGenie e PagerDuty em Terraform
+
+Tags literais `chave:valor` de `datadog_monitor` são emissores. Condições de tags em
+`opsgenie_team_routing_rule` e condições PCL de
+orquestrações PagerDuty, são matchers. Igualdade é `exact`; regex, prefixo e
+contenção são `inferred`. As condições e a ordem das regras são avaliadas juntas;
+valores desconhecidos ou operações não lidas não escolhem um destino por palpite.
+
+Tags do Datadog chegam ao OpsGenie. Rótulos de regras só chegam a tags por um receiver
+OpsGenie selecionado no Alertmanager que configure `tags` explicitamente. Templates
+simples de `.CommonLabels.<chave>` ou `.GroupLabels.<chave>` usam rótulos fixados pelo
+`group_by` efetivo. Um receiver PagerDuty v2 pode encaminhar esses rótulos por `details`,
+que vira `event.custom_details.<chave>`; não há encaminhamento implícito de tags ao
+PagerDuty. Templates não lidos e encaminhamentos ausentes não geram links.
+
+`context` mostra o escopo escrito da regra, e `trace` mantém o caminho até o bloco de
+roteamento. Um matcher compatível não comprova entrega nem uma notificação final a
+uma equipe. No exemplo público #638, a regra testa `service:app`: o monitor também
+emite `support:team-b`, mas não existe ali um matcher para `support`. O YAML de
+monitor não padronizado e os valores Helm originais continuam apenas configuração.

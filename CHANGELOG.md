@@ -13,6 +13,13 @@ All notable changes to Meada are recorded here. The format follows
   levels and reasons. A bilingual legend explains each role and keyboard navigation. The
   playground exposes `value`, `iac` and `alert` searches. Release level: minor, included in
   meada and meada-core 1.4.0 (#675).
+- Datadog Terraform monitor tags join OpsGenie routing conditions through known tag
+  forwarding. Selected Alertmanager receivers explicitly transform grouped rule labels
+  into OpsGenie tags or PagerDuty v2 custom details; native PagerDuty PCL conditions keep
+  their field paths. Equality is exact; regex, prefix and containment are inferred.
+  Missing or unread forwarding yields no link, and matching never predicts final team
+  delivery. Included in the existing meada/meada-core 1.4.0 minor release (#673).
+
 - Terraform/OpenTofu JSON (`.tf.json`, `.tofu.json`) now creates IaC nodes with source spans,
   references, evaluated names and local module instances. JSON expression and literal rules
   share the HCL evaluator, provisioners and subscriptions; declared resource `via` addresses

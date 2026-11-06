@@ -13,9 +13,11 @@ pub(super) struct Summary {
     pub rules: Vec<Rule>,
     pub routes: Vec<Route>,
     pub truncated: bool,
+    #[serde(default)]
+    pub forwardings: Vec<super::forwarding::Receiver>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub(super) struct Rule {
     pub key: String,
     pub name: String,
@@ -23,6 +25,41 @@ pub(super) struct Rule {
     pub end_line: usize,
     pub labels: BTreeMap<String, String>,
     pub unknown: BTreeSet<String>,
+    #[serde(default)]
+    pub tags: BTreeSet<String>,
+    #[serde(default)]
+    pub unknown_tags: bool,
+    #[serde(default)]
+    pub stream: Stream,
+    #[serde(default)]
+    pub scopes: BTreeSet<String>,
+}
+
+#[derive(Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(super) enum Stream {
+    #[default]
+    Labels,
+    Opsgenie,
+    Pagerduty,
+}
+
+impl Rule {
+    pub fn emissions(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.labels
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .chain(self.tags.iter().filter_map(|value| tag(value)))
+    }
+}
+
+pub(super) fn tag(value: &str) -> Option<(&str, &str)> {
+    let (key, value) = value.split_once(':')?;
+    (!key.is_empty()
+        && key
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+        && !value.is_empty())
+    .then_some((key, value))
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -31,6 +68,12 @@ pub(super) enum Op {
     NotEqual,
     Regex,
     NotRegex,
+    Prefix,
+    Contains,
+    Suffix,
+    NotPrefix,
+    NotContains,
+    NotSuffix,
 }
 impl Op {
     pub fn text(self) -> &'static str {
@@ -39,10 +82,39 @@ impl Op {
             Self::NotEqual => "!=",
             Self::Regex => "=~",
             Self::NotRegex => "!~",
+            Self::Prefix => " prefix ",
+            Self::Contains => " contains ",
+            Self::Suffix => " suffix ",
+            Self::NotPrefix => " not-prefix ",
+            Self::NotContains => " not-contains ",
+            Self::NotSuffix => " not-suffix ",
         }
     }
     pub fn regex(self) -> bool {
         matches!(self, Self::Regex | Self::NotRegex)
+    }
+    pub fn inferred(self) -> bool {
+        !matches!(self, Self::Equal | Self::NotEqual)
+    }
+    pub fn negative(self) -> bool {
+        matches!(
+            self,
+            Self::NotEqual | Self::NotRegex | Self::NotPrefix | Self::NotContains | Self::NotSuffix
+        )
+    }
+    pub fn negated(self) -> Self {
+        match self {
+            Self::Equal => Self::NotEqual,
+            Self::NotEqual => Self::Equal,
+            Self::Regex => Self::NotRegex,
+            Self::NotRegex => Self::Regex,
+            Self::Prefix => Self::NotPrefix,
+            Self::NotPrefix => Self::Prefix,
+            Self::Contains => Self::NotContains,
+            Self::NotContains => Self::Contains,
+            Self::Suffix => Self::NotSuffix,
+            Self::NotSuffix => Self::Suffix,
+        }
     }
     fn read(text: &str) -> Option<Self> {
         Some(match text {
@@ -59,14 +131,27 @@ pub(super) struct Matcher {
     pub key: String,
     pub value: String,
     pub op: Op,
+    #[serde(default)]
+    pub tags: bool,
+    #[serde(default)]
+    pub field: String,
+    #[serde(default)]
+    pub tag_value: String,
 }
 impl Matcher {
     pub fn expression(&self) -> String {
+        let key = if self.tags {
+            "tags"
+        } else if self.field.is_empty() {
+            &self.key
+        } else {
+            &self.field
+        };
         format!(
             "{}{}{}",
-            serde_json::to_string(&self.key).unwrap_or_default(),
+            serde_json::to_string(key).unwrap_or_default(),
             self.op.text(),
-            serde_json::to_string(&self.value).unwrap_or_default()
+            serde_json::to_string(self.pattern()).unwrap_or_default()
         )
     }
     pub fn via(&self) -> String {
@@ -75,8 +160,15 @@ impl Matcher {
     pub fn contract(&self) -> String {
         super::contract(&self.key, &self.value)
     }
+    pub fn pattern(&self) -> &str {
+        if self.tags {
+            &self.tag_value
+        } else {
+            &self.value
+        }
+    }
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub(super) struct Route {
     pub key: String,
     pub receiver: String,
@@ -86,9 +178,29 @@ pub(super) struct Route {
     pub parent: Option<usize>,
     pub continuing: bool,
     pub valid: bool,
+    #[serde(default)]
+    pub stream: Stream,
+    #[serde(default)]
+    pub any: bool,
+    #[serde(default)]
+    pub group_by: Vec<String>,
+    #[serde(default)]
+    pub document: usize,
+    #[serde(default)]
+    pub order: Option<usize>,
+    #[serde(default)]
+    pub group: String,
+    #[serde(default)]
+    pub set: String,
+    #[serde(default)]
+    pub next: Option<String>,
+    #[serde(default)]
+    pub logic: Vec<super::pcl::Test>,
+    #[serde(default)]
+    pub opaque: bool,
 }
 
-type Spans = BTreeMap<(usize, String), (usize, usize)>;
+pub(super) type Spans = BTreeMap<(usize, String), (usize, usize)>;
 
 pub(super) fn is_file(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
@@ -99,7 +211,7 @@ pub(super) fn is_file(path: &str) -> bool {
             .iter()
             .any(|s| path.ends_with(s))
 }
-fn literal(value: &str) -> bool {
+pub(super) fn literal(value: &str) -> bool {
     !value.contains("{{") && !value.contains("${") && !value.contains("%{")
 }
 fn label_set(value: Option<&Value>) -> (BTreeMap<String, String>, BTreeSet<String>) {
@@ -132,13 +244,30 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
     }
     let mut spans = Spans::new();
     let Ok(docs) = events::read(Syntax::of(path), src, |s| {
+        if s.path.first() == Some(&Step::Key("resource".into())) {
+            let mut keys = 0;
+            for (i, step) in s.path.iter().enumerate() {
+                if let Step::Key(key) = step {
+                    keys += 1;
+                    if keys == 3 || (keys > 3 && matches!(key.as_str(), "set" | "rule")) {
+                        let end =
+                            i + 1 + usize::from(matches!(s.path.get(i + 1), Some(Step::Index(_))));
+                        let key = crate::config_values::key_path(&s.path[..end]);
+                        let span = spans.entry((s.document, key)).or_insert((s.line, s.line));
+                        span.0 = span.0.min(s.line);
+                        span.1 = span.1.max(s.line);
+                    }
+                }
+            }
+            return;
+        }
         let end = s
             .path
             .windows(2)
             .enumerate()
             .filter_map(|(i, pair)| match pair {
                 [Step::Key(key), Step::Index(_)]
-                    if matches!(key.as_str(), "rules" | "routes" | "rule") =>
+                    if matches!(key.as_str(), "rules" | "routes" | "rule" | "set") =>
                 {
                     Some(i + 2)
                 }
@@ -227,6 +356,10 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
                         end_line,
                         labels,
                         unknown,
+                        tags: BTreeSet::new(),
+                        unknown_tags: false,
+                        stream: Stream::Labels,
+                        scopes: BTreeSet::new(),
                     };
                     if charge_rule(&item, path, &mut bytes) {
                         out.rules.push(item);
@@ -252,6 +385,10 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
                         end_line: src.iter().filter(|b| **b == b'\n').count().max(1),
                         labels,
                         unknown,
+                        tags: BTreeSet::new(),
+                        unknown_tags: false,
+                        stream: Stream::Labels,
+                        scopes: BTreeSet::new(),
                     };
                     if charge_rule(&item, path, &mut bytes) {
                         out.rules.push(item);
@@ -318,6 +455,35 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
                         .and_then(Value::as_bool)
                         .unwrap_or(false),
                     valid,
+                    stream: Stream::Labels,
+                    any: false,
+                    group_by: value
+                        .get("group_by")
+                        .or_else(|| value.get("groupBy"))
+                        .and_then(Value::as_array)
+                        .and_then(|v| {
+                            v.iter()
+                                .map(|v| v.as_str().map(String::from))
+                                .collect::<Option<Vec<_>>>()
+                        })
+                        .unwrap_or_else(|| {
+                            if value
+                                .get("group_by")
+                                .or_else(|| value.get("groupBy"))
+                                .is_some()
+                            {
+                                Vec::new()
+                            } else {
+                                parent.map_or_else(Vec::new, |p| out.routes[p].group_by.clone())
+                            }
+                        }),
+                    document: d,
+                    order: None,
+                    group: String::new(),
+                    set: String::new(),
+                    next: None,
+                    logic: Vec::new(),
+                    opaque: false,
                 };
                 if !charge(&item, &mut bytes) || !charge_route(&item, path, &out.routes, &mut bytes)
                 {
@@ -331,10 +497,11 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
                 }
             }
         }
+        super::forwarding::read(body, d, &mut out, &mut bytes);
     }
     bounded(out)
 }
-fn array(value: Option<&Value>) -> &[Value] {
+pub(super) fn array(value: Option<&Value>) -> &[Value] {
     value
         .and_then(Value::as_array)
         .map(Vec::as_slice)
@@ -355,6 +522,9 @@ fn matchers(route: &Value) -> Option<Vec<Matcher>> {
                     key: key.clone(),
                     value: value.as_str()?.into(),
                     op,
+                    tags: false,
+                    field: String::new(),
+                    tag_value: String::new(),
                 });
             }
         }
@@ -378,6 +548,9 @@ fn matchers(route: &Value) -> Option<Vec<Matcher>> {
                     key: value.get("name")?.as_str()?.into(),
                     value: value.get("value")?.as_str()?.into(),
                     op,
+                    tags: false,
+                    field: String::new(),
+                    tag_value: String::new(),
                 });
             }
         }
@@ -447,6 +620,9 @@ fn expression(text: &str) -> Option<Matcher> {
                 key,
                 value,
                 op: Op::read(op)?,
+                tags: false,
+                field: String::new(),
+                tag_value: String::new(),
             });
         }
     }
@@ -463,7 +639,7 @@ fn token(text: &str) -> Option<String> {
     }
 }
 
-fn charge(item: &impl Serialize, bytes: &mut usize) -> bool {
+pub(super) fn charge(item: &impl Serialize, bytes: &mut usize) -> bool {
     let cost = serde_json::to_vec(item).map_or(ALERT_STORED_MAX, |v| v.len() + 1);
     *bytes = bytes.saturating_add(cost);
     *bytes <= ALERT_STORED_MAX.saturating_sub(64)
@@ -476,10 +652,10 @@ fn fields(bytes: &mut usize, parts: &[usize]) -> bool {
     }
     *bytes <= ALERT_STORED_MAX.saturating_sub(64)
 }
-fn charge_rule(rule: &Rule, path: &str, bytes: &mut usize) -> bool {
+pub(super) fn charge_rule(rule: &Rule, path: &str, bytes: &mut usize) -> bool {
     charge(rule, bytes)
         && charge_node(path, &rule.key, "AlertRule", &rule.name, bytes)
-        && rule.labels.iter().all(|(key, value)| {
+        && rule.emissions().all(|(key, value)| {
             fields(
                 bytes,
                 &[
@@ -493,7 +669,7 @@ fn charge_rule(rule: &Rule, path: &str, bytes: &mut usize) -> bool {
             )
         })
 }
-fn charge_route(item: &Route, path: &str, routes: &[Route], bytes: &mut usize) -> bool {
+pub(super) fn charge_route(item: &Route, path: &str, routes: &[Route], bytes: &mut usize) -> bool {
     if !charge_node(path, &item.key, "AlertmanagerRoute", &item.receiver, bytes) {
         return false;
     }
@@ -634,6 +810,10 @@ fn terraform(path: &str, src: &[u8]) -> Summary {
                 end_line: line(span.end.saturating_sub(1)),
                 labels: known,
                 unknown,
+                tags: BTreeSet::new(),
+                unknown_tags: false,
+                stream: Stream::Labels,
+                scopes: BTreeSet::new(),
             };
             if charge_rule(&item, path, &mut bytes) {
                 out.rules.push(item);
@@ -643,6 +823,7 @@ fn terraform(path: &str, src: &[u8]) -> Summary {
             }
         }
     }
+    super::incident::terraform(path, &body, text, &mut out, &mut bytes);
     bounded(out)
 }
 fn terraform_json(
@@ -682,6 +863,10 @@ fn terraform_json(
                 end_line,
                 labels,
                 unknown,
+                tags: BTreeSet::new(),
+                unknown_tags: false,
+                stream: Stream::Labels,
+                scopes: BTreeSet::new(),
             };
             if charge_rule(&item, path, bytes) {
                 out.rules.push(item);
@@ -690,6 +875,7 @@ fn terraform_json(
             }
         }
     }
+    super::incident::json(path, doc, document, spans, out, bytes);
 }
 
 #[cfg(test)]
