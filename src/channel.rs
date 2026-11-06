@@ -17,6 +17,7 @@ use crate::resolve::Code;
 use crate::shape::Shape;
 use crate::workspace::Repository;
 
+mod aws;
 mod csharp;
 mod go;
 mod java;
@@ -278,6 +279,8 @@ impl ContractKind for Channel {
                     shape: None,
                 }
             })
+            .chain(ts::aws(code))
+            .chain(python::aws(code))
             .collect()
     }
 
@@ -335,12 +338,21 @@ impl ContractKind for Channel {
 
     /// The publish at `call` and each queue the bindings of the workspace route it to.
     fn at_call(&self, exports: &[Export], export: &Export, call: &str) -> Vec<String> {
+        let mut lines: Vec<_> = export
+            .providers
+            .iter()
+            .filter(|p| p.site == call && p.contract.starts_with(PREFIX))
+            .filter_map(|p| p.via.as_deref())
+            .filter_map(|via| {
+                via.strip_prefix("env:")
+                    .map(|name| format!("unresolved environment {name}"))
+            })
+            .collect();
         let publishes: Vec<_> = export.publishes.iter().filter(|q| q.site == call).collect();
         if publishes.is_empty() {
-            return Vec::new();
+            return lines;
         }
         let routes = Routes::new(exports);
-        let mut lines = Vec::new();
         for publish in publishes {
             lines.push(format!("publishes {} {}", publish.exchange, publish.key));
             for (queue, (level, reason)) in routes.reached(publish) {

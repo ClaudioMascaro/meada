@@ -1,9 +1,8 @@
-//! Resources (spec #19): shared things a repository reads or writes, such as a database table
-//! or a bucket, declared in `meada.toml` as `[[resource]]`. No code names them, so this kind
-//! reads no code: its sides are the `via` symbols of each entry, or the repository as a whole
-//! when it names none, writers as providers and
-//! readers as consumers of the contract `resource::<kind>::<id>`. Every writer links to every
-//! reader of the same resource in another repository, at the level `declared`.
+//! Resources: shared things a repository reads or writes, such as a database table or bucket.
+//! Declarations in `meada.toml` (#19) name `via` symbols, else the repository as a whole, and
+//! link writers to readers in other repositories at `declared`. AWS SDK forms (#659) supply
+//! code sides through their client origins and name arguments; literal SDK writers and readers
+//! link at `exact`, in the same repository too. Both use `resource::<kind>::<id>` contracts.
 
 use std::collections::HashSet;
 
@@ -12,6 +11,10 @@ use crate::contract::{ContractKind, Found, Level, Link};
 use crate::index::{Consumer, Export, Indexed, Provider};
 use crate::msg::Msg;
 use crate::resolve::Code;
+
+mod aws;
+mod python;
+mod ts;
 use crate::workspace::Repository;
 
 pub struct Resource;
@@ -85,8 +88,50 @@ impl ContractKind for Resource {
         Some(("writer", "reader"))
     }
 
-    fn extract(&self, _code: &Code, _: &Indexed) -> Vec<Found> {
-        Vec::new()
+    fn extract(&self, code: &Code, _: &Indexed) -> Vec<Found> {
+        ts::sides(code)
+            .into_iter()
+            .chain(python::sides(code))
+            .collect()
+    }
+
+    fn unresolved(&self, contract: &str) -> bool {
+        contract
+            .strip_prefix(PREFIX)
+            .is_some_and(|rest| !rest.contains("::"))
+    }
+
+    fn use_level(&self, via: Option<&str>) -> Level {
+        if via == Some("sdk:aws") {
+            Level::Exact
+        } else {
+            Level::Declared
+        }
+    }
+
+    fn at_call(&self, _: &[Export], export: &Export, call: &str) -> Vec<String> {
+        let provided = export
+            .providers
+            .iter()
+            .filter(|p| p.site == call && p.contract.starts_with(PREFIX))
+            .filter_map(|p| p.via.as_deref());
+        let consumed = export
+            .consumers
+            .iter()
+            .filter(|c| {
+                c.site == call
+                    && c.contract
+                        .as_deref()
+                        .is_some_and(|contract| contract.starts_with(PREFIX))
+            })
+            .filter_map(|c| c.via.as_deref());
+        provided
+            .chain(consumed)
+            .filter_map(|via| {
+                via.strip_prefix("env:")
+                    .map(|name| format!("unresolved environment {name}"))
+            })
+            .collect()
     }
 
     fn parts<'c>(&self, contract: &'c str) -> (Option<&'c str>, Option<&'c str>) {
@@ -163,15 +208,24 @@ impl ContractKind for Resource {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
         };
+        if self.unresolved(contract) {
+            return Vec::new();
+        }
         providers
             .iter()
-            .filter(|(repo, p)| p.contract == *contract && repo.identity != from.identity)
+            .filter(|(repo, p)| {
+                p.contract == *contract
+                    && (repo.identity != from.identity
+                        || (consumer.via.as_deref() == Some("sdk:aws")
+                            && p.via.as_deref() == Some("sdk:aws")))
+            })
             .map(|(_, p)| {
                 Link::new(
                     consumer.site.clone(),
                     p.site.clone(),
                     contract.clone(),
-                    Level::Declared,
+                    self.use_level(consumer.via.as_deref())
+                        .max(self.use_level(p.via.as_deref())),
                     contract.clone(),
                     None,
                     None,

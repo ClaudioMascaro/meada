@@ -9,7 +9,8 @@ use super::message::{
     topics,
 };
 use crate::lang::{Call, Value, literal};
-use crate::resolve::{Code, Follow, Keywords, Of};
+use crate::names::python::{Maker, imported, receivers};
+use crate::resolve::{Code, Keywords};
 
 const CONFLUENT_PRODUCER: &str = "confluent_kafka.Producer";
 const CONFLUENT_CONSUMER: &str = "confluent_kafka.Consumer";
@@ -63,13 +64,6 @@ enum Client {
     Redis,
 }
 
-/// A call that made a client, with the name its imports give what it called, such as
-/// `pika.BlockingConnection.channel`.
-struct Maker<'a> {
-    name: String,
-    call: &'a Call,
-}
-
 pub(super) fn messages(code: &Code) -> Vec<Message> {
     if !code.pack().extensions().contains(&"py") {
         return Vec::new();
@@ -94,7 +88,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
             if receiver.is_empty() || !written || !METHODS.contains(&method) {
                 continue;
             }
-            let makers = receivers(code, path, call, true);
+            let makers = receivers(code, path, call, true, &FACTORIES);
             let Some(client) = makers.iter().find_map(client) else {
                 continue;
             };
@@ -176,76 +170,6 @@ fn client(maker: &Maker) -> Option<Client> {
     })
 }
 
-/// The calls that made the client `form` is called on, written in `path`: the constructors and
-/// factories of a package outside the repository that its receiver traces back to, or the
-/// receiver itself when it is a call written in place. A factory (a connection's `channel()`, a
-/// session's `client()`) is named after the constructor of the client it is called on, a level
-/// deep.
-// ponytail: only one level of client factories is followed.
-fn receivers<'a>(code: &Code<'a>, path: &'a str, form: &'a Call, through: bool) -> Vec<Maker<'a>> {
-    let receiver = form.callee.rsplit_once('.').map_or("", |(r, _)| r);
-    let made: Vec<(&'a str, &'a Call)> = if receiver == CALL {
-        head(code, path, form)
-            .map(|call| (path, call))
-            .into_iter()
-            .collect()
-    } else {
-        (code
-            .origins(
-                path,
-                &form.scope,
-                Of::Name(receiver),
-                Follow::Values {
-                    passes: crate::resolve::passes_nothing,
-                },
-            )
-            .iter())
-        .filter_map(|o| o.call)
-        .filter_map(|(at, i)| Some((at, code.call(at, i)?)))
-        .collect()
-    };
-    (made.into_iter())
-        .flat_map(|(at, call)| made_by(code, at, call, through))
-        .collect()
-}
-
-/// The client the call `call` made, written in `at`: a constructor of a package outside the
-/// repository, or a factory on a client that one made.
-fn made_by<'a>(code: &Code<'a>, at: &'a str, call: &'a Call, through: bool) -> Vec<Maker<'a>> {
-    if let Some(name) = imported(code, at, &call.scope, &call.callee) {
-        return vec![Maker { name, call }];
-    }
-    let method = call.callee.rsplit_once('.').map(|(_, method)| method);
-    match method {
-        Some(method) if through && FACTORIES.contains(&method) => {
-            (receivers(code, at, call, false).into_iter())
-                .map(|made| Maker {
-                    name: format!("{}.{method}", made.name),
-                    call,
-                })
-                .collect()
-        }
-        _ => Vec::new(),
-    }
-}
-
-/// The call that `form`, a method called on a call written in place (`X(...).method()`), is
-/// called on: the last to end of the calls that start where `form` does, inside it.
-fn head<'a>(code: &Code<'a>, path: &'a str, form: &Call) -> Option<&'a Call> {
-    let (at, _) = (code.files()[path].calls.iter().enumerate())
-        .filter(|(_, c)| c.range.start == form.range.start && c.range.end < form.range.end)
-        .max_by_key(|(_, c)| c.range.end)?;
-    code.call(path, at)
-}
-
-/// What `callee`, written in `scope` of `path`, names in a package outside the repository,
-/// spelled from the package's import: `pika.BlockingConnection` however it is imported. A
-/// method of a local (`connection.channel`) is none.
-fn imported<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
-    let (package, spelled) = code.imported(path, scope, callee)?;
-    Some(format!("{package}.{spelled}"))
-}
-
 /// Whether a boto3 call makes a client for SQS: its service, the first argument, is `"sqs"`.
 fn is_sqs(call: &Call) -> bool {
     let service = call.args.first().or_else(|| call.keyword("service_name"));
@@ -304,6 +228,50 @@ fn streams(args: &[Value], kwargs: &Keywords) -> Option<Vec<Option<String>>> {
         Value::Ref(_) => None,
         _ => Some(vec![None]),
     }
+}
+
+/// AWS source-channel operations, in addition to the existing SQS forms.
+pub(super) fn aws(code: &Code) -> Vec<crate::contract::Found> {
+    if !code.pack().extensions().contains(&"py") {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for (&path, facts) in code.files() {
+        for (n, call) in facts.calls.iter().enumerate() {
+            let Some((_, method)) = call.callee.rsplit_once('.') else {
+                continue;
+            };
+            if !super::aws::OPERATIONS.iter().any(|op| op.python == method) {
+                continue;
+            }
+            let Some(first) = crate::names::python::factory_argument(
+                code,
+                path,
+                call,
+                &BOTO3_CLIENTS,
+                &["client"],
+                "service_name",
+            ) else {
+                continue;
+            };
+            let Some(operation) = super::aws::OPERATIONS
+                .iter()
+                .find(|op| op.service == first && op.python == method)
+            else {
+                continue;
+            };
+            let read = |_: &[Value], kwargs: &Keywords| operation.read(kwargs);
+            for found in code.expand(crate::resolve::Expand::Call(path, n), &read) {
+                out.extend(
+                    found
+                        .found
+                        .into_iter()
+                        .map(|name| operation.found(name, found.site)),
+                );
+            }
+        }
+    }
+    out
 }
 
 #[cfg(test)]

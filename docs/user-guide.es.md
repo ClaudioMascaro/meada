@@ -2054,3 +2054,37 @@ diferencia de espacio en blanco) no son duplicados.
   equipo.
 - Un resultado erróneo en el código del propio Meada es un bug: abra un issue con la consulta, la
   respuesta y la esperada.
+
+## Llamadas del AWS SDK en código
+
+TypeScript y JavaScript reconocen comandos v3 enviados con `cliente.send(new Comando(...))`,
+con cliente y comando importados del paquete AWS correspondiente. Python reconoce métodos de
+clientes creados por `boto3.client(...)` o una `Session`. Los nombres pueden venir de constantes
+y argumentos de wrappers resueltos exactamente. Un cliente alcanzado solo por coincidencia
+de nombre, u oculto por un parámetro, `catch`, desestructuración u otro binding, no aporta lado.
+
+| Servicio | Produce o escribe | Lee | Argumento del nombre |
+| --- | --- | --- | --- |
+| SNS | `Publish`, `PublishBatch` | | `TopicArn` |
+| EventBridge | `PutEvents` | | `Entries[].EventBusName`, `default` si se omite |
+| Kinesis | `PutRecord`, `PutRecords` | | `StreamARN` o `StreamName` |
+| S3 | `PutObject` | `GetObject` | `Bucket` |
+| DynamoDB | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem`, `TransactWriteItems` | `GetItem`, `Query`, `Scan`, `BatchGetItem`, `TransactGetItems` | `TableName`, claves de `RequestItems`, o tablas de `TransactItems` |
+| SSM | | `GetParameter`, `GetParameters`, `GetParametersByPath` | `Name`, `Names`, `Path` |
+| Secrets Manager | | `GetSecretValue`, `BatchGetSecretValue` | `SecretId`, `SecretIdList` |
+
+En JavaScript cada operación tiene el sufijo `Command`; boto3 usa snake case
+(`put_object`, `get_secret_value`). SNS, EventBridge y Kinesis son productores; S3 y DynamoDB
+usan los lados escritor y lector de recursos. Los nombres literales y ARN compatibles se unen
+a la infraestructura por nombre físico, sin cuenta ni región. Los lados SDK literales se unen
+en `exact`, incluso a otros lados SDK del mismo repositorio; un lado declarado en `meada.toml`
+conserva `declared`. Los valores de infraestructura sustituibles siguen dando `inferred`.
+
+Una lectura como `process.env.BUCKET` u `os.getenv("BUCKET")` queda sin resolver, con
+`via: "env:BUCKET"` en el export y la variable nombrada en el contexto de su función. Un
+productor o escritor SDK también tiene `via`, opcional en el formato 1; un literal usa `sdk:aws`.
+Meada no lee el entorno del proceso. La construcción aislada de un comando, los publishes SNS
+para teléfonos o endpoints, los clientes de alto nivel `boto3.resource` y `DynamoDBDocumentClient`
+y las operaciones fuera de la tabla no se reconocen por estas formas.
+
+`GetParametersByPath` consulta una jerarquía, por lo que su lado queda sin resolver; la ruta no se trata como nombre de parámetro. Un `ConditionCheck` de `TransactWriteItems` es lector, aunque la transacción también escriba otras tablas. Las claves calculadas de `RequestItems` conservan el literal o el nombre de la variable de entorno.

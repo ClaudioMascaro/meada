@@ -220,6 +220,9 @@ pub struct CallSite {
 pub struct Provider {
     pub contract: String,
     pub site: String,
+    /// SDK origin (`sdk:aws`) or an unresolved environment read (`env:NAME`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub via: Option<String>,
     /// Configuration location of a repository-level side, `<file>#<key path>`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at: Option<String>,

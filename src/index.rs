@@ -2500,6 +2500,7 @@ impl Export {
                 provider.site = p.site;
                 provider.at = p.at;
                 provider.gateway = p.gateway;
+                provider.via = p.via;
                 provider.shape = p.shape;
                 provider
             })
@@ -2628,6 +2629,8 @@ pub(crate) struct Document {
 pub(crate) struct Provider {
     pub(crate) contract: String,
     pub(crate) site: String,
+    /// SDK origin or the unresolved environment read, stored in `contracts.via`.
+    pub(crate) via: Option<String>,
     /// Configuration location for a repository-level builder.
     pub(crate) at: Option<String>,
     /// Evidence that this side's evaluated name is overridable.
@@ -2757,7 +2760,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         .collect();
     let providers = db
         .prepare(
-            "SELECT contract, site, shape FROM contracts WHERE role = 'provider' \
+            "SELECT contract, site, shape, via FROM contracts WHERE role = 'provider' \
              ORDER BY contract, site",
         )?
         .query_map([], |r| {
@@ -2765,6 +2768,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
                 contract: r.get(0)?,
                 site: r.get(1)?,
                 shape: stored_shape(r.get(2)?),
+                via: r.get(3)?,
                 ..Provider::default()
             })
         })?

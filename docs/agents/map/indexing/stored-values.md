@@ -139,6 +139,12 @@ from ...", with the whole list. A value the index now stores joins it.
   packs that missed until none does. A contract kind that reads a
   value from a new place relies on this loop.
 
+AWS SDK directed sides (#659) retain their source marker in the existing `contracts.via`:
+`sdk:aws` for an SDK operation, `env:<name>` for an unresolved environment argument.
+The marker contains no environment value or payload. Providers read and export this field
+as optional `via`; existing providers keep it absent. The SDK stored-format sample changes
+the schema key so indexes produced before these extraction forms rebuild.
+
 The stamped `contract_configs` table (#662) stores each contract kind's configuration summary,
 keyed by its prefix, with path, hash, mtime and size. The image summary contains normalized
 builder names (patterns included), their config locations and overridable flags, Helm runner

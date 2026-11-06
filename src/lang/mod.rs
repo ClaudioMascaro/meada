@@ -1323,6 +1323,16 @@ pub fn property<'v>(
     for (k, value) in properties.iter().rev() {
         match (k.as_str(), value) {
             (k, value) if k == key => return Ok(Some(value)),
+            ("[]", Value::List(pair)) => match pair.as_slice() {
+                [Value::Str(parts), value] => match literal(parts) {
+                    Some(name) if name == key => return Ok(Some(value)),
+                    Some(_) => {}
+                    None if parts.iter().any(|p| matches!(p, Part::Ref(_))) => return Err(Depends),
+                    None => return Ok(Some(&UNKNOWN)),
+                },
+                [Value::Ref(_), _] => return Err(Depends),
+                _ => return Ok(Some(&UNKNOWN)),
+            },
             ("...", Value::Object(inner)) => {
                 if let Some(found) = property(inner, key)? {
                     return Ok(Some(found));

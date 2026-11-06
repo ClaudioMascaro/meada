@@ -12,7 +12,6 @@ use crate::index::Export;
 pub(crate) struct Side {
     pub identity: String,
     pub contract: String,
-    level: Level,
     pub node: Node,
 }
 
@@ -83,10 +82,6 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
         sides.push(Side {
             identity: format!("{repository}::{}::{}", node.path, node.address),
             contract: entry.contract(name),
-            level: match entry.contract {
-                types::Contract::Channel => Level::Exact,
-                types::Contract::Resource => Level::Declared,
-            },
             node,
         });
     }
@@ -96,18 +91,10 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
     Ok(sides)
 }
 
-/// The existing directed use sides: provisioning never invents a producer or consumer.
+/// Directed and directionless uses both reach provisioners; neither invents a direction.
 pub(crate) fn uses(export: &Export) -> impl Iterator<Item = (&str, &str)> {
-    export
-        .providers
-        .iter()
-        .map(|p| (p.site.as_str(), p.contract.as_str()))
-        .chain(
-            export
-                .consumers
-                .iter()
-                .filter_map(|c| Some((c.site.as_str(), c.contract.as_deref()?))),
-        )
+    directed_uses(export)
+        .map(|(site, contract, _)| (site, contract))
         .chain(
             export
                 .config_uses
@@ -116,10 +103,41 @@ pub(crate) fn uses(export: &Export) -> impl Iterator<Item = (&str, &str)> {
         )
 }
 
+fn directed_uses(export: &Export) -> impl Iterator<Item = (&str, &str, Level)> {
+    export
+        .providers
+        .iter()
+        .map(|p| {
+            (
+                p.site.as_str(),
+                p.contract.as_str(),
+                crate::contract::use_level(&p.contract, p.via.as_deref()),
+            )
+        })
+        .chain(export.consumers.iter().filter_map(|c| {
+            let contract = c.contract.as_deref()?;
+            Some((
+                c.site.as_str(),
+                contract,
+                crate::contract::use_level(contract, c.via.as_deref()),
+            ))
+        }))
+}
+
 /// Every use of the same contract reaches every provisioner, including one in its repository.
 /// Several roots are independent sides, never ambiguous candidates of one another.
 pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
-    let sides = exports.iter().flat_map(uses).collect::<Vec<_>>();
+    let sides = exports
+        .iter()
+        .flat_map(|export| {
+            directed_uses(export).chain(
+                export
+                    .config_uses
+                    .iter()
+                    .map(|u| (u.site.as_str(), u.contract.as_str(), u.level)),
+            )
+        })
+        .collect::<Vec<_>>();
     let config = exports
         .iter()
         .flat_map(|e| &e.config_uses)
@@ -128,10 +146,10 @@ pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
     let mut links = Vec::new();
     for export in exports {
         for p in &export.provisioners {
-            let mut level = p.level;
+            let mut level = Level::Exact;
             let contracts = sides
                 .iter()
-                .map(|(_, c)| *c)
+                .map(|(_, c, _)| *c)
                 .filter(|c| p.matches(c))
                 .collect::<std::collections::BTreeSet<_>>();
             let mut reason = p.contract.clone();
@@ -160,30 +178,18 @@ pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
                     .join(", ");
                 reason += &format!("; overridable: {values}");
             }
-            for &(site, contract) in &sides {
+            for &(site, contract, use_level) in &sides {
                 if contracts.contains(contract) {
-                    let (use_level, use_reason) = match config.get(&(site, contract)) {
-                        Some(u) => {
-                            // Resource provisioners' `declared` level describes their old
-                            // directed sides. A literal config identifier has exact evidence.
-                            let base = if level == Level::Declared {
-                                Level::Exact
-                            } else {
-                                level
-                            };
-                            (
-                                base.max(u.level),
-                                format!("{reason}; config {}#{}", u.path, u.key),
-                            )
-                        }
-                        None => (level, reason.clone()),
+                    let use_reason = match config.get(&(site, contract)) {
+                        Some(u) => format!("{reason}; config {}#{}", u.path, u.key),
+                        None => reason.clone(),
                     };
                     let mut link = Provision::new(
                         site.into(),
                         p.identity.clone(),
                         p.node.root.clone(),
                         contract.into(),
-                        use_level,
+                        level.max(use_level),
                         use_reason,
                     );
                     if let Some(u) = config.get(&(site, contract)) {

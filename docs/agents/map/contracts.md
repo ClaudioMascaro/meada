@@ -217,10 +217,11 @@ this file, and a change to these modules updates it.
   it leaves out takes the parameter's default). In Express `use(first,
   ...)`, `first` has no path only when it is a router (a call, also one `Code::origins` reaches
   through arguments and return values) or a handler (a function or a definition); anything
-  else is an unreadable prefix, so what it mounts is served under no prefix. `resource.rs` (spec
-  #19): reads no code; `declare` turns each `[[resource]]` `via` symbol the repository has into a
+  else is an unreadable prefix, so what it mounts is served under no prefix. `resource.rs`'s
+  declarations (spec #19) read no code; `declare` turns each `[[resource]]` `via` symbol the repository has into a
   provider (writer) or consumer (reader) of `resource::<kind>::<id>`, and `link` joins every
-  reader to every writer of another repository at `declared`, reason the contract. A `via` that
+  declared reader to every declared writer of another repository at `declared`, reason the contract. The
+  [AWS SDK use sides](#aws-sdk-use-sides-659) below add code extraction and exact local SDK links. A `via` that
   names no symbol is dropped. An entry without `via`, or with none matched, makes the repository
   the side: the `site` is the bare repository identity (no `::`), the **repository-level** side.
   `report` gives the status lines per repository: each unmatched `via`, the fallback to repository
@@ -552,6 +553,32 @@ this file, and a change to these modules updates it.
   `Namespace`, the reason's `; import namespace`): the `.cs` exports rows give a public type its
   qualified name, as Java's do. `How::Namespace` is a new value of the exported `how`; the
   stored format gains only a `manifests` summary kind, with `tests/fixtures/schema/sample.csproj`.
+
+## AWS SDK use sides (#659)
+
+`channel/aws.rs` and `resource/aws.rs` own their operation matrices and argument projections;
+`channel/{ts,python}.rs` and `resource/{ts,python}.rs` apply each language's origin policy.
+`names/ts.rs` shares the constant-construction spelling; `names/python.rs` shares external
+constructors and one factory level, using the pack's enclosing-call order to find an inline
+receiver without a file scan. These helpers own no SDK operation table. Name reads use
+`Code::expand`, so wrapper arguments follow exact callers only. TS SDK commands require both
+a constant client from the corresponding SDK constructor and a command from that package.
+Python requires a matching literal boto3 service, including a Session's client.
+
+The operation list and its argument names are in the user guide's AWS SDK section. A batch
+retains each named table, parameter or secret; an omitted EventBridge bus is `default`.
+Supported ARNs use the existing IaC type table's normalization. Malformed or wrong-service
+structured identifiers remain unresolved. Only literal named sides join provisioners.
+An SDK side stores `sdk:aws` in `contracts.via`, or `env:<variable>` when unresolved through
+an environment read; providers export optional `via` just as consumers do. No process
+variable is read. Resource `use_level` keeps declarations at `declared` and SDK literals at
+`exact`; provisioning asks that seam before weakening a level for patterns or overrides.
+SDK resource readers link to SDK writers in their repository as well as peers. Existing
+configuration declarations keep their cross-repository rule and their level.
+
+SSM hierarchy queries stay unresolved instead of naming the path as a parameter; DynamoDB
+transaction condition checks are readers. Computed object keys are syntax facts (`[]` holding
+the key and value), folded by `Code::expand`; batch readers retain literal and environment keys.
 
 ## Image contracts (#662)
 

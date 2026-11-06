@@ -258,6 +258,26 @@ its rule on environment variables and its `inferred` level change as the section
 - **A `router` side for alerts.** Rejected: router is HTTP vocabulary; emitter and matcher name
   what each side does.
 
+### AWS SDK forms amendment (2026-11-06, #659)
+
+The operation matrix in the user guide specifies the low-level AWS SDK v3 and boto3 forms.
+Both the client and command origins must be the corresponding SDK's; an unsent JavaScript
+command has no direction. Batch and transaction entries retain each physical name. An omitted
+EventBridge `EventBusName` means `default`; SNS phone and endpoint publishes name no topic.
+
+The existing `contracts.via` stores `sdk:aws` for these directed sides and `env:<variable>`
+for an unresolved environment name. Providers gain optional `via` in export format 1, absent
+on existing rows; consumers already have it. Literal SDK writer-reader and provisioning links
+are `exact`, with evaluated provisioner names weakening them as above. SDK resource readers
+can reach SDK writers in their own repository; declared resource sides preserve their
+cross-repository rule and `declared` level. The environment remains unread until the scoped
+workload mechanism can resolve it; this ticket never reads the process environment.
+
+An SSM hierarchy path is not a physical parameter name, so `GetParametersByPath` remains an
+unresolved reader. A DynamoDB transaction's `ConditionCheck` is a reader of its table, even
+when the same transaction writes another table. Computed batch keys follow the same literal
+and environment rules as other name arguments.
+
 ### Image execution representation (#662, 2026-11-06)
 
 The image addition keeps export format 1. Builder locations use the optional provider `at`
@@ -284,3 +304,10 @@ Image consumer and link rows optionally carry their evaluation `root`. Their `si
 `consumer` still identify the workload. An open item's decision identity additionally names
 the image contract and root, so two container images or overlays do not share a decision.
 Replaying one decision preserves every other image side's ambiguity.
+
+### SDK and image integration (#659 and #662, 2026-11-06)
+
+Combining the SDK and image slices keeps the SDK slice's synchronized 1.4.0 minor release
+for both crates, and export format 1. The earlier image tier's 1.3.0 release note describes
+its starting tier. Optional provider `via` records SDK provenance while optional `at` records
+image build configuration locations; neither replaces the other.

@@ -147,6 +147,9 @@ Cada produtor se liga ao handler dos consumidores, inclusive no mesmo repositór
 | Kafka | `kafkajs` | `confluent-kafka`, `kafka-python` | `rdkafka` | `segmentio/kafka-go`, `confluent-kafka-go`, `sarama` | Spring Kafka | Spring Kafka | `Confluent.Kafka` |
 | RabbitMQ | `amqplib` | `pika` | `lapin` | `amqp091-go` | Spring AMQP | Spring AMQP | `RabbitMQ.Client` |
 | Amazon SQS | AWS SDK v3, `sqs-consumer` | `boto3` | `aws-sdk-sqs` | `aws-sdk-go-v2` | AWS SDK v2 | AWS SDK v2 | `AWSSDK.SQS` |
+| Amazon SNS | AWS SDK v3 `PublishCommand`, `PublishBatchCommand` | `boto3` `publish`, `publish_batch` | | | | | |
+| Amazon EventBridge | AWS SDK v3 `PutEventsCommand` | `boto3` `put_events` | | | | | |
+| Amazon Kinesis | AWS SDK v3 `PutRecordCommand`, `PutRecordsCommand` | `boto3` `put_record`, `put_records` | | | | | |
 | NATS | `nats` | `nats-py` | `async-nats` | `nats.go` | jnats | jnats | `NATS.Client` |
 | Redis streams | `ioredis`, `node-redis` | `redis-py` | crate `redis` | `go-redis` | Jedis, Lettuce | Jedis, Lettuce | `StackExchange.Redis` |
 | JMS | | | | | Spring JMS | Spring JMS | |
@@ -406,6 +409,40 @@ Um processo é a árvore de chamadas iniciada por um ponto de entrada, atravessa
 ## Limites e próximos passos
 
 Linguagens e clientes HTTP ou de mensagens fora das listas acima ainda não têm suporte. O [ADR 0003](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0003-v1-scope-and-roadmap.md) define o escopo e a ordem do trabalho. Consulte o [roadmap](roadmap.md), as [decisões](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr) e o [CHANGELOG](https://github.com/ClaudioMascaro/meada/blob/main/CHANGELOG.md).
+
+## AWS SDK em código
+
+TypeScript e JavaScript reconhecem comandos v3 enviados com `cliente.send(new Comando(...))`,
+com cliente e comando importados do pacote AWS correspondente. Python reconhece métodos de
+clientes criados por `boto3.client(...)` ou por uma `Session`. Os nomes podem vir de constantes
+e dos argumentos de wrappers chamados exatamente. Um cliente recebido só por correspondência
+de nome, ou escondido por um parâmetro, `catch`, desestruturação ou outro binding, não cria lado.
+
+| Serviço | Produz ou escreve | Lê | Argumento do nome |
+| --- | --- | --- | --- |
+| SNS | `Publish`, `PublishBatch` | | `TopicArn` |
+| EventBridge | `PutEvents` | | `Entries[].EventBusName`, `default` quando omitido |
+| Kinesis | `PutRecord`, `PutRecords` | | `StreamARN` ou `StreamName` |
+| S3 | `PutObject` | `GetObject` | `Bucket` |
+| DynamoDB | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem`, `TransactWriteItems` | `GetItem`, `Query`, `Scan`, `BatchGetItem`, `TransactGetItems` | `TableName`, chaves de `RequestItems`, ou tabelas de `TransactItems` |
+| SSM | | `GetParameter`, `GetParameters`, `GetParametersByPath` | `Name`, `Names`, `Path` |
+| Secrets Manager | | `GetSecretValue`, `BatchGetSecretValue` | `SecretId`, `SecretIdList` |
+
+Em JavaScript, cada operação acima tem o sufixo `Command`; em boto3, usa snake case
+(`put_object`, `get_secret_value`). SNS, EventBridge e Kinesis são produtores; S3 e DynamoDB
+usam os lados escritor e leitor de recursos. Os nomes literais e ARNs compatíveis se ligam à
+infraestrutura pelo nome físico, sem conta ou região. Lados de SDK literais se ligam em
+`exact`, inclusive a outros lados de SDK do mesmo repositório; um lado declarado em
+`meada.toml` conserva `declared`. Valores de infraestrutura substituíveis continuam `inferred`.
+
+Uma leitura como `process.env.BUCKET` ou `os.getenv("BUCKET")` fica não resolvida, com
+`via: "env:BUCKET"` no export e o nome da variável no contexto da função. Um produtor ou
+escritor de SDK também tem `via`, opcional no formato 1; para um literal é `sdk:aws`.
+Meada não lê o ambiente do processo. A construção isolada de um comando, um publish SNS para
+telefone ou endpoint, os clientes de alto nível `boto3.resource` e `DynamoDBDocumentClient`
+e operações fora da tabela não são reconhecidos por estas formas.
+
+`GetParametersByPath` consulta uma hierarquia, por isso seu lado fica não resolvido; o caminho não é tratado como nome de um parâmetro. Um `ConditionCheck` de `TransactWriteItems` é leitor, mesmo quando a transação também escreve outras tabelas. Chaves computadas de `RequestItems` preservam o literal ou o nome da variável de ambiente.
 
 ## Imagens e código das cargas de trabalho
 

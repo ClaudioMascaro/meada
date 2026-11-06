@@ -132,18 +132,19 @@ A contract identifier starts with its contract kind and `::`:
 | `<contract>` | `channel::<broker>::<channel>` | A queue, topic or subject of a broker: `channel::kafka::orders.created`. |
 | `<contract>` | `package::<ecosystem>::<package>` | A package: `package::npm::@example/kit`. |
 | `<contract>` | `image::<word>` | A normalized image name or an unresolved image pattern. |
-| `<contract>` | `resource::<resource-kind>::<resource-id>` | A resource declared in `meada.toml`: `resource::postgres::orders`. |
+| `<contract>` | `resource::<resource-kind>::<resource-id>` | A resource declared in `meada.toml` or used through an SDK: `resource::postgres::orders`, `resource::s3::orders-bucket`. |
 | `<method>` | `<word>` | An HTTP method in upper case, such as `GET` or `POST`. |
 | `<route>` | `<word>` | A route path; each parameter is `{}`. |
 | `<broker>` | `<word>` | The broker kind: `kafka`, `amqp`, `nats`, `sqs`, `servicebus` and the others the language packs read. |
 | `<channel>` | `<word>` | The channel's name; a pattern keeps its wildcards (`orders.>`). |
 | `<ecosystem>` | `<word>` | `npm`, `pypi`, `go`, `cargo`, `maven`, `nuget` or `swiftpm`. |
 | `<package>` | `<word>` | The package's name in its ecosystem: `@example/kit`, `example:models`, a Go module path. |
-| `<resource-kind>` | `<word>` | The resource's `kind` in `meada.toml`. |
-| `<resource-id>` | `<text>` | The resource's `id` in `meada.toml`. |
+| `<resource-kind>` | `<word>` | The declared or SDK resource kind. |
+| `<resource-id>` | `<text>` | The declared resource id or SDK physical name. |
 | `<shown-contract>` | `<contract>` | A contract as answers show it. |
 | `<shown-contract>` | `image::<word> (unresolved)` | An image pattern with insufficient literal or segment evidence. |
 | `<shown-contract>` | `channel::<broker> (unresolved)` | A channel side whose name Meada cannot read. |
+| `<shown-contract>` | `resource::<resource-kind> (unresolved)` | An SDK resource side whose physical name Meada cannot read. |
 | `<shown-contract>` | `(unresolved) <callee>` | In `search`: a consumer whose contract Meada cannot read (an open item), with the call it sits at. |
 
 ## `search`
@@ -278,7 +279,7 @@ words:
 | `annotations:` | callee, overload set, unresolved call |
 | `consumers:` | package consumer |
 | `provisioners:` | provisioner |
-| `contracts:` | provides, shape fields, shape open, produces, publishes, consumes, consumes decided, consumes unresolved |
+| `contracts:` | provides, shape fields, shape open, produces, publishes, consumes, consumes decided, consumes unresolved, environment |
 
 | Kind | Line | Meaning |
 | --- | --- | --- |
@@ -299,11 +300,12 @@ words:
 | provides | `<repository> <place> provides <contract><orphan-note?>` | The symbol provides the contract. |
 | shape fields | `<indent><repository> <shape-source> <carried> fields:<fields?>` | The field paths the shape carries. |
 | shape open | `<indent><repository> <shape-source> <carried> open: <paths>` | The parts of the shape that are open: any field may be under them. |
-| produces | `<repository> <place> produces <shown-contract><mark?><orphan-note?>` | A call of the symbol produces to the channel; after a publish, a queue its bindings route it to. |
+| produces | `<repository> <place> produces <shown-contract><mark?><orphan-note?>` | A call of the symbol produces to the channel or writes the resource; after a publish, a queue its bindings route it to. |
 | publishes | `<repository> <place> publishes <exchange> <key>` | A call of the symbol publishes to an exchange with a routing key. |
 | consumes | `<repository> <place> consumes <shown-contract><orphan-note?>` | The symbol, or a call of it, consumes the contract. |
 | consumes decided | `<repository> <place> consumes <contract> <arrow> <identity>` | A call of the symbol consumes the contract, linked by a decision to the provider `<identity>`. |
 | consumes unresolved | `<repository> <place> consumes (unresolved) <callee>` | A call of the symbol consumes a contract Meada cannot read. |
+| environment | `<repository> <place> unresolved environment <text>` | An SDK argument reads this environment variable; Meada retains its name and never reads its value. |
 | fits | ``` `<query>` fits <n> symbols; pass one of: ``` | The name fits several symbols, listed after it. |
 | no symbol | `` no symbol matches `<query>` `` | No symbol has the name. |
 | config use | `<repository> use <config-place> [<level>] <contract><orphan-note?>` | A directionless config use named by its key locator. |

@@ -5,6 +5,7 @@ mod common;
 
 mod asyncapi;
 mod aws;
+mod aws_sdk;
 mod benchmark;
 mod cargo;
 mod channel_queries;

@@ -1,0 +1,7 @@
+resource::s3::orders-bucket
+  example.com/aws/app writer app.ts:9 store
+  example.com/aws/app writer writer.py:4 write
+  example.com/aws/infra writer (repository-level)
+  example.com/aws/app reader app.ts:10 store
+  example.com/aws/infra reader (repository-level)
+  example.com/aws/infra provisioner main.tf:1 aws_s3_bucket.orders (root .)

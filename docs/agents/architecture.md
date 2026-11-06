@@ -86,11 +86,12 @@ for the area a change touches.
 - `entry.rs`: entry points (spec #31), found when an index is written. [indexing](map/indexing.md)
 - `contract.rs`: the `ContractKind` trait, `KINDS` and the free functions the engine asks. [contracts](map/contracts.md)
 - `http.rs`, `http/`: the HTTP kind: the contract and path rules, mounts, and one submodule per language for providers and consumers. [contracts](map/contracts.md)
-- `resource.rs`: the resource kind, declared in `meada.toml`. [contracts](map/contracts.md)
+- `resource.rs`, `resource/`: declared resources and AWS SDK writer/reader forms, with one reader per language and a shared operation matrix. [contracts](map/contracts.md)
+
 - `image.rs`, `image/config.rs`: image builders/runners, normalized names, checked-in build configuration, workload execution and two-role orphans. [contracts](map/contracts.md)
 - `channel.rs`, `channel/`: the channel kind (queues and topics), one module per language for message libraries. [contracts](map/contracts.md)
 - `package.rs`, `package/`: packages as contracts, one module per ecosystem behind the `Ecosystem` trait. [contracts](map/contracts.md)
-- `names.rs`: the questions the contract kinds ask of a name: what a library outside the repository is. [languages](map/languages.md)
+- `names.rs`, `names/`: external constructor origins shared by kind-owned language forms, and the questions the contract kinds ask of a name: what a library outside the repository is. [languages](map/languages.md)
 - `jvm/`: what the JVM ecosystems and kinds share: the Maven and Gradle readers, Spring configuration, file readers. [languages](map/languages.md), [seams](map/seams.md)
 - `dotnet/`: what the .NET pack and ecosystems share (spec #28): the MSBuild project reader and what builds on it. [seams](map/seams.md)
 - `xml.rs`: the bounds the XML build readers of `jvm/` and `dotnet/` share. [seams](map/seams.md)
@@ -293,6 +294,7 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
 
   | Question | The kind says |
   |---|---|
+  | `use_level` | the strength of a directed side before an evaluated provisioner name weakens it (resources distinguish SDK and declared sides) |
   | `entry` | which entry point kind a side of a contract makes (a pure function of the contract: entry points are stored) |
   | `declare` | the sides `meada.toml` declares, run at query time (a config edit needs no reindex) |
   | `symbols_read` | the symbols `declare`, `workspace_step`, `link` and `status` look up, which a partial export reads before declaring (resources: their `via` symbols; packages: every symbol of a repository with a named manifest) |

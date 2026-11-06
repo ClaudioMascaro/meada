@@ -147,6 +147,9 @@ Each producer links to its consumer handlers, including within the same reposito
 | Kafka | `kafkajs` | `confluent-kafka`, `kafka-python` | `rdkafka` | `segmentio/kafka-go`, `confluent-kafka-go`, `sarama` | Spring Kafka | Spring Kafka | `Confluent.Kafka` |
 | RabbitMQ | `amqplib` | `pika` | `lapin` | `amqp091-go` | Spring AMQP | Spring AMQP | `RabbitMQ.Client` |
 | Amazon SQS | AWS SDK v3, `sqs-consumer` | `boto3` | `aws-sdk-sqs` | `aws-sdk-go-v2` | AWS SDK v2 | AWS SDK v2 | `AWSSDK.SQS` |
+| Amazon SNS | AWS SDK v3 `PublishCommand`, `PublishBatchCommand` | `boto3` `publish`, `publish_batch` | | | | | |
+| Amazon EventBridge | AWS SDK v3 `PutEventsCommand` | `boto3` `put_events` | | | | | |
+| Amazon Kinesis | AWS SDK v3 `PutRecordCommand`, `PutRecordsCommand` | `boto3` `put_record`, `put_records` | | | | | |
 | NATS | `nats` | `nats-py` | `async-nats` | `nats.go` | jnats | jnats | `NATS.Client` |
 | Redis streams | `ioredis`, `node-redis` | `redis-py` | crate `redis` | `go-redis` | Jedis, Lettuce | Jedis, Lettuce | `StackExchange.Redis` |
 | JMS | | | | | Spring JMS | Spring JMS | |
@@ -404,6 +407,40 @@ A process is the call tree from an entry point, across repositories. Routes, cha
 ## Limits and next steps
 
 Languages and HTTP or messaging clients outside these lists are not yet supported. [ADR 0003](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0003-v1-scope-and-roadmap.md) defines scope and order. See the [roadmap](roadmap.md), [decisions](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr) and [CHANGELOG](https://github.com/ClaudioMascaro/meada/blob/main/CHANGELOG.md).
+
+## AWS SDK calls in code
+
+TypeScript and JavaScript recognize v3 commands sent with `client.send(new Command(...))`,
+with both client and command imported from the corresponding AWS package. Python recognizes
+methods on clients constructed by `boto3.client(...)` or a `Session`. Names can come from
+constants and arguments of exactly resolved wrappers. A client reached only by a name match,
+or hidden by a parameter, `catch`, destructuring or another binding, contributes no side.
+
+| Service | Produces or writes | Reads | Name argument |
+| --- | --- | --- | --- |
+| SNS | `Publish`, `PublishBatch` | | `TopicArn` |
+| EventBridge | `PutEvents` | | `Entries[].EventBusName`, `default` when omitted |
+| Kinesis | `PutRecord`, `PutRecords` | | `StreamARN` or `StreamName` |
+| S3 | `PutObject` | `GetObject` | `Bucket` |
+| DynamoDB | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem`, `TransactWriteItems` | `GetItem`, `Query`, `Scan`, `BatchGetItem`, `TransactGetItems` | `TableName`, `RequestItems` keys, or `TransactItems` tables |
+| SSM | | `GetParameter`, `GetParameters`, `GetParametersByPath` | `Name`, `Names`, `Path` |
+| Secrets Manager | | `GetSecretValue`, `BatchGetSecretValue` | `SecretId`, `SecretIdList` |
+
+In JavaScript each operation above has the `Command` suffix; boto3 uses snake case
+(`put_object`, `get_secret_value`). SNS, EventBridge and Kinesis are producers; S3 and DynamoDB
+use resource writer and reader sides. Literal names and supported ARNs join infrastructure by
+physical name, without account or region. Literal SDK sides link at `exact`, including other
+SDK sides in the same repository; a side declared in `meada.toml` keeps `declared`.
+Overridable infrastructure values still weaken a link to `inferred`.
+
+A read such as `process.env.BUCKET` or `os.getenv("BUCKET")` stays unresolved, with
+`via: "env:BUCKET"` in the export and the variable named in its function's context. An SDK
+producer or writer also has `via`, optional in format 1; a literal uses `sdk:aws`.
+Meada never reads the process environment. Constructing an unused command, SNS publishes to
+phone numbers or endpoints, high-level `boto3.resource` and `DynamoDBDocumentClient` clients,
+and operations outside this table are not recognized by these forms.
+
+`GetParametersByPath` queries a hierarchy, so its side stays unresolved; the path is not treated as a parameter name. A `ConditionCheck` in `TransactWriteItems` is a reader, even when the transaction also writes other tables. Computed `RequestItems` keys retain a literal or the environment variable name.
 
 ## Images and workload code
 

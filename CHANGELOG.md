@@ -8,6 +8,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- AWS SDK use sides in TypeScript, JavaScript (SDK v3) and Python (boto3): SNS publishes,
+  EventBridge event entries and Kinesis record writes produce channel sides; S3 and DynamoDB
+  operations write or read resource sides; SSM and Secrets Manager operations read resources.
+  Batch and transaction inputs retain each named resource. Both client and operation origins
+  must be the SDK's; name-matched hops and hidden client names produce no side. Literal names
+  and supported ARNs join provisioners at `exact`; environment reads stay unresolved and name
+  their variable through `via: env:NAME`, without reading the process environment. SDK providers
+  gain an optional `via`, absent on existing providers; format remains 1. Existing declared
+  resource sides retain `declared`. Older indexes rebuild. Release level: minor, meada and
+  meada-core 1.4.0 (#659).
 - Config values naming AWS resources become directionless use sides (#661): recognized ARNs,
   SQS queue URLs and S3 URIs are exact; plain names under final `queue`, `topic`, `bucket` and
   `table` keys are inferred. Each key links only to provisioners and counts for scoped orphans;
@@ -21,7 +31,7 @@ All notable changes to Meada are recorded here. The format follows
   back, and status reports image orphans only in scopes with both roles. Compose build paths
   run same-repository code directly at `exact`, without following symlinks. Export format 1
   adds optional builder `at` locations and direct `executions`; the console graph displays
-  both. Release level: minor for meada and meada-core, included in synchronized 1.3.0.
+  both. Release level: minor for meada and meada-core, included in synchronized 1.4.0.
 
 - AWS infrastructure contracts: Terraform/OpenTofu SNS, EventBridge and Kinesis channels;
   DynamoDB, RDS instances and clusters, ElastiCache clusters and replication groups, SSM and

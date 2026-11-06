@@ -306,6 +306,11 @@ pub trait ContractKind {
         false
     }
 
+    /// Strength of a directed use side before evaluated provisioning names weaken it.
+    fn use_level(&self, _via: Option<&str>) -> Level {
+        Level::Exact
+    }
+
     /// How the identifier is labelled in candidates and entry points. It is a function of the
     /// identifier alone, since entry points are stored when the index is written.
     fn label(&self, contract: &str) -> String {
@@ -502,6 +507,11 @@ pub fn calls_from_definition(contract: Option<&str>) -> bool {
 /// Whether `contract` is an unresolved side, by the rule of its kind.
 pub fn unresolved(contract: &str) -> bool {
     kind_of(contract).is_some_and(|k| k.unresolved(contract))
+}
+
+/// The kind owns whether a side is identified by code or declared by configuration.
+pub(crate) fn use_level(contract: &str, via: Option<&str>) -> Level {
+    kind_of(contract).map_or(Level::Exact, |kind| kind.use_level(via))
 }
 
 /// `contract` as a person reads it: an unresolved side says so.

@@ -1,0 +1,21 @@
+example.com/aws/app app.ts:8-12 store
+community: none
+processes: 1 (1 export; 1 repository): store (example.com/aws/app)
+async function store() {
+  await s3.send(new PutObjectCommand({ Bucket: 'orders-bucket', Key: 'a' }));
+  await s3.send(new GetObjectCommand({ Bucket: 'orders-bucket', Key: 'a' }));
+  await s3.send(new GetObjectCommand({ Bucket: process.env.BUCKET }));
+}
+callers: none
+callees:
+example.com/aws/app app.ts:10 (unresolved) GetObjectCommand
+example.com/aws/app app.ts:11 (unresolved) GetObjectCommand
+example.com/aws/app app.ts:9 (unresolved) PutObjectCommand
+example.com/aws/app app.ts:9 (unresolved) s3.send
+example.com/aws/app app.ts:10 (unresolved) s3.send
+example.com/aws/app app.ts:11 (unresolved) s3.send
+contracts:
+example.com/aws/app app.ts:9 produces resource::s3::orders-bucket (no provisioner in the workspace)
+example.com/aws/app app.ts:11 unresolved environment BUCKET
+example.com/aws/app app.ts:10 consumes resource::s3::orders-bucket (no provisioner in the workspace)
+example.com/aws/app app.ts:11 consumes resource::s3 (unresolved)

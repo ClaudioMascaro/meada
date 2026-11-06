@@ -1431,7 +1431,8 @@ fn contracts(
             let contract = consumer.contract.clone();
             let contract = contract.unwrap_or_else(|| unresolved(&consumer.site));
             lines.push(format!(
-                "{identity} {location} consumes {contract}{}",
+                "{identity} {location} consumes {}{}",
+                contract::shown(&contract),
                 orphans.use_note(&contract)
             ));
         }
