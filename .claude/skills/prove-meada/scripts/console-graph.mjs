@@ -76,7 +76,6 @@ try {
     await selector.focus();
     await selector.press('Home');
     for (let i = 0; i < values.indexOf(value); i++) await selector.press('ArrowDown');
-    await selector.press('Enter');
     assert.equal(await selector.inputValue(), value);
     await selector.press('Tab');
     assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('role')), 'region');
