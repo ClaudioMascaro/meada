@@ -342,6 +342,40 @@ Las lecturas del entorno mediante alias de importación en Go y C# conservan el 
 
 Los nombres de operaciones usan la grafía Go; Java empieza en minúscula y .NET acepta formas síncronas y `Async`. S3 en .NET usa `BucketName` y `GetObjectMetadata` para `HeadObject`. Los ARN se reducen al nombre físico de la infraestructura. `GetParametersByPath` queda sin resolver porque `Path` es una jerarquía, no un parámetro. Las operaciones de control de RDS y ElastiCache no demuestran lecturas o escrituras de datos. Un recurso sin nombre nunca enlaza; una declaración de `meada.toml` conserva el nivel `declared`.
 
+### GCP y Cloud Run
+
+Terraform/OpenTofu reconoce `google_pubsub_topic` y `google_pubsub_subscription` como canales
+`pubsub`, `google_storage_bucket` como `gcs`, `google_sql_database_instance` y
+`google_sql_database` como `cloudsql`, y `google_secret_manager_secret` como
+`gcpsecretmanager`. El nombre viene de `name`, excepto los secretos, que usan `secret_id`.
+Las instancias Cloud SQL usan `<instancia>`; las bases usan `<instancia>/<base>`, con una
+instancia literal o una referencia resuelta a una instancia conocida. Una base no aprovisiona
+su instancia. Los proyectos quedan fuera de la identidad.
+
+Un tópico usa `channel::pubsub::<id>`; una suscripción usa
+`channel::pubsub::subscriptions/<id>`, incluso cuando ambos comparten el mismo id. La
+suscripción enlaza a sus consumidores con los productores del tópico indicado por `topic`:
+`exact` sin filtro, `inferred` con filtro o nombres sobrescribibles. Una fuente sin resolver
+no crea un enlace ni inventa un tópico a partir del nombre de la suscripción.
+
+`gs://<bucket>/objeto`, `projects/<proyecto>/topics/<id>`,
+`projects/<proyecto>/subscriptions/<id>` y `projects/<proyecto>/secrets/<id>` (también con
+`/versions/<versión>`) son usos de configuración `exact`. Los nombres simples bajo las claves
+finales `pubsub_topic`, `pubsub_subscription`, `gcs_bucket`, `cloudsql_instance`,
+`cloudsql_database` y `gcpsecretmanager_secret` son `inferred`; `cloudsql_database` exige
+`<instancia>/<base>`. Las claves genéricas `topic` y `bucket` conservan sus significados SNS y
+S3. Los identificadores malformados, valores ocultados o cortados y la mera igualdad de texto
+no crean usos.
+
+`google_cloud_run_service`, `google_cloud_run_v2_service` y `google_cloud_run_v2_job` son
+workloads: cada contenedor conserva su imagen y su entorno. Las imágenes enlazan al
+repositorio que las publica; la evidencia sobrescribible debilita el enlace. Las lecturas de
+entorno solo reciben valores del contenedor que ejecuta su código y quedan `inferred`. Las
+referencias Secret Manager siguen como destinos sin resolver, sin leer el contenido del
+secreto. Búsqueda, `context`, `trace` en ambos sentidos, huérfanos por ámbito y export incluyen
+los nuevos contratos y runners; las entradas de entorno y valores de configuración quedan
+fuera del export.
+
 ### Canales, datos, secretos y suscripciones AWS
 
 La tabla Terraform/OpenTofu también reconoce los tipos siguientes. Los ARN se reducen al

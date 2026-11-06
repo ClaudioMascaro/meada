@@ -1,5 +1,5 @@
 //! Directionless config uses (ADR 0026, #661), derived from non-secret, uncut stored strings.
-//! Only a structured AWS identifier or a final typed key gives evidence of a contract.
+//! Only a structured cloud identifier or a final typed key gives evidence of a contract.
 
 use meada_core::export::{Level, Use};
 use rusqlite::Connection;
@@ -81,6 +81,25 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
             })
             .map(|c| (c, Level::Exact))
             .or_else(|| {
+                let alias = [
+                    "pubsub_topic",
+                    "pubsub_subscription",
+                    "gcs_bucket",
+                    "cloudsql_instance",
+                    "cloudsql_database",
+                    "gcpsecretmanager_secret",
+                ]
+                .into_iter()
+                .find(|alias| {
+                    key == *alias
+                        || key.ends_with(&format!(".{alias}"))
+                        || key.ends_with(&format!("[\"{alias}\"]"))
+                });
+                if let Some(contract) =
+                    alias.and_then(|alias| crate::contract::gcp::typed(alias, &value))
+                {
+                    return Some((contract, Level::Inferred));
+                }
                 if value.is_empty()
                     || !value
                         .bytes()

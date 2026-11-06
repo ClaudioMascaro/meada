@@ -1,0 +1,242 @@
+{
+  "format": 1,
+  "repository": "example.com/gcp/infra",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [],
+  "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/gcp/infra::main.tf::google_pubsub_subscription.orders",
+      "address": "google_pubsub_subscription.orders",
+      "type": "google_pubsub_subscription",
+      "root": ".",
+      "path": "main.tf",
+      "line": 2,
+      "end_line": 6
+    },
+    {
+      "identity": "example.com/gcp/infra::main.tf::google_pubsub_topic.orders",
+      "address": "google_pubsub_topic.orders",
+      "type": "google_pubsub_topic",
+      "root": ".",
+      "path": "main.tf",
+      "line": 1,
+      "end_line": 1
+    },
+    {
+      "identity": "example.com/gcp/infra::main.tf::google_secret_manager_secret.token",
+      "address": "google_secret_manager_secret.token",
+      "type": "google_secret_manager_secret",
+      "root": ".",
+      "path": "main.tf",
+      "line": 18,
+      "end_line": 18
+    },
+    {
+      "identity": "example.com/gcp/infra::main.tf::google_sql_database.audit",
+      "address": "google_sql_database.audit",
+      "type": "google_sql_database",
+      "root": ".",
+      "path": "main.tf",
+      "line": 14,
+      "end_line": 17
+    },
+    {
+      "identity": "example.com/gcp/infra::main.tf::google_sql_database.orders",
+      "address": "google_sql_database.orders",
+      "type": "google_sql_database",
+      "root": ".",
+      "path": "main.tf",
+      "line": 10,
+      "end_line": 13
+    },
+    {
+      "identity": "example.com/gcp/infra::main.tf::google_sql_database_instance.audit",
+      "address": "google_sql_database_instance.audit",
+      "type": "google_sql_database_instance",
+      "root": ".",
+      "path": "main.tf",
+      "line": 9,
+      "end_line": 9
+    },
+    {
+      "identity": "example.com/gcp/infra::main.tf::google_sql_database_instance.primary",
+      "address": "google_sql_database_instance.primary",
+      "type": "google_sql_database_instance",
+      "root": ".",
+      "path": "main.tf",
+      "line": 8,
+      "end_line": 8
+    },
+    {
+      "identity": "example.com/gcp/infra::main.tf::google_storage_bucket.assets",
+      "address": "google_storage_bucket.assets",
+      "type": "google_storage_bucket",
+      "root": ".",
+      "path": "main.tf",
+      "line": 7,
+      "end_line": 7
+    }
+  ],
+  "provisioners": [
+    {
+      "contract": "channel::pubsub::orders",
+      "node": "example.com/gcp/infra::main.tf::google_pubsub_topic.orders",
+      "root": "."
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders",
+      "node": "example.com/gcp/infra::main.tf::google_pubsub_subscription.orders",
+      "root": "."
+    },
+    {
+      "contract": "resource::cloudsql::audit-db",
+      "node": "example.com/gcp/infra::main.tf::google_sql_database_instance.audit",
+      "root": "."
+    },
+    {
+      "contract": "resource::cloudsql::audit-db/orders",
+      "node": "example.com/gcp/infra::main.tf::google_sql_database.audit",
+      "root": "."
+    },
+    {
+      "contract": "resource::cloudsql::orders-db",
+      "node": "example.com/gcp/infra::main.tf::google_sql_database_instance.primary",
+      "root": "."
+    },
+    {
+      "contract": "resource::cloudsql::orders-db/orders",
+      "node": "example.com/gcp/infra::main.tf::google_sql_database.orders",
+      "root": "."
+    },
+    {
+      "contract": "resource::gcpsecretmanager::api-key",
+      "node": "example.com/gcp/infra::main.tf::google_secret_manager_secret.token",
+      "root": "."
+    },
+    {
+      "contract": "resource::gcs::assets",
+      "node": "example.com/gcp/infra::main.tf::google_storage_bucket.assets",
+      "root": "."
+    }
+  ],
+  "links": [],
+  "provisions": [
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_pubsub_subscription.orders",
+      "root": ".",
+      "contract": "channel::pubsub::subscriptions/orders",
+      "level": "exact",
+      "reason": "channel::pubsub::subscriptions/orders; config settings.yaml#exact.subscription",
+      "at": "settings.yaml#exact.subscription"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_pubsub_subscription.orders",
+      "root": ".",
+      "contract": "channel::pubsub::subscriptions/orders",
+      "level": "inferred",
+      "reason": "channel::pubsub::subscriptions/orders; config settings.yaml#typed.pubsub_subscription",
+      "at": "settings.yaml#typed.pubsub_subscription"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_pubsub_topic.orders",
+      "root": ".",
+      "contract": "channel::pubsub::orders",
+      "level": "exact",
+      "reason": "channel::pubsub::orders; config settings.yaml#exact.topic",
+      "at": "settings.yaml#exact.topic"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_pubsub_topic.orders",
+      "root": ".",
+      "contract": "channel::pubsub::orders",
+      "level": "inferred",
+      "reason": "channel::pubsub::orders; config settings.yaml#typed.pubsub_topic",
+      "at": "settings.yaml#typed.pubsub_topic"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_secret_manager_secret.token",
+      "root": ".",
+      "contract": "resource::gcpsecretmanager::api-key",
+      "level": "exact",
+      "reason": "resource::gcpsecretmanager::api-key; config settings.yaml#exact.secret",
+      "at": "settings.yaml#exact.secret"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_secret_manager_secret.token",
+      "root": ".",
+      "contract": "resource::gcpsecretmanager::api-key",
+      "level": "inferred",
+      "reason": "resource::gcpsecretmanager::api-key; config settings.yaml#typed.gcpsecretmanager_secret",
+      "at": "settings.yaml#typed.gcpsecretmanager_secret"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_sql_database.audit",
+      "root": ".",
+      "contract": "resource::cloudsql::audit-db/orders",
+      "level": "declared",
+      "reason": "resource::cloudsql::audit-db/orders"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_sql_database.orders",
+      "root": ".",
+      "contract": "resource::cloudsql::orders-db/orders",
+      "level": "declared",
+      "reason": "resource::cloudsql::orders-db/orders"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_sql_database.orders",
+      "root": ".",
+      "contract": "resource::cloudsql::orders-db/orders",
+      "level": "inferred",
+      "reason": "resource::cloudsql::orders-db/orders; config settings.yaml#typed.cloudsql_database",
+      "at": "settings.yaml#typed.cloudsql_database"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_sql_database_instance.primary",
+      "root": ".",
+      "contract": "resource::cloudsql::orders-db",
+      "level": "inferred",
+      "reason": "resource::cloudsql::orders-db; config settings.yaml#typed.cloudsql_instance",
+      "at": "settings.yaml#typed.cloudsql_instance"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_storage_bucket.assets",
+      "root": ".",
+      "contract": "resource::gcs::assets",
+      "level": "exact",
+      "reason": "resource::gcs::assets; config settings.yaml#exact.bucket",
+      "at": "settings.yaml#exact.bucket"
+    },
+    {
+      "side": "example.com/gcp/app",
+      "provisioner": "example.com/gcp/infra::main.tf::google_storage_bucket.assets",
+      "root": ".",
+      "contract": "resource::gcs::assets",
+      "level": "inferred",
+      "reason": "resource::gcs::assets; config settings.yaml#typed.gcs_bucket",
+      "at": "settings.yaml#typed.gcs_bucket"
+    }
+  ],
+  "subscriptions": [
+    {
+      "source": "channel::pubsub::orders",
+      "target": "channel::pubsub::subscriptions/orders",
+      "node": "example.com/gcp/infra::main.tf::google_pubsub_subscription.orders",
+      "root": "."
+    }
+  ]
+}

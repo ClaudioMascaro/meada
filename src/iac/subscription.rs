@@ -1,4 +1,4 @@
-//! AWS subscription summaries (#658): evaluated in their root and instance, then routed by
+//! AWS/PubSub subscriptions (#658, #667): evaluated in their root and instance, then routed by
 //! the channel kind. Resource attributes name only a known node, never a cloud API value.
 use super::*;
 
@@ -15,7 +15,10 @@ pub(crate) struct Subscription {
 pub(crate) fn reads(ty: &str) -> bool {
     matches!(
         ty,
-        "aws_sns_topic_subscription" | "aws_cloudwatch_event_rule" | "aws_cloudwatch_event_target"
+        "aws_sns_topic_subscription"
+            | "aws_cloudwatch_event_rule"
+            | "aws_cloudwatch_event_target"
+            | "google_pubsub_subscription"
     )
 }
 
@@ -111,7 +114,10 @@ impl<'m> Eval<'m> {
         }
         let found = self.value(at, each, expr, depth);
         if let Val::Known(Value::String(raw)) = found.val {
-            let name = types::entry("terraform", ty).map_or(raw.as_str(), |e| e.read(&raw));
+            let name = match types::entry("terraform", ty) {
+                Some(e) => e.project(&raw)?,
+                None => raw,
+            };
             if name.is_empty()
                 || name.starts_with("arn:")
                 || name.starts_with("https:")
@@ -207,7 +213,7 @@ impl<'m> Eval<'m> {
                 ..
             } if kind == ty => {
                 if ops.len() != 2 + usize::from(key.is_some())
-                    || !matches!(ops.last(), Some(TraversalOperator::GetAttr(a)) if matches!(a.as_str(), "arn" | "id" | "name"))
+                    || !matches!(ops.last(), Some(TraversalOperator::GetAttr(a)) if matches!(a.as_str(), "id" | "name") || (a.as_str() == "arn" && ty.starts_with("aws_")) || (a.as_str() == "secret_id" && ty == "google_secret_manager_secret"))
                 {
                     return None;
                 }
@@ -220,12 +226,26 @@ impl<'m> Eval<'m> {
                     return None;
                 };
                 let node = &self.nodes[*self.subscription_inputs.nodes.get(address)?];
-                if node.pattern {
+                if node
+                    .provisioned
+                    .as_ref()
+                    .map_or(node.pattern, |p| p.pattern)
+                {
                     return None;
                 }
                 Some(Endpoint {
-                    name: node.name.clone()?,
-                    through: node.overridable.iter().cloned().collect(),
+                    name: node
+                        .provisioned
+                        .as_ref()
+                        .map_or(node.name.as_ref(), |p| p.name.as_ref())?
+                        .clone(),
+                    through: node
+                        .provisioned
+                        .as_ref()
+                        .map_or(&node.overridable, |p| &p.through)
+                        .iter()
+                        .cloned()
+                        .collect(),
                 })
             }
             _ => None,
@@ -234,7 +254,7 @@ impl<'m> Eval<'m> {
         Some(endpoint)
     }
 
-    fn endpoint_arg(
+    pub(super) fn endpoint_arg(
         &mut self,
         at: usize,
         each: Option<&Each>,
@@ -304,15 +324,50 @@ impl<'m> Eval<'m> {
                     Some(self.nodes[matched.node].address.clone()),
                 )
             }
+            "google_pubsub_subscription" => {
+                let mut source =
+                    self.endpoint_arg(at, each, block, "topic", "google_pubsub_topic")?;
+                let target = &self.nodes[node];
+                if target
+                    .provisioned
+                    .as_ref()
+                    .map_or(target.pattern, |p| p.pattern)
+                {
+                    return None;
+                }
+                let target = Endpoint {
+                    name: target
+                        .provisioned
+                        .as_ref()
+                        .map_or(target.name.as_ref(), |p| p.name.as_ref())?
+                        .clone(),
+                    through: target
+                        .provisioned
+                        .as_ref()
+                        .map_or(&target.overridable, |p| &p.through)
+                        .iter()
+                        .cloned()
+                        .collect(),
+                };
+                let filtered = block.args.get("filter").is_some_and(|arg| {
+                    let found = self.value(at, each, &arg.expr, 0);
+                    source.through.extend(found.through);
+                    found.val != Val::Known(Value::String(String::new()))
+                });
+                (source, target, filtered, None)
+            }
             _ => return None,
         };
         let broker = if block.ty == "aws_sns_topic_subscription" {
             "sns"
+        } else if block.ty == "google_pubsub_subscription" {
+            "pubsub"
         } else {
             "eventbridge"
         };
         let source_contract = format!("channel::{broker}::{}", source.name);
-        let target_contract = format!("channel::sqs::{}", target.name);
+        let target_broker = if broker == "pubsub" { "pubsub" } else { "sqs" };
+        let target_contract = format!("channel::{target_broker}::{}", target.name);
         let mut reason = format!(
             "{target_contract} subscription {} (root {})",
             self.nodes[node].address, self.root

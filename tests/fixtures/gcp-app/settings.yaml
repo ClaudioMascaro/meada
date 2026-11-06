@@ -1,0 +1,22 @@
+exact:
+  topic: projects/sample/topics/orders
+  subscription: projects/sample/subscriptions/orders
+  bucket: gs://assets/path/with?opaque#object
+  secret: projects/sample/secrets/api-key/versions/latest
+typed:
+  pubsub_topic: orders
+  pubsub_subscription: orders
+  gcs_bucket: assets
+  cloudsql_instance: orders-db
+  cloudsql_database: orders-db/orders
+  gcpsecretmanager_secret: api-key
+controls:
+  equal: orders
+  other: assets
+  pubsub_topic: projects/p/not-topics/orders
+  invalid_topic: projects/p/topics/orders/extra
+  invalid_subscription: projects/p/subscriptions/orders?query
+  invalid_project: projects//topics/orders
+  invalid_secret: projects/p/secrets/api-key/versions/latest/extra
+  invalid_bucket: gs://assets?query
+  wildcard: projects/p/topics/order-*

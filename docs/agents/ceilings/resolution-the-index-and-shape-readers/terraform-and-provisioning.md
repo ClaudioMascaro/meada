@@ -46,7 +46,7 @@
   block forms retain source indexes in their config key paths. Provider-specific computed block
   schemas are not executed or fetched; unsupported expressions stay unresolved.
 
-- AWS subscriptions (#658) share `EVAL_DEPTH_MAX`, `EVAL_WORK_MAX`, `ROOT_STORED_MAX` and
+- AWS and Pub/Sub subscriptions (#658, #667) share `EVAL_DEPTH_MAX`, `EVAL_WORK_MAX`, `ROOT_STORED_MAX` and
   `STORED_MAX`: alias/module traversal is bounded by evaluation depth/work and every stored
   summary is charged to the existing per-root and repository byte budgets. The hostile probe
   table includes repeated subscription endpoints and filters; its output counts the summaries.
@@ -85,3 +85,12 @@
   `format` or `join`, which keep no literal part. A literal
   `*` in a name reads as a wildcard. A child module's variable default its call leaves is not
   overridable. Names through a cycle of locals are partly resolved, the member met again a `*`.
+
+- GCP name projections and Cloud Run container summaries (#667) reuse the evaluator work,
+  root and repository byte budgets, plus `ENVIRONMENT_BYTES_MAX` for each workload. Projection
+  evidence is charged before copying, including added instance provenance. Subscription
+  pattern evidence is checked before adding its canonical prefix; the prefix cannot supply
+  the physical name’s minimum literal evidence.
+  Structural scans charge retained block metadata to `EVAL_WORK_MAX` before walking or
+  collecting children, including empty bodies. Exhausting a workload's environment byte
+  budget clears its entries while preserving charged images from its containers.

@@ -437,6 +437,13 @@
   trace in both directions, scope-aware orphans, segment-bounded patterns, ambiguous image
   open items, safe-path and symlink refresh, plus export/context/trace goldens.
 
+- `gcp.rs` (#667): sibling GCP infrastructure/app fixtures cover complete provisioners and
+  config uses, disjoint Pub/Sub subscriptions and filtered delivery, instance-qualified SQL
+  databases with default provenance, Cloud Run v1/v2 service and job image/environment scope,
+  unknown/secret/wrong-kind targets, ambiguous builders, refresh and scope-aware orphans.
+  Export/context/trace/status goldens retain complete answers; unknown environment fan-out
+  stays within the existing time and stored-byte ceilings.
+
 - `resources.rs` (#641): sibling `resource-via-app` and `resource-via-infra` fixtures place
   declarations at indexed IaC addresses and exact keys, including nested/quoted selectors and
   document indexes. Whole exported side/node/link sets cover all IaC formats, template
