@@ -17,6 +17,8 @@ example.com/acme/infra api/serverless.yml:18 functions.createOrder.environment.T
 example.com/acme/infra api/serverless.yml:21 functions.createOrder.events[0].http.path = "orders"
 example.com/acme/infra api/serverless.yml:22 functions.createOrder.events[0].http.method = "post"
 example.com/acme/infra api/serverless.yml:23 functions.createOrder.events[1].httpApi = "GET /orders/{id}"
+env createOrder QUEUE_URL -> Serverless resource OrdersQueue: channel::sqs::shop-dev-orders
+env createOrder TABLE -> Serverless default: shop-dev-orders
 
 example.com/acme/infra api/serverless.yml:24-31 functions.processOrder
 type: Serverless::Function
@@ -80,6 +82,8 @@ example.com/acme/infra api/serverless.yml:24 functions.processOrder via Fn::GetA
 values:
 example.com/acme/infra api/serverless.yml:40 resources.Resources.OrdersQueue.Type = "AWS::SQS::Queue"
 example.com/acme/infra api/serverless.yml:42 resources.Resources.OrdersQueue.Properties.QueueName = "${self:custom.prefix}-orders"
+channel::sqs::shop-dev-orders
+  example.com/acme/infra provisioner api/serverless.yml:39 OrdersQueue (root api/serverless.yml)
 
 example.com/acme/infra api/serverless.yml:43-46 OrdersTable
 type: AWS::DynamoDB::Table
@@ -92,6 +96,8 @@ referenced by: none
 values:
 example.com/acme/infra api/serverless.yml:44 resources.Resources.OrdersTable.Type = "AWS::DynamoDB::Table"
 example.com/acme/infra api/serverless.yml:46 resources.Resources.OrdersTable.Properties.TableName = "${self:custom.ordersTable}"
+resource::dynamodb::shop-dev-orders
+  example.com/acme/infra provisioner api/serverless.yml:43 OrdersTable (root api/serverless.yml) (no use in the workspace)
 
 example.com/acme/infra api/serverless.yml:47-50 DeadLetter
 type: AWS::SQS::Queue
@@ -103,6 +109,8 @@ referenced by: none
 values:
 example.com/acme/infra api/serverless.yml:48 resources.Resources.DeadLetter.Type = "AWS::SQS::Queue"
 example.com/acme/infra api/serverless.yml:50 resources.Resources.DeadLetter.Properties.QueueName = "${env:DLQ_NAME}-dead"
+channel::sqs::*-dead
+  example.com/acme/infra provisioner api/serverless.yml:47 DeadLetter (root api/serverless.yml)
 
 example.com/acme/infra api/serverless.yml:51-54 Assets
 type: AWS::S3::Bucket
@@ -114,6 +122,8 @@ referenced by: none
 values:
 example.com/acme/infra api/serverless.yml:52 resources.Resources.Assets.Type = "AWS::S3::Bucket"
 example.com/acme/infra api/serverless.yml:54 resources.Resources.Assets.Properties.BucketName = "${AWS::Region}-${self:service}-assets"
+resource::s3::*-shop-assets
+  example.com/acme/infra provisioner api/serverless.yml:51 Assets (root api/serverless.yml) (no use in the workspace)
 
 example.com/acme/infra api/serverless.yml:55-58 Vault
 type: AWS::SecretsManager::Secret

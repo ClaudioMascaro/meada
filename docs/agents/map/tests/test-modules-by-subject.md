@@ -470,3 +470,7 @@
   provisioners under a time bound. The latter asserts the complete source and candidate sets.
   `iac::pattern` unit tests cross each
   named matcher limit.
+
+- `tests/it/aws_workloads.rs`: Lambda/SAM/Serverless/ECS image/direct execution and scoped
+  environments, typed identities, all curated CFN aliases, JSON encoders, unknown overrides,
+  path-only refresh/refusals, archive opacity, ambiguity and expansion bounds (#664).

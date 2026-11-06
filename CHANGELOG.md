@@ -19,6 +19,13 @@ All notable changes to Meada are recorded here. The format follows
   their field paths. Equality is exact; regex, prefix and containment are inferred.
   Missing or unread forwarding yields no link, and matching never predicts final team
   delivery. Included in the existing meada/meada-core 1.4.0 minor release (#673).
+- AWS workload execution and environments (#664): Terraform/OpenTofu Lambda images and local
+  code/archive inputs, SAM CodeUri/Handler/ImageUri with Globals overrides, Serverless handlers
+  with provider/function environments, and encoded ECS container images/environments. Known
+  resource references retain typed identities; secret and dynamic contents remain unread.
+  Context, bidirectional traces and scope-aware image orphans include these workloads; new
+  local paths refuse absolute paths, every parent component and symbolic links. Included in
+  the minor development release of meada and meada-core 1.4.0.
 
 - Terraform/OpenTofu JSON (`.tf.json`, `.tofu.json`) now creates IaC nodes with source spans,
   references, evaluated names and local module instances. JSON expression and literal rules

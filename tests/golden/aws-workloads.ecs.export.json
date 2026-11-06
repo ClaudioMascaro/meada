@@ -1,0 +1,77 @@
+{
+  "format": 1,
+  "repository": "example.com/acme/tasks",
+  "commit": "181826fca75fff7d15c8fbfc8733e205f6a985c4",
+  "dirty": false,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "image::docker.io/library/redis",
+      "site": "example.com/acme/tasks::main.tf::aws_ecs_task_definition.worker",
+      "via": null,
+      "root": "."
+    },
+    {
+      "contract": "image::ghcr.io/acme/aws-sidecar",
+      "site": "example.com/acme/tasks::main.tf::aws_ecs_task_definition.worker",
+      "via": null,
+      "root": "."
+    },
+    {
+      "contract": "image::ghcr.io/acme/aws-worker",
+      "site": "example.com/acme/tasks::main.tf::aws_ecs_task_definition.worker",
+      "via": null,
+      "root": "."
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "example.com/acme/tasks::main.tf::aws_ecs_task_definition.worker",
+      "address": "aws_ecs_task_definition.worker",
+      "type": "aws_ecs_task_definition",
+      "root": ".",
+      "path": "main.tf",
+      "line": 2,
+      "end_line": 9
+    },
+    {
+      "identity": "example.com/acme/tasks::main.tf::aws_sqs_queue.orders",
+      "address": "aws_sqs_queue.orders",
+      "type": "aws_sqs_queue",
+      "root": ".",
+      "path": "main.tf",
+      "line": 1,
+      "end_line": 1
+    }
+  ],
+  "provisioners": [
+    {
+      "contract": "channel::sqs::orders",
+      "node": "example.com/acme/tasks::main.tf::aws_sqs_queue.orders",
+      "root": "."
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/tasks::main.tf::aws_ecs_task_definition.worker",
+      "provider": "example.com/acme/app",
+      "contract": "image::ghcr.io/acme/aws-worker",
+      "level": "exact",
+      "reason": "image::ghcr.io/acme/aws-worker",
+      "root": "."
+    }
+  ],
+  "provisions": [
+    {
+      "side": "example.com/acme/app::send.ts::dispatch::SendMessageCommand#0",
+      "provisioner": "example.com/acme/tasks::main.tf::aws_sqs_queue.orders",
+      "root": ".",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; workload:example.com/acme/tasks::main.tf::aws_ecs_task_definition.worker (root .), env:QUEUE_NAME"
+    }
+  ]
+}

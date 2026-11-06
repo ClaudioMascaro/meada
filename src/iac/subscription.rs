@@ -61,6 +61,14 @@ pub(super) struct Inputs {
     pub(super) azure_filters: HashMap<String, String>,
 }
 
+/// Only known identity attributes, never resource contents such as a secret's value.
+fn identity_attribute(ty: &str, attribute: &str) -> bool {
+    matches!(attribute, "id" | "name")
+        || (attribute == "arn" && ty.starts_with("aws_"))
+        || types::entry("terraform", ty).is_some_and(|entry| entry.name == attribute)
+        || (ty == "aws_sqs_queue" && attribute == "url")
+}
+
 impl<'m> Eval<'m> {
     pub(super) fn prepare_subscriptions(
         &mut self,
@@ -216,7 +224,7 @@ impl<'m> Eval<'m> {
                 ..
             } if kind == ty => {
                 if ops.len() != 2 + usize::from(key.is_some())
-                    || !matches!(ops.last(), Some(TraversalOperator::GetAttr(a)) if matches!(a.as_str(), "id" | "name") || (a.as_str() == "arn" && ty.starts_with("aws_")) || (a.as_str() == "secret_id" && ty == "google_secret_manager_secret"))
+                    || !matches!(ops.last(), Some(TraversalOperator::GetAttr(a)) if identity_attribute(ty, a.as_str()))
                 {
                     return None;
                 }

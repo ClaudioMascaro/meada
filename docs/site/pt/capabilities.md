@@ -323,6 +323,11 @@ um `aws_s3_bucket` provisiona `resource::s3::<nome>` pelo argumento `bucket`. A 
 em `src/iac/types.toml`, embutida no binário, também lê nomes em ARNs e URLs. Um `[[resource]]`
 com `kind = "s3"` e o mesmo `id` participa desse contrato, mantendo o nível `declared`.
 
+CloudFormation e SAM usam os mesmos contratos para SQS, SNS, EventBridge, Kinesis, S3,
+DynamoDB (Table, GlobalTable e SimpleTable), RDS (instância ou cluster), ElastiCache
+(cluster ou grupo), SSM e Secrets Manager, quando o nome físico é conhecido. A propriedade
+que define esse nome não cria um uso do próprio recurso; segredos contribuem só com a identidade.
+
 Cada produtor, consumidor, escritor e leitor se liga a cada provisionador, identificado pelo
 endereço e pelo módulo raiz. Duas raízes como `envs/dev` e `envs/prod` não são ambíguas entre si.
 Nomes escritos dão `exact`; nomes que passam por valores sobrescrevíveis dão `inferred`, com
@@ -602,11 +607,37 @@ role = "write"
 via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
 ```
 
+## Funções e tarefas AWS
+
+Lambda em Terraform/OpenTofu executa `image_uri`; SAM executa `ImageUri`, e tarefas ECS
+executam as imagens de cada container em `container_definitions`, inclusive via `jsonencode`.
+Esses executores entram nos contratos de imagem, no contexto, nos rastros e nos órfãos.
+O ambiente acompanha o container e a raiz de avaliação, sem alcançar código de outra imagem.
+
+Um `filename` local de Lambda ou `CodeUri` de SAM liga diretamente o código do mesmo
+repositório. Uma referência exata a `data.archive_file.<nome>.output_path` pode seguir somente
+seu `source_dir` ou `source_file` local explícito. Arquivos ZIP ficam como locais opacos;
+seu conteúdo não é extraído. Um handler Serverless como `worker/send.dispatch` seleciona
+um único arquivo local existente (`.ts`, `.js`, `.mjs`, `.cjs` ou `.py`); extensões ambíguas
+ficam sem resolver. Caminhos novos devem ser relativos, sem nenhum componente `..` e sem
+atravessar links simbólicos. S3, URLs e código remoto não viram caminhos locais.
+
+SAM combina `Globals.Function.Environment.Variables` com o ambiente da função; Serverless
+combina `provider.environment` com `functions.<nome>.environment`. A função prevalece,
+mesmo quando o valor que substitui o padrão não pode ser lido. Terraform Lambda e ECS também
+fornecem seus ambientes. Referências conhecidas a recursos podem carregar a identidade do
+contrato sem inventar um ARN ou URL do deploy. Segredos, referências dinâmicas e valores
+externos continuam sem conteúdo. A leitura em código resolve em `inferred`, com workload e
+variável no motivo; `context` e `trace` mostram tanto a execução por imagem como o caminho direto.
+
+Referências como `aws_sqs_queue.orders.url` e `aws_s3_bucket.assets.bucket` identificam o
+contrato sem fornecer o URL do deploy; atributos de conteúdo como `value` continuam sem resolver.
+
 ## Ambiente dos workloads
 
 Uma leitura de ambiente que nomeia uma fila, tópico ou recurso, como `process.env.QUEUE_URL`,
 é resolvida somente pelas entradas do workload que executa aquele código. O vínculo de
-execução vem da imagem publicada pelo repositório ou de um contexto de build local do Compose.
+execução vem da imagem publicada pelo repositório ou de um caminho local verificado do workload.
 Containers diferentes mantêm seus próprios ambientes. A resolução fica em `inferred`, com
 o workload e a variável no motivo.
 
