@@ -16,6 +16,7 @@ use crate::workspace::Repository;
 
 mod csharp;
 mod go;
+mod infrastructure;
 mod java;
 mod join;
 mod kotlin;
@@ -23,6 +24,7 @@ mod python;
 mod rust;
 mod swift;
 mod ts;
+pub(crate) use infrastructure::Prepared;
 #[cfg(test)]
 pub(crate) use ts::app_config_probe;
 pub(crate) use ts::{INCLUDE_DEPTH, INCLUDES, IncludeReason, config_inputs};
@@ -632,11 +634,21 @@ impl ContractKind for Http {
         })
     }
 
-    fn explain_inferred(&self, consumer: &Consumer, from: &Repository) -> bool {
+    fn explain_inferred(
+        &self,
+        consumer: &Consumer,
+        from: &Repository,
+        link: &Link,
+        exports: &[IndexExport],
+    ) -> bool {
         let via = consumer.via.as_deref().unwrap_or_default();
         let via = via.split_once(PROXY_VIA).map_or(via, |(via, _)| via);
         via.strip_prefix("env:")
             .is_some_and(|var| from.config.peers_reading(var).next().is_some())
+            || exports
+                .iter()
+                .filter_map(|e| e.http.as_ref())
+                .any(|p| p.explains(link))
     }
 
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
@@ -672,6 +684,24 @@ impl ContractKind for Http {
     /// (`keep_applicable`), once every repository declared its hosts.
     fn workspace_step(&self, exports: &mut [IndexExport], _: &[Repository]) {
         keep_applicable(exports);
+    }
+
+    fn workspace_ready(&self, exports: &mut [IndexExport], repositories: &[Repository]) {
+        infrastructure::prepare(exports, repositories);
+    }
+
+    fn workspace_links(
+        &self,
+        exports: &[IndexExport],
+        _: &[(&Repository, &Provider)],
+    ) -> Option<Vec<Link>> {
+        exports.iter().any(|e| e.http.is_some()).then(|| {
+            exports
+                .iter()
+                .filter_map(|e| e.http.as_ref())
+                .flat_map(|p| p.links.iter().cloned())
+                .collect()
+        })
     }
 
     /// Adds the routes of the repository's documents (spec #21), then the gateway paths and

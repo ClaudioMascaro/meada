@@ -26,6 +26,11 @@ All notable changes to Meada are recorded here. The format follows
   resolve to JSON nodes and refresh when sources change. Sensitive defaults, tfvars and SSM
   SecureString values also stay redacted in JSON block arrays (#642, #649).
 
+- HTTP base URLs follow Kubernetes Service DNS names and Compose service names through their
+  workloads to the repositories running the providers. Ingress hosts and literal prefixes
+  carry public URLs to their Services; rewrites remain unread mounts. Links are inferred and
+  name the Service, with workload environment provenance when applicable. Included in the
+  minor development release of meada and meada-core 1.4.0 (#665).
 - GCP infrastructure contracts (#667): Terraform/OpenTofu Pub/Sub topics and distinct
   subscription targets, Cloud Storage buckets, Cloud SQL instances and instance-qualified
   databases, and Secret Manager secrets. Structured GCP configuration identifiers are exact;

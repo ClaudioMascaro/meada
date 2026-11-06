@@ -191,6 +191,10 @@ fn objects(files: Vec<(&str, String)>) -> usize {
                 .iter()
                 .map(crate::iac::environment::Entry::size)
                 .sum::<usize>()
+            + n.ingress
+                .iter()
+                .map(|r| r.host.len() + r.prefix.len() + r.service.len())
+                .sum::<usize>()
     });
     let references = (out.references.iter())
         .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
@@ -201,6 +205,29 @@ fn objects(files: Vec<(&str, String)>) -> usize {
         .chain(images)
         .chain(unresolved)
         .sum()
+}
+
+/// A large shared host must not expand once for every path before its budget is checked.
+fn ingress_fanout() -> usize {
+    let paths = fill(2, |i| {
+        format!(
+            "          - {{path: /p{i}, pathType: Prefix, backend: {{service: {{name: api}}}}}}\n"
+        )
+    });
+    let text = format!(
+        "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata: {{name: api}}\nspec:\n  rules:\n    - host: {}\n      http:\n        paths:\n{paths}",
+        "h".repeat(70_000)
+    );
+    objects(vec![("ingress.yaml", text)])
+}
+
+#[test]
+fn ingress_host_path_fanout_stays_bounded() {
+    let start = Instant::now();
+    let size = ingress_fanout();
+    eprintln!("hostile Ingress: {:?}, {size} bytes", start.elapsed());
+    assert!(start.elapsed() < BUDGET);
+    assert!(size <= MAX_OUT);
 }
 
 /// A kustomization file naming `entries`.
@@ -1477,6 +1504,7 @@ fn probes() -> Vec<Probe> {
                 objects(vec![("env.yaml", text)])
             },
         ),
+        ("kubernetes: ingress host/path fan-out", ingress_fanout),
         ("kubernetes: services selecting many workloads", || {
             let pair = |i: usize| {
                 format!(

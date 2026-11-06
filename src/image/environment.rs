@@ -1,12 +1,11 @@
 //! Resolve directed contract reads only through the container that runs their code.
 
-use super::Image;
-use crate::contract::{ContractKind, Level};
+use crate::contract::Level;
 use crate::iac::environment::Entry;
 use crate::index::Export;
 use crate::workspace::Repository;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 // Legacy channel sides exposed no environment provenance before workload resolution.
@@ -21,6 +20,7 @@ struct Scope<'a> {
     workload: Arc<str>,
     root: &'a str,
     entry: &'a Entry,
+    certain: bool,
 }
 
 type Paths<'a> = BTreeMap<&'a str, Vec<Scope<'a>>>;
@@ -29,6 +29,14 @@ type Variables<'a> = BTreeMap<&'a str, Paths<'a>>;
 /// Workload-scoped values, shared with kinds that resolve an HTTP base or a resource name.
 pub(crate) struct Environments<'a> {
     scopes: BTreeMap<String, Variables<'a>>,
+}
+
+/// A base URL carries its workload scope without putting identities in human reason text.
+pub(crate) struct ScopedValue<'a> {
+    pub value: Option<&'a str>,
+    pub reason: String,
+    pub workload: &'a str,
+    pub root: &'a str,
 }
 
 impl<'a> Environments<'a> {
@@ -41,42 +49,17 @@ impl<'a> Environments<'a> {
                 scopes: BTreeMap::new(),
             };
         }
-        let providers = exports
-            .iter()
-            .zip(repositories)
-            .flat_map(|(e, r)| {
-                e.providers
-                    .iter()
-                    .filter(|p| p.contract.starts_with("image::"))
-                    .map(move |p| (r, p))
-            })
-            .collect::<Vec<_>>();
-        let links = exports
-            .iter()
-            .zip(repositories)
-            .flat_map(|(e, repo)| {
-                e.consumers
-                    .iter()
-                    .filter(|c| {
-                        c.contract
-                            .as_deref()
-                            .is_some_and(|c| c.starts_with("image::"))
-                    })
-                    .flat_map(|c| Image.link(c, repo, &providers, exports))
-            })
-            .collect::<Vec<_>>();
-        let mut builders = BTreeMap::<_, BTreeSet<_>>::new();
+        let links = super::execution_links(exports, repositories);
+        let mut builders = BTreeMap::<_, BTreeMap<_, bool>>::new();
         for link in &links {
-            if link.level != Level::Ambiguous {
-                builders
-                    .entry((
-                        link.consumer.clone(),
-                        link.root.as_deref().unwrap_or(".").to_string(),
-                        link.contract.clone(),
-                    ))
-                    .or_default()
-                    .insert(link.provider.as_str());
-            }
+            builders
+                .entry((
+                    link.consumer.clone(),
+                    link.root.as_deref().unwrap_or(".").to_string(),
+                    link.contract.clone(),
+                ))
+                .or_default()
+                .insert(link.provider.as_str(), link.level != Level::Ambiguous);
         }
         let mut executions = BTreeMap::<_, Vec<_>>::new();
         for x in exports.iter().flat_map(|e| &e.executions) {
@@ -98,9 +81,6 @@ impl<'a> Environments<'a> {
                 // Resolve one container image once, independently of how many variables it sets.
                 let mut images = BTreeMap::new();
                 for entry in &node.environment {
-                    if entry.value.is_none() && entry.contract.is_none() {
-                        continue;
-                    }
                     let repositories = images.entry(entry.image.as_deref()).or_insert_with(|| {
                         entry
                             .image
@@ -113,15 +93,20 @@ impl<'a> Environments<'a> {
                                     format!("image::{i}"),
                                 ))
                             })
-                            .map(|repos| repos.iter().copied().collect::<Vec<_>>())
+                            .map(|repos| {
+                                repos
+                                    .iter()
+                                    .map(|(repo, certain)| (*repo, *certain))
+                                    .collect::<Vec<_>>()
+                            })
                             .unwrap_or_default()
                     });
                     let paths = direct
                         .into_iter()
                         .flatten()
-                        .copied()
-                        .chain(repositories.iter().map(|r| (*r, ".")));
-                    for (repository, path) in paths {
+                        .map(|(repository, path)| (*repository, *path, true))
+                        .chain(repositories.iter().map(|(r, certain)| (*r, ".", *certain)));
+                    for (repository, path, certain) in paths {
                         out.scopes
                             .entry(repository.into())
                             .or_default()
@@ -133,12 +118,56 @@ impl<'a> Environments<'a> {
                                 workload: workload.clone(),
                                 root: &node.root,
                                 entry,
+                                certain,
                             });
                     }
                 }
             }
         }
         out
+    }
+
+    /// HTTP keeps unread entries too, so a Secret cannot fall back to a guessed base URL.
+    pub(crate) fn scoped_values(
+        &self,
+        repository: &str,
+        site: &str,
+        variable: &str,
+    ) -> Vec<ScopedValue<'_>> {
+        let mut entries = self.entries(repository, site, variable);
+        // An unresolved envFrom can hold any matching name, except an explicit override in
+        // that same container. Reuse the indexed paths rather than scan source or processes.
+        if let Some(variables) = self.scopes.get(repository) {
+            let unread = variables
+                .keys()
+                .filter(|name| {
+                    name.strip_suffix('*')
+                        .is_some_and(|prefix| variable.starts_with(prefix))
+                })
+                .flat_map(|name| self.entries(repository, site, name))
+                .filter(|scope| {
+                    !entries.iter().any(|exact| {
+                        exact.workload == scope.workload
+                            && exact.root == scope.root
+                            && exact.entry.container == scope.entry.container
+                    })
+                })
+                .collect::<Vec<_>>();
+            entries.extend(unread);
+        }
+        entries
+            .into_iter()
+            .map(|scope| ScopedValue {
+                value: scope
+                    .entry
+                    .value
+                    .as_deref()
+                    .filter(|_| scope.certain && scope.entry.contract.is_none()),
+                reason: scope.reason(variable),
+                workload: &scope.workload,
+                root: scope.root,
+            })
+            .collect()
     }
 
     /// Values and their explanations for one variable at one code site. No process is read.
@@ -150,7 +179,7 @@ impl<'a> Environments<'a> {
     ) -> Vec<(&str, String)> {
         self.entries(repository, site, variable)
             .into_iter()
-            .filter(|s| s.entry.contract.is_none())
+            .filter(|s| s.certain && s.entry.contract.is_none())
             .filter_map(|s| Some((s.entry.value.as_deref()?, s.reason(variable))))
             .collect()
     }
@@ -159,6 +188,7 @@ impl<'a> Environments<'a> {
     fn targets(&self, repository: &str, site: &str, variable: &str) -> Vec<(&str, String)> {
         self.entries(repository, site, variable)
             .into_iter()
+            .filter(|s| s.certain)
             .filter_map(|s| Some((s.entry.contract.as_deref()?, s.reason(variable))))
             .collect()
     }

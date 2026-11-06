@@ -3,6 +3,12 @@
 The invariant of the architecture map, "The index holds no source text and no values, apart
 from ...", with the whole list. A value the index now stores joins it.
 
+Ingress routing evidence (#665) is stored as `iac_nodes.ingress`: literal hosts and path
+prefixes plus transformed Service addresses. An empty Service address retains an unread
+mount, including rewrites and unknown backends. Selectors reuse `iac_references`; no
+additional source text or evaluated process environment enters the index. HTTP's prepared
+links and structured inference explanations are transient query values, never stored.
+
 - The index holds no source text and no values, apart from the BLAKE3 of each symbol's span
   (`symbols.hash`, `Def::hash`), the argument count, the argument
   labels and constructor form of an overloaded call (`Call::arity`, `Call::labels`,

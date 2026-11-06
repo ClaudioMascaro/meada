@@ -54,6 +54,9 @@ relevant topic. The [full catalogue](map/overview/modules-src.md) retains each m
 
 ## Seams and what extends them
 
+HTTP routing through evaluated Services, Compose and Ingress:
+[prepared routing and presentation](map/contracts/http-infrastructure-665.md).
+
 [Extension steps](map/overview/seams-and-what-extends-them.md) for kinds, packs, ecosystems,
 documents, shapes, entry points, levels, config, MCP and CLI; [library and shared-reader
 seams](map/seams.md). Read the relevant extension before changing it.
