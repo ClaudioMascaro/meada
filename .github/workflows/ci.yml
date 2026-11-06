@@ -5,11 +5,30 @@ on:
   push:
     # loop/**: the backlog loop's ticket branches, where this run is the gate before the merge.
     branches: [main, 'loop/**']
+  workflow_dispatch:
+    inputs:
+      proof_phase:
+        description: 'Bounded #676/#684 phase (full CI remains the PR/push gate)'
+        type: choice
+        options: [baseline, candidate, check, final]
+        default: baseline
+      baseline_run:
+        description: 'Exact successful baseline Actions run ID, required after baseline'
+        type: string
+      candidate_run:
+        description: 'Opaque candidate Actions run ID, required for check'
+        type: string
+      mutation:
+        description: 'Auditor only: one A7-01..A7-08 or A8-01..A8-05 ID'
+        type: string
+      baseline_attestation:
+        description: 'Fresh checker JSON: verdict, checker, receipt, baseline_manifest_sha256'
+        type: string
 
 # A newer push to a loop branch supersedes its run in progress; main and pull requests keep every run.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ startsWith(github.ref, 'refs/heads/loop/') }}
+  group: ci-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && 'proof' || 'integration' }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/loop/') }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -22,12 +41,126 @@ permissions:
 # (actions/runner-images#14748), and a new image is a change of its own.
 jobs:
   fmt:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: cargo fmt --check
 
+  # No product mutation is automatic. The baseline produces raw checks for a fresh checker;
+  # only a manual candidate phase with that checker's PROVED receipt may plant one bug.
+  proof-a7-a8:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+    env:
+      PROOF_PHASE: ${{ inputs.proof_phase || 'baseline' }}
+      BASELINE_RUN: ${{ inputs.baseline_run }}
+      CANDIDATE_RUN: ${{ inputs.candidate_run }}
+      PROOF_MUTATION: ${{ inputs.mutation }}
+      PROVE_BASELINE_ATTESTATION: ${{ inputs.baseline_attestation }}
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_BUILD_JOBS: '2'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Validate phase inputs and prepare only the proof readers
+        run: |
+          case "$PROOF_PHASE" in
+            baseline) ;;
+            candidate|check|final) [[ "$BASELINE_RUN" =~ ^[1-9][0-9]*$ ]] ;;
+            *) exit 2 ;;
+          esac
+          if [ "$PROOF_PHASE" = check ]; then [[ "$CANDIDATE_RUN" =~ ^[1-9][0-9]*$ ]]; fi
+          python3 -m venv "$RUNNER_TEMP/a7-a8-venv"
+          "$RUNNER_TEMP/a7-a8-venv/bin/pip" install --disable-pip-version-check python-hcl2==8.1.4 PyYAML==6.0.3
+      - name: Download frozen clean baseline
+        if: env.PROOF_PHASE != 'baseline'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: a7-a8-baseline
+          path: .prove-it/runs/ci-a7-a8-input/baseline
+          run-id: ${{ inputs.baseline_run }}
+          github-token: ${{ github.token }}
+      - name: Download opaque candidate packet
+        if: env.PROOF_PHASE == 'check'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: a7-a8-candidate
+          path: .prove-it/runs/ci-a7-a8-input/candidate
+          run-id: ${{ inputs.candidate_run }}
+          github-token: ${{ github.token }}
+      - name: Run one bounded proof phase
+        run: |
+          P="$RUNNER_TEMP/a7-a8-venv/bin/python"
+          S=.claude/skills/prove-meada/scripts/a7-a8-audit.py
+          R=.prove-it/runs/ci-a7-a8
+          B=.prove-it/runs/ci-a7-a8-input/baseline
+          "$P" .claude/skills/prove-meada/scripts/a7-a8-audit-selfcheck.py --run "$R/safety-checks"
+          "$P" "$S" validate-plan
+          case "$PROOF_PHASE" in
+            baseline)
+              BASE_REF=$(git merge-base HEAD origin/main)
+              "$P" "$S" baseline --base-ref "$BASE_REF" --run "$R/baseline"
+              ;;
+            candidate)
+              chmod +x "$B"/bin/meada-*
+              "$P" "$S" candidate --baseline "$B" --mutation "$PROOF_MUTATION" --run .prove-it/audits/ci-a7-a8
+              ;;
+            check)
+              chmod +x "$B"/bin/meada-* .prove-it/runs/ci-a7-a8-input/candidate/meada-candidate
+              "$P" "$S" check --baseline "$B" --candidate .prove-it/runs/ci-a7-a8-input/candidate --run "$R/check"
+              ;;
+            final)
+              chmod +x "$B"/bin/meada-*
+              "$P" "$S" check --baseline "$B" --run "$R/final"
+              ;;
+          esac
+      - name: Retain clean baseline including raw failures
+        if: always() && env.PROOF_PHASE == 'baseline'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: a7-a8-baseline
+          path: .prove-it/runs/ci-a7-a8/baseline
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Retain only the opaque candidate for the checker
+        if: success() && env.PROOF_PHASE == 'candidate'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: a7-a8-candidate
+          path: .prove-it/audits/ci-a7-a8/checker
+          if-no-files-found: error
+          retention-days: 30
+      - name: Retain auditor originals, patch and exact restore receipt
+        if: always() && env.PROOF_PHASE == 'candidate'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: a7-a8-auditor
+          path: .prove-it/audits/ci-a7-a8/auditor
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Retain checker or final raw evidence, even on failure
+        if: always() && (env.PROOF_PHASE == 'check' || env.PROOF_PHASE == 'final')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: a7-a8-checks
+          path: .prove-it/runs/ci-a7-a8
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30
+
   clippy:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -37,6 +170,7 @@ jobs:
   # Each cloud feature builds alone (ADR 0012), and in the pairs the code gates on. Clippy only:
   # the tests need services, and the `cloud` job runs them with `--all-features`.
   clippy-features:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -72,6 +206,7 @@ jobs:
       - run: cargo clippy --locked --all-targets --features ${{ matrix.features }} -- -D warnings
 
   test:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -93,6 +228,7 @@ jobs:
           if-no-files-found: warn
 
   benchmark:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -119,6 +255,7 @@ jobs:
 
   # Cloud modules (ADR 0012): every feature, against a local Valkey and S3-compatible server.
   cloud:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     # scripts/test-services mirrors these services and env; tests/it/test_services.rs keeps them in step.
     services:
@@ -205,6 +342,7 @@ jobs:
   # The standalone frontend gate (ADR 0014). Rust contributors need neither Node nor wasm-pack.
   # Keep the core dependency boundaries here beside its browser build.
   frontend:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -273,6 +411,7 @@ jobs:
           if-no-files-found: warn
 
   docs:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -198,7 +198,11 @@ def read_repo(repo):
                         ty_, name_ = unquote(ty) or ty, unquote(name) or name
                         first, last = lines_of(text, kind, [ty_, name_])
                         m["blocks"].append({"kind": kind, "type": ty_, "name": name_, "path": rel, "line": first, "end": last,
-                                            "name_raw": body.get("name"), "count_raw": body.get("count"),
+                                            # #658: Terraform's S3 resource names its bucket with
+                                            # `bucket`, not `name`. This is the provider's source
+                                            # field, independently read before any Meada answer.
+                                            "name_raw": body.get("bucket" if ty_ == "aws_s3_bucket" else "name"),
+                                            "count_raw": body.get("count"),
                                             "for_each_raw": body.get("for_each"),
                                             "refs": refs_in(body), "source": None, "args": {}})
         for entry in doc.get("module", []):

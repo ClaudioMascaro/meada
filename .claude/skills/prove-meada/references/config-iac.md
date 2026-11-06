@@ -296,8 +296,12 @@ a Lark grammar of HCL, and its own rules: never Meada's code), which derives the
 type, physical name, file, first and last line, root module) and the references, then writes
 `iac.md`:
 
-1. **`meada export` and `meada status`**: the head's equal the base's (no node is exported, no
-   status line is added).
+1. **`meada export` and `meada status`**: compare all fields with the trusted base, including
+   existing A7 IaC/contract metadata. Source-key NoEcho defaults must redact independently;
+   status adds only defaults the base did not already redact. Existing A7 annotation and
+   context contract-role tails retain the base's complete bytes, while node identities,
+   types, roots and supported physical names still answer to the independent source oracle.
+   Dedicated provision/orphan flows judge those tails' semantics independently.
 2. **Queries over stdio**, budget 200,000: per sampled node (`--sample`, 8: half with references
    both ways) `search` kind `iac` on its address, a five-character prefix and its physical name,
    `context` on `<address> (root <root>)` and `trace` down and up from it; `search` kind `iac` on
@@ -307,7 +311,9 @@ type, physical name, file, first and last line, root module) and the references,
    symbols of the code (`a7-iac` holds one named like a node), equal to the base's. Each `search` answer equals the oracle's
    hits line by line, each `context` its head, `type:`, `name:`, `root:`, `references:` and
    `referenced by:` lines (its `values:` lines are of the node's file; the values flow checks
-   their text), each `trace` its depth-first lines and an `exact` footer (`none` alone).
+   their text), the complete existing contract-role extension, each `trace` its depth-first
+   lines and an `exact` footer (`none` alone). Scalar CloudFormation NoEcho defaults are
+   queried by their independently read exact source keys and must show `redacted`.
 3. **`--http`**: every query again over HTTP, byte-equal to stdio.
 
 ### IaC oracle conventions (where the ticket names no rule)

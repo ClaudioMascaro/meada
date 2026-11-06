@@ -458,6 +458,8 @@ def export_diff(base, head, repo=None, cap=20):
 
 def spread(items, n):
     """At most `n` items spread evenly over the sorted list, so the pick is the same every run."""
+    if n <= 0:
+        return []
     if len(items) <= n:
         return items
     step = len(items) / n
@@ -941,7 +943,12 @@ def read_config(repo, rel, lockfiles=True):
             return ("unreadable", f"more than {DOCUMENTS_MAX} documents")
         rows = []
         for i, doc in enumerate(docs):
-            walk_values(doc, f"[{i}]" if len(docs) > 1 else "", rows)
+            prefix = f"[{i}]" if len(docs) > 1 else ""
+            walk_values(doc, prefix, rows)
+            private = cfn_private_keys(doc, prefix)
+            for row in rows:
+                if row["key"] in private:
+                    row["value"] = None
     except (UnicodeError, ValueError, yaml.YAMLError) as e:
         return ("unreadable", str(e).splitlines()[0][:120])
     for r in rows:
@@ -950,6 +957,84 @@ def read_config(repo, rel, lockfiles=True):
         if r["cut"]:
             r["value"] = r["value"].encode()[:VALUE_MAX].decode("utf-8", "ignore")
     return ("read", rows)
+
+
+def cfn_private_keys(node, prefix=""):
+    """#653: source-derived scalar NoEcho defaults, independent of the product reader."""
+    if not isinstance(node, yaml.MappingNode):
+        return set()
+    root = {k.value: v for k, v in node.value if isinstance(k, yaml.ScalarNode)}
+    transform = root.get("Transform")
+    sam = isinstance(transform, yaml.ScalarNode) and transform.value == "AWS::Serverless-2016-10-31"
+    sam |= isinstance(transform, yaml.SequenceNode) and any(
+        isinstance(v, yaml.ScalarNode) and v.value == "AWS::Serverless-2016-10-31" for v in transform.value)
+    params = root.get("Parameters")
+    if not ("AWSTemplateFormatVersion" in root or sam) or not isinstance(params, yaml.MappingNode):
+        return set()
+    private = set()
+    for name, body in params.value:
+        if not isinstance(name, yaml.ScalarNode) or not isinstance(body, yaml.MappingNode):
+            continue
+        fields = {k.value: v for k, v in body.value if isinstance(k, yaml.ScalarNode)}
+        flag, default = fields.get("NoEcho"), fields.get("Default")
+        if isinstance(flag, yaml.ScalarNode) and flag.value.lower() in ("true", "yes", "on", "y") \
+                and isinstance(default, yaml.ScalarNode) and scalar_kind(default) is not None:
+            private.add(prefix + (".Parameters" if prefix else "Parameters") + key_step(name.value) + ".Default")
+    return private
+
+
+def iac_existing_suffixes(lines, baseline):
+    """Keep the independent node identity/name oracle, preserving existing annotation bytes.
+
+    Orphans and contract roles were added after the original IaC oracle. A trusted A7 base
+    answers those existing fields; a pre-A7 base supplies no extension key and cannot approve
+    a new extension. The dedicated provision/orphan flows independently check their semantics.
+    """
+    old = baseline.splitlines()
+    result = []
+    for line in lines:
+        # An explicitly unsupported physical-name expression is already a documented
+        # gap. Its trusted existing answer still fixes the name and optional annotation;
+        # do not accidentally reject that annotation when the independent name is unknown.
+        pattern = re.escape(line).replace(re.escape("\x00"), r'(, (?:name|pattern) "(?:[^"\\]|\\.)*")?')
+        result.append(next((b for b in old if b == line or b.startswith(line + " ")
+                            or "\x00" in line and re.fullmatch(pattern + r'(?: .*)?', b)), line))
+    return result
+
+
+def check_iac_context(identity, path, want, got, baseline):
+    """Judge the independent node header and all existing contract-role extension bytes."""
+    problems, got_lines = [], got.splitlines()
+    if got_lines[:len(want)] != want:
+        problems.append("differs from the oracle:\n" + "\n".join(difflib.unified_diff(
+            want, got_lines[:len(want)], "oracle", "head", lineterm="", n=1)))
+    try:
+        _, extensions = iac_context_tail(identity, path, got_lines[len(want):])
+        base_lines = baseline.splitlines()
+        _, base_extensions = iac_context_tail(identity, path, base_lines[len(want):]) \
+            if base_lines[:len(want)] == want else ([], [])
+        if extensions != base_extensions:
+            problems.append("contract-role extension differs from its base key:\n" + "\n".join(
+                difflib.unified_diff(base_extensions, extensions, "base", "head", lineterm="")))
+    except ValueError as error:
+        problems.append(f"invalid values/contract section: {error}; {got_lines[len(want):][:3]}")
+    return problems
+
+
+def iac_context_tail(identity, path, lines):
+    """Separate the source-file values from subsequent contract roles, without dropping either."""
+    if lines[:1] == ["values: none"]:
+        return [], lines[1:]
+    if lines[:1] != ["values:"]:
+        raise ValueError("missing values section")
+    values, at = [], 1
+    while at < len(lines) and lines[at].startswith(f"{identity} {path}:"):
+        parse_hit(lines[at])  # malformed value lines must not become accepted extension text
+        values.append(lines[at])
+        at += 1
+    if not values:
+        raise ValueError("empty values section")
+    return values, lines[at:]
 
 
 def shown(r):
@@ -1212,7 +1297,8 @@ def cmd_values(a):
 def cmd_iac(a):
     """A7 IaC nodes (#649, and #653 for CloudFormation): the oracle's nodes and references against `search` kind `iac`,
     `context` and `trace` both ways over stdio (and HTTP with `--http`); the base answers the
-    default search, `meada status` and the export, which the change leaves alone."""
+    default search, existing annotations/contract roles, `meada status` and every export field.
+    Provision/orphan flows separately assert new semantics against their source/spec keys."""
     sys.dont_write_bytecode = True  # no __pycache__ left in the skill's folder
     import cfn_oracle as cfn  # needs PyYAML: see SKILL.md's Gotchas
     import tf_oracle as tf  # needs python-hcl2: see SKILL.md's Gotchas
@@ -1264,13 +1350,7 @@ def cmd_iac(a):
                       f"{len(references)} references; unreadable: {[f for f, _ in unreadable]}")
         same = body((run / "base" / name / "export1.json").read_bytes()) == body((run / "head" / name / "export1.json").read_bytes())
         differences += not same
-        report.append(f"meada export: {'byte-equal to base (no IaC node in it)' if same else 'DIFFERS from base'}")
-        # #653: a `NoEcho` parameter's default is redacted, so the config line's count rises by the
-        # oracle's count of them; every other line, and the rest of that one, equals the base's.
-        extra = cfn.redacted_defaults(src)
-        want_status = re.sub(r"redacted: (\d+)", lambda m: f"redacted: {int(m[1]) + extra}", b["status"]) if extra else b["status"]
-        differences += h["status"] != want_status
-        report.append(f"meada status: {'equal to base' if h['status'] == b['status'] else 'equal to base but for ' + str(extra) + ' redacted NoEcho default(s)' if h['status'] == want_status else 'DIFFERS from base'}")
+        report.append(f"meada export: {'byte-equal to base, every optional field retained' if same else 'DIFFERS from base'}")
         # The sample: nodes with references both ways first, then the rest, spread over the list.
         linked = {r[1] for r in references} & {r[2] for r in references}
         ordered = sorted(nodes, key=lambda n: (n["address"] not in linked, n["path"], n["line"], n["address"], n["root"]))
@@ -1293,6 +1373,18 @@ def cmd_iac(a):
                 queries.append({"tool": "trace", "label": f"trace {d}", "node": n, "arguments": {"from": passed, "direction": d, "budget": 200000}})
         for t in sorted({n["type"] for n in nodes})[:3]:
             search("type", t, kind="iac", budget=200000)
+        # A base may already implement #653. Probe each actual private key rather than adding
+        # its defaults to the redacted count a second time. The head must independently redact.
+        config_rows, private_rows = [], []
+        for rel, _, source in cfn.templates(src, []):
+            outcome = read_config(src, rel)
+            if outcome[0] == "read":
+                config_rows.extend(outcome[1])
+                private = cfn_private_keys(source)
+                private_rows.extend(r for r in outcome[1] if r["key"] in private)
+        for row in private_rows:
+            queries.append({"tool": "search", "label": "NoEcho default", "private": row,
+                            "arguments": {"query": row["key"], "kind": "value", "budget": 200000}})
         shared = sorted(k for k, c in counts.items() if c > 1)[:2]
         for addr in shared:
             queries.append({"tool": "context", "label": "several", "arguments": {"symbol": addr, "budget": 200000}})
@@ -1316,12 +1408,31 @@ def cmd_iac(a):
             continue
         h["queries"] = wire
         (run / "head" / name / "iac.json").write_text(json.dumps({"queries": wire, "answers": h["answers"], "seconds": secs}, indent=1, ensure_ascii=False))
+        extra = 0
+        for q, base_answer in zip(queries, b["answers"]):
+            if q["label"] != "NoEcho default":
+                continue
+            row, redacted = q["private"], False
+            for line in base_answer.splitlines():
+                try:
+                    repo, path, _, key, value = parse_hit(line)
+                except ValueError:
+                    continue
+                redacted |= (repo, path, key, value) == (identity, row["path"], row["key"], "redacted")
+            extra += not redacted
+        want_status = re.sub(r"redacted: (\d+)", lambda m: f"redacted: {int(m[1]) + extra}", b["status"]) if extra else b["status"]
+        status_same = h["status"] == want_status
+        differences += not status_same
+        report.append(f"meada status: {'equal to base' if status_same and not extra else 'equal to base plus ' + str(extra) + ' source-verified NoEcho defaults' if status_same else 'DIFFERS from base/source NoEcho key'}")
         lines, fails = [], 0
         for i, q in enumerate(queries):
             got, args, label = h["answers"][i], q["arguments"], q["label"]
             problems = []
-            if q["tool"] == "search" and args.get("kind") == "iac":
+            if label == "NoEcho default":
+                problems = check_value_answer(identity, config_rows, args["query"], got)
+            elif q["tool"] == "search" and args.get("kind") == "iac":
                 hits = tf.search_hits(identity, nodes, args["query"])
+                hits = iac_existing_suffixes(hits, b["answers"][i])
                 want = "".join(l + "\n" for l in hits) if hits else f"no matches for `{args['query']}`\n"
                 if unsure:
                     got = drop(got) or f"no matches for `{args['query']}`\n"
@@ -1340,14 +1451,7 @@ def cmd_iac(a):
                     problems.append(f"not a list of {counts[args['symbol']]} nodes: {got[:200]}")
             elif q["tool"] == "context":
                 want = tf.context_lines(identity, nodes, references, q["node"])
-                got_lines = got.splitlines()
-                head_part = got_lines[:len(want)]
-                if head_part != want:
-                    problems.append("differs from the oracle:\n" + "\n".join(difflib.unified_diff(want, head_part, "oracle", "head", lineterm="", n=1)))
-                rest = got_lines[len(want):]
-                values_ok = rest == ["values: none"] or (rest[:1] == ["values:"] and all(l.startswith(f"{identity} {q['node']['path']}:") for l in rest[1:]))
-                if not values_ok:
-                    problems.append(f"values section not of the node's file: {rest[:3]}")
+                problems = check_iac_context(identity, q["node"]["path"], want, got, b["answers"][i])
             elif q["tool"] == "trace":
                 want = tf.trace_lines(identity, nodes, references, q["node"], args["direction"] == "down")
                 got_lines = got.splitlines()

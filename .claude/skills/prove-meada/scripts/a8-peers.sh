@@ -330,15 +330,12 @@ links_of() { # <export> <fn>
     | "\(.provider | split("::")[0]) \(.level) \(.reason // "")"] | unique[]' "$1"
 }
 
-# The export without the checkout facts and without the consumers, links and processes of the given
-# functions (the landed cases, which answer to the spec, not to the base).
-rest() { # <export> <fn,fn,...>
-  jq -S --arg fns "$2" '($fns | split(",")) as $skip
-    | def mine(s): (s | split("::")[2]) as $f | $skip | index($f) != null;
-    del(.commit, .dirty)
-    | .consumers |= map(select(mine(.site) | not))
-    | .links |= map(select(mine(.consumer) | not))
-    | .processes |= map(select(mine(.entry_point) | not))' "$1"
+expected_export() { # <base export> <workspace> <run>
+  jq -S --arg workspace "$2" --rawfile cases "$3/cases.tsv" \
+    --slurpfile template "$3/base/g8/export.json" \
+    --slurpfile environment "$3/base/g9/export.json" \
+    --slurpfile proxy "$3/base/g10d/export.json" \
+    -f "$HERE/a8-expected.jq" "$1"
 }
 
 check() { # <base bin> <head bin> <run>
@@ -352,12 +349,18 @@ check() { # <base bin> <head bin> <run>
   [ ! -e "$run/base" ] && [ ! -e "$run/head" ] || die "$run already holds base/ or head/: use a new run folder"
   gen "$run/base"; gen "$run/head"
   index_all "$base" "$run/base"; index_all "$head" "$run/head"
+  { echo "base: $("$base" --version) ($base)"; echo "head: $("$head" --version) ($head)"; } > "$run/instances.txt"
+  compare_exports "$run"
+}
+
+compare_exports() { # <run holding base/ and head/ exports>
+  run=$1
   out=$run/peers.md diffs=0 pending=0
   {
     echo "# A8 peer workspaces"
     echo
-    echo "base: $("$base" --version) ($base)"
-    echo "head: $("$head" --version) ($head)"
+    if [ -f "$run/instances.txt" ]; then cat "$run/instances.txt";
+    else echo "Recorded CLI exports; binary provenance is in the caller's run manifest."; fi
     echo
     echo "| Result | Workspace | Case | Consumer | Field | Answer key | Base | Head | 1.2.0 | Links (head) |"
     echo "|---|---|---|---|---|---|---|---|---|---|"
@@ -398,22 +401,25 @@ check() { # <base bin> <head bin> <run>
   done < "$run/cases.tsv"
   {
     echo
-    echo "## Everything else against the base"
+    echo "## Complete exports against the base and specified resolutions"
     echo
-    echo "Each export without \`commit\`, \`dirty\` and the consumers, links and processes of the landed cases"
-    echo "(those answer to the spec above); the controls and pending cases stay in."
+    echo "Only \`commit\` and \`dirty\` are omitted. Landed contract/origin changes use #683;"
+    echo "their full links copy the base inline controls, and only their terminal process calls change."
+    echo "Every other field, location, row and process attribute stays in the comparison."
     echo
   } >> "$out"
   for w in $(workspaces); do
-    skip=$(awk -F"$tab" -v w="$w" '$1 == w && $5 == "landed" { printf "%s%s", s, $2; s = "," }' "$run/cases.tsv")
-    rest "$run/base/$w/export.json" "$skip" > "$run/base/$w/rest.json" || die "jq failed on base/$w"
-    rest "$run/head/$w/export.json" "$skip" > "$run/head/$w/rest.json" || die "jq failed on head/$w"
-    if cmp -s "$run/base/$w/rest.json" "$run/head/$w/rest.json"; then
-      echo "- $w: equal to base" >> "$out"
+    expected_export "$run/base/$w/export.json" "$w" "$run" > "$run/base/$w/expected.json" \
+      || die "could not derive specified export for $w"
+    jq -S 'del(.commit, .dirty)' "$run/head/$w/export.json" > "$run/head/$w/actual.json" \
+      || die "jq failed on head/$w"
+    if cmp -s "$run/base/$w/expected.json" "$run/head/$w/actual.json"; then
+      echo "- $w: complete export matches base plus specified resolutions" >> "$out"
     else
       diffs=$((diffs + 1))
-      { echo "- $w: DIFFERS from base"; echo; echo '```diff'
-        diff -u "$run/base/$w/rest.json" "$run/head/$w/rest.json" | head -60 || true
+      diff -u "$run/base/$w/expected.json" "$run/head/$w/actual.json" > "$run/$w-export.diff" || true
+      { echo "- $w: DIFFERS from base plus specified resolutions"; echo; echo '```diff'
+        head -60 "$run/$w-export.diff"
         echo '```'; } >> "$out"
     fi
   done
@@ -424,5 +430,6 @@ check() { # <base bin> <head bin> <run>
 case ${1:-} in
   gen) [ $# -eq 2 ] || die "usage: a8-peers.sh gen DIR"; gen "$2" ;;
   check) [ $# -eq 4 ] || die "usage: a8-peers.sh check BASE_BIN HEAD_BIN RUN"; check "$2" "$3" "$4" ;;
-  *) die "usage: a8-peers.sh gen DIR | check BASE_BIN HEAD_BIN RUN" ;;
+  compare) [ $# -eq 2 ] || die "usage: a8-peers.sh compare RUN"; compare_exports "$2" ;;
+  *) die "usage: a8-peers.sh gen DIR | check BASE_BIN HEAD_BIN RUN | compare RUN" ;;
 esac
