@@ -1,17 +1,33 @@
 //! Azure identity policy shared by config, IaC, environment and SDK readers (#669).
 //! A namespace/account selector is discarded only after validating the whole resource shape.
 
+use std::sync::LazyLock;
+
 /// Bound splitting and validation before allocating resource-name components.
 // ponytail: ARM identifiers fit within 1 KiB; longer source strings remain unresolved.
 const AZURE_IDENTIFIER_MAX: usize = 1024;
+// ponytail: Azure resource group selectors contain at most 90 Unicode characters.
+const RESOURCE_GROUP_NAME_MAX: usize = 90;
 // ponytail: Azure's queue/topic name ceiling, before projection.
 const SERVICEBUS_ENTITY_MAX: usize = 260;
 // ponytail: a subscription is a single topic-scoped Azure name of at most 50 characters.
 const SERVICEBUS_SUBSCRIPTION_MAX: usize = 50;
 // ponytail: Azure Event Hub entity names are at most 256 characters.
 const EVENTHUB_NAME_MAX: usize = 256;
+// ponytail: Azure storage account names have at least three characters.
+const STORAGE_ACCOUNT_NAME_MIN: usize = 3;
+// ponytail: Azure storage account names have at most 24 characters.
+const STORAGE_ACCOUNT_NAME_MAX: usize = 24;
+// ponytail: Azure blob container names have at least three characters.
+const BLOB_CONTAINER_NAME_MIN: usize = 3;
+// ponytail: Azure blob container names have at most 63 characters.
+const BLOB_CONTAINER_NAME_MAX: usize = 63;
 // ponytail: Azure Key Vault secret names are at most 127 characters.
 const KEYVAULT_SECRET_MAX: usize = 127;
+
+// The platform permits these Unicode categories, rather than every Unicode numeric character.
+static RESOURCE_GROUP_NAME: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"\A[\p{L}\p{Nd}_().-]+\z").unwrap());
 
 fn bounded(text: &str) -> bool {
     !text.is_empty() && text.len() <= AZURE_IDENTIFIER_MAX
@@ -27,6 +43,13 @@ fn entity(text: &str, slash: bool) -> bool {
             .all(|p| !p.is_empty() && p != "." && p != "..")
 }
 
+fn resource_group(text: &str) -> bool {
+    !text.is_empty()
+        && text.chars().count() <= RESOURCE_GROUP_NAME_MAX
+        && !text.ends_with('.')
+        && RESOURCE_GROUP_NAME.is_match(text)
+}
+
 fn arm(text: &str) -> Option<(&str, Vec<&str>)> {
     if !bounded(text) {
         return None;
@@ -37,7 +60,7 @@ fn arm(text: &str) -> Option<(&str, Vec<&str>)> {
         || !parts[2].eq_ignore_ascii_case("resourceGroups")
         || !parts[4].eq_ignore_ascii_case("providers")
         || !entity(parts[1], false)
-        || !entity(parts[3], false)
+        || !resource_group(parts[3])
         || parts.iter().any(|p| p.is_empty())
     {
         return None;
@@ -132,7 +155,7 @@ pub(crate) fn account(text: &str) -> Option<String> {
     } else {
         text.into()
     };
-    ((3..=24).contains(&name.len())
+    ((STORAGE_ACCOUNT_NAME_MIN..=STORAGE_ACCOUNT_NAME_MAX).contains(&name.len())
         && name
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit()))
@@ -178,7 +201,7 @@ pub(crate) fn container(text: &str) -> Option<String> {
     } else {
         text.to_string()
     };
-    ((3..=63).contains(&name.len())
+    ((BLOB_CONTAINER_NAME_MIN..=BLOB_CONTAINER_NAME_MAX).contains(&name.len())
         && name
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
@@ -332,6 +355,14 @@ mod tests {
         );
         assert!(eventhub(&"h".repeat(EVENTHUB_NAME_MAX)).is_some());
         assert!(eventhub(&"h".repeat(EVENTHUB_NAME_MAX + 1)).is_none());
+        assert!(account("aa").is_none());
+        assert!(account("aaa").is_some());
+        assert!(account(&"a".repeat(24)).is_some());
+        assert!(account(&"a".repeat(25)).is_none());
+        assert!(container("aa").is_none());
+        assert!(container("aaa").is_some());
+        assert!(container(&"a".repeat(63)).is_some());
+        assert!(container(&"a".repeat(64)).is_none());
         assert!(secret(&"k".repeat(KEYVAULT_SECRET_MAX)).is_some());
         assert!(secret(&"k".repeat(KEYVAULT_SECRET_MAX + 1)).is_none());
     }
@@ -345,5 +376,25 @@ mod tests {
             pattern("azurerm_servicebus_subscription", "audit-*"),
             Some("audit-*".into())
         );
+    }
+
+    #[test]
+    fn resource_group_selectors_accept_only_the_platform_unicode_categories() {
+        assert!(resource_group("rg(prod)"));
+        assert!(resource_group("équipe_部署-١"));
+        assert!(resource_group(&"界".repeat(90)));
+        assert!(!resource_group(&"界".repeat(91)));
+        for invalid in [
+            "",
+            "rg.",
+            "rg#prod",
+            "rg prod",
+            "rg²",
+            "rgⅣ",
+            "rge\u{301}",
+            "rg😀",
+        ] {
+            assert!(!resource_group(invalid), "{invalid}");
+        }
     }
 }

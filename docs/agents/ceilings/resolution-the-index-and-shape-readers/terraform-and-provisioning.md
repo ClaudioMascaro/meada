@@ -6,7 +6,14 @@
   root evaluation/work/storage and workload environment budgets; archives are never opened.
   The platform name ceilings `SERVICEBUS_ENTITY_MAX` (260), `SERVICEBUS_SUBSCRIPTION_MAX`
   (50), `EVENTHUB_NAME_MAX` (256) and `KEYVAULT_SECRET_MAX` (127) reject invalid names before
-  they can become exact targets.
+  they can become exact targets. `STORAGE_ACCOUNT_NAME_MIN` (3) and
+  `STORAGE_ACCOUNT_NAME_MAX` (24), and `BLOB_CONTAINER_NAME_MIN` (3) and
+  `BLOB_CONTAINER_NAME_MAX` (63), enforce the platform's storage name lengths. Boundary tests
+  include each maximum and one character past it, and each minimum and one character below it.
+  `RESOURCE_GROUP_NAME_MAX` (90 Unicode characters, not UTF-8 bytes) follows Azure's
+  [resource group naming rules](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftresources):
+  Unicode letter and decimal-digit categories plus `_-.()`, with no trailing period. Other
+  selectors keep their own policy; invalid group selectors leave the ARM use unresolved.
 
 - `iac.rs` (#649, ADR 0025): `EXPANSION_MAX` (1,000 instances of one `count` or `for_each`; past it,
   or over anything that does not resolve to a whole number, an object or a list of strings, the

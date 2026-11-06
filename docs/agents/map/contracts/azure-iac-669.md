@@ -7,6 +7,8 @@ evaluation, AsyncAPI and later Azure SDK forms. Account `azurestorage` and conta
 the colon cannot collide with a legal queue/topic name. Preserve slash-bearing queue names.
 The helper caps identifier text before splitting or allocating components, and rejects
 wrong providers/types, missing segments, unsupported suffixes and internal-marker input.
+Resource group selectors accept the platform's Unicode letter/decimal-digit categories and
+punctuation separately from namespace/entity names; their length counts characters, not bytes.
 
 `iac/azure.rs` projects provider names independently from physical `Node.name`, composes
 subscription names through known topic references under the existing evaluator budgets,

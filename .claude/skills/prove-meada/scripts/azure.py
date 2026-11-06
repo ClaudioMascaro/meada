@@ -23,7 +23,7 @@ def main():
     run.mkdir(parents=True, exist_ok=False)
     os.environ['TASK_QUEUE'] = 'process-environment-must-not-resolve'
     infra, app = run / 'work/infra', run / 'work/app'
-    prefix = '/subscriptions/deployment/resourceGroups/team/providers/'
+    prefix = '/subscriptions/deployment/resourceGroups/team(prod)/providers/'
     cases = [
         ('azurerm_servicebus_queue', 'parcel', 'channel::servicebus::parcel', 'servicebus_queue', prefix+'Microsoft.ServiceBus/namespaces/bus/queues/parcel'),
         ('azurerm_servicebus_topic', 'changes', 'channel::servicebus::changes', 'servicebus_topic', prefix+'Microsoft.ServiceBus/namespaces/bus/topics/changes'),

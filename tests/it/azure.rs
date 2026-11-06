@@ -100,6 +100,67 @@ fn azure_identifiers_provision_their_exact_kind_and_typed_keys_stay_inferred() {
 }
 
 #[test]
+fn arm_resource_groups_keep_valid_unicode_selectors_and_reject_invalid_ones() {
+    let (_, app) = workspace("azure_resource_group_selectors");
+    let arm = |group: &str| {
+        format!(
+            "/subscriptions/deployment/resourceGroups/{group}/providers/Microsoft.ServiceBus/namespaces/bus/queues/orders"
+        )
+    };
+    let mut settings = String::new();
+    for (key, group) in [
+        ("normal", "rgplain".to_string()),
+        ("parentheses", "rg(prod)".to_string()),
+        ("unicode", "équipe_部署-١".to_string()),
+        ("maximum", "界".repeat(90)),
+        ("over_maximum", "界".repeat(91)),
+        ("bad_group", "rg#prod".to_string()),
+        ("bad_ending", "rg.".to_string()),
+        ("bad_category", "rg²".to_string()),
+        ("bad_combining", "rge\u{301}".to_string()),
+    ] {
+        settings.push_str(&format!(
+            "{key}: {}\n",
+            serde_json::to_string(&arm(&group)).unwrap()
+        ));
+    }
+    settings.push_str(&format!(
+        "bad_namespace: {}\nbad_entity: {}\n",
+        serde_json::to_string(&arm("rg(prod)").replace("namespaces/bus/", "namespaces/ns:bad/"))
+            .unwrap(),
+        serde_json::to_string(&arm("rg(prod)").replace("queues/orders", "queues/or:ders")).unwrap()
+    ));
+    std::fs::write(app.join("settings.yaml"), settings).unwrap();
+    let text = Engine::open(&app).unwrap().export().unwrap();
+    let data: Value = serde_json::from_str(&text).unwrap();
+    let uses = data["uses"].as_array().unwrap();
+    let mut actual = uses
+        .iter()
+        .map(|item| {
+            assert_eq!(item["contract"], "channel::servicebus::orders");
+            item["at"].as_str().unwrap()
+        })
+        .collect::<Vec<_>>();
+    actual.sort();
+    assert_eq!(
+        actual,
+        [
+            "settings.yaml#maximum",
+            "settings.yaml#normal",
+            "settings.yaml#parentheses",
+            "settings.yaml#unicode"
+        ],
+        "{text}"
+    );
+    let provisions = data["provisions"].as_array().unwrap();
+    assert_eq!(provisions.len(), 4, "{text}");
+    assert!(
+        provisions.iter().all(|link| link["level"] == "exact"),
+        "{text}"
+    );
+}
+
+#[test]
 fn servicebus_subscriptions_keep_topic_identity_filters_and_slash_queues_separate() {
     let (infra, app) = workspace("azure_routes");
     std::fs::write(
